@@ -21,12 +21,12 @@
 use nidx_paragraph::ParagraphSearchRequest;
 use nidx_protos::filter_expression::Expr;
 use nidx_protos::{FilterExpression, FilterOperator, RelationSearchRequest, SearchRequest};
-use nidx_text::prefilter::*;
 use nidx_text::DocumentSearchRequest;
+use nidx_text::prefilter::*;
 use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
-use nidx_vector::VectorSearchRequest;
 use nidx_vector::SEGMENT_TAGS;
+use nidx_vector::VectorSearchRequest;
 
 use super::query_language::extract_label_filters;
 

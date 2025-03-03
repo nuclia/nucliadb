@@ -26,9 +26,8 @@ use nidx_vector::config::VectorConfig;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use sqlx::{
-    self,
-    types::{time::PrimitiveDateTime, JsonValue},
-    Executor, Postgres,
+    self, Executor, Postgres,
+    types::{JsonValue, time::PrimitiveDateTime},
 };
 use uuid::Uuid;
 
@@ -326,8 +325,8 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        metadata::{Index, IndexConfig, Shard},
         NidxMetadata,
+        metadata::{Index, IndexConfig, Shard},
     };
 
     #[sqlx::test]

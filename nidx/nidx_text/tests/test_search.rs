@@ -27,10 +27,10 @@ use nidx_protos::filter_expression::{
     DateRangeFilter, Expr, FacetFilter, FieldFilter, FilterExpressionList, KeywordFilter, ResourceFilter,
 };
 use nidx_protos::prost_types::Timestamp;
-use nidx_protos::{order_by::OrderField, order_by::OrderType, OrderBy};
 use nidx_protos::{Faceted, FilterExpression};
+use nidx_protos::{OrderBy, order_by::OrderField, order_by::OrderType};
 use nidx_text::TextSearcher;
-use nidx_text::{prefilter::*, DocumentSearchRequest};
+use nidx_text::{DocumentSearchRequest, prefilter::*};
 use nidx_types::prefilter::PrefilterResult;
 
 #[test]

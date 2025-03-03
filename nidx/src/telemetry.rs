@@ -35,14 +35,14 @@ use log_format::StructuredFormat;
 use opentelemetry::global::get_text_map_propagator;
 use opentelemetry::propagation::Extractor;
 use opentelemetry::trace::TraceContextExt;
-use opentelemetry::{trace::TracerProvider as _, KeyValue};
+use opentelemetry::{KeyValue, trace::TracerProvider as _};
 use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_sdk::{trace::TracerProvider, Resource};
+use opentelemetry_sdk::{Resource, trace::TracerProvider};
 use tracing::{Level, Metadata};
 use tracing_core::LevelFilter;
 use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 use tracing_subscriber::layer::Filter;
-use tracing_subscriber::{filter::FilterFn, fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, filter::FilterFn, fmt, prelude::*};
 
 struct SwappableLogLevelFilter(ArcSwap<EnvFilter>);
 

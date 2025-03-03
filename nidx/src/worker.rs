@@ -37,13 +37,13 @@ use tokio_util::sync::CancellationToken;
 use tracing::*;
 
 use crate::{
+    NidxMetadata, Settings,
     metadata::{Deletion, Index, IndexKind, MergeJob, NewSegment, Segment},
     metrics::{
-        worker::{MERGE_COUNTER, PER_INDEX_MERGE_TIME},
         IndexKindLabels, OperationStatusLabels,
+        worker::{MERGE_COUNTER, PER_INDEX_MERGE_TIME},
     },
     segment_store::{download_segment, pack_and_upload},
-    NidxMetadata, Settings,
 };
 
 pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {

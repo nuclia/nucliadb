@@ -23,7 +23,7 @@ mod common;
 use common::services::NidxFixture;
 use nidx_protos::filter_expression::{Expr, FieldFilter, FilterExpressionList, KeywordFilter, ResourceFilter};
 use nidx_protos::prost_types::Timestamp;
-use nidx_protos::{nodereader, noderesources, FilterExpression};
+use nidx_protos::{FilterExpression, nodereader, noderesources};
 use nidx_protos::{NewShardRequest, VectorIndexConfig};
 use sqlx::PgPool;
 use std::collections::HashMap;

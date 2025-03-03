@@ -36,8 +36,8 @@ use tokio_util::{compat::FuturesAsyncReadCompatExt, io::SyncIoBridge};
 use uuid::Uuid;
 
 use crate::{
-    metadata::{Index, IndexId, Segment},
     NidxMetadata,
+    metadata::{Index, IndexId, Segment},
 };
 
 /// Some metadata summary that is useful during import
@@ -252,9 +252,9 @@ mod tests {
     use nidx_vector::config::VectorConfig;
     use nidx_vector::config::VectorType;
     use object_store::ObjectStore;
+    use sqlx::Postgres;
     use sqlx::testing::TestArgs;
     use sqlx::testing::TestSupport;
-    use sqlx::Postgres;
     use tempfile::NamedTempFile;
     use uuid::Uuid;
 
@@ -263,8 +263,8 @@ mod tests {
     use crate::indexer::index_resource;
     use crate::metadata::Segment;
     use crate::{
-        metadata::{Index, IndexConfig, Shard},
         NidxMetadata,
+        metadata::{Index, IndexConfig, Shard},
     };
 
     const VECTOR_CONFIG: VectorConfig = VectorConfig {

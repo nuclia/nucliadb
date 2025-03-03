@@ -25,12 +25,12 @@ mod resource_indexer;
 mod schema;
 
 use nidx_protos::{
-    relation_node::NodeType, relation_prefix_search_request::Search, resource::ResourceStatus, RelationNode,
-    RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse,
+    RelationNode, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse,
+    relation_node::NodeType, relation_prefix_search_request::Search, resource::ResourceStatus,
 };
 use nidx_tantivy::{
-    index_reader::{open_index_with_deletions, DeletionQueryBuilder},
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
+    index_reader::{DeletionQueryBuilder, open_index_with_deletions},
 };
 use nidx_types::OpenIndexMetadata;
 use reader::{HashedRelationNode, RelationsReaderService};
@@ -38,11 +38,11 @@ use resource_indexer::index_relations;
 pub use schema::Schema as RelationSchema;
 use std::{collections::HashSet, path::Path};
 use tantivy::{
+    Term,
     directory::MmapDirectory,
     indexer::merge_indices,
     query::{Query, TermSetQuery},
     schema::Field,
-    Term,
 };
 use tracing::instrument;
 

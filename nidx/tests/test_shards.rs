@@ -24,10 +24,10 @@ use std::collections::HashMap;
 
 use common::services::NidxFixture;
 use nidx_protos::{
-    nidx::nidx_api_client::NidxApiClient, EmptyQuery, GetShardRequest, NewShardRequest, ShardId, VectorIndexConfig,
+    EmptyQuery, GetShardRequest, NewShardRequest, ShardId, VectorIndexConfig, nidx::nidx_api_client::NidxApiClient,
 };
 use sqlx::PgPool;
-use tonic::{transport::Channel, Code, Request};
+use tonic::{Code, Request, transport::Channel};
 use uuid::Uuid;
 
 #[sqlx::test]

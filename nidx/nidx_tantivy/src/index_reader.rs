@@ -26,11 +26,11 @@ use std::{
 
 use nidx_types::{OpenIndexMetadata, Seq};
 use tantivy::{
-    directory::{error::OpenReadError, MmapDirectory, RamDirectory},
+    Directory, Index, IndexMeta, IndexSettings, SegmentId, SegmentReader,
+    directory::{MmapDirectory, RamDirectory, error::OpenReadError},
     fastfield::write_alive_bitset,
     query::Query,
     schema::Schema,
-    Directory, Index, IndexMeta, IndexSettings, SegmentId, SegmentReader,
 };
 use tantivy_common::{BitSet, TerminatingWrite as _};
 
@@ -217,8 +217,8 @@ mod tests {
     use crate::TantivySegmentMetadata;
     use serde_json::Value;
     use tantivy::{
-        schema::{NumericOptions, Schema},
         Directory, SegmentId,
+        schema::{NumericOptions, Schema},
     };
     use tantivy_common::TerminatingWrite;
     use tempfile::tempdir;

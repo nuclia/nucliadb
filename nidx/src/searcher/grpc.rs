@@ -26,10 +26,10 @@ use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
 use nidx_protos::nidx::nidx_searcher_server::{NidxSearcher, NidxSearcherServer};
 use nidx_protos::*;
 use tokio::sync::RwLock;
-use tonic::service::interceptor::InterceptedService;
 use tonic::service::Interceptor;
+use tonic::service::interceptor::InterceptedService;
 use tonic::transport::Channel;
-use tonic::{service::Routes, Request, Response, Result, Status};
+use tonic::{Request, Response, Result, Status, service::Routes};
 
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::shard_selector::SearcherNode;

@@ -24,8 +24,8 @@ use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
 use crate::request_types::VectorSearchRequest;
 use crate::utils;
-use crate::{formula::*, query_io};
 use crate::{VectorErr, VectorR};
+use crate::{formula::*, query_io};
 use nidx_protos::prost::*;
 use nidx_protos::{DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchResponse};
 use nidx_types::prefilter::PrefilterResult;
@@ -277,7 +277,7 @@ mod tests {
     use super::*;
     use crate::config::{Similarity, VectorConfig, VectorType};
     use crate::data_point;
-    use crate::indexer::{index_resource, ResourceWrapper};
+    use crate::indexer::{ResourceWrapper, index_resource};
 
     #[test]
     fn test_key_prefix_search() -> anyhow::Result<()> {

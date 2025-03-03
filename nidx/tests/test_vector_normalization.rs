@@ -26,9 +26,9 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use uuid::Uuid;
 
-use nidx_protos::prost_types::Timestamp;
 use nidx_protos::NewShardRequest;
 use nidx_protos::VectorIndexConfig;
+use nidx_protos::prost_types::Timestamp;
 use nidx_protos::{nodereader, noderesources};
 
 use tonic::Request;

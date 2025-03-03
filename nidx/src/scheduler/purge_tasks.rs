@@ -24,7 +24,7 @@ use futures::StreamExt;
 use object_store::DynObjectStore;
 use tracing::*;
 
-use crate::{metadata::Segment, NidxMetadata};
+use crate::{NidxMetadata, metadata::Segment};
 
 /// Purge segments that have not been ready for a while:
 /// - Uploads that failed

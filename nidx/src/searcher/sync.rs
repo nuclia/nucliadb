@@ -22,7 +22,7 @@ use crate::metadata::{Index, IndexId, IndexKind, SegmentId, Shard};
 use crate::metrics;
 use crate::metrics::searcher::{ACTIVE_SHARDS, DESIRED_SHARDS, EVICTED_SHARDS};
 use crate::settings::SearcherSettings;
-use crate::{segment_store::download_segment, NidxMetadata};
+use crate::{NidxMetadata, segment_store::download_segment};
 use anyhow::anyhow;
 use nidx_types::Seq;
 use object_store::DynObjectStore;
@@ -36,8 +36,8 @@ use std::{
 };
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::Receiver;
-use tokio::sync::{mpsc::Sender, OwnedRwLockReadGuard, RwLock, RwLockReadGuard};
-use tokio::sync::{watch, Semaphore};
+use tokio::sync::{OwnedRwLockReadGuard, RwLock, RwLockReadGuard, mpsc::Sender};
+use tokio::sync::{Semaphore, watch};
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::*;
@@ -593,10 +593,10 @@ mod tests {
     use tempfile::tempdir;
 
     use crate::{
+        NidxMetadata,
         metadata::{Deletion, Index, Segment, SegmentId, Shard},
         scheduler::purge_deletions,
-        searcher::sync::{sync_index, Operations, SyncMetadata},
-        NidxMetadata,
+        searcher::sync::{Operations, SyncMetadata, sync_index},
     };
 
     const VECTOR_CONFIG: VectorConfig = VectorConfig {

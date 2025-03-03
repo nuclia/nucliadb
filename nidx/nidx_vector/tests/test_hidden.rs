@@ -20,9 +20,9 @@
 
 mod common;
 
-use common::{resource, TestOpener};
+use common::{TestOpener, resource};
 use nidx_types::{prefilter::PrefilterResult, query_language::BooleanExpression};
-use nidx_vector::{config::VectorConfig, VectorIndexer, VectorSearchRequest, VectorSearcher};
+use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher, config::VectorConfig};
 use std::collections::HashSet;
 use tempfile::tempdir;
 

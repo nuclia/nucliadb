@@ -23,8 +23,8 @@ use nidx_protos::VectorIndexConfig;
 use nidx_protos::{VectorSimilarity, VectorType as ProtoVectorType};
 use serde::{Deserialize, Serialize};
 
-use crate::vector_types::*;
 use crate::VectorErr;
+use crate::vector_types::*;
 
 #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Similarity {

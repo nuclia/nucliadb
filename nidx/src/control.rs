@@ -28,7 +28,7 @@ use tokio::{
 };
 use tracing::*;
 
-use crate::{metrics, settings::EnvSettings, telemetry, NidxMetadata};
+use crate::{NidxMetadata, metrics, settings::EnvSettings, telemetry};
 
 #[derive(Debug, Serialize, Deserialize, clap::Subcommand)]
 pub enum ControlRequest {

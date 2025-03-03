@@ -26,11 +26,11 @@ mod purge_tasks;
 mod vector_merge;
 
 use crate::{
-    metadata::{IndexRequest, MergeJob},
     NidxMetadata, Settings,
+    metadata::{IndexRequest, MergeJob},
 };
 use async_nats::jetstream::consumer::PullConsumer;
-use audit_task::{audit_kb_storage, NatsSendReport};
+use audit_task::{NatsSendReport, audit_kb_storage};
 use merge_task::MergeScheduler;
 use metrics_task::update_merge_job_metric;
 use nidx_types::Seq;
@@ -245,9 +245,9 @@ pub async fn retry_jobs(meta: &NidxMetadata) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use crate::{
+        NidxMetadata,
         metadata::IndexRequest,
         scheduler::{GetAckFloor, PgAckFloor},
-        NidxMetadata,
     };
 
     #[sqlx::test]

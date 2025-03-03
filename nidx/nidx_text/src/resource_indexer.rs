@@ -22,7 +22,7 @@ use anyhow::anyhow;
 use nidx_tantivy::TantivyIndexer;
 use tantivy::{doc, schema::Facet};
 
-use crate::schema::{encode_field_id, timestamp_to_datetime_utc, TextSchema};
+use crate::schema::{TextSchema, encode_field_id, timestamp_to_datetime_utc};
 
 pub fn index_document(
     writer: &mut TantivyIndexer,

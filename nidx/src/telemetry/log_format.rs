@@ -54,9 +54,9 @@ use tracing_opentelemetry::OtelData;
 use tracing_serde::AsSerde;
 use tracing_subscriber::{
     fmt::{
+        FmtContext, FormatEvent, FormatFields,
         format::Writer,
         time::{FormatTime, SystemTime},
-        FmtContext, FormatEvent, FormatFields,
     },
     registry::LookupSpan,
 };

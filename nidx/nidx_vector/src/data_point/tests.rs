@@ -23,10 +23,10 @@ use std::time::Instant;
 
 use tempfile::tempdir;
 
+use crate::VectorR;
 use crate::config::{Similarity, VectorConfig};
 use crate::data_point::{self, Elem, LabelDictionary};
 use crate::formula::{AtomClause, Clause, Formula};
-use crate::VectorR;
 
 const CONFIG: VectorConfig = VectorConfig {
     similarity: Similarity::Cosine,

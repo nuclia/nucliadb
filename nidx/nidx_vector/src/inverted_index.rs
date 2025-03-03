@@ -26,10 +26,10 @@ use map::{InvertedMapReader, InvertedMapWriter};
 use tracing::warn;
 
 use crate::{
+    VectorR,
     data_point::node::Node,
     data_types::data_store::{self},
     formula::{BooleanOperator, Clause, Formula},
-    VectorR,
 };
 
 mod fst_index;

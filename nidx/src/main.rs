@@ -20,13 +20,13 @@
 
 use clap::Parser;
 use nidx::{
-    api,
-    control::{control_client, ControlRequest, ControlServer},
+    Settings, api,
+    control::{ControlRequest, ControlServer, control_client},
     indexer, metrics, scheduler, searcher,
     settings::EnvSettings,
     telemetry,
-    tool::{run_tool, ToolCommand},
-    worker, Settings,
+    tool::{ToolCommand, run_tool},
+    worker,
 };
 use prometheus_client::registry::Registry;
 use sentry::IntoDsn;

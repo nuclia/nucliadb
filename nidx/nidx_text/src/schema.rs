@@ -21,8 +21,8 @@
 use std::cmp::min;
 
 use tantivy::{
-    schema::{FacetOptions, Field, NumericOptions, Schema, FAST, INDEXED, STORED, TEXT},
     DateOptions, DateTime,
+    schema::{FAST, FacetOptions, Field, INDEXED, NumericOptions, STORED, Schema, TEXT},
 };
 
 #[derive(Debug, Clone)]

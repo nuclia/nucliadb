@@ -22,8 +22,8 @@ use super::IndexId;
 use nidx_types::{SegmentMetadata, Seq};
 use serde::{Deserialize, Serialize};
 use sqlx::{
-    types::{time::PrimitiveDateTime, JsonValue},
     Executor, Postgres,
+    types::{JsonValue, time::PrimitiveDateTime},
 };
 use std::path::PathBuf;
 

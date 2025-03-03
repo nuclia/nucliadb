@@ -48,7 +48,7 @@ fn test_basic_search(
     #[values(Similarity::Dot, Similarity::Cosine)] similarity: Similarity,
     #[values(VectorType::DenseF32 { dimension: DIMENSION })] vector_type: VectorType,
 ) -> anyhow::Result<()> {
-    use common::{resource, TestOpener};
+    use common::{TestOpener, resource};
     use nidx_types::prefilter::PrefilterResult;
     use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher};
 
@@ -119,7 +119,7 @@ fn test_basic_search(
 
 #[test]
 fn test_deletions() -> anyhow::Result<()> {
-    use common::{resource, TestOpener};
+    use common::{TestOpener, resource};
     use nidx_types::prefilter::PrefilterResult;
     use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher};
 
@@ -173,7 +173,7 @@ fn test_deletions() -> anyhow::Result<()> {
 
 #[test]
 fn test_filtered_search() -> anyhow::Result<()> {
-    use common::{resource, TestOpener};
+    use common::{TestOpener, resource};
     use nidx_types::prefilter::PrefilterResult;
     use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher};
 

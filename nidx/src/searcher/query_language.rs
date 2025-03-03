@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use nidx_protos::{
-    filter_expression::{Expr, FacetFilter, FilterExpressionList},
     FilterExpression,
+    filter_expression::{Expr, FacetFilter, FilterExpressionList},
 };
 use nidx_types::query_language::*;
 

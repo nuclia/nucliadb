@@ -44,12 +44,12 @@ use std::io;
 use std::ops::Range;
 use std::sync::Arc;
 
-use levenshtein_automata::{Distance, LevenshteinAutomatonBuilder, DFA};
+use levenshtein_automata::{DFA, Distance, LevenshteinAutomatonBuilder};
 use once_cell::sync::Lazy;
+use tantivy::TantivyError::InvalidArgument;
 use tantivy::query::{BitSetDocSet, ConstScorer, EnableScoring, Explanation, Query, Scorer, Weight};
 use tantivy::schema::{Field, IndexRecordOption, Term};
 use tantivy::termdict::{TermDictionary, TermStreamer};
-use tantivy::TantivyError::InvalidArgument;
 use tantivy::{DocId, DocSet, Score, SegmentReader, TantivyError};
 use tantivy_common::BitSet;
 use tantivy_fst::Automaton;

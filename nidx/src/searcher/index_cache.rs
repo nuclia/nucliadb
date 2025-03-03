@@ -33,11 +33,11 @@ use serde::Deserialize;
 use tokio::sync::{Mutex, Semaphore};
 use uuid::Uuid;
 
+use crate::NidxMetadata;
 use crate::errors::{NidxError, NidxResult};
 use crate::metadata::{IndexId, IndexKind, Segment, SegmentId};
-use crate::metrics::searcher::INDEX_LOAD_TIME;
 use crate::metrics::IndexKindLabels;
-use crate::NidxMetadata;
+use crate::metrics::searcher::INDEX_LOAD_TIME;
 
 use super::sync::{Operations, ShardIndexes, SyncMetadata};
 
@@ -585,17 +585,17 @@ mod tests {
     mod index_cache {
         use std::{path::PathBuf, sync::Arc};
 
-        use sqlx::types::time::PrimitiveDateTime;
         use sqlx::types::JsonValue;
+        use sqlx::types::time::PrimitiveDateTime;
         use uuid::Uuid;
 
         use crate::{
+            NidxMetadata,
             metadata::Index,
             searcher::{
                 index_cache::IndexCache,
                 sync::{Operations, SyncMetadata},
             },
-            NidxMetadata,
         };
 
         #[sqlx::test]

@@ -24,15 +24,15 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use base64::engine::general_purpose::STANDARD as base64;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as base64;
 use config::{Config, Environment};
+use object_store::ClientOptions;
 use object_store::aws::AmazonS3Builder;
 use object_store::limit::LimitStore;
 use object_store::local::LocalFileSystem;
 use object_store::memory::InMemory;
-use object_store::ClientOptions;
-use object_store::{gcp::GoogleCloudStorageBuilder, DynObjectStore};
+use object_store::{DynObjectStore, gcp::GoogleCloudStorageBuilder};
 use serde::{Deserialize, Deserializer};
 
 use crate::NidxMetadata;

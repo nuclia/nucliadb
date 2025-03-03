@@ -24,9 +24,9 @@ use std::sync::Arc;
 use tantivy::{DocId, DocSet, Score, SegmentReader};
 use tantivy_common::BitSet;
 
+use tantivy::TantivyError;
 use tantivy::query::{BitSetDocSet, ConstScorer, Explanation, Query, Scorer, Weight};
 use tantivy::schema::{Field, IndexRecordOption};
-use tantivy::TantivyError;
 
 /// A Term Set Query matches all of the documents containing any of the Term provided
 #[derive(Debug, Clone)]

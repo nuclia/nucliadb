@@ -25,7 +25,7 @@ use nidx_protos::{SearchRequest, SearchResponse};
 use nidx_relation::RelationSearcher;
 use nidx_text::TextSearcher;
 use nidx_vector::VectorSearcher;
-use tracing::{instrument, Span};
+use tracing::{Span, instrument};
 
 use crate::errors::{NidxError, NidxResult};
 

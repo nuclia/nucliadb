@@ -19,7 +19,7 @@
 //
 use super::{IndexId, NidxMetadata, Segment, SegmentId};
 use nidx_types::Seq;
-use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
+use sqlx::{Executor, Postgres, types::time::PrimitiveDateTime};
 use tracing::*;
 
 #[derive(Clone)]
@@ -118,8 +118,8 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        metadata::{Index, MergeJob, Shard},
         NidxMetadata,
+        metadata::{Index, MergeJob, Shard},
     };
 
     const VECTOR_CONFIG: VectorConfig = VectorConfig {

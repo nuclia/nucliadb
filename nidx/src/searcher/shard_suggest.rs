@@ -23,9 +23,9 @@ use std::sync::Arc;
 use nidx_paragraph::{ParagraphSearcher, ParagraphSuggestRequest};
 use nidx_protos::{FilterOperator, RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest, SuggestResponse};
 use nidx_relation::RelationSearcher;
-use nidx_text::{prefilter::PreFilterRequest, TextSearcher};
+use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
 use nidx_types::prefilter::PrefilterResult;
-use tracing::{instrument, Span};
+use tracing::{Span, instrument};
 
 use crate::errors::{NidxError, NidxResult};
 

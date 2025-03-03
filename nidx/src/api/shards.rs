@@ -23,9 +23,9 @@ use std::collections::HashMap;
 use nidx_vector::config::VectorConfig;
 use uuid::Uuid;
 
+use crate::NidxMetadata;
 use crate::errors::{NidxError, NidxResult};
 use crate::metadata::{Index, IndexConfig, IndexKind, MergeJob, Segment, Shard};
-use crate::NidxMetadata;
 
 pub async fn create_shard(
     meta: &NidxMetadata,

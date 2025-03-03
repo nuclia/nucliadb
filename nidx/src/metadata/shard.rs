@@ -21,7 +21,7 @@ use std::collections::HashMap;
 //
 use super::index::*;
 use futures::StreamExt;
-use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
+use sqlx::{Executor, Postgres, types::time::PrimitiveDateTime};
 use uuid::Uuid;
 
 pub struct Shard {

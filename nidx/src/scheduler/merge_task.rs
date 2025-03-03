@@ -21,9 +21,9 @@
 use std::collections::HashMap;
 
 use crate::{
+    NidxMetadata,
     metadata::{IndexId, IndexKind, MergeJob, SegmentId},
     settings::MergeSettings,
-    NidxMetadata,
 };
 use nidx_types::Seq;
 

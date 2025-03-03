@@ -18,9 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use tantivy::schema::Value;
-use tantivy::schema::{Field, Schema as TantivySchema, INDEXED, STORED, STRING};
 use tantivy::TantivyDocument;
+use tantivy::schema::Value;
+use tantivy::schema::{Field, INDEXED, STORED, STRING, Schema as TantivySchema};
 
 /// The source will be deunicoded, se
 pub fn normalize(source: &str) -> String {
@@ -164,7 +164,7 @@ mod tests {
     use tantivy::collector::DocSetCollector;
     use tantivy::query::TermQuery;
     use tantivy::schema::IndexRecordOption;
-    use tantivy::{doc, Index, IndexWriter, Term};
+    use tantivy::{Index, IndexWriter, Term, doc};
 
     use super::*;
 

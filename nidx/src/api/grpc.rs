@@ -41,7 +41,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::api::shards;
-use crate::{import_export, NidxMetadata, Settings};
+use crate::{NidxMetadata, Settings, import_export};
 
 #[derive(Clone)]
 pub struct ApiServer {

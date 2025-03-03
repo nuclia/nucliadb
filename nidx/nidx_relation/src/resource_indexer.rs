@@ -19,7 +19,7 @@
 //
 
 use crate::io_maps;
-use crate::schema::{normalize, Schema};
+use crate::schema::{Schema, normalize};
 use nidx_protos::prost::*;
 use nidx_tantivy::TantivyIndexer;
 use tantivy::doc;

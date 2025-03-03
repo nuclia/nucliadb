@@ -19,9 +19,9 @@
 
 use crate::schema::ParagraphSchema;
 use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator};
+use tantivy::Term;
 use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, TermQuery};
 use tantivy::schema::{Facet, IndexRecordOption};
-use tantivy::Term;
 
 fn translate_literal(literal: &str, schema: &ParagraphSchema) -> Box<dyn Query> {
     let facet = Facet::from_text(literal).unwrap();

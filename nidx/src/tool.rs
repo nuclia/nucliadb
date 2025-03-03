@@ -20,7 +20,7 @@
 
 use std::{fs::File, path::PathBuf};
 
-use crate::{import_export, settings::EnvSettings, Settings};
+use crate::{Settings, import_export, settings::EnvSettings};
 
 #[derive(Debug, clap::Subcommand)]
 pub enum ToolCommand {

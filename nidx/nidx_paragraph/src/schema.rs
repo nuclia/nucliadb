@@ -17,13 +17,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use nidx_protos::prost::*;
 use nidx_protos::ParagraphMetadata;
-use tantivy::schema::Value;
-use tantivy::schema::{FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT};
+use nidx_protos::prost::*;
 use tantivy::DateOptions;
 use tantivy::DateTime;
 use tantivy::TantivyDocument;
+use tantivy::schema::Value;
+use tantivy::schema::{FacetOptions, Field, NumericOptions, STORED, STRING, Schema, TEXT};
 
 #[derive(Debug, Clone)]
 pub struct ParagraphSchema {

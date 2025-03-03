@@ -24,8 +24,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use nidx_types::Seq;
-use object_store::memory::InMemory;
 use object_store::ObjectStore;
+use object_store::memory::InMemory;
 use sqlx::types::JsonValue;
 use uuid::Uuid;
 
@@ -33,7 +33,7 @@ use nidx::api::shards;
 use nidx::indexer::{delete_resource, index_resource};
 use nidx::metadata::{Deletion, Index, Segment};
 use nidx::scheduler::{purge_deleted_shards_and_indexes, purge_deletions, purge_segments};
-use nidx::{metadata::Shard, NidxMetadata};
+use nidx::{NidxMetadata, metadata::Shard};
 use nidx_tests::*;
 use nidx_vector::config::VectorConfig;
 

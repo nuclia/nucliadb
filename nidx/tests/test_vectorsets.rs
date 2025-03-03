@@ -22,7 +22,7 @@ mod common;
 
 use common::services::NidxFixture;
 use nidx_protos::{
-    op_status::Status, NewShardRequest, NewVectorSetRequest, ShardId, VectorIndexConfig, VectorSetId, VectorSimilarity,
+    NewShardRequest, NewVectorSetRequest, ShardId, VectorIndexConfig, VectorSetId, VectorSimilarity, op_status::Status,
 };
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};

@@ -23,8 +23,8 @@ mod common;
 use common::services::NidxFixture;
 use itertools::Itertools;
 use nidx_protos::{
-    filter_expression::{Expr, FacetFilter, FieldFilter},
     FilterExpression, NewShardRequest, SuggestFeatures, SuggestRequest, SuggestResponse, VectorIndexConfig,
+    filter_expression::{Expr, FacetFilter, FieldFilter},
 };
 use nidx_tests::*;
 use sqlx::PgPool;

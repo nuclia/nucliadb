@@ -20,13 +20,13 @@
 use anyhow::anyhow;
 use async_nats::jetstream::consumer::PullConsumer;
 use futures::stream::StreamExt;
-use nidx_protos::nidx::nidx_indexer_server::NidxIndexer;
-use nidx_protos::nidx::nidx_indexer_server::NidxIndexerServer;
-use nidx_protos::prost::*;
 use nidx_protos::IndexMessage;
 use nidx_protos::OpStatus;
 use nidx_protos::Resource;
 use nidx_protos::TypeMessage;
+use nidx_protos::nidx::nidx_indexer_server::NidxIndexer;
+use nidx_protos::nidx::nidx_indexer_server::NidxIndexerServer;
+use nidx_protos::prost::*;
 use nidx_types::Seq;
 use object_store::{DynObjectStore, ObjectStore};
 use std::path::Path;
@@ -40,13 +40,13 @@ use uuid::Uuid;
 
 use crate::errors::NidxError;
 use crate::grpc_server::GrpcServer;
+use crate::metrics::IndexKindLabels;
+use crate::metrics::OperationStatusLabels;
 use crate::metrics::indexer::INDEXING_COUNTER;
 use crate::metrics::indexer::PER_INDEX_INDEXING_TIME;
 use crate::metrics::indexer::TOTAL_INDEXING_TIME;
-use crate::metrics::IndexKindLabels;
-use crate::metrics::OperationStatusLabels;
 use crate::segment_store::pack_and_upload;
-use crate::{metadata::*, Settings};
+use crate::{Settings, metadata::*};
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry;

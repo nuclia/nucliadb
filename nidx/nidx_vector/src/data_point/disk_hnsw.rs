@@ -46,9 +46,9 @@
 use std::collections::HashMap;
 use std::io;
 
+use super::Address;
 use super::ops_hnsw::{Hnsw, Layer};
 use super::ram_hnsw::{Edge, EntryPoint, RAMHnsw, RAMLayer};
-use super::Address;
 use crate::data_types::usize_utils::*;
 
 const EDGE_LEN: usize = 4;

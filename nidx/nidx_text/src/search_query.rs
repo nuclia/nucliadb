@@ -18,17 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::query_io::translate_keyword_to_text_query;
 use crate::DocumentSearchRequest;
-use nidx_protos::filter_expression::date_range_filter::DateField;
+use crate::query_io::translate_keyword_to_text_query;
 use nidx_protos::filter_expression::FieldFilter;
+use nidx_protos::filter_expression::date_range_filter::DateField;
 use nidx_protos::prost_types::Timestamp as ProstTimestamp;
 use nidx_protos::stream_filter::Conjunction;
 use nidx_protos::{FilterExpression, StreamFilter, StreamRequest};
 use std::ops::Bound;
+use tantivy::Term;
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
-use tantivy::Term;
 
 use crate::schema::{self, TextSchema};
 

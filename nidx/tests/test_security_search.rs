@@ -24,10 +24,10 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use common::services::NidxFixture;
+use nidx_protos::Security;
 use nidx_protos::nodewriter::VectorIndexConfig;
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::resource::ResourceStatus;
-use nidx_protos::Security;
 use nidx_protos::{IndexMetadata, NewShardRequest, Resource, ResourceId, SearchRequest};
 use sqlx::PgPool;
 use tonic::Request;

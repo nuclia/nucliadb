@@ -22,12 +22,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use nidx::indexer::{index_resource, process_index_message};
-use nidx::searcher::shard_selector::ShardSelector;
 use nidx::searcher::SyncedSearcher;
+use nidx::searcher::shard_selector::ShardSelector;
 use nidx::settings::SearcherSettings;
 use nidx::{
-    metadata::{Index, Shard},
     NidxMetadata,
+    metadata::{Index, Shard},
 };
 use nidx_protos::{IndexMessage, TypeMessage};
 use nidx_tests::*;

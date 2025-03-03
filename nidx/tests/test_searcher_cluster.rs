@@ -22,9 +22,9 @@ mod common;
 
 use common::services::NidxFixture;
 use nidx::grpc_server::GrpcServer;
-use nidx::searcher::{grpc::SearchServer, shard_selector::ShardSelector, ListNodes, SyncedSearcher};
-use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
+use nidx::searcher::{ListNodes, SyncedSearcher, grpc::SearchServer, shard_selector::ShardSelector};
 use nidx_protos::SearchRequest;
+use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
 use nidx_protos::{NewShardRequest, VectorIndexConfig};
 
 use sqlx::PgPool;

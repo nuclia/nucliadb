@@ -99,9 +99,9 @@ mod tests {
     use sqlx::types::time::PrimitiveDateTime;
 
     use crate::{
+        NidxMetadata,
         metadata::{Index, IndexConfig, Segment, Shard},
         scheduler::audit_task::audit_kb_storage,
-        NidxMetadata,
     };
 
     use super::SendReport;
