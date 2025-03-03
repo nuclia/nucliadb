@@ -29,10 +29,7 @@ use tracing::{instrument, Span};
 
 use crate::errors::{NidxError, NidxResult};
 
-use super::{
-    index_cache::IndexCache,
-    query_planner::{filter_to_boolean_expression, old_filter_compatibility::filter_from_suggest_request},
-};
+use super::{index_cache::IndexCache, query_planner::filter_to_boolean_expression};
 
 /// Max number of words accepted as a suggest query. This is useful for
 /// compounds with semantic meaning (like a name and a surname) but can add
@@ -99,18 +96,7 @@ fn blocking_suggest(
 
     let mut paragraph_request = None;
     if suggest_paragraphs {
-        let filter_expression = filter_from_suggest_request(&request)?;
-        if let Some(expr) = filter_expression {
-            if request.field_filter.is_some() {
-                return Err(anyhow::anyhow!("Cannot specify old and new filters in the same request"));
-            }
-            let prefilter = PreFilterRequest {
-                security: None,
-                filter_expression: Some(expr),
-            };
-
-            prefiltered = text_searcher.prefilter(&prefilter)?;
-        } else if let Some(expr) = &request.field_filter {
+        if let Some(expr) = &request.field_filter {
             let prefilter = PreFilterRequest {
                 security: None,
                 filter_expression: Some(expr.clone()),

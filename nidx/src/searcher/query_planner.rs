@@ -27,11 +27,8 @@ use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
 use nidx_vector::VectorSearchRequest;
 use nidx_vector::SEGMENT_TAGS;
-use old_filter_compatibility::filter_from_search_request;
 
 use super::query_language::extract_label_filters;
-
-pub mod old_filter_compatibility;
 
 /// The queries a [`QueryPlan`] has decided to send to each index.
 #[derive(Default, Clone)]
@@ -67,19 +64,7 @@ pub struct QueryPlan {
     pub index_queries: IndexQueries,
 }
 
-pub fn build_query_plan(mut search_request: SearchRequest) -> anyhow::Result<QueryPlan> {
-    // Backwards compatibility with old filters
-    let (field_filter, paragraph_filter) = filter_from_search_request(&search_request)?;
-    let has_old_filters = field_filter.is_some() || paragraph_filter.is_some();
-    let has_new_filters = search_request.field_filter.is_some() || search_request.paragraph_filter.is_some();
-    if has_old_filters && has_new_filters {
-        return Err(anyhow::anyhow!("Cannot specify old and new filters in the same request"));
-    }
-    if has_old_filters {
-        search_request.field_filter = field_filter;
-        search_request.paragraph_filter = paragraph_filter;
-    }
-
+pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPlan> {
     let relations_request = compute_relations_request(&search_request);
     let texts_request = compute_texts_request(&search_request);
     let vectors_request = compute_vectors_request(&search_request)?;
@@ -186,7 +171,6 @@ fn compute_relations_request(search_request: &SearchRequest) -> Option<RelationS
         shard_id: search_request.shard.clone(),
         prefix: search_request.relation_prefix.clone(),
         subgraph: search_request.relation_subgraph.clone(),
-        reload: search_request.reload,
     })
 }
 
@@ -222,29 +206,37 @@ pub fn filter_to_boolean_expression(filter: FilterExpression) -> anyhow::Result<
 
 #[cfg(test)]
 mod tests {
-    use nidx_protos::{filter_expression::FacetFilter, Filter};
+    use nidx_protos::filter_expression::{FacetFilter, FilterExpressionList};
 
     use super::*;
     #[test]
     fn proper_propagation() {
-        let expression = serde_json::json!({
-            "and": [
-                { "literal": "this" },
-                { "literal": "and" },
-                { "literal": "that"},
-            ],
-        });
         #[allow(deprecated)]
         let request = SearchRequest {
-            filter: Some(Filter {
-                field_labels: vec!["this".to_string()],
-                paragraph_labels: vec!["and".to_string(), "that".to_string()],
-                labels_expression: expression.to_string(),
-                keywords_expression: "".to_string(),
-            }),
             result_per_page: 10,
             vector: vec![1.0],
             paragraph: true,
+            field_filter: Some(FilterExpression {
+                expr: Some(Expr::Facet(FacetFilter {
+                    facet: "this".into(),
+                })),
+            }),
+            paragraph_filter: Some(FilterExpression {
+                expr: Some(Expr::BoolAnd(FilterExpressionList {
+                    operands: vec![
+                        FilterExpression {
+                            expr: Some(Expr::Facet(FacetFilter {
+                                facet: "and".into(),
+                            })),
+                        },
+                        FilterExpression {
+                            expr: Some(Expr::Facet(FacetFilter {
+                                facet: "that".into(),
+                            })),
+                        },
+                    ],
+                })),
+            }),
             ..Default::default()
         };
         let query_plan = build_query_plan(request).unwrap();
