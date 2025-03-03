@@ -53,19 +53,18 @@ async def test_suggest_resource_all(
             assert value is not None
             shards = PBShards()
             shards.ParseFromString(value)
-            for replica in shards.shards[0].replicas:
-                if True:
-                    shard = await node_obj.get_shard(replica.shard.id)
-                    assert shard.shard_id == replica.shard.id
-                    assert shard.fields == 3
-                    assert shard.paragraphs == 2
-                    assert shard.sentences == 3
 
-                    prequest = SuggestRequest(
-                        features=[SuggestFeatures.ENTITIES, SuggestFeatures.PARAGRAPHS],
-                    )
-                    prequest.shard = replica.shard.id
-                    prequest.body = "Ramon"
+            shard_id = shards.shards[0].nidx_shard_id
+            shard = await node_obj.get_shard(shard_id)
+            assert shard.shard_id == shard_id
+            assert shard.fields == 3
+            assert shard.paragraphs == 2
+            assert shard.sentences == 3
 
-                    suggest = await node_obj.reader.Suggest(prequest)  # type: ignore
-                    assert suggest.total == 1, f"Request:\n{prequest}\nResponse:\n{suggest}"
+            prequest = SuggestRequest(
+                features=[SuggestFeatures.ENTITIES, SuggestFeatures.PARAGRAPHS],
+            )
+            prequest.shard = shard_id
+            prequest.body = "Ramon"
+            suggest = await node_obj.reader.Suggest(prequest)  # type: ignore
+            assert suggest.total == 1, f"Request:\n{prequest}\nResponse:\n{suggest}"

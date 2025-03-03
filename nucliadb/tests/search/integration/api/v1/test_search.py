@@ -92,41 +92,40 @@ async def test_search_resource_all(
             assert value is not None
             shards = PBShards()
             shards.ParseFromString(value)
-            for replica in shards.shards[0].replicas:
-                if True:
-                    shard = await node_obj.get_shard(replica.shard.id)
-                    assert shard.shard_id == replica.shard.id
-                    assert shard.fields == 3
-                    assert shard.paragraphs == 2
-                    assert shard.sentences == 3
+            shard_id = shards.shards[0].nidx_shard_id
+            shard = await node_obj.get_shard(shard_id)
+            assert shard.shard_id == shard_id
+            assert shard.fields == 3
+            assert shard.paragraphs == 2
+            assert shard.sentences == 3
 
-                    request = SearchRequest()
-                    request.shard = replica.shard.id
-                    request.body = "Ramon"
-                    request.result_per_page = 20
-                    request.document = True
-                    request.paragraph = True
-                    request.vector.extend(Q)
-                    request.min_score_semantic = -1.0
+            request = SearchRequest()
+            request.shard = shard_id
+            request.body = "Ramon"
+            request.result_per_page = 20
+            request.document = True
+            request.paragraph = True
+            request.vector.extend(Q)
+            request.min_score_semantic = -1.0
 
-                    response = await node_obj.reader.Search(request)  # type: ignore
-                    paragraphs = response.paragraph
-                    documents = response.document
-                    vectors = response.vector
+            response = await node_obj.reader.Search(request)  # type: ignore
+            paragraphs = response.paragraph
+            documents = response.document
+            vectors = response.vector
 
-                    assert paragraphs.total == 1
-                    assert documents.total == 1
+            assert paragraphs.total == 1
+            assert documents.total == 1
 
-                    # 0-19 : My own text Ramon
-                    # 20-45 : This is great to be here
-                    # 48-65 : Where is my beer?
+            # 0-19 : My own text Ramon
+            # 20-45 : This is great to be here
+            # 48-65 : Where is my beer?
 
-                    # Q : Where is my wine?
-                    results = [(x.doc_id.id, x.score) for x in vectors.documents]
-                    results.sort(reverse=True, key=lambda x: x[1])
-                    assert results[0][0].endswith("48-65")
-                    assert results[1][0].endswith("0-19")
-                    assert results[2][0].endswith("20-45")
+            # Q : Where is my wine?
+            results = [(x.doc_id.id, x.score) for x in vectors.documents]
+            results.sort(reverse=True, key=lambda x: x[1])
+            assert results[0][0].endswith("48-65")
+            assert results[1][0].endswith("0-19")
+            assert results[2][0].endswith("20-45")
 
 
 async def test_search_with_facets(
