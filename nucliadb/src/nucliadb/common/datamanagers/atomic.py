@@ -82,6 +82,7 @@ class kb:
     exists_kb = ro_txn_wrap(kb_dm.exists_kb)
     get_config = ro_txn_wrap(kb_dm.get_config)
     get_external_index_provider_metadata = ro_txn_wrap(kb_dm.get_external_index_provider_metadata)
+    get_kb_uuid = ro_txn_wrap(kb_dm.get_kb_uuid)
 
 
 class resources:

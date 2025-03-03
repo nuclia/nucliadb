@@ -20,6 +20,7 @@
 import uuid
 from typing import AsyncIterator
 
+from nucliadb.backups.tasks import Backup
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
 from nucliadb.common.cluster.manager import get_index_nodes
@@ -472,8 +473,24 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             raise
 
     async def BackupCreate(self, request: BackupCreateRequest, context=None) -> BackupCreateResponse:  # type: ignore
-        response = BackupCreateResponse(status=BackupCreateResponse.Status.OK)
-        return response
+        if request.kb.HasField("slug"):
+            kbid = await datamanagers.atomic.kb.get_kb_uuid(slug=request.kb.slug)
+            if kbid is None:
+                return BackupCreateResponse(
+                    status=BackupCreateResponse.Status.KB_NOT_FOUND,
+                )
+        else:
+            kbid = request.kb.uuid
+        if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
+            return BackupCreateResponse(
+                status=BackupCreateResponse.Status.KB_NOT_FOUND,
+            )
+        backup_id = str(uuid.uuid4())
+        await Backup.create(kbid=kbid, backup_id=backup_id)
+        return BackupCreateResponse(
+            status=BackupCreateResponse.Status.OK,
+            backup_id=backup_id,
+        )
 
     async def BackupRestore(self, request: BackupRestoreRequest, context=None) -> BackupRestoreRequest:  # type: ignore
         response = BackupRestoreRequest()
