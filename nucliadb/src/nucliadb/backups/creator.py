@@ -18,9 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import io
 import tarfile
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import AsyncIterator, Optional
 
 from nucliadb.backups.models import BackupMetadata, CreateBackupRequest
@@ -62,7 +61,7 @@ async def backup_resources(context: ApplicationContext, kbid: str, backup_id: st
     if metadata is None:
         metadata = BackupMetadata(
             kbid=kbid,
-            requested_at=datetime.now(tz=UTC),
+            requested_at=datetime.now(tz=timezone.utc),
         )
         async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
             metadata.total_resources += 1
@@ -100,62 +99,73 @@ async def backup_resource(context: ApplicationContext, backup_id: str, kbid: str
     bm = await get_broker_message(context, kbid, rid)
     if bm is None:
         return 0
-    return await backup_resource_with_binaries(context, backup_id, kbid, bm)
+    return await backup_resource_with_binaries(context, backup_id, kbid, rid, bm)
 
 
-async def backup_resource_with_binaries(context, backup_id: str, bm: writer_pb2.BrokerMessage) -> int:
+async def to_tar(name: str, size: int, chunks: AsyncIterator[bytes]) -> AsyncIterator[bytes]:
+    """
+    This function is a generator that adds tar header and padding to the end of the chunks
+    to be compatible with the tar format.
+    """
+    tarinfo = tarfile.TarInfo(name)
+    tarinfo.size = size
+    tarinfo.mtime = int(datetime.now().timestamp())
+    tarinfo.mode = 0o644
+    tarinfo.type = tarfile.REGTYPE
+    header_bytes = tarinfo.tobuf(format=tarfile.GNU_FORMAT)
+    yield header_bytes
+    async for chunk in chunks:
+        yield chunk
+    if size % 512 != 0:
+        yield b"\x00" * (512 - (size % 512))
+
+
+async def backup_resource_with_binaries(
+    context, backup_id: str, kbid: str, rid: str, bm: writer_pb2.BrokerMessage
+) -> int:
     """
     Generate a tar file dynamically with the resource broker message and all its binary files,
     and stream it to the blob storage service. Returns the total size of the tar file in bytes.
     """
-    kbid = bm.kbid
-    rid = bm.uuid
-    fileobj = io.BytesIO()
-    with tarfile.open(fileobj=fileobj, mode="w|") as tar:
+    total_size = 0
 
-        async def tar_uploader(fileobj: io.BytesIO):
-            async def _tar_bytes_iterator():
-                while True:
-                    chunk = asyncio.to_thread(fileobj.read(2 * MB))
-                    if not chunk:
-                        break
-                    yield chunk
+    async def _iterator():
+        bm_serialized = bm.SerializeToString()
 
-            await upload_to_bucket(
-                context, _tar_bytes_iterator(), key=f"{kbid}/{backup_id}/resources/{rid}.tar"
-            )
+        async def bm_iterator():
+            yield bm_serialized
 
-        uploader_task = asyncio.create_task(tar_uploader(fileobj))
+        async for chunk in to_tar("broker-message.pb", len(bm_serialized), bm_iterator()):
+            yield chunk
+            total_size += len(chunk)
 
-        # Stream the broker message and binary files to the tar file
         for cloud_file in get_cloud_files(bm):
             serialized_cf = cloud_file.SerializeToString()
-            tar.addfile(
-                tarfile.TarInfo(f"cloud-files/{cloud_file.uri}"),
-                io.BytesIO(serialized_cf),
-            )
-            tar.addfile(
-                tarfile.TarInfo(f"binaries/{cloud_file.uri}"),
-                download_binary(context, cloud_file),
-            )
-        tar.addfile(
-            tarfile.TarInfo(f"broker-message.pb"),
-            io.BytesIO(bm.SerializeToString()),
-        )
 
-        await asyncio.gather(uploader_task)
-        return fileobj.tell()
+            async def cf_iterator():
+                yield serialized_cf
 
+            async for chunk in to_tar(
+                f"cloud-files/{cloud_file.uri}", len(serialized_cf), cf_iterator()
+            ):
+                yield chunk
+                total_size += len(chunk)
 
-async def tar_addfile():
-    pass
+            async for chunk in to_tar(
+                f"binaries/{cloud_file.uri}", cloud_file.size, download_binary(context, cloud_file)
+            ):
+                yield chunk
+                total_size += len(chunk)
+
+    await upload_to_bucket(context, _iterator(), key=f"{kbid}/{backup_id}/resources/{rid}.tar")
+    return total_size
 
 
 async def backup_labels(context: ApplicationContext, kbid: str, backup_id: str):
     labels = await get_labels(context, kbid)
     await context.blob_storage.upload_object(
-        bucket_name="backups",
-        object_name=f"{kbid}/{backup_id}/labels",
+        bucket="backups",
+        key=f"{kbid}/{backup_id}/labels",
         data=labels.SerializeToString(),
     )
 
@@ -163,8 +173,8 @@ async def backup_labels(context: ApplicationContext, kbid: str, backup_id: str):
 async def backup_entities(context: ApplicationContext, kbid: str, backup_id: str):
     entities = await get_entities(context, kbid)
     await context.blob_storage.upload_object(
-        bucket_name="backups",
-        object_name=f"{kbid}/{backup_id}/entities",
+        bucket="backups",
+        key=f"{kbid}/{backup_id}/entities",
         data=entities.SerializeToString(),
     )
 
@@ -181,7 +191,7 @@ async def get_metadata(
 
 async def set_metadata(context: ApplicationContext, kbid: str, backup_id: str, metadata: BackupMetadata):
     async with context.kv_driver.transaction() as txn:
-        await txn.set(f"kbs/{kbid}/backups/{backup_id}", metadata.model_dump_json())
+        await txn.set(f"kbs/{kbid}/backups/{backup_id}", metadata.model_dump_json().encode())
         await txn.commit()
 
 

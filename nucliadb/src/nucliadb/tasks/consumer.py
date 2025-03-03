@@ -55,7 +55,6 @@ class NatsTaskConsumer(Generic[MsgType]):
         self.msg_type = msg_type
         self.max_concurrent_messages = max_concurrent_messages
         self.initialized = False
-        self.context: Optional[ApplicationContext] = None
         self.running_tasks: list[asyncio.Task] = []
         self.subscription = None
 

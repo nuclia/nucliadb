@@ -81,10 +81,10 @@ class TaskRetryHandler:
         self,
         task_id: str,
         context: ApplicationContext,
-        max_tries: int = 5,
+        max_retries: int = 5,
     ):
         self.task_id = task_id
-        self.max_tries = max_tries
+        self.max_retries = max_retries
         self.context = context
 
     async def get_metadata(self) -> Optional[TaskMetadata]:
@@ -96,7 +96,7 @@ class TaskRetryHandler:
 
     async def set_metadata(self, metadata: TaskMetadata) -> None:
         async with self.context.kv_driver.transaction() as txn:
-            await txn.set(f"/tasks/{self.task_id}", metadata.model_dump_json())
+            await txn.set(f"/tasks/{self.task_id}", metadata.model_dump_json().encode())
             await txn.commit()
 
     def wrap(self, func):
@@ -120,7 +120,7 @@ class TaskRetryHandler:
                 )
                 return
 
-            if metadata.retries >= self.max_tries:
+            if metadata.retries >= self.max_retries:
                 metadata.status = TaskMetadata.Status.FAILED
                 metadata.error_messages.append("Max retries reached")
                 logger.info(
