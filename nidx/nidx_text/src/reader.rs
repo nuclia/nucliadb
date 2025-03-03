@@ -23,7 +23,7 @@ use std::time::*;
 
 use crate::schema::decode_field_id;
 use crate::search_query::filter_to_query;
-use crate::{prefilter::*, DocumentSearchRequest};
+use crate::{DocumentSearchRequest, prefilter::*};
 
 use super::schema::TextSchema;
 use super::search_query;
@@ -285,7 +285,7 @@ impl TextReaderService {
         Ok(PrefilterResult::Some(docs_fulfilled))
     }
 
-    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = DocumentItem>> {
+    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = DocumentItem> + use<>> {
         let producer = BatchProducer {
             offset: 0,
             total: self.count()?,

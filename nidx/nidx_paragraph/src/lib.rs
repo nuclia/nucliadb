@@ -31,20 +31,20 @@ mod stop_words;
 
 use nidx_protos::{ParagraphItem, ParagraphSearchResponse, StreamRequest};
 use nidx_tantivy::{
-    index_reader::{open_index_with_deletions, DeletionQueryBuilder},
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
+    index_reader::{DeletionQueryBuilder, open_index_with_deletions},
 };
-use nidx_types::{prefilter::PrefilterResult, OpenIndexMetadata};
+use nidx_types::{OpenIndexMetadata, prefilter::PrefilterResult};
 use reader::ParagraphReaderService;
 use resource_indexer::index_paragraphs;
 use schema::ParagraphSchema;
 use std::path::Path;
 use tantivy::{
+    Term,
     directory::MmapDirectory,
     indexer::merge_indices,
     query::{Query, TermSetQuery},
     schema::{Field, Schema},
-    Term,
 };
 use tracing::instrument;
 
@@ -157,7 +157,7 @@ impl ParagraphSearcher {
         self.reader.suggest(request, prefilter)
     }
 
-    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = ParagraphItem>> {
+    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = ParagraphItem> + use<>> {
         self.reader.iterator(request)
     }
 }

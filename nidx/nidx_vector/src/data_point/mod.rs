@@ -30,7 +30,7 @@ mod tests;
 use crate::config::{VectorConfig, VectorType};
 use crate::data_types::{data_store, trie, trie_ram};
 use crate::formula::Formula;
-use crate::inverted_index::{build_indexes, InvertedIndexes};
+use crate::inverted_index::{InvertedIndexes, build_indexes};
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use bit_set::BitSet;
 use bit_vec::BitVec;
@@ -496,7 +496,7 @@ mod test {
     use std::collections::{BTreeMap, HashSet};
 
     use nidx_protos::{Position, Representation, SentenceMetadata};
-    use rand::{rngs::SmallRng, Rng, SeedableRng};
+    use rand::{Rng, SeedableRng, rngs::SmallRng};
     use tempfile::tempdir;
 
     use crate::{
@@ -506,7 +506,7 @@ mod test {
         vector_types::dense_f32::{dot_similarity, encode_vector},
     };
 
-    use super::{create, merge, node::Node, Elem, LabelDictionary};
+    use super::{Elem, LabelDictionary, create, merge, node::Node};
     use nidx_protos::prost::*;
 
     const DIMENSION: usize = 128;
@@ -534,7 +534,7 @@ mod test {
     }
 
     fn random_key(rng: &mut impl Rng) -> String {
-        format!("{:032x?}/f/file/0-100", rng.gen::<u128>())
+        format!("{:032x?}/f/file/0-100", rng.r#gen::<u128>())
     }
 
     fn random_string(rng: &mut impl Rng) -> String {

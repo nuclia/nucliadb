@@ -1,7 +1,7 @@
 [package]
 name = "nidx_vector"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 nidx_types = { version = "0.1.0", path = "../nidx_types" }

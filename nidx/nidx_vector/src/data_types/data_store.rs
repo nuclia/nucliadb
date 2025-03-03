@@ -177,7 +177,7 @@ pub fn merge(
     let mut id_section_cursor = HEADER_LEN;
 
     let alignment = config.vector_type.vector_alignment();
-    for (ref mut alive_ids, store) in segments {
+    for (alive_ids, store) in segments {
         for element_cursor in alive_ids {
             let element_pointer = get_pointer(store, element_cursor);
             let element_slice = &store[element_pointer..];

@@ -26,14 +26,14 @@ use nidx_protos::{OrderBy, ParagraphItem, ParagraphSearchResponse, StreamRequest
 use nidx_types::prefilter::PrefilterResult;
 use tantivy::collector::{Collector, Count, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser};
-use tantivy::{schema::*, DateTime, Order};
+use tantivy::{DateTime, Order, schema::*};
 use tantivy::{DocAddress, Index, IndexReader};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
 use crate::request_types::{ParagraphSearchRequest, ParagraphSuggestRequest};
-use crate::search_query::{search_query, streaming_query, suggest_query, SharedTermC};
-use crate::search_response::{extract_labels, SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
+use crate::search_query::{SharedTermC, search_query, streaming_query, suggest_query};
+use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse, extract_labels};
 
 const FUZZY_DISTANCE: u8 = 1;
 const NUMBER_OF_RESULTS_SUGGEST: usize = 10;
@@ -94,7 +94,7 @@ impl ParagraphReaderService {
         }))
     }
 
-    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = ParagraphItem>> {
+    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = ParagraphItem> + use<>> {
         let producer = BatchProducer {
             offset: 0,
             total: self.count()?,
