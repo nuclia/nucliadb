@@ -37,7 +37,7 @@ from nucliadb.export_import.utils import (
 from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_utils.storages.storage import StorageField
 
-MB = 1024 * 1024 
+MB = 1024 * 1024
 
 
 async def backup_kb(context: ApplicationContext, msg: CreateBackupRequest):
