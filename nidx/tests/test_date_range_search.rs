@@ -23,11 +23,13 @@ mod common;
 use std::collections::HashMap;
 
 use common::services::NidxFixture;
+use nidx_protos::filter_expression::date_range_filter::DateField;
+use nidx_protos::filter_expression::{DateRangeFilter, Expr, FilterExpressionList};
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::resource::ResourceStatus;
 use nidx_protos::{
-    IndexMetadata, IndexParagraph, IndexParagraphs, NewShardRequest, Resource, ResourceId, SearchRequest,
-    TextInformation, Timestamps, VectorIndexConfig, VectorSentence, VectorsetSentences,
+    FilterExpression, IndexMetadata, IndexParagraph, IndexParagraphs, NewShardRequest, Resource, ResourceId,
+    SearchRequest, TextInformation, VectorIndexConfig, VectorSentence, VectorsetSentences,
 };
 use sqlx::PgPool;
 use tonic::Request;
@@ -138,7 +140,6 @@ async fn test_date_range_search(pool: PgPool) -> Result<(), Box<dyn std::error::
     let request = SearchRequest {
         shard: shard_id.clone(),
         order: None,
-        timestamps: None,
         vectorset: "english".to_string(),
         vector: vec![4.0, 6.0, 7.0],
         page_number: 0,
@@ -158,11 +159,25 @@ async fn test_date_range_search(pool: PgPool) -> Result<(), Box<dyn std::error::
 
     // Time range allows everything
     let mut request_all_range = request.clone();
-    request_all_range.timestamps = Some(Timestamps {
-        from_modified: Some(base_time),
-        to_modified: None,
-        from_created: Some(base_time),
-        to_created: None,
+    request_all_range.field_filter = Some(FilterExpression {
+        expr: Some(Expr::BoolAnd(FilterExpressionList {
+            operands: vec![
+                FilterExpression {
+                    expr: Some(Expr::Date(DateRangeFilter {
+                        field: DateField::Modified.into(),
+                        since: Some(base_time),
+                        until: None,
+                    })),
+                },
+                FilterExpression {
+                    expr: Some(Expr::Date(DateRangeFilter {
+                        field: DateField::Created.into(),
+                        since: Some(base_time),
+                        until: None,
+                    })),
+                },
+            ],
+        })),
     });
     let result = fixture.searcher_client.search(request_all_range).await.unwrap();
     let result = result.into_inner();
@@ -171,11 +186,25 @@ async fn test_date_range_search(pool: PgPool) -> Result<(), Box<dyn std::error::
 
     // Time range allows only second batch
     let mut request_second_batch = request.clone();
-    request_second_batch.timestamps = Some(Timestamps {
-        from_modified: Some(base_time_plus_one),
-        to_modified: None,
-        from_created: Some(base_time_plus_one),
-        to_created: None,
+    request_second_batch.field_filter = Some(FilterExpression {
+        expr: Some(Expr::BoolAnd(FilterExpressionList {
+            operands: vec![
+                FilterExpression {
+                    expr: Some(Expr::Date(DateRangeFilter {
+                        field: DateField::Modified.into(),
+                        since: Some(base_time_plus_one),
+                        until: None,
+                    })),
+                },
+                FilterExpression {
+                    expr: Some(Expr::Date(DateRangeFilter {
+                        field: DateField::Created.into(),
+                        since: Some(base_time_plus_one),
+                        until: None,
+                    })),
+                },
+            ],
+        })),
     });
     let result = fixture.searcher_client.search(request_second_batch).await.unwrap();
     let result = result.into_inner();
@@ -184,11 +213,16 @@ async fn test_date_range_search(pool: PgPool) -> Result<(), Box<dyn std::error::
 
     // Time range allows only second batch, but with modified only
     let mut request_second_batch = request.clone();
-    request_second_batch.timestamps = Some(Timestamps {
-        from_modified: Some(base_time_plus_one),
-        to_modified: None,
-        from_created: None,
-        to_created: None,
+    request_second_batch.field_filter = Some(FilterExpression {
+        expr: Some(Expr::BoolAnd(FilterExpressionList {
+            operands: vec![FilterExpression {
+                expr: Some(Expr::Date(DateRangeFilter {
+                    field: DateField::Modified.into(),
+                    since: Some(base_time_plus_one),
+                    until: None,
+                })),
+            }],
+        })),
     });
     let result = fixture.searcher_client.search(request_second_batch).await.unwrap();
     let result = result.into_inner();
@@ -200,11 +234,25 @@ async fn test_date_range_search(pool: PgPool) -> Result<(), Box<dyn std::error::
 
     // Time range does not match any field, therefore the response has no results
     let mut request_second_batch = request.clone();
-    request_second_batch.timestamps = Some(Timestamps {
-        from_modified: Some(base_time_plus_two),
-        to_modified: None,
-        from_created: Some(base_time_plus_two),
-        to_created: None,
+    request_second_batch.field_filter = Some(FilterExpression {
+        expr: Some(Expr::BoolAnd(FilterExpressionList {
+            operands: vec![
+                FilterExpression {
+                    expr: Some(Expr::Date(DateRangeFilter {
+                        field: DateField::Modified.into(),
+                        since: Some(base_time_plus_two),
+                        until: None,
+                    })),
+                },
+                FilterExpression {
+                    expr: Some(Expr::Date(DateRangeFilter {
+                        field: DateField::Created.into(),
+                        since: Some(base_time_plus_two),
+                        until: None,
+                    })),
+                },
+            ],
+        })),
     });
     let result = fixture.searcher_client.search(request_second_batch).await.unwrap();
     let result = result.into_inner();
@@ -215,11 +263,25 @@ async fn test_date_range_search(pool: PgPool) -> Result<(), Box<dyn std::error::
 
     // Multiple timestamps are parsed as AND conditions
     let mut request_second_batch = request.clone();
-    request_second_batch.timestamps = Some(Timestamps {
-        from_modified: Some(base_time_plus_one),
-        to_modified: None,
-        from_created: Some(base_time_plus_two),
-        to_created: None,
+    request_second_batch.field_filter = Some(FilterExpression {
+        expr: Some(Expr::BoolAnd(FilterExpressionList {
+            operands: vec![
+                FilterExpression {
+                    expr: Some(Expr::Date(DateRangeFilter {
+                        field: DateField::Modified.into(),
+                        since: Some(base_time_plus_one),
+                        until: None,
+                    })),
+                },
+                FilterExpression {
+                    expr: Some(Expr::Date(DateRangeFilter {
+                        field: DateField::Created.into(),
+                        since: Some(base_time_plus_two),
+                        until: None,
+                    })),
+                },
+            ],
+        })),
     });
     let result = fixture.searcher_client.search(request_second_batch).await.unwrap();
     let result = result.into_inner();

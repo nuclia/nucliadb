@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import json
 import logging
 from copy import deepcopy
 from typing import Any, Iterator, Optional
@@ -41,7 +40,7 @@ from nucliadb.common.ids import FieldId, ParagraphId, VectorId
 from nucliadb_models.search import SCORE_TYPE, TextPosition
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import utils_pb2
-from nucliadb_protos.nodereader_pb2 import SearchRequest, Timestamps
+from nucliadb_protos.nodereader_pb2 import FilterExpression, SearchRequest
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSentence
 from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils.aiopynecone.client import DataPlane, FilterOperator, LogicalOperator
@@ -762,24 +761,10 @@ def convert_to_pinecone_filter(request: SearchRequest) -> Optional[dict[str, Any
     can be used on Pinecone indexes.
     """
     and_terms = []
-    if request.HasField("filter"):
-        # Label filtering
-        if len(request.filter.paragraph_labels) > 0 and len(request.filter.field_labels) > 0:
-            raise ValueError("Cannot filter by paragraph and field labels at the same request")
-
-        decoded_expression: dict[str, Any] = json.loads(request.filter.labels_expression)
-        if len(request.filter.paragraph_labels) > 0:
-            and_terms.append(convert_label_filter_expression("paragraph_labels", decoded_expression))
-        else:
-            and_terms.append(convert_label_filter_expression("field_labels", decoded_expression))
-
-    if request.HasField("timestamps"):
-        # Date range filtering
-        and_terms.extend(convert_timestamp_filter(request.timestamps))
-
-    if len(request.key_filters) > 0:
-        # Filter by resource_id
-        and_terms.append({"rid": {FilterOperator.IN: list(set(request.key_filters))}})
+    if request.HasField("field_filter"):
+        and_terms.append(convert_filter_expression("field_labels", request.field_filter))
+    if request.HasField("paragraph_filter"):
+        and_terms.append(convert_filter_expression("paragraph_labels", request.field_filter))
 
     if len(request.security.access_groups):
         # Security filtering
@@ -795,12 +780,6 @@ def convert_to_pinecone_filter(request: SearchRequest) -> Optional[dict[str, Any
         }
         and_terms.append(security_term)
 
-    if len(request.fields) > 0:
-        # Filter by field_id
-        fields_term = {
-            "field_id": {FilterOperator.IN: list({field_id.strip("/") for field_id in request.fields})}
-        }
-        and_terms.append(fields_term)
     if len(and_terms) == 0:
         return None
     if len(and_terms) == 1:
@@ -808,8 +787,8 @@ def convert_to_pinecone_filter(request: SearchRequest) -> Optional[dict[str, Any
     return {LogicalOperator.AND: and_terms}
 
 
-def convert_label_filter_expression(
-    field: str, expression: dict[str, Any], negative: bool = False
+def convert_filter_expression(
+    field: str, expression: FilterExpression, negative: bool = False
 ) -> dict[str, Any]:
     """
     Converts internal label filter expressions to Pinecone's metadata query language.
@@ -817,77 +796,99 @@ def convert_label_filter_expression(
     Note: Since Pinecone does not support negation of expressions, we need to use De Morgan's laws to
     convert the expression to a positive one.
     """
-    if "literal" in expression:
-        if negative:
-            return {field: {FilterOperator.NOT_IN: [expression["literal"]]}}
-        else:
-            return {field: {FilterOperator.IN: [expression["literal"]]}}
 
-    if "and" in expression:
+    kind = expression.WhichOneof("expr")
+    if kind == "bool_and":
         if negative:
             return {
                 LogicalOperator.OR: [
-                    convert_label_filter_expression(field, sub_expression, negative=True)
-                    for sub_expression in expression["and"]
+                    convert_filter_expression(field, sub_expression, negative=True)
+                    for sub_expression in expression.bool_and.operands
                 ]
             }
         else:
             return {
                 LogicalOperator.AND: [
-                    convert_label_filter_expression(field, sub_expression)
-                    for sub_expression in expression["and"]
+                    convert_filter_expression(field, sub_expression)
+                    for sub_expression in expression.bool_and.operands
                 ]
             }
-
-    if "or" in expression:
+    elif kind == "bool_or":
         if negative:
             return {
                 LogicalOperator.AND: [
-                    convert_label_filter_expression(field, sub_expression, negative=True)
-                    for sub_expression in expression["or"]
+                    convert_filter_expression(field, sub_expression, negative=True)
+                    for sub_expression in expression.bool_or.operands
                 ]
             }
         else:
             return {
                 LogicalOperator.OR: [
-                    convert_label_filter_expression(field, sub_expression)
-                    for sub_expression in expression["or"]
+                    convert_filter_expression(field, sub_expression)
+                    for sub_expression in expression.bool_or.operands
                 ]
             }
 
-    if "not" in expression:
-        return convert_label_filter_expression(field, expression["not"], negative=True)
+    elif kind == "bool_not":
+        return convert_filter_expression(field, expression.bool_not, negative=not negative)
 
-    raise ValueError(f"Invalid label filter expression: {expression}")
+    elif kind == "resource":
+        operator = FilterOperator.NOT_EQUALS if negative else FilterOperator.EQUALS
+        return {"rid": {operator: expression.resource.resource_id}}
 
+    elif kind == "field":
+        field_id = expression.field.field_type
+        if expression.field.HasField("field_id"):
+            field_id += f"/{expression.field.field_id}"
+        operator = FilterOperator.NOT_EQUALS if negative else FilterOperator.EQUALS
+        return {"field_id": {operator: field_id}}
 
-def convert_timestamp_filter(timestamps: Timestamps) -> list[dict[str, Any]]:
-    """
-    Allows to filter by date_created and date_modified fields in Pinecone.
-    Powers date range filtering at NucliaDB.
-    """
-    and_terms = []
-    if timestamps.HasField("from_modified"):
-        and_terms.append(
-            {
-                "date_modified": {
-                    FilterOperator.GREATER_THAN_OR_EQUAL: timestamps.from_modified.ToSeconds()
-                }
-            }
+    elif kind == "keyword":
+        raise ValueError("Cannot filter by keywords")
+
+    elif kind == "date":
+        date_field = (
+            "date_created"
+            if expression.date.field == FilterExpression.DateRangeFilter.DateField.CREATED
+            else "date_modified"
         )
-    if timestamps.HasField("to_modified"):
-        and_terms.append(
-            {"date_modified": {FilterOperator.LESS_THAN_OR_EQUAL: timestamps.to_modified.ToSeconds()}}
-        )
-    if timestamps.HasField("from_created"):
-        and_terms.append(
-            {"date_created": {FilterOperator.GREATER_THAN_OR_EQUAL: timestamps.from_created.ToSeconds()}}
-        )
-    if timestamps.HasField("to_created"):
-        and_terms.append(
-            {"date_created": {FilterOperator.LESS_THAN_OR_EQUAL: timestamps.to_created.ToSeconds()}}
-        )
-    return and_terms
+        if negative:
+            terms = []
+            if expression.date.HasField("since"):
+                operator = FilterOperator.LESS_THAN
+                terms.append({date_field: {operator: expression.date.since.ToSeconds()}})
+            if expression.date.HasField("until"):
+                operator = FilterOperator.GREATER_THAN
+                terms.append({date_field: {operator: expression.date.until.ToSeconds()}})
+
+            if len(terms) == 2:
+                return {LogicalOperator.OR: terms}
+            elif len(terms) == 1:
+                return terms[0]
+            else:
+                raise ValueError(f"Invalid filter expression: {expression}")
+        else:
+            terms = []
+            if expression.date.HasField("since"):
+                operator = FilterOperator.GREATER_THAN_OR_EQUAL
+                terms.append({date_field: {operator: expression.date.since.ToSeconds()}})
+            if expression.date.HasField("until"):
+                operator = FilterOperator.LESS_THAN_OR_EQUAL
+                terms.append({date_field: {operator: expression.date.until.ToSeconds()}})
+
+            if len(terms) == 2:
+                return {LogicalOperator.AND: terms}
+            elif len(terms) == 1:
+                return terms[0]
+            else:
+                raise ValueError(f"Invalid filter expression: {expression}")
+
+    elif kind == "facet":
+        operator = FilterOperator.NOT_IN if negative else FilterOperator.IN
+        return {field: {operator: [expression.facet.facet]}}
+
+    else:
+        raise ValueError(f"Invalid filter expression: {expression}")
 
 
 def iter_paragraphs(resource: Resource) -> Iterator[tuple[str, IndexParagraph]]:

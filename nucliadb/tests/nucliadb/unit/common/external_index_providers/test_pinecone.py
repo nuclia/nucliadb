@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import datetime
-import json
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -29,13 +28,13 @@ from nucliadb.common.external_index_providers.pinecone import (
     PineconeIndexManager,
     PineconeQueryResults,
     VectorMetadata,
-    convert_label_filter_expression,
-    convert_timestamp_filter,
+    convert_filter_expression,
     convert_to_pinecone_filter,
 )
 from nucliadb.common.ids import ParagraphId
 from nucliadb_protos import nodereader_pb2
 from nucliadb_protos.knowledgebox_pb2 import PineconeIndexMetadata
+from nucliadb_protos.nodereader_pb2 import FilterExpression
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, IndexParagraphs
 from nucliadb_protos.noderesources_pb2 import Resource as PBResourceBrain
 from nucliadb_protos.utils_pb2 import VectorSimilarity
@@ -218,91 +217,190 @@ def test_iter_matching_text_blocks(query_response):
 
 
 def test_convert_timestamp_filter():
-    req = nodereader_pb2.SearchRequest()
     utcnow = datetime.datetime.now(datetime.timezone.utc)
     utcnow_as_int = int(utcnow.timestamp())
-    req.timestamps.from_created.FromDatetime(utcnow)
-    req.timestamps.to_created.FromDatetime(utcnow)
-    req.timestamps.from_modified.FromDatetime(utcnow)
-    req.timestamps.to_modified.FromDatetime(utcnow)
-    terms = convert_timestamp_filter(req.timestamps)
-    assert len(terms) == 4
-    assert terms[0] == {"date_modified": {"$gte": utcnow_as_int}}
-    assert terms[1] == {"date_modified": {"$lte": utcnow_as_int}}
-    assert terms[2] == {"date_created": {"$gte": utcnow_as_int}}
-    assert terms[3] == {"date_created": {"$lte": utcnow_as_int}}
+
+    created = FilterExpression()
+    created.date.field = FilterExpression.DateRangeFilter.DateField.CREATED
+    created.date.since.FromDatetime(utcnow)
+    created.date.until.FromDatetime(utcnow)
+
+    modified = FilterExpression()
+    modified.date.field = FilterExpression.DateRangeFilter.DateField.MODIFIED
+    modified.date.since.FromDatetime(utcnow)
+    modified.date.until.FromDatetime(utcnow)
+
+    expr = FilterExpression()
+    expr.bool_and.operands.append(created)
+    expr.bool_and.operands.append(modified)
+
+    terms = convert_filter_expression("field_labels", expr)
+    assert terms == {
+        "$and": [
+            {
+                "$and": [
+                    {"date_created": {"$gte": utcnow_as_int}},
+                    {"date_created": {"$lte": utcnow_as_int}},
+                ]
+            },
+            {
+                "$and": [
+                    {"date_modified": {"$gte": utcnow_as_int}},
+                    {"date_modified": {"$lte": utcnow_as_int}},
+                ]
+            },
+        ]
+    }
 
 
 @pytest.mark.parametrize(
     "expression, converted",
     [
         # Simple case: literal
-        ({"literal": "foo"}, {"paragraph_labels": {"$in": ["foo"]}}),
-        ({"not": {"literal": "foo"}}, {"paragraph_labels": {"$nin": ["foo"]}}),
+        (
+            FilterExpression(facet=FilterExpression.FacetFilter(facet="foo")),
+            {"paragraph_labels": {"$in": ["foo"]}},
+        ),
+        (
+            FilterExpression(bool_not=FilterExpression(facet=FilterExpression.FacetFilter(facet="foo"))),
+            {"paragraph_labels": {"$nin": ["foo"]}},
+        ),
         # Simple case: and
         (
-            {"and": [{"literal": "foo"}, {"literal": "bar"}]},
+            FilterExpression(
+                bool_and=FilterExpression.FilterExpressionList(
+                    operands=[
+                        FilterExpression(facet=FilterExpression.FacetFilter(facet="foo")),
+                        FilterExpression(facet=FilterExpression.FacetFilter(facet="bar")),
+                    ]
+                )
+            ),
             {"$and": [{"paragraph_labels": {"$in": ["foo"]}}, {"paragraph_labels": {"$in": ["bar"]}}]},
         ),
         (
-            {"and": [{"literal": "foo"}, {"not": {"literal": "bar"}}]},
+            FilterExpression(
+                bool_and=FilterExpression.FilterExpressionList(
+                    operands=[
+                        FilterExpression(facet=FilterExpression.FacetFilter(facet="foo")),
+                        FilterExpression(
+                            bool_not=FilterExpression(facet=FilterExpression.FacetFilter(facet="bar"))
+                        ),
+                    ]
+                )
+            ),
             {"$and": [{"paragraph_labels": {"$in": ["foo"]}}, {"paragraph_labels": {"$nin": ["bar"]}}]},
         ),
         # Simple case: or
         (
-            {"or": [{"literal": "foo"}, {"literal": "bar"}]},
+            FilterExpression(
+                bool_or=FilterExpression.FilterExpressionList(
+                    operands=[
+                        FilterExpression(facet=FilterExpression.FacetFilter(facet="foo")),
+                        FilterExpression(facet=FilterExpression.FacetFilter(facet="bar")),
+                    ]
+                )
+            ),
             {"$or": [{"paragraph_labels": {"$in": ["foo"]}}, {"paragraph_labels": {"$in": ["bar"]}}]},
         ),
         (
-            {"or": [{"literal": "foo"}, {"not": {"literal": "bar"}}]},
+            FilterExpression(
+                bool_or=FilterExpression.FilterExpressionList(
+                    operands=[
+                        FilterExpression(facet=FilterExpression.FacetFilter(facet="foo")),
+                        FilterExpression(
+                            bool_not=FilterExpression(facet=FilterExpression.FacetFilter(facet="bar"))
+                        ),
+                    ]
+                )
+            ),
             {"$or": [{"paragraph_labels": {"$in": ["foo"]}}, {"paragraph_labels": {"$nin": ["bar"]}}]},
         ),
         # And/or negated
         (
-            {"not": {"and": [{"literal": "foo"}, {"literal": "bar"}]}},
+            FilterExpression(
+                bool_not=FilterExpression(
+                    bool_and=FilterExpression.FilterExpressionList(
+                        operands=[
+                            FilterExpression(facet=FilterExpression.FacetFilter(facet="foo")),
+                            FilterExpression(facet=FilterExpression.FacetFilter(facet="bar")),
+                        ]
+                    )
+                )
+            ),
             {"$or": [{"paragraph_labels": {"$nin": ["foo"]}}, {"paragraph_labels": {"$nin": ["bar"]}}]},
         ),
         (
-            {"not": {"or": [{"literal": "foo"}, {"literal": "bar"}]}},
+            FilterExpression(
+                bool_not=FilterExpression(
+                    bool_or=FilterExpression.FilterExpressionList(
+                        operands=[
+                            FilterExpression(facet=FilterExpression.FacetFilter(facet="foo")),
+                            FilterExpression(facet=FilterExpression.FacetFilter(facet="bar")),
+                        ]
+                    )
+                )
+            ),
             {"$and": [{"paragraph_labels": {"$nin": ["foo"]}}, {"paragraph_labels": {"$nin": ["bar"]}}]},
         ),
     ],
 )
 def test_convert_label_filter_expression(expression, converted):
-    assert convert_label_filter_expression("paragraph_labels", expression) == converted
+    assert convert_filter_expression("paragraph_labels", expression) == converted
 
 
 def test_convert_to_pinecone_filter():
     request = nodereader_pb2.SearchRequest()
-    filter_expression = json.dumps({"literal": "/t/text/label"})
-    request.filter.field_labels.append("/t/text/label")
-    request.filter.labels_expression = filter_expression
 
-    request.fields.extend(["t/text", "a/title"])
+    # Label filter
+    label_filter = FilterExpression()
+    label_filter.facet.facet = "/t/text/label"
+    request.field_filter.bool_and.operands.append(label_filter)
 
+    # Field filter
+    ftitle_filter = FilterExpression()
+    ftitle_filter.field.field_type = "a"
+    ftitle_filter.field.field_id = "title"
+
+    ftext_filter = FilterExpression()
+    ftext_filter.field.field_type = "t"
+    ftext_filter.field.field_id = "text"
+
+    fields_filter = FilterExpression()
+    fields_filter.bool_or.operands.append(ftitle_filter)
+    fields_filter.bool_or.operands.append(ftext_filter)
+    request.field_filter.bool_and.operands.append(fields_filter)
+
+    # Date filter
     utcnow = datetime.datetime.now(datetime.timezone.utc)
-    request.timestamps.from_created.FromDatetime(utcnow)
+    date_filter = FilterExpression()
+    date_filter.date.field = FilterExpression.DateRangeFilter.DateField.CREATED
+    date_filter.date.since.FromDatetime(utcnow)
+    request.field_filter.bool_and.operands.append(date_filter)
 
-    request.key_filters.append("rid")
+    # Resource filter
+    rid_filter = FilterExpression()
+    rid_filter.resource.resource_id = "rid"
+    request.field_filter.bool_and.operands.append(rid_filter)
+
+    # Security
     request.security.access_groups.extend(["ag1", "ag2"])
 
     filters = convert_to_pinecone_filter(request)
     assert "$and" in filters
     and_terms = filters["$and"]
-    assert len(and_terms) == 5
-    label_filter_term = and_terms[0]
-    assert label_filter_term == {"field_labels": {"$in": ["/t/text/label"]}}
-    timestamp_filter_term = and_terms[1]
-    assert timestamp_filter_term == {"date_created": {"$gte": int(utcnow.timestamp())}}
-    key_filter_term = and_terms[2]
-    assert key_filter_term == {"rid": {"$in": ["rid"]}}
-    access_groups_term = and_terms[3]
+    assert len(and_terms) == 2
+    assert and_terms[0] == {
+        "$and": [
+            {"field_labels": {"$in": ["/t/text/label"]}},
+            {"$or": [{"field_id": {"$eq": "a/title"}}, {"field_id": {"$eq": "t/text"}}]},
+            {"date_created": {"$gte": int(utcnow.timestamp())}},
+            {"rid": {"$eq": "rid"}},
+        ]
+    }
+    access_groups_term = and_terms[1]
     assert access_groups_term["$or"][0] == {"security_public": {"$eq": True}}
     access_groups = access_groups_term["$or"][1]["security_ids_with_access"]["$in"]
     assert set(access_groups) == {"ag1", "ag2"}
-    field_filter_term = and_terms[4]
-    field_filter_terms = field_filter_term["field_id"]["$in"]
-    assert set(field_filter_terms) == {"t/text", "a/title"}
 
 
 def test_convert_to_pinecone_filter_empty():

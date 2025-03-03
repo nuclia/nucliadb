@@ -225,9 +225,6 @@ class QueryParser:
                     security_pb.access_groups.append(group_id)
             request.security.CopyFrom(security_pb)
 
-        if self.with_status is not None:
-            request.with_status = PROCESSING_STATUS_TO_PB_MAP[self.with_status]
-
         has_old_filters = False
         if self.old_filters:
             field_expr, paragraph_expr = await parse_old_filters(self.old_filters, self.fetcher)

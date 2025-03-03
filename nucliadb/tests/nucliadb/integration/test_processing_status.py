@@ -96,6 +96,12 @@ async def test_field_status_errors_processor(
 ):
     # Create a resource, processing
     br = broker_resource(standalone_knowledgebox)
+    br.texts["my_text"].CopyFrom(
+        rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
+    )
+    br.texts["other_text"].CopyFrom(
+        rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
+    )
     await inject_message(nucliadb_ingest_grpc, br)
 
     resp = await nucliadb_reader.get(
@@ -104,18 +110,31 @@ async def test_field_status_errors_processor(
     assert resp.status_code == 200
     resp_json = resp.json()
     assert resp_json["metadata"]["status"] == "PENDING"
-    assert resp_json["data"]["generics"]["title"]["status"] == "PENDING"
-    assert resp_json["data"]["generics"]["summary"]["status"] == "PENDING"
+    assert resp_json["data"]["texts"]["my_text"]["status"] == "PENDING"
+    assert resp_json["data"]["texts"]["other_text"]["status"] == "PENDING"
 
     # Receive message from processor with errors
     br.source = BrokerMessage.MessageSource.PROCESSOR
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Hello!"
+    etw.field.field = "my_text"
+    etw.field.field_type = rpb.FieldType.TEXT
+    br.extracted_text.append(etw)
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Bye!"
+    etw.field.field = "other_text"
+    etw.field.field_type = rpb.FieldType.TEXT
+    br.extracted_text.append(etw)
+
     g = Generator()
     g.processor.SetInParent()
     br.generated_by.append(g)
     br.errors.append(
         Error(
-            field_type=rpb.FieldType.GENERIC,
-            field="summary",
+            field_type=rpb.FieldType.TEXT,
+            field="my_text",
             error="Processor failed",
             code=Error.ErrorCode.EXTRACT,
         )
@@ -128,9 +147,9 @@ async def test_field_status_errors_processor(
     assert resp.status_code == 200
     resp_json = resp.json()
     assert resp_json["metadata"]["status"] == "ERROR"
-    assert resp_json["data"]["generics"]["title"]["status"] == "PROCESSED"
-    assert resp_json["data"]["generics"]["summary"]["status"] == "ERROR"
-    assert len(resp_json["data"]["generics"]["summary"]["errors"]) == 1
+    assert resp_json["data"]["texts"]["my_text"]["status"] == "ERROR"
+    assert resp_json["data"]["texts"]["other_text"]["status"] == "PROCESSED"
+    assert len(resp_json["data"]["texts"]["my_text"]["errors"]) == 1
 
     # Receive message from processor without errors, previous errors are cleared
     br.errors.pop()
@@ -142,9 +161,9 @@ async def test_field_status_errors_processor(
     assert resp.status_code == 200
     resp_json = resp.json()
     assert resp_json["metadata"]["status"] == "PROCESSED"
-    assert resp_json["data"]["generics"]["title"]["status"] == "PROCESSED"
-    assert resp_json["data"]["generics"]["summary"]["status"] == "PROCESSED"
-    assert "errors" not in resp_json["data"]["generics"]["summary"]
+    assert resp_json["data"]["texts"]["my_text"]["status"] == "PROCESSED"
+    assert resp_json["data"]["texts"]["other_text"]["status"] == "PROCESSED"
+    assert "errors" not in resp_json["data"]["texts"]["my_text"]
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -229,3 +248,27 @@ async def test_field_status_errors_data_augmentation(
     assert resp_json["data"]["generics"]["title"]["status"] == "PROCESSED"
     assert resp_json["data"]["texts"]["text"]["status"] == "ERROR"
     assert len(resp_json["data"]["texts"]["text"]["errors"]) == 1
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_empty_resource_is_processed(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    # Create a resource, processing
+    br = broker_resource(standalone_knowledgebox)
+    await inject_message(nucliadb_ingest_grpc, br)
+
+    resp = await nucliadb_writer.post(f"/kb/{standalone_knowledgebox}/resources", json={})
+    assert resp.status_code == 201
+    resp_json = resp.json()
+
+    uuid = resp_json["uuid"]
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{uuid}?show=basic&show=errors"
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PROCESSED"

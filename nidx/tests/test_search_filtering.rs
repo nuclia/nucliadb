@@ -21,8 +21,9 @@
 mod common;
 
 use common::services::NidxFixture;
+use nidx_protos::filter_expression::{Expr, FieldFilter, FilterExpressionList, KeywordFilter, ResourceFilter};
 use nidx_protos::prost_types::Timestamp;
-use nidx_protos::{nodereader, noderesources, Filter};
+use nidx_protos::{nodereader, noderesources, FilterExpression};
 use nidx_protos::{NewShardRequest, VectorIndexConfig};
 use sqlx::PgPool;
 use std::collections::HashMap;
@@ -31,6 +32,63 @@ use tonic::Request;
 use uuid::Uuid;
 
 const VECTOR_DIMENSION: usize = 10;
+
+fn file_field_filter_expression(fields: &[&str]) -> FilterExpression {
+    or_filter_expression(
+        fields
+            .iter()
+            .map(|f| FilterExpression {
+                expr: Some(Expr::Field(FieldFilter {
+                    field_type: "f".into(),
+                    field_id: Some(f.to_string()),
+                })),
+            })
+            .collect(),
+    )
+}
+
+fn resource_filter_expression(resources: &[&str]) -> FilterExpression {
+    or_filter_expression(
+        resources
+            .iter()
+            .map(|r| FilterExpression {
+                expr: Some(Expr::Resource(ResourceFilter {
+                    resource_id: r.to_string(),
+                })),
+            })
+            .collect(),
+    )
+}
+
+fn keyword_filter_expression(word: &str) -> FilterExpression {
+    FilterExpression {
+        expr: Some(Expr::Keyword(KeywordFilter {
+            keyword: word.to_string(),
+        })),
+    }
+}
+
+fn or_filter_expression(operands: Vec<FilterExpression>) -> FilterExpression {
+    FilterExpression {
+        expr: Some(Expr::BoolOr(FilterExpressionList {
+            operands,
+        })),
+    }
+}
+
+fn and_filter_expression(operands: Vec<FilterExpression>) -> FilterExpression {
+    FilterExpression {
+        expr: Some(Expr::BoolAnd(FilterExpressionList {
+            operands,
+        })),
+    }
+}
+
+fn not_filter_expression(operand: FilterExpression) -> FilterExpression {
+    FilterExpression {
+        expr: Some(Expr::BoolNot(Box::new(operand))),
+    }
+}
 
 #[sqlx::test]
 async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::error::Error>> {
@@ -66,7 +124,7 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
 
     let search_request = nodereader::SearchRequest {
         shard: shard_id.clone(),
-        fields: ["f/foobar".to_string()].to_vec(),
+        field_filter: Some(file_field_filter_expression(&["foobar"])),
         vector: query_vector.clone(),
         vectorset: "english".to_string(),
         page_number: 0,
@@ -87,7 +145,7 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
         shard: shard_id.clone(),
         vector: query_vector.clone(),
         vectorset: "english".to_string(),
-        fields: ["f/field1".to_string(), "f/unexisting".to_string()].to_vec(),
+        field_filter: Some(file_field_filter_expression(&["field1", "unexisting"])),
         page_number: 0,
         result_per_page: 1,
         min_score_semantic: -1.0,
@@ -111,7 +169,7 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
         shard: shard_id.clone(),
         vector: query_vector.clone(),
         vectorset: "english".to_string(),
-        fields: ["f/field1".to_string(), "f/field2".to_string()].to_vec(),
+        field_filter: Some(file_field_filter_expression(&["field1", "field2"])),
         page_number: 0,
         result_per_page: 2,
         min_score_semantic: -1.0,
@@ -248,7 +306,7 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
         min_score_bm25: 0.0,
         paragraph: true,
         body: "Dummy".to_string(),
-        key_filters: vec![resource1.resource.as_ref().unwrap().uuid.clone()],
+        field_filter: Some(resource_filter_expression(&[&resource1.resource.as_ref().unwrap().uuid])),
         ..Default::default()
     };
     let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
@@ -262,7 +320,10 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
         min_score_bm25: 0.0,
         paragraph: true,
         body: "Dummy".to_string(),
-        key_filters: vec![format!("{}/f/field1", resource1.resource.as_ref().unwrap().uuid)],
+        field_filter: Some(and_filter_expression(vec![
+            resource_filter_expression(&[&resource1.resource.as_ref().unwrap().uuid]),
+            file_field_filter_expression(&["field1"]),
+        ])),
         ..Default::default()
     };
     let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
@@ -276,10 +337,10 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
         min_score_bm25: 0.0,
         paragraph: true,
         body: "Dummy".to_string(),
-        key_filters: vec![
-            resource1.resource.as_ref().unwrap().uuid.clone(),
-            resource2.resource.as_ref().unwrap().uuid.clone(),
-        ],
+        field_filter: Some(resource_filter_expression(&[
+            &resource1.resource.as_ref().unwrap().uuid,
+            &resource2.resource.as_ref().unwrap().uuid,
+        ])),
         ..Default::default()
     };
     let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
@@ -293,7 +354,7 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
         min_score_bm25: 0.0,
         paragraph: true,
         body: "Dummy".to_string(),
-        key_filters: vec!["fake".into()],
+        field_filter: Some(resource_filter_expression(&["fake"])),
         ..Default::default()
     };
     let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
@@ -349,10 +410,7 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
         min_score_bm25: 0.0,
         paragraph: true,
         body: "Dummy".to_string(),
-        filter: Some(Filter {
-            keywords_expression: r#"{"literal":"text"}"#.into(),
-            ..Default::default()
-        }),
+        field_filter: Some(keyword_filter_expression("text")),
         ..Default::default()
     };
     let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
@@ -366,10 +424,7 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
         min_score_bm25: 0.0,
         paragraph: true,
         body: "Dummy".to_string(),
-        filter: Some(Filter {
-            keywords_expression: r#"{"literal":"none"}"#.into(),
-            ..Default::default()
-        }),
+        field_filter: Some(keyword_filter_expression("none")),
         ..Default::default()
     };
     let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
@@ -383,10 +438,7 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
         min_score_bm25: 0.0,
         paragraph: true,
         body: "Dummy".to_string(),
-        filter: Some(Filter {
-            keywords_expression: r#"{"not": {"literal":"none"}}"#.into(),
-            ..Default::default()
-        }),
+        field_filter: Some(not_filter_expression(keyword_filter_expression("none"))),
         ..Default::default()
     };
     let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
@@ -400,10 +452,10 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
         min_score_bm25: 0.0,
         paragraph: true,
         body: "Dummy".to_string(),
-        filter: Some(Filter {
-            keywords_expression: r#"{"or": [{"literal":"none"}, {"literal":"text"}]}"#.into(),
-            ..Default::default()
-        }),
+        field_filter: Some(or_filter_expression(vec![
+            keyword_filter_expression("none"),
+            keyword_filter_expression("text"),
+        ])),
         ..Default::default()
     };
     let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();

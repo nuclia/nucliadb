@@ -101,15 +101,15 @@ async def move_set_of_kb_resources(
     to_shard = [s for s in kb_shards.shards if s.shard == to_shard_id][0]
 
     from_node, from_shard_replica_id = choose_node(from_shard)
-    search_response: nodereader_pb2.SearchResponse = await from_node.reader.Search(  # type: ignore
-        nodereader_pb2.SearchRequest(
-            shard=from_shard_replica_id,
-            paragraph=False,
-            document=True,
-            result_per_page=count,
-            fields=["a/title"],
-        )
+    request = nodereader_pb2.SearchRequest(
+        shard=from_shard_replica_id,
+        paragraph=False,
+        document=True,
+        result_per_page=count,
     )
+    request.field_filter.field.field_type = "a"
+    request.field_filter.field.field_id = "title"
+    search_response: nodereader_pb2.SearchResponse = await from_node.reader.Search(request)  # type: ignore
 
     for result in search_response.document.results:
         resource_id = result.uuid
