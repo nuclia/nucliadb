@@ -36,8 +36,6 @@ from nucliadb.export_import.utils import (
 from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_utils.storages.storage import StorageField
 
-MB = 1024 * 1024
-
 
 async def backup_kb(context: ApplicationContext, msg: CreateBackupRequest):
     kbid = msg.kbid
@@ -54,6 +52,8 @@ async def _backup_kb(context: ApplicationContext, kbid: str, backup_id: str):
     await backup_resources(context, kbid, backup_id)
     await backup_labels(context, kbid, backup_id)
     await backup_entities(context, kbid, backup_id)
+    await notify_backup_completed(context, kbid, backup_id)
+    await delete_metadata(context, kbid, backup_id)
 
 
 async def backup_resources(context: ApplicationContext, kbid: str, backup_id: str):
@@ -195,6 +195,12 @@ async def set_metadata(context: ApplicationContext, kbid: str, backup_id: str, m
         await txn.commit()
 
 
+async def delete_metadata(context: ApplicationContext, kbid: str, backup_id: str):
+    async with context.kv_driver.transaction() as txn:
+        await txn.delete(f"kbs/{kbid}/backups/{backup_id}")
+        await txn.commit()
+
+
 async def upload_to_bucket(context: ApplicationContext, bytes_iterator: AsyncIterator[bytes], key: str):
     storage = context.blob_storage
     bucket = "backups"
@@ -204,3 +210,8 @@ async def upload_to_bucket(context: ApplicationContext, bytes_iterator: AsyncIte
     cf.source = resources_pb2.CloudFile.Source.EXPORT
     field: StorageField = storage.field_klass(storage=storage, bucket=bucket, fullkey=key, field=cf)
     await storage.uploaditerator(bytes_iterator, field, cf)
+
+
+async def notify_backup_completed(context: ApplicationContext, kbid: str, backup_id: str):
+    # TODO
+    pass
