@@ -437,14 +437,32 @@ class NotEnoughContextAskResult(AskResult):
         context in the corpus to answer.
         """
         yield self._ndjson_encode(RetrievalAskResponseItem(results=self.main_results))
+        if self.prequeries_results:
+            yield self._ndjson_encode(
+                PrequeriesAskResponseItem(
+                    results={
+                        prequery.id or f"prequery_{index}": prequery_result
+                        for index, (prequery, prequery_result) in enumerate(self.prequeries_results)
+                    }
+                )
+            )
         yield self._ndjson_encode(AnswerAskResponseItem(text=NOT_ENOUGH_CONTEXT_ANSWER))
         status = AnswerStatusCode.NO_RETRIEVAL_DATA
         yield self._ndjson_encode(StatusAskResponseItem(code=status.value, status=status.prettify()))
 
     async def json(self) -> str:
+        prequeries = (
+            {
+                prequery.id or f"prequery_{index}": prequery_result
+                for index, (prequery, prequery_result) in enumerate(self.prequeries_results)
+            }
+            if self.prequeries_results
+            else None
+        )
         return SyncAskResponse(
             answer=NOT_ENOUGH_CONTEXT_ANSWER,
             retrieval_results=self.main_results,
+            prequeries=prequeries,
             status=AnswerStatusCode.NO_RETRIEVAL_DATA.prettify(),
         ).model_dump_json()
 
