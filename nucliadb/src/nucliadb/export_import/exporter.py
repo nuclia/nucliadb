@@ -76,8 +76,8 @@ async def export_kb_to_blob_storage(context: ApplicationContext, msg: NatsTaskMe
     """
     kbid, export_id = msg.kbid, msg.id
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
-    metadata = await dm.get_metadata(type="export", kbid=kbid, id=export_id)
-    iterator = export_kb(context, kbid, metadata)  # type: ignore
+    metadata = await dm.get_export_metadata(kbid=kbid, id=export_id)
+    iterator = export_kb(context, kbid, metadata)
 
     retry_handler = TaskRetryHandler("export", dm, metadata)
 

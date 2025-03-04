@@ -17,23 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from dataclasses import dataclass
-from typing import Any, Callable, Coroutine, Optional, Type
+from typing import Any, Callable, Coroutine, TypeVar
 
 import pydantic
 
 from nucliadb.common.context import ApplicationContext
-from nucliadb_utils import const
 
-MsgType = Type[pydantic.BaseModel]
+MsgType = TypeVar("MsgType", bound=pydantic.BaseModel)
 
 # async def callback(context: ApplicationContext, msg: MyPydanticModel):
 Callback = Callable[[ApplicationContext, MsgType], Coroutine[Any, Any, Any]]
-
-
-@dataclass
-class RegisteredTask:
-    stream: const.Streams
-    callback: Callback
-    msg_type: MsgType
-    max_concurrent_messages: Optional[int] = None

@@ -17,26 +17,28 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
+from typing import Generic, Optional, Type
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.tasks.logger import logger
 from nucliadb.tasks.models import MsgType
-from nucliadb.tasks.registry import get_registered_task
 from nucliadb.tasks.utils import create_nats_stream_if_not_exists
 from nucliadb_telemetry import errors
-from nucliadb_utils import const
 
 
-class NatsTaskProducer:
+class NatsTaskProducer(Generic[MsgType]):
     def __init__(
         self,
         name: str,
-        stream: const.Streams,
-        msg_type: MsgType,
+        stream: str,
+        stream_subjects: list[str],
+        producer_subject: str,
+        msg_type: Type[MsgType],
     ):
         self.name = name
         self.stream = stream
+        self.stream_subjects = stream_subjects
+        self.producer_subject = producer_subject
         self.msg_type = msg_type
         self.context: Optional[ApplicationContext] = None
         self.initialized = False
@@ -45,12 +47,12 @@ class NatsTaskProducer:
         self.context = context
         await create_nats_stream_if_not_exists(
             self.context,
-            self.stream.name,  # type: ignore
-            subjects=[self.stream.subject],  # type: ignore
+            self.stream,
+            subjects=self.stream_subjects,
         )
         self.initialized = True
 
-    async def __call__(self, msg: MsgType) -> int:
+    async def send(self, msg: MsgType) -> int:
         """
         Publish message to the producer's nats stream.
         Returns the sequence number of the published message.
@@ -59,7 +61,7 @@ class NatsTaskProducer:
             raise RuntimeError("NatsTaskProducer not initialized")
         try:
             pub_ack = await self.context.nats_manager.js.publish(  # type: ignore
-                self.stream.subject,  # type: ignore
+                self.producer_subject,
                 msg.model_dump_json().encode("utf-8"),  # type: ignore
             )
             logger.info(
@@ -79,23 +81,19 @@ class NatsTaskProducer:
 
 def create_producer(
     name: str,
-    stream: const.Streams,
-    msg_type: MsgType,
-) -> NatsTaskProducer:
+    stream: str,
+    stream_subjects: list[str],
+    producer_subject: str,
+    msg_type: Type[MsgType],
+) -> NatsTaskProducer[MsgType]:
     """
     Returns a non-initialized producer.
     """
-    return NatsTaskProducer(name=name, stream=stream, msg_type=msg_type)
-
-
-async def get_producer(task_name: str, context: ApplicationContext) -> NatsTaskProducer:
-    """
-    Returns a producer for the given task name, ready to be used to send messages to the task stream.
-    """
-    try:
-        task = get_registered_task(task_name)
-    except KeyError:
-        raise ValueError(f"Task {task_name} not registered")
-    producer = create_producer(name=f"{task_name}_producer", stream=task.stream, msg_type=task.msg_type)
-    await producer.initialize(context)
+    producer = NatsTaskProducer[MsgType](
+        name=name,
+        stream=stream,
+        stream_subjects=stream_subjects,
+        producer_subject=producer_subject,
+        msg_type=msg_type,
+    )
     return producer

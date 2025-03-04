@@ -17,6 +17,5 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from .consumer import NatsTaskConsumer, create_consumer, start_consumer  # noqa
-from .producer import NatsTaskProducer, create_producer, get_producer  # noqa
-from .registry import register_task  # noqa
+from .consumer import NatsTaskConsumer, create_consumer  # noqa
+from .producer import NatsTaskProducer, create_producer  # noqa
