@@ -19,10 +19,11 @@
 
 from base64 import b64decode, b64encode
 from enum import Enum
-from typing import Optional, TypedDict
+from typing import Optional
 
 from google.protobuf.message import DecodeError, Message
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing_extensions import TypedDict
 
 from nucliadb_protos.resources_pb2 import FieldMetadata, FieldText, QuestionAnswers
 
