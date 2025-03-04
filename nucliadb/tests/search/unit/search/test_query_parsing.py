@@ -24,7 +24,7 @@ import pytest
 from pydantic import ValidationError
 
 from nucliadb.search.search.query_parser import models as parser_models
-from nucliadb.search.search.query_parser.parser import parse_find
+from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb_models import search as search_models
 from nucliadb_models.search import FindRequest
 

@@ -18,10 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 from nucliadb.common import datamanagers
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.filters import translate_label
+from nucliadb.search.search.query_parser.filter_expression import FacetFilterTypes, facet_from_filter
 from nucliadb.search.search.query_parser.models import (
     CatalogExpression,
     CatalogQuery,
@@ -43,8 +43,6 @@ from nucliadb_models.search import (
     SortOptions,
     SortOrder,
 )
-
-from .filter_expression import FacetFilterTypes, facet_from_filter
 
 
 async def parse_catalog(kbid: str, item: search_models.CatalogRequest) -> CatalogQuery:

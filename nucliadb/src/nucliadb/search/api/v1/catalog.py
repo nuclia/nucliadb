@@ -36,7 +36,7 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import fetch_resources
 from nucliadb.search.search.pgcatalog import pgcatalog_search
-from nucliadb.search.search.query_parser.catalog import parse_catalog
+from nucliadb.search.search.query_parser.parsers import parse_catalog
 from nucliadb.search.search.utils import (
     maybe_log_request_payload,
 )

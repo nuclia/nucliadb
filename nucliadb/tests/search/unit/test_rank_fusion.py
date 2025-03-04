@@ -36,7 +36,7 @@ from nucliadb.search.search.find_merge import (
     keyword_result_to_text_block_match,
     semantic_result_to_text_block_match,
 )
-from nucliadb.search.search.query_parser.parser import parse_find
+from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb.search.search.rank_fusion import LegacyRankFusion, ReciprocalRankFusion, get_rank_fusion
 from nucliadb_models.search import SCORE_TYPE, FindRequest
 from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
