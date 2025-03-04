@@ -26,6 +26,7 @@ proto-py:
 	python -m grpc_tools.protoc nucliadb_protos/audit.proto 		-I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
 	python -m grpc_tools.protoc nucliadb_protos/nodewriter.proto    -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
 	python -m grpc_tools.protoc nucliadb_protos/nodereader.proto    -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/backups.proto       -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
 	python -m grpc_tools.protoc nucliadb_protos/writer.proto        -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
 	python -m grpc_tools.protoc nucliadb_protos/train.proto         -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
 	python -m grpc_tools.protoc nucliadb_protos/dataset.proto       -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
