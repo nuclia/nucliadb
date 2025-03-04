@@ -24,6 +24,7 @@ import tarfile
 from typing import AsyncIterator, Union
 
 from nucliadb.backups.const import StorageKeys
+from nucliadb.backups.models import RestoreBackupRequest
 from nucliadb.backups.settings import settings
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.utils import (
@@ -32,9 +33,29 @@ from nucliadb.export_import.utils import (
     set_entities_groups,
     set_labels,
 )
+from nucliadb.tasks.retries import TaskRetryHandler
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
+
+
+async def restore_kb_retried(context: ApplicationContext, msg: RestoreBackupRequest):
+    kbid = msg.kbid
+    backup_id = msg.backup_id
+
+    retry_handler = TaskRetryHandler(
+        kbid=kbid,
+        task_type="restore",
+        task_id=backup_id,
+        context=context,
+        max_retries=3,
+    )
+
+    @retry_handler.wrap
+    async def _restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
+        await restore_kb(context, kbid, backup_id)
+
+    await _restore_kb(context, kbid, backup_id)
 
 
 async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
@@ -49,7 +70,7 @@ async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
 async def restore_resources(context: ApplicationContext, kbid: str, backup_id: str):
     tasks = []
     async for object_info in context.blob_storage.iterate_objects(
-        bucket=settings.storage_bucket,
+        bucket=settings.backups_bucket,
         prefix=StorageKeys.RESOURCES_PREFIX.format(kbid=kbid, backup_id=backup_id),
     ):
         resource_id = object_info.name.rstrip(".tar")
@@ -67,8 +88,8 @@ class CloudFileBinary:
         self.uri = uri
         self.download_stream = download_stream
 
-    async def read(self) -> AsyncIterator[bytes]:
-        async for chunk in self.download_stream:
+    async def read(self, chunk_size: int) -> AsyncIterator[bytes]:
+        async for chunk in self.download_stream(chunk_size):
             yield chunk
 
 
@@ -117,7 +138,7 @@ class ResourceBackupReader:
 
 async def restore_resource(context: ApplicationContext, kbid: str, backup_id: str, resource_id: str):
     download_stream = context.blob_storage.download(
-        bucket=settings.storage_bucket,
+        bucket=settings.backups_bucket,
         key=StorageKeys.RESOURCE.format(kbid=kbid, backup_id=backup_id, resource_id=resource_id),
     )
     reader = ResourceBackupReader(download_stream)
@@ -135,14 +156,15 @@ async def restore_resource(context: ApplicationContext, kbid: str, backup_id: st
         assert isinstance(cf, CloudFile)
         cf_binary = await reader.read_item()
         assert isinstance(cf_binary, CloudFileBinary)
-        await import_binary(context, kbid, cf, cf_binary.read())
+        assert cf.uri == cf_binary.uri
+        await import_binary(context, kbid, cf, cf_binary.read)
 
     await import_broker_message(context, kbid, bm)
 
 
 async def restore_labels(context: ApplicationContext, kbid: str, backup_id: str):
     raw = await context.blob_storage.download(
-        bucket=settings.storage_bucket,
+        bucket=settings.backups_bucket,
         key=StorageKeys.LABELS.format(kbid=kbid, backup_id=backup_id),
     )
     labels = kb_pb2.Labels()
@@ -152,7 +174,7 @@ async def restore_labels(context: ApplicationContext, kbid: str, backup_id: str)
 
 async def restore_entities(context: ApplicationContext, kbid: str, backup_id: str):
     raw = await context.blob_storage.download(
-        bucket=settings.storage_bucket,
+        bucket=settings.backups_bucket,
         key=StorageKeys.ENTITIES.format(kbid=kbid, backup_id=backup_id),
     )
     entities = kb_pb2.EntitiesGroups()

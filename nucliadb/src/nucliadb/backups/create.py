@@ -146,7 +146,7 @@ async def backup_resource_with_binaries(
     async def resource_data_iterator():
         """
         Each tar file will have the following structure:
-        
+
         - cloud-files/{cloud_file.uri}  (serialized resources_pb2.CloudFile)
         - binaries/{cloud_file.uri} (the actual binary content of the cloud file)
         - broker-message.pb

@@ -27,6 +27,8 @@ class StorageKeys:
     """
     Defines the key templates used to store backup files in the backups bucket of the storage.
     """
+
+    BACKUP_PREFIX = "kbs/{kbid}/backups/{backup_id}/"
     RESOURCES_PREFIX = "kbs/{kbid}/{backup_id}/resources/"
     RESOURCE = "kbs/{kbid}/{backup_id}/resources/{resource_id}.tar"
     ENTITIES = "kbs/{kbid}/{backup_id}/entities.pb"

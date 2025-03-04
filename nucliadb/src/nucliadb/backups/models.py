@@ -27,6 +27,16 @@ class CreateBackupRequest(BaseModel):
     backup_id: str
 
 
+class RestoreBackupRequest(BaseModel):
+    kbid: str
+    backup_id: str
+
+
+class DeleteBackupRequest(BaseModel):
+    kbid: str
+    backup_id: str
+
+
 class BackupMetadata(BaseModel):
     kbid: str
     requested_at: datetime
