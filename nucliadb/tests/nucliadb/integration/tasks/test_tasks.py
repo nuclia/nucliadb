@@ -52,42 +52,6 @@ class Message(pydantic.BaseModel):
     kbid: str
 
 
-async def test_tasks_registry_api(context):
-    work_done = asyncio.Event()
-
-    async def some_work(context: ApplicationContext, msg: Message):
-        nonlocal work_done
-
-        work_done.set()
-
-    producer = tasks.create_producer(
-        name="some_work",
-        stream="work",
-        stream_subjects=["work"],
-        producer_subject="work",
-        msg_type=Message,
-    )
-    await producer.initialize()
-
-    consumer = tasks.create_consumer(
-        name="some_work",
-        stream="work",
-        stream_subjects=["work"],
-        consumer_subject="work",
-        callback=some_work,
-        msg_type=Message,
-    )
-    await consumer.initialize(context=context)
-
-    msg = Message(kbid="kbid1")
-    await producer(msg)
-
-    await work_done.wait()
-    work_done.clear()
-
-    await consumer.finalize()
-
-
 async def test_tasks_factory_api(context):
     work_done = asyncio.Event()
 
