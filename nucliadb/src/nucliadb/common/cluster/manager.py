@@ -22,14 +22,10 @@ import logging
 import uuid
 from typing import Any, Awaitable, Callable, Optional
 
-import backoff
-
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import (
-    NodeClusterSmall,
     NodeError,
-    NodesUnsync,
     ShardNotFound,
     ShardsNotFound,
 )
@@ -48,17 +44,6 @@ from nucliadb_utils.utilities import get_storage
 from .settings import settings
 
 logger = logging.getLogger(__name__)
-
-INDEX_NODES: dict[str, AbstractIndexNode] = {}
-READ_REPLICA_INDEX_NODES: dict[str, set[str]] = {}
-
-
-def get_index_nodes(include_secondary: bool = False) -> list[AbstractIndexNode]:
-    return [get_nidx_fake_node()]
-
-
-def get_index_node(node_id: str) -> Optional[AbstractIndexNode]:
-    return get_nidx_fake_node()
 
 
 class KBShardManager:
@@ -301,7 +286,6 @@ class StandaloneKBShardManager(KBShardManager):
         self._lock = asyncio.Lock()
         self._change_count: dict[tuple[str, str], int] = {}
 
-    @backoff.on_exception(backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5)
     async def delete_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -321,7 +305,6 @@ class StandaloneKBShardManager(KBShardManager):
             indexpb.typemessage = nodewriter_pb2.TypeMessage.DELETION
             await nidx.index(indexpb)
 
-    @backoff.on_exception(backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5)
     async def add_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -367,57 +350,3 @@ def choose_node(
 ) -> tuple[AbstractIndexNode, str]:
     fake_node = get_nidx_fake_node()
     return fake_node, shard.nidx_shard_id
-
-
-def check_enough_nodes():
-    return True
-    """
-    It raises an exception if it can't find enough nodes for the configured replicas.
-    """
-    drain_nodes = settings.drain_nodes
-    target_replicas = settings.node_replicas
-    available_nodes = get_index_nodes()
-    available_nodes = [node for node in available_nodes if node.id not in drain_nodes]
-    if len(available_nodes) < target_replicas:
-        raise NodeClusterSmall(
-            f"Not enough nodes. Total: {len(available_nodes)}, Required: {target_replicas}"
-        )
-    if settings.max_node_replicas >= 0:
-        available_nodes = list(
-            filter(lambda n: n.shard_count < settings.max_node_replicas, available_nodes)
-        )
-        if len(available_nodes) < target_replicas:
-            raise NodeClusterSmall(
-                f"Could not find enough nodes with available shards. Available: {len(available_nodes)}, Required: {target_replicas}"  # noqa
-            )
-
-
-def sorted_primary_nodes(
-    avoid_nodes: Optional[list[str]] = None,
-    ignore_nodes: Optional[list[str]] = None,
-) -> list[str]:
-    """
-    Returns the list of all primary node ids sorted by decreasing available
-    disk space (from more to less available disk reported).
-
-    Nodes in `avoid_nodes` are placed at the tail of the list.
-    Nodes in `ignore_nodes` are ignored and never returned.
-    """
-    primary_nodes = get_index_nodes(include_secondary=False)
-
-    # Sort by available disk
-    sorted_nodes = sorted(primary_nodes, key=lambda n: n.available_disk, reverse=True)
-    available_node_ids = [node.id for node in sorted_nodes]
-
-    avoid_nodes = avoid_nodes or []
-    ignore_nodes = ignore_nodes or []
-
-    # Get the non-avoided nodes first
-    preferred_nodes = [nid for nid in available_node_ids if nid not in avoid_nodes]
-
-    # Add avoid_nodes to the end of the last nodes
-    result_nodes = preferred_nodes + [nid for nid in available_node_ids if nid not in preferred_nodes]
-
-    # Remove ignore_nodes from the list
-    result_nodes = [nid for nid in result_nodes if nid not in ignore_nodes]
-    return result_nodes

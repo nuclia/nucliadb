@@ -47,7 +47,3 @@ def reset_config():
         for attr, _value in settings:
             default_value = getattr(defaults, attr)
             setattr(settings, attr, default_value)
-
-    from nucliadb.common.cluster import manager
-
-    manager.INDEX_NODES.clear()
