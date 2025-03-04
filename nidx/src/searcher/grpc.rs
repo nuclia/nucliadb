@@ -169,6 +169,19 @@ impl NidxSearcher for SearchServer {
         }
     }
 
+    async fn graph_search(&self, request: Request<GraphSearchRequest>) -> Result<Response<GraphSearchResponse>> {
+        let request = request.into_inner();
+        let shard_id = uuid::Uuid::parse_str(&request.shard).map_err(NidxError::from)?;
+        shard_request! {
+            "graph_search",
+            self,
+            request,
+            shard_id,
+            LOCAL => shard_search::graph_search(Arc::clone(&self.index_cache), request.clone()).await,
+            REMOTE => graph_search
+        }
+    }
+
     type ParagraphsStream = Pin<Box<dyn Stream<Item = Result<ParagraphItem, Status>> + Send>>;
     async fn paragraphs(&self, request: Request<StreamRequest>) -> Result<Response<Self::ParagraphsStream>> {
         let request = request.into_inner();

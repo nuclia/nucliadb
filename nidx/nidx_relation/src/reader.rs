@@ -23,11 +23,12 @@ use std::path::Path;
 
 use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::{
-    EntitiesSubgraphResponse, RelationNode, RelationPrefixSearchResponse, RelationSearchRequest, RelationSearchResponse,
+    EntitiesSubgraphResponse, GraphSearchRequest, GraphSearchResponse, RelationNode, RelationPrefixSearchResponse,
+    RelationSearchRequest, RelationSearchResponse,
 };
 use tantivy::collector::TopDocs;
 use tantivy::query::{BooleanQuery, Occur, Query};
-use tantivy::{Index, IndexReader};
+use tantivy::{DocAddress, Index, IndexReader, Searcher};
 
 use crate::graph_query_parser::{
     Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, PathQuery, Relation, Term,
@@ -62,7 +63,72 @@ impl RelationsReaderService {
         })
     }
 
-    pub fn graph_search(&self, query: GraphQuery) -> anyhow::Result<Vec<nidx_protos::Relation>> {
+    pub fn graph_search(&self, request: &GraphSearchRequest) -> anyhow::Result<GraphSearchResponse> {
+        // No query? Empty graph
+        let Some(query) = &request.query else {
+            return Ok(GraphSearchResponse::default());
+        };
+        let Some(query) = &query.query else {
+            return Ok(GraphSearchResponse::default());
+        };
+
+        // Convert proto to tantivy query
+        let query = GraphQuery::try_from(query)?;
+        let parser = GraphQueryParser::new();
+        let index_query = parser.parse(query);
+
+        // Tantivy searcher query
+        let collector = TopDocs::with_limit(request.top_k as usize);
+
+        let searcher = self.reader.searcher();
+        let matching_docs = searcher.search(&index_query, &collector)?;
+
+        self.build_graph_response(&searcher, matching_docs.into_iter().map(|(_score, doc_address)| doc_address))
+    }
+
+    fn build_graph_response(
+        &self,
+        searcher: &Searcher,
+        docs: impl Iterator<Item = DocAddress>,
+    ) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
+        // We are being very naive and writing everything to the proto response. We could be smarter
+        // and deduplicates nodes and relations. As paths are pointers, this would improve proto
+        // size and ser/de time at expenses of deduplication effort.
+
+        let mut nodes = Vec::new();
+        let mut relations = Vec::new();
+        let mut graph = Vec::new();
+
+        for doc_address in docs {
+            let doc = searcher.doc(doc_address)?;
+
+            let source = io_maps::source_to_relation_node(&self.schema, &doc);
+            let relation = io_maps::doc_to_graph_relation(&self.schema, &doc);
+            let destination = io_maps::target_to_relation_node(&self.schema, &doc);
+
+            let source_idx = nodes.len();
+            nodes.push(source);
+            let relation_idx = relations.len();
+            relations.push(relation);
+            let destination_idx = nodes.len();
+            nodes.push(destination);
+
+            graph.push(nidx_protos::graph_search_response::Path {
+                source: source_idx as u32,
+                relation: relation_idx as u32,
+                destination: destination_idx as u32,
+            })
+        }
+
+        let response = nidx_protos::GraphSearchResponse {
+            nodes,
+            relations,
+            graph,
+        };
+        Ok(response)
+    }
+
+    pub fn inner_graph_search(&self, query: GraphQuery) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
         let parser = GraphQueryParser::new();
         let index_query: Box<dyn Query> = parser.parse(query);
 
@@ -71,13 +137,8 @@ impl RelationsReaderService {
 
         let searcher = self.reader.searcher();
         let matching_docs = searcher.search(&index_query, &collector)?;
-        let mut relations = Vec::with_capacity(matching_docs.len());
-        for (_, doc_addr) in matching_docs {
-            let doc = searcher.doc(doc_addr)?;
-            let relation = io_maps::doc_to_relation(&self.schema, &doc);
-            relations.push(relation);
-        }
-        Ok(relations)
+
+        self.build_graph_response(&searcher, matching_docs.into_iter().map(|(_score, doc_address)| doc_address))
     }
 }
 
@@ -238,7 +299,11 @@ impl RelationsReaderService {
         }
 
         let searcher = self.reader.searcher();
-        let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
+        // FIXME: we are using a topdocs collector to get prefix results from source and target
+        // nodes. However, we are deduplicating afterwards, and this means we could end up with less
+        // results although results may exist. As a quick fix, we increase here the limit of the
+        // collector. The proper solution would be implementing a custom collector for this task
+        let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST * 2);
         let schema = &self.schema;
 
         match search {
@@ -321,16 +386,17 @@ impl RelationsReaderService {
             let relation_node = io_maps::source_to_relation_node(schema, &source_res_doc);
             results.insert(HashedRelationNode(relation_node));
         }
-        for (_, source_res_addr) in searcher.search(&target_prefix_query, &topdocs)? {
-            let source_res_doc = searcher.doc(source_res_addr)?;
-            let relation_node = io_maps::target_to_relation_node(schema, &source_res_doc);
+        for (_, target_res_addr) in searcher.search(&target_prefix_query, &topdocs)? {
+            let target_res_doc = searcher.doc(target_res_addr)?;
+            let relation_node = io_maps::target_to_relation_node(schema, &target_res_doc);
             results.insert(HashedRelationNode(relation_node));
         }
-        response.nodes = results.into_iter().map(Into::into).collect();
+        response.nodes = results.into_iter().take(NUMBER_OF_RESULTS_SUGGEST).map(Into::into).collect();
         Ok(Some(response))
     }
 }
 
+#[derive(Debug)]
 pub struct HashedRelationNode(pub RelationNode);
 
 impl From<HashedRelationNode> for RelationNode {
