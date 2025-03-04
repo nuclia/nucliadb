@@ -21,7 +21,7 @@
 use std::sync::Arc;
 
 use nidx_paragraph::ParagraphSearcher;
-use nidx_protos::{SearchRequest, SearchResponse, GraphSearchResponse, GraphSearchRequest};
+use nidx_protos::{GraphSearchRequest, GraphSearchResponse, SearchRequest, SearchResponse};
 use nidx_relation::RelationSearcher;
 use nidx_text::TextSearcher;
 use nidx_vector::VectorSearcher;
@@ -176,10 +176,13 @@ fn blocking_search(
 }
 
 #[instrument(skip_all, fields(shard_id = graph_request.shard))]
-pub async fn graph_search(index_cache: Arc<IndexCache>, graph_request: GraphSearchRequest) -> NidxResult<GraphSearchResponse> {
+pub async fn graph_search(
+    index_cache: Arc<IndexCache>,
+    graph_request: GraphSearchRequest,
+) -> NidxResult<GraphSearchResponse> {
     let shard_id = uuid::Uuid::parse_str(&graph_request.shard)?;
 
-    let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await  else {
+    let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await else {
         return Err(NidxError::NotFound);
     };
 
@@ -195,6 +198,7 @@ pub async fn graph_search(index_cache: Arc<IndexCache>, graph_request: GraphSear
             let searcher: &RelationSearcher = relation_searcher.as_ref().into();
             searcher.graph_search(&graph_request)
         })
-    }).await??;
+    })
+    .await??;
     Ok(results)
 }

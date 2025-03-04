@@ -448,9 +448,17 @@ impl TryFrom<&nidx_protos::graph_query::Query> for GraphQuery {
                 };
 
                 if path.undirected {
-                    Self::PathQuery(PathQuery::UndirectedPath((Expression::Value(source), Expression::Value(relation), Expression::Value(destination))))
+                    Self::PathQuery(PathQuery::UndirectedPath((
+                        Expression::Value(source),
+                        Expression::Value(relation),
+                        Expression::Value(destination),
+                    )))
                 } else {
-                    Self::PathQuery(PathQuery::DirectedPath((Expression::Value(source), Expression::Value(relation), Expression::Value(destination))))
+                    Self::PathQuery(PathQuery::DirectedPath((
+                        Expression::Value(source),
+                        Expression::Value(relation),
+                        Expression::Value(destination),
+                    )))
                 }
             }
         };

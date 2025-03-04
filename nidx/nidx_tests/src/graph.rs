@@ -62,7 +62,6 @@ pub fn friendly_print(result: &nidx_protos::GraphSearchResponse) {
     println!();
 }
 
-
 /// Returns a simple knowledge graph as a list of relations
 pub fn knowledge_graph_as_relations() -> Vec<Relation> {
     let entities = HashMap::from([
