@@ -152,7 +152,9 @@ async def backup_resource_with_binaries(
         async def bm_iterator():
             yield bm_serialized
 
-        async for chunk in to_tar("broker-message.pb", len(bm_serialized), bm_iterator()):
+        async for chunk in to_tar(
+            name="broker-message.pb", size=len(bm_serialized), chunks=bm_iterator()
+        ):
             yield chunk
             total_size += len(chunk)
 
@@ -163,13 +165,15 @@ async def backup_resource_with_binaries(
                 yield serialized_cf
 
             async for chunk in to_tar(
-                f"cloud-files/{cloud_file.uri}", len(serialized_cf), cf_iterator()
+                name=f"cloud-files/{cloud_file.uri}", size=len(serialized_cf), chunks=cf_iterator()
             ):
                 yield chunk
                 total_size += len(chunk)
 
             async for chunk in to_tar(
-                f"binaries/{cloud_file.uri}", cloud_file.size, download_binary(context, cloud_file)
+                name=f"binaries/{cloud_file.uri}",
+                size=cloud_file.size,
+                chunks=download_binary(context, cloud_file),
             ):
                 yield chunk
                 total_size += len(chunk)
