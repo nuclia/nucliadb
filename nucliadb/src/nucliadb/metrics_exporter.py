@@ -24,11 +24,12 @@ from typing import AsyncGenerator, Callable, Tuple, cast
 
 from nucliadb import logger
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.migrator.datamanager import MigrationsDataManager
+from nucliadb_protos.noderesources_pb2 import EmptyQuery, NodeMetadata
 from nucliadb_telemetry import metrics
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
@@ -48,11 +49,10 @@ async def update_node_metrics(context: ApplicationContext):
     # Clear previoulsy set values so that we report only the current state
     SHARD_COUNT.gauge.clear()
 
-    all_nodes = cluster_manager.get_index_nodes()
-    for node in all_nodes:
-        if node.primary_id is not None:
-            continue
-        SHARD_COUNT.set(node.shard_count, labels=dict(node=node.id))
+    nidx_api = get_nidx_api_client()
+    metadata: NodeMetadata = await nidx_api.GetMetadata(EmptyQuery())
+
+    SHARD_COUNT.set(metadata.shard_count, labels={"node": "nidx"})
 
 
 async def iter_kbids(context: ApplicationContext) -> AsyncGenerator[str, None]:

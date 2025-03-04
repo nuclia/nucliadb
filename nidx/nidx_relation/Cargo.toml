@@ -2,6 +2,7 @@
 name = "nidx_relation"
 version = "0.1.0"
 edition = "2024"
+license = "AGPL-3.0"
 
 [dependencies]
 anyhow = "1.0.92"

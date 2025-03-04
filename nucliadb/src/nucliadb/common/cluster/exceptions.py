@@ -27,10 +27,6 @@ class NotFound(Exception):
     pass
 
 
-class NodeClusterSmall(Exception):
-    pass
-
-
 class ShardNotFound(NotFound):
     pass
 
@@ -39,15 +35,7 @@ class ShardsNotFound(NotFound):
     pass
 
 
-class NodesUnsync(Exception):
-    pass
-
-
 class NodeError(Exception):
-    pass
-
-
-class ExhaustedNodesError(Exception):
     pass
 
 
@@ -61,12 +49,4 @@ class SequenceOrderViolation(Exception):
 
 
 class EntitiesGroupNotFound(NotFound):
-    pass
-
-
-class NoHealthyNodeAvailable(Exception):
-    pass
-
-
-class NodeConnectionError(Exception):
     pass

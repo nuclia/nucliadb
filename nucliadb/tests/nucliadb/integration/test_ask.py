@@ -221,16 +221,51 @@ async def test_ask_synchronous(nucliadb_reader: AsyncClient, standalone_knowledg
 async def test_ask_status_code_no_retrieval_data(
     nucliadb_reader: AsyncClient, standalone_knowledgebox: str
 ):
+    ask_payload = {
+        "query": "title",
+        "rag_strategies": [
+            {
+                "name": "prequeries",
+                "queries": [
+                    {
+                        "request": {"query": "foobar"},
+                        "weight": 20,
+                    },
+                ],
+            }
+        ],
+    }
+
+    # Sync ask
     resp = await nucliadb_reader.post(
         f"/kb/{standalone_knowledgebox}/ask",
-        json={"query": "title"},
+        json=ask_payload,
         headers={"X-Synchronous": "True"},
     )
     assert resp.status_code == 200
     resp_data = SyncAskResponse.model_validate_json(resp.content)
     assert resp_data.answer == "Not enough data to answer this."
     assert len(resp_data.retrieval_results.resources) == 0
+    assert resp_data.prequeries is not None
+    assert len(resp_data.prequeries.popitem()[1].resources) == 0
     assert resp_data.status == AnswerStatusCode.NO_RETRIEVAL_DATA.prettify()
+
+    # Stream ask
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json=ask_payload,
+    )
+    assert resp.status_code == 200
+    results = parse_ask_response(resp)
+    main_results = results[0]
+    assert main_results.item.type == "retrieval"
+    assert len(main_results.item.results.resources) == 0
+    prequeries_results = results[1]
+    assert prequeries_results.item.type == "prequeries"
+    assert len(prequeries_results.item.results) == 1
+    assert len(prequeries_results.item.results.popitem()[1].resources) == 0
+    assert results[-1].item.type == "status"
+    assert results[-1].item.status == AnswerStatusCode.NO_RETRIEVAL_DATA.prettify()
 
 
 @pytest.mark.deploy_modes("standalone")
