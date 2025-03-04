@@ -80,7 +80,7 @@ async def test_tasks_factory_api(context):
     await consumer.initialize(context=context)
 
     msg = Message(kbid="kbid1")
-    await producer(msg)
+    await producer.send(msg)
 
     await work_done.wait()
     work_done.clear()
@@ -123,9 +123,9 @@ async def test_consumer_consumes_multiple_messages_concurrently(context):
     await consumer.initialize(context=context)
 
     # Produce three messages
-    await producer(Message(kbid="kbid1"))
-    await producer(Message(kbid="kbid2"))
-    await producer(Message(kbid="kbid3"))
+    await producer.send(Message(kbid="kbid1"))
+    await producer.send(Message(kbid="kbid2"))
+    await producer.send(Message(kbid="kbid3"))
 
     # Wait for them to finish
     start = time.perf_counter()
@@ -173,7 +173,7 @@ async def test_consumer_finalize_cancels_tasks(context):
     await consumer.initialize(context=context)
 
     # Produce three messages
-    await producer(Message(kbid="kbid1"))
+    await producer.send(Message(kbid="kbid1"))
     # Give a bit of time for the message to be delivered to the consumer via nats
     await asyncio.sleep(0.3)
 
@@ -216,7 +216,7 @@ async def test_consumer_max_concurrent_tasks(context):
     await consumer.initialize(context=context)
 
     for i in range(30):
-        await producer(Message(kbid=f"kbid_{i}"))
+        await producer.send(Message(kbid=f"kbid_{i}"))
 
     # Give a bit of time for the messages to be delivered to the consumer via nats
     await asyncio.sleep(0.3)
