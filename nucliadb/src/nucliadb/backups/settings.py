@@ -17,19 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from datetime import datetime
 
-from pydantic import BaseModel
-
-
-class CreateBackupRequest(BaseModel):
-    kbid: str
-    backup_id: str
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
-class BackupMetadata(BaseModel):
-    kbid: str
-    requested_at: datetime
-    total_resources: int = 0
-    missing_resources: list[str] = []
-    total_size: int = 0
+class BackupSettings(BaseSettings):
+    backups_bucket: str = Field(
+        default="backups", description="The bucket where the backups are stored."
+    )
+
+
+settings = BackupSettings()
