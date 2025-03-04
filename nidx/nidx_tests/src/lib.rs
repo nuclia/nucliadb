@@ -25,6 +25,8 @@ use relation::RelationType;
 use relation_node::NodeType;
 use uuid::Uuid;
 
+pub mod graph;
+
 pub fn minimal_resource(shard_id: String) -> Resource {
     let resource_id = Uuid::new_v4().simple().to_string();
 

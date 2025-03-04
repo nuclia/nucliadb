@@ -279,7 +279,8 @@ fn test_prefix_search() -> anyhow::Result<()> {
         ..Default::default()
     })?;
 
-    assert_eq!(result.prefix.unwrap().nodes.len(), 12);
+    // max number of prefixes is fixed
+    assert_eq!(result.prefix.unwrap().nodes.len(), 10);
 
     let result = reader.search(&RelationSearchRequest {
         prefix: Some(RelationPrefixSearchRequest {

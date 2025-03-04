@@ -418,3 +418,89 @@ impl From<&str> for Term {
         Self::Exact(value.to_string())
     }
 }
+
+impl TryFrom<&nidx_protos::graph_query::Query> for GraphQuery {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &nidx_protos::graph_query::Query) -> Result<Self, Self::Error> {
+        let query = match value {
+            nidx_protos::graph_query::Query::Node(query_node) => {
+                let node = Node::try_from(query_node)?;
+                Self::NodeQuery(NodeQuery::Node(Expression::Value(node)))
+            }
+
+            nidx_protos::graph_query::Query::Relation(relation) => {
+                Self::RelationQuery(RelationQuery(Expression::Value(Relation::try_from(relation)?)))
+            }
+
+            nidx_protos::graph_query::Query::Path(path) => {
+                let source = match &path.source {
+                    Some(source_pb) => Node::try_from(source_pb)?,
+                    None => Node::default(),
+                };
+                let relation = match &path.relation {
+                    Some(relation_pb) => Relation::try_from(relation_pb)?,
+                    None => Relation::default(),
+                };
+                let destination = match &path.destination {
+                    Some(destination_pb) => Node::try_from(destination_pb)?,
+                    None => Node::default(),
+                };
+
+                if path.undirected {
+                    Self::PathQuery(PathQuery::UndirectedPath((
+                        Expression::Value(source),
+                        Expression::Value(relation),
+                        Expression::Value(destination),
+                    )))
+                } else {
+                    Self::PathQuery(PathQuery::DirectedPath((
+                        Expression::Value(source),
+                        Expression::Value(relation),
+                        Expression::Value(destination),
+                    )))
+                }
+            }
+        };
+
+        Ok(query)
+    }
+}
+
+impl TryFrom<&nidx_protos::graph_query::Node> for Node {
+    type Error = anyhow::Error;
+
+    fn try_from(node_pb: &nidx_protos::graph_query::Node) -> Result<Self, Self::Error> {
+        let value = node_pb.value.clone().map(|value| {
+            if node_pb.fuzzy_distance > 0 || node_pb.as_prefix {
+                Term::Fuzzy(FuzzyTerm {
+                    value: value,
+                    fuzzy_distance: node_pb.fuzzy_distance as u8,
+                    is_prefix: node_pb.as_prefix,
+                })
+            } else {
+                Term::Exact(value)
+            }
+        });
+        let node_type = node_pb.node_type.map(NodeType::try_from).transpose()?;
+        let node_subtype = node_pb.node_subtype.clone();
+
+        Ok(Node {
+            value,
+            node_type,
+            node_subtype,
+        })
+    }
+}
+
+impl TryFrom<&nidx_protos::graph_query::Relation> for Relation {
+    type Error = anyhow::Error;
+
+    fn try_from(relation_pb: &nidx_protos::graph_query::Relation) -> Result<Self, Self::Error> {
+        let value = relation_pb.value.clone();
+
+        Ok(Relation {
+            value,
+        })
+    }
+}

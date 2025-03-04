@@ -101,51 +101,36 @@ impl Schema {
             .expect("Documents must have a resource id")
     }
 
-    pub fn source_value(&self, doc: &TantivyDocument) -> String {
-        doc.get_first(self.source_value)
-            .and_then(|i| i.as_str())
-            .map(String::from)
-            .expect("Documents must have a source value")
+    pub fn source_value<'a>(&self, doc: &'a TantivyDocument) -> &'a str {
+        doc.get_first(self.source_value).and_then(|i| i.as_str()).expect("Documents must have a source value")
     }
 
     pub fn source_type(&self, doc: &TantivyDocument) -> u64 {
         doc.get_first(self.source_type).and_then(|i| i.as_u64()).expect("Documents must have a source type")
     }
 
-    pub fn source_subtype(&self, doc: &TantivyDocument) -> String {
-        doc.get_first(self.source_subtype)
-            .and_then(|i| i.as_str())
-            .map(String::from)
-            .expect("Documents must have a source subtype")
+    pub fn source_subtype<'a>(&self, doc: &'a TantivyDocument) -> &'a str {
+        doc.get_first(self.source_subtype).and_then(|i| i.as_str()).expect("Documents must have a source subtype")
     }
 
-    pub fn target_value(&self, doc: &TantivyDocument) -> String {
-        doc.get_first(self.target_value)
-            .and_then(|i| i.as_str())
-            .map(String::from)
-            .expect("Documents must have a target value")
+    pub fn target_value<'a>(&self, doc: &'a TantivyDocument) -> &'a str {
+        doc.get_first(self.target_value).and_then(|i| i.as_str()).expect("Documents must have a target value")
     }
 
     pub fn target_type(&self, doc: &TantivyDocument) -> u64 {
         doc.get_first(self.target_type).and_then(|i| i.as_u64()).expect("Documents must have a target type")
     }
 
-    pub fn target_subtype(&self, doc: &TantivyDocument) -> String {
-        doc.get_first(self.target_subtype)
-            .and_then(|i| i.as_str())
-            .map(String::from)
-            .expect("Documents must have a target subtype")
+    pub fn target_subtype<'a>(&self, doc: &'a TantivyDocument) -> &'a str {
+        doc.get_first(self.target_subtype).and_then(|i| i.as_str()).expect("Documents must have a target subtype")
     }
 
     pub fn relationship(&self, doc: &TantivyDocument) -> u64 {
         doc.get_first(self.relationship).and_then(|i| i.as_u64()).expect("Documents must have a relationship type")
     }
 
-    pub fn relationship_label(&self, doc: &TantivyDocument) -> String {
-        doc.get_first(self.label)
-            .and_then(|i| i.as_str())
-            .map(String::from)
-            .expect("Documents must have a relationship label")
+    pub fn relationship_label<'a>(&self, doc: &'a TantivyDocument) -> &'a str {
+        doc.get_first(self.label).and_then(|i| i.as_str()).expect("Documents must have a relationship label")
     }
 
     pub fn metadata<'a>(&self, doc: &'a TantivyDocument) -> Option<&'a [u8]> {
