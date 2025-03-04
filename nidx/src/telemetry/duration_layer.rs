@@ -21,12 +21,12 @@
 use std::time::Instant;
 
 use tracing::{
+    Subscriber,
     field::Visit,
     span::{Attributes, Id},
-    Subscriber,
 };
 use tracing_core::Field;
-use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
+use tracing_subscriber::{Layer, layer::Context, registry::LookupSpan};
 
 use crate::metrics;
 

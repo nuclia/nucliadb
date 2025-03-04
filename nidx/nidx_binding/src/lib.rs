@@ -23,21 +23,21 @@ use nidx::worker;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
+use nidx::Settings;
 use nidx::api::grpc::ApiServer;
 use nidx::grpc_server::GrpcServer;
 use nidx::indexer::process_index_message;
 use nidx::searcher::grpc::SearchServer;
 use nidx::searcher::{SyncStatus, SyncedSearcher};
 use nidx::settings::EnvSettings;
-use nidx::Settings;
-use nidx_protos::prost::*;
 use nidx_protos::IndexMessage;
+use nidx_protos::prost::*;
 use std::collections::HashMap;
-use std::sync::atomic::AtomicI64;
 use std::sync::Arc;
-use tempfile::{tempdir, TempDir};
+use std::sync::atomic::AtomicI64;
+use tempfile::{TempDir, tempdir};
 use tokio::runtime::Runtime;
-use tokio::sync::mpsc::{channel, Sender};
+use tokio::sync::mpsc::{Sender, channel};
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 
@@ -112,9 +112,15 @@ impl NidxBinding {
     pub fn wait_for_sync(&mut self) {
         self.runtime.as_ref().unwrap().block_on(async {
             // Wait for a new sync to start
-            self.sync_watcher.wait_for(|s| matches!(s, SyncStatus::Syncing)).await.unwrap();
+            self.sync_watcher
+                .wait_for(|s| matches!(s, SyncStatus::Syncing))
+                .await
+                .unwrap();
             // Wait for it to finish
-            self.sync_watcher.wait_for(|s| matches!(s, SyncStatus::Synced)).await.unwrap();
+            self.sync_watcher
+                .wait_for(|s| matches!(s, SyncStatus::Synced))
+                .await
+                .unwrap();
         });
     }
 }

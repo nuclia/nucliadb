@@ -22,7 +22,7 @@ use crate::metadata::{Index, IndexId, IndexKind, SegmentId, Shard};
 use crate::metrics;
 use crate::metrics::searcher::{ACTIVE_SHARDS, DESIRED_SHARDS, EVICTED_SHARDS};
 use crate::settings::SearcherSettings;
-use crate::{segment_store::download_segment, NidxMetadata};
+use crate::{NidxMetadata, segment_store::download_segment};
 use anyhow::anyhow;
 use nidx_types::Seq;
 use object_store::DynObjectStore;
@@ -36,8 +36,8 @@ use std::{
 };
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::Receiver;
-use tokio::sync::{mpsc::Sender, OwnedRwLockReadGuard, RwLock, RwLockReadGuard};
-use tokio::sync::{watch, Semaphore};
+use tokio::sync::{OwnedRwLockReadGuard, RwLock, RwLockReadGuard, mpsc::Sender};
+use tokio::sync::{Semaphore, watch};
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::*;
@@ -393,7 +393,10 @@ impl ShardIndexes {
     fn single_index_by_kind(&self, kind: IndexKind) -> Option<IndexId> {
         let indexes: Vec<_> = self.0.iter().filter(|i| i.kind == kind).collect();
         if indexes.len() > 2 {
-            error!(?indexes, "Unexpected multiple indexes of the same kind for the same shard");
+            error!(
+                ?indexes,
+                "Unexpected multiple indexes of the same kind for the same shard"
+            );
             None
         } else {
             indexes.first().map(|i| i.id)
@@ -413,7 +416,11 @@ impl ShardIndexes {
     }
 
     pub fn vector_index(&self, name: &str) -> Option<IndexId> {
-        self.0.iter().filter(|i| i.kind == IndexKind::Vector && i.name == name).map(|i| i.id).next()
+        self.0
+            .iter()
+            .filter(|i| i.kind == IndexKind::Vector && i.name == name)
+            .map(|i| i.id)
+            .next()
     }
 }
 
@@ -464,14 +471,16 @@ impl SyncMetadata {
             drop(read_meta);
             let shard_id = index.shard_id;
             let shard_index = ShardIndex::new(&index);
-            self.synced_metadata.write().await.insert(
-                index.id,
-                RwLock::new(IndexMetadata {
-                    index,
-                    operations,
-                }),
-            );
-            self.shard_metadata.write().await.entry(shard_id).or_default().push(shard_index);
+            self.synced_metadata
+                .write()
+                .await
+                .insert(index.id, RwLock::new(IndexMetadata { index, operations }));
+            self.shard_metadata
+                .write()
+                .await
+                .entry(shard_id)
+                .or_default()
+                .push(shard_index);
         }
     }
 
@@ -522,7 +531,11 @@ impl SyncMetadata {
             shards_to_sync.push(*new_shard);
         }
         if count_new_shards > 0 || count_recovered_shards > 0 {
-            info!(new = count_new_shards, recovered = count_recovered_shards, "New shards added to sync");
+            info!(
+                new = count_new_shards,
+                recovered = count_recovered_shards,
+                "New shards added to sync"
+            );
         }
 
         // Completely purge evicted and expired shards
@@ -572,10 +585,7 @@ pub struct GuardedIndexMetadata {
 
 impl GuardedIndexMetadata {
     fn new(guard: OwnedRwLockReadGuard<HashMap<IndexId, RwLock<IndexMetadata>>>, index_id: IndexId) -> Self {
-        Self {
-            guard,
-            index_id,
-        }
+        Self { guard, index_id }
     }
 
     pub async fn get(&self) -> Option<RwLockReadGuard<IndexMetadata>> {
@@ -593,25 +603,27 @@ mod tests {
     use tempfile::tempdir;
 
     use crate::{
+        NidxMetadata,
         metadata::{Deletion, Index, Segment, SegmentId, Shard},
         scheduler::purge_deletions,
-        searcher::sync::{sync_index, Operations, SyncMetadata},
-        NidxMetadata,
+        searcher::sync::{Operations, SyncMetadata, sync_index},
     };
 
     const VECTOR_CONFIG: VectorConfig = VectorConfig {
         similarity: nidx_vector::config::Similarity::Cosine,
         normalize_vectors: false,
-        vector_type: nidx_vector::config::VectorType::DenseF32 {
-            dimension: 3,
-        },
+        vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 3 },
     };
 
     #[sqlx::test]
     async fn test_load_index_metadata(pool: sqlx::PgPool) -> anyhow::Result<()> {
-        let index =
-            Index::create(&pool, Shard::create(&pool, uuid::Uuid::new_v4()).await?.id, "english", VECTOR_CONFIG.into())
-                .await?;
+        let index = Index::create(
+            &pool,
+            Shard::create(&pool, uuid::Uuid::new_v4()).await?.id,
+            "english",
+            VECTOR_CONFIG.into(),
+        )
+        .await?;
 
         // Seq 1: A segment was created and unmerged
         let s1 = Segment::create(&pool, index.id, 1i64.into(), 4, serde_json::Value::Null).await?;
@@ -686,7 +698,14 @@ mod tests {
         let index_path = work_dir.path().join("1");
 
         // Initial sync with empty data
-        sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
+        sync_index(
+            &meta,
+            storage.clone(),
+            sync_metadata.clone(),
+            Index::get(&meta.pool, index.id).await?,
+            &tx,
+        )
+        .await?;
         // We get a notification even for an empty index (so we don't return errors for empty indexes)
         assert!(rx.try_recv().is_ok());
         // No data yet
@@ -694,11 +713,20 @@ mod tests {
 
         // Adds a first segment
         let s1 = Segment::create(&meta.pool, index.id, 1i64.into(), 4, serde_json::Value::Null).await?;
-        storage.put(&s1.id.storage_key(), PutPayload::from_iter(dummy_data.iter().cloned())).await?;
+        storage
+            .put(&s1.id.storage_key(), PutPayload::from_iter(dummy_data.iter().cloned()))
+            .await?;
         s1.mark_ready(&meta.pool, 122).await?;
         Deletion::create(&meta.pool, index.id, 1i64.into(), &["k1".to_string()]).await?;
 
-        sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
+        sync_index(
+            &meta,
+            storage.clone(),
+            sync_metadata.clone(),
+            Index::get(&meta.pool, index.id).await?,
+            &tx,
+        )
+        .await?;
         assert_eq!(rx.try_recv()?, index.id);
         assert_eq!(downloaded_segments(&index_path)?, vec![s1.id]);
         {
@@ -709,11 +737,20 @@ mod tests {
 
         // Adds another segment
         let s2 = Segment::create(&meta.pool, index.id, 2i64.into(), 4, serde_json::Value::Null).await?;
-        storage.put(&s2.id.storage_key(), PutPayload::from_iter(dummy_data.iter().cloned())).await?;
+        storage
+            .put(&s2.id.storage_key(), PutPayload::from_iter(dummy_data.iter().cloned()))
+            .await?;
         s2.mark_ready(&meta.pool, 122).await?;
         Deletion::create(&meta.pool, index.id, 2i64.into(), &["k2".to_string()]).await?;
 
-        sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
+        sync_index(
+            &meta,
+            storage.clone(),
+            sync_metadata.clone(),
+            Index::get(&meta.pool, index.id).await?,
+            &tx,
+        )
+        .await?;
         assert_eq!(rx.try_recv()?, index.id);
         assert_eq!(downloaded_segments(&index_path)?, vec![s1.id, s2.id]);
         {
@@ -728,10 +765,19 @@ mod tests {
         storage.delete(&s1.id.storage_key()).await?;
         storage.delete(&s2.id.storage_key()).await?;
         let s3 = Segment::create(&meta.pool, index.id, 3i64.into(), 4, serde_json::Value::Null).await?;
-        storage.put(&s3.id.storage_key(), PutPayload::from_iter(dummy_data.iter().cloned())).await?;
+        storage
+            .put(&s3.id.storage_key(), PutPayload::from_iter(dummy_data.iter().cloned()))
+            .await?;
         s3.mark_ready(&meta.pool, 122).await?;
 
-        sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
+        sync_index(
+            &meta,
+            storage.clone(),
+            sync_metadata.clone(),
+            Index::get(&meta.pool, index.id).await?,
+            &tx,
+        )
+        .await?;
         assert_eq!(rx.try_recv()?, index.id);
         assert_eq!(downloaded_segments(&index_path)?, vec![s3.id]);
         {
@@ -746,7 +792,14 @@ mod tests {
         // Purge old deletions
         purge_deletions(&meta, 10).await?;
 
-        sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
+        sync_index(
+            &meta,
+            storage.clone(),
+            sync_metadata.clone(),
+            Index::get(&meta.pool, index.id).await?,
+            &tx,
+        )
+        .await?;
         assert_eq!(rx.try_recv()?, index.id);
         assert_eq!(downloaded_segments(&index_path)?, vec![s3.id]);
         {

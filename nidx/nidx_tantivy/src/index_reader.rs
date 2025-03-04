@@ -26,11 +26,11 @@ use std::{
 
 use nidx_types::{OpenIndexMetadata, Seq};
 use tantivy::{
-    directory::{error::OpenReadError, MmapDirectory, RamDirectory},
+    Directory, Index, IndexMeta, IndexSettings, SegmentId, SegmentReader,
+    directory::{MmapDirectory, RamDirectory, error::OpenReadError},
     fastfield::write_alive_bitset,
     query::Query,
     schema::Schema,
-    Directory, Index, IndexMeta, IndexSettings, SegmentId, SegmentReader,
 };
 use tantivy_common::{BitSet, TerminatingWrite as _};
 
@@ -57,14 +57,13 @@ pub fn open_index_with_deletions(
         let mut bitset = BitSet::with_max_value_and_full(segment.meta().max_doc());
 
         let query = query_builder.query(segment_deletions);
-        query.weight(tantivy::query::EnableScoring::disabled_from_schema(&index.schema()))?.for_each_no_score(
-            &segment_reader,
-            &mut |doc_set| {
+        query
+            .weight(tantivy::query::EnableScoring::disabled_from_schema(&index.schema()))?
+            .for_each_no_score(&segment_reader, &mut |doc_set| {
                 for doc in doc_set {
                     bitset.remove(*doc);
                 }
-            },
-        )?;
+            })?;
 
         let mut writer = index.directory().open_write(Path::new(&format!(
             "{}.{}.del",
@@ -179,7 +178,9 @@ impl Directory for UnionDirectory {
             if let Some((position, _)) = found {
                 let opstamp = name_parts[1].parse().unwrap();
                 let segment = locked_meta.segments.swap_remove(position);
-                locked_meta.segments.push(segment.with_delete_meta(opstamp, opstamp as u64));
+                locked_meta
+                    .segments
+                    .push(segment.with_delete_meta(opstamp, opstamp as u64));
             }
         }
         self.ram.open_write(path)
@@ -217,8 +218,8 @@ mod tests {
     use crate::TantivySegmentMetadata;
     use serde_json::Value;
     use tantivy::{
-        schema::{NumericOptions, Schema},
         Directory, SegmentId,
+        schema::{NumericOptions, Schema},
     };
     use tantivy_common::TerminatingWrite;
     use tempfile::tempdir;
@@ -263,8 +264,18 @@ mod tests {
         let directory = UnionDirectory::new(Schema::builder().build(), segments.into_iter())?;
 
         // Can read existing files
-        assert_eq!(directory.open_read(Path::new(&format!("{uuid1}.store")))?.read_bytes()?, "dir1");
-        assert_eq!(directory.open_read(Path::new(&format!("{uuid2}.store")))?.read_bytes()?, "dir2");
+        assert_eq!(
+            directory
+                .open_read(Path::new(&format!("{uuid1}.store")))?
+                .read_bytes()?,
+            "dir1"
+        );
+        assert_eq!(
+            directory
+                .open_read(Path::new(&format!("{uuid2}.store")))?
+                .read_bytes()?,
+            "dir2"
+        );
 
         // Can not read unknown files of existing segments
         assert!(directory.open_read(Path::new(&format!("{uuid1}.fake"))).is_err());
@@ -322,12 +333,20 @@ mod tests {
 
         // Has schema
         let schema = root["schema"].as_array().unwrap();
-        assert_eq!(schema[0].as_object().unwrap()["name"], Value::String("mirror".to_string()));
+        assert_eq!(
+            schema[0].as_object().unwrap()["name"],
+            Value::String("mirror".to_string())
+        );
 
         // Has list of segments
         let segments = root["segments"].as_array().unwrap();
         let segment = segments[0].as_object().unwrap();
-        assert_eq!(segment["deletes"].as_object().unwrap()["num_deleted_docs"].as_i64().unwrap(), 0);
+        assert_eq!(
+            segment["deletes"].as_object().unwrap()["num_deleted_docs"]
+                .as_i64()
+                .unwrap(),
+            0
+        );
         assert_eq!(segment["deletes"].as_object().unwrap()["opstamp"].as_i64().unwrap(), 12);
         assert_eq!(segment["segment_id"].as_str().unwrap().replace('-', ""), uuid1);
 
@@ -344,7 +363,12 @@ mod tests {
             .iter()
             .find(|s| s.as_object().unwrap()["segment_id"].as_str().unwrap().replace('-', "") == uuid1)
             .unwrap();
-        assert_eq!(segment["deletes"].as_object().unwrap()["num_deleted_docs"].as_i64().unwrap(), 7);
+        assert_eq!(
+            segment["deletes"].as_object().unwrap()["num_deleted_docs"]
+                .as_i64()
+                .unwrap(),
+            7
+        );
 
         Ok(())
     }

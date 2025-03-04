@@ -34,8 +34,8 @@ use shard_selector::KubernetesCluster;
 pub use shard_selector::ListNodes;
 use shard_selector::ShardSelector;
 use shard_selector::SingleNodeCluster;
-use sync::run_sync;
 use sync::SyncMetadata;
+use sync::run_sync;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::watch;
 use tokio::task::JoinSet;
@@ -171,7 +171,12 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
         None => work_dir.path(),
     };
     let meta = settings.metadata.clone();
-    let storage = settings.storage.as_ref().expect("Storage settings needed").object_store.clone();
+    let storage = settings
+        .storage
+        .as_ref()
+        .expect("Storage settings needed")
+        .object_store
+        .clone();
 
     let mut tasks = JoinSet::new();
     let (list_nodes, shard_selector_task_id): (Arc<dyn ListNodes>, _) =
@@ -199,7 +204,11 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
     let shutdown2 = shutdown.clone();
     let shard_selector = ShardSelector::new(list_nodes, searcher_settings.shard_partitioning.replicas);
     let search_task = tasks
-        .spawn(async move { searcher.run(storage, searcher_settings, shutdown2, shard_selector, None, None).await })
+        .spawn(async move {
+            searcher
+                .run(storage, searcher_settings, shutdown2, shard_selector, None, None)
+                .await
+        })
         .id();
 
     while let Some(join_result) = tasks.join_next_with_id().await {

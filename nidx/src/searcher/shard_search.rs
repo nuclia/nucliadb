@@ -25,7 +25,7 @@ use nidx_protos::{GraphSearchRequest, GraphSearchResponse, SearchRequest, Search
 use nidx_relation::RelationSearcher;
 use nidx_text::TextSearcher;
 use nidx_vector::VectorSearcher;
-use tracing::{instrument, Span};
+use tracing::{Span, instrument};
 
 use crate::errors::{NidxError, NidxResult};
 
@@ -128,8 +128,9 @@ fn blocking_search(
         move || paragraph_searcher.unwrap().search(&request, prefilter)
     });
 
-    let relation_task =
-        index_queries.relations_request.map(|request| move || relation_searcher.unwrap().search(&request));
+    let relation_task = index_queries
+        .relations_request
+        .map(|request| move || relation_searcher.unwrap().search(&request));
 
     let vector_task = index_queries.vectors_request.map(|mut request| {
         request.id = search_id.clone();

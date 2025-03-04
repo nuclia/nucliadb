@@ -35,14 +35,14 @@ use log_format::StructuredFormat;
 use opentelemetry::global::get_text_map_propagator;
 use opentelemetry::propagation::Extractor;
 use opentelemetry::trace::TraceContextExt;
-use opentelemetry::{trace::TracerProvider as _, KeyValue};
+use opentelemetry::{KeyValue, trace::TracerProvider as _};
 use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_sdk::{trace::TracerProvider, Resource};
+use opentelemetry_sdk::{Resource, trace::TracerProvider};
 use tracing::{Level, Metadata};
 use tracing_core::LevelFilter;
 use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 use tracing_subscriber::layer::Filter;
-use tracing_subscriber::{filter::FilterFn, fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, filter::FilterFn, fmt, prelude::*};
 
 struct SwappableLogLevelFilter(ArcSwap<EnvFilter>);
 
@@ -72,9 +72,11 @@ pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
     // Configure logging format
     let log_layer = match settings.log_format {
         LogFormat::Pretty => fmt::layer().with_filter(ENV_FILTER.deref()).boxed(),
-        LogFormat::Structured => {
-            fmt::layer().json().event_format(StructuredFormat).with_filter(ENV_FILTER.deref()).boxed()
-        }
+        LogFormat::Structured => fmt::layer()
+            .json()
+            .event_format(StructuredFormat)
+            .with_filter(ENV_FILTER.deref())
+            .boxed(),
     };
 
     // Trace propagation is done in Zipkin format (b3-* headers)
@@ -102,8 +104,9 @@ pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
         None
     };
 
-    let metrics_layer =
-        DurationLayer.with_filter(LevelFilter::from_level(Level::INFO)).with_filter(FilterFn::new(nidx_filter));
+    let metrics_layer = DurationLayer
+        .with_filter(LevelFilter::from_level(Level::INFO))
+        .with_filter(FilterFn::new(nidx_filter));
 
     // Initialize all telemetry layers
     tracing_subscriber::registry()

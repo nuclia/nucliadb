@@ -33,7 +33,9 @@ pub struct NatsSendReport<'a>(pub &'a async_nats::Client);
 
 impl SendReport for NatsSendReport<'_> {
     async fn send(&self, report: kb_usage::KbUsage) -> anyhow::Result<()> {
-        self.0.publish("kb-usage.nuclia_db", report.encode_to_vec().into()).await?;
+        self.0
+            .publish("kb-usage.nuclia_db", report.encode_to_vec().into())
+            .await?;
         Ok(())
     }
 }
@@ -99,9 +101,9 @@ mod tests {
     use sqlx::types::time::PrimitiveDateTime;
 
     use crate::{
+        NidxMetadata,
         metadata::{Index, IndexConfig, Segment, Shard},
         scheduler::audit_task::audit_kb_storage,
-        NidxMetadata,
     };
 
     use super::SendReport;

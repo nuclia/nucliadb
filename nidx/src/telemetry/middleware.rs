@@ -34,9 +34,7 @@ impl<S> Layer<S> for GrpcInstrumentorLayer {
     type Service = GrpcInstrumentor<S>;
 
     fn layer(&self, service: S) -> Self::Service {
-        GrpcInstrumentor {
-            inner: service,
-        }
+        GrpcInstrumentor { inner: service }
     }
 }
 
@@ -89,9 +87,7 @@ where
             rpc.method = method
         );
         let parent_context = opentelemetry::global::get_text_map_propagator(|propagator| {
-            propagator.extract(&HeaderMapWrapper {
-                inner: req.headers(),
-            })
+            propagator.extract(&HeaderMapWrapper { inner: req.headers() })
         });
 
         span.set_parent(parent_context);
@@ -107,7 +103,11 @@ struct HeaderMapWrapper<'a> {
 
 impl<'a> Extractor for HeaderMapWrapper<'a> {
     fn get(&self, key: &str) -> Option<&str> {
-        self.inner.get(key).map(|value| value.to_str()).transpose().unwrap_or(None)
+        self.inner
+            .get(key)
+            .map(|value| value.to_str())
+            .transpose()
+            .unwrap_or(None)
     }
 
     fn keys(&self) -> Vec<&str> {
@@ -131,6 +131,9 @@ struct MetadataMapWrapper<'a> {
 
 impl<'a> Injector for MetadataMapWrapper<'a> {
     fn set(&mut self, key: &str, value: String) {
-        self.inner.insert(MetadataKey::from_bytes(key.to_lowercase().as_bytes()).unwrap(), value.parse().unwrap());
+        self.inner.insert(
+            MetadataKey::from_bytes(key.to_lowercase().as_bytes()).unwrap(),
+            value.parse().unwrap(),
+        );
     }
 }

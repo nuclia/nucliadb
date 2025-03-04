@@ -19,7 +19,7 @@
 
 use crate::config::VectorConfig;
 use crate::data_point::{self, Elem, LabelDictionary};
-use crate::{utils, VectorSegmentMetadata};
+use crate::{VectorSegmentMetadata, utils};
 use nidx_protos::{noderesources, prost::*};
 use std::collections::HashMap;
 use std::path::Path;
@@ -67,26 +67,29 @@ impl<'a> ResourceWrapper<'a> {
 
     pub fn fields(&self) -> impl Iterator<Item = (&String, impl Iterator<Item = ParagraphVectors>)> {
         self.resource.paragraphs.iter().map(|(field_id, paragraphs_wrapper)| {
-            let sentences_iterator = paragraphs_wrapper.paragraphs.iter().filter_map(|(_paragraph_id, paragraph)| {
-                let sentences = if let Some(vectorset) = &self.vectorset {
-                    // indexing a vectorset, we should return only paragraphs from this vectorset.
-                    // If vectorset is not found, we'll skip this paragraph
-                    if let Some(vectorset_sentences) = paragraph.vectorsets_sentences.get(vectorset) {
-                        Some(&vectorset_sentences.sentences)
-                    } else if self.fallback_to_default_vectorset {
-                        Some(&paragraph.sentences)
+            let sentences_iterator = paragraphs_wrapper
+                .paragraphs
+                .iter()
+                .filter_map(|(_paragraph_id, paragraph)| {
+                    let sentences = if let Some(vectorset) = &self.vectorset {
+                        // indexing a vectorset, we should return only paragraphs from this vectorset.
+                        // If vectorset is not found, we'll skip this paragraph
+                        if let Some(vectorset_sentences) = paragraph.vectorsets_sentences.get(vectorset) {
+                            Some(&vectorset_sentences.sentences)
+                        } else if self.fallback_to_default_vectorset {
+                            Some(&paragraph.sentences)
+                        } else {
+                            None
+                        }
                     } else {
-                        None
-                    }
-                } else {
-                    // Default vectors index (no vectorset)
-                    Some(&paragraph.sentences)
-                };
-                sentences.map(|s| ParagraphVectors {
-                    vectors: s,
-                    labels: &paragraph.labels,
-                })
-            });
+                        // Default vectors index (no vectorset)
+                        Some(&paragraph.sentences)
+                    };
+                    sentences.map(|s| ParagraphVectors {
+                        vectors: s,
+                        labels: &paragraph.labels,
+                    })
+                });
             (field_id, sentences_iterator)
         })
     }
@@ -138,7 +141,12 @@ pub fn index_resource(
         return Ok(None);
     }
 
-    let tags = resource.labels().iter().filter(|t| SEGMENT_TAGS.contains(&t.as_str())).cloned().collect();
+    let tags = resource
+        .labels()
+        .iter()
+        .filter(|t| SEGMENT_TAGS.contains(&t.as_str()))
+        .cloned()
+        .collect();
     let data_point = data_point::create(output_path, elems, config, tags)?;
 
     let v = time.elapsed().as_millis();

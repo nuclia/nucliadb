@@ -20,7 +20,7 @@
 
 use std::collections::HashMap;
 
-use nidx_protos::{relation::RelationType, relation_node::NodeType, GraphSearchResponse, Relation, RelationNode};
+use nidx_protos::{GraphSearchResponse, Relation, RelationNode, relation::RelationType, relation_node::NodeType};
 
 /// Parse a graph search response and return a list of triplets (source,
 /// relation, target). This is a simplified view but yet useful view of the
@@ -33,7 +33,11 @@ pub fn friendly_parse<'a>(relations: &'a GraphSearchResponse) -> Vec<(&'a str, &
             let source = relations.nodes.get(path.source as usize).unwrap();
             let relation = relations.relations.get(path.relation as usize).unwrap();
             let destination = relations.nodes.get(path.destination as usize).unwrap();
-            (source.value.as_str(), relation.label.as_str(), destination.value.as_str())
+            (
+                source.value.as_str(),
+                relation.label.as_str(),
+                destination.value.as_str(),
+            )
         })
         .collect()
 }

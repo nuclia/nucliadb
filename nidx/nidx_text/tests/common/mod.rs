@@ -37,10 +37,7 @@ pub struct TestOpener {
 
 impl TestOpener {
     pub fn new(segments: Vec<(TantivySegmentMetadata, Seq)>, deletions: Vec<(String, Seq)>) -> Self {
-        Self {
-            segments,
-            deletions,
-        }
+        Self { segments, deletions }
     }
 }
 
@@ -57,9 +54,16 @@ impl OpenIndexMetadata<TantivyMeta> for TestOpener {
 pub fn test_reader() -> TextSearcher {
     let dir = TempDir::new().unwrap();
     let resource = create_resource("shard".to_string());
-    let segment_meta = TextIndexer.index_resource(dir.path(), TextConfig::default(), &resource).unwrap().unwrap();
+    let segment_meta = TextIndexer
+        .index_resource(dir.path(), TextConfig::default(), &resource)
+        .unwrap()
+        .unwrap();
 
-    TextSearcher::open(TextConfig::default(), TestOpener::new(vec![(segment_meta, 1i64.into())], vec![])).unwrap()
+    TextSearcher::open(
+        TextConfig::default(),
+        TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]),
+    )
+    .unwrap()
 }
 
 pub fn create_resource(shard_id: String) -> Resource {

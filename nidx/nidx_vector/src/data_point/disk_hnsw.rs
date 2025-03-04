@@ -46,9 +46,9 @@
 use std::collections::HashMap;
 use std::io;
 
+use super::Address;
 use super::ops_hnsw::{Hnsw, Layer};
 use super::ram_hnsw::{Edge, EntryPoint, RAMHnsw, RAMLayer};
-use super::Address;
 use crate::data_types::usize_utils::*;
 
 const EDGE_LEN: usize = 4;
@@ -88,10 +88,7 @@ impl<'a> Hnsw for &'a [u8] {
         DiskHnsw::get_entry_point(self)
     }
     fn get_layer(&self, i: usize) -> Self::L {
-        DiskLayer {
-            hnsw: self,
-            layer: i,
-        }
+        DiskLayer { hnsw: self, layer: i }
     }
 }
 
@@ -172,10 +169,7 @@ impl DiskHnsw {
                 buf.write_all(&ends_at.to_le_bytes())?;
                 length += USIZE_LEN;
             }
-            let EntryPoint {
-                node,
-                layer,
-            } = entry_point;
+            let EntryPoint { node, layer } = entry_point;
             buf.write_all(&layer.to_le_bytes())?;
             buf.write_all(&node.0.to_le_bytes())?;
             let _length = length + 2 * USIZE_LEN;
@@ -287,7 +281,11 @@ mod tests {
     #[test]
     fn hnsw_test() {
         let no_nodes = 3;
-        let cnx0 = vec![vec![(Address(1), 1.0)], vec![(Address(2), 2.0)], vec![(Address(3), 3.0)]];
+        let cnx0 = vec![
+            vec![(Address(1), 1.0)],
+            vec![(Address(2), 2.0)],
+            vec![(Address(3), 3.0)],
+        ];
         let layer0 = RAMLayer {
             out: cnx0.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
         };
@@ -321,7 +319,11 @@ mod tests {
     #[test]
     fn hnsw_deserialize_test() {
         let no_nodes = 3;
-        let cnx0 = [vec![(Address(1), 1.0)], vec![(Address(2), 2.0)], vec![(Address(3), 3.0)]];
+        let cnx0 = [
+            vec![(Address(1), 1.0)],
+            vec![(Address(2), 2.0)],
+            vec![(Address(3), 3.0)],
+        ];
         let layer0 = RAMLayer {
             out: cnx0.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
         };

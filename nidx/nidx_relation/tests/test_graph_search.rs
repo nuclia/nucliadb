@@ -36,8 +36,9 @@ fn test_graph_node_query() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
     // (s)-[]->()
-    let result =
-        reader.reader.inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
             value: None,
             node_type: None,
             node_subtype: None,
@@ -46,8 +47,9 @@ fn test_graph_node_query() -> anyhow::Result<()> {
     assert_eq!(result.graph.len(), 16);
 
     // (:PERSON)-[]->()
-    let result =
-        reader.reader.inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
             value: None,
             node_type: Some(NodeType::Entity),
             node_subtype: Some("PERSON".to_string()),
@@ -56,8 +58,9 @@ fn test_graph_node_query() -> anyhow::Result<()> {
     assert_eq!(result.graph.len(), 12);
 
     // (:Anna)-[]->()
-    let result =
-        reader.reader.inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
             value: Some("Anna".into()),
             node_type: Some(NodeType::Entity),
             node_subtype: Some("PERSON".to_string()),
@@ -71,25 +74,29 @@ fn test_graph_node_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Anna", "WORK_IN", "New York")));
 
     // ()-[]->(:Anna)
-    let result = reader.reader.inner_graph_search(GraphQuery::NodeQuery(NodeQuery::DestinationNode(
-        Expression::Value(Node {
-            value: Some("Anna".into()),
-            node_type: Some(NodeType::Entity),
-            node_subtype: Some("PERSON".to_string()),
-            ..Default::default()
-        }),
-    )))?;
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Value(
+            Node {
+                value: Some("Anna".into()),
+                node_type: Some(NodeType::Entity),
+                node_subtype: Some("PERSON".to_string()),
+                ..Default::default()
+            },
+        ))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 1);
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
 
     // (:Anna)
-    let result = reader.reader.inner_graph_search(GraphQuery::NodeQuery(NodeQuery::Node(Expression::Value(Node {
-        value: Some("Anna".into()),
-        node_type: Some(NodeType::Entity),
-        node_subtype: Some("PERSON".to_string()),
-        ..Default::default()
-    }))))?;
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::NodeQuery(NodeQuery::Node(Expression::Value(Node {
+            value: Some("Anna".into()),
+            node_type: Some(NodeType::Entity),
+            node_subtype: Some("PERSON".to_string()),
+            ..Default::default()
+        }))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 5);
     assert!(relations.contains(&("Anna", "FOLLOW", "Erin")));
@@ -106,8 +113,9 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
     // (:~Anastas)
-    let result =
-        reader.reader.inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
             value: Some(Term::Fuzzy(FuzzyTerm {
                 value: "Anastas".to_string(),
                 fuzzy_distance: 2,
@@ -120,8 +128,9 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
 
     // (:~AnXstXsia) with fuzzy=1
-    let result =
-        reader.reader.inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
             value: Some(Term::Fuzzy(FuzzyTerm {
                 value: "AnXstXsia".to_string(),
                 fuzzy_distance: 1,
@@ -133,8 +142,9 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     assert_eq!(relations.len(), 0);
 
     // (:~AnXstXsia) with fuzzy=2
-    let result =
-        reader.reader.inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
             value: Some(Term::Fuzzy(FuzzyTerm {
                 value: "AnXstXsia".to_string(),
                 fuzzy_distance: 2,
@@ -147,8 +157,9 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
 
     // (:^Ana)
-    let result =
-        reader.reader.inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
             value: Some(Term::Fuzzy(FuzzyTerm {
                 value: "Anas".to_string(),
                 fuzzy_distance: 0,
@@ -161,8 +172,9 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
 
     // (:^~Anas)
-    let result =
-        reader.reader.inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
             value: Some(Term::Fuzzy(FuzzyTerm {
                 value: "Anas".to_string(),
                 fuzzy_distance: 2,
@@ -186,8 +198,9 @@ fn test_graph_relation_query() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
     // ()-[:LIVE_IN]->()
-    let result =
-        reader.reader.inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Value(Relation {
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Value(Relation {
             value: Some("LIVE_IN".to_string()),
         }))))?;
     let relations = friendly_parse(&result);
@@ -196,14 +209,16 @@ fn test_graph_relation_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
 
     // ()-[:LIVE_IN | BORN_IN]->()
-    let result = reader.reader.inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Or(vec![
-        Relation {
-            value: Some("BORN_IN".to_string()),
-        },
-        Relation {
-            value: Some("LIVE_IN".to_string()),
-        },
-    ]))))?;
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Or(vec![
+            Relation {
+                value: Some("BORN_IN".to_string()),
+            },
+            Relation {
+                value: Some("LIVE_IN".to_string()),
+            },
+        ]))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 3);
     assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
@@ -211,8 +226,9 @@ fn test_graph_relation_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
 
     // // ()-[:!LIVE_IN]->()
-    let result =
-        reader.reader.inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Not(Relation {
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Not(Relation {
             value: Some("LIVE_IN".to_string()),
         }))))?;
     let relations = friendly_parse(&result);
@@ -226,43 +242,43 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
     // (:Erin)-[]->(:UK)
-    let result = reader.reader.inner_graph_search(GraphQuery::PathQuery(PathQuery::DirectedPath((
-        Expression::Value(Node {
-            value: Some("Erin".into()),
-            node_type: Some(NodeType::Entity),
-            node_subtype: Some("PERSON".to_string()),
-        }),
-        Expression::Value(Relation {
-            value: None,
-        }),
-        Expression::Value(Node {
-            value: Some("UK".into()),
-            node_type: Some(NodeType::Entity),
-            node_subtype: Some("PLACE".to_string()),
-        }),
-    ))))?;
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::PathQuery(PathQuery::DirectedPath((
+            Expression::Value(Node {
+                value: Some("Erin".into()),
+                node_type: Some(NodeType::Entity),
+                node_subtype: Some("PERSON".to_string()),
+            }),
+            Expression::Value(Relation { value: None }),
+            Expression::Value(Node {
+                value: Some("UK".into()),
+                node_type: Some(NodeType::Entity),
+                node_subtype: Some("PLACE".to_string()),
+            }),
+        ))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 1);
     assert!(relations.contains(&("Erin", "BORN_IN", "UK")));
 
     // (:PERSON)-[]->(:PLACE)
-    let result = reader.reader.inner_graph_search(GraphQuery::PathQuery(PathQuery::DirectedPath((
-        Expression::Value(Node {
-            value: None,
-            node_type: Some(NodeType::Entity),
-            node_subtype: Some("PERSON".to_string()),
-            ..Default::default()
-        }),
-        Expression::Value(Relation {
-            value: None,
-        }),
-        Expression::Value(Node {
-            value: None,
-            node_type: None,
-            node_subtype: Some("PLACE".to_string()),
-            ..Default::default()
-        }),
-    ))))?;
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::PathQuery(PathQuery::DirectedPath((
+            Expression::Value(Node {
+                value: None,
+                node_type: Some(NodeType::Entity),
+                node_subtype: Some("PERSON".to_string()),
+                ..Default::default()
+            }),
+            Expression::Value(Relation { value: None }),
+            Expression::Value(Node {
+                value: None,
+                node_type: None,
+                node_subtype: Some("PLACE".to_string()),
+                ..Default::default()
+            }),
+        ))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 4);
     assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
@@ -271,51 +287,55 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
 
     // (:PERSON)-[:LIVE_IN]->(:PLACE)
-    let result = reader.reader.inner_graph_search(GraphQuery::PathQuery(PathQuery::DirectedPath((
-        Expression::Value(Node {
-            value: None,
-            node_type: None,
-            node_subtype: Some("PERSON".to_string()),
-            ..Default::default()
-        }),
-        Expression::Value(Relation {
-            value: Some("LIVE_IN".to_string()),
-        }),
-        Expression::Value(Node {
-            value: None,
-            node_type: None,
-            node_subtype: Some("PLACE".to_string()),
-            ..Default::default()
-        }),
-    ))))?;
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::PathQuery(PathQuery::DirectedPath((
+            Expression::Value(Node {
+                value: None,
+                node_type: None,
+                node_subtype: Some("PERSON".to_string()),
+                ..Default::default()
+            }),
+            Expression::Value(Relation {
+                value: Some("LIVE_IN".to_string()),
+            }),
+            Expression::Value(Node {
+                value: None,
+                node_type: None,
+                node_subtype: Some("PLACE".to_string()),
+                ..Default::default()
+            }),
+        ))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 2);
     assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
     assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
 
     // (:!Anna)-[:LIVE_IN|LOVE]->()
-    let result = reader.reader.inner_graph_search(GraphQuery::PathQuery(PathQuery::DirectedPath((
-        Expression::Not(Node {
-            value: Some("Anna".into()),
-            node_type: Some(NodeType::Entity),
-            node_subtype: Some("PERSON".to_string()),
-            ..Default::default()
-        }),
-        Expression::Or(vec![
-            Relation {
-                value: Some("LIVE_IN".to_string()),
-            },
-            Relation {
-                value: Some("LOVE".to_string()),
-            },
-        ]),
-        Expression::Value(Node {
-            value: None,
-            node_type: None,
-            node_subtype: None,
-            ..Default::default()
-        }),
-    ))))?;
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::PathQuery(PathQuery::DirectedPath((
+            Expression::Not(Node {
+                value: Some("Anna".into()),
+                node_type: Some(NodeType::Entity),
+                node_subtype: Some("PERSON".to_string()),
+                ..Default::default()
+            }),
+            Expression::Or(vec![
+                Relation {
+                    value: Some("LIVE_IN".to_string()),
+                },
+                Relation {
+                    value: Some("LOVE".to_string()),
+                },
+            ]),
+            Expression::Value(Node {
+                value: None,
+                node_type: None,
+                node_subtype: None,
+                ..Default::default()
+            }),
+        ))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 3);
     assert!(relations.contains(&("Erin", "LOVE", "Climbing")));
@@ -330,18 +350,20 @@ fn test_graph_undirected_path_query() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
     // (:Anna)-[:IS_FRIEND]-()
-    let result = reader.reader.inner_graph_search(GraphQuery::PathQuery(PathQuery::UndirectedPath((
-        Expression::Value(Node {
-            value: Some("Anna".into()),
-            node_type: Some(NodeType::Entity),
-            node_subtype: Some("PERSON".to_string()),
-            ..Default::default()
-        }),
-        Expression::Value(Relation {
-            value: Some("IS_FRIEND".to_string()),
-        }),
-        Expression::Value(Node::default()),
-    ))))?;
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::PathQuery(PathQuery::UndirectedPath((
+            Expression::Value(Node {
+                value: Some("Anna".into()),
+                node_type: Some(NodeType::Entity),
+                node_subtype: Some("PERSON".to_string()),
+                ..Default::default()
+            }),
+            Expression::Value(Relation {
+                value: Some("IS_FRIEND".to_string()),
+            }),
+            Expression::Value(Node::default()),
+        ))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 1);
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
@@ -354,14 +376,16 @@ fn test_graph_response() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
     // ()-[:LIVE_IN]->()
-    let result = reader.reader.inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Or(vec![
-        Relation {
-            value: Some("LIVE_IN".to_string()),
-        },
-        Relation {
-            value: Some("WORK_IN".to_string()),
-        },
-    ]))))?;
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Or(vec![
+            Relation {
+                value: Some("LIVE_IN".to_string()),
+            },
+            Relation {
+                value: Some("WORK_IN".to_string()),
+            },
+        ]))))?;
     friendly_print(&result);
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 4);

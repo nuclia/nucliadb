@@ -23,7 +23,7 @@ mod common;
 use common::services::NidxFixture;
 use nidx_protos::filter_expression::{Expr, FieldFilter, FilterExpressionList, KeywordFilter, ResourceFilter};
 use nidx_protos::prost_types::Timestamp;
-use nidx_protos::{nodereader, noderesources, FilterExpression};
+use nidx_protos::{FilterExpression, nodereader, noderesources};
 use nidx_protos::{NewShardRequest, VectorIndexConfig};
 use sqlx::PgPool;
 use std::collections::HashMap;
@@ -70,17 +70,13 @@ fn keyword_filter_expression(word: &str) -> FilterExpression {
 
 fn or_filter_expression(operands: Vec<FilterExpression>) -> FilterExpression {
     FilterExpression {
-        expr: Some(Expr::BoolOr(FilterExpressionList {
-            operands,
-        })),
+        expr: Some(Expr::BoolOr(FilterExpressionList { operands })),
     }
 }
 
 fn and_filter_expression(operands: Vec<FilterExpression>) -> FilterExpression {
     FilterExpression {
-        expr: Some(Expr::BoolAnd(FilterExpressionList {
-            operands,
-        })),
+        expr: Some(Expr::BoolAnd(FilterExpressionList { operands })),
     }
 }
 
@@ -135,7 +131,11 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
         body: "Dummy".to_string(),
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
 
     assert!(results.vector.is_none());
     assert!(results.paragraph.is_none());
@@ -154,7 +154,11 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
         body: "Dummy".to_string(),
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
 
     assert!(results.vector.is_some());
     let vector_results = results.vector.unwrap();
@@ -178,7 +182,11 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
         body: "Dummy".to_string(),
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
 
     assert!(results.vector.is_some());
     let vector_results = results.vector.unwrap();
@@ -295,7 +303,11 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
         body: "Dummy".to_string(),
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
     assert_eq!(results.paragraph.unwrap().results.len(), 2);
 
     // Finds resource 1 by uuid
@@ -306,10 +318,18 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
         min_score_bm25: 0.0,
         paragraph: true,
         body: "Dummy".to_string(),
-        field_filter: Some(resource_filter_expression(&[&resource1.resource.as_ref().unwrap().uuid])),
+        field_filter: Some(resource_filter_expression(&[&resource1
+            .resource
+            .as_ref()
+            .unwrap()
+            .uuid])),
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
     assert_eq!(results.paragraph.unwrap().results.len(), 1);
 
     // Finds resource 1 by uuid and field
@@ -326,7 +346,11 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
         ])),
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
     assert_eq!(results.paragraph.unwrap().results.len(), 1);
 
     // Finds resource 1 or 2 by uuid
@@ -343,7 +367,11 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
         ])),
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
     assert_eq!(results.paragraph.unwrap().results.len(), 2);
 
     // Finds nothing with fake id
@@ -357,7 +385,11 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
         field_filter: Some(resource_filter_expression(&["fake"])),
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
     assert!(results.paragraph.is_none());
 
     Ok(())
@@ -399,7 +431,11 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
         body: "Dummy".to_string(),
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
     assert_eq!(results.paragraph.unwrap().results.len(), 1);
 
     // With keyword filter, finds the resource
@@ -413,7 +449,11 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
         field_filter: Some(keyword_filter_expression("text")),
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
     assert_eq!(results.paragraph.unwrap().results.len(), 1);
 
     // With keyword filter, finds the resource
@@ -427,7 +467,11 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
         field_filter: Some(keyword_filter_expression("none")),
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
     assert!(results.paragraph.is_none());
 
     // With not keyword filter, finds the resource
@@ -441,7 +485,11 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
         field_filter: Some(not_filter_expression(keyword_filter_expression("none"))),
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
     assert_eq!(results.paragraph.unwrap().results.len(), 1);
 
     // With not keyword filter, finds the resource
@@ -458,7 +506,11 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
         ])),
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
     assert_eq!(results.paragraph.unwrap().results.len(), 1);
 
     Ok(())

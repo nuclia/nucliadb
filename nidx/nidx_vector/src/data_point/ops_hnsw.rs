@@ -262,7 +262,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 _ => (),
             }
         }
-        ms_neighbours.into_sorted_vec().into_iter().map(|Reverse(Cnx(n, d))| (n, d)).collect()
+        ms_neighbours
+            .into_sorted_vec()
+            .into_iter()
+            .map(|Reverse(Cnx(n, d))| (n, d))
+            .collect()
     }
 
     fn layer_insert(&self, x: Address, layer: &mut RAMLayer, entry_points: &[Address], mmax: usize) -> Vec<Address> {
@@ -283,7 +287,9 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         for crnt in needs_repair {
             let edges = layer.take_out_edges(crnt);
             let neighbours = self.select_neighbours_heuristic(params::prune_m(mmax), edges, layer);
-            neighbours.into_iter().for_each(|(y, edge)| layer.add_edge(crnt, edge, y));
+            neighbours
+                .into_iter()
+                .for_each(|(y, edge)| layer.add_edge(crnt, edge, y));
         }
         result
     }

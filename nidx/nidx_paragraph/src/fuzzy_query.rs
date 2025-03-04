@@ -44,12 +44,12 @@ use std::io;
 use std::ops::Range;
 use std::sync::Arc;
 
-use levenshtein_automata::{Distance, LevenshteinAutomatonBuilder, DFA};
+use levenshtein_automata::{DFA, Distance, LevenshteinAutomatonBuilder};
 use once_cell::sync::Lazy;
+use tantivy::TantivyError::InvalidArgument;
 use tantivy::query::{BitSetDocSet, ConstScorer, EnableScoring, Explanation, Query, Scorer, Weight};
 use tantivy::schema::{Field, IndexRecordOption, Term};
 use tantivy::termdict::{TermDictionary, TermStreamer};
-use tantivy::TantivyError::InvalidArgument;
 use tantivy::{DocId, DocSet, Score, SegmentReader, TantivyError};
 use tantivy_common::BitSet;
 use tantivy_fst::Automaton;
@@ -224,7 +224,11 @@ impl FuzzyTermQuery {
                 } else {
                     automaton_builder.build_dfa(term_text)
                 };
-                Ok(AutomatonWeight::new(self.term.field(), DfaWrapper(automaton), self.termc.clone()))
+                Ok(AutomatonWeight::new(
+                    self.term.field(),
+                    DfaWrapper(automaton),
+                    self.termc.clone(),
+                ))
             }
             None => Err(InvalidArgument(format!(
                 "Levenshtein distance of {} is not allowed. Choose a value in the {:?} range",

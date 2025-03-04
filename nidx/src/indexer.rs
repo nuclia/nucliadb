@@ -20,13 +20,13 @@
 use anyhow::anyhow;
 use async_nats::jetstream::consumer::PullConsumer;
 use futures::stream::StreamExt;
-use nidx_protos::nidx::nidx_indexer_server::NidxIndexer;
-use nidx_protos::nidx::nidx_indexer_server::NidxIndexerServer;
-use nidx_protos::prost::*;
 use nidx_protos::IndexMessage;
 use nidx_protos::OpStatus;
 use nidx_protos::Resource;
 use nidx_protos::TypeMessage;
+use nidx_protos::nidx::nidx_indexer_server::NidxIndexer;
+use nidx_protos::nidx::nidx_indexer_server::NidxIndexerServer;
+use nidx_protos::prost::*;
 use nidx_types::Seq;
 use object_store::{DynObjectStore, ObjectStore};
 use std::path::Path;
@@ -40,13 +40,13 @@ use uuid::Uuid;
 
 use crate::errors::NidxError;
 use crate::grpc_server::GrpcServer;
+use crate::metrics::IndexKindLabels;
+use crate::metrics::OperationStatusLabels;
 use crate::metrics::indexer::INDEXING_COUNTER;
 use crate::metrics::indexer::PER_INDEX_INDEXING_TIME;
 use crate::metrics::indexer::TOTAL_INDEXING_TIME;
-use crate::metrics::IndexKindLabels;
-use crate::metrics::OperationStatusLabels;
 use crate::segment_store::pack_and_upload;
-use crate::{metadata::*, Settings};
+use crate::{Settings, metadata::*};
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry;
@@ -301,8 +301,14 @@ pub async fn index_resource(
                 };
 
                 // Create the segment first so we can track it if the upload gets interrupted
-                let segment =
-                    Segment::create(&meta.pool, index.id, seq, new_segment.records, new_segment.index_metadata).await?;
+                let segment = Segment::create(
+                    &meta.pool,
+                    index.id,
+                    seq,
+                    new_segment.records,
+                    new_segment.index_metadata,
+                )
+                .await?;
                 let size = pack_and_upload(storage.clone(), output_dir.path(), segment.id.storage_key()).await?;
 
                 Ok(Some((segment, size, deletions)))
@@ -343,13 +349,15 @@ fn index_resource_to_index(
         IndexKind::Vector => nidx_vector::VectorIndexer
             .index_resource(output_dir, &index.config()?, resource, &index.name, single_vector_index)?
             .map(|x| x.into()),
-        IndexKind::Text => {
-            nidx_text::TextIndexer.index_resource(output_dir, index.config()?, resource)?.map(|x| x.into())
-        }
-        IndexKind::Paragraph => {
-            nidx_paragraph::ParagraphIndexer.index_resource(output_dir, resource)?.map(|x| x.into())
-        }
-        IndexKind::Relation => nidx_relation::RelationIndexer.index_resource(output_dir, resource)?.map(|x| x.into()),
+        IndexKind::Text => nidx_text::TextIndexer
+            .index_resource(output_dir, index.config()?, resource)?
+            .map(|x| x.into()),
+        IndexKind::Paragraph => nidx_paragraph::ParagraphIndexer
+            .index_resource(output_dir, resource)?
+            .map(|x| x.into()),
+        IndexKind::Relation => nidx_relation::RelationIndexer
+            .index_resource(output_dir, resource)?
+            .map(|x| x.into()),
     };
 
     let deletions = match index.kind {
@@ -358,7 +366,9 @@ fn index_resource_to_index(
         IndexKind::Paragraph => nidx_paragraph::ParagraphIndexer.deletions_for_resource(resource),
         IndexKind::Relation => nidx_relation::RelationIndexer.deletions_for_resource(resource),
     };
-    PER_INDEX_INDEXING_TIME.get_or_create(&IndexKindLabels::new(index.kind)).observe(t.elapsed().as_secs_f64());
+    PER_INDEX_INDEXING_TIME
+        .get_or_create(&IndexKindLabels::new(index.kind))
+        .observe(t.elapsed().as_secs_f64());
 
     Ok((segment, deletions))
 }
@@ -379,9 +389,7 @@ mod tests {
     const VECTOR_CONFIG: VectorConfig = VectorConfig {
         similarity: Similarity::Cosine,
         normalize_vectors: false,
-        vector_type: VectorType::DenseF32 {
-            dimension: 3,
-        },
+        vector_type: VectorType::DenseF32 { dimension: 3 },
     };
 
     #[sqlx::test]
@@ -389,7 +397,9 @@ mod tests {
         let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
         let kbid = Uuid::new_v4();
         let shard = Shard::create(&meta.pool, kbid).await.unwrap();
-        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into())
+            .await
+            .unwrap();
 
         let storage = Arc::new(object_store::memory::InMemory::new());
         index_resource(
@@ -410,7 +420,10 @@ mod tests {
         assert_eq!(segment.delete_at, None);
         assert_eq!(segment.records, 1);
 
-        let download = storage.get(&object_store::path::Path::parse(segment.id.storage_key()).unwrap()).await.unwrap();
+        let download = storage
+            .get(&object_store::path::Path::parse(segment.id.storage_key()).unwrap())
+            .await
+            .unwrap();
         let mut out = tempfile().unwrap();
         out.write_all(&download.bytes().await.unwrap()).unwrap();
         let downloaded_size = out.stream_position().unwrap() as i64;
@@ -438,19 +451,20 @@ mod tests {
         )
         .await?;
 
-        assert!(Deletion::for_index_and_seq(&meta.pool, index.id, 10i64.into()).await?.is_empty());
+        assert!(
+            Deletion::for_index_and_seq(&meta.pool, index.id, 10i64.into())
+                .await?
+                .is_empty()
+        );
 
         // Resource with some deletions, a single `Deletion` with multiple keys is created
         let keys = vec![
             format!("{}/a/title/0-15", resource.resource.as_ref().unwrap().uuid),
             format!("{}/a/summary/0-150", resource.resource.as_ref().unwrap().uuid),
         ];
-        resource.vector_prefixes_to_delete.insert(
-            index.name,
-            StringList {
-                items: keys.clone(),
-            },
-        );
+        resource
+            .vector_prefixes_to_delete
+            .insert(index.name, StringList { items: keys.clone() });
         index_resource(
             &meta,
             storage.clone(),

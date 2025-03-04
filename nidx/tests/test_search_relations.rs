@@ -30,9 +30,9 @@ use nidx_protos::relation_node::NodeType;
 use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::resource::ResourceStatus;
 use nidx_protos::{
-    graph_query, EntitiesSubgraphRequest, GraphQuery, GraphSearchRequest, IndexMetadata, NewShardRequest, Relation,
+    EntitiesSubgraphRequest, GraphQuery, GraphSearchRequest, IndexMetadata, NewShardRequest, Relation,
     RelationMetadata, RelationNode, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest,
-    RelationSearchResponse, Resource, ResourceId,
+    RelationSearchResponse, Resource, ResourceId, graph_query,
 };
 use nidx_protos::{SearchRequest, VectorIndexConfig};
 use nidx_tests::graph::{friendly_parse, friendly_print};
@@ -95,7 +95,11 @@ async fn test_search_relations_by_prefix(pool: PgPool) -> Result<(), Box<dyn std
     let expected = HashSet::from_iter(["Cat".to_string(), "Catwoman".to_string(), "Batman".to_string()]);
     assert!(response.prefix.is_some());
     let prefix_response = response.prefix.as_ref().unwrap();
-    let results = prefix_response.nodes.iter().map(|node| node.value.to_owned()).collect::<HashSet<_>>();
+    let results = prefix_response
+        .nodes
+        .iter()
+        .map(|node| node.value.to_owned())
+        .collect::<HashSet<_>>();
     assert_eq!(results, expected);
 
     // --------------------------------------------------------------
@@ -121,7 +125,11 @@ async fn test_search_relations_by_prefix(pool: PgPool) -> Result<(), Box<dyn std
     let expected = HashSet::from_iter(["Cat".to_string()]);
     assert!(response.prefix.is_some());
     let prefix_response = response.prefix.as_ref().unwrap();
-    let results = prefix_response.nodes.iter().map(|node| node.value.to_owned()).collect::<HashSet<_>>();
+    let results = prefix_response
+        .nodes
+        .iter()
+        .map(|node| node.value.to_owned())
+        .collect::<HashSet<_>>();
     assert_eq!(results, expected);
 
     let response = relation_search(
@@ -143,7 +151,11 @@ async fn test_search_relations_by_prefix(pool: PgPool) -> Result<(), Box<dyn std
     let expected = HashSet::from_iter(["Catwoman".to_string()]);
     assert!(response.prefix.is_some());
     let prefix_response = response.prefix.as_ref().unwrap();
-    let results = prefix_response.nodes.iter().map(|node| node.value.to_owned()).collect::<HashSet<_>>();
+    let results = prefix_response
+        .nodes
+        .iter()
+        .map(|node| node.value.to_owned())
+        .collect::<HashSet<_>>();
     assert_eq!(results, expected);
 
     // --------------------------------------------------------------
@@ -169,7 +181,11 @@ async fn test_search_relations_by_prefix(pool: PgPool) -> Result<(), Box<dyn std
     let expected = HashSet::from_iter(["Cat".to_string()]);
     assert!(response.prefix.is_some());
     let prefix_response = response.prefix.as_ref().unwrap();
-    let results = prefix_response.nodes.iter().map(|node| node.value.to_owned()).collect::<HashSet<_>>();
+    let results = prefix_response
+        .nodes
+        .iter()
+        .map(|node| node.value.to_owned())
+        .collect::<HashSet<_>>();
     assert_eq!(results, expected);
 
     // --------------------------------------------------------------
@@ -210,7 +226,10 @@ async fn test_search_relations_neighbours(pool: PgPool) -> Result<(), Box<dyn st
             .iter()
             .flat_map(|neighbours| neighbours.relations.iter())
             .flat_map(|node| {
-                [(node.source.as_ref().unwrap().value.to_owned(), node.to.as_ref().unwrap().value.to_owned())]
+                [(
+                    node.source.as_ref().unwrap().value.to_owned(),
+                    node.to.as_ref().unwrap().value.to_owned(),
+                )]
             })
             .collect::<HashSet<_>>()
     }
@@ -321,7 +340,10 @@ async fn test_search_relations_neighbours(pool: PgPool) -> Result<(), Box<dyn st
     let first_relation = &subgraph.relations[0];
     let metadata = first_relation.metadata.as_ref().unwrap();
 
-    assert_eq!(metadata.paragraph_id, Some("myresource/0/myresource/100-200".to_string()));
+    assert_eq!(
+        metadata.paragraph_id,
+        Some("myresource/0/myresource/100-200".to_string())
+    );
     assert_eq!(metadata.source_start, Some(0));
     assert_eq!(metadata.source_end, Some(10));
     assert_eq!(metadata.to_start, Some(11));
@@ -950,7 +972,9 @@ async fn create_knowledge_graph(fixture: &mut NidxFixture, shard_id: String) -> 
     let mut relation_edges = vec![];
     for (source, relation, destination, relation_metadata) in graph {
         let (source_type, source_subtype) = entities.get(source).unwrap();
-        let relation_type = relations.get(relation).expect(&format!("Expecting to find relation '{relation}'"));
+        let relation_type = relations
+            .get(relation)
+            .expect(&format!("Expecting to find relation '{relation}'"));
         let (destination_type, destination_subtype) = entities.get(destination).unwrap();
 
         relation_edges.push(Relation {

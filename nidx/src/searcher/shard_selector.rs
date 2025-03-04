@@ -195,10 +195,7 @@ pub struct ShardSelector {
 
 impl ShardSelector {
     pub fn new(nodes: Arc<dyn ListNodes>, num_replicas: usize) -> Self {
-        Self {
-            nodes,
-            num_replicas,
-        }
+        Self { nodes, num_replicas }
     }
 
     pub fn new_single() -> Self {

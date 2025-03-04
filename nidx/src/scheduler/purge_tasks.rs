@@ -24,7 +24,7 @@ use futures::StreamExt;
 use object_store::DynObjectStore;
 use tracing::*;
 
-use crate::{metadata::Segment, NidxMetadata};
+use crate::{NidxMetadata, metadata::Segment};
 
 /// Purge segments that have not been ready for a while:
 /// - Uploads that failed
@@ -32,15 +32,15 @@ use crate::{metadata::Segment, NidxMetadata};
 pub async fn purge_segments(meta: &NidxMetadata, storage: &Arc<DynObjectStore>) -> anyhow::Result<()> {
     let deleted_segments = Segment::marked_as_deleted(&meta.pool).await?;
     let paths = deleted_segments.iter().map(|sid| Ok(sid.storage_key()));
-    let results = storage.delete_stream(futures::stream::iter(paths).boxed()).collect::<Vec<_>>().await;
+    let results = storage
+        .delete_stream(futures::stream::iter(paths).boxed())
+        .collect::<Vec<_>>()
+        .await;
 
     let mut deleted = Vec::new();
     for (segment_id, result) in deleted_segments.into_iter().zip(results.iter()) {
         match result {
-            Ok(_)
-            | Err(object_store::Error::NotFound {
-                ..
-            }) => deleted.push(segment_id),
+            Ok(_) | Err(object_store::Error::NotFound { .. }) => deleted.push(segment_id),
             Err(e) => warn!("Error deleting segment from storage: {e:?}"),
         }
     }

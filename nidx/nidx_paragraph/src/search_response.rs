@@ -30,7 +30,11 @@ use crate::reader::ParagraphReaderService;
 use crate::search_query::TermCollector;
 
 pub fn extract_labels<'a>(facets_iterator: impl Iterator<Item = &'a OwnedValue>) -> Vec<String> {
-    facets_iterator.flat_map(|x| x.as_facet()).filter(|x| is_label(x)).map(|x| x.to_path_string()).collect()
+    facets_iterator
+        .flat_map(|x| x.as_facet())
+        .filter(|x| is_label(x))
+        .map(|x| x.to_path_string())
+        .collect()
 }
 
 pub fn is_label(facet: &Facet) -> bool {
@@ -56,14 +60,7 @@ pub fn produce_facets(facets: Vec<String>, facets_count: FacetCounts) -> HashMap
         .map(|facet| (&facets_count, facet))
         .map(|(facets_count, facet)| (facet_count(&facet, facets_count), facet))
         .filter(|(r, _)| !r.is_empty())
-        .map(|(facetresults, facet)| {
-            (
-                facet,
-                FacetResults {
-                    facetresults,
-                },
-            )
-        })
+        .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
         .collect()
 }
 
@@ -102,7 +99,10 @@ pub struct SearchFacetsResponse<'a> {
 
 impl<'a> From<SearchFacetsResponse<'a>> for ParagraphSearchResponse {
     fn from(response: SearchFacetsResponse) -> Self {
-        let facets = response.facets_count.map(|count| produce_facets(response.facets, count)).unwrap_or_default();
+        let facets = response
+            .facets_count
+            .map(|count| produce_facets(response.facets, count))
+            .unwrap_or_default();
         let results: Vec<ParagraphResult> = Vec::with_capacity(0);
         ParagraphSearchResponse {
             results,
@@ -161,7 +161,12 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_string();
 
-                    let split = doc.get_first(schema.split).unwrap_or(&default_split).as_str().unwrap().to_string();
+                    let split = doc
+                        .get_first(schema.split)
+                        .unwrap_or(&default_split)
+                        .as_str()
+                        .unwrap()
+                        .to_string();
 
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
                     let mut terms: Vec<_> = response.termc.get_fterms(doc_address.doc_id).into_iter().collect();
@@ -186,7 +191,10 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
             }
         }
 
-        let facets = response.facets_count.map(|count| produce_facets(response.facets, count)).unwrap_or_default();
+        let facets = response
+            .facets_count
+            .map(|count| produce_facets(response.facets, count))
+            .unwrap_or_default();
         ParagraphSearchResponse {
             results,
             facets,
@@ -251,7 +259,12 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_string();
 
-                    let split = doc.get_first(schema.split).unwrap_or(&default_split).as_str().unwrap().to_string();
+                    let split = doc
+                        .get_first(schema.split)
+                        .unwrap_or(&default_split)
+                        .as_str()
+                        .unwrap()
+                        .to_string();
 
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
                     let mut terms: Vec<_> = response.termc.get_fterms(doc_address.doc_id).into_iter().collect();
@@ -276,7 +289,10 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
             }
         }
 
-        let facets = response.facets_count.map(|count| produce_facets(response.facets, count)).unwrap_or_default();
+        let facets = response
+            .facets_count
+            .map(|count| produce_facets(response.facets, count))
+            .unwrap_or_default();
         ParagraphSearchResponse {
             results,
             facets,

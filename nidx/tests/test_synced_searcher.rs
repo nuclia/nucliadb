@@ -22,12 +22,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use nidx::indexer::{index_resource, process_index_message};
-use nidx::searcher::shard_selector::ShardSelector;
 use nidx::searcher::SyncedSearcher;
+use nidx::searcher::shard_selector::ShardSelector;
 use nidx::settings::SearcherSettings;
 use nidx::{
-    metadata::{Index, Shard},
     NidxMetadata,
+    metadata::{Index, Shard},
 };
 use nidx_protos::{IndexMessage, TypeMessage};
 use nidx_tests::*;
@@ -40,9 +40,7 @@ use tokio_util::sync::CancellationToken;
 const VECTOR_CONFIG: VectorConfig = VectorConfig {
     similarity: nidx_vector::config::Similarity::Cosine,
     normalize_vectors: false,
-    vector_type: nidx_vector::config::VectorType::DenseF32 {
-        dimension: 3,
-    },
+    vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 3 },
 };
 
 #[sqlx::test]
@@ -112,8 +110,15 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
         ..Default::default()
     };
     // We will not use indexer storage here, so it's fine to pass an incorrect indexer storage
-    process_index_message(&meta, storage.clone(), storage.clone(), &tempfile::env::temp_dir(), deletion, 2i64.into())
-        .await?;
+    process_index_message(
+        &meta,
+        storage.clone(),
+        storage.clone(),
+        &tempfile::env::temp_dir(),
+        deletion,
+        2i64.into(),
+    )
+    .await?;
 
     tokio::time::sleep(Duration::from_secs(2)).await;
 

@@ -95,7 +95,10 @@ pub fn will_need(src: &[u8], id: usize, vector_len: usize) {
     let start = src.as_ptr().wrapping_add(get_pointer(src, id));
     let offset = start.align_offset(*PAGE_SIZE);
     let (start_page, advise_size) = if offset > 0 {
-        (start.wrapping_add(offset).wrapping_sub(*PAGE_SIZE), node_size + *PAGE_SIZE - offset)
+        (
+            start.wrapping_add(offset).wrapping_sub(*PAGE_SIZE),
+            node_size + *PAGE_SIZE - offset,
+        )
     } else {
         (start, node_size)
     };
@@ -177,7 +180,7 @@ pub fn merge(
     let mut id_section_cursor = HEADER_LEN;
 
     let alignment = config.vector_type.vector_alignment();
-    for (ref mut alive_ids, store) in segments {
+    for (alive_ids, store) in segments {
         for element_cursor in alive_ids {
             let element_pointer = get_pointer(store, element_cursor);
             let element_slice = &store[element_pointer..];
@@ -213,9 +216,7 @@ mod tests {
     use crate::data_point::{Elem, LabelDictionary};
 
     const VECTOR_CONFIG: VectorConfig = VectorConfig {
-        vector_type: VectorType::DenseF32 {
-            dimension: 3,
-        },
+        vector_type: VectorType::DenseF32 { dimension: 3 },
         similarity: crate::config::Similarity::Dot,
         normalize_vectors: false,
     };
@@ -240,7 +241,12 @@ mod tests {
     }
 
     fn create_elem(num: &usize) -> Elem {
-        Elem::new(num.to_string(), [*num as f32; 16].to_vec(), LabelDictionary::default(), None)
+        Elem::new(
+            num.to_string(),
+            [*num as f32; 16].to_vec(),
+            LabelDictionary::default(),
+            None,
+        )
     }
 
     #[test]
@@ -263,7 +269,11 @@ mod tests {
         let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
         let mut merge_store = tempfile::tempfile().unwrap();
-        let mut elems = vec![(0..3, v0_map.as_ref()), (0..3, v1_map.as_ref()), (0..4, v2_map.as_ref())];
+        let mut elems = vec![
+            (0..3, v0_map.as_ref()),
+            (0..3, v1_map.as_ref()),
+            (0..4, v2_map.as_ref()),
+        ];
 
         merge(&mut merge_store, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };

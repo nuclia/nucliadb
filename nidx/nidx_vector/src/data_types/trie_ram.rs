@@ -81,7 +81,12 @@ mod tests {
             b"BAD".as_slice(),
             b"GOOD".as_slice(),
         ];
-        let not_in_dictionary = [b"WO1D1".as_slice(), b"LORD".as_slice(), b"BAF".as_slice(), b"WOR".as_slice()];
+        let not_in_dictionary = [
+            b"WO1D1".as_slice(),
+            b"LORD".as_slice(),
+            b"BAF".as_slice(),
+            b"WOR".as_slice(),
+        ];
 
         let trie = create_trie(&dictionary);
         assert!(dictionary.iter().all(|w| has_word(&trie, w)));

@@ -52,10 +52,7 @@ pub struct CompoundClause {
 }
 impl CompoundClause {
     pub fn new(operator: BooleanOperator, operands: Vec<Clause>) -> CompoundClause {
-        CompoundClause {
-            operator,
-            operands,
-        }
+        CompoundClause { operator, operands }
     }
 }
 

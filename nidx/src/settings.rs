@@ -24,15 +24,15 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use base64::engine::general_purpose::STANDARD as base64;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as base64;
 use config::{Config, Environment};
+use object_store::ClientOptions;
 use object_store::aws::AmazonS3Builder;
 use object_store::limit::LimitStore;
 use object_store::local::LocalFileSystem;
 use object_store::memory::InMemory;
-use object_store::ClientOptions;
-use object_store::{gcp::GoogleCloudStorageBuilder, DynObjectStore};
+use object_store::{DynObjectStore, gcp::GoogleCloudStorageBuilder};
 use serde::{Deserialize, Deserializer};
 
 use crate::NidxMetadata;
@@ -59,7 +59,9 @@ pub enum ObjectStoreKind {
 }
 
 fn deserialize_u64<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<u64>, D::Error> {
-    Ok(Some(String::deserialize(deserializer)?.parse().expect("Expected a number")))
+    Ok(Some(
+        String::deserialize(deserializer)?.parse().expect("Expected a number"),
+    ))
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -108,13 +110,15 @@ impl ObjectStoreConfig {
                 region_name,
                 endpoint,
             } => {
-                let mut builder =
-                    AmazonS3Builder::new().with_region(region_name.clone()).with_bucket_name(bucket.clone());
+                let mut builder = AmazonS3Builder::new()
+                    .with_region(region_name.clone())
+                    .with_bucket_name(bucket.clone());
                 // Unless client_id and client_secret are specified, the library will try to use the credentials by looking
                 // at the standard AWS_WEB_IDENTITY_TOKEN_FILE environment variable
                 if let (Some(client_id), Some(client_secret)) = (client_id, client_secret) {
-                    builder =
-                        builder.with_access_key_id(client_id.clone()).with_secret_access_key(client_secret.clone());
+                    builder = builder
+                        .with_access_key_id(client_id.clone())
+                        .with_secret_access_key(client_secret.clone());
                 }
                 if endpoint.is_some() {
                     // This is needed for minio compatibility
@@ -125,9 +129,7 @@ impl ObjectStoreConfig {
                 }
                 Box::new(builder.build().unwrap())
             }
-            ObjectStoreKind::File {
-                file_path,
-            } => Box::new(LocalFileSystem::new_with_prefix(file_path).unwrap()),
+            ObjectStoreKind::File { file_path } => Box::new(LocalFileSystem::new_with_prefix(file_path).unwrap()),
             ObjectStoreKind::Memory => Box::new(InMemory::new()),
         };
 
@@ -384,10 +386,7 @@ impl Settings {
 
     pub async fn from_env_settings(settings: EnvSettings) -> anyhow::Result<Self> {
         let metadata = NidxMetadata::new(&settings.metadata.as_ref().expect("DB config required").database_url).await?;
-        Ok(Self {
-            metadata,
-            settings,
-        })
+        Ok(Self { metadata, settings })
     }
 }
 
@@ -410,6 +409,9 @@ mod tests {
         assert_eq!(&settings.metadata.unwrap().database_url, "postgresql://localhost");
         assert_eq!(settings.indexer.unwrap().nats_server, Some("localhost".to_string()));
         assert_eq!(settings.merge.max_deletions, 1234);
-        assert_eq!(settings.merge.log_merge.min_number_of_segments, LogMergeSettings::default().min_number_of_segments);
+        assert_eq!(
+            settings.merge.log_merge.min_number_of_segments,
+            LogMergeSettings::default().min_number_of_segments
+        );
     }
 }

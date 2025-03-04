@@ -67,12 +67,7 @@ async fn populate(fixture: &mut NidxFixture, shard_id: String, metadata: IndexMe
         start: 0,
         end: 0,
         sentences: sentences.clone(),
-        vectorsets_sentences: HashMap::from([(
-            "__default__".to_string(),
-            VectorsetSentences {
-                sentences,
-            },
-        )]),
+        vectorsets_sentences: HashMap::from([("__default__".to_string(), VectorsetSentences { sentences })]),
         field: field_id.clone(),
         labels: vec![],
         index: 3,

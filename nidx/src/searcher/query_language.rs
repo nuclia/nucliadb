@@ -18,24 +18,25 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use nidx_protos::{
-    filter_expression::{Expr, FacetFilter, FilterExpressionList},
     FilterExpression,
+    filter_expression::{Expr, FacetFilter, FilterExpressionList},
 };
 use nidx_types::query_language::*;
 
 /// Extract an expression only involving some labels if it's an AND subset of the total expression
 pub fn extract_label_filters(expression: &FilterExpression, labels: &[&str]) -> Option<BooleanExpression> {
     match expression.expr.as_ref().unwrap() {
-        Expr::Facet(FacetFilter {
-            facet,
-        }) if labels.contains(&facet.as_str()) => Some(BooleanExpression::Literal(facet.clone())),
+        Expr::Facet(FacetFilter { facet }) if labels.contains(&facet.as_str()) => {
+            Some(BooleanExpression::Literal(facet.clone()))
+        }
         Expr::BoolNot(not_expr) => {
             extract_label_filters(not_expr.as_ref(), labels).map(|e| BooleanExpression::Not(Box::new(e)))
         }
-        Expr::BoolAnd(FilterExpressionList {
-            operands,
-        }) => {
-            let relevant: Vec<_> = operands.iter().filter_map(|e| extract_label_filters(e, labels)).collect();
+        Expr::BoolAnd(FilterExpressionList { operands }) => {
+            let relevant: Vec<_> = operands
+                .iter()
+                .filter_map(|e| extract_label_filters(e, labels))
+                .collect();
             match &relevant[..] {
                 [] => None,
                 [expression] => Some(expression.clone()),
@@ -58,19 +59,13 @@ mod tests {
         const LABELS: &[&str] = &["/v", "/w"];
 
         let a = FilterExpression {
-            expr: Some(Expr::Facet(FacetFilter {
-                facet: "/a".into(),
-            })),
+            expr: Some(Expr::Facet(FacetFilter { facet: "/a".into() })),
         };
         let v = FilterExpression {
-            expr: Some(Expr::Facet(FacetFilter {
-                facet: "/v".into(),
-            })),
+            expr: Some(Expr::Facet(FacetFilter { facet: "/v".into() })),
         };
         let w = FilterExpression {
-            expr: Some(Expr::Facet(FacetFilter {
-                facet: "/w".into(),
-            })),
+            expr: Some(Expr::Facet(FacetFilter { facet: "/w".into() })),
         };
 
         let not = |e| FilterExpression {
@@ -79,14 +74,19 @@ mod tests {
 
         // Literal
         assert_eq!(extract_label_filters(&a, LABELS), None);
-        assert_eq!(extract_label_filters(&v, LABELS), Some(BooleanExpression::Literal("/v".into())));
+        assert_eq!(
+            extract_label_filters(&v, LABELS),
+            Some(BooleanExpression::Literal("/v".into()))
+        );
 
         // Not literal
         assert_eq!(extract_label_filters(&not(a.clone()), LABELS), None);
 
         assert_eq!(
             extract_label_filters(&not(v.clone()), LABELS),
-            Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal("/v".into()))))
+            Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal(
+                "/v".into()
+            ))))
         );
 
         // Or (not supported)
@@ -118,6 +118,9 @@ mod tests {
                 operands: vec![a, v, or_expr],
             })),
         };
-        assert_eq!(extract_label_filters(&expr, LABELS), Some(BooleanExpression::Literal("/v".into())));
+        assert_eq!(
+            extract_label_filters(&expr, LABELS),
+            Some(BooleanExpression::Literal("/v".into()))
+        );
     }
 }

@@ -28,11 +28,15 @@ use tempfile::tempdir;
 fn test_index_merge_search() -> anyhow::Result<()> {
     let resource = little_prince("shard", None);
     let segment_dir = tempdir()?;
-    let meta1 = TextIndexer.index_resource(segment_dir.path(), TextConfig::default(), &resource)?.unwrap();
+    let meta1 = TextIndexer
+        .index_resource(segment_dir.path(), TextConfig::default(), &resource)?
+        .unwrap();
     let records = meta1.records;
 
     let segment_dir2 = tempdir()?;
-    let meta2 = TextIndexer.index_resource(segment_dir2.path(), TextConfig::default(), &resource)?.unwrap();
+    let meta2 = TextIndexer
+        .index_resource(segment_dir2.path(), TextConfig::default(), &resource)?
+        .unwrap();
 
     let merge_dir = tempdir()?;
     let merged_meta = TextIndexer.merge(
@@ -48,8 +52,10 @@ fn test_index_merge_search() -> anyhow::Result<()> {
     assert_eq!(merged_meta.records, records);
 
     // Search on first resource
-    let searcher =
-        TextSearcher::open(TextConfig::default(), TestOpener::new(vec![(meta1.clone(), 1i64.into())], vec![]))?;
+    let searcher = TextSearcher::open(
+        TextConfig::default(),
+        TestOpener::new(vec![(meta1.clone(), 1i64.into())], vec![]),
+    )?;
     let result = searcher.search(&DocumentSearchRequest {
         result_per_page: 20,
         ..Default::default()
@@ -68,8 +74,10 @@ fn test_index_merge_search() -> anyhow::Result<()> {
     assert_eq!(result.results.len(), 4);
 
     // Search on merged resources
-    let searcher =
-        TextSearcher::open(TextConfig::default(), TestOpener::new(vec![(merged_meta, 1i64.into())], vec![]))?;
+    let searcher = TextSearcher::open(
+        TextConfig::default(),
+        TestOpener::new(vec![(merged_meta, 1i64.into())], vec![]),
+    )?;
     let result = searcher.search(&DocumentSearchRequest {
         result_per_page: 20,
         ..Default::default()
