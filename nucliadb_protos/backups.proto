@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package backups;
+
+import "google/protobuf/timestamp.proto";
+
+
+
+message CreateBackupRequest {
+    string backup_id = 1;
+    string kbid = 2;
+}
+
+
+message CreateBackupResponse {
+    enum Status {
+        OK = 0;
+        ERROR = 1;
+        KB_NOT_FOUND = 2;
+    }
+    Status status = 1;
+}
+
+
+message DeleteBackupRequest {
+    string backup_id = 1;
+    string kbid = 2;
+}
+
+
+message DeleteBackupResponse {
+    enum Status {
+        OK = 0;
+        ERROR = 1;
+    }
+    Status status = 1;
+}
+
+message RestoreBackupRequest {
+    string backup_id = 1;
+    string kbid = 2;
+}
+
+
+message RestoreBackupResponse {
+    enum Status {
+        OK = 0;
+        ERROR = 1;
+        NOT_FOUND = 2;
+    }
+    Status status = 1;
+}
+
+
+message BackupCreatedNotification {
+    google.protobuf.Timestamp finished_at = 1;
+    string backup_id = 2;
+}

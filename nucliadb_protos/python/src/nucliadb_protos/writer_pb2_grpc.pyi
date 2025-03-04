@@ -7,6 +7,7 @@ import abc
 import collections.abc
 import grpc
 import grpc.aio
+import nucliadb_protos.backups_pb2
 import nucliadb_protos.knowledgebox_pb2
 import nucliadb_protos.writer_pb2
 import typing
@@ -27,6 +28,15 @@ from nucliadb_protos.audit_pb2 import (
     TaskType as TaskType,
     WEB as WEB,
     WIDGET as WIDGET,
+)
+from nucliadb_protos.backups_pb2 import (
+    BackupCreatedNotification as BackupCreatedNotification,
+    CreateBackupRequest as CreateBackupRequest,
+    CreateBackupResponse as CreateBackupResponse,
+    DeleteBackupRequest as DeleteBackupRequest,
+    DeleteBackupResponse as DeleteBackupResponse,
+    RestoreBackupRequest as RestoreBackupRequest,
+    RestoreBackupResponse as RestoreBackupResponse,
 )
 from nucliadb_protos.knowledgebox_pb2 import (
     AWS_EU_WEST_1 as AWS_EU_WEST_1,
@@ -256,6 +266,21 @@ class WriterStub:
         nucliadb_protos.writer_pb2.IndexStatus,
     ]
 
+    CreateBackup: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.backups_pb2.CreateBackupRequest,
+        nucliadb_protos.backups_pb2.CreateBackupResponse,
+    ]
+
+    DeleteBackup: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.backups_pb2.DeleteBackupRequest,
+        nucliadb_protos.backups_pb2.DeleteBackupResponse,
+    ]
+
+    RestoreBackup: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.backups_pb2.RestoreBackupRequest,
+        nucliadb_protos.backups_pb2.RestoreBackupResponse,
+    ]
+
 class WriterAsyncStub:
     NewKnowledgeBoxV2: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Request,
@@ -331,6 +356,21 @@ class WriterAsyncStub:
     ReIndex: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.IndexResource,
         nucliadb_protos.writer_pb2.IndexStatus,
+    ]
+
+    CreateBackup: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.backups_pb2.CreateBackupRequest,
+        nucliadb_protos.backups_pb2.CreateBackupResponse,
+    ]
+
+    DeleteBackup: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.backups_pb2.DeleteBackupRequest,
+        nucliadb_protos.backups_pb2.DeleteBackupResponse,
+    ]
+
+    RestoreBackup: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.backups_pb2.RestoreBackupRequest,
+        nucliadb_protos.backups_pb2.RestoreBackupResponse,
     ]
 
 class WriterServicer(metaclass=abc.ABCMeta):
@@ -439,5 +479,26 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.writer_pb2.IndexResource,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.writer_pb2.IndexStatus, collections.abc.Awaitable[nucliadb_protos.writer_pb2.IndexStatus]]: ...
+
+    @abc.abstractmethod
+    def CreateBackup(
+        self,
+        request: nucliadb_protos.backups_pb2.CreateBackupRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.backups_pb2.CreateBackupResponse, collections.abc.Awaitable[nucliadb_protos.backups_pb2.CreateBackupResponse]]: ...
+
+    @abc.abstractmethod
+    def DeleteBackup(
+        self,
+        request: nucliadb_protos.backups_pb2.DeleteBackupRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.backups_pb2.DeleteBackupResponse, collections.abc.Awaitable[nucliadb_protos.backups_pb2.DeleteBackupResponse]]: ...
+
+    @abc.abstractmethod
+    def RestoreBackup(
+        self,
+        request: nucliadb_protos.backups_pb2.RestoreBackupRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.backups_pb2.RestoreBackupResponse, collections.abc.Awaitable[nucliadb_protos.backups_pb2.RestoreBackupResponse]]: ...
 
 def add_WriterServicer_to_server(servicer: WriterServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

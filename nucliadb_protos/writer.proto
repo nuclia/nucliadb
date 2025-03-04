@@ -8,6 +8,7 @@ import public "nucliadb_protos/noderesources.proto";
 import public "nucliadb_protos/resources.proto";
 import public "nucliadb_protos/knowledgebox.proto";
 import public "nucliadb_protos/audit.proto";
+import public "nucliadb_protos/backups.proto";
 
 // We receive this information throw an stream system
 
@@ -456,6 +457,8 @@ message NewKnowledgeBoxV2Response {
 }
 
 
+
+
 service Writer {
     rpc NewKnowledgeBoxV2(NewKnowledgeBoxV2Request) returns (NewKnowledgeBoxV2Response) {}
     rpc DeleteKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.DeleteKnowledgeBoxResponse) {}
@@ -478,6 +481,10 @@ service Writer {
 
     rpc Index(IndexResource) returns (IndexStatus) {}
     rpc ReIndex(IndexResource) returns (IndexStatus) {}
+
+    rpc CreateBackup(backups.CreateBackupRequest) returns (backups.CreateBackupResponse) {}
+    rpc DeleteBackup(backups.DeleteBackupRequest) returns (backups.DeleteBackupResponse) {}
+    rpc RestoreBackup(backups.RestoreBackupRequest) returns (backups.RestoreBackupResponse) {}
 }
 
 message FieldError {

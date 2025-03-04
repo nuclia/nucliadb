@@ -36,7 +36,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
-from nucliadb_protos import writer_pb2, writer_pb2_grpc
+from nucliadb_protos import backups_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse,
     KnowledgeBoxID,
@@ -467,3 +467,18 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
             raise
+
+    async def CreateBackup(
+        self, request: backups_pb2.CreateBackupRequest, context=None
+    ) -> backups_pb2.CreateBackupResponse:
+        return backups_pb2.CreateBackupResponse()
+
+    async def DeleteBackup(
+        self, request: backups_pb2.DeleteBackupRequest, context=None
+    ) -> backups_pb2.DeleteBackupResponse:
+        return backups_pb2.DeleteBackupResponse()
+
+    async def RestoreBackup(
+        self, request: backups_pb2.RestoreBackupRequest, context=None
+    ) -> backups_pb2.RestoreBackupResponse:
+        return backups_pb2.RestoreBackupResponse()
