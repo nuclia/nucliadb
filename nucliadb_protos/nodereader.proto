@@ -219,10 +219,6 @@ message GraphQuery {
         // source/destination node queries
         Path path = 3;
 
-        // Boolean combinations
-        BoolQuery bool_and = 4;
-        BoolQuery bool_or = 5;
-        BoolQuery bool_not = 6;
     }
 }
 

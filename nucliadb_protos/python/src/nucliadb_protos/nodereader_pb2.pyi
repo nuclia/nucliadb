@@ -775,9 +775,6 @@ class GraphQuery(google.protobuf.message.Message):
     NODE_FIELD_NUMBER: builtins.int
     RELATION_FIELD_NUMBER: builtins.int
     PATH_FIELD_NUMBER: builtins.int
-    BOOL_AND_FIELD_NUMBER: builtins.int
-    BOOL_OR_FIELD_NUMBER: builtins.int
-    BOOL_NOT_FIELD_NUMBER: builtins.int
     @property
     def node(self) -> global___GraphQuery.Node:
         """Search a node in any position"""
@@ -792,27 +789,16 @@ class GraphQuery(google.protobuf.message.Message):
         source/destination node queries
         """
 
-    @property
-    def bool_and(self) -> global___GraphQuery.BoolQuery:
-        """Boolean combinations"""
-
-    @property
-    def bool_or(self) -> global___GraphQuery.BoolQuery: ...
-    @property
-    def bool_not(self) -> global___GraphQuery.BoolQuery: ...
     def __init__(
         self,
         *,
         node: global___GraphQuery.Node | None = ...,
         relation: global___GraphQuery.Relation | None = ...,
         path: global___GraphQuery.Path | None = ...,
-        bool_and: global___GraphQuery.BoolQuery | None = ...,
-        bool_or: global___GraphQuery.BoolQuery | None = ...,
-        bool_not: global___GraphQuery.BoolQuery | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "node", b"node", "path", b"path", "query", b"query", "relation", b"relation"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "node", b"node", "path", b"path", "query", b"query", "relation", b"relation"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["query", b"query"]) -> typing.Literal["node", "relation", "path", "bool_and", "bool_or", "bool_not"] | None: ...
+    def HasField(self, field_name: typing.Literal["node", b"node", "path", b"path", "query", b"query", "relation", b"relation"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["node", b"node", "path", b"path", "query", b"query", "relation", b"relation"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["query", b"query"]) -> typing.Literal["node", "relation", "path"] | None: ...
 
 global___GraphQuery = GraphQuery
 
