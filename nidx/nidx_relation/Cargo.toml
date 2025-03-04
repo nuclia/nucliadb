@@ -16,3 +16,4 @@ tracing = "0.1.41"
 [dev-dependencies]
 tempfile = "3"
 lazy_static = "1.4.0"
+nidx_tests = { path = "../nidx_tests" }

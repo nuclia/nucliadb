@@ -21,6 +21,7 @@ service NidxApi {
 
 service NidxSearcher {
   rpc Search(nodereader.SearchRequest) returns (nodereader.SearchResponse) {}
+  rpc GraphSearch(nodereader.GraphSearchRequest) returns (nodereader.GraphSearchResponse) {}
   rpc Suggest(nodereader.SuggestRequest) returns (nodereader.SuggestResponse) {}
 
   // Streams

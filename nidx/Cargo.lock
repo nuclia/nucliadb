@@ -2126,6 +2126,7 @@ dependencies = [
  "lazy_static",
  "nidx_protos",
  "nidx_tantivy",
+ "nidx_tests",
  "nidx_types",
  "tantivy",
  "tempfile",
