@@ -453,16 +453,6 @@ impl TryFrom<&nidx_protos::graph_query::Query> for GraphQuery {
                     Self::PathQuery(PathQuery::DirectedPath((Expression::Value(source), Expression::Value(relation), Expression::Value(destination))))
                 }
             }
-
-            nidx_protos::graph_query::Query::BoolAnd(_expression) => {
-                unimplemented!()
-            }
-            nidx_protos::graph_query::Query::BoolOr(_expression) => {
-                unimplemented!()
-            }
-            nidx_protos::graph_query::Query::BoolNot(_expression) => {
-                unimplemented!()
-            }
         };
 
         Ok(query)
