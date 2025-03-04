@@ -31,23 +31,22 @@ async def delete_backup(context: ApplicationContext, msg: DeleteBackupRequest):
     """
     Deletes the backup files from the cloud storage.
     """
-    kbid = msg.kbid
     backup_id = msg.backup_id
     while True:
-        deleted = await delete_n(context, kbid, backup_id, n=1000)
+        deleted = await delete_n(context, backup_id, n=1000)
         if deleted == 0:
             # No more objects to delete
             break
         await asyncio.sleep(1)
 
 
-async def delete_n(context: ApplicationContext, kbid: str, backup_id: str, n: int):
+async def delete_n(context: ApplicationContext, backup_id: str, n: int):
     concurrent_batch_size = 50
     deleted = 0
     tasks = []
     async for object_info in context.blob_storage.iterate_objects(
         bucket=settings.backups_bucket,
-        prefix=StorageKeys.BACKUP_PREFIX.format(kbid=kbid, backup_id=backup_id),
+        prefix=StorageKeys.BACKUP_PREFIX.format(backup_id=backup_id),
     ):
         if deleted >= n:
             # Deleted enough objects

@@ -33,7 +33,6 @@ class RestoreBackupRequest(BaseModel):
 
 
 class DeleteBackupRequest(BaseModel):
-    kbid: str
     backup_id: str
 
 

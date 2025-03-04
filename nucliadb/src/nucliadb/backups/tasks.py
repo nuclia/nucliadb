@@ -95,7 +95,7 @@ def deleter_consumer() -> NatsTaskConsumer[DeleteBackupRequest]:
     return consumer
 
 
-async def delete(kbid: str, backup_id: str) -> None:
+async def delete(backup_id: str) -> None:
     producer: NatsTaskProducer[DeleteBackupRequest] = create_producer(
         name="backup_deleter",
         stream="backups",
@@ -104,7 +104,6 @@ async def delete(kbid: str, backup_id: str) -> None:
         msg_type=DeleteBackupRequest,
     )
     msg = DeleteBackupRequest(
-        kbid=kbid,
         backup_id=backup_id,
     )
     await producer.send(msg)
