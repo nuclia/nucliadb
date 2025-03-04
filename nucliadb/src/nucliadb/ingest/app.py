@@ -214,6 +214,8 @@ def run_subscriber_workers() -> None:  # pragma: no cover
         - shard creator subscriber
         - audit counter subscriber
         - audit fields subscriber
+        - export/import subscriber
+        - materializer subscriber
     """
     setup_configuration()
     asyncio.run(main_subscriber_workers())

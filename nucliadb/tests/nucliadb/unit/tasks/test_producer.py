@@ -78,12 +78,12 @@ class TestProducer:
     async def test_produce_raises_error_if_not_initialized(self, producer):
         producer.initialized = False
         with pytest.raises(RuntimeError):
-            await producer(Mock())
+            await producer.send(Mock())
 
     async def test_produce_ok(self, producer, stream):
         msg = Message(kbid="kbid")
 
-        await producer(msg)
+        await producer.send(msg)
 
         publish_args = producer.context.nats_manager.js.publish.call_args[0]
         assert publish_args[0] == stream.subject
@@ -96,4 +96,4 @@ class TestProducer:
         nats_manager.js.publish.side_effect = ValueError("foo")
 
         with pytest.raises(ValueError):
-            await producer(Mock())
+            await producer.send(Mock())
