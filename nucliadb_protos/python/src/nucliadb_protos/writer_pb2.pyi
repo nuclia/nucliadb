@@ -40,6 +40,15 @@ from nucliadb_protos.audit_pb2 import (
     WEB as WEB,
     WIDGET as WIDGET,
 )
+from nucliadb_protos.backups_pb2 import (
+    BackupCreatedNotification as BackupCreatedNotification,
+    CreateBackupRequest as CreateBackupRequest,
+    CreateBackupResponse as CreateBackupResponse,
+    DeleteBackupRequest as DeleteBackupRequest,
+    DeleteBackupResponse as DeleteBackupResponse,
+    RestoreBackupRequest as RestoreBackupRequest,
+    RestoreBackupResponse as RestoreBackupResponse,
+)
 from nucliadb_protos.knowledgebox_pb2 import (
     AWS_EU_WEST_1 as AWS_EU_WEST_1,
     AWS_US_EAST_1 as AWS_US_EAST_1,
