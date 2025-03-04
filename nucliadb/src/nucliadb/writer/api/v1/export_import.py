@@ -197,7 +197,7 @@ async def start_export_task(context: ApplicationContext, kbid: str, export_id: s
     try:
         producer = await get_exports_producer(context)
         msg = NatsTaskMessage(kbid=kbid, id=export_id)
-        seqid = await producer(msg)  # type: ignore
+        seqid = await producer.send(msg)
         logger.info(f"Export task produced. seqid={seqid} kbid={kbid} export_id={export_id}")
     except Exception as e:
         errors.capture_exception(e)
@@ -214,7 +214,7 @@ async def start_import_task(context: ApplicationContext, kbid: str, import_id: s
     try:
         producer = await get_imports_producer(context)
         msg = NatsTaskMessage(kbid=kbid, id=import_id)
-        seqid = await producer(msg)  # type: ignore
+        seqid = await producer.send(msg)
         logger.info(f"Import task produced. seqid={seqid} kbid={kbid} import_id={import_id}")
     except Exception as e:
         errors.capture_exception(e)

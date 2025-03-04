@@ -31,20 +31,20 @@ class Message(pydantic.BaseModel):
 
 
 def test_create_producer():
-    stream = MagicMock()
-
-    producer = create_producer("foo", stream=stream, msg_type=Message)
+    producer = create_producer(
+        "foo",
+        stream="stream",
+        stream_subjects=["stream.>"],
+        producer_subject="stream.subject",
+        msg_type=Message,
+    )
     assert not producer.initialized
 
     assert producer.name == "foo"
-    assert producer.stream == stream
+    assert producer.stream == "stream"
 
 
 class TestProducer:
-    @pytest.fixture(scope="function")
-    def stream(self):
-        return MagicMock()
-
     @pytest.fixture(scope="function")
     def nats_manager(self):
         mgr = MagicMock()
@@ -54,11 +54,17 @@ class TestProducer:
         yield mgr
 
     @pytest.fixture(scope="function")
-    async def producer(self, context, stream, nats_manager):
+    async def producer(self, context, nats_manager):
         async def callback(context, msg: Message):
             pass
 
-        producer = create_producer("foo", stream=stream, msg_type=Message)
+        producer = create_producer(
+            "foo",
+            stream="stream",
+            stream_subjects=["stream.>"],
+            producer_subject="stream.subject",
+            msg_type=Message,
+        )
         await producer.initialize(context)
         producer.context.nats_manager = nats_manager
         yield producer
@@ -66,21 +72,21 @@ class TestProducer:
     async def test_initialize_creates_stream(self, producer, nats_manager):
         # Check that the stream is on inialization
         assert nats_manager.js.add_stream.call_count == 1
-        assert nats_manager.js.add_stream.call_args[1]["name"] == producer.stream.name
-        assert nats_manager.js.add_stream.call_args[1]["subjects"] == [producer.stream.subject]
+        assert nats_manager.js.add_stream.call_args[1]["name"] == "stream"
+        assert nats_manager.js.add_stream.call_args[1]["subjects"] == ["stream.>"]
 
     async def test_produce_raises_error_if_not_initialized(self, producer):
         producer.initialized = False
         with pytest.raises(RuntimeError):
-            await producer(Mock())
+            await producer.send(Mock())
 
-    async def test_produce_ok(self, producer, stream):
+    async def test_produce_ok(self, producer):
         msg = Message(kbid="kbid")
 
-        await producer(msg)
+        await producer.send(msg)
 
         publish_args = producer.context.nats_manager.js.publish.call_args[0]
-        assert publish_args[0] == stream.subject
+        assert publish_args[0] == "stream.subject"
 
         raw_message = publish_args[1]
         sent_message = Message.model_validate_json(raw_message)
@@ -90,4 +96,4 @@ class TestProducer:
         nats_manager.js.publish.side_effect = ValueError("foo")
 
         with pytest.raises(ValueError):
-            await producer(Mock())
+            await producer.send(Mock())

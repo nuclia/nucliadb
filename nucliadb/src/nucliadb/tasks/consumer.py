@@ -19,7 +19,7 @@
 #
 
 import asyncio
-from typing import Optional
+from typing import Generic, Optional, Type
 
 import nats
 import pydantic
@@ -27,42 +27,41 @@ from nats.aio.client import Msg
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.tasks.logger import logger
-from nucliadb.tasks.models import MsgType
-from nucliadb.tasks.registry import get_registered_task
-from nucliadb.tasks.utils import TaskCallback, create_nats_stream_if_not_exists
+from nucliadb.tasks.models import Callback, MsgType
+from nucliadb.tasks.utils import create_nats_stream_if_not_exists
 from nucliadb_telemetry import errors
-from nucliadb_utils import const
 from nucliadb_utils.nats import MessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 
 BEFORE_NAK_SLEEP_SECONDS = 2
 
 
-class NatsTaskConsumer:
+class NatsTaskConsumer(Generic[MsgType]):
     def __init__(
         self,
         name: str,
-        stream: const.Streams,
-        callback: TaskCallback,
-        msg_type: MsgType,
+        stream: str,
+        stream_subjects: list[str],
+        consumer_subject: str,
+        callback: Callback,
+        msg_type: Type[MsgType],
         max_concurrent_messages: Optional[int] = None,
     ):
         self.name = name
         self.stream = stream
+        self.stream_subjects = stream_subjects
+        self.consumer_subject = consumer_subject
         self.callback = callback
         self.msg_type = msg_type
         self.max_concurrent_messages = max_concurrent_messages
         self.initialized = False
-        self.context: Optional[ApplicationContext] = None
         self.running_tasks: list[asyncio.Task] = []
         self.subscription = None
 
     async def initialize(self, context: ApplicationContext):
         self.context = context
         await create_nats_stream_if_not_exists(
-            self.context,
-            self.stream.name,  # type: ignore
-            subjects=[self.stream.subject],  # type: ignore
+            context, stream_name=self.stream, subjects=self.stream_subjects
         )
         await self._setup_nats_subscription()
         self.initialized = True
@@ -81,9 +80,8 @@ class NatsTaskConsumer:
 
     async def _setup_nats_subscription(self):
         # Nats push consumer
-        subject = self.stream.subject
-        group = self.stream.group
-        stream = self.stream.name
+        stream = self.stream
+        subject = group = self.consumer_subject
         max_ack_pending = (
             self.max_concurrent_messages
             if self.max_concurrent_messages
@@ -146,7 +144,7 @@ class NatsTaskConsumer:
 
             logger.info(f"Starting task consumption", extra={"consumer_name": self.name})
             try:
-                await self.callback(self.context, task_msg)  # type: ignore
+                await self.callback(self.context, task_msg)
             except asyncio.CancelledError:
                 logger.debug(
                     f"Task cancelled. Naking and exiting...",
@@ -180,38 +178,23 @@ class NatsTaskConsumer:
 
 def create_consumer(
     name: str,
-    stream: const.Streams,
-    callback: TaskCallback,
-    msg_type: MsgType,
+    stream: str,
+    stream_subjects: list[str],
+    consumer_subject: str,
+    callback: Callback,
+    msg_type: Type[MsgType],
     max_concurrent_messages: Optional[int] = None,
-) -> NatsTaskConsumer:
+) -> NatsTaskConsumer[MsgType]:
     """
     Returns a non-initialized consumer
     """
     consumer = NatsTaskConsumer(
         name=name,
         stream=stream,
+        stream_subjects=stream_subjects,
+        consumer_subject=consumer_subject,
         callback=callback,
         msg_type=msg_type,
         max_concurrent_messages=max_concurrent_messages,
     )
-    return consumer
-
-
-async def start_consumer(task_name: str, context: ApplicationContext) -> NatsTaskConsumer:
-    """
-    Returns an initialized consumer for the given task name, ready to consume messages from the task stream.
-    """
-    try:
-        task = get_registered_task(task_name)
-    except KeyError:
-        raise ValueError(f"Task {task_name} not registered")
-    consumer = create_consumer(
-        name=f"{task_name}_consumer",
-        stream=task.stream,
-        callback=task.callback,  # type: ignore
-        msg_type=task.msg_type,
-        max_concurrent_messages=task.max_concurrent_messages,
-    )
-    await consumer.initialize(context)
     return consumer
