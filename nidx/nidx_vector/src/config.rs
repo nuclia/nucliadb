@@ -45,9 +45,7 @@ impl From<VectorSimilarity> for Similarity {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum VectorType {
-    DenseF32 {
-        dimension: usize,
-    },
+    DenseF32 { dimension: usize },
 }
 
 impl VectorType {
@@ -86,9 +84,7 @@ impl VectorConfig {
     /// The length of bytes of each vector
     pub fn vector_len_bytes(&self) -> usize {
         match self.vector_type {
-            VectorType::DenseF32 {
-                dimension,
-            } => dimension * size_of::<f32>(),
+            VectorType::DenseF32 { dimension } => dimension * size_of::<f32>(),
         }
     }
 

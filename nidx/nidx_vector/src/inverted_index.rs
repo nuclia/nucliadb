@@ -157,14 +157,18 @@ impl InvertedIndexes {
     }
 
     pub fn filter(&self, formula: &Formula) -> Option<BitSet> {
-        formula.clauses.iter().map(|f| self.filter_clause(f)).reduce(|mut a, b| {
-            if formula.operator == BooleanOperator::And {
-                a.intersect_with(&b)
-            } else {
-                a.union_with(&b)
-            }
-            a
-        })
+        formula
+            .clauses
+            .iter()
+            .map(|f| self.filter_clause(f))
+            .reduce(|mut a, b| {
+                if formula.operator == BooleanOperator::And {
+                    a.intersect_with(&b)
+                } else {
+                    a.union_with(&b)
+                }
+                a
+            })
     }
 
     fn filter_clause(&self, clause: &Clause) -> BitSet {
@@ -197,7 +201,12 @@ impl InvertedIndexes {
                         a
                     },
                 };
-                let mut bitset = expression.operands.iter().map(|f| self.filter_clause(f)).reduce(func).unwrap();
+                let mut bitset = expression
+                    .operands
+                    .iter()
+                    .map(|f| self.filter_clause(f))
+                    .reduce(func)
+                    .unwrap();
                 if matches!(expression.operator, crate::formula::BooleanOperator::Not) {
                     bitset.get_mut().iter_mut().for_each(|mut f| *f = !*f);
                     bitset

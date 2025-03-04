@@ -54,10 +54,7 @@ where
 {
     fn new(writer: T) -> Self {
         let writer = SyncIoBridge::new(writer);
-        Self {
-            writer,
-            counter: 0,
-        }
+        Self { writer, counter: 0 }
     }
     fn finish(&mut self) -> std::io::Result<usize> {
         self.writer.shutdown()?;

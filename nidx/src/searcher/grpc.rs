@@ -80,7 +80,9 @@ impl SearchServer {
             return Ok(client.clone());
         }
 
-        let transport = tonic::transport::Endpoint::new(format!("http://{hostname}"))?.connect().await?;
+        let transport = tonic::transport::Endpoint::new(format!("http://{hostname}"))?
+            .connect()
+            .await?;
         let client = NidxSearcherClient::with_interceptor(transport, TelemetryInterceptor);
         self.clients.write().await.insert(hostname.clone(), client.clone());
         Ok(client)

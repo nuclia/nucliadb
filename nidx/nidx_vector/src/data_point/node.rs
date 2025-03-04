@@ -201,7 +201,11 @@ mod tests {
         assert_eq!(&buf[skey], key.as_slice());
         assert_eq!(Node::vector(&buf), &vector);
         assert_eq!(Node::key(&buf), key);
-        assert!(LABELS.iter().all(|l| Node::labels(&buf).contains(&String::from_utf8_lossy(l).to_string())));
+        assert!(
+            LABELS
+                .iter()
+                .all(|l| Node::labels(&buf).contains(&String::from_utf8_lossy(l).to_string()))
+        );
     }
 
     #[test]

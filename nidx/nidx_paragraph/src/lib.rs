@@ -61,11 +61,7 @@ impl DeletionQueryBuilder for ParagraphDeletionQueryBuilder {
         Box::new(TermSetQuery::new(keys.map(|k| {
             // Our keys can be resource or field ids, match the corresponding tantivy field
             let is_field = k.len() > 32;
-            let tantivy_field = if is_field {
-                self.field
-            } else {
-                self.resource
-            };
+            let tantivy_field = if is_field { self.field } else { self.resource };
             Term::from_field_bytes(tantivy_field, k.as_bytes())
         })))
     }
@@ -134,7 +130,10 @@ impl ParagraphSearcher {
             reader: ParagraphReaderService {
                 index: index.clone(),
                 schema: ParagraphSchema::new(),
-                reader: index.reader_builder().reload_policy(tantivy::ReloadPolicy::Manual).try_into()?,
+                reader: index
+                    .reader_builder()
+                    .reload_policy(tantivy::ReloadPolicy::Manual)
+                    .try_into()?,
             },
         })
     }

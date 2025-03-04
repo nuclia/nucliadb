@@ -57,7 +57,9 @@ pub struct RelationIndexer;
 pub struct RelationDeletionQueryBuilder(Field);
 impl DeletionQueryBuilder for RelationDeletionQueryBuilder {
     fn query<'a>(&self, keys: impl Iterator<Item = &'a String>) -> Box<dyn Query> {
-        Box::new(TermSetQuery::new(keys.map(|k| Term::from_field_bytes(self.0, k.as_bytes()))))
+        Box::new(TermSetQuery::new(
+            keys.map(|k| Term::from_field_bytes(self.0, k.as_bytes())),
+        ))
     }
 }
 impl RelationDeletionQueryBuilder {
@@ -126,7 +128,10 @@ impl RelationSearcher {
             reader: RelationsReaderService {
                 index: index.clone(),
                 schema: RelationSchema::new(),
-                reader: index.reader_builder().reload_policy(tantivy::ReloadPolicy::Manual).try_into()?,
+                reader: index
+                    .reader_builder()
+                    .reload_policy(tantivy::ReloadPolicy::Manual)
+                    .try_into()?,
             },
         })
     }
@@ -143,18 +148,19 @@ impl RelationSearcher {
 
     #[instrument(name = "relation::suggest", skip_all)]
     pub fn suggest(&self, prefixes: Vec<String>) -> Vec<RelationNode> {
-        let requests =
-            prefixes.iter().filter(|prefix| prefix.len() >= MIN_SUGGEST_PREFIX_LENGTH).cloned().map(|prefix| {
-                RelationSearchRequest {
-                    prefix: Some(RelationPrefixSearchRequest {
-                        search: Some(Search::Prefix(prefix)),
-                        node_filters: vec![RelationNodeFilter {
-                            node_type: NodeType::Entity.into(),
-                            ..Default::default()
-                        }],
-                    }),
-                    ..Default::default()
-                }
+        let requests = prefixes
+            .iter()
+            .filter(|prefix| prefix.len() >= MIN_SUGGEST_PREFIX_LENGTH)
+            .cloned()
+            .map(|prefix| RelationSearchRequest {
+                prefix: Some(RelationPrefixSearchRequest {
+                    search: Some(Search::Prefix(prefix)),
+                    node_filters: vec![RelationNodeFilter {
+                        node_type: NodeType::Entity.into(),
+                        ..Default::default()
+                    }],
+                }),
+                ..Default::default()
             });
 
         let responses: Vec<_> = requests.map(|request| self.search(&request)).collect();

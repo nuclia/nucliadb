@@ -92,7 +92,11 @@ pub async fn export_shard(
     })
     .await??;
 
-    let index_id_str = index_ids.iter().map(|i| i.sql().to_string()).collect::<Vec<_>>().join(",");
+    let index_id_str = index_ids
+        .iter()
+        .map(|i| i.sql().to_string())
+        .collect::<Vec<_>>()
+        .join(",");
 
     let query = &format!("SELECT * FROM shards WHERE id = '{shard_id}'");
     tar = archive_query(tar, &meta, query, "shards").await?;
@@ -109,7 +113,11 @@ pub async fn export_shard(
     // Export segments
     for segment in segments {
         let download = storage.get(&segment.id.storage_key()).await?;
-        let reader = download.into_stream().map_err(std::io::Error::from).into_async_read().compat();
+        let reader = download
+            .into_stream()
+            .map_err(std::io::Error::from)
+            .into_async_read()
+            .compat();
         let sync_reader = SyncIoBridge::new(reader);
 
         tar = tokio::task::spawn_blocking(move || {
@@ -270,9 +278,7 @@ mod tests {
     const VECTOR_CONFIG: VectorConfig = VectorConfig {
         similarity: Similarity::Cosine,
         normalize_vectors: false,
-        vector_type: VectorType::DenseF32 {
-            dimension: 3,
-        },
+        vector_type: VectorType::DenseF32 { dimension: 3 },
     };
 
     #[sqlx::test]
@@ -283,9 +289,21 @@ mod tests {
         let kbid = Uuid::new_v4();
         let shard = Shard::create(&meta_source.pool, kbid).await?;
         let mut index_ids = Vec::new();
-        index_ids.push(Index::create(&meta_source.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?.id);
-        index_ids.push(Index::create(&meta_source.pool, shard.id, "text", IndexConfig::new_text()).await?.id);
-        index_ids.push(Index::create(&meta_source.pool, shard.id, "paragraph", IndexConfig::new_paragraph()).await?.id);
+        index_ids.push(
+            Index::create(&meta_source.pool, shard.id, "multilingual", VECTOR_CONFIG.into())
+                .await?
+                .id,
+        );
+        index_ids.push(
+            Index::create(&meta_source.pool, shard.id, "text", IndexConfig::new_text())
+                .await?
+                .id,
+        );
+        index_ids.push(
+            Index::create(&meta_source.pool, shard.id, "paragraph", IndexConfig::new_paragraph())
+                .await?
+                .id,
+        );
 
         let storage_source = Arc::new(object_store::memory::InMemory::new());
         index_resource(
@@ -306,7 +324,9 @@ mod tests {
             3
         );
         assert_eq!(
-            sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM deletions").fetch_one(&meta_source.pool).await?,
+            sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM deletions")
+                .fetch_one(&meta_source.pool)
+                .await?,
             1
         );
 
@@ -327,7 +347,9 @@ mod tests {
         assert_eq!(shard_dest.kbid, shard.kbid);
         assert_eq!(Index::for_shard(&meta_dest.pool, shard.id).await?.len(), 3);
         assert_eq!(
-            sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM deletions").fetch_one(&meta_dest.pool).await?,
+            sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM deletions")
+                .fetch_one(&meta_dest.pool)
+                .await?,
             1
         );
 

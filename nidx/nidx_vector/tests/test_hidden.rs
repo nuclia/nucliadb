@@ -31,27 +31,30 @@ fn test_hidden_search() -> anyhow::Result<()> {
     let config = VectorConfig {
         normalize_vectors: false,
         similarity: nidx_vector::config::Similarity::Dot,
-        vector_type: nidx_vector::config::VectorType::DenseF32 {
-            dimension: 4,
-        },
+        vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 4 },
     };
 
     // Create two resources, one hidden and one not
     let labels = vec!["/q/h".to_string()];
     let hidden_resource = resource(labels, vec![]);
     let hidden_dir = tempdir()?;
-    let hidden_segment =
-        VectorIndexer.index_resource(hidden_dir.path(), &config, &hidden_resource, "default", true)?.unwrap();
+    let hidden_segment = VectorIndexer
+        .index_resource(hidden_dir.path(), &config, &hidden_resource, "default", true)?
+        .unwrap();
 
     let visible_resource = resource(vec![], vec![]);
     let visible_dir = tempdir()?;
-    let visible_segment =
-        VectorIndexer.index_resource(visible_dir.path(), &config, &visible_resource, "default", true)?.unwrap();
+    let visible_segment = VectorIndexer
+        .index_resource(visible_dir.path(), &config, &visible_resource, "default", true)?
+        .unwrap();
 
     // Find all resources
     let reader = VectorSearcher::open(
         config,
-        TestOpener::new(vec![(hidden_segment, 1i64.into()), (visible_segment, 2i64.into())], vec![]),
+        TestOpener::new(
+            vec![(hidden_segment, 1i64.into()), (visible_segment, 2i64.into())],
+            vec![],
+        ),
     )?;
     let mut request = VectorSearchRequest {
         vector: vec![0.5, 0.5, 0.5, 0.5],
@@ -71,8 +74,9 @@ fn test_hidden_search() -> anyhow::Result<()> {
     );
 
     // Find only the visible resource
-    request.segment_filtering_formula =
-        Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal("/q/h".to_string()))));
+    request.segment_filtering_formula = Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal(
+        "/q/h".to_string(),
+    ))));
     let visible = reader.search(&request, &PrefilterResult::All)?;
     assert_eq!(visible.documents.len(), 1);
     assert_eq!(

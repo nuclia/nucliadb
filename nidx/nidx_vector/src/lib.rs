@@ -153,10 +153,7 @@ pub enum VectorErr {
     #[error("Can not merge zero datapoints")]
     EmptyMerge,
     #[error("Inconsistent dimensions. Index={index_config} Vector={vector}")]
-    InconsistentDimensions {
-        index_config: usize,
-        vector: usize,
-    },
+    InconsistentDimensions { index_config: usize, vector: usize },
     #[error("UTF8 decoding error: {0}")]
     FromUtf8Error(#[from] std::string::FromUtf8Error),
     #[error("Some of the merged segments were not found")]

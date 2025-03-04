@@ -24,24 +24,18 @@ use crate::{Settings, import_export, settings::EnvSettings};
 
 #[derive(Debug, clap::Subcommand)]
 pub enum ToolCommand {
-    Import {
-        file: PathBuf,
-    },
+    Import { file: PathBuf },
 }
 
 #[derive(Debug, clap::Subcommand)]
 pub enum ImportCommand {
-    File {
-        file: PathBuf,
-    },
+    File { file: PathBuf },
     Stdin,
 }
 
 pub async fn run_tool(settings: &EnvSettings, cmd: ToolCommand) -> anyhow::Result<()> {
     match cmd {
-        ToolCommand::Import {
-            file,
-        } => run_import(settings, file).await,
+        ToolCommand::Import { file } => run_import(settings, file).await,
     }
 }
 

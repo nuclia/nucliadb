@@ -141,9 +141,7 @@ impl TryFrom<Neighbour> for DocumentScored {
         Ok(DocumentScored {
             labels,
             metadata,
-            doc_id: Some(DocumentVectorIdentifier {
-                id,
-            }),
+            doc_id: Some(DocumentVectorIdentifier { id }),
             score: neighbour.score(),
         })
     }
@@ -171,9 +169,7 @@ impl Reader {
         };
 
         // Validate vector dimensions
-        let crate::config::VectorType::DenseF32 {
-            dimension,
-        } = self.config.vector_type;
+        let crate::config::VectorType::DenseF32 { dimension } = self.config.vector_type;
 
         if dimension != query.len() {
             return Err(VectorErr::InconsistentDimensions {
@@ -190,7 +186,10 @@ impl Reader {
 
         for open_data_point in &self.open_data_points {
             // Skip this segment if it doesn't match the segment filter
-            if !segment_filter.as_ref().map_or(true, |f| segment_matches(f, open_data_point.tags())) {
+            if !segment_filter
+                .as_ref()
+                .map_or(true, |f| segment_matches(f, open_data_point.tags()))
+            {
                 continue;
             }
             let partial_solution =
@@ -219,7 +218,10 @@ impl Reader {
         let mut formula = Formula::new();
 
         if let PrefilterResult::Some(valid_fields) = prefilter {
-            let field_ids = valid_fields.iter().map(|f| format!("{}{}", f.resource_id.simple(), f.field_id)).collect();
+            let field_ids = valid_fields
+                .iter()
+                .map(|f| format!("{}{}", f.resource_id.simple(), f.field_id))
+                .collect();
             let clause_labels = AtomClause::key_set(field_ids);
             formula.extend(clause_labels);
         }
@@ -286,15 +288,25 @@ mod tests {
         let vsc = VectorConfig {
             similarity: Similarity::Cosine,
             normalize_vectors: false,
-            vector_type: VectorType::DenseF32 {
-                dimension: 3,
-            },
+            vector_type: VectorType::DenseF32 { dimension: 3 },
         };
         let raw_sentences = [
-            ("6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1/1".to_string(), vec![1.0, 3.0, 4.0]),
-            ("6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1/2".to_string(), vec![2.0, 4.0, 5.0]),
-            ("6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1/3".to_string(), vec![3.0, 5.0, 6.0]),
-            ("6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1/4".to_string(), vec![3.0, 5.0, 6.0]),
+            (
+                "6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1/1".to_string(),
+                vec![1.0, 3.0, 4.0],
+            ),
+            (
+                "6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1/2".to_string(),
+                vec![2.0, 4.0, 5.0],
+            ),
+            (
+                "6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1/3".to_string(),
+                vec![3.0, 5.0, 6.0],
+            ),
+            (
+                "6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1/4".to_string(),
+                vec![3.0, 5.0, 6.0],
+            ),
         ];
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),
@@ -313,12 +325,7 @@ mod tests {
             start: 0,
             end: 0,
             sentences: sentences.clone(),
-            vectorsets_sentences: HashMap::from([(
-                "__default__".to_string(),
-                VectorsetSentences {
-                    sentences,
-                },
-            )]),
+            vectorsets_sentences: HashMap::from([("__default__".to_string(), VectorsetSentences { sentences })]),
             field: "".to_string(),
             labels: vec!["1".to_string()],
             index: 3,
@@ -355,11 +362,15 @@ mod tests {
             resource_id: uuid::Uuid::parse_str("6c5fc1f7a69042d4b24b7f18ea354b4a").unwrap(),
             field_id: "/f/field1".to_string(),
         };
-        let result = reader.search(&request, &PrefilterResult::Some(vec![field_filter.clone()])).unwrap();
+        let result = reader
+            .search(&request, &PrefilterResult::Some(vec![field_filter.clone()]))
+            .unwrap();
         assert_eq!(result.documents.len(), 4);
 
         field_filter.field_id = "/f/field2".to_string();
-        let result = reader.search(&request, &PrefilterResult::Some(vec![field_filter])).unwrap();
+        let result = reader
+            .search(&request, &PrefilterResult::Some(vec![field_filter]))
+            .unwrap();
         assert_eq!(result.documents.len(), 0);
 
         Ok(())
@@ -372,15 +383,25 @@ mod tests {
         let vsc = VectorConfig {
             similarity: Similarity::Cosine,
             normalize_vectors: false,
-            vector_type: VectorType::DenseF32 {
-                dimension: 3,
-            },
+            vector_type: VectorType::DenseF32 { dimension: 3 },
         };
         let raw_sentences = [
-            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-1".to_string(), vec![1.0, 3.0, 4.0]),
-            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/1-2".to_string(), vec![2.0, 4.0, 5.0]),
-            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/2-3".to_string(), vec![3.0, 5.0, 6.0]),
-            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/3-4".to_string(), vec![3.0, 5.0, 6.0]),
+            (
+                "9cb39c75f8d9498d8f82d92b173011f5/f/field/0-1".to_string(),
+                vec![1.0, 3.0, 4.0],
+            ),
+            (
+                "9cb39c75f8d9498d8f82d92b173011f5/f/field/1-2".to_string(),
+                vec![2.0, 4.0, 5.0],
+            ),
+            (
+                "9cb39c75f8d9498d8f82d92b173011f5/f/field/2-3".to_string(),
+                vec![3.0, 5.0, 6.0],
+            ),
+            (
+                "9cb39c75f8d9498d8f82d92b173011f5/f/field/3-4".to_string(),
+                vec![3.0, 5.0, 6.0],
+            ),
         ];
         let resource_id = ResourceId {
             shard_id: "dec1c64b-06e5-419c-897a-72d8a39b799e".to_string(),
@@ -399,12 +420,7 @@ mod tests {
             start: 0,
             end: 0,
             sentences: sentences.clone(),
-            vectorsets_sentences: HashMap::from([(
-                "__default__".to_string(),
-                VectorsetSentences {
-                    sentences,
-                },
-            )]),
+            vectorsets_sentences: HashMap::from([("__default__".to_string(), VectorsetSentences { sentences })]),
             field: "".to_string(),
             labels: vec!["1".to_string()],
             index: 3,
@@ -487,13 +503,17 @@ mod tests {
         let vsc = VectorConfig {
             similarity: Similarity::Cosine,
             normalize_vectors: false,
-            vector_type: VectorType::DenseF32 {
-                dimension: 3,
-            },
+            vector_type: VectorType::DenseF32 { dimension: 3 },
         };
         let raw_sentences = [
-            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string(), vec![1.0, 2.0, 3.0]),
-            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/100-200".to_string(), vec![1.0, 2.0, 3.0]),
+            (
+                "9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string(),
+                vec![1.0, 2.0, 3.0],
+            ),
+            (
+                "9cb39c75f8d9498d8f82d92b173011f5/f/field/100-200".to_string(),
+                vec![1.0, 2.0, 3.0],
+            ),
         ];
         let resource_id = ResourceId {
             shard_id: "dec1c64b-06e5-419c-897a-72d8a39b799e".to_string(),
@@ -512,12 +532,7 @@ mod tests {
             start: 0,
             end: 0,
             sentences: sentences.clone(),
-            vectorsets_sentences: HashMap::from([(
-                "__default__".to_string(),
-                VectorsetSentences {
-                    sentences,
-                },
-            )]),
+            vectorsets_sentences: HashMap::from([("__default__".to_string(), VectorsetSentences { sentences })]),
             field: "".to_string(),
             labels: vec!["1".to_string()],
             index: 3,

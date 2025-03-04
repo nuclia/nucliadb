@@ -26,27 +26,37 @@ pub mod metadata {
     use sqlx::{Executor, Postgres};
 
     pub async fn count_shards(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<usize> {
-        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM shards"#).fetch_one(meta).await?;
+        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM shards"#)
+            .fetch_one(meta)
+            .await?;
         Ok(count as usize)
     }
 
     pub async fn count_indexes(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<usize> {
-        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM indexes"#).fetch_one(meta).await?;
+        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM indexes"#)
+            .fetch_one(meta)
+            .await?;
         Ok(count as usize)
     }
 
     pub async fn count_segments(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<usize> {
-        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM segments"#).fetch_one(meta).await?;
+        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM segments"#)
+            .fetch_one(meta)
+            .await?;
         Ok(count as usize)
     }
 
     pub async fn count_merge_jobs(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<usize> {
-        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM merge_jobs"#).fetch_one(meta).await?;
+        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM merge_jobs"#)
+            .fetch_one(meta)
+            .await?;
         Ok(count as usize)
     }
 
     pub async fn count_deletions(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<usize> {
-        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM deletions"#).fetch_one(meta).await?;
+        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM deletions"#)
+            .fetch_one(meta)
+            .await?;
         Ok(count as usize)
     }
 }

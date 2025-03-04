@@ -106,7 +106,11 @@ fn blocking_suggest(
         }
         paragraph_request = Some(ParagraphSuggestRequest {
             body: request.body,
-            filtering_formula: request.paragraph_filter.clone().map(filter_to_boolean_expression).transpose()?,
+            filtering_formula: request
+                .paragraph_filter
+                .clone()
+                .map(filter_to_boolean_expression)
+                .transpose()?,
             filter_or: request.filter_operator == FilterOperator::Or as i32,
         })
     }
@@ -149,9 +153,7 @@ fn blocking_suggest(
     }
 
     if let Some(entities) = rrelation {
-        response.entity_results = Some(RelationPrefixSearchResponse {
-            nodes: entities,
-        });
+        response.entity_results = Some(RelationPrefixSearchResponse { nodes: entities });
     }
 
     Ok(response)

@@ -37,15 +37,21 @@ pub struct IndexStats {
 
 impl Shard {
     pub async fn create(meta: impl Executor<'_, Database = Postgres>, kbid: Uuid) -> sqlx::Result<Shard> {
-        sqlx::query_as!(Shard, "INSERT INTO shards (kbid) VALUES ($1) RETURNING *", kbid).fetch_one(meta).await
+        sqlx::query_as!(Shard, "INSERT INTO shards (kbid) VALUES ($1) RETURNING *", kbid)
+            .fetch_one(meta)
+            .await
     }
 
     pub async fn get(meta: impl Executor<'_, Database = Postgres>, id: Uuid) -> sqlx::Result<Shard> {
-        sqlx::query_as!(Shard, "SELECT * FROM shards WHERE id = $1 AND deleted_at IS NULL", id).fetch_one(meta).await
+        sqlx::query_as!(Shard, "SELECT * FROM shards WHERE id = $1 AND deleted_at IS NULL", id)
+            .fetch_one(meta)
+            .await
     }
 
     pub async fn mark_delete(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
-        sqlx::query!("UPDATE shards SET deleted_at = NOW() WHERE id = $1", self.id).execute(meta).await?;
+        sqlx::query!("UPDATE shards SET deleted_at = NOW() WHERE id = $1", self.id)
+            .execute(meta)
+            .await?;
         Ok(())
     }
 
@@ -94,6 +100,8 @@ impl Shard {
     }
 
     pub async fn list_ids(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Uuid>> {
-        sqlx::query_scalar("SELECT id FROM shards WHERE deleted_at IS NULL").fetch_all(meta).await
+        sqlx::query_scalar("SELECT id FROM shards WHERE deleted_at IS NULL")
+            .fetch_all(meta)
+            .await
     }
 }

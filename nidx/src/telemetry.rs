@@ -72,9 +72,11 @@ pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
     // Configure logging format
     let log_layer = match settings.log_format {
         LogFormat::Pretty => fmt::layer().with_filter(ENV_FILTER.deref()).boxed(),
-        LogFormat::Structured => {
-            fmt::layer().json().event_format(StructuredFormat).with_filter(ENV_FILTER.deref()).boxed()
-        }
+        LogFormat::Structured => fmt::layer()
+            .json()
+            .event_format(StructuredFormat)
+            .with_filter(ENV_FILTER.deref())
+            .boxed(),
     };
 
     // Trace propagation is done in Zipkin format (b3-* headers)
@@ -102,8 +104,9 @@ pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
         None
     };
 
-    let metrics_layer =
-        DurationLayer.with_filter(LevelFilter::from_level(Level::INFO)).with_filter(FilterFn::new(nidx_filter));
+    let metrics_layer = DurationLayer
+        .with_filter(LevelFilter::from_level(Level::INFO))
+        .with_filter(FilterFn::new(nidx_filter));
 
     // Initialize all telemetry layers
     tracing_subscriber::registry()

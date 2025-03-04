@@ -35,10 +35,7 @@ fn sentence(index: usize) -> VectorSentence {
     let mut vector: Vec<f32> = [0.0; DIMENSION].into();
     vector[index] = 1.0;
 
-    VectorSentence {
-        vector,
-        metadata: None,
-    }
+    VectorSentence { vector, metadata: None }
 }
 
 const DIMENSION: usize = 64;
@@ -60,8 +57,16 @@ fn test_basic_search(
 
     // Creates a resource with some orthogonal vectors, to test search
     let mut resource = resource(vec![], vec![]);
-    let sentences =
-        &mut resource.paragraphs.values_mut().next().unwrap().paragraphs.values_mut().next().unwrap().sentences;
+    let sentences = &mut resource
+        .paragraphs
+        .values_mut()
+        .next()
+        .unwrap()
+        .paragraphs
+        .values_mut()
+        .next()
+        .unwrap()
+        .sentences;
     sentences.clear();
     let id = &resource.resource.as_ref().unwrap().uuid;
     for i in 0..DIMENSION {
@@ -69,10 +74,15 @@ fn test_basic_search(
     }
 
     let segment_dir = tempdir()?;
-    let segment_meta = VectorIndexer.index_resource(segment_dir.path(), &config, &resource, "default", true)?.unwrap();
+    let segment_meta = VectorIndexer
+        .index_resource(segment_dir.path(), &config, &resource, "default", true)?
+        .unwrap();
 
     // Search near one specific vector
-    let reader = VectorSearcher::open(config.clone(), TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]))?;
+    let reader = VectorSearcher::open(
+        config.clone(),
+        TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]),
+    )?;
     let search_for = sentence(5);
     let results = reader.search(
         &VectorSearchRequest {
@@ -84,7 +94,10 @@ fn test_basic_search(
     )?;
 
     assert_eq!(results.documents.len(), 10);
-    assert_eq!(results.documents[0].doc_id.as_ref().unwrap().id, format!("{id}/a/title/0-5"));
+    assert_eq!(
+        results.documents[0].doc_id.as_ref().unwrap().id,
+        format!("{id}/a/title/0-5")
+    );
     assert_eq!(results.documents[0].score, 1.0);
     assert_eq!(results.documents[1].score, 0.0);
 
@@ -104,13 +117,25 @@ fn test_basic_search(
     )?;
 
     assert_eq!(results.documents.len(), 10);
-    assert_eq!(results.documents[0].doc_id.as_ref().unwrap().id, format!("{id}/a/title/0-42"));
+    assert_eq!(
+        results.documents[0].doc_id.as_ref().unwrap().id,
+        format!("{id}/a/title/0-42")
+    );
     assert!(results.documents[0].score > 0.2);
-    assert_eq!(results.documents[1].doc_id.as_ref().unwrap().id, format!("{id}/a/title/0-43"));
+    assert_eq!(
+        results.documents[1].doc_id.as_ref().unwrap().id,
+        format!("{id}/a/title/0-43")
+    );
     assert!(results.documents[1].score > 0.2);
-    assert_eq!(results.documents[2].doc_id.as_ref().unwrap().id, format!("{id}/a/title/0-44"));
+    assert_eq!(
+        results.documents[2].doc_id.as_ref().unwrap().id,
+        format!("{id}/a/title/0-44")
+    );
     assert!(results.documents[2].score > 0.2);
-    assert_eq!(results.documents[3].doc_id.as_ref().unwrap().id, format!("{id}/a/title/0-45"));
+    assert_eq!(
+        results.documents[3].doc_id.as_ref().unwrap().id,
+        format!("{id}/a/title/0-45")
+    );
     assert!(results.documents[3].score > 0.2);
     assert_eq!(results.documents[5].score, 0.0);
 
@@ -125,9 +150,7 @@ fn test_deletions() -> anyhow::Result<()> {
 
     let config = VectorConfig {
         similarity: Similarity::Dot,
-        vector_type: VectorType::DenseF32 {
-            dimension: 4,
-        },
+        vector_type: VectorType::DenseF32 { dimension: 4 },
         normalize_vectors: false,
     };
 
@@ -137,8 +160,12 @@ fn test_deletions() -> anyhow::Result<()> {
 
     let segment1_dir = tempdir()?;
     let segment2_dir = tempdir()?;
-    let segment1 = VectorIndexer.index_resource(segment1_dir.path(), &config, &resource1, "default", true)?.unwrap();
-    let segment2 = VectorIndexer.index_resource(segment2_dir.path(), &config, &resource2, "default", true)?.unwrap();
+    let segment1 = VectorIndexer
+        .index_resource(segment1_dir.path(), &config, &resource1, "default", true)?
+        .unwrap();
+    let segment2 = VectorIndexer
+        .index_resource(segment2_dir.path(), &config, &resource2, "default", true)?
+        .unwrap();
 
     // Search initially returns both resources
     let segments = vec![(segment1, 1i64.into()), (segment2, 2i64.into())];
@@ -154,19 +181,38 @@ fn test_deletions() -> anyhow::Result<()> {
     assert_eq!(results.documents.len(), 2);
 
     // Delete a full resource, it does not appear in search
-    let open_config = TestOpener::new(segments.clone(), vec![(resource1.resource.clone().unwrap().uuid, 3i64.into())]);
+    let open_config = TestOpener::new(
+        segments.clone(),
+        vec![(resource1.resource.clone().unwrap().uuid, 3i64.into())],
+    );
     let reader = VectorSearcher::open(config.clone(), open_config)?;
     let results = reader.search(search_request, &PrefilterResult::All)?;
     assert_eq!(results.documents.len(), 1);
-    assert!(results.documents[0].doc_id.as_ref().unwrap().id.starts_with(&resource2.resource.as_ref().unwrap().uuid));
+    assert!(
+        results.documents[0]
+            .doc_id
+            .as_ref()
+            .unwrap()
+            .id
+            .starts_with(&resource2.resource.as_ref().unwrap().uuid)
+    );
 
     // Delete a field, it does not appear in search
-    let open_config =
-        TestOpener::new(segments, vec![(format!("{}/a/title", resource2.resource.unwrap().uuid), 3i64.into())]);
+    let open_config = TestOpener::new(
+        segments,
+        vec![(format!("{}/a/title", resource2.resource.unwrap().uuid), 3i64.into())],
+    );
     let reader = VectorSearcher::open(config.clone(), open_config)?;
     let results = reader.search(search_request, &PrefilterResult::All)?;
     assert_eq!(results.documents.len(), 1);
-    assert!(results.documents[0].doc_id.as_ref().unwrap().id.starts_with(&resource1.resource.as_ref().unwrap().uuid));
+    assert!(
+        results.documents[0]
+            .doc_id
+            .as_ref()
+            .unwrap()
+            .id
+            .starts_with(&resource1.resource.as_ref().unwrap().uuid)
+    );
 
     Ok(())
 }
@@ -179,9 +225,7 @@ fn test_filtered_search() -> anyhow::Result<()> {
 
     let config = VectorConfig {
         similarity: Similarity::Dot,
-        vector_type: VectorType::DenseF32 {
-            dimension: 4,
-        },
+        vector_type: VectorType::DenseF32 { dimension: 4 },
         normalize_vectors: false,
     };
 
@@ -193,7 +237,13 @@ fn test_filtered_search() -> anyhow::Result<()> {
     let work_path = tempdir()?;
     let resources: Vec<_> = (0..4)
         .map(|i| {
-            resource(vec![], vec![format!("/l/labelset/label_{}", i), format!("/l/labelset/label_{}", (i % 2) + 8)])
+            resource(
+                vec![],
+                vec![
+                    format!("/l/labelset/label_{}", i),
+                    format!("/l/labelset/label_{}", (i % 2) + 8),
+                ],
+            )
         })
         .collect();
     let segments = resources
@@ -203,7 +253,10 @@ fn test_filtered_search() -> anyhow::Result<()> {
             let segment_path = &work_path.path().join(i.to_string());
             std::fs::create_dir(segment_path).unwrap();
             (
-                VectorIndexer.index_resource(segment_path, &config, r, "default", true).unwrap().unwrap(),
+                VectorIndexer
+                    .index_resource(segment_path, &config, r, "default", true)
+                    .unwrap()
+                    .unwrap(),
                 (i as i64).into(),
             )
         })
@@ -225,7 +278,13 @@ fn test_filtered_search() -> anyhow::Result<()> {
         results
             .documents
             .iter()
-            .map(|d| d.labels.iter().map(|l| l.split("_").last().unwrap().parse().unwrap()).min().unwrap())
+            .map(|d| {
+                d.labels
+                    .iter()
+                    .map(|l| l.split("_").last().unwrap().parse().unwrap())
+                    .min()
+                    .unwrap()
+            })
             .collect()
     };
 
@@ -233,7 +292,10 @@ fn test_filtered_search() -> anyhow::Result<()> {
     assert_eq!(search(None), [0, 1, 2, 3].into());
 
     // Literal: Even
-    assert_eq!(search(Some(BooleanExpression::Literal("/l/labelset/label_8".into()))), [0, 2].into());
+    assert_eq!(
+        search(Some(BooleanExpression::Literal("/l/labelset/label_8".into()))),
+        [0, 2].into()
+    );
 
     // OR: Even or 3
     assert_eq!(
@@ -261,7 +323,9 @@ fn test_filtered_search() -> anyhow::Result<()> {
 
     // NOT: Not 3
     assert_eq!(
-        search(Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal("/l/labelset/label_3".into()))))),
+        search(Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal(
+            "/l/labelset/label_3".into()
+        ))))),
         [0, 1, 2].into()
     );
 
@@ -297,7 +361,13 @@ fn test_filtered_search() -> anyhow::Result<()> {
         results
             .documents
             .iter()
-            .map(|d| d.labels.iter().map(|l| l.split("_").last().unwrap().parse().unwrap()).min().unwrap())
+            .map(|d| {
+                d.labels
+                    .iter()
+                    .map(|l| l.split("_").last().unwrap().parse().unwrap())
+                    .min()
+                    .unwrap()
+            })
             .collect()
     };
 
@@ -307,7 +377,10 @@ fn test_filtered_search() -> anyhow::Result<()> {
     };
 
     // Prefilter only
-    assert_eq!(search(None, PrefilterResult::Some(vec![resource(0)]), false), [0].into());
+    assert_eq!(
+        search(None, PrefilterResult::Some(vec![resource(0)]), false),
+        [0].into()
+    );
 
     // Prefilter AND labels
     assert_eq!(

@@ -27,11 +27,7 @@ pub fn level_factor() -> f64 {
 }
 
 pub const fn m_max_for_layer(layer: usize) -> usize {
-    if layer == 0 {
-        m_max0()
-    } else {
-        m_max()
-    }
+    if layer == 0 { m_max0() } else { m_max() }
 }
 
 /// M to use when pruning neighbours

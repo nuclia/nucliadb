@@ -91,10 +91,18 @@ pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
 
 pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &VectorConfig) -> VectorR<OpenDataPoint> {
     let nodes_path = data_point_path.join(file_names::NODES);
-    let mut nodes_file = File::options().read(true).write(true).create_new(true).open(nodes_path)?;
+    let mut nodes_file = File::options()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(nodes_path)?;
 
     let hnsw_path = data_point_path.join(file_names::HNSW);
-    let mut hnsw_file = File::options().read(true).write(true).create_new(true).open(hnsw_path)?;
+    let mut hnsw_file = File::options()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(hnsw_path)?;
 
     // Sort largest operant first so we reuse as much of the HNSW as possible
     let mut operants = operants.iter().collect::<Vec<_>>();
@@ -153,9 +161,7 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
     let metadata = VectorSegmentMetadata {
         path: data_point_path.to_path_buf(),
         records: no_nodes,
-        index_metadata: VectorSegmentMeta {
-            tags: tags.clone(),
-        },
+        index_metadata: VectorSegmentMeta { tags: tags.clone() },
     };
 
     build_indexes(data_point_path, &nodes)?;
@@ -182,9 +188,17 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         }
     }
 
-    let mut nodes_file = File::options().read(true).write(true).create_new(true).open(path.join(file_names::NODES))?;
+    let mut nodes_file = File::options()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(path.join(file_names::NODES))?;
 
-    let mut hnsw_file = File::options().read(true).write(true).create_new(true).open(path.join(file_names::HNSW))?;
+    let mut hnsw_file = File::options()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(path.join(file_names::HNSW))?;
 
     // Serializing nodes on disk
     // Nodes are stored on disk and mmaped.
@@ -221,9 +235,7 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
     let metadata = VectorSegmentMetadata {
         path: path.to_path_buf(),
         records: no_nodes,
-        index_metadata: VectorSegmentMeta {
-            tags,
-        },
+        index_metadata: VectorSegmentMeta { tags },
     };
 
     build_indexes(path, &nodes)?;
@@ -479,14 +491,20 @@ impl OpenDataPoint {
             }
             scored_results.sort();
             return Box::new(
-                scored_results.into_iter().map(|Reverse(a)| Neighbour::new(a.0, &self.nodes, a.1)).take(results),
+                scored_results
+                    .into_iter()
+                    .map(|Reverse(a)| Neighbour::new(a.0, &self.nodes, a.1))
+                    .take(results),
             );
         }
 
         let ops = HnswOps::new(&tracker, true);
         let neighbours = ops.search(query_address, self.index.as_ref(), results, bitset, with_duplicates);
         Box::new(
-            neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results),
+            neighbours
+                .into_iter()
+                .map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist)))
+                .take(results),
         )
     }
 }
@@ -529,7 +547,11 @@ mod test {
     fn random_nearby_vector(rng: &mut impl Rng, close_to: &[f32], distance: f32) -> Vec<f32> {
         // Create a random vector of low modulus
         let fuzz = random_vector(rng);
-        let v = close_to.iter().zip(fuzz.iter()).map(|(v, fuzz)| v + fuzz * distance).collect();
+        let v = close_to
+            .iter()
+            .zip(fuzz.iter())
+            .map(|(v, fuzz)| v + fuzz * distance)
+            .collect();
         normalize(v)
     }
 
@@ -578,9 +600,7 @@ mod test {
     fn test_save_recall_aligned_data() -> anyhow::Result<()> {
         let config = VectorConfig {
             similarity: Similarity::Dot,
-            vector_type: crate::config::VectorType::DenseF32 {
-                dimension: DIMENSION,
-            },
+            vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
             normalize_vectors: false,
         };
         let mut rng = SmallRng::seed_from_u64(1234567890);
@@ -589,7 +609,12 @@ mod test {
         // Create a data point with random data of different length
         let path = temp_dir.path();
         let elems = (0..100).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp = create(path, elems.iter().cloned().map(|x| x.0).collect(), &config, HashSet::new())?;
+        let dp = create(
+            path,
+            elems.iter().cloned().map(|x| x.0).collect(),
+            &config,
+            HashSet::new(),
+        )?;
         let nodes = dp.nodes;
 
         for (i, (elem, mut labels)) in elems.into_iter().enumerate() {
@@ -618,9 +643,7 @@ mod test {
     fn test_save_recall_aligned_data_after_merge() -> anyhow::Result<()> {
         let config = VectorConfig {
             similarity: Similarity::Dot,
-            vector_type: crate::config::VectorType::DenseF32 {
-                dimension: DIMENSION,
-            },
+            vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
             normalize_vectors: false,
         };
         let mut rng = SmallRng::seed_from_u64(1234567890);
@@ -628,11 +651,21 @@ mod test {
         // Create two data points with random data of different length
         let path1 = tempdir()?;
         let elems1 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp1 = create(path1.path(), elems1.iter().cloned().map(|x| x.0).collect(), &config, HashSet::new())?;
+        let dp1 = create(
+            path1.path(),
+            elems1.iter().cloned().map(|x| x.0).collect(),
+            &config,
+            HashSet::new(),
+        )?;
 
         let path2 = tempdir()?;
         let elems2 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp2 = create(path2.path(), elems2.iter().cloned().map(|x| x.0).collect(), &config, HashSet::new())?;
+        let dp2 = create(
+            path2.path(),
+            elems2.iter().cloned().map(|x| x.0).collect(),
+            &config,
+            HashSet::new(),
+        )?;
 
         let path_merged = tempdir()?;
         let merged_dp = merge(path_merged.path(), &[&dp1, &dp2], &config)?;
@@ -685,9 +718,7 @@ mod test {
 
         let config = VectorConfig {
             similarity: Similarity::Dot,
-            vector_type: crate::config::VectorType::DenseF32 {
-                dimension: DIMENSION,
-            },
+            vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
             normalize_vectors: false,
         };
 
@@ -695,7 +726,10 @@ mod test {
         let temp_dir = tempdir()?;
         let dp = create(
             temp_dir.path(),
-            elems.iter().map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None)).collect(),
+            elems
+                .iter()
+                .map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None))
+                .collect(),
             &config,
             HashSet::new(),
         )?;
@@ -712,7 +746,10 @@ mod test {
 
                 let results: Vec<_> = dp.search(&query, &Formula::new(), false, 5, &config, 0.0).collect();
 
-                let search: Vec<_> = results.iter().map(|r| String::from_utf8(r.id().to_vec()).unwrap()).collect();
+                let search: Vec<_> = results
+                    .iter()
+                    .map(|r| String::from_utf8(r.id().to_vec()).unwrap())
+                    .collect();
                 let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();
                 search == brute_force
             })

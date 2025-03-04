@@ -88,7 +88,11 @@ async fn test_vector_normalization_shard(pool: PgPool) -> Result<(), Box<dyn std
         min_score_semantic: 0.9,
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
 
     assert!(results.vector.is_some());
     let vector_results = results.vector.unwrap();

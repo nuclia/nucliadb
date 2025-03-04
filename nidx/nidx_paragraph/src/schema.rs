@@ -70,7 +70,8 @@ impl ParagraphSchema {
 
     /// Returns the paragraph metadata for the given document, if any.
     pub fn metadata(&self, doc: &TantivyDocument) -> Option<ParagraphMetadata> {
-        doc.get_first(self.metadata).and_then(|value| ParagraphMetadata::decode(value.as_bytes()?).ok())
+        doc.get_first(self.metadata)
+            .and_then(|value| ParagraphMetadata::decode(value.as_bytes()?).ok())
     }
 }
 

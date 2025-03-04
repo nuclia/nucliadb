@@ -31,15 +31,16 @@ impl IndexRequest {
     }
 
     pub async fn create(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<IndexRequest> {
-        let seq =
-            sqlx::query_scalar!("INSERT INTO index_requests DEFAULT VALUES RETURNING seq",).fetch_one(meta).await?;
-        Ok(IndexRequest {
-            seq,
-        })
+        let seq = sqlx::query_scalar!("INSERT INTO index_requests DEFAULT VALUES RETURNING seq",)
+            .fetch_one(meta)
+            .await?;
+        Ok(IndexRequest { seq })
     }
 
     pub async fn delete(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
-        sqlx::query!("DELETE FROM index_requests WHERE seq = $1", self.seq).execute(meta).await?;
+        sqlx::query!("DELETE FROM index_requests WHERE seq = $1", self.seq)
+            .execute(meta)
+            .await?;
         Ok(())
     }
 

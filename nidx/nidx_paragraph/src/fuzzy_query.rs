@@ -224,7 +224,11 @@ impl FuzzyTermQuery {
                 } else {
                     automaton_builder.build_dfa(term_text)
                 };
-                Ok(AutomatonWeight::new(self.term.field(), DfaWrapper(automaton), self.termc.clone()))
+                Ok(AutomatonWeight::new(
+                    self.term.field(),
+                    DfaWrapper(automaton),
+                    self.termc.clone(),
+                ))
             }
             None => Err(InvalidArgument(format!(
                 "Levenshtein distance of {} is not allowed. Choose a value in the {:?} range",

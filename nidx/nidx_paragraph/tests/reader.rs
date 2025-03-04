@@ -91,7 +91,13 @@ fn create_resource(shard_id: String, timestamp: Timestamp) -> Resource {
         repeated_in_field: false,
         metadata: None,
     };
-    let p2_uuid = format!("{}/{}/{}-{}", UUID, "body", DOC1_P1.len(), DOC1_P1.len() + DOC1_P2.len());
+    let p2_uuid = format!(
+        "{}/{}/{}-{}",
+        UUID,
+        "body",
+        DOC1_P1.len(),
+        DOC1_P1.len() + DOC1_P2.len()
+    );
 
     let p3 = IndexParagraph {
         start: (DOC1_P1.len() + DOC1_P2.len()) as i32,
@@ -135,8 +141,12 @@ fn create_resource(shard_id: String, timestamp: Timestamp) -> Resource {
         paragraphs: [(p4_uuid, p4)].into_iter().collect(),
     };
 
-    let paragraphs =
-        [("body".to_string(), body_paragraphs), ("title".to_string(), title_paragraphs)].into_iter().collect();
+    let paragraphs = [
+        ("body".to_string(), body_paragraphs),
+        ("title".to_string(), title_paragraphs),
+    ]
+    .into_iter()
+    .collect();
 
     Resource {
         resource: Some(resource_id),
@@ -158,11 +168,11 @@ fn create_resource(shard_id: String, timestamp: Timestamp) -> Resource {
 fn test_total_number_of_results() -> anyhow::Result<()> {
     const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
 
-    let seconds = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|t| t.as_secs() as i64).unwrap();
-    let timestamp = Timestamp {
-        seconds,
-        nanos: 0,
-    };
+    let seconds = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|t| t.as_secs() as i64)
+        .unwrap();
+    let timestamp = Timestamp { seconds, nanos: 0 };
 
     let resource1 = create_resource("shard1".to_string(), timestamp);
     let paragraph_reader_service = test_reader(&resource1);
@@ -205,11 +215,11 @@ fn test_total_number_of_results() -> anyhow::Result<()> {
 fn test_filtered_search() -> anyhow::Result<()> {
     const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
 
-    let seconds = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|t| t.as_secs() as i64).unwrap();
-    let timestamp = Timestamp {
-        seconds,
-        nanos: 0,
-    };
+    let seconds = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|t| t.as_secs() as i64)
+        .unwrap();
+    let timestamp = Timestamp { seconds, nanos: 0 };
 
     let resource1 = create_resource("shard1".to_string(), timestamp);
     let paragraph_reader_service = test_reader(&resource1);
@@ -261,11 +271,11 @@ fn test_filtered_search() -> anyhow::Result<()> {
 fn test_new_paragraph() -> anyhow::Result<()> {
     const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
 
-    let seconds = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|t| t.as_secs() as i64).unwrap();
-    let timestamp = Timestamp {
-        seconds,
-        nanos: 0,
-    };
+    let seconds = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|t| t.as_secs() as i64)
+        .unwrap();
+    let timestamp = Timestamp { seconds, nanos: 0 };
 
     let resource1 = create_resource("shard1".to_string(), timestamp);
     let paragraph_reader_service = test_reader(&resource1);

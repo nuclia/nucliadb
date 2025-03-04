@@ -97,11 +97,13 @@ fn test_prefilter_not_search() {
     let request = PreFilterRequest {
         security: None,
         filter_expression: Some(FilterExpression {
-            expr: Some(nidx_protos::filter_expression::Expr::BoolNot(Box::new(FilterExpression {
-                expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
-                    facet: "/l/mylabel".into(),
-                })),
-            }))),
+            expr: Some(nidx_protos::filter_expression::Expr::BoolNot(Box::new(
+                FilterExpression {
+                    expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                        facet: "/l/mylabel".into(),
+                    })),
+                },
+            ))),
         }),
     };
     let response = reader.prefilter(&request).unwrap();
@@ -265,7 +267,11 @@ fn test_faceted_search() {
         };
         let response = reader.search(&request).unwrap();
         println!("Response: {response:#?}");
-        assert_eq!(response.total, expected, "Failed faceted query: '{}'. With facets: {:?}", query, facets);
+        assert_eq!(
+            response.total, expected,
+            "Failed faceted query: '{}'. With facets: {:?}",
+            query, facets
+        );
 
         assert_eq!(response.total, response.results.len() as i32);
         assert!(!response.next_page);

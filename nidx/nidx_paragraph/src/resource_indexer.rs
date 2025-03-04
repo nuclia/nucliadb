@@ -49,8 +49,12 @@ pub fn index_paragraphs(
     };
 
     let empty_paragraph = HashMap::with_capacity(0);
-    let inspect_paragraph =
-        |field: &str| resource.paragraphs.get(field).map_or_else(|| &empty_paragraph, |i| &i.paragraphs);
+    let inspect_paragraph = |field: &str| {
+        resource
+            .paragraphs
+            .get(field)
+            .map_or_else(|| &empty_paragraph, |i| &i.paragraphs)
+    };
 
     let resource_labels = resource
         .labels

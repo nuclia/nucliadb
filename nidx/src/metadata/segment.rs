@@ -165,9 +165,13 @@ impl Segment {
         meta: impl Executor<'_, Database = Postgres>,
         segment_ids: &[SegmentId],
     ) -> sqlx::Result<Vec<Segment>> {
-        sqlx::query_as!(Segment, "SELECT * FROM segments WHERE id = ANY($1)", segment_ids as &[SegmentId])
-            .fetch_all(meta)
-            .await
+        sqlx::query_as!(
+            Segment,
+            "SELECT * FROM segments WHERE id = ANY($1)",
+            segment_ids as &[SegmentId]
+        )
+        .fetch_all(meta)
+        .await
     }
 
     pub async fn in_index(
@@ -200,7 +204,9 @@ impl Segment {
         meta: impl Executor<'_, Database = Postgres>,
         merge_job_id: i64,
     ) -> sqlx::Result<Vec<Segment>> {
-        sqlx::query_as!(Segment, "SELECT * FROM segments WHERE merge_job_id = $1", merge_job_id).fetch_all(meta).await
+        sqlx::query_as!(Segment, "SELECT * FROM segments WHERE merge_job_id = $1", merge_job_id)
+            .fetch_all(meta)
+            .await
     }
 
     pub fn metadata<T: for<'de> Deserialize<'de>>(&self, path: PathBuf) -> SegmentMetadata<T> {

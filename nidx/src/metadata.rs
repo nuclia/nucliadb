@@ -44,8 +44,10 @@ pub struct NidxMetadata {
 
 impl NidxMetadata {
     pub async fn new(database_url: &str) -> sqlx::Result<Self> {
-        let pool =
-            sqlx::postgres::PgPoolOptions::new().acquire_timeout(Duration::from_secs(2)).connect(database_url).await?;
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .acquire_timeout(Duration::from_secs(2))
+            .connect(database_url)
+            .await?;
 
         Self::new_with_pool(pool).await
     }
@@ -53,13 +55,13 @@ impl NidxMetadata {
     pub async fn new_with_pool(pool: sqlx::PgPool) -> sqlx::Result<Self> {
         // Run migrations inside a transaction that holds a global lock, avoids races
         let mut tx = pool.begin().await?;
-        sqlx::query!("SELECT pg_advisory_xact_lock($1)", MIGRATION_LOCK_ID).execute(&mut *tx).await?;
+        sqlx::query!("SELECT pg_advisory_xact_lock($1)", MIGRATION_LOCK_ID)
+            .execute(&mut *tx)
+            .await?;
         sqlx::migrate!("./migrations").run(&pool).await?;
         tx.commit().await?;
 
-        Ok(NidxMetadata {
-            pool,
-        })
+        Ok(NidxMetadata { pool })
     }
 
     pub async fn transaction(&self) -> sqlx::Result<sqlx::Transaction<sqlx::Postgres>> {
@@ -90,9 +92,7 @@ mod tests {
     const VECTOR_CONFIG: VectorConfig = VectorConfig {
         similarity: Similarity::Cosine,
         normalize_vectors: false,
-        vector_type: VectorType::DenseF32 {
-            dimension: 3,
-        },
+        vector_type: VectorType::DenseF32 { dimension: 3 },
     };
 
     #[sqlx::test(migrations = false)]
@@ -102,12 +102,16 @@ mod tests {
         let shard = Shard::create(&meta.pool, kbid).await.unwrap();
         assert_eq!(shard.kbid, kbid);
 
-        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into())
+            .await
+            .unwrap();
         assert_eq!(index.shard_id, shard.id);
         assert_eq!(index.kind, IndexKind::Vector);
         assert_eq!(index.name, "multilingual");
 
-        let found = Index::find(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await.unwrap();
+        let found = Index::find(&meta.pool, shard.id, IndexKind::Vector, "multilingual")
+            .await
+            .unwrap();
         assert_eq!(found.id, index.id);
         assert_eq!(found.shard_id, shard.id);
         assert_eq!(found.kind, IndexKind::Vector);

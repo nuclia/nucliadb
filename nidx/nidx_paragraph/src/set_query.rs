@@ -38,14 +38,9 @@ impl SetQuery {
     /// Create a Term Set Query
     pub fn new(field: Field, values: impl Iterator<Item = String>) -> Self {
         let values = values.collect();
-        let set = SetWeightWrapper::new(SetWeight {
-            field,
-            values,
-        });
+        let set = SetWeightWrapper::new(SetWeight { field, values });
 
-        SetQuery {
-            set,
-        }
+        SetQuery { set }
     }
 }
 

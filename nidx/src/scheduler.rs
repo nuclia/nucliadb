@@ -176,7 +176,10 @@ pub async fn run_tasks(
             };
             match ack_floor.get().await {
                 Ok(oldest_confirmed_seq) => {
-                    if let Err(e) = merge_scheduler.schedule_merges(&meta2, Seq::from(oldest_confirmed_seq)).await {
+                    if let Err(e) = merge_scheduler
+                        .schedule_merges(&meta2, Seq::from(oldest_confirmed_seq))
+                        .await
+                    {
                         warn!("Error in schedule_merges task: {e:?}");
                     }
                 }

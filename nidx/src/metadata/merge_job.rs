@@ -93,12 +93,16 @@ impl MergeJob {
     }
 
     pub async fn keep_alive(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
-        sqlx::query!("UPDATE merge_jobs SET running_at = NOW() WHERE id = $1", self.id,).execute(meta).await?;
+        sqlx::query!("UPDATE merge_jobs SET running_at = NOW() WHERE id = $1", self.id,)
+            .execute(meta)
+            .await?;
         Ok(())
     }
 
     pub async fn finish(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
-        sqlx::query!("DELETE FROM merge_jobs WHERE id = $1", self.id,).execute(meta).await?;
+        sqlx::query!("DELETE FROM merge_jobs WHERE id = $1", self.id,)
+            .execute(meta)
+            .await?;
         Ok(())
     }
 
@@ -106,7 +110,9 @@ impl MergeJob {
         meta: impl Executor<'_, Database = Postgres>,
         index_id: IndexId,
     ) -> sqlx::Result<()> {
-        sqlx::query!("DELETE FROM merge_jobs WHERE index_id = $1", index_id as IndexId).execute(meta).await?;
+        sqlx::query!("DELETE FROM merge_jobs WHERE index_id = $1", index_id as IndexId)
+            .execute(meta)
+            .await?;
         Ok(())
     }
 }
@@ -125,9 +131,7 @@ mod tests {
     const VECTOR_CONFIG: VectorConfig = VectorConfig {
         similarity: nidx_vector::config::Similarity::Cosine,
         normalize_vectors: false,
-        vector_type: nidx_vector::config::VectorType::DenseF32 {
-            dimension: 3,
-        },
+        vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 3 },
     };
 
     #[sqlx::test]

@@ -34,10 +34,7 @@ pub struct TestOpener {
 
 impl TestOpener {
     pub fn new(segments: Vec<(SegmentMetadata<VectorSegmentMeta>, Seq)>, deletions: Vec<(String, Seq)>) -> Self {
-        Self {
-            segments,
-            deletions,
-        }
+        Self { segments, deletions }
     }
 }
 

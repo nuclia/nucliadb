@@ -35,9 +35,7 @@ pub struct MergeScheduler {
 
 impl MergeScheduler {
     pub fn from_settings(settings: MergeSettings) -> Self {
-        Self {
-            settings,
-        }
+        Self { settings }
     }
 
     /// Enqueue merge jobs for segments older than `last_indexed_seq` that aren't
@@ -131,11 +129,7 @@ impl MergeScheduler {
 /// - Merging small segments (will take short time)
 /// - Merging because of deletions
 fn calculate_priority(segments: usize, records: i64, forced: bool) -> i32 {
-    let forced_score = if forced {
-        5
-    } else {
-        0
-    };
+    let forced_score = if forced { 5 } else { 0 };
     segments as i32 + forced_score - records as i32 / 10_000
 }
 
@@ -161,9 +155,7 @@ mod tests {
         const VECTOR_CONFIG: VectorConfig = VectorConfig {
             similarity: nidx_vector::config::Similarity::Cosine,
             normalize_vectors: false,
-            vector_type: nidx_vector::config::VectorType::DenseF32 {
-                dimension: 3,
-            },
+            vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 3 },
         };
 
         fn merge_scheduler() -> MergeScheduler {
@@ -343,8 +335,14 @@ mod tests {
             let hidden_count = 1;
             let visible_count = 2;
 
-            let segment_hidden =
-                Segment::create(&meta.pool, index.id, 1i64.into(), hidden_count, json!({"tags": ["/q/h"]})).await?;
+            let segment_hidden = Segment::create(
+                &meta.pool,
+                index.id,
+                1i64.into(),
+                hidden_count,
+                json!({"tags": ["/q/h"]}),
+            )
+            .await?;
             segment_hidden.mark_ready(&meta.pool, 1000).await?;
 
             let segment_visible =
@@ -356,8 +354,14 @@ mod tests {
             let jobs = get_all_merge_jobs(&meta).await?;
             assert!(jobs.is_empty());
 
-            let segment_hidden2 =
-                Segment::create(&meta.pool, index.id, 3i64.into(), hidden_count, json!({"tags": ["/q/h"]})).await?;
+            let segment_hidden2 = Segment::create(
+                &meta.pool,
+                index.id,
+                3i64.into(),
+                hidden_count,
+                json!({"tags": ["/q/h"]}),
+            )
+            .await?;
             segment_hidden2.mark_ready(&meta.pool, 1000).await?;
 
             let segment_visible2 =

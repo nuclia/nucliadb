@@ -163,8 +163,14 @@ mod tests {
             min_number_of_segments: 3,
             ..Default::default()
         };
-        let jobs =
-            plan_merges(&log_merge, vec![(1i64.into(), 50, false), (2i64.into(), 50, false), (3i64.into(), 50, false)]);
+        let jobs = plan_merges(
+            &log_merge,
+            vec![
+                (1i64.into(), 50, false),
+                (2i64.into(), 50, false),
+                (3i64.into(), 50, false),
+            ],
+        );
 
         // all segments have been scheduled for merge in a single job
         assert_eq!(jobs.len(), 1);
@@ -215,7 +221,10 @@ mod tests {
         // 63, 124
         assert_eq!(jobs[2], vec![5.into(), 4i64.into()]);
         // Bottom bucket (10, 20, 50, 51, 62)
-        assert_eq!(jobs[3], vec![6i64.into(), 10i64.into(), 1i64.into(), 2i64.into(), 8i64.into()]);
+        assert_eq!(
+            jobs[3],
+            vec![6i64.into(), 10i64.into(), 1i64.into(), 2i64.into(), 8i64.into()]
+        );
 
         // Not merged
         // 1001 -> top_bucket_max_records

@@ -94,13 +94,19 @@ pub fn create_query(
 fn create_stream_filter_queries(schema: &TextSchema, filter: &StreamFilter) -> Vec<(Occur, Box<dyn Query>)> {
     let mut queries = vec![];
 
-    let conjunction = Conjunction::try_from(filter.conjunction).unwrap_or(Conjunction::And).into_occur();
+    let conjunction = Conjunction::try_from(filter.conjunction)
+        .unwrap_or(Conjunction::And)
+        .into_occur();
 
-    filter.labels.iter().flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter()).for_each(|facet| {
-        let facet_term = Term::from_facet(schema.facets, &facet);
-        let facet_term_query: Box<dyn Query> = Box::new(TermQuery::new(facet_term, IndexRecordOption::Basic));
-        queries.push((conjunction, facet_term_query))
-    });
+    filter
+        .labels
+        .iter()
+        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
+        .for_each(|facet| {
+            let facet_term = Term::from_facet(schema.facets, &facet);
+            let facet_term_query: Box<dyn Query> = Box::new(TermQuery::new(facet_term, IndexRecordOption::Basic));
+            queries.push((conjunction, facet_term_query))
+        });
 
     queries
 }
@@ -116,18 +122,22 @@ fn field_key(field: &FieldFilter) -> String {
 pub fn filter_to_query(schema: &TextSchema, expr: &FilterExpression) -> Box<dyn Query> {
     let filter_to_query = |expr| filter_to_query(schema, expr);
     match expr.expr.as_ref().unwrap() {
-        nidx_protos::filter_expression::Expr::BoolAnd(e) => {
-            Box::new(BooleanQuery::intersection(e.operands.iter().map(filter_to_query).collect()))
-        }
+        nidx_protos::filter_expression::Expr::BoolAnd(e) => Box::new(BooleanQuery::intersection(
+            e.operands.iter().map(filter_to_query).collect(),
+        )),
         nidx_protos::filter_expression::Expr::BoolOr(e) => {
             Box::new(BooleanQuery::union(e.operands.iter().map(filter_to_query).collect()))
         }
-        nidx_protos::filter_expression::Expr::BoolNot(e) => {
-            Box::new(BooleanQuery::new(vec![(Occur::Must, Box::new(AllQuery)), (Occur::MustNot, filter_to_query(e))]))
-        }
+        nidx_protos::filter_expression::Expr::BoolNot(e) => Box::new(BooleanQuery::new(vec![
+            (Occur::Must, Box::new(AllQuery)),
+            (Occur::MustNot, filter_to_query(e)),
+        ])),
         nidx_protos::filter_expression::Expr::Resource(resource_filter) => {
             let key = resource_filter.resource_id.clone();
-            Box::new(TermQuery::new(Term::from_field_bytes(schema.uuid, key.as_bytes()), IndexRecordOption::Basic))
+            Box::new(TermQuery::new(
+                Term::from_field_bytes(schema.uuid, key.as_bytes()),
+                IndexRecordOption::Basic,
+            ))
         }
         nidx_protos::filter_expression::Expr::Field(field_filter) => Box::new(TermQuery::new(
             Term::from_facet(schema.field, &Facet::from(&field_key(field_filter))),

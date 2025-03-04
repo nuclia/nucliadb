@@ -116,9 +116,7 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
             shard: shard_id.clone(),
             document: true,
             vectorset: "english".to_string(),
-            security: Some(Security {
-                access_groups: vec![],
-            }),
+            security: Some(Security { access_groups: vec![] }),
             ..Default::default()
         })
         .await
@@ -211,9 +209,7 @@ async fn test_security_search_public_resource(pool: PgPool) -> Result<(), Box<dy
             vectorset: "english".to_string(),
             shard: shard_id.clone(),
             document: true,
-            security: Some(Security {
-                access_groups: vec![],
-            }),
+            security: Some(Security { access_groups: vec![] }),
             ..Default::default()
         })
         .await

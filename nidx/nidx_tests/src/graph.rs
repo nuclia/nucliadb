@@ -33,7 +33,11 @@ pub fn friendly_parse<'a>(relations: &'a GraphSearchResponse) -> Vec<(&'a str, &
             let source = relations.nodes.get(path.source as usize).unwrap();
             let relation = relations.relations.get(path.relation as usize).unwrap();
             let destination = relations.nodes.get(path.destination as usize).unwrap();
-            (source.value.as_str(), relation.label.as_str(), destination.value.as_str())
+            (
+                source.value.as_str(),
+                relation.label.as_str(),
+                destination.value.as_str(),
+            )
         })
         .collect()
 }

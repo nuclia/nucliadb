@@ -31,9 +31,7 @@ use crate::formula::{AtomClause, Clause, Formula};
 const CONFIG: VectorConfig = VectorConfig {
     similarity: Similarity::Cosine,
     normalize_vectors: false,
-    vector_type: crate::config::VectorType::DenseF32 {
-        dimension: 178,
-    },
+    vector_type: crate::config::VectorType::DenseF32 { dimension: 178 },
 };
 
 fn create_query() -> Vec<f32> {
@@ -101,11 +99,15 @@ fn accuracy_test() {
         acc.extend(i.clone());
         acc
     });
-    let mut result_0 = reader.search(&query, &formula, true, no_results, &CONFIG, -1.0).collect::<Vec<_>>();
+    let mut result_0 = reader
+        .search(&query, &formula, true, no_results, &CONFIG, -1.0)
+        .collect::<Vec<_>>();
     result_0.sort_by(|i, j| i.id().cmp(j.id()));
     let query: Vec<_> = query.into_iter().map(|v| v + 1.0).collect();
     let no_results = 10;
-    let mut result_1 = reader.search(&query, &formula, true, no_results, &CONFIG, -1.0).collect::<Vec<_>>();
+    let mut result_1 = reader
+        .search(&query, &formula, true, no_results, &CONFIG, -1.0)
+        .collect::<Vec<_>>();
     result_1.sort_by(|i, j| i.id().cmp(j.id()));
     assert_ne!(result_0, result_1)
 }
@@ -125,7 +127,9 @@ fn single_graph() {
 
     let temp_dir = tempfile::tempdir().unwrap();
     let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
-    let result = reader.search(&vector, &formula, true, 5, &CONFIG, -1.0).collect::<Vec<_>>();
+    let result = reader
+        .search(&vector, &formula, true, 5, &CONFIG, -1.0)
+        .collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(result[0].id() == key.as_bytes());
@@ -135,10 +139,20 @@ fn single_graph() {
 fn data_merge() -> anyhow::Result<()> {
     let key0 = "9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string();
     let vector0 = create_query();
-    let elems0 = vec![Elem::new(key0.clone(), vector0.clone(), LabelDictionary::default(), None)];
+    let elems0 = vec![Elem::new(
+        key0.clone(),
+        vector0.clone(),
+        LabelDictionary::default(),
+        None,
+    )];
     let key1 = "29ee1f6e4585423585f31ded0202ee3a/f/field/0-100".to_string();
     let vector1 = create_query();
-    let elems1 = vec![Elem::new(key1.clone(), vector1.clone(), LabelDictionary::default(), None)];
+    let elems1 = vec![Elem::new(
+        key1.clone(),
+        vector1.clone(),
+        LabelDictionary::default(),
+        None,
+    )];
 
     let dp0_path = tempdir()?;
     let dp0 = data_point::create(dp0_path.path(), elems0, &CONFIG, HashSet::new()).unwrap();
@@ -201,7 +215,9 @@ fn label_filtering_test() {
             acc.extend(i.clone());
             acc
         });
-        let result_0 = reader.search(&query, &formula, true, no_results, &CONFIG, -1.0).collect::<Vec<_>>();
+        let result_0 = reader
+            .search(&query, &formula, true, no_results, &CONFIG, -1.0)
+            .collect::<Vec<_>>();
         assert_eq!(result_0.len(), 1);
     }
 
@@ -211,7 +227,9 @@ fn label_filtering_test() {
             acc.extend(i.clone());
             acc
         });
-        let result_0 = reader.search(&query, &formula, true, no_results, &CONFIG, -1.0).collect::<Vec<_>>();
+        let result_0 = reader
+            .search(&query, &formula, true, no_results, &CONFIG, -1.0)
+            .collect::<Vec<_>>();
         assert_eq!(result_0.len(), 0);
     }
 }
@@ -234,19 +252,25 @@ fn label_prefix_search_test() {
     // Searching for the labelset, returns all results
     let mut formula = Formula::new();
     formula.extend(Clause::Atom(AtomClause::Label("/l/labelset".into())));
-    let result = reader.search(&query, &formula, true, 10, &CONFIG, -1.0).collect::<Vec<_>>();
+    let result = reader
+        .search(&query, &formula, true, 10, &CONFIG, -1.0)
+        .collect::<Vec<_>>();
     assert_eq!(result.len(), 5);
 
     // Searching for a label, returns one results
     let mut formula = Formula::new();
     formula.extend(Clause::Atom(AtomClause::Label("/l/labelset/LABEL_0".into())));
-    let result = reader.search(&query, &formula, true, 10, &CONFIG, -1.0).collect::<Vec<_>>();
+    let result = reader
+        .search(&query, &formula, true, 10, &CONFIG, -1.0)
+        .collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
 
     // Searching for a label prefix, returns no results
     let mut formula = Formula::new();
     formula.extend(Clause::Atom(AtomClause::Label("/l/labelset/LABEL".into())));
-    let result = reader.search(&query, &formula, true, 10, &CONFIG, -1.0).collect::<Vec<_>>();
+    let result = reader
+        .search(&query, &formula, true, 10, &CONFIG, -1.0)
+        .collect::<Vec<_>>();
     assert_eq!(result.len(), 0);
 }
 

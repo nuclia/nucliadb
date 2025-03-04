@@ -179,7 +179,10 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
 
     while let Some(join_result) = tasks.join_next_with_id().await {
         let (id, task_result) = join_result.unwrap();
-        let task_name = task_ids.get(&id).map(|x| format!("{x:?}")).unwrap_or("<unknown>".to_string());
+        let task_name = task_ids
+            .get(&id)
+            .map(|x| format!("{x:?}"))
+            .unwrap_or("<unknown>".to_string());
         if let Err(e) = task_result {
             panic!("Task {task_name} finished with error, stopping: {e:?}");
         } else {

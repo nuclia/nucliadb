@@ -29,9 +29,16 @@ pub fn index_relations(
     resource: &nidx_protos::Resource,
     schema: Schema,
 ) -> anyhow::Result<()> {
-    let resource_id = resource.resource.as_ref().map(|r| r.uuid.as_str()).expect("Missing resource ID");
+    let resource_id = resource
+        .resource
+        .as_ref()
+        .map(|r| r.uuid.as_str())
+        .expect("Missing resource ID");
 
-    let iter = resource.relations.iter().filter(|rel| rel.to.is_some() || rel.source.is_some());
+    let iter = resource
+        .relations
+        .iter()
+        .filter(|rel| rel.to.is_some() || rel.source.is_some());
 
     for relation in iter {
         let source = relation.source.as_ref().expect("Missing source");

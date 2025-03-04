@@ -106,7 +106,10 @@ impl<T: for<'de> Deserialize<'de>> OpenIndexMetadata<T> for IndexOperations {
     }
 
     fn deletions(&self) -> impl Iterator<Item = (&String, Seq)> {
-        self.operations.0.iter().flat_map(|op| op.deleted_keys.iter().map(|key| (key, op.seq)))
+        self.operations
+            .0
+            .iter()
+            .flat_map(|op| op.deleted_keys.iter().map(|key| (key, op.seq)))
     }
 }
 
@@ -198,7 +201,9 @@ impl IndexCache {
             IndexKind::Vector => IndexSearcher::Vector(VectorSearcher::open(meta.index.config()?, open_index)?),
             IndexKind::Relation => IndexSearcher::Relation(RelationSearcher::open(open_index)?),
         };
-        INDEX_LOAD_TIME.get_or_create(&IndexKindLabels::new(meta.index.kind)).observe(t.elapsed().as_secs_f64());
+        INDEX_LOAD_TIME
+            .get_or_create(&IndexKindLabels::new(meta.index.kind))
+            .observe(t.elapsed().as_secs_f64());
 
         Ok(Arc::new(searcher))
     }

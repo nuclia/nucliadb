@@ -112,9 +112,15 @@ impl NidxBinding {
     pub fn wait_for_sync(&mut self) {
         self.runtime.as_ref().unwrap().block_on(async {
             // Wait for a new sync to start
-            self.sync_watcher.wait_for(|s| matches!(s, SyncStatus::Syncing)).await.unwrap();
+            self.sync_watcher
+                .wait_for(|s| matches!(s, SyncStatus::Syncing))
+                .await
+                .unwrap();
             // Wait for it to finish
-            self.sync_watcher.wait_for(|s| matches!(s, SyncStatus::Synced)).await.unwrap();
+            self.sync_watcher
+                .wait_for(|s| matches!(s, SyncStatus::Synced))
+                .await
+                .unwrap();
         });
     }
 }

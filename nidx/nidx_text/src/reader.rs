@@ -61,14 +61,7 @@ fn produce_facets(facets: Vec<String>, facets_count: FacetCounts) -> HashMap<Str
         .map(|facet| (&facets_count, facet))
         .map(|(facets_count, facet)| (facet_count(&facet, facets_count), facet))
         .filter(|(r, _)| !r.is_empty())
-        .map(|(facetresults, facet)| {
-            (
-                facet,
-                FacetResults {
-                    facetresults,
-                },
-            )
-        })
+        .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
         .collect()
 }
 
@@ -90,7 +83,10 @@ pub struct TextReaderService {
 
 impl Debug for TextReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FieldReaderService").field("index", &self.index).field("schema", &self.schema).finish()
+        f.debug_struct("FieldReaderService")
+            .field("index", &self.index)
+            .field("schema", &self.schema)
+            .finish()
     }
 }
 
@@ -110,7 +106,9 @@ impl SegmentCollector for FieldUuidSegmentCollector {
 
         let mut facet_ords = self.field_reader.facet_ords(doc);
         let mut facet = Facet::root();
-        self.field_reader.facet_from_ord(facet_ords.next().unwrap(), &mut facet).expect("field facet not found");
+        self.field_reader
+            .facet_from_ord(facet_ords.next().unwrap(), &mut facet)
+            .expect("field facet not found");
 
         if let Ok(resource_id) = Uuid::parse_str(std::str::from_utf8(&uuid_bytes).unwrap()) {
             self.results.push(FieldId {
@@ -326,13 +324,15 @@ impl TextReaderService {
             OrderType::Desc => |t: i64| t,
             OrderType::Asc => |t: i64| -t,
         };
-        TopDocs::with_limit(limit).and_offset(offset).custom_score(move |segment_reader: &SegmentReader| {
-            let reader = match order.sort_by() {
-                OrderField::Created => segment_reader.fast_fields().date("created").unwrap(),
-                OrderField::Modified => segment_reader.fast_fields().date("modified").unwrap(),
-            };
-            move |doc: DocId| sorter(reader.values_for_doc(doc).next().unwrap().into_timestamp_secs())
-        })
+        TopDocs::with_limit(limit)
+            .and_offset(offset)
+            .custom_score(move |segment_reader: &SegmentReader| {
+                let reader = match order.sort_by() {
+                    OrderField::Created => segment_reader.fast_fields().date("created").unwrap(),
+                    OrderField::Modified => segment_reader.fast_fields().date("modified").unwrap(),
+                };
+                move |doc: DocId| sorter(reader.values_for_doc(doc).next().unwrap().into_timestamp_secs())
+            })
     }
 
     fn convert_int_order(&self, response: SearchResponse<i64>, searcher: &Searcher) -> DocumentSearchResponse {
@@ -492,8 +492,11 @@ impl TextReaderService {
             query_parser
         };
         let text = TextReaderService::adapt_text(&query_parser, &request.body);
-        let advanced_query =
-            request.advanced_query.as_ref().map(|query| query_parser.parse_query(query)).transpose()?;
+        let advanced_query = request
+            .advanced_query
+            .as_ref()
+            .map(|query| query_parser.parse_query(query))
+            .transpose()?;
         let query = create_query(&query_parser, request, &self.schema, &text, advanced_query)?;
 
         // Offset to search from
@@ -501,8 +504,10 @@ impl TextReaderService {
         let offset = results * request.page_number as usize;
         let extra_result = results + 1;
         let maybe_order = request.order.clone();
-        let valid_facet_iter =
-            request.faceted.iter().flat_map(|v| v.labels.iter().filter(|s| TextReaderService::is_valid_facet(s)));
+        let valid_facet_iter = request
+            .faceted
+            .iter()
+            .flat_map(|v| v.labels.iter().filter(|s| TextReaderService::is_valid_facet(s)));
 
         let mut facets = vec![];
         let mut facet_collector = FacetCollector::for_field("facets");
@@ -598,7 +603,10 @@ impl Iterator for BatchProducer {
         let top_docs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
         let top_docs = self.searcher.search(&self.query, &top_docs).unwrap();
         let mut items = vec![];
-        for doc in top_docs.into_iter().flat_map(|i| self.searcher.doc::<TantivyDocument>(i.1)) {
+        for doc in top_docs
+            .into_iter()
+            .flat_map(|i| self.searcher.doc::<TantivyDocument>(i.1))
+        {
             let uuid = String::from_utf8(
                 doc.get_first(self.uuid_field)
                     .expect("document doesn't appear to have uuid.")
@@ -621,11 +629,7 @@ impl Iterator for BatchProducer {
                 .map(|x| x.to_path_string())
                 .filter(|x| x.starts_with("/l/"))
                 .collect_vec();
-            items.push(DocumentItem {
-                field,
-                uuid,
-                labels,
-            });
+            items.push(DocumentItem { field, uuid, labels });
         }
         self.offset += Self::BATCH;
         let v = time.elapsed().as_millis();

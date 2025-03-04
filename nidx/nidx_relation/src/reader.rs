@@ -51,7 +51,10 @@ pub struct RelationsReaderService {
 
 impl Debug for RelationsReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FieldReaderService").field("index", &self.index).field("schema", &self.schema).finish()
+        f.debug_struct("FieldReaderService")
+            .field("index", &self.index)
+            .field("schema", &self.schema)
+            .finish()
     }
 }
 
@@ -83,7 +86,10 @@ impl RelationsReaderService {
         let searcher = self.reader.searcher();
         let matching_docs = searcher.search(&index_query, &collector)?;
 
-        self.build_graph_response(&searcher, matching_docs.into_iter().map(|(_score, doc_address)| doc_address))
+        self.build_graph_response(
+            &searcher,
+            matching_docs.into_iter().map(|(_score, doc_address)| doc_address),
+        )
     }
 
     fn build_graph_response(
@@ -138,7 +144,10 @@ impl RelationsReaderService {
         let searcher = self.reader.searcher();
         let matching_docs = searcher.search(&index_query, &collector)?;
 
-        self.build_graph_response(&searcher, matching_docs.into_iter().map(|(_score, doc_address)| doc_address))
+        self.build_graph_response(
+            &searcher,
+            matching_docs.into_iter().map(|(_score, doc_address)| doc_address),
+        )
     }
 }
 
@@ -290,11 +299,15 @@ impl RelationsReaderService {
         if !node_filters.is_empty() {
             source_q.push((
                 Occur::Must,
-                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(node_filters.clone())))),
+                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(
+                    node_filters.clone(),
+                )))),
             ));
             target_q.push((
                 Occur::Must,
-                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(node_filters)))),
+                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(
+                    node_filters,
+                )))),
             ))
         }
 
@@ -344,13 +357,15 @@ impl RelationsReaderService {
                 // add fuzzy query for all prefixes
                 source_q.push((
                     Occur::Must,
-                    query_parser
-                        .parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(prefix_nodes_q.clone())))),
+                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(
+                        prefix_nodes_q.clone(),
+                    )))),
                 ));
                 target_q.push((
                     Occur::Must,
-                    query_parser
-                        .parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(prefix_nodes_q)))),
+                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(
+                        prefix_nodes_q,
+                    )))),
                 ));
             }
             Search::Prefix(prefix) => {
@@ -365,13 +380,15 @@ impl RelationsReaderService {
                 };
                 source_q.push((
                     Occur::Must,
-                    query_parser
-                        .parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(node_filter.clone())))),
+                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(
+                        node_filter.clone(),
+                    )))),
                 ));
                 target_q.push((
                     Occur::Must,
-                    query_parser
-                        .parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Value(node_filter)))),
+                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Value(
+                        node_filter,
+                    )))),
                 ));
             }
         }
@@ -391,7 +408,11 @@ impl RelationsReaderService {
             let relation_node = io_maps::target_to_relation_node(schema, &target_res_doc);
             results.insert(HashedRelationNode(relation_node));
         }
-        response.nodes = results.into_iter().take(NUMBER_OF_RESULTS_SUGGEST).map(Into::into).collect();
+        response.nodes = results
+            .into_iter()
+            .take(NUMBER_OF_RESULTS_SUGGEST)
+            .map(Into::into)
+            .collect();
         Ok(Some(response))
     }
 }

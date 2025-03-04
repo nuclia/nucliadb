@@ -48,9 +48,7 @@ struct StopWords {
 /// HashMap with the stop words for each language
 impl StopWords {
     fn new() -> StopWords {
-        StopWords {
-            words: HashSet::new(),
-        }
+        StopWords { words: HashSet::new() }
     }
 
     /// LOads the stop words for the given language, from a JSON file
@@ -76,8 +74,16 @@ static CA: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/stop_words/
 static DE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/stop_words/de.json"));
 static NL: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/stop_words/nl.json"));
 static PT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/stop_words/pt.json"));
-static LOADED_LANGUAGES: [[&str; 2]; 8] =
-    [["fr", FR], ["it", IT], ["es", ES], ["en", EN], ["ca", CA], ["de", DE], ["nl", NL], ["pt", PT]];
+static LOADED_LANGUAGES: [[&str; 2]; 8] = [
+    ["fr", FR],
+    ["it", IT],
+    ["es", ES],
+    ["en", EN],
+    ["ca", CA],
+    ["de", DE],
+    ["nl", NL],
+    ["pt", PT],
+];
 
 /// Returns `true` if the word is a stop word
 pub fn is_stop_word(word: &str) -> bool {
@@ -98,7 +104,14 @@ mod tests {
         // make sure we never spend more than 100 ms for the cache warmup
         assert!(elapsed < 100.0, "{}", elapsed);
 
-        let tests = [("nuclia", false), ("is", true), ("le", true), ("el", true), ("stop", false), ("stop", false)];
+        let tests = [
+            ("nuclia", false),
+            ("is", true),
+            ("le", true),
+            ("el", true),
+            ("stop", false),
+            ("stop", false),
+        ];
 
         for (word, expected) in tests {
             let start_time = std::time::Instant::now();

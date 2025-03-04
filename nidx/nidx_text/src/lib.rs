@@ -77,7 +77,9 @@ pub struct TextIndexer;
 pub struct TextDeletionQueryBuilder(Field);
 impl DeletionQueryBuilder for TextDeletionQueryBuilder {
     fn query<'a>(&self, keys: impl Iterator<Item = &'a String>) -> Box<dyn Query> {
-        Box::new(TermSetQuery::new(keys.map(|k| Term::from_field_bytes(self.0, k.as_bytes()))))
+        Box::new(TermSetQuery::new(
+            keys.map(|k| Term::from_field_bytes(self.0, k.as_bytes())),
+        ))
     }
 }
 
@@ -139,7 +141,10 @@ impl TextSearcher {
             reader: TextReaderService {
                 index: index.clone(),
                 schema,
-                reader: index.reader_builder().reload_policy(tantivy::ReloadPolicy::Manual).try_into()?,
+                reader: index
+                    .reader_builder()
+                    .reload_policy(tantivy::ReloadPolicy::Manual)
+                    .try_into()?,
             },
         })
     }
