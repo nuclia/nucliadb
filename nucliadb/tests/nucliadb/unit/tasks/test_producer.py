@@ -80,13 +80,13 @@ class TestProducer:
         with pytest.raises(RuntimeError):
             await producer.send(Mock())
 
-    async def test_produce_ok(self, producer, stream):
+    async def test_produce_ok(self, producer):
         msg = Message(kbid="kbid")
 
         await producer.send(msg)
 
         publish_args = producer.context.nats_manager.js.publish.call_args[0]
-        assert publish_args[0] == stream.subject
+        assert publish_args[0] == "stream.subject"
 
         raw_message = publish_args[1]
         sent_message = Message.model_validate_json(raw_message)
