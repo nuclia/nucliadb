@@ -20,8 +20,9 @@
 
 
 import asyncio
+import functools
 import tarfile
-from typing import AsyncIterator, Union
+from typing import AsyncIterator, Callable, Union
 
 from nucliadb.backups.const import StorageKeys
 from nucliadb.backups.models import RestoreBackupRequest
@@ -84,7 +85,7 @@ async def restore_resources(context: ApplicationContext, kbid: str, backup_id: s
 
 
 class CloudFileBinary:
-    def __init__(self, uri: str, download_stream: AsyncIterator[bytes]):
+    def __init__(self, uri: str, download_stream: Callable[[int], AsyncIterator[bytes]]):
         self.uri = uri
         self.download_stream = download_stream
 
@@ -131,7 +132,8 @@ class ResourceBackupReader:
         elif tarinfo.name.startswith("binaries"):
             uri = tarinfo.name.lstrip("binaries/")
             size = tarinfo.size
-            return CloudFileBinary(uri, self.iter(size))
+            download_stream = functools.partial(self.iter, size)
+            return CloudFileBinary(uri, download_stream)
         else:  # pragma: no cover
             raise ValueError(f"Unknown tar entry: {tarinfo.name}")
 
