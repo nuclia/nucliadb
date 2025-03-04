@@ -101,7 +101,7 @@ async def delete(kbid: str, backup_id: str) -> None:
         stream="backups",
         stream_subjects=["backups.>"],
         producer_subject="backups.delete",
-        msg_type=RestoreBackupRequest,
+        msg_type=DeleteBackupRequest,
     )
     msg = DeleteBackupRequest(
         kbid=kbid,
