@@ -22,7 +22,9 @@ import tarfile
 from datetime import datetime, timezone
 from typing import AsyncIterator, Optional
 
-from nucliadb.backups.models import BackupMetadata, CreateBackupRequest, StorageKeys
+from nucliadb.backups.const import MaindbKeys, StorageKeys
+from nucliadb.backups.models import BackupMetadata, CreateBackupRequest
+from nucliadb.backups.settings import settings
 from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.utils import (
@@ -57,6 +59,9 @@ async def backup_kb_retried(context: ApplicationContext, msg: CreateBackupReques
 
 
 async def backup_kb(context: ApplicationContext, kbid: str, backup_id: str):
+    """
+    Backs up a KB to the cloud storage.
+    """
     await backup_resources(context, kbid, backup_id)
     await backup_labels(context, kbid, backup_id)
     await backup_entities(context, kbid, backup_id)
@@ -81,7 +86,7 @@ async def backup_resources(context: ApplicationContext, kbid: str, backup_id: st
     for rid in metadata.missing_resources:
         tasks.append(asyncio.create_task(backup_resource(context, backup_id, kbid, rid)))
         backing_up.append(rid)
-        if len(tasks) >= 50:
+        if len(tasks) >= settings.backup_resources_concurrency:
             resources_bytes = await asyncio.gather(*tasks)
             metadata.total_size += sum(resources_bytes)
             metadata.missing_resources = [
@@ -106,6 +111,7 @@ async def backup_resource(context: ApplicationContext, backup_id: str, kbid: str
     """
     bm = await get_broker_message(context, kbid, rid)
     if bm is None:
+        # Resource not found. May have been deleted while the backup was running.
         return 0
     return await backup_resource_with_binaries(context, backup_id, kbid, rid, bm)
 
@@ -137,15 +143,18 @@ async def backup_resource_with_binaries(
     """
     total_size = 0
 
-    async def _iterator():
-        bm_serialized = bm.SerializeToString()
+    async def resource_data_iterator():
+        """
+        Each tar file will have the following structure:
 
-        async def bm_iterator():
-            yield bm_serialized
+        - cloud-files/{cloud_file.uri}  (serialized resources_pb2.CloudFile)
+        - binaries/{cloud_file.uri} (the actual binary content of the cloud file)
+        - broker-message.pb
 
-        async for chunk in to_tar("broker-message.pb", len(bm_serialized), bm_iterator()):
-            yield chunk
-            total_size += len(chunk)
+        The order is important because the restore process depends on it (needs to import
+        the cloud files and its binaries first before the broker message).
+        """
+        nonlocal total_size
 
         for cloud_file in get_cloud_files(bm):
             serialized_cf = cloud_file.SerializeToString()
@@ -154,20 +163,33 @@ async def backup_resource_with_binaries(
                 yield serialized_cf
 
             async for chunk in to_tar(
-                f"cloud-files/{cloud_file.uri}", len(serialized_cf), cf_iterator()
+                name=f"cloud-files/{cloud_file.uri}", size=len(serialized_cf), chunks=cf_iterator()
             ):
                 yield chunk
                 total_size += len(chunk)
 
             async for chunk in to_tar(
-                f"binaries/{cloud_file.uri}", cloud_file.size, download_binary(context, cloud_file)
+                name=f"binaries/{cloud_file.uri}",
+                size=cloud_file.size,
+                chunks=download_binary(context, cloud_file),
             ):
                 yield chunk
                 total_size += len(chunk)
 
+        bm_serialized = bm.SerializeToString()
+
+        async def bm_iterator():
+            yield bm_serialized
+
+        async for chunk in to_tar(
+            name="broker-message.pb", size=len(bm_serialized), chunks=bm_iterator()
+        ):
+            yield chunk
+            total_size += len(chunk)
+
     await upload_to_bucket(
         context,
-        _iterator(),
+        resource_data_iterator(),
         key=StorageKeys.RESOURCE.format(kbid=kbid, backup_id=backup_id, resource_id=rid),
     )
     return total_size
@@ -176,7 +198,7 @@ async def backup_resource_with_binaries(
 async def backup_labels(context: ApplicationContext, kbid: str, backup_id: str):
     labels = await get_labels(context, kbid)
     await context.blob_storage.upload_object(
-        bucket="backups",
+        bucket=settings.backups_bucket,
         key=StorageKeys.LABELS.format(kbid=kbid, backup_id=backup_id),
         data=labels.SerializeToString(),
     )
@@ -185,7 +207,7 @@ async def backup_labels(context: ApplicationContext, kbid: str, backup_id: str):
 async def backup_entities(context: ApplicationContext, kbid: str, backup_id: str):
     entities = await get_entities(context, kbid)
     await context.blob_storage.upload_object(
-        bucket="backups",
+        bucket=settings.backups_bucket,
         key=StorageKeys.ENTITIES.format(kbid=kbid, backup_id=backup_id),
         data=entities.SerializeToString(),
     )
@@ -195,7 +217,7 @@ async def get_metadata(
     context: ApplicationContext, kbid: str, backup_id: str
 ) -> Optional[BackupMetadata]:
     async with context.kv_driver.transaction(read_only=True) as txn:
-        metadata_raw = await txn.get(f"kbs/{kbid}/backups/{backup_id}")
+        metadata_raw = await txn.get(MaindbKeys.METADATA.format(kbid=kbid, backup_id=backup_id))
         if metadata_raw is None:
             return None
         return BackupMetadata.model_validate_json(metadata_raw)
@@ -203,19 +225,22 @@ async def get_metadata(
 
 async def set_metadata(context: ApplicationContext, kbid: str, backup_id: str, metadata: BackupMetadata):
     async with context.kv_driver.transaction() as txn:
-        await txn.set(f"kbs/{kbid}/backups/{backup_id}", metadata.model_dump_json().encode())
+        await txn.set(
+            MaindbKeys.METADATA.format(kbid=kbid, backup_id=backup_id),
+            metadata.model_dump_json().encode(),
+        )
         await txn.commit()
 
 
 async def delete_metadata(context: ApplicationContext, kbid: str, backup_id: str):
     async with context.kv_driver.transaction() as txn:
-        await txn.delete(f"kbs/{kbid}/backups/{backup_id}")
+        await txn.delete(MaindbKeys.METADATA.format(kbid=kbid, backup_id=backup_id))
         await txn.commit()
 
 
 async def upload_to_bucket(context: ApplicationContext, bytes_iterator: AsyncIterator[bytes], key: str):
     storage = context.blob_storage
-    bucket = "backups"
+    bucket = settings.backups_bucket
     cf = resources_pb2.CloudFile()
     cf.bucket_name = bucket
     cf.content_type = "binary/octet-stream"

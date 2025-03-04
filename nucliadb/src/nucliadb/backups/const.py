@@ -17,28 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from datetime import datetime
 
-from pydantic import BaseModel
-
-
-class CreateBackupRequest(BaseModel):
-    kbid: str
-    backup_id: str
+class MaindbKeys:
+    METADATA = "kbs/{kbid}/backups/{backup_id}"
 
 
-class RestoreBackupRequest(BaseModel):
-    kbid: str
-    backup_id: str
+class StorageKeys:
+    """
+    Defines the key templates used to store backup files in the backups bucket of the storage.
+    """
 
-
-class DeleteBackupRequest(BaseModel):
-    backup_id: str
-
-
-class BackupMetadata(BaseModel):
-    kbid: str
-    requested_at: datetime
-    total_resources: int = 0
-    missing_resources: list[str] = []
-    total_size: int = 0
+    BACKUP_PREFIX = "backups/{backup_id}/"
+    RESOURCES_PREFIX = "backups/{backup_id}/resources/"
+    RESOURCE = "backups/{backup_id}/resources/{resource_id}.tar"
+    ENTITIES = "backups/{backup_id}/entities.pb"
+    LABELS = "backups/{backup_id}/labels.pb"

@@ -553,6 +553,13 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         else:
             await self.insert_object(bucket, key, data)
 
+    @abc.abstractmethod
+    async def create_bucket(self, bucket_name: str) -> None:
+        """
+        Create a new bucket in the storage.
+        """
+        ...
+
 
 async def iter_and_add_size(
     stream: AsyncGenerator[bytes, None], cf: CloudFile

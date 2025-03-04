@@ -18,37 +18,92 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from nucliadb.backups.create import backup_kb_retried
-from nucliadb.backups.models import CreateBackupRequest
+from nucliadb.backups.delete import delete_backup
+from nucliadb.backups.models import CreateBackupRequest, DeleteBackupRequest, RestoreBackupRequest
+from nucliadb.backups.restore import restore_kb_retried
 from nucliadb.tasks import create_consumer, create_producer
 from nucliadb.tasks.consumer import NatsTaskConsumer
 from nucliadb.tasks.producer import NatsTaskProducer
 
 
-class Backup:
-    @classmethod
-    async def creator_consumer(cls) -> NatsTaskConsumer[CreateBackupRequest]:
-        consumer: NatsTaskConsumer = create_consumer(
-            name="backup_creator",
-            stream="backups",
-            stream_subjects=["backups.>"],
-            consumer_subject="backups.create",
-            callback=backup_kb_retried,
-            msg_type=CreateBackupRequest,
-            max_concurrent_messages=10,
-        )
-        return consumer
+def creator_consumer() -> NatsTaskConsumer[CreateBackupRequest]:
+    consumer: NatsTaskConsumer = create_consumer(
+        name="backup_creator",
+        stream="backups",
+        stream_subjects=["backups.>"],
+        consumer_subject="backups.create",
+        callback=backup_kb_retried,
+        msg_type=CreateBackupRequest,
+        max_concurrent_messages=10,
+    )
+    return consumer
 
-    @classmethod
-    async def create(cls, kbid: str, backup_id: str) -> None:
-        producer: NatsTaskProducer[CreateBackupRequest] = create_producer(
-            name="backup_creator",
-            stream="backups",
-            stream_subjects=["backups.>"],
-            producer_subject="backups.create",
-            msg_type=CreateBackupRequest,
-        )
-        msg = CreateBackupRequest(
-            kbid=kbid,
-            backup_id=backup_id,
-        )
-        await producer.send(msg)
+
+async def create(kbid: str, backup_id: str) -> None:
+    producer: NatsTaskProducer[CreateBackupRequest] = create_producer(
+        name="backup_creator",
+        stream="backups",
+        stream_subjects=["backups.>"],
+        producer_subject="backups.create",
+        msg_type=CreateBackupRequest,
+    )
+    msg = CreateBackupRequest(
+        kbid=kbid,
+        backup_id=backup_id,
+    )
+    await producer.send(msg)
+
+
+def restorer_consumer() -> NatsTaskConsumer[RestoreBackupRequest]:
+    consumer: NatsTaskConsumer = create_consumer(
+        name="backup_restorer",
+        stream="backups",
+        stream_subjects=["backups.>"],
+        consumer_subject="backups.restore",
+        callback=restore_kb_retried,
+        msg_type=RestoreBackupRequest,
+        max_concurrent_messages=10,
+    )
+    return consumer
+
+
+async def restore(kbid: str, backup_id: str) -> None:
+    producer: NatsTaskProducer[RestoreBackupRequest] = create_producer(
+        name="backup_restorer",
+        stream="backups",
+        stream_subjects=["backups.>"],
+        producer_subject="backups.restore",
+        msg_type=RestoreBackupRequest,
+    )
+    msg = RestoreBackupRequest(
+        kbid=kbid,
+        backup_id=backup_id,
+    )
+    await producer.send(msg)
+
+
+def deleter_consumer() -> NatsTaskConsumer[DeleteBackupRequest]:
+    consumer: NatsTaskConsumer = create_consumer(
+        name="backup_deleter",
+        stream="backups",
+        stream_subjects=["backups.>"],
+        consumer_subject="backups.delete",
+        callback=delete_backup,
+        msg_type=DeleteBackupRequest,
+        max_concurrent_messages=2,
+    )
+    return consumer
+
+
+async def delete(backup_id: str) -> None:
+    producer: NatsTaskProducer[DeleteBackupRequest] = create_producer(
+        name="backup_deleter",
+        stream="backups",
+        stream_subjects=["backups.>"],
+        producer_subject="backups.delete",
+        msg_type=DeleteBackupRequest,
+    )
+    msg = DeleteBackupRequest(
+        backup_id=backup_id,
+    )
+    await producer.send(msg)

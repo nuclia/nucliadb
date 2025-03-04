@@ -17,3 +17,200 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
+
+import asyncio
+import functools
+import tarfile
+from typing import AsyncIterator, Callable, Union
+
+from nucliadb.backups.const import StorageKeys
+from nucliadb.backups.models import RestoreBackupRequest
+from nucliadb.backups.settings import settings
+from nucliadb.common.context import ApplicationContext
+from nucliadb.export_import.utils import (
+    import_binary,
+    import_broker_message,
+    set_entities_groups,
+    set_labels,
+)
+from nucliadb.tasks.retries import TaskRetryHandler
+from nucliadb_protos import knowledgebox_pb2 as kb_pb2
+from nucliadb_protos.resources_pb2 import CloudFile
+from nucliadb_protos.writer_pb2 import BrokerMessage
+
+
+async def restore_kb_retried(context: ApplicationContext, msg: RestoreBackupRequest):
+    kbid = msg.kbid
+    backup_id = msg.backup_id
+
+    retry_handler = TaskRetryHandler(
+        kbid=kbid,
+        task_type="restore",
+        task_id=backup_id,
+        context=context,
+        max_retries=3,
+    )
+
+    @retry_handler.wrap
+    async def _restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
+        await restore_kb(context, kbid, backup_id)
+
+    await _restore_kb(context, kbid, backup_id)
+
+
+async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
+    """
+    Downloads the backup files from the cloud storage and imports them into the KB.
+    """
+    await restore_resources(context, kbid, backup_id)
+    await restore_labels(context, kbid, backup_id)
+    await restore_entities(context, kbid, backup_id)
+
+
+async def restore_resources(context: ApplicationContext, kbid: str, backup_id: str):
+    tasks = []
+    async for object_info in context.blob_storage.iterate_objects(
+        bucket=settings.backups_bucket,
+        prefix=StorageKeys.RESOURCES_PREFIX.format(kbid=kbid, backup_id=backup_id),
+    ):
+        resource_id = object_info.name.split("/")[-1].rstrip(".tar")
+        tasks.append(asyncio.create_task(restore_resource(context, kbid, backup_id, resource_id)))
+        if len(tasks) > settings.restore_resources_concurrency:
+            await asyncio.gather(*tasks)
+            tasks = []
+    if len(tasks) > 0:
+        await asyncio.gather(*tasks)
+        tasks = []
+
+
+class CloudFileBinary:
+    def __init__(self, uri: str, download_stream: Callable[[int], AsyncIterator[bytes]]):
+        self.uri = uri
+        self.download_stream = download_stream
+
+    async def read(self, chunk_size: int) -> AsyncIterator[bytes]:
+        async for chunk in self.download_stream(chunk_size):
+            yield chunk
+
+
+class ResourceBackupReader:
+    def __init__(self, download_stream: AsyncIterator[bytes]):
+        self.download_stream = download_stream
+        self.buffer = b""
+
+    async def read(self, size: int) -> bytes:
+        while len(self.buffer) < size:
+            chunk = await self.download_stream.__anext__()
+            self.buffer += chunk
+        result = self.buffer[:size]
+        self.buffer = self.buffer[size:]
+        return result
+
+    async def iter_data(self, total_bytes: int, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
+        padding_bytes = 0
+        if total_bytes % 512 != 0:
+            # We need to read the padding bytes and then discard them
+            padding_bytes = 512 - (total_bytes % 512)
+        read_bytes = 0
+        padding_reached = False
+        async for chunk in self._iter(total_bytes + padding_bytes, chunk_size):
+            if padding_reached:
+                # Skip padding bytes. We can't break here because we need
+                # to read the padding bytes from the stream
+                continue
+            padding_reached = read_bytes + len(chunk) >= total_bytes
+            if padding_reached:
+                chunk = chunk[: total_bytes - read_bytes]
+            else:
+                read_bytes += len(chunk)
+            yield chunk
+
+    async def _iter(self, total_bytes: int, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
+        read_bytes = 0
+        while read_bytes < total_bytes:
+            to_read = min(chunk_size, total_bytes - read_bytes)
+            chunk = await self.read(to_read)
+            yield chunk
+            read_bytes += len(chunk)
+        assert read_bytes == total_bytes
+
+    async def read_tarinfo(self):
+        raw_tar_header = await self.read(512)
+        return tarfile.TarInfo.frombuf(raw_tar_header, encoding="utf-8", errors="strict")
+
+    async def read_data(self, tarinfo: tarfile.TarInfo) -> bytes:
+        tarinfo_size = tarinfo.size
+        padding_bytes = 0
+        if tarinfo_size % 512 != 0:
+            # We need to read the padding bytes and then discard them
+            padding_bytes = 512 - (tarinfo_size % 512)
+        data = await self.read(tarinfo_size + padding_bytes)
+        return data[:tarinfo_size]
+
+    async def read_item(self) -> Union[BrokerMessage, CloudFile, CloudFileBinary]:
+        tarinfo = await self.read_tarinfo()
+        if tarinfo.name.startswith("broker-message"):
+            raw_bm = await self.read_data(tarinfo)
+            bm = BrokerMessage()
+            bm.ParseFromString(raw_bm)
+            return bm
+        elif tarinfo.name.startswith("cloud-files"):
+            raw_cf = await self.read_data(tarinfo)
+            cf = CloudFile()
+            cf.FromString(raw_cf)
+            return cf
+        elif tarinfo.name.startswith("binaries"):
+            uri = tarinfo.name.lstrip("binaries/")
+            size = tarinfo.size
+            download_stream = functools.partial(self.iter_data, size)
+            return CloudFileBinary(uri, download_stream)
+        else:  # pragma: no cover
+            raise ValueError(f"Unknown tar entry: {tarinfo.name}")
+
+
+async def restore_resource(context: ApplicationContext, kbid: str, backup_id: str, resource_id: str):
+    download_stream = context.blob_storage.download(
+        bucket=settings.backups_bucket,
+        key=StorageKeys.RESOURCE.format(kbid=kbid, backup_id=backup_id, resource_id=resource_id),
+    )
+    reader = ResourceBackupReader(download_stream)
+    bm = None
+    while True:
+        item = await reader.read_item()
+        if isinstance(item, BrokerMessage):
+            # When the broker message is read, this means all cloud files
+            # and binaries of that resource have been read and imported
+            bm = item
+            bm.kbid = kbid
+            break
+
+        # Read the cloud file and its binary
+        cf = await reader.read_item()
+        assert isinstance(cf, CloudFile)
+        cf_binary = await reader.read_item()
+        assert isinstance(cf_binary, CloudFileBinary)
+        assert cf.uri == cf_binary.uri
+        await import_binary(context, kbid, cf, cf_binary.read)
+
+    await import_broker_message(context, kbid, bm)
+
+
+async def restore_labels(context: ApplicationContext, kbid: str, backup_id: str):
+    raw = await context.blob_storage.downloadbytes(
+        bucket=settings.backups_bucket,
+        key=StorageKeys.LABELS.format(kbid=kbid, backup_id=backup_id),
+    )
+    labels = kb_pb2.Labels()
+    labels.ParseFromString(raw.getvalue())
+    await set_labels(context, kbid, labels)
+
+
+async def restore_entities(context: ApplicationContext, kbid: str, backup_id: str):
+    raw = await context.blob_storage.downloadbytes(
+        bucket=settings.backups_bucket,
+        key=StorageKeys.ENTITIES.format(kbid=kbid, backup_id=backup_id),
+    )
+    entities = kb_pb2.EntitiesGroups()
+    entities.ParseFromString(raw.getvalue())
+    await set_entities_groups(context, kbid, entities)
