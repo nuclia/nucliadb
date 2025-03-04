@@ -58,10 +58,6 @@ async def nucliadb(
     tmp_path: Path,
     learning_config,
 ):
-    from nucliadb.common.cluster import manager
-
-    manager.INDEX_NODES.clear()
-
     # we need to force DATA_PATH updates to run every test on the proper
     # temporary directory
     data_path = str((tmp_path / "node").absolute())

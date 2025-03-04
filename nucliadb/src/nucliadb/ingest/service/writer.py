@@ -22,7 +22,7 @@ from typing import AsyncIterator
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
-from nucliadb.common.cluster.manager import get_index_nodes
+from nucliadb.common.cluster.manager import get_nidx_fake_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
@@ -418,7 +418,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     shard_count=n.shard_count,
                     primary_id=n.primary_id or "",
                 )
-                for n in get_index_nodes(include_secondary=True)
+                for n in [get_nidx_fake_node()]
             ]
         )
         return response

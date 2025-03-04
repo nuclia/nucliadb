@@ -26,13 +26,10 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.common.cluster import manager
-from nucliadb.ingest.settings import DriverConfig
 from nucliadb.middleware import ProcessTimeHeaderMiddleware
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import lifespan
-from nucliadb.search.settings import settings
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi.utils import (
     client_disconnect_handler,
@@ -89,28 +86,8 @@ async def homepage(request: Request) -> HTMLResponse:
     return HTMLResponse("NucliaDB Search Service")
 
 
-async def node_members(request: Request) -> JSONResponse:
-    return JSONResponse(
-        [
-            {
-                "id": node.id,
-                "listen_address": node.address,
-                "type": node.label,
-                "shard_count": node.shard_count,
-                "available_disk": node.available_disk,
-                "dummy": node.dummy,
-                "primary_id": node.primary_id,
-            }
-            for node in manager.get_index_nodes(include_secondary=True)
-        ]
-    )
-
-
 async def alive(request: Request) -> JSONResponse:
-    if len(manager.get_index_nodes()) == 0 and settings.driver != DriverConfig.LOCAL:
-        return JSONResponse({"status": "error"}, status_code=503)
-    else:
-        return JSONResponse({"status": "ok"})
+    return JSONResponse({"status": "ok"})
 
 
 async def ready(request: Request) -> JSONResponse:
@@ -122,6 +99,5 @@ async def ready(request: Request) -> JSONResponse:
 
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
-application.add_route("/node/members", node_members)
 application.add_route("/health/alive", alive)
 application.add_route("/health/ready", ready)

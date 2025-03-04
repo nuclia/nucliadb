@@ -55,26 +55,15 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardLocation]:
     """
     # To avoid detecting a new shard as orphan, query the index first and maindb
     # afterwards
-    indexed_shards: dict[str, ShardLocation] = {}
-    available_nodes = manager.get_index_nodes()
-    for node in available_nodes:
-        node_shards = await _get_indexed_shards(node)
-        indexed_shards.update(node_shards)
-
+    indexed_shards = await _get_indexed_shards()
     stored_shards = await _get_stored_shards(driver)
 
     # Log an error in case we found a shard stored but not indexed, this should
     # never happen as shards are created in the index node and then stored in
     # maindb
     not_indexed_shards = stored_shards.keys() - indexed_shards.keys()
-    available_nodes_ids = [node.id for node in available_nodes]
     for shard_id in not_indexed_shards:
         location = stored_shards[shard_id]
-
-        # skip shards from unavailable nodes
-        if location.node_id not in available_nodes_ids:
-            continue
-
         logger.error(
             "Found a shard on maindb not indexed in the index nodes",
             extra={
@@ -86,41 +75,24 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardLocation]:
 
     orphan_shard_ids = indexed_shards.keys() - stored_shards.keys()
     orphan_shards: dict[str, ShardLocation] = {}
-    unavailable_nodes: set[str] = set()
+    node = manager.get_nidx_fake_node()
     async with datamanagers.with_ro_transaction() as txn:
         for shard_id in orphan_shard_ids:
-            node_id = indexed_shards[shard_id].node_id
-            node = manager.get_index_node(node_id)  # type: ignore
-            if node is None:
-                unavailable_nodes.add(node_id)
-                kbid = UNKNOWN_KB
-            else:
-                kbid = await _get_kbid(node, shard_id) or UNKNOWN_KB
-
+            kbid = await _get_kbid(node, shard_id) or UNKNOWN_KB
             # Shards with knwon KB ids can be checked and ignore those comming from
             # an ongoing migration/rollover
             if kbid != UNKNOWN_KB:
                 skip = await datamanagers.rollover.is_rollover_shard(txn, kbid=kbid, shard_id=shard_id)
                 if skip:
                     continue
-
-            orphan_shards[shard_id] = ShardLocation(kbid=kbid, node_id=node_id)
-
-    if len(unavailable_nodes) > 0:
-        logger.info(
-            "Some nodes were unavailable while checking shard details and were skipped",
-            extra={"nodes": list(unavailable_nodes)},
-        )
-
+            orphan_shards[shard_id] = ShardLocation(kbid=kbid, node_id="nidx")
     return orphan_shards
 
 
-async def _get_indexed_shards(node: AbstractIndexNode) -> dict[str, ShardLocation]:
-    indexed_shards: dict[str, ShardLocation] = {}
-    node_shards = await node.list_shards()
-    for shard_id in node_shards:
-        indexed_shards[shard_id] = ShardLocation(kbid=UNKNOWN_KB, node_id=node.id)
-    return indexed_shards
+async def _get_indexed_shards() -> dict[str, ShardLocation]:
+    nidx = manager.get_nidx_fake_node()
+    shards = await nidx.list_shards()
+    return {shard_id: ShardLocation(kbid=UNKNOWN_KB, node_id="nidx") for shard_id in shards}
 
 
 async def _get_stored_shards(driver: Driver) -> dict[str, ShardLocation]:
@@ -188,13 +160,8 @@ async def purge_orphan_shards(driver: Driver):
     orphan_shards = await detect_orphan_shards(driver)
     logger.info(f"Found {len(orphan_shards)} orphan shards. Purge starts...")
 
-    unavailable_nodes: set[str] = set()
+    node = manager.get_nidx_fake_node()
     for shard_id, location in orphan_shards.items():
-        node = manager.get_index_node(location.node_id)
-        if node is None:
-            unavailable_nodes.add(location.node_id)
-            continue
-
         logger.info(
             "Deleting orphan shard from index node",
             extra={
@@ -204,12 +171,6 @@ async def purge_orphan_shards(driver: Driver):
             },
         )
         await node.delete_shard(shard_id)
-
-    for node_id in unavailable_nodes:
-        logger.warning(
-            "Index node has been unavailable while purging. Orphan shards may still exist",
-            extra={"node_id": node_id},
-        )
 
 
 def parse_arguments():
