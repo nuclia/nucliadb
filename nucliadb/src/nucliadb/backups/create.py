@@ -59,6 +59,9 @@ async def backup_kb_retried(context: ApplicationContext, msg: CreateBackupReques
 
 
 async def backup_kb(context: ApplicationContext, kbid: str, backup_id: str):
+    """
+    Backs up a KB to the cloud storage.
+    """
     await backup_resources(context, kbid, backup_id)
     await backup_labels(context, kbid, backup_id)
     await backup_entities(context, kbid, backup_id)
@@ -143,21 +146,14 @@ async def backup_resource_with_binaries(
     async def resource_data_iterator():
         """
         Each tar file will have the following structure:
-        - broker-message.pb
+        
         - cloud-files/{cloud_file.uri}  (serialized resources_pb2.CloudFile)
         - binaries/{cloud_file.uri} (the actual binary content of the cloud file)
+        - broker-message.pb
+
+        The order is important because the restore process depends on it (needs to import
+        the cloud files and its binaries first before the broker message).
         """
-        bm_serialized = bm.SerializeToString()
-
-        async def bm_iterator():
-            yield bm_serialized
-
-        async for chunk in to_tar(
-            name="broker-message.pb", size=len(bm_serialized), chunks=bm_iterator()
-        ):
-            yield chunk
-            total_size += len(chunk)
-
         for cloud_file in get_cloud_files(bm):
             serialized_cf = cloud_file.SerializeToString()
 
@@ -177,6 +173,17 @@ async def backup_resource_with_binaries(
             ):
                 yield chunk
                 total_size += len(chunk)
+
+                bm_serialized = bm.SerializeToString()
+
+        async def bm_iterator():
+            yield bm_serialized
+
+        async for chunk in to_tar(
+            name="broker-message.pb", size=len(bm_serialized), chunks=bm_iterator()
+        ):
+            yield chunk
+            total_size += len(chunk)
 
     await upload_to_bucket(
         context,
