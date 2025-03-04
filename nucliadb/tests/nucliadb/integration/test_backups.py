@@ -18,10 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
-from httpx import AsyncClient
-from nucliadb.backups.create import backup_kb
-from nucliadb.common.context import ApplicationContext
+
 import pytest
+from httpx import AsyncClient
+
+from nucliadb.backups.create import backup_kb
+from nucliadb.backups.restore import restore_kb
+from nucliadb.backups.settings import settings as backups_settings
+from nucliadb.common.context import ApplicationContext
 
 
 async def create_kb(
@@ -33,13 +37,14 @@ async def create_kb(
     kbid = resp.json().get("uuid")
     return kbid
 
+
 @pytest.fixture(scope="function")
 async def src_kb(
     nucliadb_writer: AsyncClient,
     nucliadb_writer_manager: AsyncClient,
 ):
     kbid = await create_kb(nucliadb_writer_manager)
-    
+
     # Create 10 simple resources with a text field
     for i in range(10):
         resp = await nucliadb_writer.post(
@@ -53,7 +58,7 @@ async def src_kb(
                     "text": {
                         "body": f"This is a test {i}",
                     }
-                }
+                },
             },
         )
         assert resp.status_code == 201
@@ -95,12 +100,28 @@ async def dst_kb(
     yield kbid
 
 
-
 @pytest.mark.deploy_modes("standalone")
-async def test_backup(
-    nucliadb_reader: AsyncClient, src_kb: str, dst_kb: str
-):
+async def test_backup(nucliadb_reader: AsyncClient, src_kb: str, dst_kb: str):
+    backup_id = "foo"
     context = ApplicationContext()
     await context.initialize()
-    backup_id = "foo"
+    await context.blob_storage.create_bucket(backups_settings.backups_bucket)
+
     await backup_kb(context, src_kb, backup_id)
+    await restore_kb(context, dst_kb, backup_id)
+
+    # Check that the resources were restored
+    resp = await nucliadb_reader.get(f"/kb/{dst_kb}/resources")
+    assert resp.status_code == 200
+    resources = resp.json()["resources"]
+    assert len(resources) == 10
+
+    # Check that the entities were restored
+    resp = await nucliadb_reader.get(f"/kb/{dst_kb}/entitiesgroups")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 1
+
+    # Check that the labelset was restored
+    resp = await nucliadb_reader.get(f"/kb/{dst_kb}/labelset/foo")
+    assert resp.status_code == 200
+    assert len(resp.json()["labels"]) == 1

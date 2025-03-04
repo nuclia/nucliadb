@@ -51,6 +51,10 @@ class WaitFor:
         self.seq = seq
 
 
+class TransactionError(Exception):
+    pass
+
+
 class TransactionCommitTimeoutError(Exception):
     pass
 
@@ -80,7 +84,7 @@ class LocalTransactionUtility:
 
         resp = await ingest.ProcessMessage(iterator(writer))  # type: ignore
         if resp.status != OpStatusWriter.Status.OK:
-            logger.error(f"Local transaction failed processing {writer}")
+            raise TransactionError(f"Local transaction failed processing {writer}")
         return 0
 
     async def finalize(self):

@@ -107,7 +107,26 @@ class ResourceBackupReader:
         self.buffer = self.buffer[size:]
         return result
 
-    async def iter(self, total_bytes: int, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
+    async def iter_data(self, total_bytes: int, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
+        padding_bytes = 0
+        if total_bytes % 512 != 0:
+            # We need to read the padding bytes and then discard them
+            padding_bytes = 512 - (total_bytes % 512)
+        read_bytes = 0
+        padding_reached = False
+        async for chunk in self._iter(total_bytes + padding_bytes, chunk_size):
+            if padding_reached:
+                # Skip padding bytes. We can't break here because we need
+                # to read the padding bytes from the stream
+                continue
+            padding_reached = read_bytes + len(chunk) >= total_bytes
+            if padding_reached:
+                chunk = chunk[: total_bytes - read_bytes]
+            else:
+                read_bytes += len(chunk)
+            yield chunk
+
+    async def _iter(self, total_bytes: int, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
         read_bytes = 0
         while read_bytes < total_bytes:
             to_read = min(chunk_size, total_bytes - read_bytes)
@@ -116,23 +135,35 @@ class ResourceBackupReader:
             read_bytes += len(chunk)
         assert read_bytes == total_bytes
 
-    async def read_item(self) -> Union[BrokerMessage, CloudFile, CloudFileBinary]:
+    async def read_tarinfo(self):
         raw_tar_header = await self.read(512)
-        tarinfo = tarfile.TarInfo.frombuf(raw_tar_header, encoding="utf-8", errors="strict")
-        if tarinfo.name.startswith("broker_message"):
-            raw_bm = await self.read(tarinfo.size)
+        return tarfile.TarInfo.frombuf(raw_tar_header, encoding="utf-8", errors="strict")
+
+    async def read_data(self, tarinfo: tarfile.TarInfo) -> bytes:
+        tarinfo_size = tarinfo.size
+        padding_bytes = 0
+        if tarinfo_size % 512 != 0:
+            # We need to read the padding bytes and then discard them
+            padding_bytes = 512 - (tarinfo_size % 512)
+        data = await self.read(tarinfo_size + padding_bytes)
+        return data[:tarinfo_size]
+
+    async def read_item(self) -> Union[BrokerMessage, CloudFile, CloudFileBinary]:
+        tarinfo = await self.read_tarinfo()
+        if tarinfo.name.startswith("broker-message"):
+            raw_bm = await self.read_data(tarinfo)
             bm = BrokerMessage()
-            bm.FromString(raw_bm)
+            bm.ParseFromString(raw_bm)
             return bm
         elif tarinfo.name.startswith("cloud-files"):
-            raw_cf = await self.read(tarinfo.size)
+            raw_cf = await self.read_data(tarinfo)
             cf = CloudFile()
             cf.FromString(raw_cf)
             return cf
         elif tarinfo.name.startswith("binaries"):
             uri = tarinfo.name.lstrip("binaries/")
             size = tarinfo.size
-            download_stream = functools.partial(self.iter, size)
+            download_stream = functools.partial(self.iter_data, size)
             return CloudFileBinary(uri, download_stream)
         else:  # pragma: no cover
             raise ValueError(f"Unknown tar entry: {tarinfo.name}")
@@ -151,6 +182,7 @@ async def restore_resource(context: ApplicationContext, kbid: str, backup_id: st
             # When the broker message is read, this means all cloud files
             # and binaries of that resource have been read and imported
             bm = item
+            bm.kbid = kbid
             break
 
         # Read the cloud file and its binary
@@ -165,20 +197,20 @@ async def restore_resource(context: ApplicationContext, kbid: str, backup_id: st
 
 
 async def restore_labels(context: ApplicationContext, kbid: str, backup_id: str):
-    raw = await context.blob_storage.download(
+    raw = await context.blob_storage.downloadbytes(
         bucket=settings.backups_bucket,
         key=StorageKeys.LABELS.format(kbid=kbid, backup_id=backup_id),
     )
     labels = kb_pb2.Labels()
-    labels.ParseFromString(raw)
+    labels.ParseFromString(raw.getvalue())
     await set_labels(context, kbid, labels)
 
 
 async def restore_entities(context: ApplicationContext, kbid: str, backup_id: str):
-    raw = await context.blob_storage.download(
+    raw = await context.blob_storage.downloadbytes(
         bucket=settings.backups_bucket,
         key=StorageKeys.ENTITIES.format(kbid=kbid, backup_id=backup_id),
     )
     entities = kb_pb2.EntitiesGroups()
-    entities.ParseFromString(raw)
+    entities.ParseFromString(raw.getvalue())
     await set_entities_groups(context, kbid, entities)

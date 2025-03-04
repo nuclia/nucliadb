@@ -241,13 +241,16 @@ class LocalStorage(Storage):
 
     async def create_kb(self, kbid: str):
         bucket = self.get_bucket_name(kbid)
-        path = self.get_bucket_path(bucket)
         try:
-            os.makedirs(path, exist_ok=True)
+            await self.create_bucket(bucket)
             created = True
         except FileExistsError:
             created = False
         return created
+
+    async def create_bucket(self, bucket_name: str):
+        path = self.get_bucket_path(bucket_name)
+        os.makedirs(path, exist_ok=True)
 
     async def delete_kb(self, kbid: str) -> tuple[bool, bool]:
         bucket = self.get_bucket_name(kbid)
@@ -286,11 +289,11 @@ class LocalStorage(Storage):
             name = key.split("/")[-1]
             yield ObjectInfo(name=name)
 
-    async def download(self, bucket_name: str, key: str, range: Optional[Range] = None):
-        key_path = self.get_file_path(bucket_name, key)
+    async def download(self, bucket: str, key: str, range: Optional[Range] = None):
+        key_path = self.get_file_path(bucket, key)
         if not os.path.exists(key_path):
             return
-        async for chunk in super().download(bucket_name, key, range=range):
+        async for chunk in super().download(bucket, key, range=range):
             yield chunk
 
     async def insert_object(self, bucket: str, key: str, data: bytes) -> None:

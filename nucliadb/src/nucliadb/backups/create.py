@@ -154,6 +154,8 @@ async def backup_resource_with_binaries(
         The order is important because the restore process depends on it (needs to import
         the cloud files and its binaries first before the broker message).
         """
+        nonlocal total_size
+
         for cloud_file in get_cloud_files(bm):
             serialized_cf = cloud_file.SerializeToString()
 
@@ -174,7 +176,7 @@ async def backup_resource_with_binaries(
                 yield chunk
                 total_size += len(chunk)
 
-                bm_serialized = bm.SerializeToString()
+        bm_serialized = bm.SerializeToString()
 
         async def bm_iterator():
             yield bm_serialized
