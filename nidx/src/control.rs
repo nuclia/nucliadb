@@ -28,15 +28,13 @@ use tokio::{
 };
 use tracing::*;
 
-use crate::{metrics, settings::EnvSettings, telemetry, NidxMetadata};
+use crate::{NidxMetadata, metrics, settings::EnvSettings, telemetry};
 
 #[derive(Debug, Serialize, Deserialize, clap::Subcommand)]
 pub enum ControlRequest {
     Alive,
     Ready,
-    SetLogLevel {
-        level: String,
-    },
+    SetLogLevel { level: String },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -118,9 +116,7 @@ impl ControlServer {
         match req {
             ControlRequest::Alive => ControlResponse::Alive(self.alive().await),
             ControlRequest::Ready => self.ready().await,
-            ControlRequest::SetLogLevel {
-                level,
-            } => telemetry::set_log_level(&level).into(),
+            ControlRequest::SetLogLevel { level } => telemetry::set_log_level(&level).into(),
         }
     }
 

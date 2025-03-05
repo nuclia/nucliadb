@@ -24,10 +24,10 @@ use std::collections::HashMap;
 
 use common::services::NidxFixture;
 use nidx_protos::{
-    nidx::nidx_api_client::NidxApiClient, EmptyQuery, GetShardRequest, NewShardRequest, ShardId, VectorIndexConfig,
+    EmptyQuery, GetShardRequest, NewShardRequest, ShardId, VectorIndexConfig, nidx::nidx_api_client::NidxApiClient,
 };
 use sqlx::PgPool;
-use tonic::{transport::Channel, Code, Request};
+use tonic::{Code, Request, transport::Channel};
 use uuid::Uuid;
 
 #[sqlx::test]
@@ -106,8 +106,11 @@ async fn test_list_shards(pool: PgPool) -> anyhow::Result<()> {
 
     let request_ids = create_shards(&mut fixture.api_client, 5).await;
 
-    let response =
-        fixture.api_client.list_shards(Request::new(EmptyQuery {})).await.expect("Error in list_shards request");
+    let response = fixture
+        .api_client
+        .list_shards(Request::new(EmptyQuery {}))
+        .await
+        .expect("Error in list_shards request");
 
     let response_ids: Vec<String> = response.get_ref().ids.iter().map(|s| s.id.clone()).collect();
 
@@ -137,17 +140,18 @@ async fn test_delete_shards(pool: PgPool) -> anyhow::Result<()> {
     for (id, expected) in request_ids.iter().map(|v| (v.clone(), v.clone())) {
         let response = fixture
             .api_client
-            .delete_shard(Request::new(ShardId {
-                id,
-            }))
+            .delete_shard(Request::new(ShardId { id }))
             .await
             .expect("Error in delete_shard request");
         let deleted_id = response.get_ref().id.clone();
         assert_eq!(deleted_id, expected);
     }
 
-    let response =
-        fixture.api_client.list_shards(Request::new(EmptyQuery {})).await.expect("Error in list_shards request");
+    let response = fixture
+        .api_client
+        .list_shards(Request::new(EmptyQuery {}))
+        .await
+        .expect("Error in list_shards request");
 
     assert_eq!(response.get_ref().ids.len(), current);
 

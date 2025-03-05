@@ -26,9 +26,9 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use uuid::Uuid;
 
-use nidx_protos::prost_types::Timestamp;
 use nidx_protos::NewShardRequest;
 use nidx_protos::VectorIndexConfig;
+use nidx_protos::prost_types::Timestamp;
 use nidx_protos::{nodereader, noderesources};
 
 use tonic::Request;
@@ -88,7 +88,11 @@ async fn test_vector_normalization_shard(pool: PgPool) -> Result<(), Box<dyn std
         min_score_semantic: 0.9,
         ..Default::default()
     };
-    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    let results = fixture
+        .searcher_client
+        .search(Request::new(search_request))
+        .await?
+        .into_inner();
 
     assert!(results.vector.is_some());
     let vector_results = results.vector.unwrap();

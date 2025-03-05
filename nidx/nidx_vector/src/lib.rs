@@ -33,7 +33,7 @@ mod vector_types;
 use config::VectorConfig;
 use data_point::OpenDataPoint;
 use data_point_provider::reader::Reader;
-use indexer::{index_resource, ResourceWrapper};
+use indexer::{ResourceWrapper, index_resource};
 use nidx_protos::{Resource, VectorSearchResponse};
 use nidx_types::prefilter::PrefilterResult;
 use nidx_types::{OpenIndexMetadata, SegmentMetadata};
@@ -128,7 +128,7 @@ fn open_segments(open_index: impl OpenIndexMetadata<VectorSegmentMeta>) -> Vecto
     }
 
     for (deletion, deletion_seq) in open_index.deletions() {
-        for (ref mut segment, ref segment_seq) in &mut open_data_points {
+        for (segment, segment_seq) in &mut open_data_points {
             if deletion_seq > *segment_seq {
                 segment.apply_deletion(deletion.as_str());
             }
@@ -153,10 +153,7 @@ pub enum VectorErr {
     #[error("Can not merge zero datapoints")]
     EmptyMerge,
     #[error("Inconsistent dimensions. Index={index_config} Vector={vector}")]
-    InconsistentDimensions {
-        index_config: usize,
-        vector: usize,
-    },
+    InconsistentDimensions { index_config: usize, vector: usize },
     #[error("UTF8 decoding error: {0}")]
     FromUtf8Error(#[from] std::string::FromUtf8Error),
     #[error("Some of the merged segments were not found")]

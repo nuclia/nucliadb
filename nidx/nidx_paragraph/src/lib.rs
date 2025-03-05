@@ -31,20 +31,20 @@ mod stop_words;
 
 use nidx_protos::{ParagraphItem, ParagraphSearchResponse, StreamRequest};
 use nidx_tantivy::{
-    index_reader::{open_index_with_deletions, DeletionQueryBuilder},
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
+    index_reader::{DeletionQueryBuilder, open_index_with_deletions},
 };
-use nidx_types::{prefilter::PrefilterResult, OpenIndexMetadata};
+use nidx_types::{OpenIndexMetadata, prefilter::PrefilterResult};
 use reader::ParagraphReaderService;
 use resource_indexer::index_paragraphs;
 use schema::ParagraphSchema;
 use std::path::Path;
 use tantivy::{
+    Term,
     directory::MmapDirectory,
     indexer::merge_indices,
     query::{Query, TermSetQuery},
     schema::{Field, Schema},
-    Term,
 };
 use tracing::instrument;
 
@@ -61,11 +61,7 @@ impl DeletionQueryBuilder for ParagraphDeletionQueryBuilder {
         Box::new(TermSetQuery::new(keys.map(|k| {
             // Our keys can be resource or field ids, match the corresponding tantivy field
             let is_field = k.len() > 32;
-            let tantivy_field = if is_field {
-                self.field
-            } else {
-                self.resource
-            };
+            let tantivy_field = if is_field { self.field } else { self.resource };
             Term::from_field_bytes(tantivy_field, k.as_bytes())
         })))
     }
@@ -134,7 +130,10 @@ impl ParagraphSearcher {
             reader: ParagraphReaderService {
                 index: index.clone(),
                 schema: ParagraphSchema::new(),
-                reader: index.reader_builder().reload_policy(tantivy::ReloadPolicy::Manual).try_into()?,
+                reader: index
+                    .reader_builder()
+                    .reload_policy(tantivy::ReloadPolicy::Manual)
+                    .try_into()?,
             },
         })
     }
@@ -157,7 +156,7 @@ impl ParagraphSearcher {
         self.reader.suggest(request, prefilter)
     }
 
-    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = ParagraphItem>> {
+    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = ParagraphItem> + use<>> {
         self.reader.iterator(request)
     }
 }

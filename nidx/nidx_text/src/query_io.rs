@@ -18,10 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::schema::TextSchema;
+use tantivy::Term;
 use tantivy::query::{PhraseQuery, Query, TermQuery};
 use tantivy::schema::IndexRecordOption;
 use tantivy::tokenizer::TokenizerManager;
-use tantivy::Term;
 
 pub fn translate_keyword_to_text_query(literal: &str, schema: &TextSchema) -> Box<dyn Query> {
     // Tokenize the literal in the same way we tokenize the text field at indexing time

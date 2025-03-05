@@ -257,7 +257,10 @@ fn test_search_metadata() -> anyhow::Result<()> {
 
     let relation = &subgraph.relations[0];
     let metadata = relation.metadata.as_ref().unwrap();
-    assert_eq!(metadata.paragraph_id, Some("myresource/0/myresource/100-200".to_string()));
+    assert_eq!(
+        metadata.paragraph_id,
+        Some("myresource/0/myresource/100-200".to_string())
+    );
     assert_eq!(metadata.source_start, Some(0));
     assert_eq!(metadata.source_end, Some(10));
     assert_eq!(metadata.to_start, Some(11));
@@ -279,7 +282,8 @@ fn test_prefix_search() -> anyhow::Result<()> {
         ..Default::default()
     })?;
 
-    assert_eq!(result.prefix.unwrap().nodes.len(), 12);
+    // max number of prefixes is fixed
+    assert_eq!(result.prefix.unwrap().nodes.len(), 10);
 
     let result = reader.search(&RelationSearchRequest {
         prefix: Some(RelationPrefixSearchRequest {

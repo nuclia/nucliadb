@@ -41,7 +41,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::api::shards;
-use crate::{import_export, NidxMetadata, Settings};
+use crate::{NidxMetadata, Settings, import_export};
 
 #[derive(Clone)]
 pub struct ApiServer {
@@ -62,8 +62,14 @@ impl ApiServer {
         let myself2 = self.clone();
         Routes::new(NidxApiServer::new(self))
             .into_axum_router()
-            .route("/api/shard/:shard_id/download", axum::routing::get(download_shard).with_state(myself))
-            .route("/api/index/:index_id/download", axum::routing::get(download_index).with_state(myself2))
+            .route(
+                "/api/shard/:shard_id/download",
+                axum::routing::get(download_shard).with_state(myself),
+            )
+            .route(
+                "/api/index/:index_id/download",
+                axum::routing::get(download_index).with_state(myself2),
+            )
     }
 }
 
@@ -71,7 +77,10 @@ impl ApiServer {
 impl NidxApi for ApiServer {
     async fn get_shard(&self, request: Request<GetShardRequest>) -> Result<Response<noderesources::Shard>> {
         let request = request.into_inner();
-        let shard_id = request.shard_id.ok_or(Status::invalid_argument("Shard ID required"))?.id;
+        let shard_id = request
+            .shard_id
+            .ok_or(Status::invalid_argument("Shard ID required"))?
+            .id;
         let shard_id = Uuid::parse_str(&shard_id).map_err(NidxError::from)?;
 
         let shard = Shard::get(&self.meta.pool, shard_id).await.map_err(NidxError::from)?;
@@ -96,11 +105,15 @@ impl NidxApi for ApiServer {
         let kbid = Uuid::from_str(&request.kbid).map_err(NidxError::from)?;
         let mut vector_configs = HashMap::with_capacity(request.vectorsets_configs.len());
         for (vectorset_id, config) in request.vectorsets_configs {
-            vector_configs
-                .insert(vectorset_id, VectorConfig::try_from(config).map_err(|e| Status::internal(e.to_string()))?);
+            vector_configs.insert(
+                vectorset_id,
+                VectorConfig::try_from(config).map_err(|e| Status::internal(e.to_string()))?,
+            );
         }
 
-        let shard = shards::create_shard(&self.meta, kbid, vector_configs).await.map_err(NidxError::from)?;
+        let shard = shards::create_shard(&self.meta, kbid, vector_configs)
+            .await
+            .map_err(NidxError::from)?;
 
         Ok(Response::new(ShardCreated {
             id: shard.id.to_string(),
@@ -124,21 +137,14 @@ impl NidxApi for ApiServer {
     async fn list_shards(&self, _request: Request<EmptyQuery>) -> Result<Response<ShardIds>> {
         let ids = Shard::list_ids(&self.meta.pool).await.map_err(NidxError::from)?;
         Ok(Response::new(ShardIds {
-            ids: ids
-                .iter()
-                .map(|x| ShardId {
-                    id: x.to_string(),
-                })
-                .collect(),
+            ids: ids.iter().map(|x| ShardId { id: x.to_string() }).collect(),
         }))
     }
 
     async fn add_vector_set(&self, request: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>> {
         let request = request.into_inner();
         let Some(VectorSetId {
-            shard: Some(ShardId {
-                id: ref shard_id,
-            }),
+            shard: Some(ShardId { id: ref shard_id }),
             ref vectorset,
         }) = request.id
         else {
@@ -152,7 +158,9 @@ impl NidxApi for ApiServer {
             return Err(NidxError::invalid("Vectorset configuration is required").into());
         };
 
-        Index::create(&self.meta.pool, shard_id, vectorset, config.into()).await.map_err(NidxError::from)?;
+        Index::create(&self.meta.pool, shard_id, vectorset, config.into())
+            .await
+            .map_err(NidxError::from)?;
 
         Ok(Response::new(OpStatus {
             status: op_status::Status::Ok.into(),
@@ -163,9 +171,7 @@ impl NidxApi for ApiServer {
 
     async fn remove_vector_set(&self, request: Request<VectorSetId>) -> Result<Response<OpStatus>> {
         let VectorSetId {
-            shard: Some(ShardId {
-                id: ref shard_id,
-            }),
+            shard: Some(ShardId { id: ref shard_id }),
             ref vectorset,
         } = request.into_inner()
         else {
@@ -186,10 +192,15 @@ impl NidxApi for ApiServer {
         let request = request.into_inner();
         let shard_id = Uuid::from_str(&request.id).map_err(NidxError::from)?;
         // TODO: query only vector indexes
-        let indexes = Index::for_shard(&self.meta.pool, shard_id).await.map_err(NidxError::from)?;
+        let indexes = Index::for_shard(&self.meta.pool, shard_id)
+            .await
+            .map_err(NidxError::from)?;
 
-        let vectorsets =
-            indexes.into_iter().filter(|index| index.kind == IndexKind::Vector).map(|index| index.name).collect();
+        let vectorsets = indexes
+            .into_iter()
+            .filter(|index| index.kind == IndexKind::Vector)
+            .map(|index| index.name)
+            .collect();
         Ok(tonic::Response::new(VectorSetList {
             shard: Some(request),
             vectorsets,
@@ -267,7 +278,10 @@ async fn download_export(
 
     let body = Body::from_stream(ReceiverStream::new(rx));
     axum::response::Response::builder()
-        .header("Content-Disposition", format!("attachment; filename=\"{filename}.tar.zstd\""))
+        .header(
+            "Content-Disposition",
+            format!("attachment; filename=\"{filename}.tar.zstd\""),
+        )
         .body(body)
         .unwrap()
 }

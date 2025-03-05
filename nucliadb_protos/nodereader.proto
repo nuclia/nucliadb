@@ -186,6 +186,79 @@ message EntitiesSubgraphResponse {
 }
 
 
+message GraphQuery {
+    message Node {
+        optional string value = 1;
+        optional utils.RelationNode.NodeType node_type = 2;
+        optional string node_subtype = 3;
+        uint32 fuzzy_distance = 4;
+        bool as_prefix = 5;
+    }
+
+    message Relation {
+        optional string value = 1;
+    }
+
+    message Path {
+        optional Node source = 1;
+        optional Relation relation = 2;
+        optional Node destination = 3;
+        bool undirected = 4;
+    }
+
+    message BoolQuery {
+        repeated GraphQuery operands = 1;
+    }
+
+    oneof query {
+        // Search a node in any position
+        Node node = 1;
+        // Search for relations
+        Relation relation = 2;
+        // Search for directed/undirected paths. It can also express
+        // source/destination node queries
+        Path path = 3;
+
+    }
+}
+
+message GraphSearchRequest {
+    string shard = 1;
+    GraphQuery query = 2;
+
+    // decides what do we want in return: paths (triplets), nodes or relations.
+    // Returning paths implies returning nodes and relations.
+    enum QueryKind {
+        PATH = 0;
+        NODES = 1;
+        RELATIONS = 2;
+    }
+    QueryKind kind = 3;
+
+    uint32 top_k = 4;
+}
+
+message GraphSearchResponse {
+    message Relation {
+        utils.Relation.RelationType relation_type = 1;
+        string label = 2;
+        utils.RelationMetadata metadata = 3;
+    }
+
+    // To optimize proto size, paths are built using pointers to nodes and
+    // relations. This avoid repetition of nodes/relations and allow smaller
+    // protos for big graphs.
+    message Path {
+        uint32 source = 1;
+        uint32 relation = 2;
+        uint32 destination = 3;
+    }
+
+    repeated utils.RelationNode nodes = 1;
+    repeated Relation relations = 2;
+    repeated Path graph = 3;
+}
+
 // Query relation index to obtain different information about the
 // knowledge graph. It can be queried using the following strategies:
 //

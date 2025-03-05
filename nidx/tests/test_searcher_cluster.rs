@@ -22,9 +22,9 @@ mod common;
 
 use common::services::NidxFixture;
 use nidx::grpc_server::GrpcServer;
-use nidx::searcher::{grpc::SearchServer, shard_selector::ShardSelector, ListNodes, SyncedSearcher};
-use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
+use nidx::searcher::{ListNodes, SyncedSearcher, grpc::SearchServer, shard_selector::ShardSelector};
 use nidx_protos::SearchRequest;
+use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
 use nidx_protos::{NewShardRequest, VectorIndexConfig};
 
 use sqlx::PgPool;
@@ -42,7 +42,10 @@ impl ListNodes for ManualListNodes {
     }
 
     fn this_node(&self) -> String {
-        self.list_nodes().get(self.1).cloned().unwrap_or("out_of_cluster".to_string())
+        self.list_nodes()
+            .get(self.1)
+            .cloned()
+            .unwrap_or("out_of_cluster".to_string())
     }
 }
 
@@ -301,7 +304,10 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
             different += 1;
         }
     }
-    assert!(different > 0, "Shard distribution after scale down + up should be different than originally");
+    assert!(
+        different > 0,
+        "Shard distribution after scale down + up should be different than originally"
+    );
 
     Ok(())
 }

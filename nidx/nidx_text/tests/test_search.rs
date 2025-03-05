@@ -27,10 +27,10 @@ use nidx_protos::filter_expression::{
     DateRangeFilter, Expr, FacetFilter, FieldFilter, FilterExpressionList, KeywordFilter, ResourceFilter,
 };
 use nidx_protos::prost_types::Timestamp;
-use nidx_protos::{order_by::OrderField, order_by::OrderType, OrderBy};
 use nidx_protos::{Faceted, FilterExpression};
+use nidx_protos::{OrderBy, order_by::OrderField, order_by::OrderType};
 use nidx_text::TextSearcher;
-use nidx_text::{prefilter::*, DocumentSearchRequest};
+use nidx_text::{DocumentSearchRequest, prefilter::*};
 use nidx_types::prefilter::PrefilterResult;
 
 #[test]
@@ -97,11 +97,13 @@ fn test_prefilter_not_search() {
     let request = PreFilterRequest {
         security: None,
         filter_expression: Some(FilterExpression {
-            expr: Some(nidx_protos::filter_expression::Expr::BoolNot(Box::new(FilterExpression {
-                expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
-                    facet: "/l/mylabel".into(),
-                })),
-            }))),
+            expr: Some(nidx_protos::filter_expression::Expr::BoolNot(Box::new(
+                FilterExpression {
+                    expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                        facet: "/l/mylabel".into(),
+                    })),
+                },
+            ))),
         }),
     };
     let response = reader.prefilter(&request).unwrap();
@@ -265,7 +267,11 @@ fn test_faceted_search() {
         };
         let response = reader.search(&request).unwrap();
         println!("Response: {response:#?}");
-        assert_eq!(response.total, expected, "Failed faceted query: '{}'. With facets: {:?}", query, facets);
+        assert_eq!(
+            response.total, expected,
+            "Failed faceted query: '{}'. With facets: {:?}",
+            query, facets
+        );
 
         assert_eq!(response.total, response.results.len() as i32);
         assert!(!response.next_page);

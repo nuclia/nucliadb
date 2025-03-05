@@ -90,8 +90,8 @@ mod tests {
     use tempfile::NamedTempFile;
 
     use crate::{
-        inverted_index::map::{InvertedMapReader, InvertedMapWriter},
         VectorR,
+        inverted_index::map::{InvertedMapReader, InvertedMapWriter},
     };
 
     use super::{FstIndexReader, FstIndexWriter};
@@ -106,11 +106,11 @@ mod tests {
             let len = rng.gen_range(1..2000);
             let mut ids = Vec::new();
             for _ in 0..len {
-                ids.push(rng.gen());
+                ids.push(rng.r#gen());
             }
             let mut key = [0; 16];
             for k in &mut key {
-                *k = rng.gen();
+                *k = rng.r#gen();
             }
             entries.insert(key.to_vec(), ids);
         }

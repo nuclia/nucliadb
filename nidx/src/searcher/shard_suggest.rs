@@ -23,9 +23,9 @@ use std::sync::Arc;
 use nidx_paragraph::{ParagraphSearcher, ParagraphSuggestRequest};
 use nidx_protos::{FilterOperator, RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest, SuggestResponse};
 use nidx_relation::RelationSearcher;
-use nidx_text::{prefilter::PreFilterRequest, TextSearcher};
+use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
 use nidx_types::prefilter::PrefilterResult;
-use tracing::{instrument, Span};
+use tracing::{Span, instrument};
 
 use crate::errors::{NidxError, NidxResult};
 
@@ -106,7 +106,11 @@ fn blocking_suggest(
         }
         paragraph_request = Some(ParagraphSuggestRequest {
             body: request.body,
-            filtering_formula: request.paragraph_filter.clone().map(filter_to_boolean_expression).transpose()?,
+            filtering_formula: request
+                .paragraph_filter
+                .clone()
+                .map(filter_to_boolean_expression)
+                .transpose()?,
             filter_or: request.filter_operator == FilterOperator::Or as i32,
         })
     }
@@ -149,9 +153,7 @@ fn blocking_suggest(
     }
 
     if let Some(entities) = rrelation {
-        response.entity_results = Some(RelationPrefixSearchResponse {
-            nodes: entities,
-        });
+        response.entity_results = Some(RelationPrefixSearchResponse { nodes: entities });
     }
 
     Ok(response)

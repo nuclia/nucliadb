@@ -37,13 +37,13 @@ use tokio_util::sync::CancellationToken;
 use tracing::*;
 
 use crate::{
+    NidxMetadata, Settings,
     metadata::{Deletion, Index, IndexKind, MergeJob, NewSegment, Segment},
     metrics::{
-        worker::{MERGE_COUNTER, PER_INDEX_MERGE_TIME},
         IndexKindLabels, OperationStatusLabels,
+        worker::{MERGE_COUNTER, PER_INDEX_MERGE_TIME},
     },
     segment_store::{download_segment, pack_and_upload},
-    NidxMetadata, Settings,
 };
 
 pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
@@ -114,7 +114,9 @@ impl<T: for<'de> Deserialize<'de>> OpenIndexMetadata<T> for MergeInputs {
     }
 
     fn deletions(&self) -> impl Iterator<Item = (&String, Seq)> {
-        self.deletions.iter().flat_map(|del| del.keys.iter().map(|key| (key, del.seq)))
+        self.deletions
+            .iter()
+            .flat_map(|del| del.keys.iter().map(|key| (key, del.seq)))
     }
 }
 
@@ -145,7 +147,13 @@ pub async fn run_job(
         download_tasks.spawn(download_segment(storage, s.id, work_dir));
     });
     let span = info_span!("download_segments");
-    match download_tasks.join_all().instrument(span).await.into_iter().reduce(Result::and) {
+    match download_tasks
+        .join_all()
+        .instrument(span)
+        .await
+        .into_iter()
+        .reduce(Result::and)
+    {
         None => return Err(anyhow!("No segments downloaded")),
         Some(Err(e)) => return Err(e),
         Some(Ok(())) => {}
@@ -164,10 +172,12 @@ pub async fn run_job(
     let index2 = index.clone();
     let merged: NewSegment = tokio::task::spawn_blocking(move || {
         span.in_scope(|| match index.kind {
-            IndexKind::Vector => {
-                VectorIndexer.merge(&work_path, index2.config().unwrap(), merge_inputs).map(|x| x.into())
-            }
-            IndexKind::Text => TextIndexer.merge(&work_path, index2.config().unwrap(), merge_inputs).map(|x| x.into()),
+            IndexKind::Vector => VectorIndexer
+                .merge(&work_path, index2.config().unwrap(), merge_inputs)
+                .map(|x| x.into()),
+            IndexKind::Text => TextIndexer
+                .merge(&work_path, index2.config().unwrap(), merge_inputs)
+                .map(|x| x.into()),
             IndexKind::Paragraph => ParagraphIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
             IndexKind::Relation => RelationIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
         })
@@ -196,7 +206,9 @@ pub async fn run_job(
     job.finish(&mut *tx).await?;
     tx.commit().await?;
 
-    PER_INDEX_MERGE_TIME.get_or_create(&IndexKindLabels::new(index.kind)).observe(t.elapsed().as_secs_f64());
+    PER_INDEX_MERGE_TIME
+        .get_or_create(&IndexKindLabels::new(index.kind))
+        .observe(t.elapsed().as_secs_f64());
 
     Ok(())
 }
@@ -218,7 +230,9 @@ mod tests {
         let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
         let kbid = Uuid::new_v4();
         let shard = Shard::create(&meta.pool, kbid).await.unwrap();
-        let index = Index::create(&meta.pool, shard.id, "text", IndexConfig::new_text()).await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, "text", IndexConfig::new_text())
+            .await
+            .unwrap();
 
         let resource = little_prince(shard.id.to_string(), None);
         let resource_id = resource.resource.clone().unwrap().uuid;

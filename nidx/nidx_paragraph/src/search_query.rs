@@ -66,11 +66,7 @@ impl TermCollector {
             let term_dict = index.terms();
             let mut term_s = vec![];
             let found = term_dict.ord_to_term(term, &mut term_s).unwrap_or(false);
-            let elem = if found {
-                term_s
-            } else {
-                vec![]
-            };
+            let elem = if found { term_s } else { vec![] };
             match String::from_utf8(elem).ok() {
                 Some(v) if v.len() > 2 => terms.push(v),
                 _ => (),
@@ -123,9 +119,11 @@ fn queryp_map(queries: Vec<QueryP>, distance: u8, as_prefix: Option<usize>, term
 }
 
 fn flat_bool_query(query: BooleanQuery, collector: (usize, Vec<QueryP>)) -> (usize, Vec<QueryP>) {
-    query.clauses().iter().map(|(occur, subq)| (*occur, subq.box_clone())).fold(
-        collector,
-        |(mut id, mut c), (occur, subq)| {
+    query
+        .clauses()
+        .iter()
+        .map(|(occur, subq)| (*occur, subq.box_clone()))
+        .fold(collector, |(mut id, mut c), (occur, subq)| {
             if subq.is::<BooleanQuery>() {
                 let subq: Box<BooleanQuery> = subq.downcast().unwrap();
                 flat_bool_query(*subq, (id, c))
@@ -137,8 +135,7 @@ fn flat_bool_query(query: BooleanQuery, collector: (usize, Vec<QueryP>)) -> (usi
                 c.push((occur, subq));
                 (id, c)
             }
-        },
-    )
+        })
 }
 
 fn flat_and_adapt(query: Box<dyn Query>, prefixed: bool, distance: u8, termc: SharedTermC) -> Vec<QueryP> {
@@ -155,16 +152,7 @@ fn flat_and_adapt(query: Box<dyn Query>, prefixed: bool, distance: u8, termc: Sh
         let as_prefix = 1;
         (queries, as_prefix)
     };
-    queryp_map(
-        queries,
-        distance,
-        if prefixed {
-            Some(as_prefix)
-        } else {
-            None
-        },
-        termc,
-    )
+    queryp_map(queries, distance, if prefixed { Some(as_prefix) } else { None }, termc)
 }
 
 fn fuzzied_queries(query: Box<dyn Query>, prefixed: bool, distance: u8, termc: SharedTermC) -> Vec<QueryP> {
@@ -192,9 +180,12 @@ fn parse_query(parser: &QueryParser, text: &str) -> Box<dyn Query> {
 /// The last term of the query is a prefix fuzzy term and must be preserved.
 fn remove_stop_words(query: &str) -> Cow<'_, str> {
     match query.rsplit_once(' ') {
-        Some((query, last_term)) => {
-            query.split(' ').filter(|term| !is_stop_word(&term.to_lowercase())).chain([last_term]).join(" ").into()
-        }
+        Some((query, last_term)) => query
+            .split(' ')
+            .filter(|term| !is_stop_word(&term.to_lowercase()))
+            .chain([last_term])
+            .join(" ")
+            .into(),
         None => query.into(),
     }
 }
@@ -222,7 +213,10 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
         let unquote = query[start..qstart].trim();
         let unquote = remove_stop_words(unquote);
 
-        unquote.split(' ').filter(|s| !s.is_empty()).for_each(|t| tc.log_eterm(t.to_string()));
+        unquote
+            .split(' ')
+            .filter(|s| !s.is_empty())
+            .for_each(|t| tc.log_eterm(t.to_string()));
         tc.log_eterm(quote.to_string());
 
         if !regular_query.is_empty() {
@@ -245,7 +239,9 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
         let tail = query[start..].trim();
         let tail = remove_stop_words(tail);
 
-        tail.split(' ').filter(|s| !s.is_empty()).for_each(|t| tc.log_eterm(t.to_string()));
+        tail.split(' ')
+            .filter(|s| !s.is_empty())
+            .for_each(|t| tc.log_eterm(t.to_string()));
 
         if !regular_query.is_empty() {
             regular_query.push(' ');
@@ -270,11 +266,7 @@ fn filter_query(
     filter_or: bool,
 ) -> Option<Box<dyn Query>> {
     let mut filter_terms = vec![];
-    let operator = if filter_or {
-        Occur::Should
-    } else {
-        Occur::Must
-    };
+    let operator = if filter_or { Occur::Should } else { Occur::Must };
 
     // Paragraph filter
     if let Some(formula) = &paragraph_formula {
@@ -286,7 +278,9 @@ fn filter_query(
     if let PrefilterResult::Some(field_keys) = prefilter {
         let set_query = Box::new(SetQuery::new(
             schema.field_uuid,
-            field_keys.iter().map(|x| format!("{}{}", x.resource_id.simple(), x.field_id)),
+            field_keys
+                .iter()
+                .map(|x| format!("{}{}", x.resource_id.simple(), x.field_id)),
         ));
         filter_terms.push((operator, set_query));
     }
@@ -434,8 +428,14 @@ mod tests {
 
     #[test]
     fn test() {
-        let subqueries0: Vec<_> = vec![dummy_term_query; 12].into_iter().map(|f| (Occur::Must, f())).collect();
-        let subqueries1: Vec<_> = vec![dummy_term_query; 12].into_iter().map(|f| (Occur::Must, f())).collect();
+        let subqueries0: Vec<_> = vec![dummy_term_query; 12]
+            .into_iter()
+            .map(|f| (Occur::Must, f()))
+            .collect();
+        let subqueries1: Vec<_> = vec![dummy_term_query; 12]
+            .into_iter()
+            .map(|f| (Occur::Must, f()))
+            .collect();
         let boolean0: Box<dyn Query> = Box::new(BooleanQuery::new(subqueries0));
         let boolean1: Box<dyn Query> = Box::new(BooleanQuery::new(subqueries1));
         let nested = BooleanQuery::new(vec![(Occur::Should, boolean0), (Occur::Should, boolean1)]);
@@ -448,7 +448,10 @@ mod tests {
     #[test]
     fn it_removes_stop_word_fterms() {
         let tests = [
-            ("nuclia is a database for unstructured data", "nuclia database unstructured data"),
+            (
+                "nuclia is a database for unstructured data",
+                "nuclia database unstructured data",
+            ),
             (
                 "nuclia is a database for the",
                 // keeps last term even if is a stop word
@@ -457,8 +460,14 @@ mod tests {
             ("is a for and", "and"),
             ("what does stop is?", "stop is?"),
             ("", ""),
-            ("comment s'appelle le train à grande vitesse", "comment s'appelle train grande vitesse"),
-            ("¿Qué significa la palabra sentence en español?", "¿Qué significa palabra sentence español?"),
+            (
+                "comment s'appelle le train à grande vitesse",
+                "comment s'appelle train grande vitesse",
+            ),
+            (
+                "¿Qué significa la palabra sentence en español?",
+                "¿Qué significa palabra sentence español?",
+            ),
             ("Per què les vaques no són de color rosa?", "vaques color rosa?"),
             ("How can I learn to make a flat white?", "learn make flat white?"),
             ("Qué es escalada en bloque?", "escalada bloque?"),
@@ -466,7 +475,10 @@ mod tests {
                 "Wer hat gesagt: 'Kaffeetrinken ist integraler Bestandteil des Kletterns'?",
                 "Wer gesagt: 'Kaffeetrinken integraler Bestandteil Kletterns'?",
             ),
-            ("i pistacchi siciliani sono i migliori al mondo?", "pistacchi siciliani migliori mondo?"),
+            (
+                "i pistacchi siciliani sono i migliori al mondo?",
+                "pistacchi siciliani migliori mondo?",
+            ),
         ];
 
         for (query, expected_fuzzy_query) in tests {

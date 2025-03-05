@@ -19,7 +19,7 @@
 //
 mod common;
 
-use nidx_protos::{relation::RelationType, relation_node::NodeType, RelationMetadata, Resource, ResourceId};
+use nidx_protos::{RelationMetadata, Resource, ResourceId, relation::RelationType, relation_node::NodeType};
 use nidx_relation::RelationIndexer;
 use tempfile::TempDir;
 

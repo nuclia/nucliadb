@@ -33,10 +33,7 @@ pub struct TestOpener {
 
 impl TestOpener {
     pub fn new(segments: Vec<(TantivySegmentMetadata, Seq)>, deletions: Vec<(String, Seq)>) -> Self {
-        Self {
-            segments,
-            deletions,
-        }
+        Self { segments, deletions }
     }
 }
 
@@ -73,9 +70,7 @@ pub fn create_relation(
         to: Some(create_relation_node(to, to_node_type, to_subtype)),
         relation: rel_type.into(),
         relation_label: rel_label,
-        metadata: Some(RelationMetadata {
-            ..Default::default()
-        }),
+        metadata: Some(RelationMetadata { ..Default::default() }),
     }
 }
 
@@ -91,8 +86,16 @@ pub fn create_relation_with_metadata(
     rel_label: String,
     metadata: RelationMetadata,
 ) -> Relation {
-    let mut relation =
-        create_relation(source, source_node_type, source_subtype, to, to_node_type, to_subtype, rel_type, rel_label);
+    let mut relation = create_relation(
+        source,
+        source_node_type,
+        source_subtype,
+        to,
+        to_node_type,
+        to_subtype,
+        rel_type,
+        rel_label,
+    );
     relation.metadata = Some(metadata);
     relation
 }

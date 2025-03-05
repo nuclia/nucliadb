@@ -26,9 +26,8 @@ use nidx_vector::config::VectorConfig;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use sqlx::{
-    self,
-    types::{time::PrimitiveDateTime, JsonValue},
-    Executor, Postgres,
+    self, Executor, Postgres,
+    types::{JsonValue, time::PrimitiveDateTime},
 };
 use uuid::Uuid;
 
@@ -181,14 +180,22 @@ impl Index {
     }
 
     pub async fn updated(meta: impl Executor<'_, Database = Postgres>, index_id: &IndexId) -> sqlx::Result<()> {
-        sqlx::query!("UPDATE indexes SET updated_at = NOW() WHERE id = $1", index_id as &IndexId).execute(meta).await?;
+        sqlx::query!(
+            "UPDATE indexes SET updated_at = NOW() WHERE id = $1",
+            index_id as &IndexId
+        )
+        .execute(meta)
+        .await?;
         Ok(())
     }
 
     pub async fn updated_many(meta: impl Executor<'_, Database = Postgres>, index_id: &[IndexId]) -> sqlx::Result<()> {
-        sqlx::query!("UPDATE indexes SET updated_at = NOW() WHERE id = ANY($1)", index_id as &[IndexId])
-            .execute(meta)
-            .await?;
+        sqlx::query!(
+            "UPDATE indexes SET updated_at = NOW() WHERE id = ANY($1)",
+            index_id as &[IndexId]
+        )
+        .execute(meta)
+        .await?;
         Ok(())
     }
 
@@ -223,7 +230,9 @@ impl Index {
     }
 
     pub async fn delete(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
-        sqlx::query!("DELETE FROM indexes WHERE id = $1", self.id as IndexId).execute(meta).await?;
+        sqlx::query!("DELETE FROM indexes WHERE id = $1", self.id as IndexId)
+            .execute(meta)
+            .await?;
         Ok(())
     }
 
@@ -326,8 +335,8 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        metadata::{Index, IndexConfig, Shard},
         NidxMetadata,
+        metadata::{Index, IndexConfig, Shard},
     };
 
     #[sqlx::test]
@@ -336,11 +345,15 @@ mod tests {
 
         // Default version for new indexes is 2
         let shard = Shard::create(&meta.pool, Uuid::new_v4()).await.unwrap();
-        let index = Index::create(&meta.pool, shard.id, "multilingual", IndexConfig::new_text()).await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, "multilingual", IndexConfig::new_text())
+            .await
+            .unwrap();
         assert_eq!(index.config::<TextConfig>()?.version, 2);
 
         // Default version if DB is empty is 1
-        sqlx::query("UPDATE indexes SET configuration = NULL").execute(&meta.pool).await?;
+        sqlx::query("UPDATE indexes SET configuration = NULL")
+            .execute(&meta.pool)
+            .await?;
         let index = Index::get(&meta.pool, index.id).await?;
         assert_eq!(index.config::<TextConfig>()?.version, 1);
 

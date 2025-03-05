@@ -23,8 +23,8 @@ mod common;
 use common::services::NidxFixture;
 use itertools::Itertools;
 use nidx_protos::{
-    filter_expression::{Expr, FacetFilter, FieldFilter},
     FilterExpression, NewShardRequest, SuggestFeatures, SuggestRequest, SuggestResponse, VectorIndexConfig,
+    filter_expression::{Expr, FacetFilter, FieldFilter},
 };
 use nidx_tests::*;
 use sqlx::PgPool;
@@ -48,7 +48,10 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
     // typo tolerant search
     expect_paragraphs(
         &suggest_paragraphs(&mut fixture, &shard.id, "princes").await,
-        &[(&shard.resources["little prince"], "/a/title"), (&shard.resources["little prince"], "/a/summary")],
+        &[
+            (&shard.resources["little prince"], "/a/title"),
+            (&shard.resources["little prince"], "/a/summary"),
+        ],
     );
 
     // fuzzy search with distance 1 will only match 'a' from resource 2
@@ -105,7 +108,10 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
 
     expect_paragraphs(
         &response,
-        &[(&shard.resources["little prince"], "/a/title"), (&shard.resources["little prince"], "/a/summary")],
+        &[
+            (&shard.resources["little prince"], "/a/title"),
+            (&shard.resources["little prince"], "/a/summary"),
+        ],
     );
 
     let response = fixture
@@ -143,7 +149,10 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
 
     expect_paragraphs(
         &response,
-        &[(&shard.resources["little prince"], "/a/title"), (&shard.resources["little prince"], "/a/summary")],
+        &[
+            (&shard.resources["little prince"], "/a/title"),
+            (&shard.resources["little prince"], "/a/summary"),
+        ],
     );
 
     let response = fixture
@@ -172,7 +181,10 @@ async fn test_suggest_entities(pool: PgPool) -> Result<(), Box<dyn std::error::E
     let (mut fixture, shard) = suggest_shard(pool).await?;
 
     // basic suggests
-    expect_entities(&suggest_entities(&mut fixture, &shard.id, "Ann").await, &["Anna", "Anthony"]);
+    expect_entities(
+        &suggest_entities(&mut fixture, &shard.id, "Ann").await,
+        &["Anna", "Anthony"],
+    );
 
     expect_entities(&suggest_entities(&mut fixture, &shard.id, "joh").await, &["John"]);
 
@@ -181,15 +193,30 @@ async fn test_suggest_entities(pool: PgPool) -> Result<(), Box<dyn std::error::E
     expect_entities(&suggest_entities(&mut fixture, &shard.id, "anything").await, &[]);
 
     // validate tokenization
-    expect_entities(&suggest_entities(&mut fixture, &shard.id, "barc").await, &["Barcelona", "Bárcenas"]);
+    expect_entities(
+        &suggest_entities(&mut fixture, &shard.id, "barc").await,
+        &["Barcelona", "Bárcenas"],
+    );
 
-    expect_entities(&suggest_entities(&mut fixture, &shard.id, "Barc").await, &["Barcelona", "Bárcenas"]);
+    expect_entities(
+        &suggest_entities(&mut fixture, &shard.id, "Barc").await,
+        &["Barcelona", "Bárcenas"],
+    );
 
-    expect_entities(&suggest_entities(&mut fixture, &shard.id, "BARC").await, &["Barcelona", "Bárcenas"]);
+    expect_entities(
+        &suggest_entities(&mut fixture, &shard.id, "BARC").await,
+        &["Barcelona", "Bárcenas"],
+    );
 
-    expect_entities(&suggest_entities(&mut fixture, &shard.id, "BÄRĈ").await, &["Barcelona", "Bárcenas"]);
+    expect_entities(
+        &suggest_entities(&mut fixture, &shard.id, "BÄRĈ").await,
+        &["Barcelona", "Bárcenas"],
+    );
 
-    expect_entities(&suggest_entities(&mut fixture, &shard.id, "BáRc").await, &["Barcelona", "Bárcenas"]);
+    expect_entities(
+        &suggest_entities(&mut fixture, &shard.id, "BáRc").await,
+        &["Barcelona", "Bárcenas"],
+    );
 
     // multiple words and result ordering
     let response = suggest_entities(&mut fixture, &shard.id, "Solomon Isa").await;
@@ -288,9 +315,18 @@ async fn suggest_paragraphs(
 }
 
 fn expect_paragraphs(response: &SuggestResponse, expected: &[(&str, &str)]) {
-    assert_eq!(response.total as usize, expected.len(), "\nfailed assert for \n'{:#?}'", response);
+    assert_eq!(
+        response.total as usize,
+        expected.len(),
+        "\nfailed assert for \n'{:#?}'",
+        response
+    );
 
-    let results = response.results.iter().map(|result| (result.uuid.as_str(), result.field.as_str())).sorted();
+    let results = response
+        .results
+        .iter()
+        .map(|result| (result.uuid.as_str(), result.field.as_str()))
+        .sorted();
     results
         .zip(expected.iter().sorted())
         .for_each(|(item, expected)| assert_eq!(item, *expected, "\nfailed assert for \n'{:#?}'", response));
@@ -321,6 +357,14 @@ fn expect_entities(response: &SuggestResponse, expected: &[&str]) {
         expected,
     );
     for entity in expected {
-        assert!(response.entity_results.as_ref().unwrap().nodes.iter().any(|e| &e.value == entity));
+        assert!(
+            response
+                .entity_results
+                .as_ref()
+                .unwrap()
+                .nodes
+                .iter()
+                .any(|e| &e.value == entity)
+        );
     }
 }

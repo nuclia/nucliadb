@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nidx_protos::{prost_types::Timestamp, FilterExpression, Security};
+use nidx_protos::{FilterExpression, Security, prost_types::Timestamp};
 
 /// A field has two dates
 #[derive(Debug, Clone, Copy)]

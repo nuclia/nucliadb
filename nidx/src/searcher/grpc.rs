@@ -26,10 +26,10 @@ use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
 use nidx_protos::nidx::nidx_searcher_server::{NidxSearcher, NidxSearcherServer};
 use nidx_protos::*;
 use tokio::sync::RwLock;
-use tonic::service::interceptor::InterceptedService;
 use tonic::service::Interceptor;
+use tonic::service::interceptor::InterceptedService;
 use tonic::transport::Channel;
-use tonic::{service::Routes, Request, Response, Result, Status};
+use tonic::{Request, Response, Result, Status, service::Routes};
 
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::shard_selector::SearcherNode;
@@ -80,7 +80,9 @@ impl SearchServer {
             return Ok(client.clone());
         }
 
-        let transport = tonic::transport::Endpoint::new(format!("http://{hostname}"))?.connect().await?;
+        let transport = tonic::transport::Endpoint::new(format!("http://{hostname}"))?
+            .connect()
+            .await?;
         let client = NidxSearcherClient::with_interceptor(transport, TelemetryInterceptor);
         self.clients.write().await.insert(hostname.clone(), client.clone());
         Ok(client)
@@ -166,6 +168,19 @@ impl NidxSearcher for SearchServer {
             shard_id,
             LOCAL => shard_suggest::suggest(Arc::clone(&self.index_cache), request.clone()).await,
             REMOTE => suggest
+        }
+    }
+
+    async fn graph_search(&self, request: Request<GraphSearchRequest>) -> Result<Response<GraphSearchResponse>> {
+        let request = request.into_inner();
+        let shard_id = uuid::Uuid::parse_str(&request.shard).map_err(NidxError::from)?;
+        shard_request! {
+            "graph_search",
+            self,
+            request,
+            shard_id,
+            LOCAL => shard_search::graph_search(Arc::clone(&self.index_cache), request.clone()).await,
+            REMOTE => graph_search
         }
     }
 

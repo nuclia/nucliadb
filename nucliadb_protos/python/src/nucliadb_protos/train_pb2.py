@@ -76,6 +76,10 @@ try:
   nucliadb__protos_dot_audit__pb2 = nucliadb__protos_dot_writer__pb2.nucliadb__protos_dot_audit__pb2
 except AttributeError:
   nucliadb__protos_dot_audit__pb2 = nucliadb__protos_dot_writer__pb2.nucliadb_protos.audit_pb2
+try:
+  nucliadb__protos_dot_backups__pb2 = nucliadb__protos_dot_writer__pb2.nucliadb__protos_dot_backups__pb2
+except AttributeError:
+  nucliadb__protos_dot_backups__pb2 = nucliadb__protos_dot_writer__pb2.nucliadb_protos.backups_pb2
 
 from nucliadb_protos.knowledgebox_pb2 import *
 from nucliadb_protos.resources_pb2 import *

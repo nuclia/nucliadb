@@ -25,6 +25,8 @@ use relation::RelationType;
 use relation_node::NodeType;
 use uuid::Uuid;
 
+pub mod graph;
+
 pub fn minimal_resource(shard_id: String) -> Resource {
     let resource_id = Uuid::new_v4().simple().to_string();
 
@@ -167,11 +169,13 @@ pub fn people_and_places(shard_id: impl Into<String>) -> Resource {
         subtype: "".to_string(),
     });
 
-    let people = ["Anna", "Anthony", "Bárcenas", "Ben", "John"].into_iter().map(|person| RelationNode {
-        value: person.to_string(),
-        ntype: NodeType::Entity as i32,
-        subtype: "person".to_string(),
-    });
+    let people = ["Anna", "Anthony", "Bárcenas", "Ben", "John"]
+        .into_iter()
+        .map(|person| RelationNode {
+            value: person.to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "person".to_string(),
+        });
 
     let cities = ["Barcelona", "New York", "York"].into_iter().map(|city| RelationNode {
         value: city.to_string(),
@@ -179,11 +183,13 @@ pub fn people_and_places(shard_id: impl Into<String>) -> Resource {
         subtype: "city".to_string(),
     });
 
-    let countries = ["Israel", "Netherlands", "Solomon Islands"].into_iter().map(|country| RelationNode {
-        value: country.to_string(),
-        ntype: NodeType::Entity as i32,
-        subtype: "country".to_string(),
-    });
+    let countries = ["Israel", "Netherlands", "Solomon Islands"]
+        .into_iter()
+        .map(|country| RelationNode {
+            value: country.to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "country".to_string(),
+        });
 
     let entities = people.chain(cities).chain(countries);
 

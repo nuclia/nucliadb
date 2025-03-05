@@ -19,11 +19,11 @@
 //
 
 use crate::{
+    NidxMetadata,
     metrics::{
         self,
         scheduler::{JobFamily, JobState},
     },
-    NidxMetadata,
 };
 
 pub async fn update_merge_job_metric(metadb: &NidxMetadata) -> anyhow::Result<()> {

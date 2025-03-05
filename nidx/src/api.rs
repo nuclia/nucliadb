@@ -24,7 +24,7 @@ pub mod shards;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
-use crate::{grpc_server::GrpcServer, Settings};
+use crate::{Settings, grpc_server::GrpcServer};
 
 pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
     let service = grpc::ApiServer::new(&settings).into_router();

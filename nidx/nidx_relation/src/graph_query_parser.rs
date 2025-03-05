@@ -118,9 +118,7 @@ pub struct GraphQueryParser {
 
 impl GraphQueryParser {
     pub fn new() -> Self {
-        Self {
-            schema: Schema::new(),
-        }
+        Self { schema: Schema::new() }
     }
 
     pub fn parse(&self, query: GraphQuery) -> Box<dyn Query> {
@@ -157,8 +155,11 @@ impl GraphQueryParser {
     }
 
     fn parse_relation_query(&self, query: RelationQuery) -> Box<dyn Query> {
-        let equivalent_path_query =
-            PathQuery::DirectedPath((Expression::Value(Node::default()), query.0, Expression::Value(Node::default())));
+        let equivalent_path_query = PathQuery::DirectedPath((
+            Expression::Value(Node::default()),
+            query.0,
+            Expression::Value(Node::default()),
+        ));
         self.parse_path_query(equivalent_path_query)
     }
 
@@ -180,7 +181,11 @@ impl GraphQueryParser {
                 Box::new(BooleanQuery::new(subqueries))
             }
             PathQuery::UndirectedPath((source, relation, destination)) => Box::new(BooleanQuery::union(vec![
-                self.parse_path_query(PathQuery::DirectedPath((source.clone(), relation.clone(), destination.clone()))),
+                self.parse_path_query(PathQuery::DirectedPath((
+                    source.clone(),
+                    relation.clone(),
+                    destination.clone(),
+                ))),
                 self.parse_path_query(PathQuery::DirectedPath((destination, relation, source))),
             ])),
         }
@@ -223,7 +228,11 @@ impl GraphQueryParser {
 
         match expression {
             Expression::Value(query) => {
-                queries.extend(self.has_node(query, fields).into_iter().map(|query| (Occur::Must, query)));
+                queries.extend(
+                    self.has_node(query, fields)
+                        .into_iter()
+                        .map(|query| (Occur::Must, query)),
+                );
             }
             Expression::Not(query) => {
                 // NOT granularity is a node, so we to use a Must { MustNot { X } } instead of
@@ -282,7 +291,10 @@ impl GraphQueryParser {
     fn has_node(&self, node: &Node, fields: NodeSchemaFields) -> Vec<Box<dyn Query>> {
         let mut subqueries = vec![];
 
-        let value_query = node.value.as_ref().and_then(|value| self.has_node_value(value, fields.normalized_value));
+        let value_query = node
+            .value
+            .as_ref()
+            .and_then(|value| self.has_node_value(value, fields.normalized_value));
         if let Some(query) = value_query {
             subqueries.push(query);
         }
@@ -305,27 +317,15 @@ impl GraphQueryParser {
         let mut subqueries = vec![];
 
         match expression {
-            Expression::Value(Relation {
-                value: None,
-            }) => {}
-            Expression::Value(Relation {
-                value: Some(value),
-            }) if value.is_empty() => {}
-            Expression::Value(Relation {
-                value: Some(value),
-            }) => {
+            Expression::Value(Relation { value: None }) => {}
+            Expression::Value(Relation { value: Some(value) }) if value.is_empty() => {}
+            Expression::Value(Relation { value: Some(value) }) => {
                 subqueries.push((Occur::Must, self.has_relation_label(&value)));
             }
 
-            Expression::Not(Relation {
-                value: None,
-            }) => {}
-            Expression::Not(Relation {
-                value: Some(value),
-            }) if value.is_empty() => {}
-            Expression::Not(Relation {
-                value: Some(value),
-            }) => {
+            Expression::Not(Relation { value: None }) => {}
+            Expression::Not(Relation { value: Some(value) }) if value.is_empty() => {}
+            Expression::Not(Relation { value: Some(value) }) => {
                 subqueries.push((Occur::MustNot, self.has_relation_label(&value)));
             }
 
@@ -364,10 +364,7 @@ impl GraphQueryParser {
             Term::Fuzzy(fuzzy) => {
                 let normalized_value = schema::normalize(&fuzzy.value);
                 match fuzzy {
-                    FuzzyTerm {
-                        value,
-                        ..
-                    } if value.is_empty() => None,
+                    FuzzyTerm { value, .. } if value.is_empty() => None,
 
                     FuzzyTerm {
                         fuzzy_distance: distance,
@@ -395,15 +392,24 @@ impl GraphQueryParser {
 
     fn has_node_type(&self, node_type: NodeType, field: Field) -> Box<dyn Query> {
         let node_type = io_maps::node_type_to_u64(node_type);
-        Box::new(TermQuery::new(tantivy::Term::from_field_u64(field, node_type), IndexRecordOption::Basic))
+        Box::new(TermQuery::new(
+            tantivy::Term::from_field_u64(field, node_type),
+            IndexRecordOption::Basic,
+        ))
     }
 
     fn has_node_subtype(&self, node_subtype: &str, field: Field) -> Box<dyn Query> {
-        Box::new(TermQuery::new(tantivy::Term::from_field_text(field, node_subtype), IndexRecordOption::Basic))
+        Box::new(TermQuery::new(
+            tantivy::Term::from_field_text(field, node_subtype),
+            IndexRecordOption::Basic,
+        ))
     }
 
     fn has_relation_label(&self, label: &str) -> Box<dyn Query> {
-        Box::new(TermQuery::new(tantivy::Term::from_field_text(self.schema.label, &label), IndexRecordOption::Basic))
+        Box::new(TermQuery::new(
+            tantivy::Term::from_field_text(self.schema.label, &label),
+            IndexRecordOption::Basic,
+        ))
     }
 }
 
@@ -416,5 +422,89 @@ impl From<String> for Term {
 impl From<&str> for Term {
     fn from(value: &str) -> Self {
         Self::Exact(value.to_string())
+    }
+}
+
+impl TryFrom<&nidx_protos::graph_query::Query> for GraphQuery {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &nidx_protos::graph_query::Query) -> Result<Self, Self::Error> {
+        let query = match value {
+            nidx_protos::graph_query::Query::Node(query_node) => {
+                let node = Node::try_from(query_node)?;
+                Self::NodeQuery(NodeQuery::Node(Expression::Value(node)))
+            }
+
+            nidx_protos::graph_query::Query::Relation(relation) => {
+                Self::RelationQuery(RelationQuery(Expression::Value(Relation::try_from(relation)?)))
+            }
+
+            nidx_protos::graph_query::Query::Path(path) => {
+                let source = match &path.source {
+                    Some(source_pb) => Node::try_from(source_pb)?,
+                    None => Node::default(),
+                };
+                let relation = match &path.relation {
+                    Some(relation_pb) => Relation::try_from(relation_pb)?,
+                    None => Relation::default(),
+                };
+                let destination = match &path.destination {
+                    Some(destination_pb) => Node::try_from(destination_pb)?,
+                    None => Node::default(),
+                };
+
+                if path.undirected {
+                    Self::PathQuery(PathQuery::UndirectedPath((
+                        Expression::Value(source),
+                        Expression::Value(relation),
+                        Expression::Value(destination),
+                    )))
+                } else {
+                    Self::PathQuery(PathQuery::DirectedPath((
+                        Expression::Value(source),
+                        Expression::Value(relation),
+                        Expression::Value(destination),
+                    )))
+                }
+            }
+        };
+
+        Ok(query)
+    }
+}
+
+impl TryFrom<&nidx_protos::graph_query::Node> for Node {
+    type Error = anyhow::Error;
+
+    fn try_from(node_pb: &nidx_protos::graph_query::Node) -> Result<Self, Self::Error> {
+        let value = node_pb.value.clone().map(|value| {
+            if node_pb.fuzzy_distance > 0 || node_pb.as_prefix {
+                Term::Fuzzy(FuzzyTerm {
+                    value: value,
+                    fuzzy_distance: node_pb.fuzzy_distance as u8,
+                    is_prefix: node_pb.as_prefix,
+                })
+            } else {
+                Term::Exact(value)
+            }
+        });
+        let node_type = node_pb.node_type.map(NodeType::try_from).transpose()?;
+        let node_subtype = node_pb.node_subtype.clone();
+
+        Ok(Node {
+            value,
+            node_type,
+            node_subtype,
+        })
+    }
+}
+
+impl TryFrom<&nidx_protos::graph_query::Relation> for Relation {
+    type Error = anyhow::Error;
+
+    fn try_from(relation_pb: &nidx_protos::graph_query::Relation) -> Result<Self, Self::Error> {
+        let value = relation_pb.value.clone();
+
+        Ok(Relation { value })
     }
 }

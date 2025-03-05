@@ -20,13 +20,13 @@
 
 use clap::Parser;
 use nidx::{
-    api,
-    control::{control_client, ControlRequest, ControlServer},
+    Settings, api,
+    control::{ControlRequest, ControlServer, control_client},
     indexer, metrics, scheduler, searcher,
     settings::EnvSettings,
     telemetry,
-    tool::{run_tool, ToolCommand},
-    worker, Settings,
+    tool::{ToolCommand, run_tool},
+    worker,
 };
 use prometheus_client::registry::Registry;
 use sentry::IntoDsn;
@@ -179,7 +179,10 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
 
     while let Some(join_result) = tasks.join_next_with_id().await {
         let (id, task_result) = join_result.unwrap();
-        let task_name = task_ids.get(&id).map(|x| format!("{x:?}")).unwrap_or("<unknown>".to_string());
+        let task_name = task_ids
+            .get(&id)
+            .map(|x| format!("{x:?}"))
+            .unwrap_or("<unknown>".to_string());
         if let Err(e) = task_result {
             panic!("Task {task_name} finished with error, stopping: {e:?}");
         } else {

@@ -33,8 +33,9 @@ pub fn plan_merges(settings: &VectorMergeSettings, segments: Vec<(SegmentId, i64
     let mut merges = Vec::new();
 
     // Segments come sorted for largest to smallest, start processing big segments
-    let (big, small): (Vec<_>, Vec<_>) =
-        segments.iter().partition(|(_, records, _)| *records > settings.small_segment_threshold as i64);
+    let (big, small): (Vec<_>, Vec<_>) = segments
+        .iter()
+        .partition(|(_, records, _)| *records > settings.small_segment_threshold as i64);
 
     // Merge big segments if there are many of them or we are forced
     let mut forced = false;
@@ -161,7 +162,10 @@ mod tests {
         // Big segments
         assert_eq!(jobs[0], vec![2i64.into(), 3i64.into(), 4i64.into()]);
         // First batch of small segments
-        assert_eq!(jobs[1], vec![12i64.into(), 11i64.into(), 10i64.into(), 9i64.into(), 8i64.into()]);
+        assert_eq!(
+            jobs[1],
+            vec![12i64.into(), 11i64.into(), 10i64.into(), 9i64.into(), 8i64.into()]
+        );
         // Second batch of small segments
         assert_eq!(jobs[2], vec![7i64.into(), 6i64.into()]);
 

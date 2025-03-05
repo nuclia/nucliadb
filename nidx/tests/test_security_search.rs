@@ -24,10 +24,10 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use common::services::NidxFixture;
+use nidx_protos::Security;
 use nidx_protos::nodewriter::VectorIndexConfig;
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::resource::ResourceStatus;
-use nidx_protos::Security;
 use nidx_protos::{IndexMetadata, NewShardRequest, Resource, ResourceId, SearchRequest};
 use sqlx::PgPool;
 use tonic::Request;
@@ -116,9 +116,7 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
             shard: shard_id.clone(),
             document: true,
             vectorset: "english".to_string(),
-            security: Some(Security {
-                access_groups: vec![],
-            }),
+            security: Some(Security { access_groups: vec![] }),
             ..Default::default()
         })
         .await
@@ -211,9 +209,7 @@ async fn test_security_search_public_resource(pool: PgPool) -> Result<(), Box<dy
             vectorset: "english".to_string(),
             shard: shard_id.clone(),
             document: true,
-            security: Some(Security {
-                access_groups: vec![],
-            }),
+            security: Some(Security { access_groups: vec![] }),
             ..Default::default()
         })
         .await

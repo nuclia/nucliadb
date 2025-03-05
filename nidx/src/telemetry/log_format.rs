@@ -54,9 +54,9 @@ use tracing_opentelemetry::OtelData;
 use tracing_serde::AsSerde;
 use tracing_subscriber::{
     fmt::{
+        FmtContext, FormatEvent, FormatFields,
         format::Writer,
         time::{FormatTime, SystemTime},
-        FmtContext, FormatEvent, FormatFields,
     },
     registry::LookupSpan,
 };
@@ -94,7 +94,10 @@ where
             serializer = visitor.take_serializer()?;
 
             // Extract and serialize `trace_id`
-            let span = event.parent().and_then(|id| ctx.span(id)).or_else(|| ctx.lookup_current());
+            let span = event
+                .parent()
+                .and_then(|id| ctx.span(id))
+                .or_else(|| ctx.lookup_current());
             if let Some(span) = span {
                 if let Some(otel_data) = span.extensions().get::<OtelData>() {
                     let trace_id = match otel_data.builder.trace_id {
@@ -119,9 +122,7 @@ pub struct WriteAdaptor<'a> {
 
 impl<'a> WriteAdaptor<'a> {
     pub fn new(fmt_write: &'a mut dyn fmt::Write) -> Self {
-        Self {
-            fmt_write,
-        }
+        Self { fmt_write }
     }
 }
 
@@ -129,7 +130,9 @@ impl<'a> std::io::Write for WriteAdaptor<'a> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let s = std::str::from_utf8(buf).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
 
-        self.fmt_write.write_str(s).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        self.fmt_write
+            .write_str(s)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         Ok(s.as_bytes().len())
     }

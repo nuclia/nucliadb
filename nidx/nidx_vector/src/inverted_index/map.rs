@@ -104,7 +104,7 @@ mod tests {
             let len = rng.gen_range(1..2000);
             let mut entry = Vec::new();
             for _ in 0..len {
-                entry.push(rng.gen());
+                entry.push(rng.r#gen());
             }
             entries.push(entry);
         }

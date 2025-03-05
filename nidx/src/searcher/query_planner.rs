@@ -21,12 +21,12 @@
 use nidx_paragraph::ParagraphSearchRequest;
 use nidx_protos::filter_expression::Expr;
 use nidx_protos::{FilterExpression, FilterOperator, RelationSearchRequest, SearchRequest};
-use nidx_text::prefilter::*;
 use nidx_text::DocumentSearchRequest;
+use nidx_text::prefilter::*;
 use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
-use nidx_vector::VectorSearchRequest;
 use nidx_vector::SEGMENT_TAGS;
+use nidx_vector::VectorSearchRequest;
 
 use super::query_language::extract_label_filters;
 
@@ -115,7 +115,11 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> anyhow::Result<
         id: String::default(),
         min_score: search_request.min_score_bm25,
         security: search_request.security.clone(),
-        filtering_formula: search_request.paragraph_filter.clone().map(filter_to_boolean_expression).transpose()?,
+        filtering_formula: search_request
+            .paragraph_filter
+            .clone()
+            .map(filter_to_boolean_expression)
+            .transpose()?,
         filter_or: search_request.filter_operator == FilterOperator::Or as i32,
     }))
 }
@@ -144,8 +148,10 @@ fn compute_vectors_request(search_request: &SearchRequest) -> anyhow::Result<Opt
         return Ok(None);
     }
 
-    let segment_filtering_formula =
-        search_request.field_filter.as_ref().and_then(|f| extract_label_filters(f, SEGMENT_TAGS));
+    let segment_filtering_formula = search_request
+        .field_filter
+        .as_ref()
+        .and_then(|f| extract_label_filters(f, SEGMENT_TAGS));
 
     Ok(Some(VectorSearchRequest {
         id: search_request.shard.clone(),
@@ -155,7 +161,11 @@ fn compute_vectors_request(search_request: &SearchRequest) -> anyhow::Result<Opt
         result_per_page: search_request.result_per_page,
         with_duplicates: search_request.with_duplicates,
         min_score: search_request.min_score_semantic,
-        filtering_formula: search_request.paragraph_filter.clone().map(filter_to_boolean_expression).transpose()?,
+        filtering_formula: search_request
+            .paragraph_filter
+            .clone()
+            .map(filter_to_boolean_expression)
+            .transpose()?,
         segment_filtering_formula,
         filter_or: search_request.filter_operator == FilterOperator::Or as i32,
     }))
@@ -200,7 +210,9 @@ pub fn filter_to_boolean_expression(filter: FilterExpression) -> anyhow::Result<
         }
         Expr::BoolNot(not) => Ok(BooleanExpression::Not(Box::new(filter_to_boolean_expression(*not)?))),
         Expr::Facet(facet_filter) => Ok(BooleanExpression::Literal(facet_filter.facet)),
-        _ => Err(anyhow::anyhow!("FilterExpression type not supported for conversion to BooleanExpression")),
+        _ => Err(anyhow::anyhow!(
+            "FilterExpression type not supported for conversion to BooleanExpression"
+        )),
     }
 }
 
@@ -217,22 +229,16 @@ mod tests {
             vector: vec![1.0],
             paragraph: true,
             field_filter: Some(FilterExpression {
-                expr: Some(Expr::Facet(FacetFilter {
-                    facet: "this".into(),
-                })),
+                expr: Some(Expr::Facet(FacetFilter { facet: "this".into() })),
             }),
             paragraph_filter: Some(FilterExpression {
                 expr: Some(Expr::BoolAnd(FilterExpressionList {
                     operands: vec![
                         FilterExpression {
-                            expr: Some(Expr::Facet(FacetFilter {
-                                facet: "and".into(),
-                            })),
+                            expr: Some(Expr::Facet(FacetFilter { facet: "and".into() })),
                         },
                         FilterExpression {
-                            expr: Some(Expr::Facet(FacetFilter {
-                                facet: "that".into(),
-                            })),
+                            expr: Some(Expr::Facet(FacetFilter { facet: "that".into() })),
                         },
                     ],
                 })),
@@ -247,9 +253,7 @@ mod tests {
             panic!("The prefilter should have a formula");
         };
         let FilterExpression {
-            expr: Some(Expr::Facet(FacetFilter {
-                facet: literal,
-            })),
+            expr: Some(Expr::Facet(FacetFilter { facet: literal })),
         } = &formula
         else {
             panic!("The formula should be a literal")

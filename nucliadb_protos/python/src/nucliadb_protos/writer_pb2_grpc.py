@@ -2,6 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
+from nucliadb_protos import backups_pb2 as nucliadb__protos_dot_backups__pb2
 from nucliadb_protos import knowledgebox_pb2 as nucliadb__protos_dot_knowledgebox__pb2
 from nucliadb_protos import writer_pb2 as nucliadb__protos_dot_writer__pb2
 
@@ -89,6 +90,21 @@ class WriterStub(object):
                 '/fdbwriter.Writer/ReIndex',
                 request_serializer=nucliadb__protos_dot_writer__pb2.IndexResource.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.IndexStatus.FromString,
+                )
+        self.CreateBackup = channel.unary_unary(
+                '/fdbwriter.Writer/CreateBackup',
+                request_serializer=nucliadb__protos_dot_backups__pb2.CreateBackupRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_backups__pb2.CreateBackupResponse.FromString,
+                )
+        self.DeleteBackup = channel.unary_unary(
+                '/fdbwriter.Writer/DeleteBackup',
+                request_serializer=nucliadb__protos_dot_backups__pb2.DeleteBackupRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_backups__pb2.DeleteBackupResponse.FromString,
+                )
+        self.RestoreBackup = channel.unary_unary(
+                '/fdbwriter.Writer/RestoreBackup',
+                request_serializer=nucliadb__protos_dot_backups__pb2.RestoreBackupRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_backups__pb2.RestoreBackupResponse.FromString,
                 )
 
 
@@ -186,6 +202,24 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateBackup(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteBackup(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RestoreBackup(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_WriterServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -263,6 +297,21 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.ReIndex,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.IndexResource.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.IndexStatus.SerializeToString,
+            ),
+            'CreateBackup': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateBackup,
+                    request_deserializer=nucliadb__protos_dot_backups__pb2.CreateBackupRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_backups__pb2.CreateBackupResponse.SerializeToString,
+            ),
+            'DeleteBackup': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteBackup,
+                    request_deserializer=nucliadb__protos_dot_backups__pb2.DeleteBackupRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_backups__pb2.DeleteBackupResponse.SerializeToString,
+            ),
+            'RestoreBackup': grpc.unary_unary_rpc_method_handler(
+                    servicer.RestoreBackup,
+                    request_deserializer=nucliadb__protos_dot_backups__pb2.RestoreBackupRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_backups__pb2.RestoreBackupResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -526,5 +575,56 @@ class Writer(object):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/ReIndex',
             nucliadb__protos_dot_writer__pb2.IndexResource.SerializeToString,
             nucliadb__protos_dot_writer__pb2.IndexStatus.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def CreateBackup(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/CreateBackup',
+            nucliadb__protos_dot_backups__pb2.CreateBackupRequest.SerializeToString,
+            nucliadb__protos_dot_backups__pb2.CreateBackupResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def DeleteBackup(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/DeleteBackup',
+            nucliadb__protos_dot_backups__pb2.DeleteBackupRequest.SerializeToString,
+            nucliadb__protos_dot_backups__pb2.DeleteBackupResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def RestoreBackup(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/RestoreBackup',
+            nucliadb__protos_dot_backups__pb2.RestoreBackupRequest.SerializeToString,
+            nucliadb__protos_dot_backups__pb2.RestoreBackupResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

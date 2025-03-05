@@ -26,14 +26,14 @@ use nidx_protos::{OrderBy, ParagraphItem, ParagraphSearchResponse, StreamRequest
 use nidx_types::prefilter::PrefilterResult;
 use tantivy::collector::{Collector, Count, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser};
-use tantivy::{schema::*, DateTime, Order};
+use tantivy::{DateTime, Order, schema::*};
 use tantivy::{DocAddress, Index, IndexReader};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
 use crate::request_types::{ParagraphSearchRequest, ParagraphSuggestRequest};
-use crate::search_query::{search_query, streaming_query, suggest_query, SharedTermC};
-use crate::search_response::{extract_labels, SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
+use crate::search_query::{SharedTermC, search_query, streaming_query, suggest_query};
+use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse, extract_labels};
 
 const FUZZY_DISTANCE: u8 = 1;
 const NUMBER_OF_RESULTS_SUGGEST: usize = 10;
@@ -46,7 +46,10 @@ pub struct ParagraphReaderService {
 
 impl Debug for ParagraphReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TextService").field("index", &self.index).field("schema", &self.schema).finish()
+        f.debug_struct("TextService")
+            .field("index", &self.index)
+            .field("schema", &self.schema)
+            .finish()
     }
 }
 
@@ -94,7 +97,7 @@ impl ParagraphReaderService {
         }))
     }
 
-    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = ParagraphItem>> {
+    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = ParagraphItem> + use<>> {
         let producer = BatchProducer {
             offset: 0,
             total: self.count()?,
@@ -136,7 +139,11 @@ impl ParagraphReaderService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: starts at {v} ms");
 
-        let advanced = request.advanced_query.as_ref().map(|query| parser.parse_query(query)).transpose()?;
+        let advanced = request
+            .advanced_query
+            .as_ref()
+            .map(|query| parser.parse_query(query))
+            .transpose()?;
         #[rustfmt::skip] let (original, termc, fuzzied) = search_query(
             &parser,
             &text,
@@ -245,7 +252,10 @@ impl Iterator for BatchProducer {
             return None;
         };
         let mut items = vec![];
-        for doc in top_docs.into_iter().flat_map(|i| self.searcher.doc::<TantivyDocument>(i.1)) {
+        for doc in top_docs
+            .into_iter()
+            .flat_map(|i| self.searcher.doc::<TantivyDocument>(i.1))
+        {
             let id = doc
                 .get_first(self.paragraph_field)
                 .expect("document doesn't appear to have uuid.")
@@ -254,10 +264,7 @@ impl Iterator for BatchProducer {
                 .to_string();
 
             let labels = extract_labels(doc.get_all(self.facet_field));
-            items.push(ParagraphItem {
-                id,
-                labels,
-            });
+            items.push(ParagraphItem { id, labels });
         }
         self.offset += Self::BATCH;
         let v = time.elapsed().as_millis();
@@ -290,7 +297,9 @@ impl<'a> Searcher<'a> {
             OrderType::Desc => Order::Desc,
             OrderType::Asc => Order::Asc,
         };
-        TopDocs::with_limit(limit).and_offset(offset).order_by_fast_field(order_field, order_direction)
+        TopDocs::with_limit(limit)
+            .and_offset(offset)
+            .order_by_fast_field(order_field, order_direction)
     }
     fn do_search(
         &self,
@@ -300,10 +309,13 @@ impl<'a> Searcher<'a> {
         min_score: f32,
     ) -> anyhow::Result<ParagraphSearchResponse> {
         let searcher = service.reader.searcher();
-        let facet_collector = self.facets.iter().fold(FacetCollector::for_field("facets"), |mut collector, facet| {
-            collector.add_facet(Facet::from(facet));
-            collector
-        });
+        let facet_collector = self
+            .facets
+            .iter()
+            .fold(FacetCollector::for_field("facets"), |mut collector, facet| {
+                collector.add_facet(Facet::from(facet));
+                collector
+            });
         if self.only_faceted {
             // No query search, just facets
             let facets_count = searcher.search(&query, &facet_collector).unwrap();
