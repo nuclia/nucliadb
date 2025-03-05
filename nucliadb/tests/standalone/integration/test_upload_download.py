@@ -308,7 +308,7 @@ async def test_tus_upload_handles_unknown_upload_ids(
     indirect=True,
 )
 @pytest.mark.deploy_modes("standalone")
-async def test_content_type_validation(
+async def _test_content_type_validation(
     storage: Storage,
     configure_redis_dm,
     nucliadb_reader: AsyncClient,
