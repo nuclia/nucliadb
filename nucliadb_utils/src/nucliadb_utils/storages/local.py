@@ -285,10 +285,10 @@ class LocalStorage(Storage):
     ) -> AsyncGenerator[ObjectInfo, None]:
         pathname = f"{self.get_file_path(bucket, prefix)}*"
         for key in sorted(glob.glob(pathname)):
-            if start is not None and key <= start:
-                continue
             if key.endswith(".metadata"):
                 # Skip metadata files -- they are internal to the local-storage implementation.
+                continue
+            if start is not None and key < start:
                 continue
             name = key.split("/")[-1]
             yield ObjectInfo(name=name)

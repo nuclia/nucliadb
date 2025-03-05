@@ -426,7 +426,9 @@ class S3Storage(Storage):
         self, bucket: str, prefix: str = "/", start: Optional[str] = None
     ) -> AsyncGenerator[ObjectInfo, None]:
         paginator = self._s3aioclient.get_paginator("list_objects")
-        async for result in paginator.paginate(Bucket=bucket, Prefix=prefix, StartingToken=start):
+        async for result in paginator.paginate(
+            Bucket=bucket, Prefix=prefix, PaginationConfig={"StartingToken": start}
+        ):
             for item in result.get("Contents", []):
                 yield ObjectInfo(name=item["Key"])
 
