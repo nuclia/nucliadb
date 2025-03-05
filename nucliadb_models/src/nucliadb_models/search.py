@@ -711,6 +711,9 @@ class CatalogRequest(BaseModel):
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
     hidden: Optional[bool] = SearchParamDefaults.hidden.to_pydantic_field()
+    show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field(
+        default=[ResourceProperties.BASIC, ResourceProperties.ERRORS]
+    )
 
     @field_validator("faceted")
     @classmethod

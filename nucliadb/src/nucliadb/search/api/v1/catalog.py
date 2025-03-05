@@ -98,6 +98,9 @@ async def catalog_get(
         SearchParamDefaults.range_modification_end
     ),
     hidden: Optional[bool] = fastapi_query(SearchParamDefaults.hidden),
+    show: list[ResourceProperties] = fastapi_query(
+        SearchParamDefaults.show, default=[ResourceProperties.BASIC, ResourceProperties.ERRORS]
+    ),
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
     try:
         expr = (
@@ -121,6 +124,7 @@ async def catalog_get(
         range_modification_start=range_modification_start,
         range_modification_end=range_modification_end,
         hidden=hidden,
+        show=show,
     )
     if sort_field:
         item.sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
@@ -169,7 +173,7 @@ async def catalog(
             catalog_results.resources = await fetch_resources(
                 resources=[r.rid for r in catalog_results.fulltext.results],
                 kbid=kbid,
-                show=[ResourceProperties.BASIC, ResourceProperties.ERRORS],
+                show=item.show,
                 field_type_filter=list(FieldTypeName),
                 extracted=[],
             )
