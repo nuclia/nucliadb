@@ -248,14 +248,8 @@ async def create_broker_message_with_relations():
     return bm
 
 
-@pytest.mark.deploy_modes("standalone")
-async def test_user_defined_knowledge_graph(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    standalone_knowledgebox,
-):
-    kbid = standalone_knowledgebox
-
+@pytest.fixture(scope="function")
+def knowledge_graph() -> tuple[dict[str, RelationEntity], list[tuple[str, str, str]]]:
     entities = {
         "Anastasia": RelationEntity(value="Anastasia", type=RelationNodeType.ENTITY, group="PERSON"),
         "Anna": RelationEntity(value="Anna", type=RelationNodeType.ENTITY, group="PERSON"),
@@ -278,14 +272,37 @@ async def test_user_defined_knowledge_graph(
         "Tom": RelationEntity(value="Tom", type=RelationNodeType.ENTITY, group="ANIMAL"),
         "UK": RelationEntity(value="UK", type=RelationNodeType.ENTITY, group="PLACE"),
     }
-
     graph = [
         ("Anastasia", "IS_FRIEND", "Anna"),
+        ("Anna", "FOLLOW", "Erin"),
         ("Anna", "LIVE_IN", "New York"),
         ("Anna", "LOVE", "Cat"),
+        ("Apollo", "IS", "Rocket"),
+        ("Erin", "BORN_IN", "UK"),
+        ("Erin", "IS", "Olympic athlete"),
+        ("Erin", "LOVE", "Climbing"),
+        ("Jerry", "IS", "Mouse"),
+        ("Margaret", "DEVELOPED", "Apollo"),
+        ("Margaret", "WORK_IN", "Computer science"),
         ("Peter", "LIVE_IN", "New York"),
+        ("Tom", "CHASE", "Jerry"),
+        ("Tom", "IS", "Cat"),
     ]
 
+    return (entities, graph)
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_user_defined_knowledge_graph(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+    knowledge_graph: tuple[dict[str, RelationEntity], list[tuple[str, str, str]]],
+):
+    kbid = standalone_knowledgebox
+    entities, paths = knowledge_graph
+
+    graph = paths[:3]
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={
@@ -315,21 +332,7 @@ async def test_user_defined_knowledge_graph(
 
     # Update graph
 
-    graph.extend(
-        [
-            ("Anna", "FOLLOW", "Erin"),
-            ("Apollo", "IS", "Rocket"),
-            ("Erin", "BORN_IN", "UK"),
-            ("Erin", "IS", "Olympic athlete"),
-            ("Erin", "LOVE", "Climbing"),
-            ("Jerry", "IS", "Mouse"),
-            ("Margaret", "DEVELOPED", "Apollo"),
-            ("Margaret", "WORK_IN", "Computer science"),
-            ("Tom", "CHASE", "Jerry"),
-            ("Tom", "IS", "Cat"),
-        ]
-    )
-
+    graph = paths
     resp = await nucliadb_writer.patch(
         f"/kb/{kbid}/resource/{rid}",
         json={
@@ -378,18 +381,13 @@ async def test_user_defined_knowledge_graph(
             else:
                 path = (source, "<-", target["relation_label"], "-", target["entity"])
 
-            assert path not in retrieved_graph
+            assert path not in retrieved_graph, "We don't expect duplicated paths"
             retrieved_graph.add(path)
 
     for relation in retrieved_graph:
         print(relation)
 
     assert len(retrieved_graph) == 4
-
-    from tests.utils.dirty_index import mark_dirty, wait_for_sync
-
-    await mark_dirty()
-    await wait_for_sync()
 
     # Use graph search endpoints
 
