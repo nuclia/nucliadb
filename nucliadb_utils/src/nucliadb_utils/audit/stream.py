@@ -57,7 +57,7 @@ from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtili
 
 
 class RequestContext:
-    def __init__(self):
+    def __init__(self: "RequestContext"):
         self.audit_request: AuditRequest = AuditRequest()
         self.start_time: float = time.monotonic()
         self.path: str = ""

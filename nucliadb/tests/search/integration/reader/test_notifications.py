@@ -19,7 +19,6 @@
 #
 
 import asyncio
-from typing import Union
 from unittest.mock import patch
 
 import httpx
@@ -113,12 +112,6 @@ async def test_notification_stream(nucliadb_stream_reader, knowledgebox_ingest, 
                     "resource_indexed",
                     "resource_written",
                     "resource_processed",
-                ]
-
-                notif: Union[
-                    ResourceIndexedNotification,
-                    ResourceWrittenNotification,
-                    ResourceProcessedNotification,
                 ]
 
                 if notification_type == "resource_indexed":

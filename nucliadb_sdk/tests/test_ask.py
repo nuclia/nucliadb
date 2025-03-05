@@ -142,7 +142,7 @@ def test_ask_response_parser_stream():
     }
     response.iter_lines = unittest.mock.Mock(return_value=raw_lines)
 
-    ask_response: SyncAskResponse = ask_response_parser(SyncAskResponse, response)
+    ask_response = ask_response_parser(SyncAskResponse, response)
 
     assert ask_response.learning_id == "learning_id"
     assert ask_response.answer == "This is your Nuclia answer."

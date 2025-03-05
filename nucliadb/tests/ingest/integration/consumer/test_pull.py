@@ -57,7 +57,7 @@ class PullProcessorAPI:
 @pytest.fixture()
 async def pull_processor_api():
     app = FastAPI()
-    messages: list[BrokerMessage] = []
+    messages = []
 
     @app.get("/api/v1/internal/processing/pull")
     async def pull():
