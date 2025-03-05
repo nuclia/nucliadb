@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import os
-from typing import Any, Type
+from typing import Any, Iterator, Type
 from unittest.mock import Mock
 
 import pytest
@@ -75,7 +75,7 @@ async def storage(request):
 
 
 @pytest.fixture(scope="function")
-def storage_settings(request, storage) -> dict[str, Any]:
+def storage_settings(request, storage) -> Iterator[dict[str, Any]]:
     """Useful fixture that returns the settings used in the generic `storage`
     fixture.
 

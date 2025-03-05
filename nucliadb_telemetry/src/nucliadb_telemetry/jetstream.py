@@ -19,13 +19,12 @@
 
 from datetime import datetime
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import nats
 from nats.aio.client import Client
 from nats.aio.msg import Msg
 from nats.js.client import JetStreamContext
-from opentelemetry.context import attach
 from opentelemetry.propagate import extract, inject
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.semconv.trace import SpanAttributes
@@ -63,7 +62,7 @@ msg_sent_counter = metrics.Counter("nuclia_nats_msg_sent", labels={"subject": ""
 
 
 def start_span_message_receiver(tracer: Tracer, msg: Msg):
-    attributes = {
+    attributes: dict[str, Union[str, int]] = {
         SpanAttributes.MESSAGING_DESTINATION_KIND: "nats",
         SpanAttributes.MESSAGING_MESSAGE_PAYLOAD_SIZE_BYTES: len(msg.data),
         SpanAttributes.MESSAGING_MESSAGE_ID: msg.reply,
@@ -71,14 +70,14 @@ def start_span_message_receiver(tracer: Tracer, msg: Msg):
 
     # add some attributes from the metadata
     ctx = extract(msg.headers)
-    token = attach(ctx)
 
-    span = tracer.start_as_current_span(  # type: ignore
+    span = tracer.start_as_current_span(
         name=f"Received from {msg.subject}",
+        context=ctx,
         kind=SpanKind.SERVER,
         attributes=attributes,
     )
-    span._token = token
+
     return span
 
 
@@ -249,14 +248,12 @@ class NatsClientTelemetry:
 
         with start_span_message_publisher(tracer, subject) as span:
             try:
-                result = await self.nc.publish(subject, body, headers=headers, **kwargs)
+                await self.nc.publish(subject, body, headers=headers, **kwargs)
                 msg_sent_counter.inc({"subject": subject, "status": metrics.OK})
             except Exception as error:
                 set_span_exception(span, error)
                 msg_sent_counter.inc({"subject": subject, "status": metrics.ERROR})
                 raise error
-
-        return result
 
     async def request(
         self,

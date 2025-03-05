@@ -29,7 +29,7 @@ format:
 lint:
 	ruff check --config=../ruff.toml .
 	ruff format --check --config=../ruff.toml .
-	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
+	mypy --config-file=../mypy.ini .
 
 # pytest doesn't support test discovery across our multiple "top-level folders"
 # so we need to run all test targets one by one

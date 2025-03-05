@@ -19,7 +19,7 @@
 #
 from contextlib import ExitStack
 from dataclasses import dataclass
-from typing import Any, Generator
+from typing import Any, Generator, Iterator
 from unittest.mock import patch
 
 import pytest
@@ -112,7 +112,7 @@ def azurite() -> Generator[AzuriteFixture, None, None]:
 
 
 @pytest.fixture(scope="function")
-def azure_storage_settings(azurite: AzuriteFixture) -> dict[str, Any]:
+def azure_storage_settings(azurite: AzuriteFixture) -> Iterator[dict[str, Any]]:
     settings = {
         "file_backend": FileBackendConfig.AZURE,
         "azure_account_url": azurite.account_url,
