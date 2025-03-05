@@ -18,6 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 from .catalog import parse_catalog  # noqa: F401
 from .find import parse_find  # noqa: F401
+from .graph import parse_graph_search  # noqa: F401

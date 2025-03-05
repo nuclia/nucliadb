@@ -20,6 +20,7 @@
 import pytest
 from httpx import AsyncClient
 
+from nucliadb_models.metadata import RelationEntity, RelationNodeType
 from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldType,
@@ -142,7 +143,6 @@ async def test_broker_message_relations(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_extracted_relations(
-    nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     standalone_knowledgebox,
@@ -246,3 +246,170 @@ async def create_broker_message_with_relations():
     bm.field_metadata.append(fcmw)
 
     return bm
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_user_defined_knowledge_graph(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox,
+):
+    kbid = standalone_knowledgebox
+
+    entities = {
+        "Anastasia": RelationEntity(value="Anastasia", type=RelationNodeType.ENTITY, group="PERSON"),
+        "Anna": RelationEntity(value="Anna", type=RelationNodeType.ENTITY, group="PERSON"),
+        "Apollo": RelationEntity(value="Apollo", type=RelationNodeType.ENTITY, group="PROJECT"),
+        "Cat": RelationEntity(value="Cat", type=RelationNodeType.ENTITY, group="ANIMAL"),
+        "Climbing": RelationEntity(value="Climbing", type=RelationNodeType.ENTITY, group="ACTIVITY"),
+        "Computer science": RelationEntity(
+            value="Computer science", type=RelationNodeType.ENTITY, group="STUDY_FIELD"
+        ),
+        "Erin": RelationEntity(value="Erin", type=RelationNodeType.ENTITY, group="PERSON"),
+        "Jerry": RelationEntity(value="Jerry", type=RelationNodeType.ENTITY, group="ANIMAL"),
+        "Margaret": RelationEntity(value="Margaret", type=RelationNodeType.ENTITY, group="PERSON"),
+        "Mouse": RelationEntity(value="Mouse", type=RelationNodeType.ENTITY, group="ANIMAL"),
+        "New York": RelationEntity(value="New York", type=RelationNodeType.ENTITY, group="PLACE"),
+        "Olympic athlete": RelationEntity(
+            value="Olympic athlete", type=RelationNodeType.ENTITY, group="SPORT"
+        ),
+        "Peter": RelationEntity(value="Peter", type=RelationNodeType.ENTITY, group="PERSON"),
+        "Rocket": RelationEntity(value="Rocket", type=RelationNodeType.ENTITY, group="VEHICLE"),
+        "Tom": RelationEntity(value="Tom", type=RelationNodeType.ENTITY, group="ANIMAL"),
+        "UK": RelationEntity(value="UK", type=RelationNodeType.ENTITY, group="PLACE"),
+    }
+
+    graph = [
+        ("Anastasia", "IS_FRIEND", "Anna"),
+        ("Anna", "LIVE_IN", "New York"),
+        ("Anna", "LOVE", "Cat"),
+        ("Peter", "LIVE_IN", "New York"),
+    ]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Knowledge graph",
+            "slug": "knowledge-graph",
+            "summary": "User defined knowledge graph",
+            "usermetadata": {
+                "relations": [
+                    {
+                        "relation": "ENTITY",
+                        "label": relation,
+                        "from": entities[source].model_dump(),
+                        "to": entities[target].model_dump(),
+                    }
+                    for source, relation, target in graph
+                ],
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=basic")
+    assert resp.status_code == 200
+    user_graph = resp.json()["usermetadata"]["relations"]
+    assert len(user_graph) == len(graph)
+
+    # Update graph
+
+    graph.extend(
+        [
+            ("Anna", "FOLLOW", "Erin"),
+            ("Apollo", "IS", "Rocket"),
+            ("Erin", "BORN_IN", "UK"),
+            ("Erin", "IS", "Olympic athlete"),
+            ("Erin", "LOVE", "Climbing"),
+            ("Jerry", "IS", "Mouse"),
+            ("Margaret", "DEVELOPED", "Apollo"),
+            ("Margaret", "WORK_IN", "Computer science"),
+            ("Tom", "CHASE", "Jerry"),
+            ("Tom", "IS", "Cat"),
+        ]
+    )
+
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{rid}",
+        json={
+            "usermetadata": {
+                "relations": [
+                    {
+                        "relation": "ENTITY",
+                        "label": relation,
+                        "from": entities[source].model_dump(),
+                        "to": entities[target].model_dump(),
+                    }
+                    for source, relation, target in graph
+                ],
+            },
+        },
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=basic")
+    assert resp.status_code == 200
+    user_graph = resp.json()["usermetadata"]["relations"]
+    assert len(user_graph) == len(graph)
+
+    # Search graph
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query_entities": [
+                {
+                    "name": entities["Anna"].value,
+                    "type": entities["Anna"].type.value,
+                    "subtype": entities["Anna"].group,
+                }
+            ],
+            "features": ["relations"],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    retrieved_graph = set()
+    for source, subgraph in body["relations"]["entities"].items():
+        for target in subgraph["related_to"]:
+            if target["direction"] == "in":
+                path = (source, "-", target["relation_label"], "->", target["entity"])
+            else:
+                path = (source, "<-", target["relation_label"], "-", target["entity"])
+
+            assert path not in retrieved_graph
+            retrieved_graph.add(path)
+
+    for relation in retrieved_graph:
+        print(relation)
+
+    assert len(retrieved_graph) == 4
+
+    from tests.utils.dirty_index import mark_dirty, wait_for_sync
+
+    await mark_dirty()
+    await wait_for_sync()
+
+    # Use graph search endpoints
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "value": "FOLLOW",
+                },
+                "destination": {
+                    "value": "Erin",
+                },
+            },
+            "top_k": 20,
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["paths"]) == 1

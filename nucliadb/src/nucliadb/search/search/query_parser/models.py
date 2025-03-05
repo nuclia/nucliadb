@@ -101,3 +101,11 @@ class CatalogQuery(BaseModel):
     faceted: list[str]
     page_size: int
     page_number: int
+
+
+### Graph
+
+
+# right now, we don't need any special treatment or generalization, so this
+# private and public models are the same
+class GraphRetrieval(search_models.GraphSearchRequest): ...

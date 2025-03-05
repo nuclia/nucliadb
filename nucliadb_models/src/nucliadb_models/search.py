@@ -2128,3 +2128,28 @@ def parse_custom_prompt(item: AskRequest) -> CustomPrompt:
 def parse_rephrase_prompt(item: AskRequest) -> Optional[str]:
     prompt = parse_custom_prompt(item)
     return prompt.rephrase
+
+
+class GraphNode(BaseModel):
+    value: str
+
+
+class GraphRelation(BaseModel):
+    value: str
+
+
+class GraphPath(BaseModel):
+    source: GraphNode
+    relation: GraphRelation
+    destination: GraphNode
+
+
+class GraphSearchRequest(BaseModel):
+    query: GraphPath
+    top_k: int
+
+
+class GraphSearchResponse(BaseModel):
+    paths: list[GraphPath]
+
+    pass
