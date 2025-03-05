@@ -17,10 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import Awaitable, Callable
+
 from nucliadb.backups.create import backup_kb_retried
 from nucliadb.backups.delete import delete_backup
 from nucliadb.backups.models import CreateBackupRequest, DeleteBackupRequest, RestoreBackupRequest
 from nucliadb.backups.restore import restore_kb_retried
+from nucliadb.common.context import ApplicationContext
 from nucliadb.tasks import create_consumer, create_producer
 from nucliadb.tasks.consumer import NatsTaskConsumer
 from nucliadb.tasks.producer import NatsTaskProducer
@@ -107,3 +110,17 @@ async def delete(backup_id: str) -> None:
         backup_id=backup_id,
     )
     await producer.send(msg)
+
+
+async def initialize_consumers(context: ApplicationContext) -> list[Callable[[], Awaitable[None]]]:
+    creator = creator_consumer()
+    restorer = restorer_consumer()
+    deleter = deleter_consumer()
+    await creator.initialize(context)
+    await restorer.initialize(context)
+    await deleter.initialize(context)
+    return [
+        creator.finalize,
+        restorer.finalize,
+        deleter.finalize,
+    ]
