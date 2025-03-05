@@ -26,7 +26,7 @@ dev = [
     "nucliadb_workspace[nucliadb,nidx,sdk]",
     # Linting
     "mypy-protobuf>=3.6.0",
-    "mypy==1.14",
+    "mypy==1.15",
     "ruff==0.9.9",
     "pre-commit==2.20.0",
     # Testing

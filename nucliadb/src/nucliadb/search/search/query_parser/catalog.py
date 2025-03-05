@@ -169,13 +169,16 @@ async def parse_filter_expression(expr: ResourceFilterExpression, kbid: str) -> 
     elif isinstance(expr, Resource):
         if expr.id:
             cat.resource_id = expr.id
-        else:
+        elif expr.slug:
             rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(
                 kbid=kbid, slug=expr.slug
             )
             if rid is None:
                 raise InvalidQueryError("slug", f"Cannot find slug {expr.slug}")
             cat.resource_id = rid
+        else:
+            # Cannot happen due to model validation
+            raise ValueError("Resource needs id or slug")
     elif isinstance(expr, DateCreated):
         cat.date = CatalogExpression.Date(field="created_at", since=expr.since, until=expr.until)
     elif isinstance(expr, DateModified):

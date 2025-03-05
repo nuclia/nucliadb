@@ -35,8 +35,12 @@ it's transaction
 
 """
 
-import sys
 from functools import wraps
+from typing import Awaitable, Callable, TypeVar
+
+from typing_extensions import Concatenate, ParamSpec
+
+from nucliadb.common.maindb.driver import Transaction
 
 from . import kb as kb_dm
 from . import labels as labels_dm
@@ -44,34 +48,24 @@ from . import resources as resources_dm
 from . import synonyms as synonyms_dm
 from .utils import with_ro_transaction, with_transaction
 
-# XXX: we are using the not exported _ParamSpec to support 3.9. Whenever we
-# upgrade to >= 3.10 we'll be able to use ParamSpecKwargs and improve the
-# typing. We are abusing of ParamSpec anywat to better support text editors, so
-# we also need to ignore some mypy complains
-
-__python_version = (sys.version_info.major, sys.version_info.minor)
-if __python_version == (3, 9):
-    from typing_extensions import ParamSpec
-else:
-    from typing import ParamSpec  # type: ignore
-
 P = ParamSpec("P")
+T = TypeVar("T")
 
 
-def ro_txn_wrap(fun: P) -> P:  # type: ignore
+def ro_txn_wrap(fun: Callable[Concatenate[Transaction, P], Awaitable[T]]) -> Callable[P, Awaitable[T]]:
     @wraps(fun)
-    async def wrapper(**kwargs: P.kwargs):
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         async with with_ro_transaction() as txn:
-            return await fun(txn, **kwargs)
+            return await fun(txn, *args, **kwargs)
 
     return wrapper
 
 
-def rw_txn_wrap(fun: P) -> P:  # type: ignore
+def rw_txn_wrap(fun: Callable[Concatenate[Transaction, P], Awaitable[T]]) -> Callable[P, Awaitable[T]]:
     @wraps(fun)
-    async def wrapper(**kwargs: P.kwargs):
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         async with with_transaction() as txn:
-            result = await fun(txn, **kwargs)
+            result = await fun(txn, *args, **kwargs)
             await txn.commit()
             return result
 
