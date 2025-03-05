@@ -304,10 +304,7 @@ class Resource:
     @processor_observer.wrap({"type": "generate_index_message"})
     async def generate_index_message(self, reindex: bool = False) -> ResourceBrain:
         brain = ResourceBrain(rid=self.uuid)
-        origin = await self.get_origin()
         basic = await self.get_basic()
-        if basic is not None:
-            brain.set_resource_metadata(basic, origin)
         await self.compute_security(brain)
         await self.compute_global_tags(brain)
         fields = await self.get_fields(force=True)
