@@ -2131,17 +2131,20 @@ def parse_rephrase_prompt(item: AskRequest) -> Optional[str]:
 
 
 class GraphNode(BaseModel):
-    value: str
+    value: Optional[str] = None
+    type: Optional[RelationNodeType] = None
+    group: Optional[str] = None
 
 
 class GraphRelation(BaseModel):
-    value: str
+    label: Optional[str] = None
 
 
 class GraphPath(BaseModel):
-    source: GraphNode
-    relation: GraphRelation
-    destination: GraphNode
+    source: Optional[GraphNode] = None
+    relation: Optional[GraphRelation] = None
+    destination: Optional[GraphNode] = None
+    undirected: bool = False
 
 
 class GraphSearchRequest(BaseModel):
@@ -2151,5 +2154,3 @@ class GraphSearchRequest(BaseModel):
 
 class GraphSearchResponse(BaseModel):
     paths: list[GraphPath]
-
-    pass

@@ -21,6 +21,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb_models.metadata import RelationEntity, RelationNodeType
+from nucliadb_models.search import GraphPath, GraphSearchResponse
 from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldType,
@@ -259,6 +260,7 @@ def knowledge_graph() -> tuple[dict[str, RelationEntity], list[tuple[str, str, s
         "Computer science": RelationEntity(
             value="Computer science", type=RelationNodeType.ENTITY, group="STUDY_FIELD"
         ),
+        "Dimitri": RelationEntity(value="Dimitri", type=RelationNodeType.ENTITY, group="PERSON"),
         "Erin": RelationEntity(value="Erin", type=RelationNodeType.ENTITY, group="PERSON"),
         "Jerry": RelationEntity(value="Jerry", type=RelationNodeType.ENTITY, group="ANIMAL"),
         "Margaret": RelationEntity(value="Margaret", type=RelationNodeType.ENTITY, group="PERSON"),
@@ -389,10 +391,123 @@ async def test_user_defined_knowledge_graph(
     for relation in retrieved_graph:
         print(relation)
 
-    assert len(retrieved_graph) == 4
+    assert len(retrieved_graph) == 5
 
-    # Use graph search endpoints
 
+@pytest.mark.deploy_modes("standalone")
+async def test_graph_search(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+    knowledge_graph: tuple[dict[str, RelationEntity], list[tuple[str, str, str]]],
+):
+    kbid = standalone_knowledgebox
+    entities, paths = knowledge_graph
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "usermetadata": {
+                "relations": [
+                    {
+                        "relation": "ENTITY",
+                        "label": relation,
+                        "from": entities[source].model_dump(),
+                        "to": entities[target].model_dump(),
+                    }
+                    for source, relation, target in paths
+                ],
+            },
+        },
+    )
+    assert resp.status_code == 201
+
+    def simple_paths(paths: list[GraphPath]) -> list[tuple[str, str, str]]:
+        simple_paths = []
+        for path in paths:
+            # response should never return empty nodes/relations
+            assert path.source is not None
+            assert path.source.value is not None
+            assert path.relation is not None
+            assert path.relation.label is not None
+            assert path.destination is not None
+            assert path.destination.value is not None
+            simple_paths.append((path.source.value, path.relation.label, path.destination.value))
+        return simple_paths
+
+    ## Directed paths
+
+    # (:Erin)-[]->(:UK)
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "source": {
+                    "value": "Erin",
+                    "group": "PERSON",
+                },
+                "destination": {
+                    "value": "UK",
+                    "group": "PLACE",
+                },
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert ("Erin", "BORN_IN", "UK") in paths
+
+    # (:PERSON)-[]->(:PLACE)
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "source": {
+                    "group": "PERSON",
+                },
+                "destination": {
+                    "group": "PLACE",
+                },
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 4
+    assert ("Anna", "LIVE_IN", "New York") in paths
+    assert ("Anna", "WORK_IN", "New York") in paths
+    assert ("Erin", "BORN_IN", "UK") in paths
+    assert ("Peter", "LIVE_IN", "New York") in paths
+
+    # (:PERSON)-[LIVE_IN]->(:PLACE)
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "source": {
+                    "group": "PERSON",
+                },
+                "relation": {
+                    "label": "LIVE_IN",
+                },
+                "destination": {
+                    "group": "PLACE",
+                },
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 2
+    assert ("Anna", "LIVE_IN", "New York") in paths
+    assert ("Peter", "LIVE_IN", "New York") in paths
+
+    ## Undirected paths
+    # (:Anna)-[:IS_FRIEND]-()
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/graph",
         json={
@@ -401,15 +516,14 @@ async def test_user_defined_knowledge_graph(
                     "value": "Anna",
                 },
                 "relation": {
-                    "value": "FOLLOW",
+                    "label": "IS_FRIEND",
                 },
-                "destination": {
-                    "value": "Erin",
-                },
+                "undirected": True,
             },
-            "top_k": 20,
+            "top_k": 100,
         },
     )
     assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["paths"]) == 1
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert ("Anastasia", "IS_FRIEND", "Anna") in paths

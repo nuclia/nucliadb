@@ -20,6 +20,7 @@
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
+from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.query_parser.models import GraphRetrieval
@@ -86,22 +87,37 @@ async def _graph_search(
 def graph_retrieval_to_pb(payload: GraphRetrieval) -> nodereader_pb2.GraphSearchRequest:
     pb = nodereader_pb2.GraphSearchRequest()
 
-    # path query
-    pb.query.path.source.value = payload.query.source.value
-    pb.query.path.relation.value = payload.query.relation.value
-    pb.query.path.destination.value = payload.query.destination.value
+    if payload.query.source is not None:
+        source = payload.query.source
+        if source.value is not None:
+            pb.query.path.source.value = source.value
+        if source.type is not None:
+            pb.query.path.source.node_type = RelationNodeTypeMap[source.type]
+        if source.group is not None:
+            pb.query.path.source.node_subtype = source.group
+
+    if payload.query.destination is not None:
+        destination = payload.query.destination
+        if destination.value is not None:
+            pb.query.path.destination.value = destination.value
+        if destination.type is not None:
+            pb.query.path.destination.node_type = RelationNodeTypeMap[destination.type]
+        if destination.group is not None:
+            pb.query.path.destination.node_subtype = destination.group
+
+    if payload.query.relation is not None:
+        relation = payload.query.relation
+        if relation.label is not None:
+            pb.query.path.relation.value = relation.label
+
+    pb.query.path.undirected = payload.query.undirected
 
     pb.top_k = payload.top_k
-    print(f"Graph request: {pb}")
     return pb
 
 
 def build_graph_response(results: list[nodereader_pb2.GraphSearchResponse]) -> GraphSearchResponse:
-    print(f"Graph results: {results}")
-    response = GraphSearchResponse(
-        paths=[],
-    )
-
+    paths = []
     for shard_results in results:
         for pb_path in shard_results.graph:
             source = shard_results.nodes[pb_path.source]
@@ -113,12 +129,13 @@ def build_graph_response(results: list[nodereader_pb2.GraphSearchResponse]) -> G
                     value=source.value,
                 ),
                 relation=GraphRelation(
-                    value=relation.label,
+                    label=relation.label,
                 ),
                 destination=GraphNode(
                     value=destination.value,
                 ),
             )
-            response.paths.append(path)
+            paths.append(path)
 
+    response = GraphSearchResponse(paths=paths)
     return response
