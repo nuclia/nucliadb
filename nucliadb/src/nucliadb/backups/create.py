@@ -35,7 +35,7 @@ from nucliadb.export_import.utils import (
     get_labels,
 )
 from nucliadb.tasks.retries import TaskRetryHandler
-from nucliadb_protos import resources_pb2, writer_pb2
+from nucliadb_protos import backups_pb2, resources_pb2, writer_pb2
 from nucliadb_utils.storages.storage import StorageField
 
 
@@ -250,5 +250,14 @@ async def upload_to_bucket(context: ApplicationContext, bytes_iterator: AsyncIte
 
 
 async def notify_backup_completed(context: ApplicationContext, kbid: str, backup_id: str):
-    # TODO
+    metadata = await get_metadata(context, kbid, backup_id)
+    if metadata is None:  # pragma: no cover
+        raise ValueError("Backup metadata not found")
+    notification = backups_pb2.BackupCreatedNotification()
+    notification.finished_at.FromDatetime(datetime.now(tz=timezone.utc))
+    notification.kbid = kbid
+    notification.backup_id = backup_id
+    notification.size = metadata.total_size
+    notification.resources = metadata.total_resources
+    # TODO: send notification to idp nats stream when it's available
     pass
