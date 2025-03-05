@@ -151,9 +151,9 @@ class BrokerMessageBuilder:
                 pass
 
             elif field.id.field_type == rpb.FieldType.TEXT:
-                assert (
-                    field.extracted.text is not None
-                ), "only text fields with extracted data are supported nowadays"
+                assert field.extracted.text is not None, (
+                    "only text fields with extracted data are supported nowadays"
+                )
 
             elif field.id.field_type == rpb.FieldType.FILE:
                 file_field = self.bm.files[field.id.field]

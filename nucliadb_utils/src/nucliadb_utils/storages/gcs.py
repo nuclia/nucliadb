@@ -371,7 +371,7 @@ class GCSStorageField(StorageField):
                 await self.storage.delete_upload(self.field.old_uri, self.field.bucket_name)
             except GoogleCloudException as e:
                 logger.warning(
-                    f"Could not delete existing google cloud file " f"with uri: {self.field.uri}: {e}"
+                    f"Could not delete existing google cloud file with uri: {self.field.uri}: {e}"
                 )
         if self.field.upload_uri != self.key:
             await self.move(self.field.upload_uri, self.key, self.field.bucket_name, self.bucket)
@@ -551,7 +551,7 @@ class GCSStorage(Storage):
                     data = {"text": text}
                 if resp.status == 404:
                     logger.warning(
-                        f"Attempt to delete not found gcloud: {data}, " f"status: {resp.status}",
+                        f"Attempt to delete not found gcloud: {data}, status: {resp.status}",
                         exc_info=True,
                     )
                 elif resp.status not in (200, 204):
@@ -658,7 +658,7 @@ class GCSStorage(Storage):
                     logger.error("Not implemented")
                 elif resp.status == 404:
                     logger.error(
-                        f"Attempt to delete not found gcloud: {data}, " f"status: {resp.status}",
+                        f"Attempt to delete not found gcloud: {data}, status: {resp.status}",
                         exc_info=True,
                     )
                 else:

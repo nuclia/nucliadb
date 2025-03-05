@@ -28,4 +28,4 @@ class InvalidPBClass(Exception):
     def __init__(self, source: Type, destination: Type):
         self.source = source
         self.destination = destination
-        super().__init__("Source and destination does not match " f"{self.source} - {self.destination}")
+        super().__init__(f"Source and destination does not match {self.source} - {self.destination}")
