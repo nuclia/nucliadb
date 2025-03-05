@@ -45,6 +45,7 @@ from nucliadb_utils.authentication import requires
     description="Search on the Knowledge Box graph and retrieve triplets of vertex-edge-vertex",
     response_model=GraphSearchResponse,
     response_model_exclude_unset=True,
+    include_in_schema=False,
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
