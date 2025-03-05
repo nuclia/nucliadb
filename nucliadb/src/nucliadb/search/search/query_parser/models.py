@@ -28,6 +28,7 @@ from pydantic import (
 )
 
 from nucliadb_models import search as search_models
+from nucliadb_protos import nodereader_pb2
 
 ### Retrieval
 
@@ -106,6 +107,6 @@ class CatalogQuery(BaseModel):
 ### Graph
 
 
-# right now, we don't need any special treatment or generalization, so this
-# private and public models are the same
-class GraphRetrieval(search_models.GraphSearchRequest): ...
+# Right now, we don't need a more generic model for graph queries, we can
+# directly use the protobuffer directly
+GraphRetrieval = nodereader_pb2.GraphSearchRequest

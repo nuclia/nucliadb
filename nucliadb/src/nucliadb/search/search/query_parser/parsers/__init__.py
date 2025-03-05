@@ -20,4 +20,4 @@
 
 from .catalog import parse_catalog  # noqa: F401
 from .find import parse_find  # noqa: F401
-from .graph import parse_graph_search  # noqa: F401
+from .graph import parse_graph_node_search, parse_graph_relation_search, parse_graph_search  # noqa: F401

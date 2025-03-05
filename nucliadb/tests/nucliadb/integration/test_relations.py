@@ -21,7 +21,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb_models.metadata import RelationEntity, RelationNodeType
-from nucliadb_models.search import GraphPath, GraphSearchResponse
+from nucliadb_models.search import GraphNodesSearchResponse, GraphPath, GraphSearchResponse
 from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldType,
@@ -435,6 +435,145 @@ async def test_graph_search(
             simple_paths.append((path.source.value, path.relation.label, path.destination.value))
         return simple_paths
 
+    ## Node queries
+
+    # ()-[]->()
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "source": {},
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 16
+
+    # (:PERSON)-[]->()
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "source": {
+                    "group": "PERSON",
+                },
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 12
+
+    # (:Anna)-[]->()
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "source": {
+                    "value": "Anna",
+                    "group": "PERSON",
+                },
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 4
+    assert ("Anna", "FOLLOW", "Erin") in paths
+    assert ("Anna", "LIVE_IN", "New York") in paths
+    assert ("Anna", "LOVE", "Cat") in paths
+    assert ("Anna", "WORK_IN", "New York") in paths
+
+    # ()-[]->(:Anna)
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "destination": {
+                    "value": "Anna",
+                    "group": "PERSON",
+                },
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert ("Anastasia", "IS_FRIEND", "Anna") in paths
+
+    # (:Anna)
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "source": {
+                    "value": "Anna",
+                    "group": "PERSON",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 5
+    assert ("Anna", "FOLLOW", "Erin") in paths
+    assert ("Anna", "LIVE_IN", "New York") in paths
+    assert ("Anna", "LOVE", "Cat") in paths
+    assert ("Anna", "WORK_IN", "New York") in paths
+    assert ("Anastasia", "IS_FRIEND", "Anna") in paths
+
+    ## Fuzzy node queries
+
+    # (:Anna)
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "source": {
+                    "value": "Anna",
+                    "group": "PERSON",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 5
+    assert ("Anna", "FOLLOW", "Erin") in paths
+    assert ("Anna", "LIVE_IN", "New York") in paths
+    assert ("Anna", "LOVE", "Cat") in paths
+    assert ("Anna", "WORK_IN", "New York") in paths
+    assert ("Anastasia", "IS_FRIEND", "Anna") in paths
+
+    ## Relations
+
+    # ()-[LIVE_IN]->()
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "relation": {
+                    "label": "LIVE_IN",
+                },
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 2
+    assert ("Anna", "LIVE_IN", "New York") in paths
+    assert ("Peter", "LIVE_IN", "New York") in paths
+
     ## Directed paths
 
     # (:Erin)-[]->(:UK)
@@ -527,3 +666,48 @@ async def test_graph_search(
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
     assert len(paths) == 1
     assert ("Anastasia", "IS_FRIEND", "Anna") in paths
+
+
+@pytest.mark.skip(reason="Early development")
+@pytest.mark.deploy_modes("standalone")
+async def test_graph_nodes_search(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+    knowledge_graph: tuple[dict[str, RelationEntity], list[tuple[str, str, str]]],
+):
+    kbid = standalone_knowledgebox
+    entities, paths = knowledge_graph
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "usermetadata": {
+                "relations": [
+                    {
+                        "relation": "ENTITY",
+                        "label": relation,
+                        "from": entities[source].model_dump(),
+                        "to": entities[target].model_dump(),
+                    }
+                    for source, relation, target in paths
+                ],
+            },
+        },
+    )
+    assert resp.status_code == 201
+
+    # (:PERSON)-[]->()
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph/nodes",
+        json={
+            "query": {
+                "position": "source",
+                "group": "PERSON",
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    nodes = GraphNodesSearchResponse.model_validate(resp.json()).nodes
+    assert len(nodes) == 12

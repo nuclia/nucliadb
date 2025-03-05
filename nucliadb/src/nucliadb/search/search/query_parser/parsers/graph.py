@@ -19,14 +19,96 @@
 #
 
 
-from nucliadb.search.search.query_parser.models import (
-    GraphRetrieval,
-)
+from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
+from nucliadb.search.search.query_parser.models import GraphRetrieval
 from nucliadb_models.search import (
+    GraphNodePosition,
+    GraphNodesSearchRequest,
+    GraphRelationsSearchRequest,
     GraphSearchRequest,
 )
+from nucliadb_protos import nodereader_pb2
 
 
-async def parse_graph_search(kbid: str, item: GraphSearchRequest) -> GraphRetrieval:
-    parsed: GraphRetrieval = item  # type: ignore
-    return parsed
+async def parse_graph_search(item: GraphSearchRequest) -> GraphRetrieval:
+    pb = nodereader_pb2.GraphSearchRequest()
+
+    query = item.query
+    if query.source is not None:
+        source = query.source
+        if source.value is not None:
+            pb.query.path.source.value = source.value
+        if source.type is not None:
+            pb.query.path.source.node_type = RelationNodeTypeMap[source.type]
+        if source.group is not None:
+            pb.query.path.source.node_subtype = source.group
+
+    if query.destination is not None:
+        destination = query.destination
+        if destination.value is not None:
+            pb.query.path.destination.value = destination.value
+        if destination.type is not None:
+            pb.query.path.destination.node_type = RelationNodeTypeMap[destination.type]
+        if destination.group is not None:
+            pb.query.path.destination.node_subtype = destination.group
+
+    if query.relation is not None:
+        relation = query.relation
+        if relation.label is not None:
+            pb.query.path.relation.value = relation.label
+
+    pb.query.path.undirected = query.undirected
+
+    pb.top_k = item.top_k
+    return pb
+
+
+async def parse_graph_node_search(item: GraphNodesSearchRequest) -> GraphRetrieval:
+    pb = nodereader_pb2.GraphSearchRequest()
+
+    query = item.query
+
+    if query.position == GraphNodePosition.ANY:
+        if query.value is not None:
+            pb.query.node.value = query.value
+        if query.type is not None:
+            pb.query.node.node_type = RelationNodeTypeMap[query.type]
+        if query.group is not None:
+            pb.query.node.node_subtype = query.group
+
+    elif query.position == GraphNodePosition.SOURCE:
+        source = query
+        if source.value is not None:
+            pb.query.path.source.value = source.value
+        if source.type is not None:
+            pb.query.path.source.node_type = RelationNodeTypeMap[source.type]
+        if source.group is not None:
+            pb.query.path.source.node_subtype = source.group
+
+    elif query.position == GraphNodePosition.DESTINATION:
+        destination = query
+        if destination.value is not None:
+            pb.query.path.destination.value = destination.value
+        if destination.type is not None:
+            pb.query.path.destination.node_type = RelationNodeTypeMap[destination.type]
+        if destination.group is not None:
+            pb.query.path.destination.node_subtype = destination.group
+
+    else:  # pragma: nocover
+        raise ValueError(f"Unknown graph node position: {query.position}")
+
+    pb.top_k = item.top_k
+    return pb
+
+
+async def parse_graph_relation_search(item: GraphRelationsSearchRequest) -> GraphRetrieval:
+    pb = nodereader_pb2.GraphSearchRequest()
+
+    query = item.query
+
+    relation = query
+    if relation.label is not None:
+        pb.query.path.relation.value = relation.label
+
+    pb.top_k = item.top_k
+    return pb

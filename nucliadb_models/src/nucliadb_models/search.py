@@ -2130,10 +2130,44 @@ def parse_rephrase_prompt(item: AskRequest) -> Optional[str]:
     return prompt.rephrase
 
 
+class GraphNodeValue(BaseModel):
+    value: Optional[str]
+    fuzzy_distance: Optional[int] = Field(
+        default=None,
+        le=2,
+    )
+    is_prefix: bool = False
+
+    @model_validator(mode="after")
+    def fuzzy_and_prefix_on_value(self) -> Self:
+        if self.value is None:
+            if self.fuzzy_distance is not None:
+                raise ValueError("Fuzzy distance can only be used with a value")
+            if self.is_prefix:
+                raise ValueError("Prefix can only be used with a value")
+
+        if len(self.value) < 3 and self.fuzzy_distance is not None:
+            raise ValueError(
+                "Fuzzy distance must be used with values containing, at least, 3 characters"
+            )
+
+        return self
+
+
 class GraphNode(BaseModel):
-    value: Optional[str] = None
+    value: Union[str, GraphNodeValue, None] = None
     type: Optional[RelationNodeType] = None
     group: Optional[str] = None
+
+
+class GraphNodePosition(str, Enum):
+    ANY = "any"
+    SOURCE = "source"
+    DESTINATION = "destination"
+
+
+class PositionedGraphNode(GraphNode):
+    position: GraphNodePosition = GraphNodePosition.ANY
 
 
 class GraphRelation(BaseModel):
@@ -2147,10 +2181,42 @@ class GraphPath(BaseModel):
     undirected: bool = False
 
 
-class GraphSearchRequest(BaseModel):
+class BaseGraphSearchRequest(BaseModel):
+    top_k: int = Field(default=50, title="Number of results to retrieve")
+
+
+class BaseGraphSearchResponse(BaseModel):
+    pass
+
+
+# Graph path queries
+
+
+class GraphSearchRequest(BaseGraphSearchRequest):
     query: GraphPath
-    top_k: int
 
 
-class GraphSearchResponse(BaseModel):
+class GraphSearchResponse(BaseGraphSearchResponse):
     paths: list[GraphPath]
+
+
+# Node queries
+
+
+class GraphNodesSearchRequest(BaseGraphSearchRequest):
+    query: PositionedGraphNode
+
+
+class GraphNodesSearchResponse(BaseGraphSearchResponse):
+    nodes: list[GraphNode]
+
+
+# Relation queries
+
+
+class GraphRelationsSearchRequest(BaseGraphSearchRequest):
+    query: GraphRelation
+
+
+class GraphRelationsSearchResponse(BaseGraphSearchResponse):
+    relations: list[GraphRelation]
