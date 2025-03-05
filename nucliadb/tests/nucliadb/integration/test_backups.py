@@ -25,6 +25,7 @@ from httpx import AsyncClient
 from nucliadb.backups.create import backup_kb, get_metadata
 from nucliadb.backups.restore import restore_kb
 from nucliadb.backups.settings import settings as backups_settings
+from nucliadb.backups.utils import exists_backup
 from nucliadb.common.context import ApplicationContext
 
 
@@ -111,7 +112,11 @@ async def test_backup(nucliadb_reader: AsyncClient, src_kb: str, dst_kb: str):
     backups_settings.backup_resources_concurrency = 2
     backups_settings.restore_resources_concurrency = 2
 
+    assert await exists_backup(context.blob_storage, backup_id) is False
+
     await backup_kb(context, src_kb, backup_id)
+
+    assert await exists_backup(context.blob_storage, backup_id) is True
 
     # Make sure that the backup metadata is cleaned up
     assert await get_metadata(context, src_kb, backup_id) is None

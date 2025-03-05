@@ -20,6 +20,8 @@
 import uuid
 from typing import AsyncIterator
 
+from nucliadb.backups import tasks as backup_tasks
+from nucliadb.backups import utils as backup_utils
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
 from nucliadb.common.cluster.manager import get_nidx_fake_node
@@ -471,14 +473,37 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def CreateBackup(
         self, request: backups_pb2.CreateBackupRequest, context=None
     ) -> backups_pb2.CreateBackupResponse:
-        return backups_pb2.CreateBackupResponse()
+        if not await exists_kb(request.kbid):
+            return backups_pb2.CreateBackupResponse(
+                status=backups_pb2.CreateBackupResponse.Status.KB_NOT_FOUND
+            )
+        await backup_tasks.create(request.kbid, request.backup_id)
+        return backups_pb2.CreateBackupResponse(status=backups_pb2.CreateBackupResponse.Status.OK)
 
     async def DeleteBackup(
         self, request: backups_pb2.DeleteBackupRequest, context=None
     ) -> backups_pb2.DeleteBackupResponse:
-        return backups_pb2.DeleteBackupResponse()
+        if not await backup_utils.exists_backup(self.storage, request.backup_id):
+            return backups_pb2.DeleteBackupResponse(
+                status=backups_pb2.DeleteBackupResponse.Status.OK,
+            )
+        await backup_tasks.delete(request.backup_id)
+        return backups_pb2.DeleteBackupResponse(status=backups_pb2.DeleteBackupResponse.Status.OK)
 
     async def RestoreBackup(
         self, request: backups_pb2.RestoreBackupRequest, context=None
     ) -> backups_pb2.RestoreBackupResponse:
-        return backups_pb2.RestoreBackupResponse()
+        if not await exists_kb(request.kbid):
+            return backups_pb2.RestoreBackupResponse(
+                status=backups_pb2.RestoreBackupResponse.Status.NOT_FOUND
+            )
+        if not await backup_utils.exists_backup(self.storage, request.backup_id):
+            return backups_pb2.RestoreBackupResponse(
+                status=backups_pb2.RestoreBackupResponse.Status.NOT_FOUND
+            )
+        await backup_tasks.restore(request.kbid, request.backup_id)
+        return backups_pb2.RestoreBackupResponse(status=backups_pb2.RestoreBackupResponse.Status.OK)
+
+
+async def exists_kb(kbid: str) -> bool:
+    return await datamanagers.atomic.kb.exists_kb(kbid=kbid)
