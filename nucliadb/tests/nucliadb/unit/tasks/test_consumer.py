@@ -30,15 +30,22 @@ class Message(pydantic.BaseModel):
 
 
 def test_create_consumer():
-    stream = MagicMock()
-
     async def callback(): ...
 
-    consumer = create_consumer("foo", stream=stream, msg_type=Message, callback=callback)
+    consumer = create_consumer(
+        "foo",
+        stream="stream",
+        stream_subjects=["stream.>"],
+        consumer_subject="stream.subject",
+        msg_type=Message,
+        callback=callback,
+    )
     assert not consumer.initialized
 
     assert consumer.name == "foo"
-    assert consumer.stream == stream
+    assert consumer.stream == "stream"
+    assert consumer.stream_subjects == ["stream.>"]
+    assert consumer.consumer_subject == "stream.subject"
     assert consumer.callback == callback
     assert consumer.msg_type == Message
 
@@ -50,7 +57,14 @@ class TestSubscriptionWorker:
 
     @pytest.fixture(scope="function")
     async def consumer(self, context, callback):
-        consumer = create_consumer("foo", stream=MagicMock(), callback=callback, msg_type=Message)
+        consumer = create_consumer(
+            "foo",
+            stream="stream",
+            stream_subjects=["stream.>"],
+            consumer_subject="stream.subject",
+            callback=callback,
+            msg_type=Message,
+        )
         await consumer.initialize(context)
         yield consumer
 

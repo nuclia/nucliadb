@@ -19,7 +19,7 @@
 #
 import json
 from datetime import datetime
-from typing import AsyncGenerator, Union
+from typing import AsyncGenerator, Type, Union, cast
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.export_import import logger
@@ -59,11 +59,12 @@ class ExportImportDataManager:
         if data is None or data == b"":
             raise MetadataNotFound()
         decoded = data.decode("utf-8")
+        model_type: Union[Type[ExportMetadata], Type[ImportMetadata]]
         if type == "export":
             model_type = ExportMetadata
         elif type == "import":
-            model_type = ImportMetadata  # type: ignore
-        else:
+            model_type = ImportMetadata
+        else:  # pragma: no cover
             raise ValueError(f"Invalid type: {type}")
         json_decoded = json.loads(decoded)
 
@@ -73,8 +74,10 @@ class ExportImportDataManager:
             json_decoded["total"] = 0
         if json_decoded.get("processed") is None:
             json_decoded["processed"] = 0
-
         return model_type.model_validate(json_decoded)
+
+    async def get_export_metadata(self, kbid: str, id: str) -> ExportMetadata:
+        return cast(ExportMetadata, await self.get_metadata("export", kbid, id))
 
     async def set_metadata(
         self,
