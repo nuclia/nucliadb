@@ -23,16 +23,16 @@ class CreateBackupRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     BACKUP_ID_FIELD_NUMBER: builtins.int
-    KBID_FIELD_NUMBER: builtins.int
+    KB_ID_FIELD_NUMBER: builtins.int
     backup_id: builtins.str
-    kbid: builtins.str
+    kb_id: builtins.str
     def __init__(
         self,
         *,
         backup_id: builtins.str = ...,
-        kbid: builtins.str = ...,
+        kb_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "kbid", b"kbid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "kb_id", b"kb_id"]) -> None: ...
 
 global___CreateBackupRequest = CreateBackupRequest
 
@@ -71,16 +71,16 @@ class DeleteBackupRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     BACKUP_ID_FIELD_NUMBER: builtins.int
-    KBID_FIELD_NUMBER: builtins.int
+    KB_ID_FIELD_NUMBER: builtins.int
     backup_id: builtins.str
-    kbid: builtins.str
+    kb_id: builtins.str
     def __init__(
         self,
         *,
         backup_id: builtins.str = ...,
-        kbid: builtins.str = ...,
+        kb_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "kbid", b"kbid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "kb_id", b"kb_id"]) -> None: ...
 
 global___DeleteBackupRequest = DeleteBackupRequest
 
@@ -117,16 +117,16 @@ class RestoreBackupRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     BACKUP_ID_FIELD_NUMBER: builtins.int
-    KBID_FIELD_NUMBER: builtins.int
+    KB_ID_FIELD_NUMBER: builtins.int
     backup_id: builtins.str
-    kbid: builtins.str
+    kb_id: builtins.str
     def __init__(
         self,
         *,
         backup_id: builtins.str = ...,
-        kbid: builtins.str = ...,
+        kb_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "kbid", b"kbid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "kb_id", b"kb_id"]) -> None: ...
 
 global___RestoreBackupRequest = RestoreBackupRequest
 
@@ -166,7 +166,9 @@ class BackupCreatedNotification(google.protobuf.message.Message):
 
     FINISHED_AT_FIELD_NUMBER: builtins.int
     BACKUP_ID_FIELD_NUMBER: builtins.int
+    SIZE_FIELD_NUMBER: builtins.int
     backup_id: builtins.str
+    size: builtins.int
     @property
     def finished_at(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     def __init__(
@@ -174,8 +176,9 @@ class BackupCreatedNotification(google.protobuf.message.Message):
         *,
         finished_at: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         backup_id: builtins.str = ...,
+        size: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["finished_at", b"finished_at"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "finished_at", b"finished_at"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "finished_at", b"finished_at", "size", b"size"]) -> None: ...
 
 global___BackupCreatedNotification = BackupCreatedNotification

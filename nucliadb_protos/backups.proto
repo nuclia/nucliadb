@@ -8,7 +8,7 @@ import "google/protobuf/timestamp.proto";
 
 message CreateBackupRequest {
     string backup_id = 1;
-    string kbid = 2;
+    string kb_id = 2;
 }
 
 
@@ -24,7 +24,7 @@ message CreateBackupResponse {
 
 message DeleteBackupRequest {
     string backup_id = 1;
-    string kbid = 2;
+    string kb_id = 2;
 }
 
 
@@ -38,7 +38,7 @@ message DeleteBackupResponse {
 
 message RestoreBackupRequest {
     string backup_id = 1;
-    string kbid = 2;
+    string kb_id = 2;
 }
 
 
@@ -55,4 +55,5 @@ message RestoreBackupResponse {
 message BackupCreatedNotification {
     google.protobuf.Timestamp finished_at = 1;
     string backup_id = 2;
+    uint64 size = 3;
 }
