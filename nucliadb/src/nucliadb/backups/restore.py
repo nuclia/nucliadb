@@ -127,13 +127,13 @@ class ResourceBackupReader:
             yield chunk
 
     async def _iter(self, total_bytes: int, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
-        read_bytes = 0
-        while read_bytes < total_bytes:
-            to_read = min(chunk_size, total_bytes - read_bytes)
+        remaining_bytes = total_bytes
+        while remaining_bytes > 0:
+            to_read = min(chunk_size, remaining_bytes)
             chunk = await self.read(to_read)
             yield chunk
-            read_bytes += len(chunk)
-        assert read_bytes == total_bytes
+            remaining_bytes -= len(chunk)
+        assert remaining_bytes == 0
 
     async def read_tarinfo(self):
         raw_tar_header = await self.read(512)
