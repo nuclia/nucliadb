@@ -22,7 +22,11 @@ import tarfile
 from datetime import datetime, timezone
 from typing import AsyncIterator, Optional
 
-from nucliadb.backups.const import MaindbKeys, StorageKeys
+from nucliadb.backups.const import (
+    BackupFinishedStream,
+    MaindbKeys,
+    StorageKeys,
+)
 from nucliadb.backups.models import BackupMetadata, CreateBackupRequest
 from nucliadb.backups.settings import settings
 from nucliadb.common import datamanagers
@@ -36,7 +40,9 @@ from nucliadb.export_import.utils import (
 )
 from nucliadb.tasks.retries import TaskRetryHandler
 from nucliadb_protos import backups_pb2, resources_pb2, writer_pb2
+from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.storages.storage import StorageField
+from nucliadb_utils.utilities import get_audit
 
 
 async def backup_kb_retried(context: ApplicationContext, msg: CreateBackupRequest):
@@ -250,14 +256,22 @@ async def upload_to_bucket(context: ApplicationContext, bytes_iterator: AsyncIte
 
 
 async def notify_backup_completed(context: ApplicationContext, kbid: str, backup_id: str):
+    audit = get_audit()
+    if audit is None or not isinstance(audit, StreamAuditStorage):
+        # We rely on the stream audit utility as it already holds a connection
+        # to the idp nats server. If it's not available, we can't send the notification.
+        return
     metadata = await get_metadata(context, kbid, backup_id)
     if metadata is None:  # pragma: no cover
         raise ValueError("Backup metadata not found")
     notification = backups_pb2.BackupCreatedNotification()
     notification.finished_at.FromDatetime(datetime.now(tz=timezone.utc))
-    notification.kbid = kbid
+    notification.kb_id = kbid
     notification.backup_id = backup_id
     notification.size = metadata.total_size
     notification.resources = metadata.total_resources
-    # TODO: send notification to idp nats stream when it's available
-    pass
+    await audit.js.publish(
+        BackupFinishedStream.subject,
+        notification.SerializeToString(),
+        stream=BackupFinishedStream.name,
+    )

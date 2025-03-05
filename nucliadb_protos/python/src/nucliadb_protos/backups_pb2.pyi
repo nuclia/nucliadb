@@ -166,11 +166,11 @@ class BackupCreatedNotification(google.protobuf.message.Message):
 
     FINISHED_AT_FIELD_NUMBER: builtins.int
     BACKUP_ID_FIELD_NUMBER: builtins.int
-    KBID_FIELD_NUMBER: builtins.int
+    KB_ID_FIELD_NUMBER: builtins.int
     SIZE_FIELD_NUMBER: builtins.int
     RESOURCES_FIELD_NUMBER: builtins.int
     backup_id: builtins.str
-    kbid: builtins.str
+    kb_id: builtins.str
     size: builtins.int
     resources: builtins.int
     @property
@@ -180,11 +180,11 @@ class BackupCreatedNotification(google.protobuf.message.Message):
         *,
         finished_at: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         backup_id: builtins.str = ...,
-        kbid: builtins.str = ...,
+        kb_id: builtins.str = ...,
         size: builtins.int = ...,
         resources: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["finished_at", b"finished_at"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "finished_at", b"finished_at", "kbid", b"kbid", "resources", b"resources", "size", b"size"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "finished_at", b"finished_at", "kb_id", b"kb_id", "resources", b"resources", "size", b"size"]) -> None: ...
 
 global___BackupCreatedNotification = BackupCreatedNotification

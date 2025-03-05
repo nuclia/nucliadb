@@ -55,7 +55,7 @@ message RestoreBackupResponse {
 message BackupCreatedNotification {
     google.protobuf.Timestamp finished_at = 1;
     string backup_id = 2;
-    string kbid = 3;
+    string kb_id = 3;
     uint64 size = 4;
     uint64 resources = 5;
 }

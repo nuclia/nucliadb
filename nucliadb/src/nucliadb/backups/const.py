@@ -33,3 +33,8 @@ class StorageKeys:
     RESOURCE = "backups/{backup_id}/resources/{resource_id}.tar"
     ENTITIES = "backups/{backup_id}/entities.pb"
     LABELS = "backups/{backup_id}/labels.pb"
+
+
+class BackupFinishedStream:
+    name = "backups"
+    subject = "backups.creation_finished"
