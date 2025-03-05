@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import functools
-from typing import AsyncGenerator, AsyncIterator, Callable, Optional, Union
+from typing import AsyncGenerator, AsyncIterator, Callable, Optional
 
 from google.protobuf.message import DecodeError as ProtobufDecodeError
 
@@ -40,7 +40,7 @@ from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_utils.const import Streams
 from nucliadb_utils.transaction import MaxTransactionSizeExceededError
 
-BinaryStream = Union[AsyncGenerator[bytes, None], AsyncIterator[bytes]]
+BinaryStream = AsyncIterator[bytes]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
 
 
