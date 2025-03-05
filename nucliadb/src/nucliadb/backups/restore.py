@@ -22,9 +22,9 @@
 import asyncio
 import functools
 import tarfile
-from typing import AsyncIterator, Callable, Union
+from typing import AsyncIterator, Callable, Optional, Union
 
-from nucliadb.backups.const import StorageKeys
+from nucliadb.backups.const import MaindbKeys, StorageKeys
 from nucliadb.backups.models import RestoreBackupRequest
 from nucliadb.backups.settings import settings
 from nucliadb.common.context import ApplicationContext
@@ -69,19 +69,42 @@ async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
 
 
 async def restore_resources(context: ApplicationContext, kbid: str, backup_id: str):
+    last = await get_last_restored_resource_id(context, kbid, backup_id)
     tasks = []
     async for object_info in context.blob_storage.iterate_objects(
         bucket=settings.backups_bucket,
         prefix=StorageKeys.RESOURCES_PREFIX.format(kbid=kbid, backup_id=backup_id),
+        start=last,
     ):
         resource_id = object_info.name.split("/")[-1].rstrip(".tar")
         tasks.append(asyncio.create_task(restore_resource(context, kbid, backup_id, resource_id)))
         if len(tasks) > settings.restore_resources_concurrency:
             await asyncio.gather(*tasks)
             tasks = []
+            await set_last_restored_resource_id(context, kbid, backup_id, resource_id)
     if len(tasks) > 0:
         await asyncio.gather(*tasks)
         tasks = []
+
+
+async def get_last_restored_resource_id(
+    context: ApplicationContext, kbid: str, backup_id: str
+) -> Optional[str]:
+    key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)
+    async with context.kv_driver.transaction(read_only=True) as txn:
+        raw = await txn.get(key)
+        if raw is None:
+            return None
+        return raw.decode()
+
+
+async def set_last_restored_resource_id(
+    context: ApplicationContext, kbid: str, backup_id: str, resource_id: str
+):
+    key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)
+    async with context.kv_driver.transaction() as txn:
+        await txn.set(key, resource_id.encode())
+        await txn.commit()
 
 
 class CloudFileBinary:

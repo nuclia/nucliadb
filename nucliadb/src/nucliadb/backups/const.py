@@ -21,6 +21,7 @@
 
 class MaindbKeys:
     METADATA = "kbs/{kbid}/backups/{backup_id}"
+    LAST_RESTORED = "kbs/{kbid}/backup/{backup_id}/last_restored"
 
 
 class StorageKeys:

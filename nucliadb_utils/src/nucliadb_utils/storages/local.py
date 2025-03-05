@@ -280,9 +280,13 @@ class LocalStorage(Storage):
             deleted = False
         return deleted
 
-    async def iterate_objects(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
+    async def iterate_objects(
+        self, bucket: str, prefix: str, start: Optional[str] = None
+    ) -> AsyncGenerator[ObjectInfo, None]:
         pathname = f"{self.get_file_path(bucket, prefix)}*"
-        for key in glob.glob(pathname):
+        for key in sorted(glob.glob(pathname)):
+            if start is not None and key <= start:
+                continue
             if key.endswith(".metadata"):
                 # Skip metadata files -- they are internal to the local-storage implementation.
                 continue

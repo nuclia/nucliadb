@@ -695,15 +695,20 @@ class GCSStorage(Storage):
                     errors.capture_message(msg, "error", scope)
         return deleted, conflict
 
-    async def iterate_objects(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
+    async def iterate_objects(
+        self, bucket: str, prefix: str, start: Optional[str] = None
+    ) -> AsyncGenerator[ObjectInfo, None]:
         if self.session is None:
             raise AttributeError()
         url = "{}/{}/o".format(self.object_base_url, bucket)
         headers = await self.get_access_headers()
+        params = {"prefix": prefix}
+        if start:
+            params["startOffset"] = start
         async with self.session.get(
             url,
             headers=headers,
-            params={"prefix": prefix},
+            params=params,
         ) as resp:
             assert resp.status == 200
             data = await resp.json()

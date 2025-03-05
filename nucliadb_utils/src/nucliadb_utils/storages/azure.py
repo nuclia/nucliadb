@@ -211,8 +211,10 @@ class AzureStorage(Storage):
         bucket_name = self.get_bucket_name(kbid)
         return await self.object_store.bucket_delete(bucket_name)
 
-    async def iterate_objects(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
-        async for obj in self.object_store.iterate(bucket, prefix):
+    async def iterate_objects(
+        self, bucket: str, prefix: str, start: Optional[str] = None
+    ) -> AsyncGenerator[ObjectInfo, None]:
+        async for obj in self.object_store.iterate(bucket, prefix, start):
             yield obj
 
     async def insert_object(self, bucket_name: str, key: str, data: bytes) -> None:
@@ -373,9 +375,13 @@ class AzureObjectStore(ObjectStore):
         async for chunk in downloader.chunks():
             yield chunk
 
-    async def iterate(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
+    async def iterate(
+        self, bucket: str, prefix: str, start: Optional[str] = None
+    ) -> AsyncGenerator[ObjectInfo, None]:
         container_client = self.service_client.get_container_client(bucket)
         async for blob in container_client.list_blobs(name_starts_with=prefix):
+            if start and blob.name <= start:
+                continue
             yield ObjectInfo(name=blob.name)
 
     async def get_metadata(self, bucket: str, key: str) -> ObjectMetadata:

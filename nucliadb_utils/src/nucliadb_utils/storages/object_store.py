@@ -120,7 +120,9 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
         yield b""
 
     @abc.abstractmethod
-    async def iterate(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
+    async def iterate(
+        self, bucket: str, prefix: str, start: Optional[str] = None
+    ) -> AsyncGenerator[ObjectInfo, None]:
         raise NotImplementedError()
         yield ObjectInfo(name="")
 
