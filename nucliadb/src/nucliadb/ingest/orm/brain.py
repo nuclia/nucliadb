@@ -430,7 +430,6 @@ class ResourceBrain:
             )
 
         # relations
-        self.brain.ClearField("relations")
         self.brain.relations.extend(basic.usermetadata.relations)
 
     def _set_resource_labels(self, basic: Basic, origin: Optional[Origin]):
