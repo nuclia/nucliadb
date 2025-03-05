@@ -314,12 +314,18 @@ class Processor:
                 # index message
 
                 if resource:
-                    await resource.compute_global_text()
-                    await resource.compute_global_tags(resource.indexer)
-                    await resource.compute_security(resource.indexer)
                     if message.reindex:
                         # when reindexing, let's just generate full new index message
+                        # TODO - This should be improved in the future as it's not optimal for very large resources:
+                        # As of now, there are some API operations that require fully reindexing all the fields of a resource.
+                        # An example of this is classification label changes - we need to reindex all the fields of a resource to
+                        # propagate the label changes to the index.
                         resource.replace_indexer(await resource.generate_index_message(reindex=True))
+                    else:
+                        # TODO - Ideally we should only update the fields that have been changed in the current transaction.
+                        await resource.compute_global_text()
+                        await resource.compute_global_tags(resource.indexer)
+                        await resource.compute_security(resource.indexer)
 
                 if resource and resource.modified:
                     await pgcatalog_update(txn, kbid, resource)
