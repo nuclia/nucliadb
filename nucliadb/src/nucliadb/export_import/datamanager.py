@@ -74,7 +74,7 @@ class ExportImportDataManager:
             json_decoded["total"] = 0
         if json_decoded.get("processed") is None:
             json_decoded["processed"] = 0
-        return model_type.model_load_json(json_decoded)  # type: ignore
+        return model_type.model_validate(json_decoded)
 
     async def get_export_metadata(self, kbid: str, id: str) -> ExportMetadata:
         return cast(ExportMetadata, await self.get_metadata("export", kbid, id))
