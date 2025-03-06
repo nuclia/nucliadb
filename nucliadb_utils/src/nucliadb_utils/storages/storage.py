@@ -502,7 +502,9 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     async def finalize(self) -> None: ...
 
     @abc.abstractmethod
-    async def iterate_objects(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
+    async def iterate_objects(
+        self, bucket: str, prefix: str, start: Optional[str] = None
+    ) -> AsyncGenerator[ObjectInfo, None]:
         raise NotImplementedError()
         yield ObjectInfo(name="")
 
@@ -552,6 +554,13 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             await self.chunked_upload_object(bucket, key, data)
         else:
             await self.insert_object(bucket, key, data)
+
+    @abc.abstractmethod
+    async def create_bucket(self, bucket_name: str) -> None:
+        """
+        Create a new bucket in the storage.
+        """
+        ...
 
 
 async def iter_and_add_size(

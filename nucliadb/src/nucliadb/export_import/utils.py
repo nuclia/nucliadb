@@ -40,7 +40,7 @@ from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_utils.const import Streams
 from nucliadb_utils.transaction import MaxTransactionSizeExceededError
 
-BinaryStream = AsyncGenerator[bytes, None]
+BinaryStream = AsyncIterator[bytes]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
 
 
@@ -237,8 +237,11 @@ async def download_binary(
     context: ApplicationContext, cf: resources_pb2.CloudFile
 ) -> AsyncGenerator[bytes, None]:
     bucket_name = context.blob_storage.get_bucket_name_from_cf(cf)
+    downloaded_bytes = 0
     async for data in context.blob_storage.download(bucket_name, cf.uri):
         yield data
+        downloaded_bytes += len(data)
+    assert downloaded_bytes == cf.size, "Downloaded bytes do not match the expected size"
 
 
 async def get_entities(context: ApplicationContext, kbid: str) -> kb_pb2.EntitiesGroups:
@@ -416,6 +419,8 @@ class ExportStreamReader:
 class TaskRetryHandler:
     """
     Class that wraps an import/export task and adds retry logic to it.
+
+    TODO: This should be refactored to use generic task retry logic at tasks/retries.py::TaskRetryHandler
     """
 
     def __init__(

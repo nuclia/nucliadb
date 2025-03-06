@@ -55,6 +55,9 @@ async def storage_test(storage: Storage):
     kbid1 = uuid4().hex
     kbid2 = uuid4().hex
 
+    await storage.create_bucket("foobar")
+    await storage.upload_object("foobar", "foo", b"bar")
+
     assert await storage.create_kb(kbid1)
     assert await storage.create_kb(kbid2)
 
@@ -89,11 +92,13 @@ async def storage_test(storage: Storage):
     # Delete one of the keys
     await storage.delete_upload(key2, bucket)
 
-    # Check that the downloaded key is not there
+    # Check that the deleted key is not there
     names = []
     async for object_info in storage.iterate_objects(bucket, ""):
         names.append(object_info.name)
     assert names == [key1]
+
+    await _test_iterate_objects(storage)
 
     # Check insert object
     key = "barbafoo"
@@ -110,3 +115,27 @@ async def storage_test(storage: Storage):
     assert deleted
 
     await storage.delete_kb(kbid2)
+
+
+async def _test_iterate_objects(storage: Storage):
+    bucket = "itertest"
+    await storage.create_bucket(bucket)
+
+    # Create a few objects
+    for i in range(10):
+        await storage.upload_object(bucket, f"key{i}/foo", b"mytestinfo")
+
+    # Check that all keys are there
+    keys = [object_info.name async for object_info in storage.iterate_objects(bucket, prefix="")]
+    assert keys == [f"key{i}/foo" for i in range(10)]
+
+    # Check prefix
+    keys = [object_info.name async for object_info in storage.iterate_objects(bucket, prefix="key0")]
+    assert keys == ["key0/foo"]
+
+    # Check start
+    keys = [
+        object_info.name
+        async for object_info in storage.iterate_objects(bucket, prefix="key", start="key0/foo")
+    ]
+    assert keys == [f"key{i}/foo" for i in range(1, 10)]

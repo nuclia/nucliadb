@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from math import ceil
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -68,7 +69,7 @@ class StorageTest(Storage):
     def get_bucket_name(self, kbid):
         return "bucket"
 
-    async def iterate_objects(self, bucket_name, prefix):
+    async def iterate_objects(self, bucket_name, prefix, start: Optional[str] = None):
         yield ObjectInfo(name="uri")
 
     async def download(self, bucket_name, uri):
@@ -94,6 +95,9 @@ class StorageTest(Storage):
         return True
 
     async def insert_object(self, bucket, key, data):
+        pass
+
+    async def create_bucket(self, bucket_name):
         pass
 
 

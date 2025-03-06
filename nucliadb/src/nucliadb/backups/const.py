@@ -17,5 +17,25 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from .consumer import NatsTaskConsumer, create_consumer  # noqa: F401
-from .producer import NatsTaskProducer, create_producer  # noqa: F401
+
+
+class MaindbKeys:
+    METADATA = "kbs/{kbid}/backups/{backup_id}"
+    LAST_RESTORED = "kbs/{kbid}/backup/{backup_id}/last_restored"
+
+
+class StorageKeys:
+    """
+    Defines the key templates used to store backup files in the backups bucket of the storage.
+    """
+
+    BACKUP_PREFIX = "backups/{backup_id}/"
+    RESOURCES_PREFIX = "backups/{backup_id}/resources/"
+    RESOURCE = "backups/{backup_id}/resources/{resource_id}.tar"
+    ENTITIES = "backups/{backup_id}/entities.pb"
+    LABELS = "backups/{backup_id}/labels.pb"
+
+
+class BackupFinishedStream:
+    name = "backups"
+    subject = "backups.creation_finished"

@@ -17,5 +17,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from .consumer import NatsTaskConsumer, create_consumer  # noqa: F401
-from .producer import NatsTaskProducer, create_producer  # noqa: F401
+
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
+
+class BackupSettings(BaseSettings):
+    backups_bucket: str = Field(
+        default="backups", description="The bucket where the backups are stored."
+    )
+    restore_resources_concurrency: int = Field(
+        default=10, description="The number of concurrent resource restores."
+    )
+    backup_resources_concurrency: int = Field(
+        default=10, description="The number of concurrent resource backups."
+    )
+
+
+settings = BackupSettings()

@@ -422,10 +422,14 @@ class S3Storage(Storage):
         else:
             raise AttributeError("No valid uri")
 
-    async def iterate_objects(self, bucket: str, prefix: str = "/") -> AsyncGenerator[ObjectInfo, None]:
+    async def iterate_objects(
+        self, bucket: str, prefix: str = "/", start: Optional[str] = None
+    ) -> AsyncGenerator[ObjectInfo, None]:
         paginator = self._s3aioclient.get_paginator("list_objects")
-        async for result in paginator.paginate(Bucket=bucket, Prefix=prefix):
-            for item in result.get("Contents", []):
+        async for result in paginator.paginate(
+            Bucket=bucket, Prefix=prefix, PaginationConfig={"StartingToken": start}
+        ):
+            for item in result.get("Contents") or []:
                 yield ObjectInfo(name=item["Key"])
 
     async def create_kb(self, kbid: str):

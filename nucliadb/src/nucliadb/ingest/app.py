@@ -22,6 +22,7 @@ import importlib.metadata
 from typing import Awaitable, Callable
 
 from nucliadb import health
+from nucliadb.backups.tasks import initialize_consumers as initialize_backup_consumers
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.nidx import start_nidx_utility
@@ -154,6 +155,7 @@ async def main_subscriber_workers():  # pragma: no cover
     await exports_consumer.initialize(context)
     imports_consumer = get_imports_consumer()
     await imports_consumer.initialize(context)
+    backup_consumers_finalizers = await initialize_backup_consumers(context)
 
     await run_until_exit(
         [
@@ -165,7 +167,10 @@ async def main_subscriber_workers():  # pragma: no cover
             metrics_server.shutdown,
             grpc_health_finalizer,
             context.finalize,
+            exports_consumer.finalize,
+            imports_consumer.finalize,
         ]
+        + backup_consumers_finalizers
         + finalizers
     )
 
@@ -216,6 +221,7 @@ def run_subscriber_workers() -> None:  # pragma: no cover
         - audit fields subscriber
         - export/import subscriber
         - materializer subscriber
+        - backups subscribers
     """
     setup_configuration()
     asyncio.run(main_subscriber_workers())

@@ -17,5 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from .consumer import NatsTaskConsumer, create_consumer  # noqa: F401
-from .producer import NatsTaskProducer, create_producer  # noqa: F401
+
+from nucliadb.backups.const import StorageKeys
+from nucliadb.backups.settings import settings
+from nucliadb_utils.storages.storage import Storage
+
+
+async def exists_backup(storage: Storage, backup_id: str) -> bool:
+    async for _ in storage.iterate_objects(
+        bucket=settings.backups_bucket,
+        prefix=StorageKeys.BACKUP_PREFIX.format(backup_id=backup_id),
+    ):
+        return True
+    return False
