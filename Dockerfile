@@ -40,6 +40,8 @@ RUN pdm use -f /app && pdm sync -G nucliadb --no-editable
 # This is the main image, it just copies the virtual env into the base image
 #
 FROM python:3.12-slim-bookworm
+# media-types needed for content type checks (python mimetype module uses this)
+RUN apt update && apt install -y media-types && apt clean && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app /app
 
 # HTTP
