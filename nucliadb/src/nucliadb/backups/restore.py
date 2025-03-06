@@ -69,25 +69,26 @@ async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
 
 
 async def restore_resources(context: ApplicationContext, kbid: str, backup_id: str):
-    last = await get_last_restored_resource_id(context, kbid, backup_id)
+    last_restored = await get_last_restored_resource_key(context, kbid, backup_id)
     tasks = []
     async for object_info in context.blob_storage.iterate_objects(
         bucket=settings.backups_bucket,
         prefix=StorageKeys.RESOURCES_PREFIX.format(kbid=kbid, backup_id=backup_id),
-        start=last,
+        start=last_restored,
     ):
-        resource_id = object_info.name.split("/")[-1].rstrip(".tar")
+        key = object_info.name
+        resource_id = key.split("/")[-1].rstrip(".tar")
         tasks.append(asyncio.create_task(restore_resource(context, kbid, backup_id, resource_id)))
         if len(tasks) > settings.restore_resources_concurrency:
             await asyncio.gather(*tasks)
             tasks = []
-            await set_last_restored_resource_id(context, kbid, backup_id, resource_id)
+            await set_last_restored_resource_key(context, kbid, backup_id, key)
     if len(tasks) > 0:
         await asyncio.gather(*tasks)
         tasks = []
 
 
-async def get_last_restored_resource_id(
+async def get_last_restored_resource_key(
     context: ApplicationContext, kbid: str, backup_id: str
 ) -> Optional[str]:
     key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)
@@ -98,7 +99,7 @@ async def get_last_restored_resource_id(
         return raw.decode()
 
 
-async def set_last_restored_resource_id(
+async def set_last_restored_resource_key(
     context: ApplicationContext, kbid: str, backup_id: str, resource_id: str
 ):
     key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)

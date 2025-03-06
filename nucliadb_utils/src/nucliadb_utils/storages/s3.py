@@ -429,7 +429,7 @@ class S3Storage(Storage):
         async for result in paginator.paginate(
             Bucket=bucket, Prefix=prefix, PaginationConfig={"StartingToken": start}
         ):
-            for item in result.get("Contents", []):
+            for item in result.get("Contents") or []:
                 yield ObjectInfo(name=item["Key"])
 
     async def create_kb(self, kbid: str):

@@ -18,12 +18,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
+from datetime import datetime
 
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.backups.create import backup_kb, get_metadata
-from nucliadb.backups.restore import restore_kb
+from nucliadb.backups.const import StorageKeys
+from nucliadb.backups.create import backup_kb, get_metadata, set_metadata
+from nucliadb.backups.models import BackupMetadata
+from nucliadb.backups.restore import restore_kb, set_last_restored_resource_key
+from nucliadb.backups.settings import BackupSettings
 from nucliadb.backups.settings import settings as backups_settings
 from nucliadb.backups.utils import exists_backup
 from nucliadb.common.context import ApplicationContext
@@ -101,16 +105,32 @@ async def dst_kb(
     yield kbid
 
 
-@pytest.mark.deploy_modes("standalone")
-async def test_backup(nucliadb_reader: AsyncClient, src_kb: str, dst_kb: str):
-    backup_id = "foo"
-    context = ApplicationContext()
-    await context.initialize()
-    await context.blob_storage.create_bucket(backups_settings.backups_bucket)
-
+@pytest.fixture(scope="function")
+def settings():
     # We lower the concurrency in tests to avoid exhausting psql connections
     backups_settings.backup_resources_concurrency = 2
     backups_settings.restore_resources_concurrency = 2
+    yield backups_settings
+
+
+@pytest.fixture(scope="function")
+async def context(nucliadb_reader: AsyncClient, settings: BackupSettings):
+    context = ApplicationContext()
+    await context.initialize()
+    await context.blob_storage.create_bucket(backups_settings.backups_bucket)
+    yield context
+    await context.finalize()
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_backup(
+    nucliadb_reader: AsyncClient,
+    src_kb: str,
+    dst_kb: str,
+    settings: BackupSettings,
+    context: ApplicationContext,
+):
+    backup_id = str(uuid.uuid4())
 
     assert await exists_backup(context.blob_storage, backup_id) is False
 
@@ -138,3 +158,69 @@ async def test_backup(nucliadb_reader: AsyncClient, src_kb: str, dst_kb: str):
     resp = await nucliadb_reader.get(f"/kb/{dst_kb}/labelset/foo")
     assert resp.status_code == 200
     assert len(resp.json()["labels"]) == 1
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_backup_resumed(
+    nucliadb_reader: AsyncClient,
+    src_kb: str,
+    dst_kb: str,
+    settings: BackupSettings,
+    context: ApplicationContext,
+):
+    backup_id = str(uuid.uuid4())
+
+    # Read all rids
+    resp = await nucliadb_reader.get(f"/kb/{src_kb}/resources")
+    assert resp.status_code == 200
+    rids = sorted([r["id"] for r in resp.json()["resources"]])
+
+    # Set the metadata as if the backup was interrupted right after exporting the first resource
+    metadata = BackupMetadata(
+        kbid=src_kb, requested_at=datetime.now(), total_resources=len(rids), missing_resources=rids[1:]
+    )
+    await set_metadata(context, src_kb, backup_id, metadata)
+
+    await backup_kb(context, src_kb, backup_id)
+
+    await restore_kb(context, dst_kb, backup_id)
+
+    # Check that the resources were restored
+    resp = await nucliadb_reader.get(f"/kb/{dst_kb}/resources")
+    assert resp.status_code == 200
+    resources = resp.json()["resources"]
+    assert len(resources) == 9
+    assert sorted([r["id"] for r in resources]) == rids[1:]
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_restore_resumed(
+    nucliadb_reader: AsyncClient,
+    src_kb: str,
+    dst_kb: str,
+    settings: BackupSettings,
+    context: ApplicationContext,
+):
+    backup_id = str(uuid.uuid4())
+
+    # Read all rids
+    resp = await nucliadb_reader.get(f"/kb/{src_kb}/resources")
+    assert resp.status_code == 200
+    rids = sorted([r["id"] for r in resp.json()["resources"]])
+
+    await backup_kb(context, src_kb, backup_id)
+
+    # Set the last restored resource id as if the restore was interrupted right after restoring the first resource
+    last_restored_key = StorageKeys.RESOURCE.format(
+        kbid=src_kb, backup_id=backup_id, resource_id=rids[0]
+    )
+    await set_last_restored_resource_key(context, dst_kb, backup_id, last_restored_key)
+
+    await restore_kb(context, dst_kb, backup_id)
+
+    # Check that the correct resources were restored
+    resp = await nucliadb_reader.get(f"/kb/{dst_kb}/resources")
+    assert resp.status_code == 200
+    resources = resp.json()["resources"]
+    assert len(resources) == 9
+    assert sorted([r["id"] for r in resources]) == rids[1:]
