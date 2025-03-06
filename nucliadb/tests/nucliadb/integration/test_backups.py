@@ -26,7 +26,11 @@ from httpx import AsyncClient
 from nucliadb.backups.const import StorageKeys
 from nucliadb.backups.create import backup_kb, get_metadata, set_metadata
 from nucliadb.backups.models import BackupMetadata
-from nucliadb.backups.restore import get_last_restored_resource_key, restore_kb, set_last_restored_resource_key
+from nucliadb.backups.restore import (
+    get_last_restored_resource_key,
+    restore_kb,
+    set_last_restored_resource_key,
+)
 from nucliadb.backups.settings import BackupSettings
 from nucliadb.backups.settings import settings as backups_settings
 from nucliadb.backups.utils import exists_backup
