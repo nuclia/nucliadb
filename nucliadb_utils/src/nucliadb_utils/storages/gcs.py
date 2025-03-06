@@ -714,6 +714,10 @@ class GCSStorage(Storage):
             data = await resp.json()
             if "items" in data:
                 for item in data["items"]:
+                    if start is not None and item["name"] == start:
+                        # Skip the start item to be compatible with all
+                        # storage implementations
+                        continue
                     yield ObjectInfo(name=item["name"])
 
         page_token = data.get("nextPageToken")

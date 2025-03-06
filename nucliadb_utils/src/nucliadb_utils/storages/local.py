@@ -283,14 +283,17 @@ class LocalStorage(Storage):
     async def iterate_objects(
         self, bucket: str, prefix: str, start: Optional[str] = None
     ) -> AsyncGenerator[ObjectInfo, None]:
-        pathname = f"{self.get_file_path(bucket, prefix)}*"
-        for key in sorted(glob.glob(pathname)):
+        bucket_path = self.get_bucket_path(bucket)
+        pathname = f"{self.get_file_path(bucket, prefix)}**/*"
+        for key in sorted(glob.glob(pathname, recursive=True)):
+            if not os.path.isfile(key):
+                continue
             if key.endswith(".metadata"):
                 # Skip metadata files -- they are internal to the local-storage implementation.
                 continue
-            if start is not None and key < start:
+            name = key.split(bucket_path)[-1].lstrip("/")
+            if start is not None and name <= start:
                 continue
-            name = key.split("/")[-1]
             yield ObjectInfo(name=name)
 
     async def download(self, bucket: str, key: str, range: Optional[Range] = None):

@@ -380,7 +380,7 @@ class AzureObjectStore(ObjectStore):
     ) -> AsyncGenerator[ObjectInfo, None]:
         container_client = self.service_client.get_container_client(bucket)
         async for blob in container_client.list_blobs(name_starts_with=prefix):
-            if start and blob.name < start:
+            if start and blob.name <= start:
                 continue
             yield ObjectInfo(name=blob.name)
 
