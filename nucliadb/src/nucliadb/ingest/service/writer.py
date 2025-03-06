@@ -473,11 +473,11 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def CreateBackup(
         self, request: backups_pb2.CreateBackupRequest, context=None
     ) -> backups_pb2.CreateBackupResponse:
-        if not await exists_kb(request.kbid):
+        if not await exists_kb(request.kb_id):
             return backups_pb2.CreateBackupResponse(
                 status=backups_pb2.CreateBackupResponse.Status.KB_NOT_FOUND
             )
-        await backup_tasks.create(request.kbid, request.backup_id)
+        await backup_tasks.create(request.kb_id, request.backup_id)
         return backups_pb2.CreateBackupResponse(status=backups_pb2.CreateBackupResponse.Status.OK)
 
     async def DeleteBackup(
@@ -493,7 +493,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def RestoreBackup(
         self, request: backups_pb2.RestoreBackupRequest, context=None
     ) -> backups_pb2.RestoreBackupResponse:
-        if not await exists_kb(request.kbid):
+        if not await exists_kb(request.kb_id):
             return backups_pb2.RestoreBackupResponse(
                 status=backups_pb2.RestoreBackupResponse.Status.NOT_FOUND
             )
@@ -501,7 +501,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return backups_pb2.RestoreBackupResponse(
                 status=backups_pb2.RestoreBackupResponse.Status.NOT_FOUND
             )
-        await backup_tasks.restore(request.kbid, request.backup_id)
+        await backup_tasks.restore(request.kb_id, request.backup_id)
         return backups_pb2.RestoreBackupResponse(status=backups_pb2.RestoreBackupResponse.Status.OK)
 
 

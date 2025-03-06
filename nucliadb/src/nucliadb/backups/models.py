@@ -23,12 +23,12 @@ from pydantic import BaseModel
 
 
 class CreateBackupRequest(BaseModel):
-    kbid: str
+    kb_id: str
     backup_id: str
 
 
 class RestoreBackupRequest(BaseModel):
-    kbid: str
+    kb_id: str
     backup_id: str
 
 
@@ -37,7 +37,7 @@ class DeleteBackupRequest(BaseModel):
 
 
 class BackupMetadata(BaseModel):
-    kbid: str
+    kb_id: str
     requested_at: datetime
     total_resources: int = 0
     missing_resources: list[str] = []

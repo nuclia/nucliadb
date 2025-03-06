@@ -52,7 +52,7 @@ async def create(kbid: str, backup_id: str) -> None:
         msg_type=CreateBackupRequest,
     )
     msg = CreateBackupRequest(
-        kbid=kbid,
+        kb_id=kbid,
         backup_id=backup_id,
     )
     await producer.send(msg)
@@ -80,7 +80,7 @@ async def restore(kbid: str, backup_id: str) -> None:
         msg_type=RestoreBackupRequest,
     )
     msg = RestoreBackupRequest(
-        kbid=kbid,
+        kb_id=kbid,
         backup_id=backup_id,
     )
     await producer.send(msg)
