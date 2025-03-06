@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from contextlib import ExitStack
-from typing import Any
+from typing import Any, AsyncIterator
 from unittest.mock import patch
 
 import pytest
@@ -62,7 +62,7 @@ def s3():
 
 
 @pytest.fixture(scope="function")
-async def s3_storage_settings(s3) -> dict[str, Any]:
+async def s3_storage_settings(s3) -> AsyncIterator[dict[str, Any]]:
     settings = {
         "file_backend": FileBackendConfig.S3,
         "s3_endpoint": s3,

@@ -91,7 +91,7 @@ async def create_test_database(base_url):
     ):
         for i in range(10):
             try:
-                dbname = f"_nucliadb_test_{random.randint(0,999999)}"
+                dbname = f"_nucliadb_test_{random.randint(0, 999999)}"
                 await cursor.execute(f"CREATE DATABASE {dbname}")
                 return dbname
             except psycopg.errors.DuplicateDatabase:

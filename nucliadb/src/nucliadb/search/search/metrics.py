@@ -59,7 +59,7 @@ rag_histogram = metrics.Histogram(
 
 
 class RAGMetrics:
-    def __init__(self):
+    def __init__(self: "RAGMetrics"):
         self.global_start = time.monotonic()
         self._start_times: dict[str, float] = {}
         self._end_times: dict[str, float] = {}

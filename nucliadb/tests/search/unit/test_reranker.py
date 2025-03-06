@@ -66,7 +66,7 @@ class DummyReranker(Reranker):
 
 async def test_rerank_find_response():
     """Validate manipulation of find response by the reranker"""
-    reranker: Reranker = DummyReranker(window=3)
+    reranker = DummyReranker(window=3)
 
     find_response = KnowledgeboxFindResults(
         resources={

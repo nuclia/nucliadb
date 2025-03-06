@@ -189,7 +189,7 @@ async def managed_serialize(
 
     include_values = ResourceProperties.VALUES in show
 
-    include_extracted_data = ResourceProperties.EXTRACTED in show and extracted is not []
+    include_extracted_data = ResourceProperties.EXTRACTED in show and extracted != []
 
     if ResourceProperties.BASIC in show:
         await orm_resource.get_basic()

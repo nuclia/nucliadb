@@ -281,7 +281,7 @@ class KBShardManager:
 class StandaloneKBShardManager(KBShardManager):
     max_ops_before_checks = 200
 
-    def __init__(self):
+    def __init__(self: "StandaloneKBShardManager"):
         super().__init__()
         self._lock = asyncio.Lock()
         self._change_count: dict[tuple[str, str], int] = {}

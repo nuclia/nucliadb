@@ -41,7 +41,7 @@ class EntitiesMetaCache:
     change the structure of this class or we'll break the index.
     """
 
-    def __init__(self):
+    def __init__(self: "EntitiesMetaCache") -> None:
         self.deleted_entities: dict[str, list[str]] = {}
         self.duplicate_entities: dict[str, dict[str, list[str]]] = {}
         # materialize by value for faster lookups

@@ -12,7 +12,7 @@ format:
 lint:
 	ruff check --config=../ruff.toml .
 	ruff format --check --config=../ruff.toml .
-	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini . --show-traceback
+	mypy --config-file=../mypy.ini . --show-traceback
 
 .PHONY: test
 test:

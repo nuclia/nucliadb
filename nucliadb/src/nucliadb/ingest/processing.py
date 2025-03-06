@@ -477,9 +477,9 @@ class ProcessingEngine:
 
 
 class DummyProcessingEngine(ProcessingEngine):
-    def __init__(self):
+    def __init__(self: "DummyProcessingEngine"):
         self.calls: list[list[Any]] = []
-        self.values = defaultdict(list)
+        self.values: dict[str, Any] = defaultdict(list)
         self.onprem = True
 
     async def initialize(self):

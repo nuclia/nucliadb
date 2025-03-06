@@ -392,7 +392,7 @@ class S3Storage(Storage):
             self._session = get_session()
         return self._session
 
-    async def initialize(self):
+    async def initialize(self: "S3Storage") -> None:
         session = AioSession()
         self._s3aioclient: AioBaseClient = await self._exit_stack.enter_async_context(
             session.create_client("s3", **self.opts)

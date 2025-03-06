@@ -550,7 +550,7 @@ def prepare_request(
 ):
     path = prepare_request_base(path_template, path_params, kwargs)
     data: Optional[RawRequestContent] = None
-    if request_type is not None and request_type != type(None):
+    if request_type is not None and request_type is not type(None):
         if content is not None:
             if isinstance(content, list):
                 data = _parse_list_of_pydantic(content)

@@ -19,7 +19,7 @@
 #
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 from unittest.mock import patch
 
 import pytest
@@ -29,7 +29,7 @@ from nucliadb_utils.storages.local import LocalStorage
 
 
 @pytest.fixture(scope="function")
-def local_storage_settings(tmp_path: Path) -> dict[str, Any]:
+def local_storage_settings(tmp_path: Path) -> Iterator[dict[str, Any]]:
     settings = {
         "file_backend": FileBackendConfig.LOCAL,
         "local_files": str((tmp_path / "blob").absolute()),

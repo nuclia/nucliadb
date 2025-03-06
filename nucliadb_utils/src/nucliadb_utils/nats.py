@@ -47,8 +47,9 @@ def get_traced_jetstream(
 
     if tracer_provider is not None and jetstream is not None:  # pragma: no cover
         logger.info(f"Configuring {service_name} jetstream with telemetry")
-        jetstream = JetStreamContextTelemetry(jetstream, service_name, tracer_provider)
-    return jetstream
+        return JetStreamContextTelemetry(jetstream, service_name, tracer_provider)
+    else:
+        return jetstream
 
 
 class MessageProgressUpdater:

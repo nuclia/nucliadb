@@ -28,7 +28,7 @@ from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 from .utils import get_path_template
 
 try:
-    from starlette_prometheus.middleware import (
+    from starlette_prometheus.middleware import (  # type: ignore
         EXCEPTIONS,
         REQUESTS,
         REQUESTS_IN_PROGRESS,

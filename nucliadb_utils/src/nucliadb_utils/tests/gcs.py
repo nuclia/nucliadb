@@ -20,7 +20,7 @@
 import re
 from concurrent.futures.thread import ThreadPoolExecutor
 from contextlib import ExitStack
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 from unittest.mock import patch
 
 import docker  # type: ignore  # type: ignore
@@ -91,7 +91,7 @@ def running_in_mac_os() -> bool:
 
 
 @pytest.fixture(scope="function")
-def gcs_storage_settings(gcs) -> dict[str, Any]:
+def gcs_storage_settings(gcs) -> Iterator[dict[str, Any]]:
     settings = {
         "file_backend": FileBackendConfig.GCS,
         "gcs_endpoint_url": gcs,

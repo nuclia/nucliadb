@@ -181,7 +181,7 @@ async def _create_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
         raise ConfigurationError("Invalid storage settings, please configure FILE_BACKEND")
 
 
-async def teardown_storage():
+async def teardown_storage() -> None:
     storage: Optional[Storage] = get_utility(Utility.STORAGE)
     if storage is None:
         return

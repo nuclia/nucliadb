@@ -102,13 +102,16 @@ async def parse_expression(
     elif isinstance(expr, Resource):
         if expr.id:
             f.resource.resource_id = expr.id
-        else:
+        elif expr.slug:
             rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(
                 kbid=kbid, slug=expr.slug
             )
             if rid is None:
                 raise InvalidQueryError("slug", f"Cannot find slug {expr.slug}")
             f.resource.resource_id = rid
+        else:  # pragma: nocover
+            # Cannot happen due to model validation
+            raise ValueError("Resource needs id or slug")
     elif isinstance(expr, Field):
         f.field.field_type = FIELD_TYPE_NAME_TO_STR[expr.type]
         if expr.name:

@@ -1,9 +1,0 @@
-from opentelemetry.context.context import Context as Context
-from opentelemetry.propagators import textmap
-from typing import Optional, Set
-
-class W3CBaggagePropagator(textmap.TextMapPropagator):
-    def extract(self, carrier: textmap.CarrierT, context: Optional[Context] = ..., getter: textmap.Getter = ...) -> Context: ...
-    def inject(self, carrier: textmap.CarrierT, context: Optional[Context] = ..., setter: textmap.Setter = ...) -> None: ...
-    @property
-    def fields(self) -> Set[str]: ...

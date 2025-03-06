@@ -205,9 +205,9 @@ async def init_fixture(
     kbid = kb_obj.uuid
 
     import_resp = requests.get(dataset_location)
-    assert (
-        import_resp.status_code == 200
-    ), f"Error pulling dataset {dataset_location}:{import_resp.status_code}"
+    assert import_resp.status_code == 200, (
+        f"Error pulling dataset {dataset_location}:{import_resp.status_code}"
+    )
     import_data = import_resp.content
 
     import_id = sdk.start_import(kbid=kbid, content=import_data).import_id
