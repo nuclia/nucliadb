@@ -45,7 +45,7 @@ from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_audit
 
 
-async def backup_kb_retried(context: ApplicationContext, msg: CreateBackupRequest):
+async def backup_kb_task(context: ApplicationContext, msg: CreateBackupRequest):
     kbid = msg.kbid
     backup_id = msg.backup_id
 

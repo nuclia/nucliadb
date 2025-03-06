@@ -40,7 +40,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
-async def restore_kb_retried(context: ApplicationContext, msg: RestoreBackupRequest):
+async def restore_kb_task(context: ApplicationContext, msg: RestoreBackupRequest):
     kbid = msg.kbid
     backup_id = msg.backup_id
 

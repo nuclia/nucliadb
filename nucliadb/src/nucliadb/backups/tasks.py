@@ -19,10 +19,10 @@
 #
 from typing import Awaitable, Callable
 
-from nucliadb.backups.create import backup_kb_retried
+from nucliadb.backups.create import backup_kb_task
 from nucliadb.backups.delete import delete_backup
 from nucliadb.backups.models import CreateBackupRequest, DeleteBackupRequest, RestoreBackupRequest
-from nucliadb.backups.restore import restore_kb_retried
+from nucliadb.backups.restore import restore_kb_task
 from nucliadb.common.context import ApplicationContext
 from nucliadb.tasks import create_consumer, create_producer
 from nucliadb.tasks.consumer import NatsTaskConsumer
@@ -35,7 +35,7 @@ def creator_consumer() -> NatsTaskConsumer[CreateBackupRequest]:
         stream="backups",
         stream_subjects=["backups.>"],
         consumer_subject="backups.create",
-        callback=backup_kb_retried,
+        callback=backup_kb_task,
         msg_type=CreateBackupRequest,
         max_concurrent_messages=10,
     )
@@ -63,7 +63,7 @@ def restorer_consumer() -> NatsTaskConsumer[RestoreBackupRequest]:
         stream="backups",
         stream_subjects=["backups.>"],
         consumer_subject="backups.restore",
-        callback=restore_kb_retried,
+        callback=restore_kb_task,
         msg_type=RestoreBackupRequest,
         max_concurrent_messages=10,
     )
