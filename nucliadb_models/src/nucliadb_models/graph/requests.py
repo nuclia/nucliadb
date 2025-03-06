@@ -42,11 +42,11 @@ class GraphNodeValue(BaseModel):
                 raise ValueError("Fuzzy distance can only be used with a value")
             if self.is_prefix:
                 raise ValueError("Prefix can only be used with a value")
-
-        if len(self.value) < 3 and self.fuzzy_distance is not None:
-            raise ValueError(
-                "Fuzzy distance must be used with values containing, at least, 3 characters"
-            )
+        else:
+            if len(self.value) < 3 and self.fuzzy_distance is not None:
+                raise ValueError(
+                    "Fuzzy distance must be used with values containing, at least, 3 characters"
+                )
 
         return self
 

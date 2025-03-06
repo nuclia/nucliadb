@@ -41,7 +41,7 @@ class PositionedGraphNode(GraphNode):
 
 
 class GraphRelation(BaseModel):
-    label: str = None
+    label: str
 
 
 class GraphPath(BaseModel):
