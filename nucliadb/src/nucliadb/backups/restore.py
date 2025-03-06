@@ -136,7 +136,7 @@ class ResourceBackupReader:
         while len(self.buffer) < size:
             chunk = await self.download_stream.__anext__()
             if not chunk:
-                pass
+                continue
             self.buffer += chunk
         result = self.buffer[:size]
         self.buffer = self.buffer[size:]
