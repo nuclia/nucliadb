@@ -206,19 +206,52 @@ message GraphQuery {
         bool undirected = 4;
     }
 
-    message BoolQuery {
-        repeated GraphQuery operands = 1;
+    message NodeQuery {
+        message BoolQuery {
+            repeated NodeQuery operands = 1;
+        }
+        oneof query {
+            GraphQuery.Node node = 1;
+            NodeQuery bool_not = 2;
+            BoolQuery bool_and = 3;
+            BoolQuery bool_or = 4;
+        }
+    }
+
+    message RelationQuery {
+        message BoolQuery {
+            repeated RelationQuery operands = 1;
+        }
+        oneof query {
+            GraphQuery.Relation relation = 1;
+            RelationQuery bool_not = 2;
+            BoolQuery bool_and = 3;
+            BoolQuery bool_or = 4;
+        }
+    }
+
+    message PathQuery {
+        message BoolQuery {
+            repeated PathQuery operands = 1;
+        }
+        oneof query {
+            GraphQuery.Path path = 1;
+            PathQuery bool_not = 2;
+            BoolQuery bool_and = 3;
+            BoolQuery bool_or = 4;
+        }
     }
 
     oneof query {
-        // Search a node in any position
-        Node node = 1;
-        // Search for relations
-        Relation relation = 2;
-        // Search for directed/undirected paths. It can also express
-        // source/destination node queries
-        Path path = 3;
+        // Search nodes in any position
+        NodeQuery node = 1;
 
+        // Search relations
+        RelationQuery relation = 2;
+
+        // Search directed/undirected paths (triplets of node-relation-node). It
+        // can also express source/destination node queries
+        PathQuery path = 3;
     }
 }
 

@@ -759,42 +759,154 @@ class GraphQuery(google.protobuf.message.Message):
         def WhichOneof(self, oneof_group: typing.Literal["_source", b"_source"]) -> typing.Literal["source"] | None: ...
 
     @typing.final
-    class BoolQuery(google.protobuf.message.Message):
+    class NodeQuery(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        OPERANDS_FIELD_NUMBER: builtins.int
+        @typing.final
+        class BoolQuery(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            OPERANDS_FIELD_NUMBER: builtins.int
+            @property
+            def operands(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___GraphQuery.NodeQuery]: ...
+            def __init__(
+                self,
+                *,
+                operands: collections.abc.Iterable[global___GraphQuery.NodeQuery] | None = ...,
+            ) -> None: ...
+            def ClearField(self, field_name: typing.Literal["operands", b"operands"]) -> None: ...
+
+        NODE_FIELD_NUMBER: builtins.int
+        BOOL_NOT_FIELD_NUMBER: builtins.int
+        BOOL_AND_FIELD_NUMBER: builtins.int
+        BOOL_OR_FIELD_NUMBER: builtins.int
         @property
-        def operands(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___GraphQuery]: ...
+        def node(self) -> global___GraphQuery.Node: ...
+        @property
+        def bool_not(self) -> global___GraphQuery.NodeQuery: ...
+        @property
+        def bool_and(self) -> global___GraphQuery.NodeQuery.BoolQuery: ...
+        @property
+        def bool_or(self) -> global___GraphQuery.NodeQuery.BoolQuery: ...
         def __init__(
             self,
             *,
-            operands: collections.abc.Iterable[global___GraphQuery] | None = ...,
+            node: global___GraphQuery.Node | None = ...,
+            bool_not: global___GraphQuery.NodeQuery | None = ...,
+            bool_and: global___GraphQuery.NodeQuery.BoolQuery | None = ...,
+            bool_or: global___GraphQuery.NodeQuery.BoolQuery | None = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing.Literal["operands", b"operands"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "node", b"node", "query", b"query"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "node", b"node", "query", b"query"]) -> None: ...
+        def WhichOneof(self, oneof_group: typing.Literal["query", b"query"]) -> typing.Literal["node", "bool_not", "bool_and", "bool_or"] | None: ...
+
+    @typing.final
+    class RelationQuery(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        @typing.final
+        class BoolQuery(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            OPERANDS_FIELD_NUMBER: builtins.int
+            @property
+            def operands(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___GraphQuery.RelationQuery]: ...
+            def __init__(
+                self,
+                *,
+                operands: collections.abc.Iterable[global___GraphQuery.RelationQuery] | None = ...,
+            ) -> None: ...
+            def ClearField(self, field_name: typing.Literal["operands", b"operands"]) -> None: ...
+
+        RELATION_FIELD_NUMBER: builtins.int
+        BOOL_NOT_FIELD_NUMBER: builtins.int
+        BOOL_AND_FIELD_NUMBER: builtins.int
+        BOOL_OR_FIELD_NUMBER: builtins.int
+        @property
+        def relation(self) -> global___GraphQuery.Relation: ...
+        @property
+        def bool_not(self) -> global___GraphQuery.RelationQuery: ...
+        @property
+        def bool_and(self) -> global___GraphQuery.RelationQuery.BoolQuery: ...
+        @property
+        def bool_or(self) -> global___GraphQuery.RelationQuery.BoolQuery: ...
+        def __init__(
+            self,
+            *,
+            relation: global___GraphQuery.Relation | None = ...,
+            bool_not: global___GraphQuery.RelationQuery | None = ...,
+            bool_and: global___GraphQuery.RelationQuery.BoolQuery | None = ...,
+            bool_or: global___GraphQuery.RelationQuery.BoolQuery | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "query", b"query", "relation", b"relation"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "query", b"query", "relation", b"relation"]) -> None: ...
+        def WhichOneof(self, oneof_group: typing.Literal["query", b"query"]) -> typing.Literal["relation", "bool_not", "bool_and", "bool_or"] | None: ...
+
+    @typing.final
+    class PathQuery(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        @typing.final
+        class BoolQuery(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            OPERANDS_FIELD_NUMBER: builtins.int
+            @property
+            def operands(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___GraphQuery.PathQuery]: ...
+            def __init__(
+                self,
+                *,
+                operands: collections.abc.Iterable[global___GraphQuery.PathQuery] | None = ...,
+            ) -> None: ...
+            def ClearField(self, field_name: typing.Literal["operands", b"operands"]) -> None: ...
+
+        PATH_FIELD_NUMBER: builtins.int
+        BOOL_NOT_FIELD_NUMBER: builtins.int
+        BOOL_AND_FIELD_NUMBER: builtins.int
+        BOOL_OR_FIELD_NUMBER: builtins.int
+        @property
+        def path(self) -> global___GraphQuery.Path: ...
+        @property
+        def bool_not(self) -> global___GraphQuery.PathQuery: ...
+        @property
+        def bool_and(self) -> global___GraphQuery.PathQuery.BoolQuery: ...
+        @property
+        def bool_or(self) -> global___GraphQuery.PathQuery.BoolQuery: ...
+        def __init__(
+            self,
+            *,
+            path: global___GraphQuery.Path | None = ...,
+            bool_not: global___GraphQuery.PathQuery | None = ...,
+            bool_and: global___GraphQuery.PathQuery.BoolQuery | None = ...,
+            bool_or: global___GraphQuery.PathQuery.BoolQuery | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "path", b"path", "query", b"query"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "path", b"path", "query", b"query"]) -> None: ...
+        def WhichOneof(self, oneof_group: typing.Literal["query", b"query"]) -> typing.Literal["path", "bool_not", "bool_and", "bool_or"] | None: ...
 
     NODE_FIELD_NUMBER: builtins.int
     RELATION_FIELD_NUMBER: builtins.int
     PATH_FIELD_NUMBER: builtins.int
     @property
-    def node(self) -> global___GraphQuery.Node:
-        """Search a node in any position"""
+    def node(self) -> global___GraphQuery.NodeQuery:
+        """Search nodes in any position"""
 
     @property
-    def relation(self) -> global___GraphQuery.Relation:
-        """Search for relations"""
+    def relation(self) -> global___GraphQuery.RelationQuery:
+        """Search relations"""
 
     @property
-    def path(self) -> global___GraphQuery.Path:
-        """Search for directed/undirected paths. It can also express
-        source/destination node queries
+    def path(self) -> global___GraphQuery.PathQuery:
+        """Search directed/undirected paths (triplets of node-relation-node). It
+        can also express source/destination node queries
         """
 
     def __init__(
         self,
         *,
-        node: global___GraphQuery.Node | None = ...,
-        relation: global___GraphQuery.Relation | None = ...,
-        path: global___GraphQuery.Path | None = ...,
+        node: global___GraphQuery.NodeQuery | None = ...,
+        relation: global___GraphQuery.RelationQuery | None = ...,
+        path: global___GraphQuery.PathQuery | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["node", b"node", "path", b"path", "query", b"query", "relation", b"relation"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["node", b"node", "path", b"path", "query", b"query", "relation", b"relation"]) -> None: ...
