@@ -266,9 +266,9 @@ async def test_create_resource_async(
     assert "elapsed" in data
     assert data["elapsed"] is None
     rid = data["uuid"]
-    assert (
-        await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)
-    ) is False, "shouldn't be ingest yet"
+    assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is False, (
+        "shouldn't be ingest yet"
+    )
     assert spy.call_args.kwargs["wait"] is False
 
 

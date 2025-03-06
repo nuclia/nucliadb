@@ -469,13 +469,13 @@ async def test_find_keyword_filters(
         )
         assert resp.status_code == 200, f"Keyword filters: {keyword_filters}"
         body = resp.json()
-        assert len(body["resources"]) == len(
-            expected_rids
-        ), f"Keyword filters: {keyword_filters}, expected rids: {expected_rids}"
+        assert len(body["resources"]) == len(expected_rids), (
+            f"Keyword filters: {keyword_filters}, expected rids: {expected_rids}"
+        )
         for rid in expected_rids:
-            assert (
-                rid in body["resources"]
-            ), f"Keyword filters: {keyword_filters}, expected rids: {expected_rids}"
+            assert rid in body["resources"], (
+                f"Keyword filters: {keyword_filters}, expected rids: {expected_rids}"
+            )
 
 
 @pytest.mark.deploy_modes("standalone")

@@ -858,9 +858,9 @@ class Resource:
         for field_vectors in fields_vectors:
             # Bw/c with extracted vectors without vectorsets
             if not field_vectors.vectorset_id:
-                assert (
-                    len(vectorsets) == 1
-                ), "Invalid broker message, can't ingest vectors from unknown vectorset to KB with multiple vectorsets"
+                assert len(vectorsets) == 1, (
+                    "Invalid broker message, can't ingest vectors from unknown vectorset to KB with multiple vectorsets"
+                )
                 vectorset = list(vectorsets.values())[0]
 
             else:
