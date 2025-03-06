@@ -237,8 +237,11 @@ async def download_binary(
     context: ApplicationContext, cf: resources_pb2.CloudFile
 ) -> AsyncGenerator[bytes, None]:
     bucket_name = context.blob_storage.get_bucket_name_from_cf(cf)
+    downloaded_bytes = 0
     async for data in context.blob_storage.download(bucket_name, cf.uri):
         yield data
+        downloaded_bytes += len(data)
+    assert downloaded_bytes == cf.size, "Downloaded bytes do not match the expected size"
 
 
 async def get_entities(context: ApplicationContext, kbid: str) -> kb_pb2.EntitiesGroups:
