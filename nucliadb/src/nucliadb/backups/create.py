@@ -79,7 +79,7 @@ async def backup_resources(context: ApplicationContext, kbid: str, backup_id: st
     metadata = await get_metadata(context, kbid, backup_id)
     if metadata is None:
         metadata = BackupMetadata(
-            kbid=kbid,
+            kb_id=kbid,
             requested_at=datetime.now(tz=timezone.utc),
         )
         async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
