@@ -25,7 +25,7 @@ fn map_literal(literal: &str) -> Clause {
     Clause::Atom(AtomClause::label(literal.to_string()))
 }
 
-fn map_not(inner: &BooleanExpression) -> Clause {
+fn map_not(inner: &BooleanExpression<String>) -> Clause {
     let operator = BooleanOperator::Not;
     let operand = map_expression(inner);
     let operands = vec![operand];
@@ -33,7 +33,7 @@ fn map_not(inner: &BooleanExpression) -> Clause {
     Clause::Compound(CompoundClause::new(operator, operands))
 }
 
-fn map_operation(operation: &BooleanOperation) -> Clause {
+fn map_operation(operation: &BooleanOperation<String>) -> Clause {
     let operator = match operation.operator {
         Operator::And => BooleanOperator::And,
         Operator::Or => BooleanOperator::Or,
@@ -43,7 +43,7 @@ fn map_operation(operation: &BooleanOperation) -> Clause {
     Clause::Compound(CompoundClause::new(operator, operands))
 }
 
-pub fn map_expression(expression: &BooleanExpression) -> Clause {
+pub fn map_expression(expression: &BooleanExpression<String>) -> Clause {
     match expression {
         BooleanExpression::Not(inner) => map_not(inner),
         BooleanExpression::Literal(literal) => map_literal(literal),

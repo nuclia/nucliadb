@@ -93,7 +93,7 @@ pub struct Reader {
     open_data_points: Vec<OpenDataPoint>,
 }
 
-fn segment_matches(expression: &BooleanExpression, labels: &HashSet<String>) -> bool {
+fn segment_matches(expression: &BooleanExpression<String>, labels: &HashSet<String>) -> bool {
     match expression {
         BooleanExpression::Literal(tag) => labels.contains(tag),
         BooleanExpression::Not(expr) => !segment_matches(expr, labels),
@@ -158,7 +158,7 @@ impl Reader {
     pub fn _search(
         &self,
         request: &dyn SearchRequest,
-        segment_filter: &Option<BooleanExpression>,
+        segment_filter: &Option<BooleanExpression<String>>,
     ) -> VectorR<Vec<Neighbour>> {
         let normalized_query;
         let query = if self.config.normalize_vectors {

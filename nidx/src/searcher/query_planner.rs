@@ -184,14 +184,14 @@ fn compute_relations_request(search_request: &SearchRequest) -> Option<RelationS
     })
 }
 
-pub fn filter_to_boolean_expression(filter: FilterExpression) -> anyhow::Result<BooleanExpression> {
+pub fn filter_to_boolean_expression(filter: FilterExpression) -> anyhow::Result<BooleanExpression<String>> {
     match filter.expr.unwrap() {
         Expr::BoolAnd(and) => {
             let operands = and
                 .operands
                 .into_iter()
                 .map(filter_to_boolean_expression)
-                .collect::<anyhow::Result<Vec<BooleanExpression>>>()?;
+                .collect::<anyhow::Result<Vec<BooleanExpression<String>>>>()?;
             Ok(BooleanExpression::Operation(BooleanOperation {
                 operator: Operator::And,
                 operands,
@@ -202,7 +202,7 @@ pub fn filter_to_boolean_expression(filter: FilterExpression) -> anyhow::Result<
                 .operands
                 .into_iter()
                 .map(filter_to_boolean_expression)
-                .collect::<anyhow::Result<Vec<BooleanExpression>>>()?;
+                .collect::<anyhow::Result<Vec<BooleanExpression<String>>>>()?;
             Ok(BooleanExpression::Operation(BooleanOperation {
                 operator: Operator::Or,
                 operands,

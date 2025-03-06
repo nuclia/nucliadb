@@ -262,7 +262,7 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
 fn filter_query(
     schema: &ParagraphSchema,
     prefilter: &PrefilterResult,
-    paragraph_formula: &Option<BooleanExpression>,
+    paragraph_formula: &Option<BooleanExpression<String>>,
     filter_or: bool,
 ) -> Option<Box<dyn Query>> {
     let mut filter_terms = vec![];
