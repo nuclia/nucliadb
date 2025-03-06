@@ -184,7 +184,7 @@ async def test_backup_resumed(
 
     # Set the metadata as if the backup was interrupted right after exporting the first resource
     metadata = BackupMetadata(
-        kbid=src_kb, requested_at=datetime.now(), total_resources=len(rids), missing_resources=rids[1:]
+        kb_id=src_kb, requested_at=datetime.now(), total_resources=len(rids), missing_resources=rids[1:]
     )
     await set_metadata(context, src_kb, backup_id, metadata)
 
