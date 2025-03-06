@@ -24,6 +24,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
 use common::services::NidxFixture;
+use nidx_protos::graph_query::{node_query, path_query, relation_query};
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
@@ -410,7 +411,7 @@ async fn test_graph_search__node_query(pool: PgPool) -> anyhow::Result<()> {
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Node(graph_query::Node::default())),
+                query: Some(graph_query::Query::Node(graph_query::NodeQuery::default())),
             }),
             top_k: 100,
             ..Default::default()
@@ -426,13 +427,15 @@ async fn test_graph_search__node_query(pool: PgPool) -> anyhow::Result<()> {
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Path(graph_query::Path {
-                    source: Some(graph_query::Node {
-                        node_type: Some(NodeType::Entity.into()),
-                        node_subtype: Some("PERSON".to_string()),
+                query: Some(graph_query::Query::Path(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            node_type: Some(NodeType::Entity.into()),
+                            node_subtype: Some("PERSON".to_string()),
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    }),
-                    ..Default::default()
+                    })),
                 })),
             }),
             top_k: 100,
@@ -450,14 +453,16 @@ async fn test_graph_search__node_query(pool: PgPool) -> anyhow::Result<()> {
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Path(graph_query::Path {
-                    source: Some(graph_query::Node {
-                        value: Some("Anna".to_string()),
-                        node_type: Some(NodeType::Entity.into()),
-                        node_subtype: Some("PERSON".to_string()),
+                query: Some(graph_query::Query::Path(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            value: Some("Anna".to_string()),
+                            node_type: Some(NodeType::Entity.into()),
+                            node_subtype: Some("PERSON".to_string()),
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    }),
-                    ..Default::default()
+                    })),
                 })),
             }),
             top_k: 100,
@@ -479,14 +484,16 @@ async fn test_graph_search__node_query(pool: PgPool) -> anyhow::Result<()> {
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Path(graph_query::Path {
-                    destination: Some(graph_query::Node {
-                        value: Some("Anna".to_string()),
-                        node_type: Some(NodeType::Entity.into()),
-                        node_subtype: Some("PERSON".to_string()),
+                query: Some(graph_query::Query::Path(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        destination: Some(graph_query::Node {
+                            value: Some("Anna".to_string()),
+                            node_type: Some(NodeType::Entity.into()),
+                            node_subtype: Some("PERSON".to_string()),
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    }),
-                    ..Default::default()
+                    })),
                 })),
             }),
             top_k: 100,
@@ -505,11 +512,13 @@ async fn test_graph_search__node_query(pool: PgPool) -> anyhow::Result<()> {
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Node(graph_query::Node {
-                    value: Some("Anna".to_string()),
-                    node_type: Some(NodeType::Entity.into()),
-                    node_subtype: Some("PERSON".to_string()),
-                    ..Default::default()
+                query: Some(graph_query::Query::Node(graph_query::NodeQuery {
+                    query: Some(node_query::Query::Node(graph_query::Node {
+                        value: Some("Anna".to_string()),
+                        node_type: Some(NodeType::Entity.into()),
+                        node_subtype: Some("PERSON".to_string()),
+                        ..Default::default()
+                    })),
                 })),
             }),
             top_k: 100,
@@ -541,14 +550,16 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Path(graph_query::Path {
-                    source: Some(graph_query::Node {
-                        value: Some("Anastas".to_string()),
-                        fuzzy_distance: 2,
-                        as_prefix: false,
+                query: Some(graph_query::Query::Path(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            value: Some("Anastas".to_string()),
+                            fuzzy_distance: 2,
+                            as_prefix: false,
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    }),
-                    ..Default::default()
+                    })),
                 })),
             }),
             top_k: 100,
@@ -567,14 +578,16 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Path(graph_query::Path {
-                    source: Some(graph_query::Node {
-                        value: Some("AnXstXsia".to_string()),
-                        fuzzy_distance: 1,
-                        as_prefix: false,
+                query: Some(graph_query::Query::Path(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            value: Some("AnXstXsia".to_string()),
+                            fuzzy_distance: 1,
+                            as_prefix: false,
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    }),
-                    ..Default::default()
+                    })),
                 })),
             }),
             top_k: 100,
@@ -592,14 +605,16 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Path(graph_query::Path {
-                    source: Some(graph_query::Node {
-                        value: Some("AnXstXsia".to_string()),
-                        fuzzy_distance: 2,
-                        as_prefix: false,
+                query: Some(graph_query::Query::Path(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            value: Some("AnXstXsia".to_string()),
+                            fuzzy_distance: 2,
+                            as_prefix: false,
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    }),
-                    ..Default::default()
+                    })),
                 })),
             }),
             top_k: 100,
@@ -618,14 +633,16 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Path(graph_query::Path {
-                    source: Some(graph_query::Node {
-                        value: Some("Anas".to_string()),
-                        fuzzy_distance: 0,
-                        as_prefix: true,
+                query: Some(graph_query::Query::Path(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            value: Some("Anas".to_string()),
+                            fuzzy_distance: 0,
+                            as_prefix: true,
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    }),
-                    ..Default::default()
+                    })),
                 })),
             }),
             top_k: 100,
@@ -644,14 +661,16 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Path(graph_query::Path {
-                    source: Some(graph_query::Node {
-                        value: Some("Anas".to_string()),
-                        fuzzy_distance: 2,
-                        as_prefix: true,
+                query: Some(graph_query::Query::Path(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            value: Some("Anas".to_string()),
+                            fuzzy_distance: 2,
+                            as_prefix: true,
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    }),
-                    ..Default::default()
+                    })),
                 })),
             }),
             top_k: 100,
@@ -683,8 +702,10 @@ async fn test_graph_search__relation_query(pool: PgPool) -> anyhow::Result<()> {
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Relation(graph_query::Relation {
-                    value: Some("LIVE_IN".to_string()),
+                query: Some(graph_query::Query::Relation(graph_query::RelationQuery {
+                    query: Some(relation_query::Query::Relation(graph_query::Relation {
+                        value: Some("LIVE_IN".to_string()),
+                    })),
                 })),
             }),
             top_k: 100,
@@ -705,11 +726,13 @@ async fn test_graph_search__relation_query(pool: PgPool) -> anyhow::Result<()> {
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Path(graph_query::Path {
-                    relation: Some(graph_query::Relation {
-                        value: Some("LIVE_IN".to_string()),
-                    }),
-                    ..Default::default()
+                query: Some(graph_query::Query::Path(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        relation: Some(graph_query::Relation {
+                            value: Some("LIVE_IN".to_string()),
+                        }),
+                        ..Default::default()
+                    })),
                 })),
             }),
             top_k: 100,
@@ -740,21 +763,23 @@ async fn test_graph_search__directed_path_query(pool: PgPool) -> anyhow::Result<
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Path(graph_query::Path {
-                    source: Some(graph_query::Node {
-                        value: Some("Erin".to_string()),
-                        node_type: Some(NodeType::Entity.into()),
-                        node_subtype: Some("PERSON".to_string()),
+                query: Some(graph_query::Query::Path(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            value: Some("Erin".to_string()),
+                            node_type: Some(NodeType::Entity.into()),
+                            node_subtype: Some("PERSON".to_string()),
+                            ..Default::default()
+                        }),
+                        relation: None,
+                        destination: Some(graph_query::Node {
+                            value: Some("UK".to_string()),
+                            node_type: Some(NodeType::Entity.into()),
+                            node_subtype: Some("PLACE".to_string()),
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    }),
-                    relation: None,
-                    destination: Some(graph_query::Node {
-                        value: Some("UK".to_string()),
-                        node_type: Some(NodeType::Entity.into()),
-                        node_subtype: Some("PLACE".to_string()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
+                    })),
                 })),
             }),
             top_k: 100,
@@ -773,18 +798,20 @@ async fn test_graph_search__directed_path_query(pool: PgPool) -> anyhow::Result<
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Path(graph_query::Path {
-                    source: Some(graph_query::Node {
-                        node_type: Some(NodeType::Entity.into()),
-                        node_subtype: Some("PERSON".to_string()),
+                query: Some(graph_query::Query::Path(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            node_type: Some(NodeType::Entity.into()),
+                            node_subtype: Some("PERSON".to_string()),
+                            ..Default::default()
+                        }),
+                        relation: None,
+                        destination: Some(graph_query::Node {
+                            node_subtype: Some("PLACE".to_string()),
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    }),
-                    relation: None,
-                    destination: Some(graph_query::Node {
-                        node_subtype: Some("PLACE".to_string()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
+                    })),
                 })),
             }),
             top_k: 100,
@@ -806,20 +833,22 @@ async fn test_graph_search__directed_path_query(pool: PgPool) -> anyhow::Result<
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Path(graph_query::Path {
-                    source: Some(graph_query::Node {
-                        node_type: Some(NodeType::Entity.into()),
-                        node_subtype: Some("PERSON".to_string()),
+                query: Some(graph_query::Query::Path(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            node_type: Some(NodeType::Entity.into()),
+                            node_subtype: Some("PERSON".to_string()),
+                            ..Default::default()
+                        }),
+                        relation: Some(graph_query::Relation {
+                            value: Some("LIVE_IN".to_string()),
+                        }),
+                        destination: Some(graph_query::Node {
+                            node_subtype: Some("PLACE".to_string()),
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    }),
-                    relation: Some(graph_query::Relation {
-                        value: Some("LIVE_IN".to_string()),
-                    }),
-                    destination: Some(graph_query::Node {
-                        node_subtype: Some("PLACE".to_string()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
+                    })),
                 })),
             }),
             top_k: 100,
@@ -850,18 +879,20 @@ async fn test_graph_search__undirected_path_query(pool: PgPool) -> anyhow::Resul
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
-                query: Some(graph_query::Query::Path(graph_query::Path {
-                    source: Some(graph_query::Node {
-                        value: Some("Anna".to_string()),
-                        node_type: Some(NodeType::Entity.into()),
-                        node_subtype: Some("PERSON".to_string()),
-                        ..Default::default()
-                    }),
-                    relation: Some(graph_query::Relation {
-                        value: Some("IS_FRIEND".to_string()),
-                    }),
-                    destination: Some(graph_query::Node::default()),
-                    undirected: true,
+                query: Some(graph_query::Query::Path(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            value: Some("Anna".to_string()),
+                            node_type: Some(NodeType::Entity.into()),
+                            node_subtype: Some("PERSON".to_string()),
+                            ..Default::default()
+                        }),
+                        relation: Some(graph_query::Relation {
+                            value: Some("IS_FRIEND".to_string()),
+                        }),
+                        destination: Some(graph_query::Node::default()),
+                        undirected: true,
+                    })),
                 })),
             }),
             top_k: 100,

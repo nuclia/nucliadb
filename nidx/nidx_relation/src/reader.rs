@@ -31,7 +31,7 @@ use tantivy::query::{BooleanQuery, Occur, Query};
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
 
 use crate::graph_query_parser::{
-    Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, PathQuery, Relation, Term,
+    BoolGraphQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, PathQuery, Relation, Term,
 };
 use crate::schema::Schema;
 use crate::{io_maps, schema};
@@ -76,9 +76,9 @@ impl RelationsReaderService {
         };
 
         // Convert proto to tantivy query
-        let query = GraphQuery::try_from(query)?;
+        let query = BoolGraphQuery::try_from(query)?;
         let parser = GraphQueryParser::new();
-        let index_query = parser.parse(query);
+        let index_query = parser.parse_bool(query);
 
         // Tantivy searcher query
         let collector = TopDocs::with_limit(request.top_k as usize);
