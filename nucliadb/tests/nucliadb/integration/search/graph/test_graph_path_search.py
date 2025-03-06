@@ -131,16 +131,97 @@ async def test_graph_search__fuzzy_node_queries(
 ):
     kbid = kb_with_entity_graph
 
-    # (:Anna)
+    # (:~Anastas)
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/graph",
         json={
             "query": {
                 "source": {
-                    "value": "Anna",
-                    "group": "PERSON",
+                    "value": {
+                        "value": "Anastas",
+                        "fuzzy_distance": 2,
+                    },
                 },
-                "undirected": True,
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert ("Anastasia", "IS_FRIEND", "Anna") in paths
+
+    # (:~AnXstXsia) with fuzzy=1
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "source": {
+                    "value": {
+                        "value": "AnXstXsia",
+                        "fuzzy_distance": 1,
+                    },
+                },
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+    # (:~AnXstXsia) with fuzzy=1
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "source": {
+                    "value": {
+                        "value": "AnXstXsia",
+                        "fuzzy_distance": 2,
+                    },
+                },
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert ("Anastasia", "IS_FRIEND", "Anna") in paths
+
+    # (:^Anas)
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "source": {
+                    "value": {
+                        "value": "Anas",
+                        "is_prefix": True,
+                    },
+                },
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert ("Anastasia", "IS_FRIEND", "Anna") in paths
+
+    # (:^~Anas)
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "source": {
+                    "value": {
+                        "value": "Anas",
+                        "fuzzy_distance": 2,
+                        "is_prefix": True,
+                    },
+                },
             },
             "top_k": 100,
         },
@@ -148,11 +229,11 @@ async def test_graph_search__fuzzy_node_queries(
     assert resp.status_code == 200
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
     assert len(paths) == 5
+    assert ("Anastasia", "IS_FRIEND", "Anna") in paths
     assert ("Anna", "FOLLOW", "Erin") in paths
     assert ("Anna", "LIVE_IN", "New York") in paths
     assert ("Anna", "LOVE", "Cat") in paths
     assert ("Anna", "WORK_IN", "New York") in paths
-    assert ("Anastasia", "IS_FRIEND", "Anna") in paths
 
 
 @pytest.mark.deploy_modes("standalone")
