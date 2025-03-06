@@ -66,6 +66,7 @@ async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
     await restore_resources(context, kbid, backup_id)
     await restore_labels(context, kbid, backup_id)
     await restore_entities(context, kbid, backup_id)
+    await delete_last_restored_resource_key(context, kbid, backup_id)
 
 
 async def restore_resources(context: ApplicationContext, kbid: str, backup_id: str):
@@ -86,6 +87,7 @@ async def restore_resources(context: ApplicationContext, kbid: str, backup_id: s
     if len(tasks) > 0:
         await asyncio.gather(*tasks)
         tasks = []
+        await set_last_restored_resource_key(context, kbid, backup_id, key)
 
 
 async def get_last_restored_resource_key(
@@ -105,6 +107,13 @@ async def set_last_restored_resource_key(
     key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)
     async with context.kv_driver.transaction() as txn:
         await txn.set(key, resource_id.encode())
+        await txn.commit()
+
+
+async def delete_last_restored_resource_key(context: ApplicationContext, kbid: str, backup_id: str):
+    key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)
+    async with context.kv_driver.transaction() as txn:
+        await txn.delete(key)
         await txn.commit()
 
 
