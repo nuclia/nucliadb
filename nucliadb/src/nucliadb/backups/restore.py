@@ -40,7 +40,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
-async def restore_kb_retried(context: ApplicationContext, msg: RestoreBackupRequest):
+async def restore_kb_task(context: ApplicationContext, msg: RestoreBackupRequest):
     kbid = msg.kb_id
     backup_id = msg.backup_id
 
@@ -135,6 +135,8 @@ class ResourceBackupReader:
     async def read(self, size: int) -> bytes:
         while len(self.buffer) < size:
             chunk = await self.download_stream.__anext__()
+            if not chunk:
+                continue
             self.buffer += chunk
         result = self.buffer[:size]
         self.buffer = self.buffer[size:]

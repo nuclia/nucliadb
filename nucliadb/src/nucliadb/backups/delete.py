@@ -27,11 +27,14 @@ from nucliadb.backups.settings import settings
 from nucliadb.common.context import ApplicationContext
 
 
-async def delete_backup(context: ApplicationContext, msg: DeleteBackupRequest):
+async def delete_backup_task(context: ApplicationContext, msg: DeleteBackupRequest):
     """
     Deletes the backup files from the cloud storage.
     """
-    backup_id = msg.backup_id
+    await delete_backup(context, msg.backup_id)
+
+
+async def delete_backup(context: ApplicationContext, backup_id: str):
     while True:
         deleted = await delete_n(context, backup_id, n=1000)
         if deleted == 0:

@@ -25,6 +25,7 @@ from httpx import AsyncClient
 
 from nucliadb.backups.const import StorageKeys
 from nucliadb.backups.create import backup_kb, get_metadata, set_metadata
+from nucliadb.backups.delete import delete_backup
 from nucliadb.backups.models import BackupMetadata
 from nucliadb.backups.restore import (
     get_last_restored_resource_key,
@@ -149,6 +150,10 @@ async def test_backup(
 
     # Make sure that the restore metadata is cleaned up
     assert await get_last_restored_resource_key(context, dst_kb, backup_id) is None
+
+    await delete_backup(context, backup_id)
+
+    assert await exists_backup(context.blob_storage, backup_id) is False
 
     # Check that the resources were restored
     resp = await nucliadb_reader.get(f"/kb/{dst_kb}/resources")
