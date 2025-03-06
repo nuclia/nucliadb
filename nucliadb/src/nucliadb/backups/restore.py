@@ -41,7 +41,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
 async def restore_kb_retried(context: ApplicationContext, msg: RestoreBackupRequest):
-    kbid = msg.kbid
+    kbid = msg.kb_id
     backup_id = msg.backup_id
 
     retry_handler = TaskRetryHandler(

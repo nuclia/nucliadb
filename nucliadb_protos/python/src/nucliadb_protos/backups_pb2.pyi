@@ -23,16 +23,16 @@ class CreateBackupRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     BACKUP_ID_FIELD_NUMBER: builtins.int
-    KBID_FIELD_NUMBER: builtins.int
+    KB_ID_FIELD_NUMBER: builtins.int
     backup_id: builtins.str
-    kbid: builtins.str
+    kb_id: builtins.str
     def __init__(
         self,
         *,
         backup_id: builtins.str = ...,
-        kbid: builtins.str = ...,
+        kb_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "kbid", b"kbid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "kb_id", b"kb_id"]) -> None: ...
 
 global___CreateBackupRequest = CreateBackupRequest
 
@@ -71,16 +71,16 @@ class DeleteBackupRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     BACKUP_ID_FIELD_NUMBER: builtins.int
-    KBID_FIELD_NUMBER: builtins.int
+    KB_ID_FIELD_NUMBER: builtins.int
     backup_id: builtins.str
-    kbid: builtins.str
+    kb_id: builtins.str
     def __init__(
         self,
         *,
         backup_id: builtins.str = ...,
-        kbid: builtins.str = ...,
+        kb_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "kbid", b"kbid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "kb_id", b"kb_id"]) -> None: ...
 
 global___DeleteBackupRequest = DeleteBackupRequest
 
@@ -117,16 +117,16 @@ class RestoreBackupRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     BACKUP_ID_FIELD_NUMBER: builtins.int
-    KBID_FIELD_NUMBER: builtins.int
+    KB_ID_FIELD_NUMBER: builtins.int
     backup_id: builtins.str
-    kbid: builtins.str
+    kb_id: builtins.str
     def __init__(
         self,
         *,
         backup_id: builtins.str = ...,
-        kbid: builtins.str = ...,
+        kb_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "kbid", b"kbid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "kb_id", b"kb_id"]) -> None: ...
 
 global___RestoreBackupRequest = RestoreBackupRequest
 

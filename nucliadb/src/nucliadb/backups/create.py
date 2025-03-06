@@ -46,7 +46,7 @@ from nucliadb_utils.utilities import get_audit
 
 
 async def backup_kb_retried(context: ApplicationContext, msg: CreateBackupRequest):
-    kbid = msg.kbid
+    kbid = msg.kb_id
     backup_id = msg.backup_id
 
     retry_handler = TaskRetryHandler(
