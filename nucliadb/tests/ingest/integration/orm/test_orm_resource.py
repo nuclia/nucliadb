@@ -239,9 +239,9 @@ async def test_vector_duplicate_fields(
             for vectorset_id, vectorset_sentences in paragraph.vectorsets_sentences.items():
                 for vector_id, sentence in vectorset_sentences.sentences.items():
                     count += 1
-                    assert len(sentence.vector) == 768, (
-                        f"bad key {len(sentence.vector)} {field_id} - {paragraph_id} - {vectorset_id} - {vector_id}"
-                    )
+                    assert (
+                        len(sentence.vector) == 768
+                    ), f"bad key {len(sentence.vector)} {field_id} - {paragraph_id} - {vectorset_id} - {vector_id}"
 
     assert count == 1
 

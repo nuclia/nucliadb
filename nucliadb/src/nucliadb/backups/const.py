@@ -39,3 +39,11 @@ class StorageKeys:
 class BackupFinishedStream:
     name = "backups"
     subject = "backups.creation_finished"
+
+
+class BackupsNatsStream:
+    name = "ndb-backups"
+    stream_subjects = ["ndb-backups.>"]
+    create_subject = "ndb-backups.create"
+    delete_subject = "ndb-backups.delete"
+    restore_subject = "ndb-backups.restore"

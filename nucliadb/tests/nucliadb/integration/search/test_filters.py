@@ -409,9 +409,9 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
         ]
 
         # Check that only the expected paragraphs were returned
-        assert len(paragraphs) == len(expected_paragraphs), (
-            f"{filters}\n{paragraphs}\n{expected_paragraphs}"
-        )
+        assert len(paragraphs) == len(
+            expected_paragraphs
+        ), f"{filters}\n{paragraphs}\n{expected_paragraphs}"
         not_yet_found = expected_paragraphs.copy()
         for par in paragraphs:
             if par["text"] not in expected_paragraphs:
@@ -450,17 +450,17 @@ async def test_filtering_field_and_paragraph(app_context, nucliadb_reader: Async
         print("expected", expected_paragraphs)
 
         # Check that only the expected paragraphs were returned
-        assert len(paragraphs) == len(expected_paragraphs), (
-            f"{filter_expression}\n{paragraphs}\n{expected_paragraphs}"
-        )
+        assert len(paragraphs) == len(
+            expected_paragraphs
+        ), f"{filter_expression}\n{paragraphs}\n{expected_paragraphs}"
         not_yet_found = expected_paragraphs.copy()
         for par in paragraphs:
             if par["text"] not in expected_paragraphs:
                 raise AssertionError(f"Paragraph not expected: {par['text']}")
             if par["text"] in not_yet_found:
-                assert par["score_type"] == "BOTH", (
-                    f"Score type not expected with filters {filter_expression}"
-                )
+                assert (
+                    par["score_type"] == "BOTH"
+                ), f"Score type not expected with filters {filter_expression}"
                 not_yet_found.remove(par["text"])
         assert len(not_yet_found) == 0, f"Some paragraphs were not found: {not_yet_found}"
 
