@@ -28,7 +28,7 @@ from nucliadb_protos import nodereader_pb2
 # nodes/relations to pb nodes/relations
 
 
-async def parse_graph_search(item: graph_requests.GraphSearchRequest) -> GraphRetrieval:
+def parse_graph_search(item: graph_requests.GraphSearchRequest) -> GraphRetrieval:
     pb = nodereader_pb2.GraphSearchRequest()
 
     query = item.query
@@ -61,7 +61,7 @@ async def parse_graph_search(item: graph_requests.GraphSearchRequest) -> GraphRe
     return pb
 
 
-async def parse_graph_node_search(item: graph_requests.GraphNodesSearchRequest) -> GraphRetrieval:
+def parse_graph_node_search(item: graph_requests.GraphNodesSearchRequest) -> GraphRetrieval:
     pb = nodereader_pb2.GraphSearchRequest()
 
     query = item.query
@@ -99,7 +99,7 @@ async def parse_graph_node_search(item: graph_requests.GraphNodesSearchRequest) 
     return pb
 
 
-async def parse_graph_relation_search(
+def parse_graph_relation_search(
     item: graph_requests.GraphRelationsSearchRequest,
 ) -> GraphRetrieval:
     pb = nodereader_pb2.GraphSearchRequest()
