@@ -269,7 +269,7 @@ async def _tus_post(
     if request_content_type is None:
         request_content_type = content_types.guess(metadata["filename"]) or "application/octet-stream"
 
-    if False and request_content_type is not None and not content_types.valid(request_content_type):
+    if request_content_type is not None and not content_types.valid(request_content_type):
         raise HTTPException(
             status_code=415,
             detail=f"Unsupported content type: {request_content_type}",
@@ -555,7 +555,7 @@ async def _tus_patch(
             creation_payload = pickle.loads(base64.b64decode(item_payload))
 
         content_type = dm.get("metadata", {}).get("content_type")
-        if False and content_type is not None and not content_types.valid(content_type):
+        if content_type is not None and not content_types.valid(content_type):
             return HTTPClientError(
                 status_code=415,
                 detail=f"Unsupported content type: {content_type}",
@@ -744,7 +744,7 @@ async def _upload(
     if content_type is None:
         content_type = content_types.guess(filename) or "application/octet-stream"
 
-    if False and not content_types.valid(content_type):
+    if not content_types.valid(content_type):
         raise HTTPException(
             status_code=415,
             detail=f"Unsupported content type: {content_type}",

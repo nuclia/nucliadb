@@ -187,11 +187,11 @@ def test_search(kbid: str, resource_id: str):
 
     raise_for_status(resp)
     ask_response = resp.json()
-    print(f"Search results: {ask_response["retrieval_results"]}")
+    print(f"Search results: {ask_response['retrieval_results']}")
     assert len(ask_response["retrieval_results"]["resources"]) == 1
-    print(f"Relations payload: {ask_response["relations"]}")
-    print(f"Answer: {ask_response["answer"]}")
-    print(f"Citations: {ask_response["citations"]}")
+    print(f"Relations payload: {ask_response['relations']}")
+    print(f"Answer: {ask_response['answer']}")
+    print(f"Citations: {ask_response['citations']}")
 
 
 def test_predict_proxy(kbid: str):
@@ -247,6 +247,41 @@ def test_learning_config(kbid: str):
         },
     )
     raise_for_status(resp)
+
+
+def test_mimetypes(kbid: str):
+    # Create a resource with a few different mimetypes to ensure they are supported
+    # These depend on /etc/mime.types being available in the container image
+
+    MIMETYPES = [
+        (".pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+        (".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        (".ods", "application/vnd.oasis.opendocument.spreadsheet"),
+        (".epub", "application/epub+zip"),
+        (".scad", "application/x-openscad"),
+    ]
+
+    for extension, mimetype in MIMETYPES:
+        resp = requests.post(
+            os.path.join(BASE_URL, f"api/v1/kb/{kbid}/resources"),
+            headers={
+                "content-type": "application/json",
+                "X-NUCLIADB-ROLES": "WRITER",
+                "x-ndb-client": "web",
+            },
+            json={
+                "files": {
+                    "mimetype_test": {
+                        "file": {
+                            "filename": f"hello.{extension}",
+                            "content_type": mimetype,
+                            "payload": "",
+                        }
+                    }
+                }
+            },
+        )
+        raise_for_status(resp)
 
 
 def _test_predict_proxy_chat(kbid: str):

@@ -101,7 +101,7 @@ class File(BaseModel):
 
     @model_validator(mode="after")
     def _check_internal_file_fields(self) -> Self:
-        if False and not content_types.valid(self.content_type):
+        if not content_types.valid(self.content_type):
             raise ValueError(f"Unsupported content type: {self.content_type}")
         if self.uri:
             # Externally hosted file
@@ -133,7 +133,7 @@ class FileB64(BaseModel):
 
     @field_validator("content_type")
     def check_content_type(cls, v):
-        if False and not content_types.valid(v):
+        if not content_types.valid(v):
             raise ValueError(f"Unsupported content type: {v}")
         return v
 
