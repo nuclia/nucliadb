@@ -20,8 +20,9 @@
 import pytest
 from httpx import AsyncClient
 
+from nucliadb_models.graph import responses as graph_responses
+from nucliadb_models.graph.responses import GraphNodesSearchResponse, GraphSearchResponse
 from nucliadb_models.metadata import RelationEntity, RelationNodeType
-from nucliadb_models.search import GraphNodesSearchResponse, GraphPath, GraphSearchResponse
 from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldType,
@@ -422,7 +423,7 @@ async def test_graph_search(
     )
     assert resp.status_code == 201
 
-    def simple_paths(paths: list[GraphPath]) -> list[tuple[str, str, str]]:
+    def simple_paths(paths: list[graph_responses.GraphPath]) -> list[tuple[str, str, str]]:
         simple_paths = []
         for path in paths:
             # response should never return empty nodes/relations

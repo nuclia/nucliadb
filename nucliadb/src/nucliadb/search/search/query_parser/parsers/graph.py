@@ -21,16 +21,14 @@
 
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
 from nucliadb.search.search.query_parser.models import GraphRetrieval
-from nucliadb_models.search import (
-    GraphNodePosition,
-    GraphNodesSearchRequest,
-    GraphRelationsSearchRequest,
-    GraphSearchRequest,
-)
+from nucliadb_models.graph import requests as graph_requests
 from nucliadb_protos import nodereader_pb2
 
+# TODO: remove repetition by adding some functions to convert query
+# nodes/relations to pb nodes/relations
 
-async def parse_graph_search(item: GraphSearchRequest) -> GraphRetrieval:
+
+async def parse_graph_search(item: graph_requests.GraphSearchRequest) -> GraphRetrieval:
     pb = nodereader_pb2.GraphSearchRequest()
 
     query = item.query
@@ -63,12 +61,12 @@ async def parse_graph_search(item: GraphSearchRequest) -> GraphRetrieval:
     return pb
 
 
-async def parse_graph_node_search(item: GraphNodesSearchRequest) -> GraphRetrieval:
+async def parse_graph_node_search(item: graph_requests.GraphNodesSearchRequest) -> GraphRetrieval:
     pb = nodereader_pb2.GraphSearchRequest()
 
     query = item.query
 
-    if query.position == GraphNodePosition.ANY:
+    if query.position == graph_requests.GraphNodePosition.ANY:
         if query.value is not None:
             pb.query.node.value = query.value
         if query.type is not None:
@@ -76,7 +74,7 @@ async def parse_graph_node_search(item: GraphNodesSearchRequest) -> GraphRetriev
         if query.group is not None:
             pb.query.node.node_subtype = query.group
 
-    elif query.position == GraphNodePosition.SOURCE:
+    elif query.position == graph_requests.GraphNodePosition.SOURCE:
         source = query
         if source.value is not None:
             pb.query.path.source.value = source.value
@@ -85,7 +83,7 @@ async def parse_graph_node_search(item: GraphNodesSearchRequest) -> GraphRetriev
         if source.group is not None:
             pb.query.path.source.node_subtype = source.group
 
-    elif query.position == GraphNodePosition.DESTINATION:
+    elif query.position == graph_requests.GraphNodePosition.DESTINATION:
         destination = query
         if destination.value is not None:
             pb.query.path.destination.value = destination.value
@@ -101,7 +99,9 @@ async def parse_graph_node_search(item: GraphNodesSearchRequest) -> GraphRetriev
     return pb
 
 
-async def parse_graph_relation_search(item: GraphRelationsSearchRequest) -> GraphRetrieval:
+async def parse_graph_relation_search(
+    item: graph_requests.GraphRelationsSearchRequest,
+) -> GraphRetrieval:
     pb = nodereader_pb2.GraphSearchRequest()
 
     query = item.query

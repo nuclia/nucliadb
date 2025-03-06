@@ -20,28 +20,32 @@
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
-from nucliadb.common.models_utils.from_proto import RelationNodeTypePbMap
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.search.graph_merge import (
+    build_graph_nodes_response,
+    build_graph_relations_response,
+    build_graph_response,
+)
 from nucliadb.search.search.query_parser.parsers import (
     parse_graph_node_search,
     parse_graph_relation_search,
     parse_graph_search,
 )
+from nucliadb_models.graph.requests import (
+    GraphNodesSearchRequest,
+    GraphRelationsSearchRequest,
+    GraphSearchRequest,
+)
+from nucliadb_models.graph.responses import (
+    GraphNodesSearchResponse,
+    GraphRelationsSearchResponse,
+    GraphSearchResponse,
+)
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
-    GraphNode,
-    GraphNodesSearchRequest,
-    GraphNodesSearchResponse,
-    GraphPath,
-    GraphRelation,
-    GraphRelationsSearchRequest,
-    GraphRelationsSearchResponse,
-    GraphSearchRequest,
-    GraphSearchResponse,
     NucliaDBClientType,
 )
-from nucliadb_protos import nodereader_pb2
 from nucliadb_utils.authentication import requires
 
 
@@ -124,60 +128,3 @@ async def graph_relations_search_knowledgebox(
     results, _, _ = await node_query(kbid, Method.GRAPH, pb_query)
 
     return build_graph_relations_response(results)
-
-
-def build_graph_response(results: list[nodereader_pb2.GraphSearchResponse]) -> GraphSearchResponse:
-    paths = []
-    for shard_results in results:
-        for pb_path in shard_results.graph:
-            source = shard_results.nodes[pb_path.source]
-            relation = shard_results.relations[pb_path.relation]
-            destination = shard_results.nodes[pb_path.destination]
-
-            path = GraphPath(
-                source=GraphNode(
-                    value=source.value,
-                ),
-                relation=GraphRelation(
-                    label=relation.label,
-                ),
-                destination=GraphNode(
-                    value=destination.value,
-                ),
-            )
-            paths.append(path)
-
-    response = GraphSearchResponse(paths=paths)
-    return response
-
-
-def build_graph_nodes_response(
-    results: list[nodereader_pb2.GraphSearchResponse],
-) -> GraphNodesSearchResponse:
-    nodes = []
-    for shard_results in results:
-        for node in shard_results.nodes:
-            nodes.append(
-                GraphNode(
-                    value=node.value,
-                    type=RelationNodeTypePbMap[node.ntype],
-                    group=node.subtype,
-                )
-            )
-    response = GraphNodesSearchResponse(nodes=nodes)
-    return response
-
-
-def build_graph_relations_response(
-    results: list[nodereader_pb2.GraphSearchResponse],
-) -> GraphRelationsSearchResponse:
-    relations = []
-    for shard_results in results:
-        for relation in shard_results.relations:
-            relations.append(
-                GraphRelation(
-                    label=relation.label,
-                )
-            )
-    response = GraphRelationsSearchResponse(relations=relations)
-    return response
