@@ -24,15 +24,36 @@ from nucliadb.export_import.models import NatsTaskMessage
 from nucliadb.tasks import create_consumer, create_producer
 from nucliadb.tasks.consumer import NatsTaskConsumer
 from nucliadb.tasks.producer import NatsTaskProducer
-from nucliadb_utils import const
+from nucliadb.tasks.utils import NatsConsumer, NatsStream
+
+
+class ExportsNatsConfig:
+    stream = NatsStream(
+        name="ndb-exports",
+        subjects=["ndb-exports"],
+    )
+    consumer = NatsConsumer(
+        subject="ndb-exports",
+        group="ndb-exports",
+    )
+
+
+class ImportsNatsConfig:
+    stream = NatsStream(
+        name="ndb-imports",
+        subjects=["ndb-imports"],
+    )
+    consumer = NatsConsumer(
+        subject="ndb-imports",
+        group="ndb-imports",
+    )
 
 
 def get_exports_consumer() -> NatsTaskConsumer[NatsTaskMessage]:
     return create_consumer(
         name="exports_consumer",
-        stream=const.Streams.KB_EXPORTS.name,
-        stream_subjects=[const.Streams.KB_EXPORTS.subject],
-        consumer_subject=const.Streams.KB_EXPORTS.subject,
+        stream=ExportsNatsConfig.stream,
+        consumer=ExportsNatsConfig.consumer,
         callback=export_kb_to_blob_storage,
         msg_type=NatsTaskMessage,
         max_concurrent_messages=10,
@@ -42,9 +63,8 @@ def get_exports_consumer() -> NatsTaskConsumer[NatsTaskMessage]:
 async def get_exports_producer(context: ApplicationContext) -> NatsTaskProducer[NatsTaskMessage]:
     producer = create_producer(
         name="exports_producer",
-        stream=const.Streams.KB_EXPORTS.name,
-        stream_subjects=[const.Streams.KB_EXPORTS.subject],
-        producer_subject=const.Streams.KB_EXPORTS.subject,
+        stream=ExportsNatsConfig.stream,
+        producer_subject=ExportsNatsConfig.consumer.subject,
         msg_type=NatsTaskMessage,
     )
     await producer.initialize(context)
@@ -54,9 +74,8 @@ async def get_exports_producer(context: ApplicationContext) -> NatsTaskProducer[
 def get_imports_consumer() -> NatsTaskConsumer[NatsTaskMessage]:
     return create_consumer(
         name="imports_consumer",
-        stream=const.Streams.KB_IMPORTS.name,
-        stream_subjects=[const.Streams.KB_IMPORTS.subject],
-        consumer_subject=const.Streams.KB_IMPORTS.subject,
+        stream=ImportsNatsConfig.stream,
+        consumer=ImportsNatsConfig.consumer,
         callback=import_kb_from_blob_storage,
         msg_type=NatsTaskMessage,
         max_concurrent_messages=10,
@@ -66,9 +85,8 @@ def get_imports_consumer() -> NatsTaskConsumer[NatsTaskMessage]:
 async def get_imports_producer(context: ApplicationContext) -> NatsTaskProducer[NatsTaskMessage]:
     producer = create_producer(
         name="imports_producer",
-        stream=const.Streams.KB_IMPORTS.name,
-        stream_subjects=[const.Streams.KB_IMPORTS.subject],
-        producer_subject=const.Streams.KB_IMPORTS.subject,
+        stream=ImportsNatsConfig.stream,
+        producer_subject=ImportsNatsConfig.consumer.subject,
         msg_type=NatsTaskMessage,
     )
     await producer.initialize(context)

@@ -28,7 +28,7 @@ from nats.aio.client import Msg
 from nucliadb.common.context import ApplicationContext
 from nucliadb.tasks.logger import logger
 from nucliadb.tasks.models import Callback, MsgType
-from nucliadb.tasks.utils import create_nats_stream_if_not_exists
+from nucliadb.tasks.utils import NatsConsumer, NatsStream, create_nats_stream_if_not_exists
 from nucliadb_telemetry import errors
 from nucliadb_utils.nats import MessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
@@ -40,17 +40,15 @@ class NatsTaskConsumer(Generic[MsgType]):
     def __init__(
         self,
         name: str,
-        stream: str,
-        stream_subjects: list[str],
-        consumer_subject: str,
+        stream: NatsStream,
+        consumer: NatsConsumer,
         callback: Callback,
         msg_type: Type[MsgType],
         max_concurrent_messages: Optional[int] = None,
     ):
         self.name = name
         self.stream = stream
-        self.stream_subjects = stream_subjects
-        self.consumer_subject = consumer_subject
+        self.consumer = consumer
         self.callback = callback
         self.msg_type = msg_type
         self.max_concurrent_messages = max_concurrent_messages
@@ -61,7 +59,7 @@ class NatsTaskConsumer(Generic[MsgType]):
     async def initialize(self, context: ApplicationContext):
         self.context = context
         await create_nats_stream_if_not_exists(
-            context, stream_name=self.stream, subjects=self.stream_subjects
+            context, stream_name=self.stream.name, subjects=self.stream.subjects
         )
         await self._setup_nats_subscription()
         self.initialized = True
@@ -80,17 +78,15 @@ class NatsTaskConsumer(Generic[MsgType]):
 
     async def _setup_nats_subscription(self):
         # Nats push consumer
-        stream = self.stream
-        subject = group = self.consumer_subject
         max_ack_pending = (
             self.max_concurrent_messages
             if self.max_concurrent_messages
             else nats_consumer_settings.nats_max_ack_pending
         )
         self.subscription = await self.context.nats_manager.subscribe(
-            subject=subject,
-            queue=group,
-            stream=stream,
+            subject=self.consumer.subject,
+            queue=self.consumer.group,
+            stream=self.stream.name,
             cb=self._subscription_worker_as_task,
             subscription_lost_cb=self._setup_nats_subscription,
             manual_ack=True,
@@ -103,7 +99,7 @@ class NatsTaskConsumer(Generic[MsgType]):
             ),
         )
         logger.info(
-            f"Subscribed to {subject} on stream {stream}",
+            f"Subscribed {self.consumer.group} to {self.consumer.subject} on stream {self.stream.name}",
             extra={"consumer_name": self.name},
         )
 
@@ -178,9 +174,8 @@ class NatsTaskConsumer(Generic[MsgType]):
 
 def create_consumer(
     name: str,
-    stream: str,
-    stream_subjects: list[str],
-    consumer_subject: str,
+    stream: NatsStream,
+    consumer: NatsConsumer,
     callback: Callback,
     msg_type: Type[MsgType],
     max_concurrent_messages: Optional[int] = None,
@@ -188,13 +183,11 @@ def create_consumer(
     """
     Returns a non-initialized consumer
     """
-    consumer = NatsTaskConsumer(
+    return NatsTaskConsumer(
         name=name,
         stream=stream,
-        stream_subjects=stream_subjects,
-        consumer_subject=consumer_subject,
+        consumer=consumer,
         callback=callback,
         msg_type=msg_type,
         max_concurrent_messages=max_concurrent_messages,
     )
-    return consumer

@@ -23,6 +23,10 @@ class PubSubChannels:
 
 
 class Streams:
+    """
+    NOTE: groups can't contain '.', '*' or '>' characters.
+    """
+
     class INGEST:
         """
         Writing resource changes go to this steam/consumer group.
@@ -41,24 +45,6 @@ class Streams:
         name = "nucliadb"
         subject = "ndb.consumer.processed"
         group = "nucliadb-pull-processed"
-
-    class KB_EXPORTS:
-        """
-        Exporting kbs
-        """
-
-        name = "ndb-exports"
-        subject = "ndb-exports"
-        group = "ndb-exports"
-
-    class KB_IMPORTS:
-        """
-        Importing kbs
-        """
-
-        name = "ndb-imports"
-        subject = "ndb-imports"
-        group = "ndb-imports"
 
 
 class Features:

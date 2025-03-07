@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from dataclasses import dataclass
+
 import nats
 
 from nucliadb.common.context import ApplicationContext
@@ -31,3 +33,19 @@ async def create_nats_stream_if_not_exists(
         await js.stream_info(stream_name)
     except nats.js.errors.NotFoundError:
         await js.add_stream(name=stream_name, subjects=subjects)
+
+
+@dataclass
+class NatsStream:
+    name: str
+    subjects: list[str]
+
+
+@dataclass
+class NatsConsumer:
+    """
+    NOTE: groups can't contain '.', '*' or '>' characters.
+    """
+
+    subject: str
+    group: str

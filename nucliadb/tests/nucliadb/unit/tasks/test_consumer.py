@@ -23,10 +23,15 @@ import pydantic
 import pytest
 
 from nucliadb.tasks.consumer import create_consumer
+from nucliadb.tasks.utils import NatsConsumer, NatsStream
 
 
 class Message(pydantic.BaseModel):
     kbid: str
+
+
+nstream = NatsStream(name="stream", subjects=["stream.>"])
+nconsumer = NatsConsumer(subject="stream.subject", group="group")
 
 
 def test_create_consumer():
@@ -34,18 +39,16 @@ def test_create_consumer():
 
     consumer = create_consumer(
         "foo",
-        stream="stream",
-        stream_subjects=["stream.>"],
-        consumer_subject="stream.subject",
+        stream=nstream,
+        consumer=nconsumer,
         msg_type=Message,
         callback=callback,
     )
     assert not consumer.initialized
 
     assert consumer.name == "foo"
-    assert consumer.stream == "stream"
-    assert consumer.stream_subjects == ["stream.>"]
-    assert consumer.consumer_subject == "stream.subject"
+    assert consumer.stream == nstream
+    assert consumer.consumer == nconsumer
     assert consumer.callback == callback
     assert consumer.msg_type == Message
 
@@ -59,9 +62,8 @@ class TestSubscriptionWorker:
     async def consumer(self, context, callback):
         consumer = create_consumer(
             "foo",
-            stream="stream",
-            stream_subjects=["stream.>"],
-            consumer_subject="stream.subject",
+            stream=nstream,
+            consumer=nconsumer,
             callback=callback,
             msg_type=Message,
         )
