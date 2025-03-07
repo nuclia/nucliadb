@@ -24,24 +24,28 @@ import pydantic
 import pytest
 
 from nucliadb.tasks.producer import create_producer
+from nucliadb.tasks.utils import NatsConsumer, NatsStream
 
 
 class Message(pydantic.BaseModel):
     kbid: str
 
 
+stream = NatsStream(name="stream", subjects=["stream.>"])
+consumer = NatsConsumer(subject="stream.subject", group="group")
+
+
 def test_create_producer():
     producer = create_producer(
         "foo",
-        stream="stream",
-        stream_subjects=["stream.>"],
-        producer_subject="stream.subject",
+        stream=stream,
+        producer_subject=consumer.subject,
         msg_type=Message,
     )
     assert not producer.initialized
 
     assert producer.name == "foo"
-    assert producer.stream == "stream"
+    assert producer.stream == stream
 
 
 class TestProducer:
@@ -60,9 +64,8 @@ class TestProducer:
 
         producer = create_producer(
             "foo",
-            stream="stream",
-            stream_subjects=["stream.>"],
-            producer_subject="stream.subject",
+            stream=stream,
+            producer_subject=consumer.subject,
             msg_type=Message,
         )
         await producer.initialize(context)
@@ -72,8 +75,8 @@ class TestProducer:
     async def test_initialize_creates_stream(self, producer, nats_manager):
         # Check that the stream is on inialization
         assert nats_manager.js.add_stream.call_count == 1
-        assert nats_manager.js.add_stream.call_args[1]["name"] == "stream"
-        assert nats_manager.js.add_stream.call_args[1]["subjects"] == ["stream.>"]
+        assert nats_manager.js.add_stream.call_args[1]["name"] == stream.name
+        assert nats_manager.js.add_stream.call_args[1]["subjects"] == stream.subjects
 
     async def test_produce_raises_error_if_not_initialized(self, producer):
         producer.initialized = False
@@ -86,7 +89,7 @@ class TestProducer:
         await producer.send(msg)
 
         publish_args = producer.context.nats_manager.js.publish.call_args[0]
-        assert publish_args[0] == "stream.subject"
+        assert publish_args[0] == consumer.subject
 
         raw_message = publish_args[1]
         sent_message = Message.model_validate_json(raw_message)

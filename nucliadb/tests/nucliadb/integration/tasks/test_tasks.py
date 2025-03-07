@@ -28,6 +28,7 @@ import pytest
 from nucliadb import tasks
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.context import ApplicationContext
+from nucliadb.tasks.utils import NatsConsumer, NatsStream
 from nucliadb_utils.settings import indexing_settings
 
 
@@ -53,6 +54,9 @@ class Message(pydantic.BaseModel):
 
 
 async def test_tasks_factory_api(context):
+    nstream = NatsStream(name="work", subjects=["work"])
+    nconsumer = NatsConsumer(subject="work", group="work")
+
     work_done = asyncio.Event()
 
     async def some_work(context: ApplicationContext, msg: Message):
@@ -62,18 +66,16 @@ async def test_tasks_factory_api(context):
 
     producer = tasks.create_producer(
         name="some_work",
-        stream="work",
-        stream_subjects=["work"],
-        producer_subject="work",
+        stream=nstream,
+        producer_subject=nconsumer.subject,
         msg_type=Message,
     )
     await producer.initialize(context=context)
 
     consumer = tasks.create_consumer(
         name="some_work",
-        stream="work",
-        stream_subjects=["work"],
-        consumer_subject="work",
+        stream=nstream,
+        consumer=nconsumer,
         callback=some_work,
         msg_type=Message,
     )
@@ -89,6 +91,9 @@ async def test_tasks_factory_api(context):
 
 
 async def test_consumer_consumes_multiple_messages_concurrently(context):
+    nstream = NatsStream(name="concurrent_work", subjects=["concurrent_work"])
+    nconsumer = NatsConsumer(subject="concurrent_work", group="concurrent_work")
+
     work_duration_s = 2
     work_done = {
         "kbid1": asyncio.Event(),
@@ -104,18 +109,16 @@ async def test_consumer_consumes_multiple_messages_concurrently(context):
 
     producer = tasks.create_producer(
         name="some_work",
-        stream="concurrent_work",
-        stream_subjects=["concurrent_work"],
-        producer_subject="concurrent_work",
+        stream=nstream,
+        producer_subject=nconsumer.subject,
         msg_type=Message,
     )
     await producer.initialize(context=context)
 
     consumer = tasks.create_consumer(
         name="some_work",
-        stream="concurrent_work",
-        stream_subjects=["concurrent_work"],
-        consumer_subject="concurrent_work",
+        stream=nstream,
+        consumer=nconsumer,
         callback=some_work,
         msg_type=Message,
         max_concurrent_messages=10,
@@ -144,6 +147,9 @@ async def test_consumer_consumes_multiple_messages_concurrently(context):
 
 
 async def test_consumer_finalize_cancels_tasks(context):
+    nstream = NatsStream(name="work", subjects=["work"])
+    nconsumer = NatsConsumer(subject="work", group="work")
+
     cancelled_event = asyncio.Event()
 
     async def some_work(context: ApplicationContext, msg: Message):
@@ -155,18 +161,16 @@ async def test_consumer_finalize_cancels_tasks(context):
 
     producer = tasks.create_producer(
         name="some_work",
-        stream="work",
-        stream_subjects=["work"],
-        producer_subject="work",
+        stream=nstream,
+        producer_subject=nconsumer.subject,
         msg_type=Message,
     )
     await producer.initialize(context=context)
 
     consumer = tasks.create_consumer(
         name="some_work",
-        stream="work",
-        stream_subjects=["work"],
-        consumer_subject="work",
+        stream=nstream,
+        consumer=nconsumer,
         callback=some_work,
         msg_type=Message,
     )
@@ -186,6 +190,9 @@ async def test_consumer_finalize_cancels_tasks(context):
 
 
 async def test_consumer_max_concurrent_tasks(context):
+    nstream = NatsStream(name="work_with_max", subjects=["work_with_max"])
+    nconsumer = NatsConsumer(subject="work_with_max", group="work_with_max")
+
     async def some_work(context: ApplicationContext, msg: Message):
         print(f"Doing some work! {msg.kbid}")
         start = time.perf_counter()
@@ -197,18 +204,16 @@ async def test_consumer_max_concurrent_tasks(context):
 
     producer = tasks.create_producer(
         name="some_work",
-        stream="work_with_max",
-        stream_subjects=["work_with_max"],
-        producer_subject="work_with_max",
+        stream=nstream,
+        producer_subject=nconsumer.subject,
         msg_type=Message,
     )
     await producer.initialize(context=context)
 
     consumer = tasks.create_consumer(
         name="some_work",
-        stream="work_with_max",
-        stream_subjects=["work_with_max"],
-        consumer_subject="work_with_max",
+        stream=nstream,
+        consumer=nconsumer,
         callback=some_work,
         msg_type=Message,
         max_concurrent_messages=5,
