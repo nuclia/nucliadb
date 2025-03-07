@@ -18,12 +18,28 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, Tag, model_validator
+from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
 from typing_extensions import Self
 
+from nucliadb_models.filters import And, Not, Or, filter_discriminator
 from nucliadb_models.metadata import RelationNodeType
+
+# FIXME For some reason, pydantic breaks if we try to reuse the same And/Or/Not
+# classes from the filters module but redefining them as subclasses works
+
+
+class And(And):  # type: ignore[no-redef]
+    ...
+
+
+class Or(Or):  # type: ignore[no-redef]
+    ...
+
+
+class Not(Not):  # type: ignore[no-redef]
+    ...
 
 
 class GraphNodeMatchKind(str, Enum):
@@ -77,7 +93,18 @@ class BaseGraphSearchRequest(BaseModel):
     top_k: int = Field(default=50, title="Number of results to retrieve")
 
 
-GraphPathQuery = Annotated[GraphPath, Tag("path")]
+graph_query_discriminator = filter_discriminator
+
+
+GraphPathQuery = Annotated[
+    Union[
+        Annotated[And["GraphPathQuery"], Tag("and")],
+        Annotated[Or["GraphPathQuery"], Tag("or")],
+        Annotated[Not["GraphPathQuery"], Tag("not")],
+        Annotated[GraphPath, Tag("path")],
+    ],
+    Discriminator(graph_query_discriminator),
+]
 
 
 class GraphSearchRequest(BaseGraphSearchRequest):

@@ -116,7 +116,4 @@ async def test_user_defined_knowledge_graph(
             assert path not in retrieved_graph, "We don't expect duplicated paths"
             retrieved_graph.add(path)
 
-    for relation in retrieved_graph:
-        print(relation)
-
     assert len(retrieved_graph) == 5

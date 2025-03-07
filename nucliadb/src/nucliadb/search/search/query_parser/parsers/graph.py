@@ -24,27 +24,10 @@ from nucliadb.search.search.query_parser.models import GraphRetrieval
 from nucliadb_models.graph import requests as graph_requests
 from nucliadb_protos import nodereader_pb2
 
-# TODO: remove repetition by adding some functions to convert query
-# nodes/relations to pb nodes/relations
-
 
 def parse_graph_search(item: graph_requests.GraphSearchRequest) -> GraphRetrieval:
     pb = nodereader_pb2.GraphSearchRequest()
-
-    query = item.query
-    if query.source is not None:
-        _set_node_to_pb(query.source, pb.query.path.path.source)
-
-    if query.destination is not None:
-        _set_node_to_pb(query.destination, pb.query.path.path.destination)
-
-    if query.relation is not None:
-        relation = query.relation
-        if relation.label is not None:
-            pb.query.path.path.relation.value = relation.label
-
-    pb.query.path.path.undirected = query.undirected
-
+    pb.query.path.CopyFrom(_parse_path_query(item.query))
     pb.top_k = item.top_k
     return pb
 
@@ -65,7 +48,9 @@ def parse_graph_node_search(item: graph_requests.GraphNodesSearchRequest) -> Gra
         _set_node_to_pb(query, pb.query.path.path.destination)
 
     else:  # pragma: nocover
-        raise ValueError(f"Unknown graph node position: {query.position}")
+        # This is a trick so mypy generates an error if this branch can be reached,
+        # that is, if we are missing some ifs
+        _a: int = "a"
 
     pb.top_k = item.top_k
     return pb
@@ -86,6 +71,42 @@ def parse_graph_relation_search(
     return pb
 
 
+def _parse_path_query(expr: graph_requests.GraphPathQuery) -> nodereader_pb2.GraphQuery.PathQuery:
+    pb = nodereader_pb2.GraphQuery.PathQuery()
+
+    if isinstance(expr, graph_requests.And):
+        for op in expr.operands:
+            pb.bool_and.operands.append(_parse_path_query(op))
+
+    elif isinstance(expr, graph_requests.Or):
+        for op in expr.operands:
+            pb.bool_or.operands.append(_parse_path_query(op))
+
+    elif isinstance(expr, graph_requests.Not):
+        pb.bool_not.CopyFrom(_parse_path_query(expr.operand))
+
+    elif isinstance(expr, graph_requests.GraphPath):
+        if expr.source is not None:
+            _set_node_to_pb(expr.source, pb.path.source)
+
+        if expr.destination is not None:
+            _set_node_to_pb(expr.destination, pb.path.destination)
+
+        if expr.relation is not None:
+            relation = expr.relation
+            if relation.label is not None:
+                pb.path.relation.value = relation.label
+
+        pb.path.undirected = expr.undirected
+
+    else:  # pragma: nocover
+        # This is a trick so mypy generates an error if this branch can be reached,
+        # that is, if we are missing some ifs
+        _a: int = "a"
+
+    return pb
+
+
 def _set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuery.Node):
     if node.value is not None:
         pb.value = node.value
@@ -96,8 +117,9 @@ def _set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuer
             pb.match_kind = nodereader_pb2.GraphQuery.Node.MatchKind.FUZZY
 
         else:  # pragma: nocover
-            # can only happen if new types are added to the API but not in the parser logic
-            raise ValueError(f"Unknown graph node match kind: {type(node.match)}")
+            # This is a trick so mypy generates an error if this branch can be reached,
+            # that is, if we are missing some ifs
+            _a: int = "a"
 
     if node.type is not None:
         pb.node_type = RelationNodeTypeMap[node.type]
