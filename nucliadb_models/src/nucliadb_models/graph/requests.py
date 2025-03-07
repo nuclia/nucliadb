@@ -19,7 +19,7 @@
 #
 
 from enum import Enum
-from typing import Optional, Union
+from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
@@ -27,34 +27,29 @@ from typing_extensions import Self
 from nucliadb_models.metadata import RelationNodeType
 
 
-class GraphNodeValue(BaseModel):
-    value: Optional[str]
-    fuzzy_distance: Optional[int] = Field(
-        default=None,
-        le=2,
-    )
-    is_prefix: bool = False
-
-    @model_validator(mode="after")
-    def fuzzy_and_prefix_on_value(self) -> Self:
-        if self.value is None:
-            if self.fuzzy_distance is not None:
-                raise ValueError("Fuzzy distance can only be used with a value")
-            if self.is_prefix:
-                raise ValueError("Prefix can only be used with a value")
-        else:
-            if len(self.value) < 3 and self.fuzzy_distance is not None:
-                raise ValueError(
-                    "Fuzzy distance must be used with values containing, at least, 3 characters"
-                )
-
-        return self
+class GraphNodeMatchKind(str, Enum):
+    EXACT = "exact"
+    FUZZY = "fuzzy"
 
 
 class GraphNode(BaseModel):
-    value: Union[str, GraphNodeValue, None] = None
-    type: Optional[RelationNodeType] = None
+    value: Optional[str] = None
+    match: GraphNodeMatchKind = GraphNodeMatchKind.EXACT
+    type: Optional[RelationNodeType] = RelationNodeType.ENTITY
     group: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_fuzzy_usage(self) -> Self:
+        if self.match == GraphNodeMatchKind.FUZZY:
+            if self.value is None:
+                raise ValueError("Fuzzy match can only be used if a node value is provided")
+            else:
+                if len(self.value) < 3:
+                    raise ValueError(
+                        "Fuzzy match must be used with values containing at least 3 characters"
+                    )
+
+        return self
 
 
 class GraphNodePosition(str, Enum):

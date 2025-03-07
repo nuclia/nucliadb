@@ -33,17 +33,17 @@ def parse_graph_search(item: graph_requests.GraphSearchRequest) -> GraphRetrieva
 
     query = item.query
     if query.source is not None:
-        set_node_to_pb(query.source, pb.query.path.source)
+        _set_node_to_pb(query.source, pb.query.path.path.source)
 
     if query.destination is not None:
-        set_node_to_pb(query.destination, pb.query.path.destination)
+        _set_node_to_pb(query.destination, pb.query.path.path.destination)
 
     if query.relation is not None:
         relation = query.relation
         if relation.label is not None:
-            pb.query.path.relation.value = relation.label
+            pb.query.path.path.relation.value = relation.label
 
-    pb.query.path.undirected = query.undirected
+    pb.query.path.path.undirected = query.undirected
 
     pb.top_k = item.top_k
     return pb
@@ -55,13 +55,14 @@ def parse_graph_node_search(item: graph_requests.GraphNodesSearchRequest) -> Gra
     query = item.query
 
     if query.position == graph_requests.GraphNodePosition.ANY:
-        set_node_to_pb(query, pb.query.node)
+        _set_node_to_pb(query, pb.query.path.path.source)
+        pb.query.path.path.undirected = True
 
     elif query.position == graph_requests.GraphNodePosition.SOURCE:
-        set_node_to_pb(query, pb.query.path.source)
+        _set_node_to_pb(query, pb.query.path.path.source)
 
     elif query.position == graph_requests.GraphNodePosition.DESTINATION:
-        set_node_to_pb(query, pb.query.path.destination)
+        _set_node_to_pb(query, pb.query.path.path.destination)
 
     else:  # pragma: nocover
         raise ValueError(f"Unknown graph node position: {query.position}")
@@ -79,28 +80,27 @@ def parse_graph_relation_search(
 
     relation = query
     if relation.label is not None:
-        pb.query.path.relation.value = relation.label
+        pb.query.path.path.relation.value = relation.label
 
     pb.top_k = item.top_k
     return pb
 
 
-def set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuery.Node):
+def _set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuery.Node):
     if node.value is not None:
-        if isinstance(node.value, str):
-            pb.value = node.value
-        elif isinstance(node.value, graph_requests.GraphNodeValue):
-            if node.value.value is not None:
-                pb.value = node.value.value
-                if node.value.fuzzy_distance:
-                    pb.fuzzy_distance = node.value.fuzzy_distance
-                pb.as_prefix = node.value.is_prefix
+        pb.value = node.value
+        if node.match == graph_requests.GraphNodeMatchKind.EXACT:
+            pb.match_kind = nodereader_pb2.GraphQuery.Node.MatchKind.EXACT
+
+        elif node.match == graph_requests.GraphNodeMatchKind.FUZZY:
+            pb.match_kind = nodereader_pb2.GraphQuery.Node.MatchKind.FUZZY
 
         else:  # pragma: nocover
             # can only happen if new types are added to the API but not in the parser logic
-            raise ValueError(f"Unknown graph node value of type: {type(node.value)}")
+            raise ValueError(f"Unknown graph node match kind: {type(node.match)}")
 
     if node.type is not None:
         pb.node_type = RelationNodeTypeMap[node.type]
+
     if node.group is not None:
         pb.node_subtype = node.group
