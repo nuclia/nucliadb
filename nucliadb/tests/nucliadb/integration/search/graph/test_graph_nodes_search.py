@@ -22,8 +22,10 @@ from httpx import AsyncClient
 
 from nucliadb_models.graph.responses import GraphNodesSearchResponse
 
+# FIXME: all asserts here are wrong, as we are not deduplicating nor Rust is
+# returning the proper entities. Fix all asserts once both issues are tackled
 
-@pytest.mark.skip(reason="Early development")
+
 @pytest.mark.deploy_modes("standalone")
 async def test_graph_nodes_search(
     nucliadb_reader: AsyncClient,
@@ -31,12 +33,12 @@ async def test_graph_nodes_search(
 ):
     kbid = kb_with_entity_graph
 
-    # (:PERSON)-[]->()
+    # (:PERSON)
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/graph/nodes",
         json={
             "query": {
-                "position": "source",
+                "prop": "node",
                 "group": "PERSON",
             },
             "top_k": 100,
@@ -44,4 +46,59 @@ async def test_graph_nodes_search(
     )
     assert resp.status_code == 200
     nodes = GraphNodesSearchResponse.model_validate(resp.json()).nodes
-    assert len(nodes) == 12
+    assert len(nodes) == 24
+
+    # (:PERSON)-[]->()
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph/nodes",
+        json={
+            "query": {
+                "prop": "source_node",
+                "group": "PERSON",
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    nodes = GraphNodesSearchResponse.model_validate(resp.json()).nodes
+    assert len(nodes) == 24
+
+    # ()-[]->(:PERSON)
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph/nodes",
+        json={
+            "query": {
+                "prop": "destination_node",
+                "group": "PERSON",
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    nodes = GraphNodesSearchResponse.model_validate(resp.json()).nodes
+    assert len(nodes) == 6
+
+    # (:Anastasia) -- implemented as an or instead of using prop=node
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph/nodes",
+        json={
+            "query": {
+                "or": [
+                    {
+                        "prop": "source_node",
+                        "value": "Anastasia",
+                        "group": "PERSON",
+                    },
+                    {
+                        "prop": "destination_node",
+                        "value": "Anastasia",
+                        "group": "PERSON",
+                    },
+                ],
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    nodes = GraphNodesSearchResponse.model_validate(resp.json()).nodes
+    assert len(nodes) == 4

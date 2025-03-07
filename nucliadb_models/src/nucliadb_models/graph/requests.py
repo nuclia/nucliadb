@@ -26,36 +26,23 @@ from typing_extensions import Self
 from nucliadb_models.filters import And, Not, Or, filter_discriminator
 from nucliadb_models.metadata import RelationNodeType
 
-# FIXME For some reason, pydantic breaks if we try to reuse the same And/Or/Not
-# classes from the filters module but redefining them as subclasses works
+## Models for graph nodes and relations
 
 
-class And(And):  # type: ignore[no-redef]
-    ...
-
-
-class Or(Or):  # type: ignore[no-redef]
-    ...
-
-
-class Not(Not):  # type: ignore[no-redef]
-    ...
-
-
-class GraphNodeMatchKind(str, Enum):
+class NodeMatchKind(str, Enum):
     EXACT = "exact"
     FUZZY = "fuzzy"
 
 
 class GraphNode(BaseModel):
     value: Optional[str] = None
-    match: GraphNodeMatchKind = GraphNodeMatchKind.EXACT
+    match: NodeMatchKind = NodeMatchKind.EXACT
     type: Optional[RelationNodeType] = RelationNodeType.ENTITY
     group: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_fuzzy_usage(self) -> Self:
-        if self.match == GraphNodeMatchKind.FUZZY:
+        if self.match == NodeMatchKind.FUZZY:
             if self.value is None:
                 raise ValueError("Fuzzy match can only be used if a node value is provided")
             else:
@@ -63,30 +50,41 @@ class GraphNode(BaseModel):
                     raise ValueError(
                         "Fuzzy match must be used with values containing at least 3 characters"
                     )
-
         return self
-
-
-class GraphNodePosition(str, Enum):
-    ANY = "any"
-    SOURCE = "source"
-    DESTINATION = "destination"
-
-
-class PositionedGraphNode(GraphNode):
-    position: GraphNodePosition = GraphNodePosition.ANY
 
 
 class GraphRelation(BaseModel):
     label: Optional[str] = None
 
 
+## Models for query expressions
+
+
+class AnyNode(GraphNode):
+    prop: Literal["node"]
+
+
+class SourceNode(GraphNode):
+    prop: Literal["source_node"]
+
+
+class DestinationNode(GraphNode):
+    prop: Literal["destination_node"]
+
+
+class Relation(GraphRelation):
+    prop: Literal["relation"]
+
+
 class GraphPath(BaseModel, extra="forbid"):
-    prop: Literal["path"]
+    prop: Literal["path"] = "path"
     source: Optional[GraphNode] = None
     relation: Optional[GraphRelation] = None
     destination: Optional[GraphNode] = None
     undirected: bool = False
+
+
+## Requests models
 
 
 class BaseGraphSearchRequest(BaseModel):
@@ -96,12 +94,22 @@ class BaseGraphSearchRequest(BaseModel):
 graph_query_discriminator = filter_discriminator
 
 
+# Paths search
+
 GraphPathQuery = Annotated[
     Union[
+        # bool expressions
         Annotated[And["GraphPathQuery"], Tag("and")],
         Annotated[Or["GraphPathQuery"], Tag("or")],
         Annotated[Not["GraphPathQuery"], Tag("not")],
+        # paths
         Annotated[GraphPath, Tag("path")],
+        # nodes
+        Annotated[SourceNode, Tag("source_node")],
+        Annotated[DestinationNode, Tag("destination_node")],
+        Annotated[AnyNode, Tag("node")],
+        # relations
+        Annotated[Relation, Tag("relation")],
     ],
     Discriminator(graph_query_discriminator),
 ]
@@ -111,9 +119,42 @@ class GraphSearchRequest(BaseGraphSearchRequest):
     query: GraphPathQuery
 
 
+# Nodes search
+
+GraphNodesQuery = Annotated[
+    Union[
+        Annotated[And["GraphNodesQuery"], Tag("and")],
+        Annotated[Or["GraphNodesQuery"], Tag("or")],
+        Annotated[Not["GraphNodesQuery"], Tag("not")],
+        Annotated[SourceNode, Tag("source_node")],
+        Annotated[DestinationNode, Tag("destination_node")],
+        Annotated[AnyNode, Tag("node")],
+    ],
+    Discriminator(graph_query_discriminator),
+]
+
+
 class GraphNodesSearchRequest(BaseGraphSearchRequest):
-    query: PositionedGraphNode
+    query: GraphNodesQuery
+
+
+# Relations search
+
+GraphRelationsQuery = Annotated[
+    Union[
+        Annotated[Or["GraphRelationsQuery"], Tag("or")],
+        Annotated[Not["GraphRelationsQuery"], Tag("not")],
+        Annotated[Relation, Tag("relation")],
+    ],
+    Discriminator(graph_query_discriminator),
+]
 
 
 class GraphRelationsSearchRequest(BaseGraphSearchRequest):
-    query: GraphRelation
+    query: GraphRelationsQuery
+
+
+# We need this to avoid issues with pydantic and generic types defined in another module
+GraphSearchRequest.model_rebuild()
+GraphNodesSearchRequest.model_rebuild()
+GraphRelationsSearchRequest.model_rebuild()
