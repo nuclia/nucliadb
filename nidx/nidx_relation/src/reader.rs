@@ -31,7 +31,7 @@ use tantivy::query::{BooleanQuery, Occur, Query};
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
 
 use crate::graph_query_parser::{
-    BoolGraphQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, PathQuery, Relation, Term,
+    BoolGraphQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
 };
 use crate::schema::Schema;
 use crate::{io_maps, schema};
@@ -192,15 +192,11 @@ impl RelationsReaderService {
         for entry_point in bfs_request.entry_points.iter() {
             statements.push((
                 Occur::Should,
-                query_parser.parse(GraphQuery::PathQuery(PathQuery::UndirectedPath((
-                    Expression::Value(Node {
-                        value: Some(entry_point.value.clone().into()),
-                        node_type: Some(entry_point.ntype()),
-                        node_subtype: Some(entry_point.subtype.clone()),
-                    }),
-                    Expression::Value(Relation::default()),
-                    Expression::Value(Node::default()),
-                )))),
+                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::Node(Expression::Value(Node {
+                    value: Some(entry_point.value.clone().into()),
+                    node_type: Some(entry_point.ntype()),
+                    node_subtype: Some(entry_point.subtype.clone()),
+                })))),
             ));
         }
 
@@ -215,20 +211,16 @@ impl RelationsReaderService {
             }
             statements.push((
                 Occur::MustNot,
-                query_parser.parse(GraphQuery::PathQuery(PathQuery::UndirectedPath((
-                    Expression::Or(
-                        deleted_nodes
-                            .node_values
-                            .iter()
-                            .map(|deleted_entity_value| Node {
-                                value: Some(deleted_entity_value.clone().into()),
-                                node_subtype: Some(deleted_nodes.node_subtype.clone()),
-                                ..Default::default()
-                            })
-                            .collect(),
-                    ),
-                    Expression::Value(Relation::default()),
-                    Expression::Value(Node::default()),
+                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::Node(Expression::Or(
+                    deleted_nodes
+                        .node_values
+                        .iter()
+                        .map(|deleted_entity_value| Node {
+                            value: Some(deleted_entity_value.clone().into()),
+                            node_subtype: Some(deleted_nodes.node_subtype.clone()),
+                            ..Default::default()
+                        })
+                        .collect(),
                 )))),
             ));
         }
@@ -247,10 +239,8 @@ impl RelationsReaderService {
         if excluded_subtypes.len() > 0 {
             statements.push((
                 Occur::MustNot,
-                query_parser.parse(GraphQuery::PathQuery(PathQuery::UndirectedPath((
-                    Expression::Or(excluded_subtypes),
-                    Expression::Value(Relation::default()),
-                    Expression::Value(Node::default()),
+                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::Node(Expression::Or(
+                    excluded_subtypes,
                 )))),
             ))
         }
