@@ -191,8 +191,12 @@ message GraphQuery {
         optional string value = 1;
         optional utils.RelationNode.NodeType node_type = 2;
         optional string node_subtype = 3;
-        uint32 fuzzy_distance = 4;
-        bool as_prefix = 5;
+
+        enum MatchKind {
+            EXACT = 0;
+            FUZZY = 1;
+        }
+        MatchKind match_kind = 4;
     }
 
     message Relation {
@@ -207,19 +211,21 @@ message GraphQuery {
     }
 
     message BoolQuery {
-        repeated GraphQuery operands = 1;
+        repeated PathQuery operands = 1;
     }
 
-    oneof query {
-        // Search a node in any position
-        Node node = 1;
-        // Search for relations
-        Relation relation = 2;
-        // Search for directed/undirected paths. It can also express
-        // source/destination node queries
-        Path path = 3;
-
+    message PathQuery {
+        oneof query {
+            GraphQuery.Path path = 1;
+            PathQuery bool_not = 2;
+            BoolQuery bool_and = 3;
+            BoolQuery bool_or = 4;
+        }
     }
+
+    // Search directed/undirected paths (triplets of node-relation-node). It
+    // can also be used to express node and relation queries
+    PathQuery path = 1;
 }
 
 message GraphSearchRequest {

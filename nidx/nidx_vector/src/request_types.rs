@@ -36,8 +36,8 @@ pub struct VectorSearchRequest {
     pub vector_set: String,
     pub min_score: f32,
 
-    pub filtering_formula: Option<BooleanExpression>,
-    pub segment_filtering_formula: Option<BooleanExpression>,
+    pub filtering_formula: Option<BooleanExpression<String>>,
+    pub segment_filtering_formula: Option<BooleanExpression<String>>,
     /// Whether to do an OR/AND between prefilter results and filtering_formula
     pub filter_or: bool,
 }

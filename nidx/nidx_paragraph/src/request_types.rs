@@ -35,14 +35,14 @@ pub struct ParagraphSearchRequest {
     pub min_score: f32,
     pub security: Option<nidx_protos::utils::Security>,
 
-    pub filtering_formula: Option<BooleanExpression>,
+    pub filtering_formula: Option<BooleanExpression<String>>,
     /// Whether to do an OR/AND between prefilter results and filtering_formula
     pub filter_or: bool,
 }
 
 pub struct ParagraphSuggestRequest {
     pub body: String,
-    pub filtering_formula: Option<BooleanExpression>,
+    pub filtering_formula: Option<BooleanExpression<String>>,
     /// Whether to do an OR/AND between prefilter results and filtering_formula
     pub filter_or: bool,
 }
