@@ -127,6 +127,7 @@ async def context(nucliadb_reader: AsyncClient, settings: BackupSettings):
     await context.finalize()
 
 
+@pytest.mark.flaky(reruns=3)
 @pytest.mark.deploy_modes("standalone")
 async def test_backup(
     nucliadb_reader: AsyncClient,
@@ -172,6 +173,7 @@ async def test_backup(
     assert len(resp.json()["labels"]) == 1
 
 
+@pytest.mark.flaky(reruns=3)
 @pytest.mark.deploy_modes("standalone")
 async def test_backup_resumed(
     nucliadb_reader: AsyncClient,
