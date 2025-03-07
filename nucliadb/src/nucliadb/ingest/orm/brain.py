@@ -45,6 +45,7 @@ from nucliadb_protos.resources_pb2 import (
     Metadata,
     Origin,
     Paragraph,
+    Relations,
     UserFieldMetadata,
     UserMetadata,
 )
@@ -375,10 +376,10 @@ class ResourceBrain:
             return "EMPTY"
         return METADATA_STATUS_PB_TYPE_TO_NAME_MAP[metadata.status]
 
-    def set_resource_metadata(self, basic: Basic, origin: Optional[Origin]):
+    def set_resource_metadata(self, basic: Basic, origin: Optional[Origin], user_relations: Relations):
         self._set_resource_dates(basic, origin)
         self._set_resource_labels(basic, origin)
-        self._set_resource_relations(basic, origin)
+        self._set_resource_relations(basic, origin, user_relations)
 
     def _set_resource_dates(self, basic: Basic, origin: Optional[Origin]):
         if basic.created.seconds > 0:
@@ -401,7 +402,7 @@ class ResourceBrain:
             if origin.HasField("modified") and origin.modified.seconds > 0:
                 self.brain.metadata.modified.CopyFrom(origin.modified)
 
-    def _set_resource_relations(self, basic: Basic, origin: Optional[Origin]):
+    def _set_resource_relations(self, basic: Basic, origin: Optional[Origin], user_relations: Relations):
         relationnodedocument = RelationNode(value=self.rid, ntype=RelationNode.NodeType.RESOURCE)
         if origin is not None:
             # origin contributors
@@ -430,7 +431,7 @@ class ResourceBrain:
             )
 
         # relations
-        self.brain.relations.extend(basic.usermetadata.relations)
+        self.brain.relations.extend(user_relations.relations)
 
     def _set_resource_labels(self, basic: Basic, origin: Optional[Origin]):
         if origin is not None:

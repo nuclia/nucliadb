@@ -227,6 +227,12 @@ async def managed_serialize(
             )
             resource.queue = QueueType[orm_resource.basic.QueueType.Name(orm_resource.basic.queue)]
 
+            if ResourceProperties.RELATIONS in show:
+                relations = await orm_resource.get_user_relations()
+                resource.usermetadata.relations = [
+                    from_proto.relation(rel) for rel in relations.relations
+                ]
+
     if ResourceProperties.RELATIONS in show:
         await orm_resource.get_relations()
         if orm_resource.relations is not None:

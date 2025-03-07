@@ -577,6 +577,9 @@ class Processor:
         if message.HasField("security"):
             await resource.set_security(message.security)
 
+        if message.HasField("user_relations"):
+            await resource.set_user_relations(message.user_relations)
+
         await resource.apply_fields(message)
         await resource.apply_extracted(message)
 

@@ -32,6 +32,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
     Metadata,
     Paragraph,
+    Relations,
     Sentence,
 )
 
@@ -214,7 +215,7 @@ def test_set_resource_metadata_promotes_origin_dates():
     origin.created.seconds = 3
     origin.modified.seconds = 4
 
-    resource_brain.set_resource_metadata(basic, origin)
+    resource_brain.set_resource_metadata(basic, origin, Relations())
 
     assert resource_brain.brain.metadata.created.seconds == 3
     assert resource_brain.brain.metadata.modified.seconds == 4
@@ -223,7 +224,7 @@ def test_set_resource_metadata_promotes_origin_dates():
 def test_set_resource_metadata_handles_timestamp_not_present():
     resource_brain = ResourceBrain("rid")
     basic = Basic()
-    resource_brain.set_resource_metadata(basic, None)
+    resource_brain.set_resource_metadata(basic, None, Relations())
     created = resource_brain.brain.metadata.created.seconds
     modified = resource_brain.brain.metadata.modified.seconds
     assert created > 0

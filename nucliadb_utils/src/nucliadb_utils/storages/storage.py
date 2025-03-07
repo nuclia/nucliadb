@@ -48,6 +48,7 @@ from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
 from nucliadb_utils.utilities import get_local_storage, get_nuclia_storage
 
 STORAGE_RESOURCE = "kbs/{kbid}/r/{uuid}"
+RESOURCE_USER_RELATIONS = "kbs/{kbid}/r/{uuid}/user-relations"
 KB_RESOURCE_FIELD = "kbs/{kbid}/r/{uuid}/f/f/{field}"
 KB_CONVERSATION_FIELD = "kbs/{kbid}/r/{uuid}/f/c/{field}/{ident}/{count}"
 STORAGE_FILE_EXTRACTED = "kbs/{kbid}/r/{uuid}/e/{field_type}/{field}/{key}"
@@ -339,6 +340,11 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         key = STORAGE_FILE_EXTRACTED.format(
             kbid=kbid, uuid=uuid, field_type=field_type, field=field, key=key
         )
+        return self.field_klass(storage=self, bucket=bucket, fullkey=key)
+
+    def user_relations(self, kbid: str, uuid: str) -> StorageField:
+        bucket = self.get_bucket_name(kbid)
+        key = RESOURCE_USER_RELATIONS.format(kbid=kbid, uuid=uuid)
         return self.field_klass(storage=self, bucket=bucket, fullkey=key)
 
     async def upload_b64file_to_cloudfile(
