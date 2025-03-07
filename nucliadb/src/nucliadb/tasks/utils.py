@@ -43,5 +43,9 @@ class NatsStream:
 
 @dataclass
 class NatsConsumer:
+    """
+    NOTE: groups can't contain '.', '*' or '>' characters.
+    """
+
     subject: str
     group: str
