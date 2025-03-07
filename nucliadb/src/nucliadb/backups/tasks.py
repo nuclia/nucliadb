@@ -42,13 +42,14 @@ def creator_consumer() -> NatsTaskConsumer[CreateBackupRequest]:
     return consumer
 
 
-async def create(kbid: str, backup_id: str) -> None:
+async def create(context: ApplicationContext, kbid: str, backup_id: str) -> None:
     producer: NatsTaskProducer[CreateBackupRequest] = create_producer(
         name="backup_creator",
         stream=BackupsNatsConfig.stream,
         producer_subject=BackupsNatsConfig.create_consumer.subject,
         msg_type=CreateBackupRequest,
     )
+    await producer.initialize(context)
     msg = CreateBackupRequest(
         kb_id=kbid,
         backup_id=backup_id,
@@ -68,13 +69,14 @@ def restorer_consumer() -> NatsTaskConsumer[RestoreBackupRequest]:
     return consumer
 
 
-async def restore(kbid: str, backup_id: str) -> None:
+async def restore(context: ApplicationContext, kbid: str, backup_id: str) -> None:
     producer: NatsTaskProducer[RestoreBackupRequest] = create_producer(
         name="backup_restorer",
         stream=BackupsNatsConfig.stream,
         producer_subject=BackupsNatsConfig.restore_consumer.subject,
         msg_type=RestoreBackupRequest,
     )
+    await producer.initialize(context)
     msg = RestoreBackupRequest(
         kb_id=kbid,
         backup_id=backup_id,
@@ -94,13 +96,14 @@ def deleter_consumer() -> NatsTaskConsumer[DeleteBackupRequest]:
     return consumer
 
 
-async def delete(backup_id: str) -> None:
+async def delete(context: ApplicationContext, backup_id: str) -> None:
     producer: NatsTaskProducer[DeleteBackupRequest] = create_producer(
         name="backup_deleter",
         stream=BackupsNatsConfig.stream,
         producer_subject=BackupsNatsConfig.delete_consumer.subject,
         msg_type=DeleteBackupRequest,
     )
+    await producer.initialize(context)
     msg = DeleteBackupRequest(
         backup_id=backup_id,
     )

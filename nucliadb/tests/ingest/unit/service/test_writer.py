@@ -272,7 +272,7 @@ class TestWriterServicer:
     async def test_GetEntities(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesRequest(kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"))
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore
 
         entities_manager = AsyncMock()
         with patch(
@@ -286,7 +286,7 @@ class TestWriterServicer:
 
     async def test_GetEntities_missing(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesRequest(kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"))
-        writer.proc.get_kb_obj.return_value = None
+        writer.proc.get_kb_obj.return_value = None  # type: ignore
 
         resp = await writer.GetEntities(request)
 
@@ -295,7 +295,7 @@ class TestWriterServicer:
     async def test_GetEntities_handle_error(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesRequest(kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"))
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore
 
         entities_manager = AsyncMock()
         with patch(
@@ -312,7 +312,7 @@ class TestWriterServicer:
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
         )
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore
 
         entities_manager = AsyncMock()
         entities_manager.list_entities_groups.return_value = {
@@ -331,7 +331,7 @@ class TestWriterServicer:
         request = writer_pb2.ListEntitiesGroupsRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
         )
-        writer.proc.get_kb_obj.return_value = None
+        writer.proc.get_kb_obj.return_value = None  # type: ignore
 
         resp = await writer.ListEntitiesGroups(request)
 
@@ -342,7 +342,7 @@ class TestWriterServicer:
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
         )
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore
 
         entities_manager = AsyncMock()
         entities_manager.list_entities_groups.side_effect = Exception("error")
@@ -359,7 +359,7 @@ class TestWriterServicer:
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
         )
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore
 
         entities_manager = AsyncMock()
         entities_manager.get_entities_group.return_value = writer_pb2.EntitiesGroup(title="group")
@@ -376,7 +376,7 @@ class TestWriterServicer:
         request = writer_pb2.GetEntitiesGroupRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
         )
-        writer.proc.get_kb_obj.return_value = None
+        writer.proc.get_kb_obj.return_value = None  # type: ignore
 
         resp = await writer.GetEntitiesGroup(request)
 
@@ -387,7 +387,7 @@ class TestWriterServicer:
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
         )
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore
 
         entities_manager = AsyncMock()
         entities_manager.get_entities_group.side_effect = Exception("error")
@@ -404,7 +404,7 @@ class TestWriterServicer:
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
         )
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore
 
         entities_manager = AsyncMock()
         with patch(
@@ -420,7 +420,7 @@ class TestWriterServicer:
         request = writer_pb2.SetEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
         )
-        writer.proc.get_kb_obj.return_value = None
+        writer.proc.get_kb_obj.return_value = None  # type: ignore
 
         resp = await writer.SetEntities(request)
 
@@ -431,7 +431,7 @@ class TestWriterServicer:
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
         )
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore
 
         entities_manager = AsyncMock()
         entities_manager.set_entities_group.side_effect = Exception("error")
@@ -448,7 +448,7 @@ class TestWriterServicer:
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
         )
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore
 
         entities_manager = AsyncMock()
         with patch(
@@ -464,7 +464,7 @@ class TestWriterServicer:
         request = writer_pb2.DelEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
         )
-        writer.proc.get_kb_obj.return_value = None
+        writer.proc.get_kb_obj.return_value = None  # type: ignore
 
         resp = await writer.DelEntities(request)
 
@@ -475,7 +475,7 @@ class TestWriterServicer:
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
         )
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore
 
         entities_manager = AsyncMock()
         entities_manager.delete_entities_group.side_effect = Exception("error")

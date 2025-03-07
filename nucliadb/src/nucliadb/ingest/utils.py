@@ -19,6 +19,7 @@
 #
 from typing import Optional
 
+from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.grpc import get_traced_grpc_channel
@@ -44,8 +45,10 @@ async def start_ingest(service_name: Optional[str] = None):
         # Its not distributed create a ingest
         from nucliadb.ingest.service.writer import WriterServicer
 
+        context = ApplicationContext()
+        await context.initialize()
         service = WriterServicer()
-        await service.initialize()
+        await service.initialize(context)
         set_utility(Utility.INGEST, service)
 
 

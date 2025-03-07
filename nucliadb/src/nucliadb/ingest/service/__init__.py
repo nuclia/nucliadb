@@ -22,6 +22,7 @@ from typing import Optional
 from grpc import aio
 
 from nucliadb import health
+from nucliadb.common.context import ApplicationContext
 from nucliadb.ingest import logger
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import settings
@@ -38,9 +39,11 @@ async def start_grpc(service_name: Optional[str] = None):
         service_name or "ingest",
         max_receive_message=settings.max_receive_message_length,
     )
+    context = ApplicationContext("ingest-grpc")
+    await context.initialize()
 
     servicer = WriterServicer()
-    await servicer.initialize()
+    await servicer.initialize(context)
     server.add_insecure_port(f"0.0.0.0:{settings.grpc_port}")
 
     writer_pb2_grpc.add_WriterServicer_to_server(servicer, server)
@@ -54,5 +57,6 @@ async def start_grpc(service_name: Optional[str] = None):
         await health_check_finalizer()
         await servicer.finalize()
         await server.stop(grace=False)
+        await context.finalize()
 
     return finalizer

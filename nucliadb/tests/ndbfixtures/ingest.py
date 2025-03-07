@@ -27,6 +27,7 @@ import pytest
 from grpc import aio
 
 from nucliadb.common.cluster.manager import KBShardManager
+from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.standalone.settings import Settings
@@ -86,8 +87,10 @@ async def ingest_grpc_server(
     shard_manager: KBShardManager,
 ) -> AsyncIterator[IngestGrpcServer]:
     """Ingest ORM gRPC server with dummy/mocked index."""
+    context = ApplicationContext()
+    await context.initialize()
     servicer = WriterServicer()
-    await servicer.initialize()
+    await servicer.initialize(context)
     server = aio.server()
     port = server.add_insecure_port("[::]:0")
     writer_pb2_grpc.add_WriterServicer_to_server(servicer, server)
@@ -98,3 +101,4 @@ async def ingest_grpc_server(
     )
     await servicer.finalize()
     await server.stop(None)
+    await context.finalize()

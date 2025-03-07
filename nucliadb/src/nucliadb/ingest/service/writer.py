@@ -25,12 +25,11 @@ from nucliadb.backups import utils as backup_utils
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
 from nucliadb.common.cluster.manager import get_nidx_fake_node
-from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
-from nucliadb.common.maindb.utils import setup_driver
-from nucliadb.ingest import SERVICE_NAME, logger
+from nucliadb.ingest import logger
 from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
@@ -74,7 +73,6 @@ from nucliadb_utils.settings import is_onprem_nucliadb
 from nucliadb_utils.utilities import (
     get_partitioning,
     get_pubsub,
-    get_storage,
     get_transaction_utility,
 )
 
@@ -83,11 +81,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     def __init__(self):
         self.partitions = settings.partitions
 
-    async def initialize(self):
-        self.storage = await get_storage(service_name=SERVICE_NAME)
-        self.driver = await setup_driver()
+    async def initialize(self, context: ApplicationContext):
+        self.context = context
+        self.storage = self.context.blob_storage
+        self.driver = self.context.kv_driver
         self.proc = Processor(driver=self.driver, storage=self.storage, pubsub=await get_pubsub())
-        self.shards_manager = get_shard_manager()
+        self.shards_manager = self.context.shard_manager
 
     async def finalize(self): ...
 
@@ -438,7 +437,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response = IndexStatus()
             return response
 
-    async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
+    async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:
         try:
             async with self.driver.transaction() as txn:
                 kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
@@ -450,7 +449,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 external_index_manager = await get_external_index_manager(kbid=request.kbid)
                 if external_index_manager is not None:
                     await self.proc.external_index_add_resource(
-                        request.kbid,
+                        external_index_manager,
                         request.rid,
                         index_message,
                     )
@@ -477,7 +476,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return backups_pb2.CreateBackupResponse(
                 status=backups_pb2.CreateBackupResponse.Status.KB_NOT_FOUND
             )
-        await backup_tasks.create(request.kb_id, request.backup_id)
+        await backup_tasks.create(self.context, request.kb_id, request.backup_id)
         return backups_pb2.CreateBackupResponse(status=backups_pb2.CreateBackupResponse.Status.OK)
 
     async def DeleteBackup(
@@ -487,7 +486,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return backups_pb2.DeleteBackupResponse(
                 status=backups_pb2.DeleteBackupResponse.Status.OK,
             )
-        await backup_tasks.delete(request.backup_id)
+        await backup_tasks.delete(self.context, request.backup_id)
         return backups_pb2.DeleteBackupResponse(status=backups_pb2.DeleteBackupResponse.Status.OK)
 
     async def RestoreBackup(
@@ -501,7 +500,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return backups_pb2.RestoreBackupResponse(
                 status=backups_pb2.RestoreBackupResponse.Status.NOT_FOUND
             )
-        await backup_tasks.restore(request.kb_id, request.backup_id)
+        await backup_tasks.restore(self.context, request.kb_id, request.backup_id)
         return backups_pb2.RestoreBackupResponse(status=backups_pb2.RestoreBackupResponse.Status.OK)
 
 
