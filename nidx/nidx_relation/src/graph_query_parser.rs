@@ -25,6 +25,8 @@ use tantivy::schema::{Field, IndexRecordOption};
 use crate::schema::Schema;
 use crate::{io_maps, schema};
 
+const DEFAULT_NODE_VALUE_FUZZY_DISTANCE: u8 = 2;
+
 #[derive(Clone)]
 pub struct FuzzyTerm {
     pub value: String,
@@ -47,7 +49,6 @@ pub struct Node {
 
 #[derive(Default, Clone)]
 pub struct Relation {
-    // TODO: fuzzy
     pub value: Option<String>,
 }
 
@@ -455,115 +456,6 @@ impl From<&str> for Term {
     }
 }
 
-impl TryFrom<&nidx_protos::graph_query::Query> for BoolGraphQuery {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &nidx_protos::graph_query::Query) -> Result<Self, Self::Error> {
-        match value {
-            nidx_protos::graph_query::Query::Node(node_query) => BoolGraphQuery::try_from(node_query),
-            nidx_protos::graph_query::Query::Relation(relation_query) => BoolGraphQuery::try_from(relation_query),
-            nidx_protos::graph_query::Query::Path(path_query) => BoolGraphQuery::try_from(path_query),
-        }
-    }
-}
-
-impl TryFrom<&nidx_protos::graph_query::NodeQuery> for BoolGraphQuery {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &nidx_protos::graph_query::NodeQuery) -> Result<Self, Self::Error> {
-        let bool_expr = match &value.query {
-            Some(query) => match query {
-                nidx_protos::graph_query::node_query::Query::Node(node) => BooleanExpression::Literal(
-                    GraphQuery::NodeQuery(NodeQuery::Node(Expression::Value(Node::try_from(node)?))),
-                ),
-
-                nidx_protos::graph_query::node_query::Query::BoolNot(bool_not) => {
-                    let subquery = BoolGraphQuery::try_from(bool_not.as_ref())?.0;
-                    BooleanExpression::Not(Box::new(subquery))
-                }
-
-                nidx_protos::graph_query::node_query::Query::BoolAnd(bool_and) => {
-                    let mut operands = Vec::with_capacity(bool_and.operands.len());
-                    for operand in bool_and.operands.iter() {
-                        let subquery = BoolGraphQuery::try_from(operand)?.0;
-                        operands.push(subquery);
-                    }
-                    BooleanExpression::Operation(BooleanOperation {
-                        operator: Operator::And,
-                        operands,
-                    })
-                }
-
-                nidx_protos::graph_query::node_query::Query::BoolOr(bool_or) => {
-                    let mut operands = Vec::with_capacity(bool_or.operands.len());
-                    for operand in bool_or.operands.iter() {
-                        let subquery = BoolGraphQuery::try_from(operand)?.0;
-                        operands.push(subquery);
-                    }
-                    BooleanExpression::Operation(BooleanOperation {
-                        operator: Operator::Or,
-                        operands,
-                    })
-                }
-            },
-
-            None => BooleanExpression::Literal(GraphQuery::NodeQuery(NodeQuery::Node(Expression::Value(
-                Node::default(),
-            )))),
-        };
-
-        Ok(BoolGraphQuery(bool_expr))
-    }
-}
-
-impl TryFrom<&nidx_protos::graph_query::RelationQuery> for BoolGraphQuery {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &nidx_protos::graph_query::RelationQuery) -> Result<Self, Self::Error> {
-        let bool_expr = match &value.query {
-            Some(query) => match query {
-                nidx_protos::graph_query::relation_query::Query::Relation(relation) => BooleanExpression::Literal(
-                    GraphQuery::RelationQuery(RelationQuery(Expression::Value(Relation::try_from(relation)?))),
-                ),
-
-                nidx_protos::graph_query::relation_query::Query::BoolNot(bool_not) => {
-                    let subquery = BoolGraphQuery::try_from(bool_not.as_ref())?.0;
-                    BooleanExpression::Not(Box::new(subquery))
-                }
-
-                nidx_protos::graph_query::relation_query::Query::BoolAnd(bool_and) => {
-                    let mut operands = Vec::with_capacity(bool_and.operands.len());
-                    for operand in bool_and.operands.iter() {
-                        let subquery = BoolGraphQuery::try_from(operand)?.0;
-                        operands.push(subquery);
-                    }
-                    BooleanExpression::Operation(BooleanOperation {
-                        operator: Operator::And,
-                        operands,
-                    })
-                }
-
-                nidx_protos::graph_query::relation_query::Query::BoolOr(bool_or) => {
-                    let mut operands = Vec::with_capacity(bool_or.operands.len());
-                    for operand in bool_or.operands.iter() {
-                        let subquery = BoolGraphQuery::try_from(operand)?.0;
-                        operands.push(subquery);
-                    }
-                    BooleanExpression::Operation(BooleanOperation {
-                        operator: Operator::Or,
-                        operands,
-                    })
-                }
-            },
-            None => BooleanExpression::Literal(GraphQuery::RelationQuery(RelationQuery(Expression::Value(
-                Relation::default(),
-            )))),
-        };
-
-        Ok(BoolGraphQuery(bool_expr))
-    }
-}
-
 impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolGraphQuery {
     type Error = anyhow::Error;
 
@@ -646,16 +538,13 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
     type Error = anyhow::Error;
 
     fn try_from(node_pb: &nidx_protos::graph_query::Node) -> Result<Self, Self::Error> {
-        let value = node_pb.value.clone().map(|value| {
-            if node_pb.fuzzy_distance > 0 || node_pb.as_prefix {
-                Term::Fuzzy(FuzzyTerm {
-                    value: value,
-                    fuzzy_distance: node_pb.fuzzy_distance as u8,
-                    is_prefix: node_pb.as_prefix,
-                })
-            } else {
-                Term::Exact(value)
-            }
+        let value = node_pb.value.clone().map(|value| match node_pb.match_kind() {
+            nidx_protos::graph_query::node::MatchKind::Exact => Term::Exact(value),
+            nidx_protos::graph_query::node::MatchKind::Fuzzy => Term::Fuzzy(FuzzyTerm {
+                value: value,
+                fuzzy_distance: DEFAULT_NODE_VALUE_FUZZY_DISTANCE,
+                is_prefix: true,
+            }),
         });
         let node_type = node_pb.node_type.map(NodeType::try_from).transpose()?;
         let node_subtype = node_pb.node_subtype.clone();

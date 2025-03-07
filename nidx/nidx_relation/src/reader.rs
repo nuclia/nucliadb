@@ -71,7 +71,7 @@ impl RelationsReaderService {
         let Some(query) = &request.query else {
             return Ok(GraphSearchResponse::default());
         };
-        let Some(query) = &query.query else {
+        let Some(query) = &query.path else {
             return Ok(GraphSearchResponse::default());
         };
 
