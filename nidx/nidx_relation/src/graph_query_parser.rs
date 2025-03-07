@@ -499,14 +499,13 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolGraphQuery {
                 }
 
                 nidx_protos::graph_query::path_query::Query::BoolAnd(bool_and) => {
-                    let mut operands = Vec::with_capacity(bool_and.operands.len());
-                    for operand in bool_and.operands.iter() {
-                        let subquery = BoolGraphQuery::try_from(operand)?.0;
-                        operands.push(subquery);
-                    }
                     BooleanExpression::Operation(BooleanOperation {
                         operator: Operator::And,
-                        operands,
+                        operands: bool_and
+                            .operands
+                            .iter()
+                            .map(|o| BoolGraphQuery::try_from(o).map(|x| x.0))
+                            .collect::<anyhow::Result<Vec<_>>>()?,
                     })
                 }
 
