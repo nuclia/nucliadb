@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from abc import ABCMeta, abstractmethod
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator
 
 from nucliadb_protos import nodereader_pb2, noderesources_pb2, utils_pb2
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
@@ -38,30 +38,14 @@ class AbstractIndexNode(metaclass=ABCMeta):
         self,
         *,
         id: str,
-        address: str,
-        shard_count: int,
-        available_disk: int,
-        dummy: bool = False,
-        primary_id: Optional[str] = None,
     ):
         self.id = id
-        self.address = address
-        self.shard_count = shard_count
-        self.available_disk = available_disk
-        self.dummy = dummy
-        self.primary_id = primary_id
 
     def __str__(self):
-        if self.primary_id is None:
-            return f"{self.__class__.__name__}({self.id}, {self.address})"
-        else:
-            return f"{self.__class__.__name__}({self.id}, {self.address}, primary_id={self.primary_id})"
+        return f"{self.__class__.__name__}({self.id}"
 
     def __repr__(self):
         return self.__str__()
-
-    def is_read_replica(self) -> bool:
-        return self.primary_id is not None
 
     @property
     @abstractmethod

@@ -76,11 +76,6 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.WriterStatusRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.WriterStatusResponse.FromString,
                 )
-        self.ListMembers = channel.unary_unary(
-                '/fdbwriter.Writer/ListMembers',
-                request_serializer=nucliadb__protos_dot_writer__pb2.ListMembersRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.ListMembersResponse.FromString,
-                )
         self.Index = channel.unary_unary(
                 '/fdbwriter.Writer/Index',
                 request_serializer=nucliadb__protos_dot_writer__pb2.IndexResource.SerializeToString,
@@ -184,12 +179,6 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def ListMembers(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def Index(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -282,11 +271,6 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.Status,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.WriterStatusRequest.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.WriterStatusResponse.SerializeToString,
-            ),
-            'ListMembers': grpc.unary_unary_rpc_method_handler(
-                    servicer.ListMembers,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.ListMembersRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.ListMembersResponse.SerializeToString,
             ),
             'Index': grpc.unary_unary_rpc_method_handler(
                     servicer.Index,
@@ -524,23 +508,6 @@ class Writer(object):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/Status',
             nucliadb__protos_dot_writer__pb2.WriterStatusRequest.SerializeToString,
             nucliadb__protos_dot_writer__pb2.WriterStatusResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def ListMembers(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/ListMembers',
-            nucliadb__protos_dot_writer__pb2.ListMembersRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.ListMembersResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
