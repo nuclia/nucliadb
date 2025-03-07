@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import asyncio
 import logging
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import backoff
 
@@ -32,6 +32,11 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import nodereader_pb2, writer_pb2
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
+
+if TYPE_CHECKING:  # pragma: no cover
+    from nucliadb.common.context import ApplicationContext
+else:
+    ApplicationContext = None
 
 logger = logging.getLogger(__name__)
 
