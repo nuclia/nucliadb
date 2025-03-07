@@ -219,6 +219,55 @@ async def test_graph_search__relation_queries(
     assert ("Anna", "LIVE_IN", "New York") in paths
     assert ("Peter", "LIVE_IN", "New York") in paths
 
+    # ()-[: LIVE_IN | BORN_IN]->()
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "or": [
+                    {
+                        "prop": "path",
+                        "relation": {
+                            "label": "LIVE_IN",
+                        },
+                    },
+                    {
+                        "prop": "path",
+                        "relation": {
+                            "label": "BORN_IN",
+                        },
+                    },
+                ]
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 3
+    assert ("Anna", "LIVE_IN", "New York") in paths
+    assert ("Erin", "BORN_IN", "UK") in paths
+    assert ("Peter", "LIVE_IN", "New York") in paths
+
+    # ()-[:!LIVE_IN]->()
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "not": {
+                    "prop": "path",
+                    "relation": {
+                        "label": "LIVE_IN",
+                    },
+                },
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 14
+
 
 @pytest.mark.deploy_modes("standalone")
 async def test_graph_search__directed_path_queries(
@@ -297,6 +346,48 @@ async def test_graph_search__directed_path_queries(
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
     assert len(paths) == 2
     assert ("Anna", "LIVE_IN", "New York") in paths
+    assert ("Peter", "LIVE_IN", "New York") in paths
+
+    # (:!Anna)-[:LIVE_IN|LOVE]->()
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "and": [
+                    {
+                        "not": {
+                            "prop": "path",
+                            "source": {
+                                "value": "Anna",
+                            },
+                        }
+                    },
+                    {
+                        "or": [
+                            {
+                                "prop": "path",
+                                "relation": {
+                                    "label": "LIVE_IN",
+                                },
+                            },
+                            {
+                                "prop": "path",
+                                "relation": {
+                                    "label": "LOVE",
+                                },
+                            },
+                        ]
+                    },
+                ]
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 3
+    assert ("Erin", "LOVE", "Climbing") in paths
+    assert ("Dimitri", "LOVE", "Anastasia") in paths
     assert ("Peter", "LIVE_IN", "New York") in paths
 
 
