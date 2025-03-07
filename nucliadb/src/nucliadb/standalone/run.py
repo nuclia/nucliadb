@@ -99,10 +99,7 @@ def run():
         "Admin UI": f"http://{settings.http_host}:{settings.http_port}/admin",
         "Key-value backend": ingest_settings.driver.value,
         "Blob storage backend": storage_settings.file_backend.value,
-        "Cluster discovery mode": cluster_settings.cluster_discovery_mode.value,
-        "Node replicas": cluster_settings.node_replicas,
         "Index data path": os.path.realpath(cluster_settings.data_path),
-        "Node port": cluster_settings.standalone_node_port,
         "Auth policy": settings.auth_policy.value,
         "Node role": cluster_settings.standalone_node_role.value,
     }

@@ -30,13 +30,6 @@ from nucliadb_utils.settings import StorageSettings
 from nucliadb_utils.storages.settings import Settings as ExtendedStorageSettings
 
 
-class StandaloneDiscoveryMode(Enum):
-    DEFAULT = "default"
-    MANUAL = "manual"
-    KUBERNETES = "kubernetes"
-    SINGLE_NODE = "single_node"
-
-
 class AuthPolicy(Enum):
     UPSTREAM_NAIVE = "upstream_naive"
     UPSTREAM_AUTH_HEADER = "upstream_auth_header"
@@ -60,8 +53,6 @@ class Settings(DriverSettings, StorageSettings, ExtendedStorageSettings):
     http_port: int = pydantic.Field(default=8080, description="HTTP Port")
     ingest_grpc_port: int = pydantic.Field(default=8030, description="Ingest GRPC Port")
     train_grpc_port: int = pydantic.Field(default=8031, description="Train GRPC Port")
-    standalone_node_port: int = pydantic.Field(default=10009, description="Node GRPC Port")
-
     auth_policy: AuthPolicy = pydantic.Field(
         default=AuthPolicy.UPSTREAM_NAIVE,
         description="""Auth policy to use for http requests.
@@ -110,8 +101,6 @@ Examples:
         default=None,
         description="JWK key used for temporary token generation and validation.",
     )
-
-    cluster_discovery_mode: StandaloneDiscoveryMode = StandaloneDiscoveryMode.DEFAULT
 
     fork: bool = pydantic.Field(default=False, description="Fork process on startup")
 

@@ -50,8 +50,6 @@ data:
   NUCLIA_HASH_SEED: {{ .Values.nuclia.nuclia_hash_seed | quote }}
   NUCLIA_PARTITIONS: {{ .Values.nuclia.nuclia_partitions | quote }}
   NUCLIADB_INGEST: {{ .Values.nucliadb.ingest }}
-  NODE_WRITER_PORT: {{ .Values.nucliadb.node_writer_port | quote }}
-  NODE_READER_PORT: {{ .Values.nucliadb.node_reader_port | quote }}
   CACHE_PUBSUB_NATS_URL: {{ toJson .Values.cache.cache_pubsub_nats_url |quote }}
 {{- with .Values.cache.cache_pubsub_nats_auth }}
   CACHE_PUBSUB_NATS_AUTH: {{ . }}

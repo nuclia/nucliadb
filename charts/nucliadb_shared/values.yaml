@@ -58,8 +58,6 @@ nuclia:
 
 nucliadb:
   ingest: ingest-orm-grpc:8030
-  node_writer_port: 10001
-  node_reader_port: 10000
 
 transaction:
   transaction_jetstream_auth:

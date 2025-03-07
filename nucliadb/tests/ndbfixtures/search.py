@@ -26,7 +26,6 @@ from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_api_client
-from nucliadb.ingest.cache import clear_ingest_cache
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.search.app import application
 from nucliadb_models.resource import NucliaDBRoles
@@ -76,7 +75,6 @@ async def cluster_nucliadb_search(
                 yield client
 
         # TODO: fix this awful global state manipulation
-        clear_ingest_cache()
         clear_global_cache()
 
 

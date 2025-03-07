@@ -29,7 +29,6 @@ envFrom:
 # Kubernetes settings
 config:
   pull_time_error_backoff: 100
-  node_replicas: 2
 
 affinity: {}
 nodeSelector: {}

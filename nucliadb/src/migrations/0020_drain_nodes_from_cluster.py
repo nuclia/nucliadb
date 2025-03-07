@@ -28,9 +28,6 @@ create new shards in the remaining nodes.
 
 import logging
 
-from nucliadb.common import datamanagers
-from nucliadb.common.cluster.rollover import rollover_kb_index
-from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -39,45 +36,4 @@ logger = logging.getLogger(__name__)
 async def migrate(context: ExecutionContext) -> None: ...
 
 
-async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    """
-    Rollover KB shards if any of the shards are on the nodes to drain
-    """
-    drain_node_ids = cluster_settings.drain_nodes
-    if len(drain_node_ids) == 0:
-        logger.info("Skipping migration because no drain_nodes are set")
-        return
-
-    if not await kb_has_shards_on_drain_nodes(kbid, drain_node_ids):
-        logger.info(
-            "KB does not have shards on the nodes to drain, skipping rollover",
-            extra={"kbid": kbid},
-        )
-        return
-
-    logger.info("Rolling over affected KB", extra={"kbid": kbid})
-    await rollover_kb_index(context, kbid, drain_nodes=drain_node_ids)
-
-
-async def kb_has_shards_on_drain_nodes(kbid: str, drain_node_ids: list[str]) -> bool:
-    async with datamanagers.with_ro_transaction() as txn:
-        shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-        if not shards:
-            logger.warning("Shards object not found", extra={"kbid": kbid})
-            return False
-        shard_in_drain_nodes = False
-        for shard in shards.shards:
-            for replica in shard.replicas:
-                if replica.node in drain_node_ids:
-                    logger.info(
-                        "Shard found in drain nodes, will rollover it",
-                        extra={
-                            "kbid": kbid,
-                            "logical_shard": shard.shard,
-                            "replica_shard_id": replica.shard.id,
-                            "node": replica.node,
-                            "drain_node_ids": drain_node_ids,
-                        },
-                    )
-                    shard_in_drain_nodes = True
-        return shard_in_drain_nodes
+async def migrate_kb(context: ExecutionContext, kbid: str) -> None: ...
