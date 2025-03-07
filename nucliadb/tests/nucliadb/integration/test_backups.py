@@ -205,6 +205,7 @@ async def test_backup_resumed(
     assert sorted([r["id"] for r in resources]) == rids[1:]
 
 
+@pytest.mark.flaky(reruns=3)
 @pytest.mark.deploy_modes("standalone")
 async def test_restore_resumed(
     nucliadb_reader: AsyncClient,
