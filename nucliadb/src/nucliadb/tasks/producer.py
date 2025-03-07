@@ -22,7 +22,7 @@ from typing import Generic, Optional, Type
 from nucliadb.common.context import ApplicationContext
 from nucliadb.tasks.logger import logger
 from nucliadb.tasks.models import MsgType
-from nucliadb.tasks.utils import create_nats_stream_if_not_exists
+from nucliadb.tasks.utils import NatsStream, create_nats_stream_if_not_exists
 from nucliadb_telemetry import errors
 
 
@@ -30,14 +30,12 @@ class NatsTaskProducer(Generic[MsgType]):
     def __init__(
         self,
         name: str,
-        stream: str,
-        stream_subjects: list[str],
+        stream: NatsStream,
         producer_subject: str,
         msg_type: Type[MsgType],
     ):
         self.name = name
         self.stream = stream
-        self.stream_subjects = stream_subjects
         self.producer_subject = producer_subject
         self.msg_type = msg_type
         self.context: Optional[ApplicationContext] = None
@@ -47,8 +45,8 @@ class NatsTaskProducer(Generic[MsgType]):
         self.context = context
         await create_nats_stream_if_not_exists(
             self.context,
-            self.stream,
-            subjects=self.stream_subjects,
+            self.stream.name,
+            subjects=self.stream.subjects,
         )
         self.initialized = True
 
@@ -81,8 +79,7 @@ class NatsTaskProducer(Generic[MsgType]):
 
 def create_producer(
     name: str,
-    stream: str,
-    stream_subjects: list[str],
+    stream: NatsStream,
     producer_subject: str,
     msg_type: Type[MsgType],
 ) -> NatsTaskProducer[MsgType]:
@@ -92,7 +89,6 @@ def create_producer(
     producer = NatsTaskProducer[MsgType](
         name=name,
         stream=stream,
-        stream_subjects=stream_subjects,
         producer_subject=producer_subject,
         msg_type=msg_type,
     )

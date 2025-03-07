@@ -19,6 +19,9 @@
 #
 
 
+from nucliadb.tasks.utils import NatsConsumer, NatsStream
+
+
 class MaindbKeys:
     METADATA = "kbs/{kbid}/backups/{backup_id}"
     LAST_RESTORED = "kbs/{kbid}/backup/{backup_id}/last_restored"
@@ -41,9 +44,8 @@ class BackupFinishedStream:
     subject = "backups.creation_finished"
 
 
-class BackupsNatsStream:
-    name = "ndb-backups"
-    stream_subjects = ["ndb-backups.>"]
-    create_subject = "ndb-backups.create"
-    delete_subject = "ndb-backups.delete"
-    restore_subject = "ndb-backups.restore"
+class BackupsNatsConfig:
+    stream = NatsStream(name="ndb-backups", subjects=["ndb-backups.>"])
+    create_consumer = NatsConsumer(subject="ndb-backups.create", group="ndb-backups-create")
+    delete_consumer = NatsConsumer(subject="ndb-backups.delete", group="ndb-backups-delete")
+    restore_consumer = NatsConsumer(subject="ndb-backups.restore", group="ndb-backups-restore")
