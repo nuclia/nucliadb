@@ -67,7 +67,6 @@ async def nucliadb(
             http_port=free_port(),
             ingest_grpc_port=free_port(),
             train_grpc_port=free_port(),
-            standalone_node_port=free_port(),
             log_format_type=LogFormatType.PLAIN,
             log_output_type=LogOutputType.FILE,
             **maindb_settings.model_dump(),

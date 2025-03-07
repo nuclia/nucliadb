@@ -12,7 +12,6 @@ data:
   GRPC_PORT: {{ .Values.serving.grpc | quote }}
   METRICS_PORT: {{ .Values.serving.metricsPort | quote }}
   PULL_TIME_ERROR_BACKOFF: {{ .Values.config.pull_time_error_backoff | quote }}
-  NODE_REPLICAS: {{ .Values.config.node_replicas | quote }}
 {{- if .Values.debug }}
   LOG_LEVEL: "DEBUG"
 {{- end }}
