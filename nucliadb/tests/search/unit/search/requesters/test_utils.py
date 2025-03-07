@@ -59,8 +59,6 @@ def shard_manager():
 @pytest.fixture()
 def faulty_search_methods():
     def fake_search(node: AbstractIndexNode, shard: str, query: nodereader_pb2.SearchRequest):
-        if node.is_read_replica():
-            raise Exception()
         return nodereader_pb2.SearchResponse()
 
     faulty_methods = {utils.Method.SEARCH: AsyncMock(side_effect=fake_search)}

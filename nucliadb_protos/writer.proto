@@ -479,8 +479,6 @@ service Writer {
 
     rpc Status(WriterStatusRequest) returns (WriterStatusResponse) {}
 
-    rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
-
     rpc Index(IndexResource) returns (IndexStatus) {}
     rpc ReIndex(IndexResource) returns (IndexStatus) {}
 

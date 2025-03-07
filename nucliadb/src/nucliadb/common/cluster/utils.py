@@ -28,6 +28,7 @@ from nucliadb.common.cluster.manager import (
     StandaloneKBShardManager,
 )
 from nucliadb.common.cluster.settings import settings
+from nucliadb.common.context import ApplicationContext
 from nucliadb.ingest.orm import index_message
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import nodereader_pb2, writer_pb2
@@ -42,8 +43,6 @@ logger = logging.getLogger(__name__)
 
 
 _lock = asyncio.Lock()
-
-_STANDALONE_SERVER = "_standalone_service"
 
 
 async def setup_cluster() -> Union[KBShardManager, StandaloneKBShardManager]:
@@ -64,11 +63,6 @@ async def setup_cluster() -> Union[KBShardManager, StandaloneKBShardManager]:
 async def teardown_cluster():
     if get_utility(Utility.SHARD_MANAGER):
         clean_utility(Utility.SHARD_MANAGER)
-
-    std_server = get_utility(_STANDALONE_SERVER)
-    if std_server is not None:
-        await std_server.stop(None)
-        clean_utility(_STANDALONE_SERVER)
 
 
 def get_shard_manager() -> KBShardManager:
