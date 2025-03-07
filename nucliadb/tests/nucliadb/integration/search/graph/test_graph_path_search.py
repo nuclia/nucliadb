@@ -36,6 +36,7 @@ async def test_graph_search__node_queries(
         f"/kb/{kbid}/graph",
         json={
             "query": {
+                "prop": "path",
                 "source": {},
             },
             "top_k": 100,
@@ -50,6 +51,7 @@ async def test_graph_search__node_queries(
         f"/kb/{kbid}/graph",
         json={
             "query": {
+                "prop": "path",
                 "source": {
                     "group": "PERSON",
                 },
@@ -66,6 +68,7 @@ async def test_graph_search__node_queries(
         f"/kb/{kbid}/graph",
         json={
             "query": {
+                "prop": "path",
                 "source": {
                     "value": "Anna",
                     "group": "PERSON",
@@ -87,6 +90,7 @@ async def test_graph_search__node_queries(
         f"/kb/{kbid}/graph",
         json={
             "query": {
+                "prop": "path",
                 "destination": {
                     "value": "Anna",
                     "group": "PERSON",
@@ -105,6 +109,7 @@ async def test_graph_search__node_queries(
         f"/kb/{kbid}/graph",
         json={
             "query": {
+                "prop": "path",
                 "source": {
                     "value": "Anna",
                     "group": "PERSON",
@@ -136,6 +141,7 @@ async def test_graph_search__fuzzy_node_queries(
         f"/kb/{kbid}/graph",
         json={
             "query": {
+                "prop": "path",
                 "source": {
                     "value": "Anastas",
                     "match": "fuzzy",
@@ -154,6 +160,7 @@ async def test_graph_search__fuzzy_node_queries(
         f"/kb/{kbid}/graph",
         json={
             "query": {
+                "prop": "path",
                 "source": {
                     "value": "AnXstXsiX",
                     "match": "fuzzy",
@@ -171,6 +178,7 @@ async def test_graph_search__fuzzy_node_queries(
         f"/kb/{kbid}/graph",
         json={
             "query": {
+                "prop": "path",
                 "source": {
                     "value": "AnXstXsia",
                     "match": "fuzzy",
@@ -197,6 +205,7 @@ async def test_graph_search__relation_queries(
         f"/kb/{kbid}/graph",
         json={
             "query": {
+                "prop": "path",
                 "relation": {
                     "label": "LIVE_IN",
                 },
@@ -223,6 +232,7 @@ async def test_graph_search__directed_path_queries(
         f"/kb/{kbid}/graph",
         json={
             "query": {
+                "prop": "path",
                 "source": {
                     "value": "Erin",
                     "group": "PERSON",
@@ -245,6 +255,7 @@ async def test_graph_search__directed_path_queries(
         f"/kb/{kbid}/graph",
         json={
             "query": {
+                "prop": "path",
                 "source": {
                     "group": "PERSON",
                 },
@@ -268,6 +279,7 @@ async def test_graph_search__directed_path_queries(
         f"/kb/{kbid}/graph",
         json={
             "query": {
+                "prop": "path",
                 "source": {
                     "group": "PERSON",
                 },
@@ -300,6 +312,7 @@ async def test_graph_search__undirected_path_queries(
         f"/kb/{kbid}/graph",
         json={
             "query": {
+                "prop": "path",
                 "source": {
                     "value": "Anna",
                 },

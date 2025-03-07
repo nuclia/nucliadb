@@ -17,11 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
 from enum import Enum
-from typing import Optional
+from typing import Annotated, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, Tag, model_validator
 from typing_extensions import Self
 
 from nucliadb_models.metadata import RelationNodeType
@@ -66,7 +65,8 @@ class GraphRelation(BaseModel):
     label: Optional[str] = None
 
 
-class GraphPath(BaseModel):
+class GraphPath(BaseModel, extra="forbid"):
+    prop: Literal["path"]
     source: Optional[GraphNode] = None
     relation: Optional[GraphRelation] = None
     destination: Optional[GraphNode] = None
@@ -77,8 +77,11 @@ class BaseGraphSearchRequest(BaseModel):
     top_k: int = Field(default=50, title="Number of results to retrieve")
 
 
+GraphPathQuery = Annotated[GraphPath, Tag("path")]
+
+
 class GraphSearchRequest(BaseGraphSearchRequest):
-    query: GraphPath
+    query: GraphPathQuery
 
 
 class GraphNodesSearchRequest(BaseGraphSearchRequest):
