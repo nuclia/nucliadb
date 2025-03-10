@@ -369,10 +369,12 @@ async def get_graph_results(
                     kbid=kbid,
                     entities=entities_to_explore,
                     timeout=5.0,
-                    only_with_metadata=True,
+                    only_with_metadata=not graph_strategy.relation_text_as_paragraphs,
                     only_agentic_relations=graph_strategy.agentic_graph_only,
+                    only_entity_to_entity=True,
                     deleted_entities=explored_entities,
                 )
+                # We only want entity to entity relations
             except Exception as e:
                 capture_exception(e)
                 logger.exception("Error in getting query relations for graph strategy")
@@ -683,6 +685,7 @@ def build_text_blocks_from_relations(
     triplets: dict[tuple[str, str, str], tuple[float, Relations, Optional[ParagraphId]]] = defaultdict(
         lambda: (0.0, Relations(entities={}), None)
     )
+    paragraph_count = 0
     for ent, subgraph in relations.entities.items():
         for rel, score in zip(subgraph.related_to, scores[ent]):
             key = (
@@ -702,6 +705,14 @@ def build_text_blocks_from_relations(
             # we keep the first one, but we lose the other ones
             if p_id is None and rel.metadata and rel.metadata.paragraph_id:
                 p_id = ParagraphId.from_string(rel.metadata.paragraph_id)
+            else:
+                # No paragraph ID set, fake it so we can hydrate the resource
+                p_id = ParagraphId(
+                    field_id=FieldId(rel.resource_id, "a", "usermetadata"),
+                    paragraph_start=paragraph_count,
+                    paragraph_end=paragraph_count + 1,
+                )
+                paragraph_count += 1
             existing_relations.entities[ent].related_to.append(rel)
             # XXX: Here we use the max even though all relations with same triplet should have same score
             triplets[key] = (max(existing_score, score), existing_relations, p_id)

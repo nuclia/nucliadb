@@ -21,6 +21,7 @@ message Relation {
     string relation_label = 8;
 
     RelationMetadata metadata = 9;
+    string resource_id = 10;
 }
 
 message RelationMetadata {

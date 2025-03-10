@@ -272,6 +272,7 @@ async def get_relations_results_from_entities(
     timeout: Optional[float] = None,
     only_with_metadata: bool = False,
     only_agentic_relations: bool = False,
+    only_entity_to_entity: bool = False,
     deleted_entities: set[str] = set(),
 ) -> Relations:
     request = SearchRequest()
@@ -295,7 +296,11 @@ async def get_relations_results_from_entities(
     )
     relations_results: list[RelationSearchResponse] = [result.relation for result in results]
     return await merge_relations_results(
-        relations_results, request.relation_subgraph, only_with_metadata, only_agentic_relations
+        relations_results,
+        request.relation_subgraph,
+        only_with_metadata,
+        only_agentic_relations,
+        only_entity_to_entity,
     )
 
 
