@@ -38,7 +38,7 @@ from nucliadb.backups.settings import settings as backups_settings
 from nucliadb.backups.utils import exists_backup
 from nucliadb.common.context import ApplicationContext
 
-N_RESOURCES = 1
+N_RESOURCES = 10
 
 
 async def create_kb(
