@@ -19,8 +19,9 @@
 
 import asyncio
 import time
+import uuid
 from contextlib import contextmanager
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pydantic
 import pytest
@@ -28,6 +29,7 @@ import pytest
 from nucliadb import tasks
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.context import ApplicationContext
+from nucliadb.tasks.retries import TaskMetadata, TaskRetryHandler
 from nucliadb.tasks.utils import NatsConsumer, NatsStream
 from nucliadb_utils.settings import indexing_settings
 
@@ -227,3 +229,99 @@ async def test_consumer_max_concurrent_tasks(context):
     await consumer.finalize()
 
     assert consumer.running_tasks == []
+
+
+async def test_task_retry_handler_ok(context):
+    task_id = str(uuid.uuid4())
+
+    async def callback(*args, **kwargs):
+        return 100
+
+    trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id=task_id, context=context)
+    callback_retried = trh.wrap(callback)
+
+    result = await callback_retried("some", param="param")
+    assert result == 100
+
+    metadata = await trh.get_metadata()
+    assert metadata.status == TaskMetadata.Status.COMPLETED
+    assert metadata.task_id == task_id
+    assert metadata.retries == 0
+    assert metadata.error_messages == []
+
+
+async def test_task_retry_handler_errors_are_retried(context):
+    callback = AsyncMock()
+    callback.side_effect = ValueError("foo")
+
+    task_id = str(uuid.uuid4())
+    trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id=task_id, context=context, max_retries=2)
+    callback_retried = trh.wrap(callback)
+
+    with pytest.raises(ValueError):
+        await callback_retried("foo", bar="baz")
+
+    callback.assert_called_once_with("foo", bar="baz")
+
+    metadata = await trh.get_metadata()
+    assert metadata.status == TaskMetadata.Status.RUNNING
+    assert metadata.retries == 1
+    assert "foo" in metadata.error_messages[0]
+
+    callback.side_effect = None
+    callback.return_value = 100
+    result = await callback_retried("foo", bar="baz")
+    assert result == 100
+
+    metadata = await trh.get_metadata()
+    assert metadata.status == TaskMetadata.Status.COMPLETED
+    assert metadata.retries == 1
+
+
+async def test_task_retry_handler_ignored_statuses(context):
+    callback = AsyncMock()
+
+    task_id = str(uuid.uuid4())
+    trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id=task_id, context=context)
+    callback_retried = trh.wrap(callback)
+
+    for status in (TaskMetadata.Status.FAILED, TaskMetadata.Status.COMPLETED):
+        metadata = TaskMetadata(
+            task_id="bar",
+            status=status,
+            retries=0,
+            error_messages=[],
+        )
+        await trh.set_metadata(metadata)
+        await callback_retried("foo", bar="baz")
+        callback.assert_not_called()
+
+
+async def test_task_retry_handler_max_retries(context):
+    callback = AsyncMock()
+
+    task_id = str(uuid.uuid4())
+    trh = TaskRetryHandler(
+        kbid="kbid",
+        task_type="foo",
+        task_id=task_id,
+        context=context,
+        max_retries=2,
+    )
+    callback_retried = trh.wrap(callback)
+
+    metadata = TaskMetadata(
+        task_id=task_id,
+        status=TaskMetadata.Status.RUNNING,
+        retries=40,
+        error_messages=[],
+    )
+    await trh.set_metadata(metadata)
+
+    await callback_retried("foo", bar="baz")
+
+    callback.assert_not_called()
+
+    metadata = await trh.get_metadata()
+    assert metadata.status == TaskMetadata.Status.FAILED
+    assert "Max retries reached" in metadata.error_messages[-1]

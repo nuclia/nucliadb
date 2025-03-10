@@ -20,7 +20,7 @@
 import functools
 import logging
 from enum import Enum
-from typing import Optional
+from typing import Callable, Optional
 
 from pydantic import BaseModel
 
@@ -73,7 +73,8 @@ class TaskRetryHandler:
         self.kbid = kbid
         self.task_type = task_type
         self.task_id = task_id
-        self.max_retries = max_retries
+        # Limit max retries to 50
+        self.max_retries = min(max_retries, 50)
         self.context = context
 
     @property
@@ -94,7 +95,7 @@ class TaskRetryHandler:
             await txn.set(self.metadata_key, metadata.model_dump_json().encode())
             await txn.commit()
 
-    def wrap(self, func):
+    def wrap(self, func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             func_result = None
@@ -110,7 +111,7 @@ class TaskRetryHandler:
 
             if metadata.status in (TaskMetadata.Status.COMPLETED, TaskMetadata.Status.FAILED):
                 logger.info(
-                    f"{self.type} task is {metadata.status.value}. Skipping",
+                    f"{self.task_type} task is {metadata.status.value}. Skipping",
                     extra={"kbid": self.kbid, "task_type": self.task_type, "task_id": self.task_id},
                 )
                 return
@@ -130,7 +131,7 @@ class TaskRetryHandler:
             except Exception as ex:
                 metadata.retries += 1
                 metadata.error_messages.append(str(ex))
-                logger.info(
+                logger.exception(
                     f"Task failed. Will be retried",
                     extra={"kbid": self.kbid, "task_type": self.task_type, "task_id": self.task_id},
                 )
