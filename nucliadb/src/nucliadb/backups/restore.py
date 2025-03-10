@@ -93,9 +93,7 @@ async def restore_resources(context: ApplicationContext, kbid: str, backup_id: s
         await set_last_restored(context, kbid, backup_id, key)
 
 
-async def get_last_restored(
-    context: ApplicationContext, kbid: str, backup_id: str
-) -> Optional[str]:
+async def get_last_restored(context: ApplicationContext, kbid: str, backup_id: str) -> Optional[str]:
     key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)
     async with context.kv_driver.transaction(read_only=True) as txn:
         raw = await txn.get(key)
@@ -104,9 +102,7 @@ async def get_last_restored(
         return raw.decode()
 
 
-async def set_last_restored(
-    context: ApplicationContext, kbid: str, backup_id: str, resource_id: str
-):
+async def set_last_restored(context: ApplicationContext, kbid: str, backup_id: str, resource_id: str):
     key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)
     async with context.kv_driver.transaction() as txn:
         await txn.set(key, resource_id.encode())
