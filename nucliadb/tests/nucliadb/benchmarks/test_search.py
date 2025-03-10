@@ -77,7 +77,7 @@ async def test_search_relations(
     knowledge_graph,
     asyncbenchmark: AsyncBenchmarkFixture,
 ):
-    relation_nodes, relation_edges = knowledge_graph
+    relation_nodes, relation_edges, rid = knowledge_graph
 
     predict_mock = Mock()
     set_utility(Utility.PREDICT, predict_mock)

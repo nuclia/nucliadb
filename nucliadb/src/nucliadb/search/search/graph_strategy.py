@@ -371,10 +371,10 @@ async def get_graph_results(
                     timeout=5.0,
                     only_with_metadata=not graph_strategy.relation_text_as_paragraphs,
                     only_agentic_relations=graph_strategy.agentic_graph_only,
+                    # We only want entity to entity relations (skip resource/labels/collaborators/etc.)
                     only_entity_to_entity=True,
                     deleted_entities=explored_entities,
                 )
-                # We only want entity to entity relations
             except Exception as e:
                 capture_exception(e)
                 logger.exception("Error in getting query relations for graph strategy")

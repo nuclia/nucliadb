@@ -121,6 +121,7 @@ def test_ask_response_parser_stream():
                                 relation=RelationType.ABOUT,
                                 relation_label="performing",
                                 direction=RelationDirection.OUT,
+                                resource_id="resource_id",
                             )
                         ]
                     )

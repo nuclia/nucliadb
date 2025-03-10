@@ -71,6 +71,7 @@ pub fn create_relation(
         relation: rel_type.into(),
         relation_label: rel_label,
         metadata: Some(RelationMetadata { ..Default::default() }),
+        resource_id: None,
     }
 }
 

@@ -100,6 +100,7 @@ async def test_rank_relations_generative(
                         relation_label="has product",
                         relation=RelationType.ENTITY,
                         direction=RelationDirection.OUT,
+                        resource_id="resource_uuid",
                     ),
                     DirectionalRelation(
                         entity="Titanium Grade 3 Roofing Nails",
@@ -108,6 +109,7 @@ async def test_rank_relations_generative(
                         relation_label="has product",
                         relation=RelationType.ENTITY,
                         direction=RelationDirection.OUT,
+                        resource_id="resource_uuid",
                     ),
                     DirectionalRelation(
                         entity="New York",
@@ -116,6 +118,7 @@ async def test_rank_relations_generative(
                         relation_label="is located in",
                         relation=RelationType.ENTITY,
                         direction=RelationDirection.OUT,
+                        resource_id="resource_uuid",
                     ),
                     DirectionalRelation(
                         entity="New York",
@@ -124,6 +127,7 @@ async def test_rank_relations_generative(
                         relation_label="is located in",
                         relation=RelationType.ENTITY,
                         direction=RelationDirection.OUT,
+                        resource_id="resource_uuid",
                     ),
                 ]
             ),
@@ -136,6 +140,7 @@ async def test_rank_relations_generative(
                         relation_label="married to",
                         relation=RelationType.ENTITY,
                         direction=RelationDirection.OUT,
+                        resource_id="resource_uuid",
                     )
                 ]
             ),
@@ -175,6 +180,7 @@ async def test_rank_relations_reranker(
                         relation_label="has product",
                         relation=RelationType.ENTITY,
                         direction=RelationDirection.OUT,
+                        resource_id="resource_uuid",
                     ),
                     DirectionalRelation(
                         entity="Titanium Grade 3 Roofing Nails",
@@ -183,6 +189,7 @@ async def test_rank_relations_reranker(
                         relation_label="has product",
                         relation=RelationType.ENTITY,
                         direction=RelationDirection.OUT,
+                        resource_id="resource_uuid",
                     ),
                     DirectionalRelation(
                         entity="New York",
@@ -191,6 +198,7 @@ async def test_rank_relations_reranker(
                         relation_label="is located in",
                         relation=RelationType.ENTITY,
                         direction=RelationDirection.OUT,
+                        resource_id="resource_uuid",
                     ),
                     DirectionalRelation(
                         entity="New York",
@@ -199,6 +207,7 @@ async def test_rank_relations_reranker(
                         relation_label="is located in",
                         relation=RelationType.ENTITY,
                         direction=RelationDirection.OUT,
+                        resource_id="resource_uuid",
                     ),
                 ]
             ),
@@ -211,6 +220,7 @@ async def test_rank_relations_reranker(
                         relation_label="married to",
                         relation=RelationType.ENTITY,
                         direction=RelationDirection.OUT,
+                        resource_id="resource_uuid",
                     )
                 ]
             ),
@@ -241,6 +251,7 @@ def test_get_paragraph_info_from_relations():
         relation=RelationType.ENTITY,
         direction=RelationDirection.OUT,
         metadata=RelationMetadata(paragraph_id=paragraph_id_str),
+        resource_id="blabla",
     )
 
     relations = Relations(entities={entity_name: EntitySubgraph(related_to=[relation])})
@@ -273,6 +284,7 @@ def test_get_paragraph_info_from_relations():
         relation=RelationType.ENTITY,
         direction=RelationDirection.OUT,
         metadata=RelationMetadata(paragraph_id=paragraph_id_str_1),
+        resource_id="blabla",
     )
     rel2 = DirectionalRelation(
         entity="entityC",
@@ -282,6 +294,7 @@ def test_get_paragraph_info_from_relations():
         relation=RelationType.ENTITY,
         direction=RelationDirection.OUT,
         metadata=RelationMetadata(paragraph_id=paragraph_id_str_2),
+        resource_id="blabla",
     )
 
     relations_2 = Relations(entities={entity_name_2: EntitySubgraph(related_to=[rel1, rel2])})
@@ -318,6 +331,7 @@ def test_get_paragraph_info_from_relations():
         relation=RelationType.ENTITY,
         direction=RelationDirection.OUT,
         metadata=RelationMetadata(paragraph_id=paragraph_id_str_contained),
+        resource_id="blabla",
     )
     rel2_container = DirectionalRelation(
         entity="entityC",
@@ -327,6 +341,7 @@ def test_get_paragraph_info_from_relations():
         relation=RelationType.ENTITY,
         direction=RelationDirection.OUT,
         metadata=RelationMetadata(paragraph_id=paragraph_id_str_container),
+        resource_id="blabla",
     )
 
     relations_3 = Relations(

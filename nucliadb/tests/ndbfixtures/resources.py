@@ -384,4 +384,4 @@ async def knowledge_graph(
     )
     assert resp.status_code == 200, resp.content
 
-    return (nodes, edges)
+    return (nodes, edges, rid)

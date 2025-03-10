@@ -123,6 +123,7 @@ pub fn knowledge_graph_as_relations() -> Vec<Relation> {
                 subtype: entities.get(target).unwrap().to_string(),
             }),
             metadata: None,
+            resource_id: None,
         })
     }
 
