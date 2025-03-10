@@ -295,3 +295,33 @@ async def test_task_retry_handler_ignored_statuses(context):
         await trh.set_metadata(metadata)
         await callback_retried("foo", bar="baz")
         callback.assert_not_called()
+
+
+async def test_task_retry_handler_max_retries(context):
+    callback = AsyncMock()
+
+    task_id = str(uuid.uuid4())
+    trh = TaskRetryHandler(
+        kbid="kbid",
+        task_type="foo",
+        task_id=task_id,
+        context=context,
+        max_retries=2,
+    )
+    callback_retried = trh.wrap(callback)
+
+    metadata = TaskMetadata(
+        task_id=task_id,
+        status=TaskMetadata.Status.RUNNING,
+        retries=40,
+        error_messages=[],
+    )
+    await trh.set_metadata(metadata)
+
+    await callback_retried("foo", bar="baz")
+
+    callback.assert_not_called()
+
+    metadata = await trh.get_metadata()
+    assert metadata.status == TaskMetadata.Status.FAILED
+    assert "Max retries reached" in metadata.error_messages[-1]

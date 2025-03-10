@@ -73,7 +73,8 @@ class TaskRetryHandler:
         self.kbid = kbid
         self.task_type = task_type
         self.task_id = task_id
-        self.max_retries = max_retries
+        # Limit max retries to 50
+        self.max_retries = min(max_retries, 50)
         self.context = context
 
     @property
