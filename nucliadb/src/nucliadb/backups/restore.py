@@ -222,7 +222,6 @@ async def restore_resource(context: ApplicationContext, kbid: str, backup_id: st
             bm = item
             bm.kbid = kbid
             break
-
         elif isinstance(item, CloudFile):
             # Read its binary and import it
             cf = item
