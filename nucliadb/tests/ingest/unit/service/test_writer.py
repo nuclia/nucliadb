@@ -30,6 +30,9 @@ from nucliadb_protos import writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.resources_pb2 import FieldText
 from nucliadb_protos.utils_pb2 import VectorSimilarity
+from nucliadb_utils.utilities import Utility, clean_utility, set_utility
+
+WRITER_MODULE = "nucliadb.ingest.service.writer"
 
 
 class TestWriterServicer:
@@ -508,3 +511,73 @@ class TestWriterServicer:
             txn.commit.assert_called_once()
 
             assert isinstance(resp, writer_pb2.IndexStatus)
+
+    @pytest.fixture(scope="function")
+    def nats_manager(self):
+        nats_manager = Mock()
+        nats_manager.js = Mock()
+        nats_manager.js.publish = AsyncMock()
+        set_utility(Utility.NATS_MANAGER, nats_manager)
+        yield nats_manager
+        clean_utility(Utility.NATS_MANAGER)
+
+    async def test_CreateBackup_ok(self, writer: WriterServicer, nats_manager):
+        with patch(f"{WRITER_MODULE}.exists_kb", return_value=True):
+            request = writer_pb2.CreateBackupRequest(kb_id="kbid", backup_id="backup_id")
+            resp = await writer.CreateBackup(request)
+            assert resp.status == writer_pb2.CreateBackupResponse.Status.OK
+            nats_manager.js.publish.assert_called_once_with(
+                "ndb-backups.create", b'{"kb_id":"kbid","backup_id":"backup_id"}'
+            )
+
+    async def test_CreateBackup_kb_not_found(self, writer: WriterServicer, nats_manager):
+        with patch(f"{WRITER_MODULE}.exists_kb", return_value=False):
+            request = writer_pb2.CreateBackupRequest(kb_id="kbid", backup_id="backup_id")
+            resp = await writer.CreateBackup(request)
+            assert resp.status == writer_pb2.CreateBackupResponse.Status.KB_NOT_FOUND
+            nats_manager.js.publish.assert_not_called()
+
+    async def test_RestoreBackup_ok(self, writer: WriterServicer, nats_manager):
+        with (
+            patch(f"{WRITER_MODULE}.exists_kb", return_value=True),
+            patch(f"{WRITER_MODULE}.backup_utils.exists_backup", return_value=True),
+        ):
+            request = writer_pb2.RestoreBackupRequest(kb_id="kbid", backup_id="backup_id")
+            resp = await writer.RestoreBackup(request)
+            assert resp.status == writer_pb2.RestoreBackupResponse.Status.OK
+            nats_manager.js.publish.assert_called_once_with(
+                "ndb-backups.restore", b'{"kb_id":"kbid","backup_id":"backup_id"}'
+            )
+
+    async def test_RestoreBackup_kb_not_found(self, writer: WriterServicer, nats_manager):
+        with patch(f"{WRITER_MODULE}.exists_kb", return_value=False):
+            request = writer_pb2.RestoreBackupRequest(kb_id="kbid", backup_id="backup_id")
+            resp = await writer.RestoreBackup(request)
+            assert resp.status == writer_pb2.RestoreBackupResponse.Status.NOT_FOUND
+            nats_manager.js.publish.assert_not_called()
+
+    async def test_RestoreBackup_backup_not_found(self, writer: WriterServicer, nats_manager):
+        with (
+            patch(f"{WRITER_MODULE}.exists_kb", return_value=True),
+            patch(f"{WRITER_MODULE}.backup_utils.exists_backup", return_value=False),
+        ):
+            request = writer_pb2.RestoreBackupRequest(kb_id="kbid", backup_id="backup_id")
+            resp = await writer.RestoreBackup(request)
+            assert resp.status == writer_pb2.RestoreBackupResponse.Status.NOT_FOUND
+            nats_manager.js.publish.assert_not_called()
+
+    async def test_DeleteBackup_ok(self, writer: WriterServicer, nats_manager):
+        with patch(f"{WRITER_MODULE}.backup_utils.exists_backup", return_value=True):
+            request = writer_pb2.DeleteBackupRequest(backup_id="backup_id")
+            resp = await writer.DeleteBackup(request)
+            assert resp.status == writer_pb2.DeleteBackupResponse.Status.OK
+            nats_manager.js.publish.assert_called_once_with(
+                "ndb-backups.delete", b'{"backup_id":"backup_id"}'
+            )
+
+    async def test_DeleteBackup_backup_not_found(self, writer: WriterServicer, nats_manager):
+        with patch(f"{WRITER_MODULE}.backup_utils.exists_backup", return_value=False):
+            request = writer_pb2.DeleteBackupRequest(backup_id="backup_id")
+            resp = await writer.DeleteBackup(request)
+            assert resp.status == writer_pb2.DeleteBackupResponse.Status.OK
+            nats_manager.js.publish.assert_not_called()

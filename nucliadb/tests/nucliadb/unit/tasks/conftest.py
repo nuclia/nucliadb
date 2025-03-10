@@ -31,6 +31,7 @@ def nats_manager():
     js = Mock()
     js.stream_info = AsyncMock(side_effect=nats.js.errors.NotFoundError)
     js.add_stream = AsyncMock()
+    js.publish = AsyncMock()
     nats_manager.js = js
     yield nats_manager
 

@@ -195,7 +195,7 @@ async def start_export_task(context: ApplicationContext, kbid: str, export_id: s
     metadata.task.status = Status.SCHEDULED
     await dm.set_metadata("export", metadata)
     try:
-        producer = await get_exports_producer(context)
+        producer = get_exports_producer()
         msg = NatsTaskMessage(kbid=kbid, id=export_id)
         seqid = await producer.send(msg)
         logger.info(f"Export task produced. seqid={seqid} kbid={kbid} export_id={export_id}")
@@ -212,7 +212,7 @@ async def start_import_task(context: ApplicationContext, kbid: str, import_id: s
     metadata.total = import_size or 0
     await dm.set_metadata("import", metadata)
     try:
-        producer = await get_imports_producer(context)
+        producer = get_imports_producer()
         msg = NatsTaskMessage(kbid=kbid, id=import_id)
         seqid = await producer.send(msg)
         logger.info(f"Import task produced. seqid={seqid} kbid={kbid} import_id={import_id}")

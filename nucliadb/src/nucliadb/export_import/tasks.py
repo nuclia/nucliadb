@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.exporter import export_kb_to_blob_storage
 from nucliadb.export_import.importer import import_kb_from_blob_storage
 from nucliadb.export_import.models import NatsTaskMessage
@@ -60,14 +59,13 @@ def get_exports_consumer() -> NatsTaskConsumer[NatsTaskMessage]:
     )
 
 
-async def get_exports_producer(context: ApplicationContext) -> NatsTaskProducer[NatsTaskMessage]:
+def get_exports_producer() -> NatsTaskProducer[NatsTaskMessage]:
     producer = create_producer(
         name="exports_producer",
         stream=ExportsNatsConfig.stream,
         producer_subject=ExportsNatsConfig.consumer.subject,
         msg_type=NatsTaskMessage,
     )
-    await producer.initialize(context)
     return producer
 
 
@@ -82,12 +80,11 @@ def get_imports_consumer() -> NatsTaskConsumer[NatsTaskMessage]:
     )
 
 
-async def get_imports_producer(context: ApplicationContext) -> NatsTaskProducer[NatsTaskMessage]:
+def get_imports_producer() -> NatsTaskProducer[NatsTaskMessage]:
     producer = create_producer(
         name="imports_producer",
         stream=ImportsNatsConfig.stream,
         producer_subject=ImportsNatsConfig.consumer.subject,
         msg_type=NatsTaskMessage,
     )
-    await producer.initialize(context)
     return producer

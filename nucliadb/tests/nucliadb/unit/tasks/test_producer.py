@@ -17,14 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import Mock
 
-import nats
 import pydantic
 import pytest
 
 from nucliadb.tasks.producer import create_producer
 from nucliadb.tasks.utils import NatsConsumer, NatsStream
+from nucliadb_utils.utilities import Utility, clean_utility, set_utility
 
 
 class Message(pydantic.BaseModel):
@@ -35,30 +35,33 @@ stream = NatsStream(name="stream", subjects=["stream.>"])
 consumer = NatsConsumer(subject="stream.subject", group="group")
 
 
-def test_create_producer():
+@pytest.fixture(scope="function")
+def nats_manager_utility(nats_manager):
+    set_utility(Utility.NATS_MANAGER, nats_manager)
+    yield
+    clean_utility(Utility.NATS_MANAGER)
+
+
+def test_create_producer(nats_manager_utility):
     producer = create_producer(
         "foo",
         stream=stream,
         producer_subject=consumer.subject,
         msg_type=Message,
     )
-    assert not producer.initialized
-
     assert producer.name == "foo"
     assert producer.stream == stream
 
 
 class TestProducer:
     @pytest.fixture(scope="function")
-    def nats_manager(self):
-        mgr = MagicMock()
-        mgr.js.stream_info = AsyncMock(side_effect=nats.js.errors.NotFoundError)
-        mgr.js.add_stream = AsyncMock()
-        mgr.js.publish = AsyncMock()
-        yield mgr
+    def nats_manager_utility(self, nats_manager):
+        set_utility(Utility.NATS_MANAGER, nats_manager)
+        yield nats_manager
+        clean_utility(Utility.NATS_MANAGER)
 
     @pytest.fixture(scope="function")
-    async def producer(self, context, nats_manager):
+    async def producer(self, context, nats_manager_utility):
         async def callback(context, msg: Message):
             pass
 
@@ -68,27 +71,14 @@ class TestProducer:
             producer_subject=consumer.subject,
             msg_type=Message,
         )
-        await producer.initialize(context)
-        producer.context.nats_manager = nats_manager
         yield producer
-
-    async def test_initialize_creates_stream(self, producer, nats_manager):
-        # Check that the stream is on inialization
-        assert nats_manager.js.add_stream.call_count == 1
-        assert nats_manager.js.add_stream.call_args[1]["name"] == stream.name
-        assert nats_manager.js.add_stream.call_args[1]["subjects"] == stream.subjects
-
-    async def test_produce_raises_error_if_not_initialized(self, producer):
-        producer.initialized = False
-        with pytest.raises(RuntimeError):
-            await producer.send(Mock())
 
     async def test_produce_ok(self, producer):
         msg = Message(kbid="kbid")
 
         await producer.send(msg)
 
-        publish_args = producer.context.nats_manager.js.publish.call_args[0]
+        publish_args = producer.nats_manager.js.publish.call_args[0]
         assert publish_args[0] == consumer.subject
 
         raw_message = publish_args[1]
