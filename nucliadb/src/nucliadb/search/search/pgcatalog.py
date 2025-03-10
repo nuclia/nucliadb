@@ -111,7 +111,7 @@ def _convert_date_filter(date: CatalogExpression.Date, filter_params: dict[str, 
         raise ValueError(f"Invalid date operator")
 
 
-def _prepare_query(catalog_query: CatalogQuery):
+def _prepare_query_filters(catalog_query: CatalogQuery) -> tuple[str, dict[str, Any]]:
     filter_sql = ["kbid = %(kbid)s"]
     filter_params: dict[str, Any] = {"kbid": catalog_query.kbid}
 
@@ -127,7 +127,17 @@ def _prepare_query(catalog_query: CatalogQuery):
     if catalog_query.filters:
         filter_sql.append(_convert_filter(catalog_query.filters, filter_params))
 
-    order_sql = ""
+    return (
+        f"SELECT * FROM catalog WHERE {' AND '.join(filter_sql)}",
+        filter_params,
+    )
+
+
+def _prepare_query(catalog_query: CatalogQuery) -> tuple[str, dict[str, Any]]:
+    # Base query with all the filters
+    query, filter_params = _prepare_query_filters(catalog_query)
+
+    # Sort
     if catalog_query.sort:
         if catalog_query.sort.field == SortField.CREATED:
             order_field = "created_at"
@@ -144,12 +154,15 @@ def _prepare_query(catalog_query: CatalogQuery):
         else:
             order_dir = "DESC"
 
-        order_sql = f" ORDER BY {order_field} {order_dir}"
+        query += f" ORDER BY {order_field} {order_dir}"
 
-    return (
-        f"SELECT * FROM catalog WHERE {' AND '.join(filter_sql)}{order_sql}",
-        filter_params,
-    )
+    # Pagination
+    offset = catalog_query.page_size * catalog_query.page_number
+    query += f" LIMIT %(page_size)s OFFSET %(offset)s"
+    filter_params["page_size"] = catalog_query.page_size
+    filter_params["offset"] = offset
+
+    return query, filter_params
 
 
 def _pg_driver() -> PGDriver:
@@ -159,7 +172,7 @@ def _pg_driver() -> PGDriver:
 @observer.wrap({"op": "search"})
 async def pgcatalog_search(catalog_query: CatalogQuery) -> Resources:
     # Prepare SQL query
-    query, query_params = _prepare_query(catalog_query)
+    query, query_params = _prepare_query_filters(catalog_query)
 
     async with _pg_driver()._get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
         facets = {}
@@ -210,15 +223,8 @@ async def pgcatalog_search(catalog_query: CatalogQuery) -> Resources:
 
         # Query
         with observer({"op": "query"}):
-            offset = catalog_query.page_size * catalog_query.page_number
-            await cur.execute(
-                f"{query} LIMIT %(page_size)s OFFSET %(offset)s",
-                {
-                    **query_params,
-                    "page_size": catalog_query.page_size,
-                    "offset": offset,
-                },
-            )
+            query, query_params = _prepare_query(catalog_query)
+            await cur.execute(query, query_params)
             data = await cur.fetchall()
 
     return Resources(
@@ -237,6 +243,6 @@ async def pgcatalog_search(catalog_query: CatalogQuery) -> Resources:
         total=total,
         page_number=catalog_query.page_number,
         page_size=catalog_query.page_size,
-        next_page=(offset + len(data) < total),
+        next_page=(catalog_query.page_size * catalog_query.page_number + len(data) < total),
         min_score=0,
     )
