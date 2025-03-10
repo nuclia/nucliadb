@@ -243,7 +243,8 @@ async def test_filter_expression():
         "(extract_facets(labels) @> %(param2)s AND (NOT modified_at > %(param3)s)) "
         "OR rid = %(param4)s"
         ") "
-        "ORDER BY created_at DESC"
+        "ORDER BY created_at DESC "
+        "LIMIT %(page_size)s OFFSET %(offset)s"
     )
     assert params == {
         "kbid": "84ed9257-04ef-41d1-b1d2-26286b92777f",
@@ -251,4 +252,6 @@ async def test_filter_expression():
         "param3": datetime(2019, 1, 1, 11, 0),
         "param4": ["00112233445566778899aabbccddeeff"],
         "query": "This is my query",
+        "page_size": 25,
+        "offset": 0,
     }
