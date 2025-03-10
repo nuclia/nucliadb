@@ -332,6 +332,10 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         key = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=uuid, field=field)
         return self.field_klass(storage=self, bucket=bucket, fullkey=key, field=old_field)
 
+    async def exists_object(self, bucket: str, key: str) -> bool:
+        sf: StorageField = self.field_klass(storage=self, bucket=bucket, fullkey=key)
+        return await sf.exists() is not None
+
     def file_extracted(
         self, kbid: str, uuid: str, field_type: str, field: str, key: str
     ) -> StorageField:
