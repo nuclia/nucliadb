@@ -24,6 +24,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def exists_backup(storage: Storage, backup_id: str) -> bool:
+    # As the labels file is always created, we use it to check if the backup exists
     return await storage.exists_object(
-        settings.backups_bucket, StorageKeys.BACKUP_PREFIX.format(backup_id=backup_id)
+        settings.backups_bucket, StorageKeys.LABELS.format(backup_id=backup_id)
     )
