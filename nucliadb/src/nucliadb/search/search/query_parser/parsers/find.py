@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 from pydantic import ValidationError
 
 from nucliadb.search.search.query_parser.exceptions import InternalParserError

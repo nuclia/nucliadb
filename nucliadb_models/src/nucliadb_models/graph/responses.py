@@ -17,19 +17,46 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from . import (  # noqa: F401
-    ask,
-    catalog,
-    feedback,
-    find,
-    graph,
-    knowledgebox,
-    predict_proxy,
-    search,
-    suggest,
-    summarize,
-)
-from .resource import ask as ask_resource  # noqa: F401
-from .resource import ingestion_agents as ingestion_agents_resource  # noqa: F401
-from .resource import search as search_resource  # noqa: F401
-from .router import api  # noqa: F401
+from enum import Enum
+
+from pydantic import BaseModel
+
+from nucliadb_models.metadata import RelationNodeType
+
+
+class GraphNode(BaseModel):
+    value: str
+    type: RelationNodeType
+    group: str
+
+
+class GraphNodePosition(str, Enum):
+    ANY = "any"
+    SOURCE = "source"
+    DESTINATION = "destination"
+
+
+class PositionedGraphNode(GraphNode):
+    position: GraphNodePosition = GraphNodePosition.ANY
+
+
+class GraphRelation(BaseModel):
+    label: str
+
+
+class GraphPath(BaseModel):
+    source: GraphNode
+    relation: GraphRelation
+    destination: GraphNode
+
+
+class GraphSearchResponse(BaseModel):
+    paths: list[GraphPath]
+
+
+class GraphNodesSearchResponse(BaseModel):
+    nodes: list[GraphNode]
+
+
+class GraphRelationsSearchResponse(BaseModel):
+    relations: list[GraphRelation]

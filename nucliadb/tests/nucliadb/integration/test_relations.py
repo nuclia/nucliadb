@@ -142,7 +142,6 @@ async def test_broker_message_relations(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_extracted_relations(
-    nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     standalone_knowledgebox,

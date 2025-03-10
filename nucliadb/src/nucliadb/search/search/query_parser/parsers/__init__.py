@@ -17,19 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from . import (  # noqa: F401
-    ask,
-    catalog,
-    feedback,
-    find,
-    graph,
-    knowledgebox,
-    predict_proxy,
-    search,
-    suggest,
-    summarize,
-)
-from .resource import ask as ask_resource  # noqa: F401
-from .resource import ingestion_agents as ingestion_agents_resource  # noqa: F401
-from .resource import search as search_resource  # noqa: F401
-from .router import api  # noqa: F401
+
+from .catalog import parse_catalog  # noqa: F401
+from .find import parse_find  # noqa: F401
+from .graph import parse_graph_node_search, parse_graph_relation_search, parse_graph_search  # noqa: F401

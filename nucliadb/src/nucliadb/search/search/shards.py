@@ -26,6 +26,8 @@ from grpc.aio import AioRpcError
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb_protos.nodereader_pb2 import (
     GetShardRequest,
+    GraphSearchRequest,
+    GraphSearchResponse,
     SearchRequest,
     SearchResponse,
     SuggestRequest,
@@ -79,3 +81,16 @@ async def suggest_shard(node: AbstractIndexNode, shard: str, query: SuggestReque
     req.shard = shard
     with node_observer({"type": "suggest", "node_id": node.id}):
         return await node.reader.Suggest(req)  # type: ignore
+
+
+@backoff.on_exception(
+    backoff.expo, Exception, jitter=None, factor=0.1, max_tries=3, giveup=should_giveup
+)
+async def graph_search_shard(
+    node: AbstractIndexNode, shard: str, query: GraphSearchRequest
+) -> GraphSearchResponse:
+    req = GraphSearchRequest()
+    req.CopyFrom(query)
+    req.shard = shard
+    with node_observer({"type": "graph_search", "node_id": node.id}):
+        return await node.reader.GraphSearch(req)  # type: ignore

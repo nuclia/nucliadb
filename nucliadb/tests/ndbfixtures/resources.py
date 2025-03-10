@@ -34,6 +34,7 @@ from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.tests.vectors import V1
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
+from nucliadb_models.metadata import RelationEntity, RelationNodeType
 from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
@@ -385,3 +386,81 @@ async def knowledge_graph(
     assert resp.status_code == 200, resp.content
 
     return (nodes, edges, rid)
+
+
+@pytest.fixture(scope="function")
+async def kb_with_entity_graph(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+    entity_graph: tuple[dict[str, RelationEntity], list[tuple[str, str, str]]],
+) -> AsyncIterator[str]:
+    kbid = standalone_knowledgebox
+    entities, paths = entity_graph
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "usermetadata": {
+                "relations": [
+                    {
+                        "relation": "ENTITY",
+                        "label": relation,
+                        "from": entities[source].model_dump(),
+                        "to": entities[target].model_dump(),
+                    }
+                    for source, relation, target in paths
+                ],
+            },
+        },
+    )
+    assert resp.status_code == 201
+
+    yield kbid
+
+
+@pytest.fixture(scope="function")
+def entity_graph() -> tuple[dict[str, RelationEntity], list[tuple[str, str, str]]]:
+    entities = {
+        "Anastasia": RelationEntity(value="Anastasia", type=RelationNodeType.ENTITY, group="PERSON"),
+        "Anna": RelationEntity(value="Anna", type=RelationNodeType.ENTITY, group="PERSON"),
+        "Apollo": RelationEntity(value="Apollo", type=RelationNodeType.ENTITY, group="PROJECT"),
+        "Cat": RelationEntity(value="Cat", type=RelationNodeType.ENTITY, group="ANIMAL"),
+        "Climbing": RelationEntity(value="Climbing", type=RelationNodeType.ENTITY, group="ACTIVITY"),
+        "Computer science": RelationEntity(
+            value="Computer science", type=RelationNodeType.ENTITY, group="STUDY_FIELD"
+        ),
+        "Dimitri": RelationEntity(value="Dimitri", type=RelationNodeType.ENTITY, group="PERSON"),
+        "Erin": RelationEntity(value="Erin", type=RelationNodeType.ENTITY, group="PERSON"),
+        "Jerry": RelationEntity(value="Jerry", type=RelationNodeType.ENTITY, group="ANIMAL"),
+        "Margaret": RelationEntity(value="Margaret", type=RelationNodeType.ENTITY, group="PERSON"),
+        "Mouse": RelationEntity(value="Mouse", type=RelationNodeType.ENTITY, group="ANIMAL"),
+        "New York": RelationEntity(value="New York", type=RelationNodeType.ENTITY, group="PLACE"),
+        "Olympic athlete": RelationEntity(
+            value="Olympic athlete", type=RelationNodeType.ENTITY, group="SPORT"
+        ),
+        "Peter": RelationEntity(value="Peter", type=RelationNodeType.ENTITY, group="PERSON"),
+        "Rocket": RelationEntity(value="Rocket", type=RelationNodeType.ENTITY, group="VEHICLE"),
+        "Tom": RelationEntity(value="Tom", type=RelationNodeType.ENTITY, group="ANIMAL"),
+        "UK": RelationEntity(value="UK", type=RelationNodeType.ENTITY, group="PLACE"),
+    }
+    graph = [
+        ("Anastasia", "IS_FRIEND", "Anna"),
+        ("Anna", "FOLLOW", "Erin"),
+        ("Anna", "LIVE_IN", "New York"),
+        ("Anna", "LOVE", "Cat"),
+        ("Anna", "WORK_IN", "New York"),
+        ("Apollo", "IS", "Rocket"),
+        ("Dimitri", "LOVE", "Anastasia"),
+        ("Erin", "BORN_IN", "UK"),
+        ("Erin", "IS", "Olympic athlete"),
+        ("Erin", "LOVE", "Climbing"),
+        ("Jerry", "IS", "Mouse"),
+        ("Margaret", "DEVELOPED", "Apollo"),
+        ("Margaret", "WORK_IN", "Computer science"),
+        ("Peter", "LIVE_IN", "New York"),
+        ("Tom", "CHASE", "Jerry"),
+        ("Tom", "IS", "Cat"),
+    ]
+
+    return (entities, graph)

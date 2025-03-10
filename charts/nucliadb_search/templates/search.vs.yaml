@@ -54,6 +54,10 @@ spec:
             regex: '^/api/v\d+/kb/[^/]+/suggest'
           method:
             regex: "GET|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/graph'
+          method:
+            regex: "POST|OPTIONS"
       retries:
         attempts: 3
         retryOn: connect-failure

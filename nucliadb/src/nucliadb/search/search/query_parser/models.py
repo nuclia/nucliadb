@@ -28,6 +28,7 @@ from pydantic import (
 )
 
 from nucliadb_models import search as search_models
+from nucliadb_protos import nodereader_pb2
 
 ### Retrieval
 
@@ -101,3 +102,11 @@ class CatalogQuery(BaseModel):
     faceted: list[str]
     page_size: int
     page_number: int
+
+
+### Graph
+
+
+# Right now, we don't need a more generic model for graph queries, we can
+# directly use the protobuffer directly
+GraphRetrieval = nodereader_pb2.GraphSearchRequest

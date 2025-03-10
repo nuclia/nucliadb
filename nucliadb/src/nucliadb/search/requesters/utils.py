@@ -33,11 +33,14 @@ from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.search import logger
 from nucliadb.search.search.shards import (
+    graph_search_shard,
     query_shard,
     suggest_shard,
 )
 from nucliadb.search.settings import settings
 from nucliadb_protos.nodereader_pb2 import (
+    GraphSearchRequest,
+    GraphSearchResponse,
     SearchRequest,
     SearchResponse,
     SuggestRequest,
@@ -50,19 +53,22 @@ from nucliadb_telemetry import errors
 class Method(Enum):
     SEARCH = auto()
     SUGGEST = auto()
+    GRAPH = auto()
 
 
 METHODS = {
     Method.SEARCH: query_shard,
     Method.SUGGEST: suggest_shard,
+    Method.GRAPH: graph_search_shard,
 }
 
-REQUEST_TYPE = Union[SuggestRequest, SearchRequest]
+REQUEST_TYPE = Union[SuggestRequest, SearchRequest, GraphSearchRequest]
 
 T = TypeVar(
     "T",
     SuggestResponse,
     SearchResponse,
+    GraphSearchResponse,
 )
 
 
@@ -82,6 +88,15 @@ async def node_query(
     pb_query: SearchRequest,
     timeout: Optional[float] = None,
 ) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
+
+
+@overload
+async def node_query(
+    kbid: str,
+    method: Method,
+    pb_query: GraphSearchRequest,
+    timeout: Optional[float] = None,
+) -> tuple[list[GraphSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
 async def node_query(

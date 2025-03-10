@@ -40,7 +40,7 @@ from nucliadb.search.search.metrics import (
 )
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.query_parser.old_filters import OldFilterParams
-from nucliadb.search.search.query_parser.parser import parse_find
+from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb.search.search.rank_fusion import (
     RankFusionAlgorithm,
     get_rank_fusion,

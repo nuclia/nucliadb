@@ -262,6 +262,7 @@ class NodeNidxAdapter:
         # Searcher methods
         self.Search = searcher_client.Search
         self.Suggest = searcher_client.Suggest
+        self.GraphSearch = searcher_client.GraphSearch
         self.Paragraphs = searcher_client.Paragraphs
         self.Documents = searcher_client.Documents
 
