@@ -170,7 +170,7 @@ async def backup_resource_with_binaries(
         """
         nonlocal total_size
 
-        for cloud_file in get_cloud_files(bm):
+        for index, cloud_file in enumerate(get_cloud_files(bm)):
             if not await exists_cf(context, cloud_file):
                 logger.warning(
                     "Cloud file not found in storage, skipping",
@@ -184,13 +184,13 @@ async def backup_resource_with_binaries(
                 yield serialized_cf
 
             async for chunk in to_tar(
-                name=f"cloud-files/{cloud_file.uri}", size=len(serialized_cf), chunks=cf_iterator()
+                name=f"cloud-files/{index}", size=len(serialized_cf), chunks=cf_iterator()
             ):
                 yield chunk
                 total_size += len(chunk)
 
             async for chunk in to_tar(
-                name=f"binaries/{cloud_file.uri}",
+                name=f"binaries/{index}",
                 size=cloud_file.size,
                 chunks=download_binary(context, cloud_file),
             ):

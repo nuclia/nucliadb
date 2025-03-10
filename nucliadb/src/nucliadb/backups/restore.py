@@ -69,11 +69,11 @@ async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
     await restore_resources(context, kbid, backup_id)
     await restore_labels(context, kbid, backup_id)
     await restore_entities(context, kbid, backup_id)
-    await delete_last_restored_resource_key(context, kbid, backup_id)
+    await delete_last_restored(context, kbid, backup_id)
 
 
 async def restore_resources(context: ApplicationContext, kbid: str, backup_id: str):
-    last_restored = await get_last_restored_resource_key(context, kbid, backup_id)
+    last_restored = await get_last_restored(context, kbid, backup_id)
     tasks = []
     async for object_info in context.blob_storage.iterate_objects(
         bucket=settings.backups_bucket,
@@ -86,16 +86,14 @@ async def restore_resources(context: ApplicationContext, kbid: str, backup_id: s
         if len(tasks) > settings.restore_resources_concurrency:
             await asyncio.gather(*tasks)
             tasks = []
-            await set_last_restored_resource_key(context, kbid, backup_id, key)
+            await set_last_restored(context, kbid, backup_id, key)
     if len(tasks) > 0:
         await asyncio.gather(*tasks)
         tasks = []
-        await set_last_restored_resource_key(context, kbid, backup_id, key)
+        await set_last_restored(context, kbid, backup_id, key)
 
 
-async def get_last_restored_resource_key(
-    context: ApplicationContext, kbid: str, backup_id: str
-) -> Optional[str]:
+async def get_last_restored(context: ApplicationContext, kbid: str, backup_id: str) -> Optional[str]:
     key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)
     async with context.kv_driver.transaction(read_only=True) as txn:
         raw = await txn.get(key)
@@ -104,16 +102,14 @@ async def get_last_restored_resource_key(
         return raw.decode()
 
 
-async def set_last_restored_resource_key(
-    context: ApplicationContext, kbid: str, backup_id: str, resource_id: str
-):
+async def set_last_restored(context: ApplicationContext, kbid: str, backup_id: str, resource_id: str):
     key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)
     async with context.kv_driver.transaction() as txn:
         await txn.set(key, resource_id.encode())
         await txn.commit()
 
 
-async def delete_last_restored_resource_key(context: ApplicationContext, kbid: str, backup_id: str):
+async def delete_last_restored(context: ApplicationContext, kbid: str, backup_id: str):
     key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)
     async with context.kv_driver.transaction() as txn:
         await txn.delete(key)
@@ -134,6 +130,7 @@ class ResourceBackupReader:
     def __init__(self, download_stream: AsyncIterator[bytes]):
         self.download_stream = download_stream
         self.buffer = b""
+        self.cloud_files: dict[int, CloudFile] = {}
 
     async def read(self, size: int) -> bytes:
         while len(self.buffer) < size:
@@ -194,15 +191,18 @@ class ResourceBackupReader:
             bm.ParseFromString(raw_bm)
             return bm
         elif tarinfo.name.startswith("cloud-files"):
+            cf_index = int(tarinfo.name.split("cloud-files/")[-1])
             raw_cf = await self.read_data(tarinfo)
             cf = CloudFile()
             cf.ParseFromString(raw_cf)
+            self.cloud_files[cf_index] = cf
             return cf
         elif tarinfo.name.startswith("binaries"):
-            uri = tarinfo.name.lstrip("binaries/")
+            bin_index = int(tarinfo.name.split("binaries/")[-1])
             size = tarinfo.size
             download_stream = functools.partial(self.iter_data, size)
-            return CloudFileBinary(uri, download_stream)
+            cf = self.cloud_files[bin_index]
+            return CloudFileBinary(cf.uri, download_stream)
         else:  # pragma: no cover
             raise ValueError(f"Unknown tar entry: {tarinfo.name}")
 

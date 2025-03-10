@@ -29,9 +29,9 @@ from nucliadb.backups.create import backup_kb, get_metadata, set_metadata
 from nucliadb.backups.delete import delete_backup
 from nucliadb.backups.models import BackupMetadata
 from nucliadb.backups.restore import (
-    get_last_restored_resource_key,
+    get_last_restored,
     restore_kb,
-    set_last_restored_resource_key,
+    set_last_restored,
 )
 from nucliadb.backups.settings import BackupSettings
 from nucliadb.backups.settings import settings as backups_settings
@@ -165,7 +165,7 @@ async def test_backup(
     await restore_kb(context, dst_kb, backup_id)
 
     # Make sure that the restore metadata is cleaned up
-    assert await get_last_restored_resource_key(context, dst_kb, backup_id) is None
+    assert await get_last_restored(context, dst_kb, backup_id) is None
 
     await delete_backup(context, backup_id)
 
@@ -264,7 +264,7 @@ async def test_restore_resumed(
     last_restored_key = StorageKeys.RESOURCE.format(
         kbid=src_kb, backup_id=backup_id, resource_id=rids[0]
     )
-    await set_last_restored_resource_key(context, dst_kb, backup_id, last_restored_key)
+    await set_last_restored(context, dst_kb, backup_id, last_restored_key)
 
     await restore_kb(context, dst_kb, backup_id)
 
