@@ -30,7 +30,6 @@ from nucliadb.backups.const import (
 )
 from nucliadb.backups.models import BackupMetadata, CreateBackupRequest
 from nucliadb.backups.settings import settings
-from nucliadb.backups.utils import exists_in_storge
 from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.utils import (
@@ -261,7 +260,7 @@ async def delete_metadata(context: ApplicationContext, kbid: str, backup_id: str
 
 
 async def exists_cf(context: ApplicationContext, cf: resources_pb2.CloudFile) -> bool:
-    return await exists_in_storge(context.blob_storage, cf.bucket_name, cf.uri)
+    return await context.blob_storage.exists_object(bucket=cf.bucket_name, key=cf.uri)
 
 
 async def upload_to_bucket(context: ApplicationContext, bytes_iterator: AsyncIterator[bytes], key: str):

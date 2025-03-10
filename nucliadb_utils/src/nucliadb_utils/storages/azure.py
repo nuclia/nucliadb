@@ -141,7 +141,10 @@ class AzureStorageField(StorageField):
             bucket = self.bucket
         else:
             return None
-        return await self.storage.object_store.get_metadata(bucket, key)
+        try:
+            return await self.storage.object_store.get_metadata(bucket, key)
+        except ObjectNotFoundError:
+            return None
 
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
         self.field = await self.start(origin)

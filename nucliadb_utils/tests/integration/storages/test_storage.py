@@ -98,6 +98,7 @@ async def storage_test(storage: Storage):
         names.append(object_info.name)
     assert names == [key1]
 
+    await _test_exists_object(storage)
     await _test_iterate_objects(storage)
 
     # Check insert object
@@ -115,6 +116,17 @@ async def storage_test(storage: Storage):
     assert deleted
 
     await storage.delete_kb(kbid2)
+
+
+async def _test_exists_object(storage: Storage):
+    bucket = "existtest"
+    await storage.create_bucket(bucket)
+
+    assert await storage.exists_object(bucket, "foo") is False
+
+    await storage.upload_object(bucket, "foo", b"bar")
+
+    assert await storage.exists_object(bucket, "foo") is True
 
 
 async def _test_iterate_objects(storage: Storage):

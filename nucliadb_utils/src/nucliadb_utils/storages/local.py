@@ -308,3 +308,11 @@ class LocalStorage(Storage):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "wb") as file:
             file.write(data)
+        metadata_path = f"{path}.metadata"
+        metadata = ObjectMetadata(
+            filename=key.split("/")[-1],
+            content_type="application/octet-stream",
+            size=len(data),
+        )
+        with open(metadata_path, "w") as file:
+            file.write(json.dumps(metadata.model_dump()))
