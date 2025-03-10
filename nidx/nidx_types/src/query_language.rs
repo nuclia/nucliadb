@@ -31,14 +31,14 @@ pub enum Operator {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BooleanOperation {
+pub struct BooleanOperation<T> {
     pub operator: Operator,
-    pub operands: Vec<BooleanExpression>,
+    pub operands: Vec<BooleanExpression<T>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum BooleanExpression {
-    Literal(String),
-    Not(Box<BooleanExpression>),
-    Operation(BooleanOperation),
+pub enum BooleanExpression<T> {
+    Literal(T),
+    Not(Box<BooleanExpression<T>>),
+    Operation(BooleanOperation<T>),
 }

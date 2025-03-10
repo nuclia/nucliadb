@@ -24,7 +24,7 @@ use nidx_protos::{
 use nidx_types::query_language::*;
 
 /// Extract an expression only involving some labels if it's an AND subset of the total expression
-pub fn extract_label_filters(expression: &FilterExpression, labels: &[&str]) -> Option<BooleanExpression> {
+pub fn extract_label_filters(expression: &FilterExpression, labels: &[&str]) -> Option<BooleanExpression<String>> {
     match expression.expr.as_ref().unwrap() {
         Expr::Facet(FacetFilter { facet }) if labels.contains(&facet.as_str()) => {
             Some(BooleanExpression::Literal(facet.clone()))

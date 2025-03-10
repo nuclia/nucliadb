@@ -29,7 +29,7 @@ fn translate_literal(literal: &str, schema: &ParagraphSchema) -> Box<dyn Query> 
     Box::new(TermQuery::new(term, IndexRecordOption::Basic))
 }
 
-fn translate_not(inner: &BooleanExpression, schema: &ParagraphSchema) -> Box<dyn Query> {
+fn translate_not(inner: &BooleanExpression<String>, schema: &ParagraphSchema) -> Box<dyn Query> {
     let mut operands = Vec::with_capacity(2);
 
     // Check the following issue to see why the additional AllQuery is needed:
@@ -43,7 +43,7 @@ fn translate_not(inner: &BooleanExpression, schema: &ParagraphSchema) -> Box<dyn
     Box::new(BooleanQuery::new(operands))
 }
 
-fn translate_operation(operation: &BooleanOperation, schema: &ParagraphSchema) -> Box<dyn Query> {
+fn translate_operation(operation: &BooleanOperation<String>, schema: &ParagraphSchema) -> Box<dyn Query> {
     let operator = match operation.operator {
         Operator::And => Occur::Must,
         Operator::Or => Occur::Should,
@@ -59,7 +59,7 @@ fn translate_operation(operation: &BooleanOperation, schema: &ParagraphSchema) -
     Box::new(BooleanQuery::new(operands))
 }
 
-pub fn translate_expression(expression: &BooleanExpression, schema: &ParagraphSchema) -> Box<dyn Query> {
+pub fn translate_expression(expression: &BooleanExpression<String>, schema: &ParagraphSchema) -> Box<dyn Query> {
     match expression {
         BooleanExpression::Not(inner) => translate_not(inner, schema),
         BooleanExpression::Literal(literal) => translate_literal(literal, schema),
