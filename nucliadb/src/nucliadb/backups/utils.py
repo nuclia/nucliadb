@@ -24,9 +24,12 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def exists_backup(storage: Storage, backup_id: str) -> bool:
-    async for _ in storage.iterate_objects(
-        bucket=settings.backups_bucket,
-        prefix=StorageKeys.BACKUP_PREFIX.format(backup_id=backup_id),
-    ):
+    return await exists_in_storge(
+        storage, settings.backups_bucket, StorageKeys.BACKUP_PREFIX.format(backup_id=backup_id)
+    )
+
+
+async def exists_in_storge(storage: Storage, bucket: str, key: str) -> bool:
+    async for _ in storage.iterate_objects(bucket=bucket, prefix=key):
         return True
     return False

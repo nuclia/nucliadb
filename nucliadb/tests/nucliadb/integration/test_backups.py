@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
 import uuid
 from datetime import datetime
 
@@ -37,6 +38,8 @@ from nucliadb.backups.settings import settings as backups_settings
 from nucliadb.backups.utils import exists_backup
 from nucliadb.common.context import ApplicationContext
 
+N_RESOURCES = 1
+
 
 async def create_kb(
     nucliadb_writer_manager: AsyncClient,
@@ -55,8 +58,8 @@ async def src_kb(
 ):
     kbid = await create_kb(nucliadb_writer_manager)
 
-    # Create 10 simple resources with a text field
-    for i in range(10):
+    # Create some simple resources with a text field
+    for i in range(N_RESOURCES):
         resp = await nucliadb_writer.post(
             f"/kb/{kbid}/resources",
             json={
@@ -70,6 +73,19 @@ async def src_kb(
                     }
                 },
             },
+        )
+        assert resp.status_code == 201
+        rid = resp.json()["uuid"]
+
+        # Add some binary files to backup
+        content = b"Test for /upload endpoint"
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/resource/{rid}/file/file/upload",
+            headers={
+                "X-Filename": base64.b64encode(b"testfile").decode("utf-8"),
+                "Content-Type": "text/plain",
+            },
+            content=base64.b64encode(content),
         )
         assert resp.status_code == 201
 
@@ -137,7 +153,6 @@ async def test_backup(
     context: ApplicationContext,
 ):
     backup_id = str(uuid.uuid4())
-
     assert await exists_backup(context.blob_storage, backup_id) is False
 
     await backup_kb(context, src_kb, backup_id)
@@ -157,10 +172,8 @@ async def test_backup(
     assert await exists_backup(context.blob_storage, backup_id) is False
 
     # Check that the resources were restored
-    resp = await nucliadb_reader.get(f"/kb/{dst_kb}/resources")
-    assert resp.status_code == 200
-    resources = resp.json()["resources"]
-    assert len(resources) == 10
+    await check_resources(nucliadb_reader, src_kb)
+    await check_resources(nucliadb_reader, dst_kb)
 
     # Check that the entities were restored
     resp = await nucliadb_reader.get(f"/kb/{dst_kb}/entitiesgroups")
@@ -171,6 +184,28 @@ async def test_backup(
     resp = await nucliadb_reader.get(f"/kb/{dst_kb}/labelset/foo")
     assert resp.status_code == 200
     assert len(resp.json()["labels"]) == 1
+
+
+async def check_resources(nucliadb_reader: AsyncClient, kbid: str):
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resources")
+    assert resp.status_code == 200
+    resources = resp.json()["resources"]
+    assert len(resources) == N_RESOURCES
+    for resource in resources:
+        rid = resource["id"]
+        resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}/file/file")
+        assert resp.status_code == 200
+        body = resp.json()
+        field = body["value"]["file"]
+        assert field["content_type"] == "text/plain"
+        assert field["filename"] == "testfile"
+        assert field["size"] == 36
+        assert kbid in field["uri"]
+
+        # Try downloading the file
+        resp = await nucliadb_reader.get(field["uri"])
+        assert resp.status_code == 200
+        assert base64.b64decode(resp.content) == b"Test for /upload endpoint"
 
 
 @pytest.mark.flaky(reruns=3)

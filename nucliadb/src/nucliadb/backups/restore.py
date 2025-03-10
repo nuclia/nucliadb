@@ -21,6 +21,7 @@
 
 import asyncio
 import functools
+import logging
 import tarfile
 from typing import AsyncIterator, Callable, Optional, Union
 
@@ -38,6 +39,8 @@ from nucliadb.tasks.retries import TaskRetryHandler
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
+
+logger = logging.getLogger(__name__)
 
 
 async def restore_kb_task(context: ApplicationContext, msg: RestoreBackupRequest):
@@ -193,7 +196,7 @@ class ResourceBackupReader:
         elif tarinfo.name.startswith("cloud-files"):
             raw_cf = await self.read_data(tarinfo)
             cf = CloudFile()
-            cf.FromString(raw_cf)
+            cf.ParseFromString(raw_cf)
             return cf
         elif tarinfo.name.startswith("binaries"):
             uri = tarinfo.name.lstrip("binaries/")
@@ -220,13 +223,19 @@ async def restore_resource(context: ApplicationContext, kbid: str, backup_id: st
             bm.kbid = kbid
             break
 
-        # Read the cloud file and its binary
-        cf = await reader.read_item()
-        assert isinstance(cf, CloudFile)
-        cf_binary = await reader.read_item()
-        assert isinstance(cf_binary, CloudFileBinary)
-        assert cf.uri == cf_binary.uri
-        await import_binary(context, kbid, cf, cf_binary.read)
+        elif isinstance(item, CloudFile):
+            # Read its binary and import it
+            cf = item
+            cf_binary = await reader.read_item()
+            assert isinstance(cf_binary, CloudFileBinary)
+            assert cf.uri == cf_binary.uri
+            await import_binary(context, kbid, cf, cf_binary.read)
+        else:
+            logger.error(
+                "Unexpected item in resource backup. Backup may be corrupted",
+                extra={"item_type": type(item), kbid: kbid, resource_id: resource_id},
+            )
+            continue
 
     await import_broker_message(context, kbid, bm)
 
