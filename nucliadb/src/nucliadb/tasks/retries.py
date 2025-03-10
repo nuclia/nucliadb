@@ -130,7 +130,7 @@ class TaskRetryHandler:
             except Exception as ex:
                 metadata.retries += 1
                 metadata.error_messages.append(str(ex))
-                logger.info(
+                logger.exception(
                     f"Task failed. Will be retried",
                     extra={"kbid": self.kbid, "task_type": self.task_type, "task_id": self.task_id},
                 )
