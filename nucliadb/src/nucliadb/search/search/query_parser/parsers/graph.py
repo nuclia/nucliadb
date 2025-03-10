@@ -34,18 +34,14 @@ def parse_graph_search(item: graph_requests.GraphSearchRequest) -> GraphRetrieva
 
 def parse_graph_node_search(item: graph_requests.GraphNodesSearchRequest) -> GraphRetrieval:
     pb = nodereader_pb2.GraphSearchRequest()
-    # HACK: this works because node queries are a subset of path queries,
-    # although is not properly defined in the type system.
-    pb.query.path.CopyFrom(_parse_path_query(item.query))  # type: ignore[arg-type]
+    pb.query.path.CopyFrom(_parse_node_query(item.query))
     pb.top_k = item.top_k
     return pb
 
 
 def parse_graph_relation_search(item: graph_requests.GraphRelationsSearchRequest) -> GraphRetrieval:
     pb = nodereader_pb2.GraphSearchRequest()
-    # HACK: this works because relation queries are a subset of path queries,
-    # although is not properly defined in the type system.
-    pb.query.path.CopyFrom(_parse_path_query(item.query))  # type: ignore[arg-type]
+    pb.query.path.CopyFrom(_parse_relation_query(item.query))
     pb.top_k = item.top_k
     return pb
 
@@ -87,6 +83,66 @@ def _parse_path_query(expr: graph_requests.GraphPathQuery) -> nodereader_pb2.Gra
     elif isinstance(expr, graph_requests.AnyNode):
         _set_node_to_pb(expr, pb.path.source)
         pb.path.undirected = True
+
+    elif isinstance(expr, graph_requests.Relation):
+        if expr.label is not None:
+            pb.path.relation.value = expr.label
+
+    else:  # pragma: nocover
+        # This is a trick so mypy generates an error if this branch can be reached,
+        # that is, if we are missing some ifs
+        _a: int = "a"
+
+    return pb
+
+
+def _parse_node_query(expr: graph_requests.GraphNodesQuery) -> nodereader_pb2.GraphQuery.PathQuery:
+    pb = nodereader_pb2.GraphQuery.PathQuery()
+
+    if isinstance(expr, graph_requests.And):
+        for op in expr.operands:
+            pb.bool_and.operands.append(_parse_node_query(op))
+
+    elif isinstance(expr, graph_requests.Or):
+        for op in expr.operands:
+            pb.bool_or.operands.append(_parse_node_query(op))
+
+    elif isinstance(expr, graph_requests.Not):
+        pb.bool_not.CopyFrom(_parse_node_query(expr.operand))
+
+    elif isinstance(expr, graph_requests.SourceNode):
+        _set_node_to_pb(expr, pb.path.source)
+
+    elif isinstance(expr, graph_requests.DestinationNode):
+        _set_node_to_pb(expr, pb.path.destination)
+
+    elif isinstance(expr, graph_requests.AnyNode):
+        _set_node_to_pb(expr, pb.path.source)
+        pb.path.undirected = True
+
+    else:  # pragma: nocover
+        # This is a trick so mypy generates an error if this branch can be reached,
+        # that is, if we are missing some ifs
+        _a: int = "a"
+
+    return pb
+
+
+def _parse_relation_query(
+    expr: graph_requests.GraphRelationsQuery,
+) -> nodereader_pb2.GraphQuery.PathQuery:
+    pb = nodereader_pb2.GraphQuery.PathQuery()
+
+    if isinstance(expr, graph_requests.And):
+        for op in expr.operands:
+            pb.bool_and.operands.append(_parse_relation_query(op))
+
+    elif isinstance(expr, graph_requests.Or):
+        for op in expr.operands:
+            pb.bool_or.operands.append(_parse_relation_query(op))
+
+    elif isinstance(expr, graph_requests.Not):
+        pb.bool_not.CopyFrom(_parse_relation_query(expr.operand))
 
     elif isinstance(expr, graph_requests.Relation):
         if expr.label is not None:
