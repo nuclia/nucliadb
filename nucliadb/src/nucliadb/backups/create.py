@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import logging
 import tarfile
 from datetime import datetime, timezone
 from typing import AsyncIterator, Optional
@@ -29,6 +30,7 @@ from nucliadb.backups.const import (
 )
 from nucliadb.backups.models import BackupMetadata, CreateBackupRequest
 from nucliadb.backups.settings import settings
+from nucliadb.backups.utils import exists_in_storge
 from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.utils import (
@@ -43,6 +45,8 @@ from nucliadb_protos import backups_pb2, resources_pb2, writer_pb2
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_audit
+
+logger = logging.getLogger(__name__)
 
 
 async def backup_kb_task(context: ApplicationContext, msg: CreateBackupRequest):
@@ -101,6 +105,10 @@ async def backup_resources(context: ApplicationContext, kbid: str, backup_id: st
             await set_metadata(context, kbid, backup_id, metadata)
             tasks = []
             backing_up = []
+            logger.info(
+                f"Backup resources: {len(metadata.missing_resources)} remaining",
+                extra={"kbid": kbid, "backup_id": backup_id},
+            )
     if len(tasks) > 0:
         resources_bytes = await asyncio.gather(*tasks)
         metadata.total_size += sum(resources_bytes)
@@ -108,6 +116,7 @@ async def backup_resources(context: ApplicationContext, kbid: str, backup_id: st
         await set_metadata(context, kbid, backup_id, metadata)
         tasks = []
         backing_up = []
+        logger.info(f"Backup resources: completed", extra={"kbid": kbid, "backup_id": backup_id})
 
 
 async def backup_resource(context: ApplicationContext, backup_id: str, kbid: str, rid: str) -> int:
@@ -163,6 +172,13 @@ async def backup_resource_with_binaries(
         nonlocal total_size
 
         for cloud_file in get_cloud_files(bm):
+            if not await exists_cf(context, cloud_file):
+                logger.warning(
+                    "Cloud file not found in storage, skipping",
+                    extra={"kbid": kbid, "rid": rid, "cf_uri": cloud_file.uri},
+                )
+                continue
+
             serialized_cf = cloud_file.SerializeToString()
 
             async def cf_iterator():
@@ -242,6 +258,10 @@ async def delete_metadata(context: ApplicationContext, kbid: str, backup_id: str
     async with context.kv_driver.transaction() as txn:
         await txn.delete(MaindbKeys.METADATA.format(kbid=kbid, backup_id=backup_id))
         await txn.commit()
+
+
+async def exists_cf(context: ApplicationContext, cf: resources_pb2.CloudFile) -> bool:
+    return await exists_in_storge(context.blob_storage, cf.bucket_name, cf.uri)
 
 
 async def upload_to_bucket(context: ApplicationContext, bytes_iterator: AsyncIterator[bytes], key: str):
