@@ -195,8 +195,8 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
 
         # protobuferrs repeated fields don't support assignment so
         # in order to replace relations, we need to clear them first
-        bm.basic.usermetadata.ClearField("relations")
-        bm.basic.usermetadata.relations.extend(relations)
+        bm.user_relations.ClearField("relations")
+        bm.user_relations.relations.extend(relations)
 
     if item.security is not None:
         unique_groups = list(set(item.security.access_groups))

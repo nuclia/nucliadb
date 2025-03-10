@@ -449,7 +449,7 @@ message Classification {
 
 message UserMetadata {
     repeated Classification classifications = 1;
-    repeated utils.Relation relations = 3;
+    repeated utils.Relation relations = 3 [deprecated=true]; // Moved to BrokerMessage (outside Basic)
 }
 
 message FieldClassifications {

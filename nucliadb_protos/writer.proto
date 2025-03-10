@@ -53,6 +53,8 @@ message Error {
     Generator generated_by = 5;
 }
 
+
+
 message BrokerMessage {
     reserved 2, 12, 14, 15, 27;
 
@@ -82,6 +84,7 @@ message BrokerMessage {
     resources.Origin origin = 9;
 
     repeated utils.Relation relations = 10;
+    optional resources.Relations user_relations = 43;
 
     // Field Conversations
     map<string, resources.Conversation> conversations = 11;

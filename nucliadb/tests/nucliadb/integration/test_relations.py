@@ -202,7 +202,9 @@ async def test_extracted_relations(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{rid}?show=basic")
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{rid}?show=basic&show=relations"
+    )
     assert resp.status_code == 200
     assert len(resp.json()["usermetadata"]["relations"]) == 5
 

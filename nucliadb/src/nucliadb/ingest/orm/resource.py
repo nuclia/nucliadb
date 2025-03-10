@@ -129,6 +129,7 @@ class Resource:
         self.basic = basic
         self.disable_vectors = disable_vectors
         self._previous_status: Optional[Metadata.Status.ValueType] = None
+        self.user_relations: Optional[PBRelations] = None
 
     @property
     def indexer(self) -> ResourceBrain:
@@ -300,6 +301,23 @@ class Resource:
         )
         self.modified = True
         self.relations = relations
+
+    async def get_user_relations(self) -> PBRelations:
+        if self.user_relations is None:
+            sf = self.storage.user_relations(self.kb.kbid, self.uuid)
+            relations = await self.storage.download_pb(sf, PBRelations)
+            if relations is None:
+                # Key not found = no relations
+                self.user_relations = PBRelations()
+            else:
+                self.user_relations = relations
+        return self.user_relations
+
+    async def set_user_relations(self, payload: PBRelations):
+        sf = self.storage.user_relations(self.kb.kbid, self.uuid)
+        await self.storage.upload_pb(sf, payload)
+        self.modified = True
+        self.user_relations = payload
 
     @processor_observer.wrap({"type": "generate_index_message"})
     async def generate_index_message(self, reindex: bool = False) -> ResourceBrain:
@@ -930,11 +948,12 @@ class Resource:
     async def compute_global_tags(self, brain: ResourceBrain):
         origin = await self.get_origin()
         basic = await self.get_basic()
+        user_relations = await self.get_user_relations()
         if basic is None:
             raise KeyError("Resource not found")
 
         brain.set_processing_status(basic=basic, previous_status=self._previous_status)
-        brain.set_resource_metadata(basic=basic, origin=origin)
+        brain.set_resource_metadata(basic=basic, origin=origin, user_relations=user_relations)
         for type, field in await self.get_fields_ids(force=True):
             fieldobj = await self.get_field(field, type, load=False)
             fieldid = FieldID(field_type=type, field=field)

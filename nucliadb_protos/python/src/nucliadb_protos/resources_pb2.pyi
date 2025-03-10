@@ -1758,7 +1758,9 @@ class UserMetadata(google.protobuf.message.Message):
     @property
     def classifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Classification]: ...
     @property
-    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
+    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]:
+        """Moved to BrokerMessage (outside Basic)"""
+
     def __init__(
         self,
         *,
