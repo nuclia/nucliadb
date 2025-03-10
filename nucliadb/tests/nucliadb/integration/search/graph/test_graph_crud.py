@@ -57,7 +57,12 @@ async def test_user_defined_knowledge_graph(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=basic")
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}",
+        params={
+            "show": ["basic", "relations"],
+        },
+    )
     assert resp.status_code == 200
     user_graph = resp.json()["usermetadata"]["relations"]
     assert len(user_graph) == len(graph)
@@ -83,7 +88,12 @@ async def test_user_defined_knowledge_graph(
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=basic")
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}",
+        params={
+            "show": ["basic", "relations"],
+        },
+    )
     assert resp.status_code == 200
     user_graph = resp.json()["usermetadata"]["relations"]
     assert len(user_graph) == len(graph)
