@@ -20,7 +20,7 @@
 import functools
 import logging
 from enum import Enum
-from typing import Optional
+from typing import Callable, Optional
 
 from pydantic import BaseModel
 
@@ -94,7 +94,7 @@ class TaskRetryHandler:
             await txn.set(self.metadata_key, metadata.model_dump_json().encode())
             await txn.commit()
 
-    def wrap(self, func):
+    def wrap(self, func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             func_result = None
@@ -110,7 +110,7 @@ class TaskRetryHandler:
 
             if metadata.status in (TaskMetadata.Status.COMPLETED, TaskMetadata.Status.FAILED):
                 logger.info(
-                    f"{self.type} task is {metadata.status.value}. Skipping",
+                    f"{self.task_type} task is {metadata.status.value}. Skipping",
                     extra={"kbid": self.kbid, "task_type": self.task_type, "task_id": self.task_id},
                 )
                 return

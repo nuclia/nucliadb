@@ -20,8 +20,9 @@
 import asyncio
 import time
 from contextlib import contextmanager
-from unittest.mock import patch
+from unittest.mock import AsyncMock, Mock, patch
 
+from nucliadb.tasks.retries import TaskMetadata, TaskRetryHandler
 import pydantic
 import pytest
 
@@ -227,3 +228,89 @@ async def test_consumer_max_concurrent_tasks(context):
     await consumer.finalize()
 
     assert consumer.running_tasks == []
+
+
+class TestTaskRetryHandler:
+    @pytest.fixture(scope="function")
+    def callback(self):
+        return AsyncMock()
+
+    @pytest.fixture(scope="function")
+    def txn(self):
+        txn = Mock()
+        txn.get = AsyncMock()
+        txn.set = AsyncMock()
+        txn.commit = AsyncMock()
+        txn.delete = AsyncMock()
+        yield txn
+
+    @pytest.fixture(scope="function")
+    def context(self, txn):
+        ctxt = Mock()
+        ctxt.kv_driver = Mock()
+        txn_cm = Mock()
+        txn_cm.__aenter__ = AsyncMock(return_value=txn)
+        txn_cm.__aexit__ = AsyncMock()
+        ctxt.kv_driver.transaction.return_value = txn_cm
+        yield ctxt
+
+    async def test_ok(self, callback, context, txn):
+        # Metadata does not exist at first
+        txn.get.return_value = None
+
+        callback.return_value = 100
+        trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id="bar", context=context)
+        callback_retried = trh.wrap(callback)
+
+        result = await callback_retried("some", param="param")
+        assert result == 100
+
+        callback.assert_called_once_with("some", param="param")
+
+        final_metadata_args = txn.set.call_args_list[-1][0]
+        assert final_metadata_args[0] == "/kbs/kbid/tasks/foo/bar"
+        metadata = TaskMetadata.model_validate_json(final_metadata_args[1])
+        assert metadata.status == TaskMetadata.Status.COMPLETED
+        assert metadata.task_id == "bar"
+        assert metadata.retries == 0
+        assert metadata.error_messages == []
+
+    async def test_errors_are_retried(self, callback, context, txn):
+        txn.get.return_value = None
+        callback.side_effect = ValueError("foo")
+
+        trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id="bar", context=context, max_retries=2)
+        callback_retried = trh.wrap(callback)
+
+        with pytest.raises(ValueError):
+            await callback_retried("foo", bar="baz")
+
+        callback.assert_called_once_with("foo", bar="baz")
+
+        final_metadata_args = txn.set.call_args_list[-1][0]
+        metadata = TaskMetadata.model_validate_json(final_metadata_args[1])
+        assert metadata.status == TaskMetadata.Status.RUNNING
+        assert metadata.retries == 1
+        assert "foo" in metadata.error_messages[0]
+
+        with pytest.raises(ValueError):
+            await callback_retried("foo", bar="baz")
+
+        final_metadata_args = txn.set.call_args_list[-1][0]
+        metadata = TaskMetadata.model_validate_json(final_metadata_args[1])
+        assert metadata.task.status == TaskMetadata.Status.RUNNING
+        assert metadata.task.retries == 2
+
+    async def test_ignored_statuses(self, callback, context, txn):
+        trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id="bar", context=context)
+        callback_retried = trh.wrap(callback)
+
+        for status in (TaskMetadata.Status.FAILED, TaskMetadata.Status.COMPLETED):
+            txn.get.return_value = TaskMetadata(
+                task_id="bar",
+                status=status,
+                retries=0,
+                error_messages=[],
+            ).model_dump_json().encode()
+            await callback_retried("foo", bar="baz")
+            callback.assert_not_called()
