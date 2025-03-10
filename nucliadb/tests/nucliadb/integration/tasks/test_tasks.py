@@ -70,7 +70,6 @@ async def test_tasks_factory_api(context):
         producer_subject=nconsumer.subject,
         msg_type=Message,
     )
-    await producer.initialize(context=context)
 
     consumer = tasks.create_consumer(
         name="some_work",
@@ -113,7 +112,6 @@ async def test_consumer_consumes_multiple_messages_concurrently(context):
         producer_subject=nconsumer.subject,
         msg_type=Message,
     )
-    await producer.initialize(context=context)
 
     consumer = tasks.create_consumer(
         name="some_work",
@@ -165,7 +163,6 @@ async def test_consumer_finalize_cancels_tasks(context):
         producer_subject=nconsumer.subject,
         msg_type=Message,
     )
-    await producer.initialize(context=context)
 
     consumer = tasks.create_consumer(
         name="some_work",
@@ -208,7 +205,6 @@ async def test_consumer_max_concurrent_tasks(context):
         producer_subject=nconsumer.subject,
         msg_type=Message,
     )
-    await producer.initialize(context=context)
 
     consumer = tasks.create_consumer(
         name="some_work",

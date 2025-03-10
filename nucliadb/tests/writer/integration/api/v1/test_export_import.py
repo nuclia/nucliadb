@@ -21,9 +21,26 @@
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.common.context import ApplicationContext
+from nucliadb.export_import.tasks import get_exports_consumer, get_imports_consumer
+
+
+@pytest.fixture(scope="function")
+async def export_import_consumers(nucliadb_writer: AsyncClient):
+    context = ApplicationContext()
+    await context.initialize()
+
+    exports = get_exports_consumer()
+    imports = get_imports_consumer()
+    await exports.initialize(context)
+    await imports.initialize(context)
+    yield
+    await exports.finalize()
+    await imports.finalize()
+
 
 @pytest.mark.deploy_modes("component")
-async def test_api(nucliadb_writer: AsyncClient, knowledgebox: str):
+async def test_api(nucliadb_writer: AsyncClient, knowledgebox: str, export_import_consumers):
     kbid = knowledgebox
 
     resp = await nucliadb_writer.post(f"/kb/{kbid}/import")

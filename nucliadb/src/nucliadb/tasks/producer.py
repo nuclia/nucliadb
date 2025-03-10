@@ -17,13 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Generic, Optional, Type
+from typing import Generic, Type
 
-from nucliadb.common.context import ApplicationContext
 from nucliadb.tasks.logger import logger
 from nucliadb.tasks.models import MsgType
-from nucliadb.tasks.utils import NatsStream, create_nats_stream_if_not_exists
+from nucliadb.tasks.utils import NatsStream
 from nucliadb_telemetry import errors
+from nucliadb_utils.utilities import get_nats_manager
 
 
 class NatsTaskProducer(Generic[MsgType]):
@@ -38,29 +38,17 @@ class NatsTaskProducer(Generic[MsgType]):
         self.stream = stream
         self.producer_subject = producer_subject
         self.msg_type = msg_type
-        self.context: Optional[ApplicationContext] = None
-        self.initialized = False
-
-    async def initialize(self, context: ApplicationContext):
-        self.context = context
-        await create_nats_stream_if_not_exists(
-            self.context,
-            self.stream.name,
-            subjects=self.stream.subjects,
-        )
-        self.initialized = True
+        self.nats_manager = get_nats_manager()
 
     async def send(self, msg: MsgType) -> int:
         """
         Publish message to the producer's nats stream.
         Returns the sequence number of the published message.
         """
-        if not self.initialized:
-            raise RuntimeError("NatsTaskProducer not initialized")
         try:
-            pub_ack = await self.context.nats_manager.js.publish(  # type: ignore
+            pub_ack = await self.nats_manager.js.publish(
                 self.producer_subject,
-                msg.model_dump_json().encode("utf-8"),  # type: ignore
+                msg.model_dump_json().encode("utf-8"),
             )
             logger.info(
                 "Message sent to Nats",
