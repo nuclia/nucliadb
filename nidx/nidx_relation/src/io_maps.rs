@@ -104,6 +104,7 @@ pub fn doc_to_relation(schema: &Schema, doc: &TantivyDocument) -> ProtosRelation
         relation_label: schema.relationship_label(doc).to_string(),
         source: Some(source_to_relation_node(schema, doc)),
         to: Some(target_to_relation_node(schema, doc)),
+        resource_id: Some(schema.resource_id(doc)),
     }
 }
 

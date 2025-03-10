@@ -429,7 +429,7 @@ async def test_search_relations(
     standalone_knowledgebox,
     knowledge_graph,
 ):
-    relation_nodes, relation_edges = knowledge_graph
+    relation_nodes, relation_edges, rid = knowledge_graph
 
     predict_mock = Mock()
     set_utility(Utility.PREDICT, predict_mock)
@@ -459,6 +459,7 @@ async def test_search_relations(
                     "direction": "out",
                     "entity_subtype": "",
                     "metadata": None,
+                    "resource_id": rid,
                 },
                 {
                     "entity": "Poetry",
@@ -468,6 +469,7 @@ async def test_search_relations(
                     "direction": "out",
                     "entity_subtype": "",
                     "metadata": None,
+                    "resource_id": rid,
                 },
                 {
                     "entity": "Joan Antoni",
@@ -477,6 +479,7 @@ async def test_search_relations(
                     "direction": "in",
                     "entity_subtype": "",
                     "metadata": None,
+                    "resource_id": rid,
                 },
             ]
         },
@@ -490,6 +493,7 @@ async def test_search_relations(
                     "direction": "out",
                     "entity_subtype": "",
                     "metadata": None,
+                    "resource_id": rid,
                 },
                 {
                     "entity": "Physics",
@@ -499,6 +503,7 @@ async def test_search_relations(
                     "direction": "out",
                     "entity_subtype": "science",
                     "metadata": None,
+                    "resource_id": rid,
                 },
             ]
         },
@@ -534,6 +539,7 @@ async def test_search_relations(
                     "direction": "in",
                     "entity_subtype": "",
                     "metadata": None,
+                    "resource_id": rid,
                 },
                 {
                     "entity": "Swallow",
@@ -543,6 +549,7 @@ async def test_search_relations(
                     "direction": "in",
                     "entity_subtype": "",
                     "metadata": None,
+                    "resource_id": rid,
                 },
             ]
         },
@@ -647,6 +654,7 @@ async def test_search_automatic_relations(
                     "direction": "out",
                     "entity_subtype": "PERSON",
                     "metadata": None,
+                    "resource_id": rid,
                 },
                 {
                     "entity": "Anne",
@@ -656,6 +664,7 @@ async def test_search_automatic_relations(
                     "direction": "out",
                     "entity_subtype": "",
                     "metadata": None,
+                    "resource_id": rid,
                 },
                 {
                     "entity": "John",
@@ -665,6 +674,7 @@ async def test_search_automatic_relations(
                     "direction": "out",
                     "entity_subtype": "",
                     "metadata": None,
+                    "resource_id": rid,
                 },
                 {
                     "entity": "cat",
@@ -674,6 +684,7 @@ async def test_search_automatic_relations(
                     "direction": "out",
                     "entity_subtype": "ANIMAL",
                     "metadata": None,
+                    "resource_id": rid,
                 },
                 {
                     "entity": "label",
@@ -683,6 +694,7 @@ async def test_search_automatic_relations(
                     "direction": "out",
                     "entity_subtype": "",
                     "metadata": None,
+                    "resource_id": rid,
                 },
                 {
                     "entity": "animals/cat",
@@ -692,6 +704,7 @@ async def test_search_automatic_relations(
                     "direction": "out",
                     "entity_subtype": "",
                     "metadata": None,
+                    "resource_id": rid,
                 },
                 {
                     "entity": "food/cookie",
@@ -701,6 +714,7 @@ async def test_search_automatic_relations(
                     "direction": "out",
                     "entity_subtype": "",
                     "metadata": None,
+                    "resource_id": rid,
                 },
                 {
                     "entity": "sub-document",
@@ -710,6 +724,7 @@ async def test_search_automatic_relations(
                     "direction": "out",
                     "entity_subtype": "",
                     "metadata": None,
+                    "resource_id": rid,
                 },
                 {
                     "entity": "other",
@@ -719,6 +734,7 @@ async def test_search_automatic_relations(
                     "direction": "out",
                     "entity_subtype": "things",
                     "metadata": None,
+                    "resource_id": rid,
                 },
             ]
         }
@@ -760,6 +776,7 @@ async def test_search_automatic_relations(
                     "direction": "in",
                     "entity_subtype": "",
                     "metadata": None,
+                    "resource_id": rid,
                 }
             ]
         }
