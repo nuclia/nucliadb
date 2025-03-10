@@ -35,6 +35,7 @@ from nucliadb.search.search.fetch import (
 )
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
+from nucliadb_models.metadata import RelationType
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
     DirectionalRelation,
@@ -445,6 +446,7 @@ async def merge_relations_results(
     query: EntitiesSubgraphRequest,
     only_with_metadata: bool = False,
     only_agentic: bool = False,
+    only_entity_to_entity: bool = False,
 ) -> Relations:
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
@@ -454,6 +456,7 @@ async def merge_relations_results(
         query,
         only_with_metadata,
         only_agentic,
+        only_entity_to_entity,
     )
 
 
@@ -462,6 +465,7 @@ def _merge_relations_results(
     query: EntitiesSubgraphRequest,
     only_with_metadata: bool,
     only_agentic: bool,
+    only_entity_to_entity: bool,
 ) -> Relations:
     """
     Merge relation search responses into a single Relations object while applying filters.
@@ -490,33 +494,41 @@ def _merge_relations_results(
             # If only_with_metadata is True, we check that metadata for the relation is not None
             # If only_agentic is True, we check that metadata for the relation is not None and that it has a data_augmentation_task_id
             # TODO: This is suboptimal, we should be able to filter this in the query to the index,
-            if (not only_with_metadata or metadata) and (
-                not only_agentic or (metadata and metadata.data_augmentation_task_id)
-            ):
-                if origin.value in relations.entities:
-                    relations.entities[origin.value].related_to.append(
-                        DirectionalRelation(
-                            entity=destination.value,
-                            entity_type=relation_node_type_to_entity_type(destination.ntype),
-                            entity_subtype=destination.subtype,
-                            relation=relation_type,
-                            relation_label=relation_label,
-                            direction=RelationDirection.OUT,
-                            metadata=from_proto.relation_metadata(metadata) if metadata else None,
-                        )
+            if only_with_metadata and not metadata:
+                continue
+
+            if only_agentic and (not metadata or not metadata.data_augmentation_task_id):
+                continue
+
+            if only_entity_to_entity and relation_type != RelationType.ENTITY:
+                continue
+
+            if origin.value in relations.entities:
+                relations.entities[origin.value].related_to.append(
+                    DirectionalRelation(
+                        entity=destination.value,
+                        entity_type=relation_node_type_to_entity_type(destination.ntype),
+                        entity_subtype=destination.subtype,
+                        relation=relation_type,
+                        relation_label=relation_label,
+                        direction=RelationDirection.OUT,
+                        metadata=from_proto.relation_metadata(metadata) if metadata else None,
+                        resource_id=relation.resource_id,
                     )
-                elif destination.value in relations.entities:
-                    relations.entities[destination.value].related_to.append(
-                        DirectionalRelation(
-                            entity=origin.value,
-                            entity_type=relation_node_type_to_entity_type(origin.ntype),
-                            entity_subtype=origin.subtype,
-                            relation=relation_type,
-                            relation_label=relation_label,
-                            direction=RelationDirection.IN,
-                            metadata=from_proto.relation_metadata(metadata) if metadata else None,
-                        )
+                )
+            elif destination.value in relations.entities:
+                relations.entities[destination.value].related_to.append(
+                    DirectionalRelation(
+                        entity=origin.value,
+                        entity_type=relation_node_type_to_entity_type(origin.ntype),
+                        entity_subtype=origin.subtype,
+                        relation=relation_type,
+                        relation_label=relation_label,
+                        direction=RelationDirection.IN,
+                        metadata=from_proto.relation_metadata(metadata) if metadata else None,
+                        resource_id=relation.resource_id,
                     )
+                )
 
     return relations
 

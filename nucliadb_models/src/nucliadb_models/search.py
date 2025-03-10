@@ -240,6 +240,7 @@ class DirectionalRelation(BaseModel):
     relation_label: str
     direction: RelationDirection
     metadata: Optional[RelationMetadata] = None
+    resource_id: str
 
 
 class EntitySubgraph(BaseModel):

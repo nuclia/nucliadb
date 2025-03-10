@@ -1049,6 +1049,128 @@ async def test_ask_graph_strategy(
     await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
 
 
+@patch("nucliadb.search.search.graph_strategy.rank_relations_reranker")
+@patch("nucliadb.search.search.graph_strategy.rank_relations_generative")
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_graph_strategy_with_user_relations(
+    mocker_generative,
+    mocker_reranker,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+    dummy_predict,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": "Knowledge graph",
+            "slug": "knowledgegraph",
+            "usermetadata": {
+                "relations": [
+                    {
+                        "relation": "ENTITY",
+                        "from": {"type": "entity", "group": "DIRECTOR", "value": "Christopher Nolan"},
+                        "to": {"type": "entity", "group": "MOVIE", "value": "Inception"},
+                        "label": "directed",
+                    },
+                    {
+                        "relation": "ENTITY",
+                        "from": {"type": "entity", "group": "ACTOR", "value": "Leonardo DiCaprio"},
+                        "to": {"type": "entity", "group": "MOVIE", "value": "Inception"},
+                        "label": "starred",
+                    },
+                    {
+                        "relation": "ENTITY",
+                        "from": {"type": "entity", "group": "ACTOR", "value": "Joseph Gordon-Levitt"},
+                        "to": {"type": "entity", "group": "MOVIE", "value": "Inception"},
+                        "label": "starred",
+                    },
+                    {
+                        "relation": "ENTITY",
+                        "from": {"type": "entity", "group": "ACTOR", "value": "Leonardo DiCaprio"},
+                        "to": {"type": "entity", "group": "ACTOR", "value": "DiCaprio"},
+                        "label": "analogy",
+                    },
+                ]
+            },
+        },
+    )
+
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Mock the rank_relations functions to return the same relations with a score of 5 (no ranking)
+    # This functions are unit tested and require connection to predict
+    def mock_rank(relations, *args, **kwargs):
+        return relations, {ent: [5 for _ in rels.related_to] for ent, rels in relations.entities.items()}
+
+    mocker_generative.side_effect = mock_rank
+    mocker_reranker.side_effect = mock_rank
+
+    # With relation_text_as_paragraphs=False, cannot return user relations (no paragraph)
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={
+            "query": "Which actors have been in movies directed by Christopher Nolan?",
+            "rag_strategies": [
+                {
+                    "name": "graph_beta",
+                    "hops": 2,
+                    "top_k": 5,
+                    "agentic_graph_only": False,
+                    "query_entity_detection": "suggest",
+                    "relation_ranking": "reranker",
+                    "relation_text_as_paragraphs": False,
+                }
+            ],
+            "reranker": "noop",
+            "debug": True,
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200, resp.text
+    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    assert ask_response.status == "no_retrieval_data"
+
+    # With relation_text_as_paragraphs=True, should answer the question
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={
+            "query": "Which actors have been in movies directed by Christopher Nolan?",
+            "rag_strategies": [
+                {
+                    "name": "graph_beta",
+                    "hops": 2,
+                    "top_k": 5,
+                    "agentic_graph_only": False,
+                    "query_entity_detection": "suggest",
+                    "relation_ranking": "reranker",
+                    "relation_text_as_paragraphs": True,
+                }
+            ],
+            "reranker": "noop",
+            "debug": True,
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200, resp.text
+    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    assert ask_response.status == "success"
+
+    fields = ask_response.prequeries["graph"].resources[rid].fields  # type: ignore
+    assert list(fields.keys()) == ["/a/usermetadata"]
+
+    paragraph_texts = {
+        p_id: paragraph.text for p_id, paragraph in fields["/a/usermetadata"].paragraphs.items()
+    }
+    assert sorted(list(paragraph_texts.values())) == [
+        "- Christopher Nolan directed Inception",
+        "- Joseph Gordon-Levitt starred Inception",
+        # "- Leonardo DiCaprio analogy DiCaprio", # Only with 3+ hops
+        "- Leonardo DiCaprio starred Inception",
+    ]
+
+
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_rag_strategy_prequeries(
     nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
