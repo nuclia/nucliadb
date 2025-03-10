@@ -19,16 +19,17 @@
 
 import asyncio
 import time
+import uuid
 from contextlib import contextmanager
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
-from nucliadb.tasks.retries import TaskMetadata, TaskRetryHandler
 import pydantic
 import pytest
 
 from nucliadb import tasks
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.context import ApplicationContext
+from nucliadb.tasks.retries import TaskMetadata, TaskRetryHandler
 from nucliadb.tasks.utils import NatsConsumer, NatsStream
 from nucliadb_utils.settings import indexing_settings
 
@@ -230,87 +231,67 @@ async def test_consumer_max_concurrent_tasks(context):
     assert consumer.running_tasks == []
 
 
-class TestTaskRetryHandler:
-    @pytest.fixture(scope="function")
-    def callback(self):
-        return AsyncMock()
+async def test_task_retry_handler_ok(context):
+    task_id = str(uuid.uuid4())
 
-    @pytest.fixture(scope="function")
-    def txn(self):
-        txn = Mock()
-        txn.get = AsyncMock()
-        txn.set = AsyncMock()
-        txn.commit = AsyncMock()
-        txn.delete = AsyncMock()
-        yield txn
+    async def callback(*args, **kwargs):
+        return 100
 
-    @pytest.fixture(scope="function")
-    def context(self, txn):
-        ctxt = Mock()
-        ctxt.kv_driver = Mock()
-        txn_cm = Mock()
-        txn_cm.__aenter__ = AsyncMock(return_value=txn)
-        txn_cm.__aexit__ = AsyncMock()
-        ctxt.kv_driver.transaction.return_value = txn_cm
-        yield ctxt
+    trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id=task_id, context=context)
+    callback_retried = trh.wrap(callback)
 
-    async def test_ok(self, callback, context, txn):
-        # Metadata does not exist at first
-        txn.get.return_value = None
+    result = await callback_retried("some", param="param")
+    assert result == 100
 
-        callback.return_value = 100
-        trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id="bar", context=context)
-        callback_retried = trh.wrap(callback)
+    metadata = await trh.get_metadata()
+    assert metadata.status == TaskMetadata.Status.COMPLETED
+    assert metadata.task_id == task_id
+    assert metadata.retries == 0
+    assert metadata.error_messages == []
 
-        result = await callback_retried("some", param="param")
-        assert result == 100
 
-        callback.assert_called_once_with("some", param="param")
+async def test_task_retry_handler_errors_are_retried(context):
+    callback = AsyncMock()
+    callback.side_effect = ValueError("foo")
 
-        final_metadata_args = txn.set.call_args_list[-1][0]
-        assert final_metadata_args[0] == "/kbs/kbid/tasks/foo/bar"
-        metadata = TaskMetadata.model_validate_json(final_metadata_args[1])
-        assert metadata.status == TaskMetadata.Status.COMPLETED
-        assert metadata.task_id == "bar"
-        assert metadata.retries == 0
-        assert metadata.error_messages == []
+    task_id = str(uuid.uuid4())
+    trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id=task_id, context=context, max_retries=2)
+    callback_retried = trh.wrap(callback)
 
-    async def test_errors_are_retried(self, callback, context, txn):
-        txn.get.return_value = None
-        callback.side_effect = ValueError("foo")
+    with pytest.raises(ValueError):
+        await callback_retried("foo", bar="baz")
 
-        trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id="bar", context=context, max_retries=2)
-        callback_retried = trh.wrap(callback)
+    callback.assert_called_once_with("foo", bar="baz")
 
-        with pytest.raises(ValueError):
-            await callback_retried("foo", bar="baz")
+    metadata = await trh.get_metadata()
+    assert metadata.status == TaskMetadata.Status.RUNNING
+    assert metadata.retries == 1
+    assert "foo" in metadata.error_messages[0]
 
-        callback.assert_called_once_with("foo", bar="baz")
+    callback.side_effect = None
+    callback.return_value = 100
+    result = await callback_retried("foo", bar="baz")
+    assert result == 100
 
-        final_metadata_args = txn.set.call_args_list[-1][0]
-        metadata = TaskMetadata.model_validate_json(final_metadata_args[1])
-        assert metadata.status == TaskMetadata.Status.RUNNING
-        assert metadata.retries == 1
-        assert "foo" in metadata.error_messages[0]
+    metadata = await trh.get_metadata()
+    assert metadata.status == TaskMetadata.Status.COMPLETED
+    assert metadata.retries == 1
 
-        with pytest.raises(ValueError):
-            await callback_retried("foo", bar="baz")
 
-        final_metadata_args = txn.set.call_args_list[-1][0]
-        metadata = TaskMetadata.model_validate_json(final_metadata_args[1])
-        assert metadata.task.status == TaskMetadata.Status.RUNNING
-        assert metadata.task.retries == 2
+async def test_task_retry_handler_ignored_statuses(context):
+    callback = AsyncMock()
 
-    async def test_ignored_statuses(self, callback, context, txn):
-        trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id="bar", context=context)
-        callback_retried = trh.wrap(callback)
+    task_id = str(uuid.uuid4())
+    trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id=task_id, context=context)
+    callback_retried = trh.wrap(callback)
 
-        for status in (TaskMetadata.Status.FAILED, TaskMetadata.Status.COMPLETED):
-            txn.get.return_value = TaskMetadata(
-                task_id="bar",
-                status=status,
-                retries=0,
-                error_messages=[],
-            ).model_dump_json().encode()
-            await callback_retried("foo", bar="baz")
-            callback.assert_not_called()
+    for status in (TaskMetadata.Status.FAILED, TaskMetadata.Status.COMPLETED):
+        metadata = TaskMetadata(
+            task_id="bar",
+            status=status,
+            retries=0,
+            error_messages=[],
+        )
+        await trh.set_metadata(metadata)
+        await callback_retried("foo", bar="baz")
+        callback.assert_not_called()
