@@ -25,7 +25,7 @@ use tantivy::schema::{Field, IndexRecordOption};
 use crate::schema::Schema;
 use crate::{io_maps, schema};
 
-const DEFAULT_NODE_VALUE_FUZZY_DISTANCE: u8 = 2;
+const DEFAULT_NODE_VALUE_FUZZY_DISTANCE: u8 = 1;
 
 #[derive(Clone)]
 pub struct FuzzyTerm {
