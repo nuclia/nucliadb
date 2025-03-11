@@ -148,7 +148,6 @@ async def context(nucliadb_reader: AsyncClient, settings: BackupSettings):
     await context.finalize()
 
 
-@pytest.mark.flaky(reruns=3)
 @pytest.mark.deploy_modes("standalone")
 async def test_backup(
     nucliadb_reader: AsyncClient,
@@ -214,7 +213,6 @@ async def check_resources(nucliadb_reader: AsyncClient, kbid: str):
         assert base64.b64decode(resp.content) == b"Test for /upload endpoint"
 
 
-@pytest.mark.flaky(reruns=3)
 @pytest.mark.deploy_modes("standalone")
 async def test_backup_resumed(
     nucliadb_reader: AsyncClient,
@@ -248,7 +246,6 @@ async def test_backup_resumed(
     assert sorted([r["id"] for r in resources]) == rids[1:]
 
 
-@pytest.mark.flaky(reruns=3)
 @pytest.mark.deploy_modes("standalone")
 async def test_restore_resumed(
     nucliadb_reader: AsyncClient,
