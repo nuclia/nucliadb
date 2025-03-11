@@ -33,6 +33,8 @@ from nucliadb.ingest.partitions import assign_partitions
 from nucliadb.ingest.processing import start_processing_engine, stop_processing_engine
 from nucliadb.ingest.service import start_grpc
 from nucliadb.ingest.settings import settings
+from nucliadb.ingest.utils import start_ingest as start_ingest_utility
+from nucliadb.ingest.utils import stop_ingest as stop_ingest_utility
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
@@ -151,6 +153,7 @@ async def main_subscriber_workers():  # pragma: no cover
     shard_creator_closer = await consumer_service.start_shard_creator()
     materializer_closer = await consumer_service.start_materializer()
 
+    await start_ingest_utility()
     exports_consumer = get_exports_consumer()
     await exports_consumer.initialize(context)
     imports_consumer = get_imports_consumer()
@@ -158,19 +161,18 @@ async def main_subscriber_workers():  # pragma: no cover
     backup_consumers_finalizers = await initialize_backup_consumers(context)
 
     await run_until_exit(
-        [
+        backup_consumers_finalizers
+        + [
             imports_consumer.finalize,
             exports_consumer.finalize,
-            auditor_closer,
-            shard_creator_closer,
+            stop_ingest_utility,
             materializer_closer,
-            metrics_server.shutdown,
+            shard_creator_closer,
+            auditor_closer,
             grpc_health_finalizer,
+            metrics_server.shutdown,
             context.finalize,
-            exports_consumer.finalize,
-            imports_consumer.finalize,
         ]
-        + backup_consumers_finalizers
         + finalizers
     )
 
