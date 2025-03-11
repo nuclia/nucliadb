@@ -22,6 +22,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from nucliadb.common.context.fastapi import inject_app_context
 from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 from nucliadb.train import SERVICE_NAME
 from nucliadb.train.utils import (
@@ -42,7 +43,8 @@ async def lifespan(app: FastAPI):
     await start_train_grpc(SERVICE_NAME)
     await start_audit_utility(SERVICE_NAME)
 
-    yield
+    async with inject_app_context(app):
+        yield
 
     await stop_audit_utility()
     await stop_train_grpc()
