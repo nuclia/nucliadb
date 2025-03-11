@@ -1,7 +1,7 @@
 [project]
 name = "nucliadb_workspace"
 requires-python = ">=3.9.2"
-version = "6.3.1"
+version = "6.3.2"
 
 [tool.pdm.dev-dependencies]
 nucliadb = [
