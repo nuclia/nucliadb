@@ -202,9 +202,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
         return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK)
 
-    async def ProcessMessage(  # type: ignore
+    async def ProcessMessage(
         self, request_stream: AsyncIterator[BrokerMessage], context=None
-    ):
+    ) -> OpStatusWriter:
         response = OpStatusWriter()
         async for message in request_stream:
             try:

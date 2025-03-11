@@ -31,7 +31,7 @@ from nucliadb.backups.settings import settings
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.utils import (
     import_binary,
-    import_broker_message,
+    restore_broker_message,
     set_entities_groups,
     set_labels,
 )
@@ -81,7 +81,7 @@ async def restore_resources(context: ApplicationContext, kbid: str, backup_id: s
         start=last_restored,
     ):
         key = object_info.name
-        resource_id = key.split("/")[-1].rstrip(".tar")
+        resource_id = key.split("/")[-1].split(".tar")[0]
         tasks.append(asyncio.create_task(restore_resource(context, kbid, backup_id, resource_id)))
         if len(tasks) > settings.restore_resources_concurrency:
             await asyncio.gather(*tasks)
@@ -235,8 +235,8 @@ async def restore_resource(context: ApplicationContext, kbid: str, backup_id: st
                 extra={"item_type": type(item), kbid: kbid, resource_id: resource_id},
             )
             continue
-
-    await import_broker_message(context, kbid, bm)
+    if bm is not None:
+        await restore_broker_message(context, kbid, bm)
 
 
 async def restore_labels(context: ApplicationContext, kbid: str, backup_id: str):

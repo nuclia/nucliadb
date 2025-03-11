@@ -39,6 +39,7 @@ from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_utils.const import Streams
 from nucliadb_utils.transaction import MaxTransactionSizeExceededError
+from nucliadb_utils.utilities import get_ingest
 
 BinaryStream = AsyncIterator[bytes]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
@@ -70,6 +71,24 @@ async def import_broker_message(
     partition = context.partitioning.generate_partition(kbid, bm.uuid)
     for pb in [get_writer_bm(bm), get_processor_bm(bm)]:
         await transaction_commit(context, pb, partition)
+
+
+async def restore_broker_message(
+    context: ApplicationContext, kbid: str, bm: writer_pb2.BrokerMessage
+) -> None:
+    bm.kbid = kbid
+
+    # First, ingest the broker message writer part synchronously
+    async def ingest_request_stream() -> AsyncIterator[writer_pb2.BrokerMessage]:
+        yield get_writer_bm(bm)
+
+    response = await get_ingest().ProcessMessage(ingest_request_stream())  # type: ignore
+    assert response.status == writer_pb2.OpStatusWriter.Status.OK, "Failed to process broker message"
+
+    # Then enqueue the processor part asynchronously
+    processor_bm = get_processor_bm(bm)
+    partition = context.partitioning.generate_partition(kbid, bm.uuid)
+    await transaction_commit(context, processor_bm, partition)
 
 
 async def transaction_commit(
