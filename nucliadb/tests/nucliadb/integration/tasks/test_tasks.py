@@ -329,7 +329,7 @@ async def test_task_retry_handler_max_retries(context):
 
 
 async def test_purge_retries(context):
-    trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id="task_id", context=context)
+    trh1 = TaskRetryHandler(kbid="kbid", task_type="foo", task_id="task_id", context=context)
     old_metadata = TaskMetadata(
         task_id="task_id",
         status=TaskMetadata.Status.COMPLETED,
@@ -337,9 +337,9 @@ async def test_purge_retries(context):
         error_messages=[],
         last_modified=datetime(2021, 1, 1, tzinfo=timezone.utc),
     )
-    await trh.set_metadata(old_metadata)
+    await trh1.set_metadata(old_metadata)
 
-    trh = TaskRetryHandler(kbid="kbid", task_type="bar", task_id="task_id", context=context)
+    trh2 = TaskRetryHandler(kbid="kbid", task_type="bar", task_id="task_id", context=context)
     recent_metadata = TaskMetadata(
         task_id="task_id",
         status=TaskMetadata.Status.RUNNING,
@@ -347,10 +347,10 @@ async def test_purge_retries(context):
         error_messages=[],
         last_modified=datetime.now(timezone.utc),
     )
-    await trh.set_metadata(recent_metadata)
+    await trh2.set_metadata(recent_metadata)
 
-    purged = await purge(context.kv_driver)
-    assert purged == 1
+    assert await purge(context.kv_driver) == 1
+    assert await purge(context.kv_driver) == 0
 
-    purged = await purge(context.kv_driver)
-    assert purged == 0
+    assert await trh1.get_metadata() is None
+    assert await trh2.get_metadata() == recent_metadata
