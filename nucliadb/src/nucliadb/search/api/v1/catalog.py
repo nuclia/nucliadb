@@ -75,9 +75,7 @@ async def catalog_get(
     response: Response,
     kbid: str,
     query: str = fastapi_query(SearchParamDefaults.query),
-    filter_expression: Optional[str] = fastapi_query(
-        SearchParamDefaults.catalog_filter_expression, include_in_schema=False
-    ),
+    filter_expression: Optional[str] = fastapi_query(SearchParamDefaults.catalog_filter_expression),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
     sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
