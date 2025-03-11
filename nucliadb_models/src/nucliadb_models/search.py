@@ -1583,6 +1583,8 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
         description="Whether to generate an answer using the generative model. If set to false, the response will only contain the retrieval results.",
     )
 
+    search_configuration: Optional[str] = Field(default=None, description="Use search configuration")
+
     @field_validator("rag_strategies", mode="before")
     @classmethod
     def validate_rag_strategies(cls, rag_strategies: list[RagStrategies]) -> list[RagStrategies]:
