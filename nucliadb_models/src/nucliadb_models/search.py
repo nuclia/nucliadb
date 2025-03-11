@@ -449,7 +449,7 @@ class SearchParamDefaults:
     filters = ParamDefault(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters",  # noqa: E501
     )
     resource_filters = ParamDefault(
         default=[],
@@ -459,7 +459,7 @@ class SearchParamDefaults:
     faceted = ParamDefault(
         default=[],
         title="Faceted",
-        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
+        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/rag/advanced/search_filters",  # noqa: E501
         max_items=50,
     )
     autofilter = ParamDefault(
@@ -682,13 +682,13 @@ class Filter(BaseModel):
 
 class CatalogRequest(BaseModel):
     query: str = SearchParamDefaults.query.to_pydantic_field()
-    filter_expression: SkipJsonSchema[Optional[CatalogFilterExpression]] = (
+    filter_expression: Optional[CatalogFilterExpression] = (
         SearchParamDefaults.catalog_filter_expression.to_pydantic_field()
     )
     filters: Union[list[str], list[Filter]] = Field(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters",  # noqa: E501
     )
     faceted: list[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
@@ -764,14 +764,14 @@ class AuditMetadataBase(BaseModel):
 
 class BaseSearchRequest(AuditMetadataBase):
     query: str = SearchParamDefaults.query.to_pydantic_field()
-    filter_expression: SkipJsonSchema[Optional[FilterExpression]] = (
+    filter_expression: Optional[FilterExpression] = (
         SearchParamDefaults.filter_expression.to_pydantic_field()
     )
     fields: list[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: Union[list[str], list[Filter]] = Field(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters",  # noqa: E501
     )
     top_k: int = SearchParamDefaults.top_k.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
@@ -1400,14 +1400,14 @@ class AskRequest(AuditMetadataBase):
         le=200,
         description="The top most relevant results to fetch at the retrieval step. The maximum number of results allowed is 200.",
     )
-    filter_expression: SkipJsonSchema[Optional[FilterExpression]] = (
+    filter_expression: Optional[FilterExpression] = (
         SearchParamDefaults.filter_expression.to_pydantic_field()
     )
     fields: list[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: Union[list[str], list[Filter]] = Field(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters",  # noqa: E501
     )
     keyword_filters: Union[list[str], list[Filter]] = Field(
         default=[],
@@ -1416,7 +1416,7 @@ class AskRequest(AuditMetadataBase):
             "List of keyword filter expressions to apply to the retrieval step. "
             "The text block search will only be performed on the documents that contain the specified keywords. "
             "The filters are case-insensitive, and only alphanumeric characters and spaces are allowed. "
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters"  # noqa: E501
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters"  # noqa: E501
         ),
         examples=[
             ["NLP", "BERT"],
@@ -1578,7 +1578,7 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
         examples=[ANSWER_JSON_SCHEMA_EXAMPLE],
     )
 
-    generate_answer: SkipJsonSchema[bool] = Field(
+    generate_answer: bool = Field(
         default=True,
         description="Whether to generate an answer using the generative model. If set to false, the response will only contain the retrieval results.",
     )
@@ -1730,7 +1730,7 @@ class FindRequest(BaseSearchRequest):
             "List of keyword filter expressions to apply to the retrieval step. "
             "The text block search will only be performed on the documents that contain the specified keywords. "
             "The filters are case-insensitive, and only alphanumeric characters and spaces are allowed. "
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters"  # noqa: E501
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters"  # noqa: E501
         ),
         examples=[
             ["NLP", "BERT"],

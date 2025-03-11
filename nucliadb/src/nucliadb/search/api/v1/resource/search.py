@@ -62,9 +62,7 @@ async def resource_search(
     kbid: str,
     query: str,
     rid: str,
-    filter_expression: Optional[str] = fastapi_query(
-        SearchParamDefaults.filter_expression, include_in_schema=False
-    ),
+    filter_expression: Optional[str] = fastapi_query(SearchParamDefaults.filter_expression),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
