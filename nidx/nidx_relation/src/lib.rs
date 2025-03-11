@@ -23,6 +23,7 @@ mod io_maps;
 mod reader;
 mod resource_indexer;
 mod schema;
+mod graph_collector;
 
 use nidx_protos::{
     GraphSearchRequest, GraphSearchResponse, RelationNode, RelationNodeFilter, RelationPrefixSearchRequest,
