@@ -22,8 +22,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from nucliadb.common.context.fastapi import inject_app_context
+from nucliadb.common.maindb.utils import setup_driver as setup_maindb
+from nucliadb.common.maindb.utils import teardown_driver as teardown_maindb
 from nucliadb.ingest.processing import start_processing_engine, stop_processing_engine
-from nucliadb.ingest.utils import start_ingest, stop_ingest
+from nucliadb.ingest.utils import setup_ingest_utility, teardown_ingest_utility
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.back_pressure import start_materializer, stop_materializer
 from nucliadb.writer.settings import back_pressure_settings
@@ -44,7 +46,8 @@ async def lifespan(app: FastAPI):
     back_pressure_enabled = back_pressure_settings.enabled and not is_onprem_nucliadb()
 
     await setup_telemetry(SERVICE_NAME)
-    await start_ingest(SERVICE_NAME)
+    await setup_maindb()
+    await setup_ingest_utility(SERVICE_NAME)
     await start_processing_engine()
     start_partitioning_utility()
     await start_transaction_utility(SERVICE_NAME)
@@ -59,8 +62,9 @@ async def lifespan(app: FastAPI):
     if back_pressure_enabled:
         await stop_materializer()
     await stop_transaction_utility()
-    await stop_ingest()
+    await teardown_ingest_utility()
     await stop_processing_engine()
     await storage_finalize()
+    await teardown_maindb()
     await clean_telemetry(SERVICE_NAME)
     await finalize_utilities()

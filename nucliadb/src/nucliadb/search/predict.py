@@ -59,7 +59,7 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.settings import nuclia_settings
-from nucliadb_utils.utilities import Utility, set_utility
+from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 
 class SendToPredictError(Exception):
@@ -153,6 +153,13 @@ async def start_predict_engine():
         )
     await predict_util.initialize()
     set_utility(Utility.PREDICT, predict_util)
+
+
+async def teardown_predict_engine():
+    predict_util = get_utility(Utility.PREDICT)
+    if predict_util is not None:
+        await predict_util.finalize()
+        clean_utility(Utility.PREDICT)
 
 
 def convert_relations(data: dict[str, list[dict[str, str]]]) -> list[RelationNode]:

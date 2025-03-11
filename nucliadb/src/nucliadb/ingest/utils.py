@@ -19,37 +19,41 @@
 #
 from typing import Optional
 
-from nucliadb.common.maindb.utils import setup_driver
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.grpc import get_traced_grpc_channel
 from nucliadb_utils.settings import nucliadb_settings
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 
-async def start_ingest(service_name: Optional[str] = None):
-    await setup_driver()
-
+async def setup_ingest_utility(service_name: Optional[str] = None):
     actual_service = get_utility(Utility.INGEST)
     if actual_service is not None:
+        # Already setup
         return
-
     if nucliadb_settings.nucliadb_ingest is not None:
-        # Its distributed lets create a GRPC client
-        # We want Jaeger telemetry enabled
-        channel = get_traced_grpc_channel(nucliadb_settings.nucliadb_ingest, service_name or "ingest")
-        set_utility(Utility.CHANNEL, channel)
-        ingest = WriterStub(channel)
-        set_utility(Utility.INGEST, ingest)
+        # For the hosted deployment, we need to connect to the ingest grpc service
+        await setup_ingest_orm_grpc_client(nucliadb_settings.nucliadb_ingest, service_name or "ingest")
     else:
-        # Its not distributed create a ingest
-        from nucliadb.ingest.service.writer import WriterServicer
-
-        service = WriterServicer()
-        await service.initialize()
-        set_utility(Utility.INGEST, service)
+        # For the on-prem deployment, we need to start the ingest grpc server
+        await setup_ingest_orm_grpc_server()
 
 
-async def stop_ingest():
+async def setup_ingest_orm_grpc_client(address: str, service_name: str):
+    channel = get_traced_grpc_channel(address, service_name)
+    set_utility(Utility.CHANNEL, channel)
+    ingest = WriterStub(channel)
+    set_utility(Utility.INGEST, ingest)
+
+
+async def setup_ingest_orm_grpc_server():
+    from nucliadb.ingest.service.writer import WriterServicer
+
+    service = WriterServicer()
+    await service.initialize()
+    set_utility(Utility.INGEST, service)
+
+
+async def teardown_ingest_utility():
     if get_utility(Utility.CHANNEL):
         await get_utility(Utility.CHANNEL).close()
         clean_utility(Utility.CHANNEL)

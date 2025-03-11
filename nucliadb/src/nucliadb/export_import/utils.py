@@ -79,10 +79,11 @@ async def restore_broker_message(
     bm.kbid = kbid
 
     # First, ingest the broker message writer part synchronously
-    async def ingest_request_stream() -> AsyncIterator[writer_pb2.BrokerMessage]:
+    async def _iterator() -> AsyncIterator[writer_pb2.BrokerMessage]:
         yield get_writer_bm(bm)
 
-    response = await get_ingest().ProcessMessage(ingest_request_stream())  # type: ignore
+    ingest_utility = get_ingest()
+    response = await ingest_utility.ProcessMessage(_iterator())  # type: ignore
     assert response.status == writer_pb2.OpStatusWriter.Status.OK, "Failed to process broker message"
 
     # Then enqueue the processor part asynchronously

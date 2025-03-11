@@ -23,17 +23,14 @@ from fastapi import FastAPI
 
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context.fastapi import inject_app_context
-from nucliadb.common.maindb.utils import setup_driver
-from nucliadb.common.nidx import start_nidx_utility
-from nucliadb.ingest.utils import start_ingest, stop_ingest
+from nucliadb.common.maindb.utils import setup_driver as setup_maindb
+from nucliadb.common.maindb.utils import teardown_driver as teardown_maindb
+from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 from nucliadb.search import SERVICE_NAME
-from nucliadb.search.predict import start_predict_engine
+from nucliadb.search.predict import start_predict_engine, teardown_predict_engine
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 from nucliadb_utils.utilities import (
-    Utility,
-    clean_utility,
     finalize_utilities,
-    get_utility,
     start_audit_utility,
     stop_audit_utility,
 )
@@ -42,26 +39,19 @@ from nucliadb_utils.utilities import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await setup_telemetry(SERVICE_NAME)
-
-    await start_ingest(SERVICE_NAME)
     await start_predict_engine()
-
-    await setup_driver()
+    await setup_maindb()
     await setup_cluster()
     await start_nidx_utility()
-
     await start_audit_utility(SERVICE_NAME)
 
     async with inject_app_context(app):
         yield
 
-    await stop_ingest()
-    if get_utility(Utility.PARTITION):
-        clean_utility(Utility.PARTITION)
-    if get_utility(Utility.PREDICT):
-        clean_utility(Utility.PREDICT)
-
-    await finalize_utilities()
     await stop_audit_utility()
+    await stop_nidx_utility()
     await teardown_cluster()
+    await teardown_maindb()
+    await teardown_predict_engine()
     await clean_telemetry(SERVICE_NAME)
+    await finalize_utilities()
