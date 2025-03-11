@@ -19,12 +19,15 @@
 #
 import functools
 import logging
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Callable, Optional
+from typing import Callable, Optional, cast
 
 from pydantic import BaseModel
 
 from nucliadb.common.context import ApplicationContext
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +44,7 @@ class TaskMetadata(BaseModel):
     status: Status
     retries: int = 0
     error_messages: list[str] = []
+    last_modified: Optional[datetime] = None
 
 
 class TaskRetryHandler:
@@ -84,16 +88,10 @@ class TaskRetryHandler:
         )
 
     async def get_metadata(self) -> Optional[TaskMetadata]:
-        async with self.context.kv_driver.transaction(read_only=True) as txn:
-            metadata = await txn.get(self.metadata_key)
-            if metadata is None:
-                return None
-            return TaskMetadata.model_validate_json(metadata)
+        return await _get_metadata(self.context.kv_driver, self.metadata_key)
 
     async def set_metadata(self, metadata: TaskMetadata) -> None:
-        async with self.context.kv_driver.transaction() as txn:
-            await txn.set(self.metadata_key, metadata.model_dump_json().encode())
-            await txn.commit()
+        await _set_metadata(self.context.kv_driver, self.metadata_key, metadata)
 
     def wrap(self, func: Callable) -> Callable:
         @functools.wraps(func)
@@ -106,6 +104,7 @@ class TaskRetryHandler:
                     task_id=self.task_id,
                     status=TaskMetadata.Status.RUNNING,
                     retries=0,
+                    last_modified=datetime.now(timezone.utc),
                 )
                 await self.set_metadata(metadata)
 
@@ -123,6 +122,7 @@ class TaskRetryHandler:
                     f"Task reached max retries. Setting to FAILED state",
                     extra={"kbid": self.kbid, "task_type": self.task_type, "task_id": self.task_id},
                 )
+                metadata.last_modified = datetime.now(timezone.utc)
                 await self.set_metadata(metadata)
                 return
             try:
@@ -144,6 +144,67 @@ class TaskRetryHandler:
                 metadata.status = TaskMetadata.Status.COMPLETED
                 return func_result
             finally:
+                metadata.last_modified = datetime.now(timezone.utc)
                 await self.set_metadata(metadata)
 
         return wrapper
+
+
+async def _get_metadata(kv_driver: Driver, metadata_key: str) -> Optional[TaskMetadata]:
+    async with kv_driver.transaction(read_only=True) as txn:
+        metadata = await txn.get(metadata_key)
+        if metadata is None:
+            return None
+        return TaskMetadata.model_validate_json(metadata)
+
+
+async def _set_metadata(kv_driver: Driver, metadata_key: str, metadata: TaskMetadata) -> None:
+    async with kv_driver.transaction() as txn:
+        await txn.set(metadata_key, metadata.model_dump_json().encode())
+        await txn.commit()
+
+
+async def purge(kv_driver: Driver) -> int:
+    if not isinstance(kv_driver, PGDriver):
+        return 0
+
+    async with kv_driver.transaction() as txn:
+        txn = cast(PGTransaction, txn)
+        async with txn.connection.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT key from resources
+                WHERE key  ~ '^/kbs/[^/]*/tasks/[^/]*/[^/]*$'
+                LIMIT 200""",
+            )
+            records = await cur.fetchall()
+            keys = [r[0] for r in records]
+
+    to_delete = []
+    for key in keys:
+        metadata = await _get_metadata(kv_driver, key)
+        if metadata is None:
+            continue
+        task_finished = metadata.status in (TaskMetadata.Status.COMPLETED, TaskMetadata.Status.FAILED)
+        # A task is old if it doesn't have last_modified or it's older than 15 days
+        old_task = (
+            metadata.last_modified is None
+            or (datetime.now(timezone.utc) - metadata.last_modified).days >= 15
+        )
+        if task_finished and old_task:
+            to_delete.append(key)
+
+    n_to_delete = len(to_delete)
+    if n_to_delete == 0:
+        return 0
+
+    logger.info(f"Deleting {len(to_delete)} old task metadata records")
+    batch_size = 50
+    while len(to_delete) > 0:
+        batch = to_delete[:batch_size]
+        to_delete = to_delete[batch_size:]
+        async with kv_driver.transaction() as txn:
+            for key in batch:
+                await txn.delete(key)
+            await txn.commit()
+    return n_to_delete
