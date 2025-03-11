@@ -165,9 +165,29 @@ async def _set_metadata(kv_driver: Driver, metadata_key: str, metadata: TaskMeta
 
 
 async def purge(kv_driver: Driver) -> int:
+    """
+    Purges old task metadata records that are in a final state and older than 15 days.
+    Returns the total number of records purged.
+    """
     if not isinstance(kv_driver, PGDriver):
         return 0
 
+    total_purged = 0
+    start: Optional[str] = ""
+    while True:
+        start, purged = await purge_batch(kv_driver, start)
+        total_purged += purged
+        if start is None:
+            break
+    return total_purged
+
+
+async def purge_batch(
+    kv_driver: PGDriver, start: Optional[str] = None, batch_size: int = 200
+) -> tuple[Optional[str], int]:
+    """
+    Returns the next start key and the number of purged records. If start is None, it means there are no more records to purge.
+    """
     async with kv_driver.transaction() as txn:
         txn = cast(PGTransaction, txn)
         async with txn.connection.cursor() as cur:
@@ -175,10 +195,18 @@ async def purge(kv_driver: Driver) -> int:
                 """
                 SELECT key from resources
                 WHERE key  ~ '^/kbs/[^/]*/tasks/[^/]*/[^/]*$'
-                LIMIT 200""",
+                AND key > %s
+                ORDER BY key
+                LIMIT %s
+                """,
+                (start, batch_size),
             )
             records = await cur.fetchall()
             keys = [r[0] for r in records]
+
+    if not keys:
+        # No more records to purge
+        return None, 0
 
     to_delete = []
     for key in keys:
@@ -186,7 +214,6 @@ async def purge(kv_driver: Driver) -> int:
         if metadata is None:
             continue
         task_finished = metadata.status in (TaskMetadata.Status.COMPLETED, TaskMetadata.Status.FAILED)
-        # A task is old if it doesn't have last_modified or it's older than 15 days
         old_task = (
             metadata.last_modified is None
             or (datetime.now(timezone.utc) - metadata.last_modified).days >= 15
@@ -195,16 +222,13 @@ async def purge(kv_driver: Driver) -> int:
             to_delete.append(key)
 
     n_to_delete = len(to_delete)
-    if n_to_delete == 0:
-        return 0
-
-    logger.info(f"Deleting {len(to_delete)} old task metadata records")
-    batch_size = 50
+    logger.info(f"Deleting {n_to_delete} old task metadata records")
+    delete_batch_size = 50
     while len(to_delete) > 0:
-        batch = to_delete[:batch_size]
-        to_delete = to_delete[batch_size:]
+        batch = to_delete[:delete_batch_size]
+        to_delete = to_delete[delete_batch_size:]
         async with kv_driver.transaction() as txn:
             for key in batch:
                 await txn.delete(key)
             await txn.commit()
-    return n_to_delete
+    return keys[-1], n_to_delete
