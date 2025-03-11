@@ -25,12 +25,17 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.backups.const import StorageKeys
-from nucliadb.backups.create import backup_kb, get_metadata, set_metadata
-from nucliadb.backups.delete import delete_backup
-from nucliadb.backups.models import BackupMetadata
+from nucliadb.backups.create import backup_kb_task, get_metadata, set_metadata
+from nucliadb.backups.delete import delete_backup_task
+from nucliadb.backups.models import (
+    BackupMetadata,
+    CreateBackupRequest,
+    DeleteBackupRequest,
+    RestoreBackupRequest,
+)
 from nucliadb.backups.restore import (
     get_last_restored,
-    restore_kb,
+    restore_kb_task,
     set_last_restored,
 )
 from nucliadb.backups.settings import BackupSettings
@@ -143,7 +148,6 @@ async def context(nucliadb_reader: AsyncClient, settings: BackupSettings):
     await context.finalize()
 
 
-@pytest.mark.flaky(reruns=3)
 @pytest.mark.deploy_modes("standalone")
 async def test_backup(
     nucliadb_reader: AsyncClient,
@@ -155,21 +159,17 @@ async def test_backup(
     backup_id = str(uuid.uuid4())
     assert await exists_backup(context.blob_storage, backup_id) is False
 
-    await backup_kb(context, src_kb, backup_id)
+    await backup_kb_task(context, CreateBackupRequest(kb_id=src_kb, backup_id=backup_id))
 
     assert await exists_backup(context.blob_storage, backup_id) is True
 
     # Make sure that the backup metadata is cleaned up
     assert await get_metadata(context, src_kb, backup_id) is None
 
-    await restore_kb(context, dst_kb, backup_id)
+    await restore_kb_task(context, RestoreBackupRequest(kb_id=dst_kb, backup_id=backup_id))
 
     # Make sure that the restore metadata is cleaned up
     assert await get_last_restored(context, dst_kb, backup_id) is None
-
-    await delete_backup(context, backup_id)
-
-    assert await exists_backup(context.blob_storage, backup_id) is False
 
     # Check that the resources were restored
     await check_resources(nucliadb_reader, src_kb)
@@ -184,6 +184,11 @@ async def test_backup(
     resp = await nucliadb_reader.get(f"/kb/{dst_kb}/labelset/foo")
     assert resp.status_code == 200
     assert len(resp.json()["labels"]) == 1
+
+    # Delete the backup
+    await delete_backup_task(context, DeleteBackupRequest(backup_id=backup_id))
+
+    assert await exists_backup(context.blob_storage, backup_id) is False
 
 
 async def check_resources(nucliadb_reader: AsyncClient, kbid: str):
@@ -208,7 +213,6 @@ async def check_resources(nucliadb_reader: AsyncClient, kbid: str):
         assert base64.b64decode(resp.content) == b"Test for /upload endpoint"
 
 
-@pytest.mark.flaky(reruns=3)
 @pytest.mark.deploy_modes("standalone")
 async def test_backup_resumed(
     nucliadb_reader: AsyncClient,
@@ -230,19 +234,18 @@ async def test_backup_resumed(
     )
     await set_metadata(context, src_kb, backup_id, metadata)
 
-    await backup_kb(context, src_kb, backup_id)
+    await backup_kb_task(context, CreateBackupRequest(kb_id=src_kb, backup_id=backup_id))
 
-    await restore_kb(context, dst_kb, backup_id)
+    await restore_kb_task(context, RestoreBackupRequest(kb_id=dst_kb, backup_id=backup_id))
 
     # Check that the resources were restored
     resp = await nucliadb_reader.get(f"/kb/{dst_kb}/resources")
     assert resp.status_code == 200
     resources = resp.json()["resources"]
-    assert len(resources) == 9
+    assert len(resources) == N_RESOURCES - 1
     assert sorted([r["id"] for r in resources]) == rids[1:]
 
 
-@pytest.mark.flaky(reruns=3)
 @pytest.mark.deploy_modes("standalone")
 async def test_restore_resumed(
     nucliadb_reader: AsyncClient,
@@ -258,7 +261,7 @@ async def test_restore_resumed(
     assert resp.status_code == 200
     rids = sorted([r["id"] for r in resp.json()["resources"]])
 
-    await backup_kb(context, src_kb, backup_id)
+    await backup_kb_task(context, CreateBackupRequest(kb_id=src_kb, backup_id=backup_id))
 
     # Set the last restored resource id as if the restore was interrupted right after restoring the first resource
     last_restored_key = StorageKeys.RESOURCE.format(
@@ -266,7 +269,7 @@ async def test_restore_resumed(
     )
     await set_last_restored(context, dst_kb, backup_id, last_restored_key)
 
-    await restore_kb(context, dst_kb, backup_id)
+    await restore_kb_task(context, RestoreBackupRequest(kb_id=dst_kb, backup_id=backup_id))
 
     # Check that the correct resources were restored
     resp = await nucliadb_reader.get(f"/kb/{dst_kb}/resources")

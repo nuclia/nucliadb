@@ -105,7 +105,7 @@ class NatsTaskConsumer(Generic[MsgType]):
 
     async def _subscription_worker_as_task(self, msg: Msg):
         seqid = int(msg.reply.split(".")[5])
-        task_name = f"NatsTaskConsumer({self.name}, msg={seqid})"
+        task_name = f"NatsTaskConsumer({self.name}, stream={self.stream.name}, subject={self.consumer.subject}, seqid={seqid})"
         task = asyncio.create_task(self.subscription_worker(msg), name=task_name)
         task.add_done_callback(self._running_tasks_remove)
         self.running_tasks.append(task)
