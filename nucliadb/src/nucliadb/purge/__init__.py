@@ -21,6 +21,7 @@ import asyncio
 import importlib.metadata
 from typing import AsyncGenerator
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
@@ -185,7 +186,11 @@ async def _purge_resources_storage_batch(driver: Driver, storage: Storage, batch
     tasks = []
     for key in to_delete_batch:
         kbid, resource_id = key.split("/")[-2:]
-        tasks.append(asyncio.create_task(storage.delete_resource(kbid, resource_id)))
+        # Check if resource exists in maindb. This can happen if a file is deleted (marked for purge) and immediately
+        # reuploaded. Without this check, we will delete the data of the newly uploaded copy of the resource.
+        if not await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=resource_id):
+            tasks.append(asyncio.create_task(storage.delete_resource(kbid, resource_id)))
+
     await asyncio.gather(*tasks)
 
     # Delete the schedule-to-delete keys
