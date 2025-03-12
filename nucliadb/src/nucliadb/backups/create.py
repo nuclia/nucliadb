@@ -174,7 +174,12 @@ async def backup_resource_with_binaries(
             if not await exists_cf(context, cloud_file):
                 logger.warning(
                     "Cloud file not found in storage, skipping",
-                    extra={"kbid": kbid, "rid": rid, "cf_uri": cloud_file.uri},
+                    extra={
+                        "kbid": kbid,
+                        "rid": rid,
+                        "cf_uri": cloud_file.uri,
+                        "cf_bucket": cloud_file.bucket_name,
+                    },
                 )
                 continue
 
@@ -260,7 +265,8 @@ async def delete_metadata(context: ApplicationContext, kbid: str, backup_id: str
 
 
 async def exists_cf(context: ApplicationContext, cf: resources_pb2.CloudFile) -> bool:
-    return await context.blob_storage.exists_object(bucket=cf.bucket_name, key=cf.uri)
+    bucket_name = context.blob_storage.get_bucket_name_from_cf(cf)
+    return await context.blob_storage.exists_object(bucket=bucket_name, key=cf.uri)
 
 
 async def upload_to_bucket(context: ApplicationContext, bytes_iterator: AsyncIterator[bytes], key: str):
