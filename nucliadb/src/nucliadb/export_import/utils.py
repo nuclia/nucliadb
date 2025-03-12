@@ -45,23 +45,61 @@ BinaryStream = AsyncIterator[bytes]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
 
 
-# Broker message fields that are populated by the processing pipeline
-PROCESSING_BM_FIELDS = [
-    "link_extracted_data",
-    "file_extracted_data",
-    "extracted_text",
-    "field_metadata",
-    "field_vectors",
-    "field_large_metadata",
-]
-
-# Broker message fields that are populated by the nucliadb writer component
-WRITER_BM_FIELDS = [
-    "links",
-    "files",
-    "texts",
-    "conversations",
-]
+# Map that indicates which fields are written by the writer and which are written by the processor
+# The keys are the fields of the BrokerMessage proto
+BM_FIELDS = {
+    "common": [
+        "kbid",
+        "uuid",
+        "type",
+        "source",
+        "reindex",
+    ],
+    "writer": [
+        "slug",
+        "basic",
+        "origin",
+        "user_relations",
+        "conversations",
+        "texts",
+        "links",
+        "files",
+        "extra",
+        "security",
+    ],
+    "processor": [
+        "link_extracted_data",
+        "file_extracted_data",
+        "extracted_text",
+        "field_metadata",
+        "field_vectors",
+        "field_large_metadata",
+        "question_answers",
+        "relations",
+    ],
+    "ignored": [
+        "audit",
+        "multiid",
+        "origin_seq",
+        "slow_processing_time",
+        "pre_processing_time",
+        "done_time",
+        "processing_id",
+        "account_seq",
+        "delete_fields",
+        "delete_question_answers",
+    ],
+    "deprecated": [
+        "txseqid",
+        "user_vectors",
+    ],
+    # TODO!!!!
+    "to_check": [
+        "errors",
+        "generated_by",
+        "field_statuses",
+    ],
+}
 
 
 async def import_broker_message(
@@ -125,7 +163,7 @@ async def transaction_commit(
 def get_writer_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
     wbm = writer_pb2.BrokerMessage()
     wbm.CopyFrom(bm)
-    for field in PROCESSING_BM_FIELDS:
+    for field in BM_FIELDS["processor"]:
         wbm.ClearField(field)  # type: ignore
     wbm.type = writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT
     wbm.source = writer_pb2.BrokerMessage.MessageSource.WRITER
@@ -135,7 +173,7 @@ def get_writer_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
 def get_processor_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
     pbm = writer_pb2.BrokerMessage()
     pbm.CopyFrom(bm)
-    for field in WRITER_BM_FIELDS:
+    for field in BM_FIELDS["writer"]:
         pbm.ClearField(field)  # type: ignore
     pbm.type = writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT
     pbm.source = writer_pb2.BrokerMessage.MessageSource.PROCESSOR
