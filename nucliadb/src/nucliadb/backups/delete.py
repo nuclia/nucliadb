@@ -20,11 +20,14 @@
 
 
 import asyncio
+import logging
 
 from nucliadb.backups.const import StorageKeys
 from nucliadb.backups.models import DeleteBackupRequest
 from nucliadb.backups.settings import settings
 from nucliadb.common.context import ApplicationContext
+
+logger = logging.getLogger(__name__)
 
 
 async def delete_backup_task(context: ApplicationContext, msg: DeleteBackupRequest):
@@ -40,7 +43,8 @@ async def delete_backup(context: ApplicationContext, backup_id: str):
         if deleted == 0:
             # No more objects to delete
             break
-        await asyncio.sleep(1)
+        logger.info(f"Deleted {deleted} objects from backup", extra={"backup_id": backup_id})
+    logger.info(f"Backup deletion completed", extra={"backup_id": backup_id})
 
 
 async def delete_n(context: ApplicationContext, backup_id: str, n: int):
