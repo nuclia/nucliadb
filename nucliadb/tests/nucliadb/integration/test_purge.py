@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import base64
 import unittest
 import uuid
 from typing import cast
@@ -291,6 +292,69 @@ async def test_purge_resources_deleted_storage(
     await asyncio.sleep(0.1)
     task.cancel()
     await task
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_purge_resources_deleted_recreated(
+    maindb_driver: Driver,
+    storage: Storage,
+    nucliadb_writer_manager: AsyncClient,
+    nucliadb_writer: AsyncClient,
+):
+    # Create a KB
+    kb_slug = str(uuid.uuid4())
+    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": kb_slug})
+    assert resp.status_code == 201
+    kbid = resp.json().get("uuid")
+
+    # Create a resource
+    content = b"Test for /upload endpoint"
+    md5 = "efb50eba3ce4d5f65446a3f4ef5e8a09"
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/upload",
+        headers={
+            "X-Filename": base64.b64encode(b"testfile").decode("utf-8"),
+            "X-Md5": md5,
+            "Content-Type": "text/plain",
+            "Content-Length": str(len(content)),
+        },
+        content=content,
+    )
+    assert resp.status_code == 201
+    # This test does not make sense if we can't consistently create a resource with the same id
+    assert resp.json()["uuid"] == md5
+
+    # Delete the resource
+    # Test the case where resources are scheduled to be deleted
+    with unittest.mock.patch("nucliadb.ingest.orm.knowledgebox.is_onprem_nucliadb", return_value=False):
+        resp = await nucliadb_writer.delete(f"/kb/{kbid}/resource/{md5}")
+        assert resp.status_code == 204
+
+    # Recreate a resource before purge gets a chance to ru
+    content = b"Test for /upload endpoint"
+    md5 = "efb50eba3ce4d5f65446a3f4ef5e8a09"
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/upload",
+        headers={
+            "X-Filename": base64.b64encode(b"testfile").decode("utf-8"),
+            "X-Md5": md5,
+            "Content-Type": "text/plain",
+            "Content-Length": str(len(content)),
+        },
+        content=content,
+    )
+    assert resp.status_code == 201
+    assert resp.json()["uuid"] == md5
+
+    # Make sure the file is in storage, otherwise this test is not meaningful
+    storage_file = await storage.file_field(kbid, md5, md5).exists()
+    assert storage_file is not None
+
+    # Purge runs. A resource is marked for deletion but also exists (recreated with same ID)
+    # We should not delete its files
+    await purge_deleted_resource_storage(maindb_driver, storage)
+    storage_file = await storage.file_field(kbid, md5, md5).exists()
+    assert storage_file is not None
 
 
 async def test_storage_dummy(maindb_driver, storage):
