@@ -188,14 +188,14 @@ async def test_graph_search__fuzzy_node_queries(
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
     assert len(paths) == 0
 
-    # (:~AnXstXsia)
+    # (:~Ansatasia)
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/graph",
         json={
             "query": {
                 "prop": "path",
                 "source": {
-                    "value": "AnXstXsia",
+                    "value": "Ansatasia",
                     "match": "fuzzy",
                 },
             },
