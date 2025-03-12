@@ -340,7 +340,7 @@ async def delete_search_configuration(request: Request, kbid: str, config_name: 
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
-        if await datamanagers.search_configurations.get(txn, kbid=kbid, name=config_name) is not None:
+        if await datamanagers.search_configurations.get(txn, kbid=kbid, name=config_name) is None:
             raise HTTPException(status_code=404, detail="Search configuration does not exist")
 
         await datamanagers.search_configurations.delete(txn, kbid=kbid, name=config_name)

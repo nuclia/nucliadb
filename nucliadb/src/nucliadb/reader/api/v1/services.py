@@ -320,12 +320,12 @@ async def processing_status(
 
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/search_configurations/{{config_name}}",
-    status_code=201,
+    status_code=200,
     summary="Get search configuration",
     tags=["Knowledge Box Services"],
     response_model_exclude_unset=True,
 )
-@requires(NucliaDBRoles.WRITER)
+@requires(NucliaDBRoles.READER)
 @version(1)
 async def get_search_configuration(request: Request, kbid: str, config_name: str) -> SearchConfiguration:
     async with datamanagers.with_transaction() as txn:
@@ -346,7 +346,7 @@ async def get_search_configuration(request: Request, kbid: str, config_name: str
     tags=["Knowledge Box Services"],
     response_model_exclude_unset=True,
 )
-@requires(NucliaDBRoles.WRITER)
+@requires(NucliaDBRoles.READER)
 @version(1)
 async def list_search_configurations(request: Request, kbid: str) -> dict[str, SearchConfiguration]:
     async with datamanagers.with_transaction() as txn:
