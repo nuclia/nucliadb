@@ -18,46 +18,90 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use tantivy::{collector::{Collector, SegmentCollector}, store::StoreReader, DocAddress, DocId, Score, SegmentOrdinal, SegmentReader, TantivyDocument};
+use tantivy::{
+    DocId, Score, SegmentOrdinal, SegmentReader, TantivyDocument,
+    collector::{Collector, SegmentCollector},
+    store::StoreReader,
+};
+use tracing::warn;
 
 use crate::io_maps;
 
-/// TODO
-pub struct TopUniqueNodesCollector {
-    // TODO: remove pubs and add constructor
-    pub limit: usize,
+// XXX: this is a completely arbitrary number. Feel free to change for a more adequate value
+const STORE_READER_CACHED_BLOCKS: usize = 10;
+
+pub type NodeId = (String, i32, String);
+pub type RelationId = (String, u64);
+
+#[derive(Clone, Copy)]
+pub enum NodeSelector {
+    AnyNode,
+    SourceNodes,
+    DestinationNodes,
 }
 
-pub struct TopUniqueNodesSegmentCollector {
+pub struct TopUniqueNodeCollector {
     limit: usize,
-    unique_nodes: HashSet<(String, i32, String)>,
-    store_reader: StoreReader,
+    selector: NodeSelector,
     schema: crate::schema::Schema,
 }
 
-impl Collector for TopUniqueNodesCollector {
-    type Fruit = HashSet<(String, i32, String)>;
-    type Child = TopUniqueNodesSegmentCollector;
+pub struct TopUniqueRelationCollector {
+    limit: usize,
+    schema: crate::schema::Schema,
+}
+
+pub struct TopUniqueNodeSegmentCollector {
+    limit: usize,
+    selector: NodeSelector,
+    unique: HashSet<NodeId>,
+    schema: crate::schema::Schema,
+    store_reader: StoreReader,
+}
+
+pub struct TopUniqueRelationSegmentCollector {
+    limit: usize,
+    unique: HashMap<RelationId, TantivyDocument>,
+    schema: crate::schema::Schema,
+    store_reader: StoreReader,
+}
+
+impl TopUniqueNodeCollector {
+    pub fn new(selector: NodeSelector, limit: usize) -> Self {
+        Self {
+            limit,
+            selector,
+            schema: crate::schema::Schema::new(),
+        }
+    }
+}
+
+impl TopUniqueRelationCollector {
+    pub fn new(limit: usize) -> Self {
+        Self {
+            limit,
+            schema: crate::schema::Schema::new(),
+        }
+    }
+}
+
+impl Collector for TopUniqueNodeCollector {
+    type Fruit = HashSet<NodeId>;
+    type Child = TopUniqueNodeSegmentCollector;
 
     fn requires_scoring(&self) -> bool {
         true
     }
 
-    fn for_segment(
-        &self,
-        _segment_local_id: SegmentOrdinal,
-        segment: &SegmentReader,
-    ) -> tantivy::Result<Self::Child> {
-        // TODO
-        let store = segment.get_store_reader(100)?;
-
-        Ok(TopUniqueNodesSegmentCollector {
+    fn for_segment(&self, _segment_local_id: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
+        Ok(TopUniqueNodeSegmentCollector {
             limit: self.limit,
-            unique_nodes: HashSet::new(),
-            store_reader: store,
-            schema: crate::schema::Schema::new(),
+            selector: self.selector,
+            unique: HashSet::new(),
+            store_reader: segment.get_store_reader(STORE_READER_CACHED_BLOCKS)?,
+            schema: self.schema.clone(),
         })
     }
 
@@ -65,35 +109,121 @@ impl Collector for TopUniqueNodesCollector {
         &self,
         segment_fruits: Vec<<Self::Child as SegmentCollector>::Fruit>,
     ) -> tantivy::Result<Self::Fruit> {
-        let mut unique_nodes = HashSet::new();
-        for fruits in segment_fruits {
-            unique_nodes.extend(fruits.into_iter());
+        let mut unique = HashSet::new();
+        let mut fruits = segment_fruits.into_iter().flatten();
+        let mut fruit = fruits.next();
+
+        while fruit.is_some() && unique.len() < self.limit {
+            unique.insert(fruit.unwrap());
+            fruit = fruits.next();
         }
-        Ok(unique_nodes)
+        Ok(unique)
     }
 }
 
-impl SegmentCollector for TopUniqueNodesSegmentCollector {
-    type Fruit = HashSet<(String, i32, String)>;
+impl Collector for TopUniqueRelationCollector {
+    type Fruit = Vec<TantivyDocument>;
+    type Child = TopUniqueRelationSegmentCollector;
 
-    fn collect(&mut self, doc: DocId, score: Score) {
-        if let Ok(doc) = self.store_reader.get::<TantivyDocument>(doc) {
+    fn requires_scoring(&self) -> bool {
+        true
+    }
+
+    fn for_segment(&self, _segment_local_id: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
+        Ok(TopUniqueRelationSegmentCollector {
+            limit: self.limit,
+            unique: HashMap::new(),
+            store_reader: segment.get_store_reader(STORE_READER_CACHED_BLOCKS)?,
+            schema: self.schema.clone(),
+        })
+    }
+
+    fn merge_fruits(
+        &self,
+        segment_fruits: Vec<<Self::Child as SegmentCollector>::Fruit>,
+    ) -> tantivy::Result<Self::Fruit> {
+        // 1. Merge de hash maps
+        // 2. Build a vec of documents for unique relations
+
+        let mut unique = HashSet::new();
+        let mut docs = Vec::new();
+        let mut fruits = segment_fruits.into_iter().flatten();
+        let mut fruit = fruits.next();
+
+        while fruit.is_some() && unique.len() < self.limit {
+            let (relation_id, doc) = fruit.unwrap();
+            if unique.insert(relation_id) {
+                docs.push(doc);
+            }
+            fruit = fruits.next();
+        }
+        Ok(docs)
+    }
+}
+
+impl SegmentCollector for TopUniqueNodeSegmentCollector {
+    type Fruit = HashSet<NodeId>;
+
+    fn collect(&mut self, doc_id: DocId, _score: Score) {
+        // we already have all unique results we need
+        if self.unique.len() >= self.limit {
+            return;
+        }
+
+        // log and skip documents not in the store. This should not happen
+        let doc = match self.store_reader.get::<TantivyDocument>(doc_id) {
+            Ok(doc) => doc,
+            Err(error) => {
+                warn!("Error while getting document from store: {error:?}");
+                return;
+            }
+        };
+
+        if matches!(self.selector, NodeSelector::SourceNodes) || matches!(self.selector, NodeSelector::AnyNode) {
             let source_value = self.schema.source_value(&doc).to_string();
             let source_type = io_maps::u64_to_node_type::<i32>(self.schema.source_type(&doc));
             let source_subtype = self.schema.source_subtype(&doc).to_string();
+            self.unique.insert((source_value, source_type, source_subtype));
+        }
 
+        if matches!(self.selector, NodeSelector::DestinationNodes) || matches!(self.selector, NodeSelector::AnyNode) {
             let destination_value = self.schema.target_value(&doc).to_string();
             let destination_type = io_maps::u64_to_node_type::<i32>(self.schema.target_type(&doc));
             let destination_subtype = self.schema.target_subtype(&doc).to_string();
-
-            self.unique_nodes.insert((source_value, source_type, source_subtype));
-            self.unique_nodes.insert((destination_value, destination_type, destination_subtype));
-        } else {
-            println!("ERROR while getting doc {doc:?} from store");
+            self.unique
+                .insert((destination_value, destination_type, destination_subtype));
         }
     }
 
     fn harvest(self) -> Self::Fruit {
-        self.unique_nodes
+        self.unique
+    }
+}
+
+impl SegmentCollector for TopUniqueRelationSegmentCollector {
+    type Fruit = HashMap<RelationId, TantivyDocument>;
+
+    fn collect(&mut self, doc_id: DocId, _score: Score) {
+        // we already have all unique results we need
+        if self.unique.len() >= self.limit {
+            return;
+        }
+
+        // log and skip documents not in the store. This should not happen
+        let doc = match self.store_reader.get::<TantivyDocument>(doc_id) {
+            Ok(doc) => doc,
+            Err(error) => {
+                warn!("Error while getting document from store: {error:?}");
+                return;
+            }
+        };
+
+        let relation_label = self.schema.relationship_label(&doc).to_string();
+        let relation_type = self.schema.relationship(&doc);
+        self.unique.insert((relation_label, relation_type), doc);
+    }
+
+    fn harvest(self) -> Self::Fruit {
+        self.unique
     }
 }

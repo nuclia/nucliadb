@@ -18,12 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+mod graph_collector;
 pub mod graph_query_parser;
 mod io_maps;
 mod reader;
 mod resource_indexer;
 mod schema;
-mod graph_collector;
 
 use nidx_protos::{
     GraphSearchRequest, GraphSearchResponse, RelationNode, RelationNodeFilter, RelationPrefixSearchRequest,
