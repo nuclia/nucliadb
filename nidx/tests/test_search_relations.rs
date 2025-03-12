@@ -446,7 +446,6 @@ async fn test_graph_search_nodes(pool: PgPool) -> anyhow::Result<()> {
         .await?
         .into_inner();
     let nodes = &response.nodes;
-    println!("Nodes: {nodes:?}");
     assert_eq!(nodes.len(), 17);
 
     // Search all ANIMAL nodes
