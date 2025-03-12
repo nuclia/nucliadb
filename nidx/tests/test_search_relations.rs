@@ -406,8 +406,7 @@ async fn test_graph_search_nodes(pool: PgPool) -> anyhow::Result<()> {
     let mut fixture = NidxFixture::new(pool).await?;
     let shard_id = setup_knowledge_graph(&mut fixture).await?;
 
-    // Search all nodes `s` or `d`
-    // (s)-[]->(d)
+    // Bad query
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
@@ -421,60 +420,73 @@ async fn test_graph_search_nodes(pool: PgPool) -> anyhow::Result<()> {
             kind: QueryKind::Nodes.into(),
             ..Default::default()
         })
+        .await;
+    // node query not in the proper format
+    assert!(response.is_err());
+
+    // Search all nodes
+    // (s)-[]->(d)
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node::default()),
+                        undirected: true,
+                        ..Default::default()
+                    })),
+                }),
+            }),
+            top_k: 100,
+            kind: QueryKind::Nodes.into(),
+            ..Default::default()
+        })
         .await?
         .into_inner();
     let nodes = &response.nodes;
+    println!("Nodes: {nodes:?}");
     assert_eq!(nodes.len(), 17);
 
-    // Only source nodes
-    // (s)-[]->()
+    // Search all ANIMAL nodes
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
-                    query: Some(path_query::Query::Path(graph_query::Path::default())),
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            node_subtype: Some("ANIMAL".to_string()),
+                            ..Default::default()
+                        }),
+                        undirected: true,
+                        ..Default::default()
+                    })),
                 }),
             }),
             top_k: 100,
-            kind: QueryKind::SourceNodes.into(),
+            kind: QueryKind::Nodes.into(),
             ..Default::default()
         })
         .await?
         .into_inner();
     let nodes = &response.nodes;
-    assert_eq!(nodes.len(), 9);
-
-    // Only destination nodes
-    // ()-[]->(d)
-    let response = fixture
-        .searcher_client
-        .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
-            query: Some(GraphQuery {
-                path: Some(graph_query::PathQuery {
-                    query: Some(path_query::Query::Path(graph_query::Path::default())),
-                }),
-            }),
-            top_k: 100,
-            kind: QueryKind::DestinationNodes.into(),
-            ..Default::default()
-        })
-        .await?
-        .into_inner();
-    let nodes = &response.nodes;
-    assert_eq!(nodes.len(), 13);
+    assert_eq!(nodes.len(), 4);
 
     // Limit by top_k
-    // (s)-[]->()
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
             shard: shard_id.clone(),
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
-                    query: Some(path_query::Query::Path(graph_query::Path::default())),
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node::default()),
+                        undirected: true,
+                        ..Default::default()
+                    })),
                 }),
             }),
             top_k: 10,

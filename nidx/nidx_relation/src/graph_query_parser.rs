@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use anyhow::anyhow;
 use nidx_protos::relation_node::NodeType;
 use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator};
 use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
@@ -107,6 +108,13 @@ pub enum GraphQuery {
     PathQuery(PathQuery),
 }
 
+#[derive(Clone, Copy)]
+enum NodePosition {
+    Source,
+    Destination,
+}
+
+pub struct BoolNodeQuery(BooleanExpression<Node>);
 pub struct BoolGraphQuery(BooleanExpression<GraphQuery>);
 
 #[derive(Clone, Copy)]
@@ -146,6 +154,43 @@ impl GraphQueryParser {
                 };
                 for expression in operation.operands {
                     subqueries.push((occur, self.inner_parse_bool(expression)));
+                }
+                Box::new(BooleanQuery::new(subqueries))
+            }
+        }
+    }
+
+    pub fn parse_bool_node(&self, query: BoolNodeQuery) -> (Box<dyn Query>, Box<dyn Query>) {
+        (
+            self.inner_parse_bool_node(query.0.clone(), NodePosition::Source),
+            self.inner_parse_bool_node(query.0, NodePosition::Destination),
+        )
+    }
+
+    fn inner_parse_bool_node(&self, query: BooleanExpression<Node>, position: NodePosition) -> Box<dyn Query> {
+        match query {
+            BooleanExpression::Literal(node) => match position {
+                NodePosition::Source => {
+                    self.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(node))))
+                }
+                NodePosition::Destination => self.parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(
+                    Expression::Value(node),
+                ))),
+            },
+            BooleanExpression::Not(subquery) => {
+                let mut subqueries = vec![];
+                subqueries.push((Occur::Must, Box::new(AllQuery) as Box<dyn Query>));
+                subqueries.push((Occur::MustNot, self.inner_parse_bool_node(*subquery, position)));
+                Box::new(BooleanQuery::new(subqueries))
+            }
+            BooleanExpression::Operation(operation) => {
+                let mut subqueries = vec![];
+                let occur = match operation.operator {
+                    Operator::And => Occur::Must,
+                    Operator::Or => Occur::Should,
+                };
+                for expression in operation.operands {
+                    subqueries.push((occur, self.inner_parse_bool_node(expression, position)));
                 }
                 Box::new(BooleanQuery::new(subqueries))
             }
@@ -453,6 +498,64 @@ impl From<String> for Term {
 impl From<&str> for Term {
     fn from(value: &str) -> Self {
         Self::Exact(value.to_string())
+    }
+}
+
+impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolNodeQuery {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &nidx_protos::graph_query::PathQuery) -> Result<Self, Self::Error> {
+        let bool_expr = match &value.query {
+            Some(query) => match query {
+                nidx_protos::graph_query::path_query::Query::Path(path) => {
+                    if !(path.source.is_some()
+                        && path.relation.is_none()
+                        && path.destination.is_none()
+                        && path.undirected == true)
+                    {
+                        // We are doing something wrong between search API and nidx
+                        return Err(anyhow!(
+                            "Invalid node query, we only expect a source for an undirected path! {path:?}"
+                        ));
+                    }
+
+                    let pb_node = path.source.as_ref().unwrap();
+                    let node = Node::try_from(pb_node)?;
+                    BooleanExpression::Literal(node)
+                }
+
+                nidx_protos::graph_query::path_query::Query::BoolNot(bool_not) => {
+                    let subquery = BoolNodeQuery::try_from(bool_not.as_ref())?.0;
+                    BooleanExpression::Not(Box::new(subquery))
+                }
+
+                nidx_protos::graph_query::path_query::Query::BoolAnd(bool_and) => {
+                    BooleanExpression::Operation(BooleanOperation {
+                        operator: Operator::And,
+                        operands: bool_and
+                            .operands
+                            .iter()
+                            .map(|o| BoolNodeQuery::try_from(o).map(|x| x.0))
+                            .collect::<anyhow::Result<Vec<_>>>()?,
+                    })
+                }
+
+                nidx_protos::graph_query::path_query::Query::BoolOr(bool_or) => {
+                    BooleanExpression::Operation(BooleanOperation {
+                        operator: Operator::Or,
+                        operands: bool_or
+                            .operands
+                            .iter()
+                            .map(|o| BoolNodeQuery::try_from(o).map(|x| x.0))
+                            .collect::<anyhow::Result<Vec<_>>>()?,
+                    })
+                }
+            },
+
+            None => BooleanExpression::Literal(Node::default()),
+        };
+
+        Ok(BoolNodeQuery(bool_expr))
     }
 }
 
