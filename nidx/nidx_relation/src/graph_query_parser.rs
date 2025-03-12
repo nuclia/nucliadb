@@ -245,7 +245,7 @@ impl GraphQueryParser {
                 let mut subqueries = vec![];
 
                 subqueries.extend(self.has_node_expression_as_source(&source_expression));
-                subqueries.extend(self.has_relation(relation_expression).into_iter());
+                subqueries.extend(self.has_relation(&relation_expression).into_iter());
                 subqueries.extend(self.has_node_expression_as_destination(&destination_expression));
 
                 // Due to implementation details on tantivy, a query containing only MustNot won't
@@ -389,29 +389,29 @@ impl GraphQueryParser {
     }
 
     // Return a list of queries needed to match a triplet containing such relation expression
-    fn has_relation(&self, expression: Expression<Relation>) -> Vec<(Occur, Box<dyn Query>)> {
+    fn has_relation(&self, expression: &Expression<Relation>) -> Vec<(Occur, Box<dyn Query>)> {
         let mut subqueries = vec![];
 
         match expression {
             Expression::Value(Relation { value: None }) => {}
             Expression::Value(Relation { value: Some(value) }) if value.is_empty() => {}
             Expression::Value(Relation { value: Some(value) }) => {
-                subqueries.push((Occur::Must, self.has_relation_label(&value)));
+                subqueries.push((Occur::Must, self.has_relation_label(value)));
             }
 
             Expression::Not(Relation { value: None }) => {}
             Expression::Not(Relation { value: Some(value) }) if value.is_empty() => {}
             Expression::Not(Relation { value: Some(value) }) => {
-                subqueries.push((Occur::MustNot, self.has_relation_label(&value)));
+                subqueries.push((Occur::MustNot, self.has_relation_label(value)));
             }
 
             Expression::Or(relations) => {
                 subqueries.extend(relations.into_iter().flat_map(|relation| {
-                    if let Some(label) = relation.value {
+                    if let Some(label) = &relation.value {
                         if label.is_empty() {
                             None
                         } else {
-                            Some((Occur::Should, self.has_relation_label(&label)))
+                            Some((Occur::Should, self.has_relation_label(label)))
                         }
                     } else {
                         None
