@@ -238,6 +238,8 @@ message GraphSearchRequest {
         PATH = 0;
         NODES = 1;
         RELATIONS = 2;
+        SOURCE_NODES = 3;
+        DESTINATION_NODES = 4;
     }
     QueryKind kind = 3;
 
