@@ -30,7 +30,7 @@ import pytest
 from nucliadb import tasks
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.context import ApplicationContext
-from nucliadb.tasks.retries import TaskMetadata, TaskRetryHandler, purge
+from nucliadb.tasks.retries import TaskMetadata, TaskRetryHandler, purge_metadata
 from nucliadb.tasks.utils import NatsConsumer, NatsStream
 from nucliadb_utils.settings import indexing_settings
 
@@ -328,7 +328,7 @@ async def test_task_retry_handler_max_retries(context):
     assert "Max retries reached" in metadata.error_messages[-1]
 
 
-async def test_purge_retries(context):
+async def test_purge_metadata(context):
     trh1 = TaskRetryHandler(kbid="kbid", task_type="foo", task_id="task_id", context=context)
     old_metadata = TaskMetadata(
         task_id="task_id",
@@ -349,8 +349,8 @@ async def test_purge_retries(context):
     )
     await trh2.set_metadata(recent_metadata)
 
-    assert await purge(context.kv_driver) == 1
-    assert await purge(context.kv_driver) == 0
+    assert await purge_metadata(context.kv_driver) == 1
+    assert await purge_metadata(context.kv_driver) == 0
 
     assert await trh1.get_metadata() is None
     assert await trh2.get_metadata() == recent_metadata

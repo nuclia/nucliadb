@@ -164,7 +164,7 @@ async def _set_metadata(kv_driver: Driver, metadata_key: str, metadata: TaskMeta
         await txn.commit()
 
 
-async def purge(kv_driver: Driver) -> int:
+async def purge_metadata(kv_driver: Driver) -> int:
     """
     Purges old task metadata records that are in a final state and older than 15 days.
     Returns the total number of records purged.
@@ -211,7 +211,7 @@ async def purge_batch(
     to_delete = []
     for key in keys:
         metadata = await _get_metadata(kv_driver, key)
-        if metadata is None:
+        if metadata is None:  # pragma: no cover
             continue
         task_finished = metadata.status in (TaskMetadata.Status.COMPLETED, TaskMetadata.Status.FAILED)
         old_task = (
@@ -222,13 +222,13 @@ async def purge_batch(
             to_delete.append(key)
 
     n_to_delete = len(to_delete)
-    logger.info(f"Deleting {n_to_delete} old task metadata records")
     delete_batch_size = 50
     while len(to_delete) > 0:
         batch = to_delete[:delete_batch_size]
         to_delete = to_delete[delete_batch_size:]
         async with kv_driver.transaction() as txn:
             for key in batch:
+                logger.info("Purging task metadata", extra={"key": key})
                 await txn.delete(key)
             await txn.commit()
     return keys[-1], n_to_delete
