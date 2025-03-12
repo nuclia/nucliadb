@@ -38,12 +38,14 @@ async def delete_backup_task(context: ApplicationContext, msg: DeleteBackupReque
 
 
 async def delete_backup(context: ApplicationContext, backup_id: str):
+    total_deleted = 0
     while True:
         deleted = await delete_n(context, backup_id, n=1000)
         if deleted == 0:
             # No more objects to delete
             break
-        logger.info(f"Deleted {deleted} objects from backup", extra={"backup_id": backup_id})
+        total_deleted += deleted
+        logger.info(f"Deleted {total_deleted} objects from backup", extra={"backup_id": backup_id})
     logger.info(f"Backup deletion completed", extra={"backup_id": backup_id})
 
 
