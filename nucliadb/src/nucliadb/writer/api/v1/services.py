@@ -283,7 +283,7 @@ async def delete_custom_synonyms(request: Request, kbid: str):
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def set_search_configuration(
+async def create_search_configuration(
     request: Request, kbid: str, config_name: str, search_configuration: SearchConfiguration
 ):
     async with datamanagers.with_transaction() as txn:
@@ -299,6 +299,32 @@ async def set_search_configuration(
         await txn.commit()
 
     return Response(status_code=201)
+
+
+@api.patch(
+    f"/{KB_PREFIX}/{{kbid}}/search_configurations/{{config_name}}",
+    status_code=200,
+    summary="Update search configuration",
+    tags=["Knowledge Box Services"],
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def update_search_configuration(
+    request: Request, kbid: str, config_name: str, search_configuration: SearchConfiguration
+):
+    async with datamanagers.with_transaction() as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+
+        if await datamanagers.search_configurations.get(txn, kbid=kbid, name=config_name) is None:
+            raise HTTPException(status_code=404, detail="Search configuration does not exist")
+
+        await datamanagers.search_configurations.set(
+            txn, kbid=kbid, name=config_name, config=search_configuration
+        )
+        await txn.commit()
+
+    return Response(status_code=200)
 
 
 @api.delete(

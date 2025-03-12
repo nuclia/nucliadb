@@ -1583,7 +1583,9 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
         description="Whether to generate an answer using the generative model. If set to false, the response will only contain the retrieval results.",
     )
 
-    search_configuration: Optional[str] = Field(default=None, description="Use search configuration")
+    search_configuration: Optional[str] = Field(
+        default=None, description="Load ask parameters from this configuration"
+    )
 
     @field_validator("rag_strategies", mode="before")
     @classmethod
@@ -1739,6 +1741,10 @@ class FindRequest(BaseSearchRequest):
             [Filter(all=["NLP", "BERT"])],
             ["Friedrich Nietzsche", "Immanuel Kant"],
         ],
+    )
+
+    search_configuration: Optional[str] = Field(
+        default=None, description="Load find parameters from this configuration"
     )
 
     @field_validator("features", mode="after")

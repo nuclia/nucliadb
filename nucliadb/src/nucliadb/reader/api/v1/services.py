@@ -38,6 +38,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader import SERVICE_NAME
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb.reader.reader.notifications import kb_notifications_stream
+from nucliadb_models.configuration import SearchConfiguration
 from nucliadb_models.entities import (
     EntitiesGroup,
     KnowledgeBoxEntities,
@@ -315,3 +316,41 @@ async def processing_status(
     # overwrite result with only resources that exist in the database.
     results.results = result_items
     return results
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/search_configurations/{{config_name}}",
+    status_code=201,
+    summary="Get search configuration",
+    tags=["Knowledge Box Services"],
+    response_model_exclude_unset=True,
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def get_search_configuration(request: Request, kbid: str, config_name: str) -> SearchConfiguration:
+    async with datamanagers.with_transaction() as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+
+        config = await datamanagers.search_configurations.get(txn, kbid=kbid, name=config_name)
+        if config is None:
+            raise HTTPException(status_code=404, detail="Search configuration does not exist")
+
+        return config
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/search_configurations",
+    status_code=200,
+    summary="List search configurations",
+    tags=["Knowledge Box Services"],
+    response_model_exclude_unset=True,
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def list_search_configurations(request: Request, kbid: str) -> dict[str, SearchConfiguration]:
+    async with datamanagers.with_transaction() as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+
+        return await datamanagers.search_configurations.list(txn, kbid=kbid)
