@@ -21,6 +21,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::path::Path;
 
+use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::{
     EntitiesSubgraphResponse, GraphSearchRequest, GraphSearchResponse, RelationNode, RelationPrefixSearchResponse,
@@ -30,6 +31,7 @@ use tantivy::collector::TopDocs;
 use tantivy::query::{BooleanQuery, Occur, Query};
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
 
+use crate::graph_collector::{NodeSelector, TopUniqueNodeCollector, TopUniqueRelationCollector};
 use crate::graph_query_parser::{
     BoolGraphQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
 };
@@ -80,8 +82,24 @@ impl RelationsReaderService {
         let parser = GraphQueryParser::new();
         let index_query = parser.parse_bool(query);
 
-        // Tantivy searcher query
-        let collector = TopDocs::with_limit(request.top_k as usize);
+        let top_k = request.top_k as usize;
+
+        let response = match request.kind() {
+            QueryKind::Path => self.paths_graph_search(&index_query, top_k),
+            QueryKind::Nodes => self.nodes_graph_search(&index_query, top_k, NodeSelector::AnyNode),
+            QueryKind::SourceNodes => self.nodes_graph_search(&index_query, top_k, NodeSelector::SourceNodes),
+            QueryKind::DestinationNodes => self.nodes_graph_search(&index_query, top_k, NodeSelector::DestinationNodes),
+            QueryKind::Relations => self.relations_graph_search(&index_query, top_k),
+        };
+        response
+    }
+
+    pub fn inner_graph_search(&self, query: GraphQuery) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
+        let parser = GraphQueryParser::new();
+        let index_query: Box<dyn Query> = parser.parse(query);
+
+        // TODO: parametrize this magic constant
+        let collector = TopDocs::with_limit(1000);
 
         let searcher = self.reader.searcher();
         let matching_docs = searcher.search(&index_query, &collector)?;
@@ -90,6 +108,63 @@ impl RelationsReaderService {
             &searcher,
             matching_docs.into_iter().map(|(_score, doc_address)| doc_address),
         )
+    }
+
+    fn paths_graph_search(&self, query: &dyn Query, top_k: usize) -> anyhow::Result<GraphSearchResponse> {
+        // Path search consist of retrieving triplets of (node, relation, node). That's how we currently
+        // store the graph, so we don't need a special collector.
+        let collector = TopDocs::with_limit(top_k);
+        let searcher = self.reader.searcher();
+        let matching_docs = searcher.search(query, &collector)?;
+        self.build_graph_response(
+            &searcher,
+            matching_docs.into_iter().map(|(_score, doc_address)| doc_address),
+        )
+    }
+
+    fn nodes_graph_search(
+        &self,
+        query: &dyn Query,
+        top_k: usize,
+        selector: NodeSelector,
+    ) -> anyhow::Result<GraphSearchResponse> {
+        // Node search returns unique nodes using a custom collector
+        let collector = TopUniqueNodeCollector::new(selector, top_k);
+        let searcher = self.reader.searcher();
+        let results = searcher.search(query, &collector)?;
+
+        let nodes = results
+            .into_iter()
+            .map(|(value, node_type, node_subtype)| RelationNode {
+                value,
+                ntype: node_type,
+                subtype: node_subtype,
+            })
+            .collect();
+
+        let response = nidx_protos::GraphSearchResponse {
+            nodes,
+            ..Default::default()
+        };
+        Ok(response)
+    }
+
+    fn relations_graph_search(&self, query: &dyn Query, top_k: usize) -> anyhow::Result<GraphSearchResponse> {
+        // Relation search returns unique relations using a custom collector
+        let collector = TopUniqueRelationCollector::new(top_k);
+        let searcher = self.reader.searcher();
+        let matching_docs = searcher.search(query, &collector)?;
+
+        let relations = matching_docs
+            .into_iter()
+            .map(|doc| io_maps::doc_to_graph_relation(&self.schema, &doc))
+            .collect();
+
+        let response = nidx_protos::GraphSearchResponse {
+            relations,
+            ..Default::default()
+        };
+        Ok(response)
     }
 
     fn build_graph_response(
@@ -132,22 +207,6 @@ impl RelationsReaderService {
             graph,
         };
         Ok(response)
-    }
-
-    pub fn inner_graph_search(&self, query: GraphQuery) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
-        let parser = GraphQueryParser::new();
-        let index_query: Box<dyn Query> = parser.parse(query);
-
-        // TODO: parametrize this magic constant
-        let collector = TopDocs::with_limit(1000);
-
-        let searcher = self.reader.searcher();
-        let matching_docs = searcher.search(&index_query, &collector)?;
-
-        self.build_graph_response(
-            &searcher,
-            matching_docs.into_iter().map(|(_score, doc_address)| doc_address),
-        )
     }
 }
 

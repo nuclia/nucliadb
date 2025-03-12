@@ -26,6 +26,7 @@ use std::time::SystemTime;
 use common::services::NidxFixture;
 use nidx_protos::graph_query::node::MatchKind;
 use nidx_protos::graph_query::path_query;
+use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
@@ -401,6 +402,94 @@ async fn setup_knowledge_graph(fixture: &mut NidxFixture) -> anyhow::Result<Stri
 }
 
 #[sqlx::test]
+async fn test_graph_search_nodes(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
+    let shard_id = setup_knowledge_graph(&mut fixture).await?;
+
+    // Search all nodes `s` or `d`
+    // (s)-[]->(d)
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path::default())),
+                }),
+            }),
+            top_k: 100,
+            kind: QueryKind::Nodes.into(),
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    let nodes = &response.nodes;
+    assert_eq!(nodes.len(), 17);
+
+    // Only source nodes
+    // (s)-[]->()
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path::default())),
+                }),
+            }),
+            top_k: 100,
+            kind: QueryKind::SourceNodes.into(),
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    let nodes = &response.nodes;
+    assert_eq!(nodes.len(), 9);
+
+    // Only destination nodes
+    // ()-[]->(d)
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path::default())),
+                }),
+            }),
+            top_k: 100,
+            kind: QueryKind::DestinationNodes.into(),
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    let nodes = &response.nodes;
+    assert_eq!(nodes.len(), 13);
+
+    // Limit by top_k
+    // (s)-[]->()
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path::default())),
+                }),
+            }),
+            top_k: 10,
+            kind: QueryKind::Nodes.into(),
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    let nodes = &response.nodes;
+    assert_eq!(nodes.len(), 10);
+
+    Ok(())
+}
+
+#[sqlx::test]
 #[allow(non_snake_case)]
 async fn test_graph_search__node_query(pool: PgPool) -> anyhow::Result<()> {
     let mut fixture = NidxFixture::new(pool).await?;
@@ -623,6 +712,96 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
     let relations = friendly_parse(&response);
     assert_eq!(relations.len(), 1);
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
+
+    Ok(())
+}
+
+#[sqlx::test]
+#[allow(non_snake_case)]
+async fn test_graph_search_relations(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
+    let shard_id = setup_knowledge_graph(&mut fixture).await?;
+
+    // Does LIVE_IN relation exist?
+    // ()-[:LIVE_IN]->()
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        relation: Some(graph_query::Relation {
+                            value: Some("LIVE_IN".to_string()),
+                        }),
+                        ..Default::default()
+                    })),
+                }),
+            }),
+            kind: QueryKind::Relations.into(),
+            top_k: 100,
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    let relations = response.relations;
+    assert_eq!(relations.len(), 1);
+    assert!(relations.iter().any(|r| r.label == "LIVE_IN"));
+
+    // Does PLAYEDrelation exist?
+    // ()-[:PLAYED]->()
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        relation: Some(graph_query::Relation {
+                            value: Some("PLAYED".to_string()),
+                        }),
+                        ..Default::default()
+                    })),
+                }),
+            }),
+            kind: QueryKind::Relations.into(),
+            top_k: 100,
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    let relations = response.relations;
+    assert_eq!(relations.len(), 0);
+
+    // Search all relations from Anna
+    // (:Anna)-[r]->()
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            value: Some("Anna".to_string()),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    })),
+                }),
+            }),
+            kind: QueryKind::Relations.into(),
+            top_k: 100,
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    let relations = response.relations;
+    assert_eq!(relations.len(), 4);
+    assert!(relations.iter().any(|r| r.label == "FOLLOW"));
+    assert!(relations.iter().any(|r| r.label == "LIVE_IN"));
+    assert!(relations.iter().any(|r| r.label == "LOVE"));
+    assert!(relations.iter().any(|r| r.label == "WORK_IN"));
 
     Ok(())
 }
