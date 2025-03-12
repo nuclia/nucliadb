@@ -37,6 +37,7 @@ from nucliadb.ingest.orm.knowledgebox import (
     RESOURCE_TO_DELETE_STORAGE_BASE,
     KnowledgeBox,
 )
+from nucliadb.tasks.retries import purge_metadata as purge_task_metadata
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig, VectorSetPurge
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
@@ -270,6 +271,7 @@ async def main():
         service_name=SERVICE_NAME,
     )
     try:
+        purge_task_metadata_task = asyncio.create_task(purge_task_metadata(driver))
         purge_resources_storage_task = asyncio.create_task(
             purge_deleted_resource_storage(driver, storage)
         )
@@ -277,6 +279,7 @@ async def main():
         await purge_kb_storage(driver, storage)
         await purge_kb_vectorsets(driver, storage)
         await purge_resources_storage_task
+        await purge_task_metadata_task
     except Exception as ex:  # pragma: no cover
         logger.exception("Unhandled exception on purge command")
         errors.capture_exception(ex)

@@ -21,6 +21,7 @@ import asyncio
 import time
 import uuid
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 import pydantic
@@ -29,7 +30,7 @@ import pytest
 from nucliadb import tasks
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.context import ApplicationContext
-from nucliadb.tasks.retries import TaskMetadata, TaskRetryHandler
+from nucliadb.tasks.retries import TaskMetadata, TaskRetryHandler, purge_metadata
 from nucliadb.tasks.utils import NatsConsumer, NatsStream
 from nucliadb_utils.settings import indexing_settings
 
@@ -325,3 +326,31 @@ async def test_task_retry_handler_max_retries(context):
     metadata = await trh.get_metadata()
     assert metadata.status == TaskMetadata.Status.FAILED
     assert "Max retries reached" in metadata.error_messages[-1]
+
+
+async def test_purge_metadata(context):
+    trh1 = TaskRetryHandler(kbid="kbid", task_type="foo", task_id="task_id", context=context)
+    old_metadata = TaskMetadata(
+        task_id="task_id",
+        status=TaskMetadata.Status.COMPLETED,
+        retries=0,
+        error_messages=[],
+        last_modified=datetime(2021, 1, 1, tzinfo=timezone.utc),
+    )
+    await trh1.set_metadata(old_metadata)
+
+    trh2 = TaskRetryHandler(kbid="kbid", task_type="bar", task_id="task_id", context=context)
+    recent_metadata = TaskMetadata(
+        task_id="task_id",
+        status=TaskMetadata.Status.RUNNING,
+        retries=0,
+        error_messages=[],
+        last_modified=datetime.now(timezone.utc),
+    )
+    await trh2.set_metadata(recent_metadata)
+
+    assert await purge_metadata(context.kv_driver) == 1
+    assert await purge_metadata(context.kv_driver) == 0
+
+    assert await trh1.get_metadata() is None
+    assert await trh2.get_metadata() == recent_metadata
