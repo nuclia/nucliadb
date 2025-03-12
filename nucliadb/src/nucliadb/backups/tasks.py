@@ -21,7 +21,7 @@ from typing import Awaitable, Callable
 
 from nucliadb.backups.const import BackupsNatsConfig
 from nucliadb.backups.create import backup_kb_task
-from nucliadb.backups.delete import delete_backup
+from nucliadb.backups.delete import delete_backup_task
 from nucliadb.backups.models import CreateBackupRequest, DeleteBackupRequest, RestoreBackupRequest
 from nucliadb.backups.restore import restore_kb_task
 from nucliadb.common.context import ApplicationContext
@@ -83,11 +83,11 @@ async def restore(kbid: str, backup_id: str) -> None:
 
 
 def deleter_consumer() -> NatsTaskConsumer[DeleteBackupRequest]:
-    consumer: NatsTaskConsumer = create_consumer(
+    consumer: NatsTaskConsumer[DeleteBackupRequest] = create_consumer(
         name="backup_deleter",
         stream=BackupsNatsConfig.stream,
         consumer=BackupsNatsConfig.delete_consumer,
-        callback=delete_backup,
+        callback=delete_backup_task,
         msg_type=DeleteBackupRequest,
         max_concurrent_messages=2,
     )
