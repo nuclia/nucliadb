@@ -598,7 +598,7 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
     let relations = friendly_parse(&response);
     assert_eq!(relations.len(), 0);
 
-    // (:~AnXstXsia)
+    // (:~Ansatasia)
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
@@ -607,7 +607,7 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
                         source: Some(graph_query::Node {
-                            value: Some("AnXstXsia".to_string()),
+                            value: Some("Ansatasia".to_string()),
                             match_kind: MatchKind::Fuzzy.into(),
                             ..Default::default()
                         }),
