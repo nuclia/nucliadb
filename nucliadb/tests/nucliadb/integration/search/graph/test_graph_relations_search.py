@@ -22,13 +22,9 @@ from httpx import AsyncClient
 
 from nucliadb_models.graph.responses import GraphRelationsSearchResponse
 
-# FIXME: in this case, the number of relations returned is correct but they are
-# duplicated, as Rust don't deduplicate them. Maybe the response should be
-# different?
-
 
 @pytest.mark.deploy_modes("standalone")
-async def test_graph_nodes_search(
+async def test_graph_relations_search(
     nucliadb_reader: AsyncClient,
     kb_with_entity_graph: str,
 ):
@@ -47,7 +43,22 @@ async def test_graph_nodes_search(
     )
     assert resp.status_code == 200
     relations = GraphRelationsSearchResponse.model_validate(resp.json()).relations
-    assert len(relations) == 2
+    assert len(relations) == 1
+
+    # [:COOK]
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph/relations",
+        json={
+            "query": {
+                "prop": "relation",
+                "label": "COOK",
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    relations = GraphRelationsSearchResponse.model_validate(resp.json()).relations
+    assert len(relations) == 0
 
     # [: LIVE_IN | BORN_IN]
     resp = await nucliadb_reader.post(
@@ -70,7 +81,7 @@ async def test_graph_nodes_search(
     )
     assert resp.status_code == 200
     relations = GraphRelationsSearchResponse.model_validate(resp.json()).relations
-    assert len(relations) == 3
+    assert len(relations) == 2
 
     # [:!LIVE_IN]
     resp = await nucliadb_reader.post(
@@ -87,4 +98,4 @@ async def test_graph_nodes_search(
     )
     assert resp.status_code == 200
     relations = GraphRelationsSearchResponse.model_validate(resp.json()).relations
-    assert len(relations) == 14
+    assert len(relations) == 8

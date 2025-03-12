@@ -126,8 +126,6 @@ GraphNodesQuery = Annotated[
         Annotated[And["GraphNodesQuery"], Tag("and")],
         Annotated[Or["GraphNodesQuery"], Tag("or")],
         Annotated[Not["GraphNodesQuery"], Tag("not")],
-        Annotated[SourceNode, Tag("source_node")],
-        Annotated[DestinationNode, Tag("destination_node")],
         Annotated[AnyNode, Tag("node")],
     ],
     Discriminator(graph_query_discriminator),

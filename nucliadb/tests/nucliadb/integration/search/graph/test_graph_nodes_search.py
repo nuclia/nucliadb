@@ -22,9 +22,6 @@ from httpx import AsyncClient
 
 from nucliadb_models.graph.responses import GraphNodesSearchResponse
 
-# FIXME: all asserts here are wrong, as we are not deduplicating nor Rust is
-# returning the proper entities. Fix all asserts once both issues are tackled
-
 
 @pytest.mark.deploy_modes("standalone")
 async def test_graph_nodes_search(
@@ -33,7 +30,23 @@ async def test_graph_nodes_search(
 ):
     kbid = kb_with_entity_graph
 
-    # (:PERSON)
+    # Search all nodes
+    # (n)
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph/nodes",
+        json={
+            "query": {
+                "prop": "node",
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    nodes = GraphNodesSearchResponse.model_validate(resp.json()).nodes
+    assert len(nodes) == 17
+
+    # Search PERSON nodes
+    # (n:PERSON)
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/graph/nodes",
         json={
@@ -46,59 +59,4 @@ async def test_graph_nodes_search(
     )
     assert resp.status_code == 200
     nodes = GraphNodesSearchResponse.model_validate(resp.json()).nodes
-    assert len(nodes) == 24
-
-    # (:PERSON)-[]->()
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/graph/nodes",
-        json={
-            "query": {
-                "prop": "source_node",
-                "group": "PERSON",
-            },
-            "top_k": 100,
-        },
-    )
-    assert resp.status_code == 200
-    nodes = GraphNodesSearchResponse.model_validate(resp.json()).nodes
-    assert len(nodes) == 24
-
-    # ()-[]->(:PERSON)
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/graph/nodes",
-        json={
-            "query": {
-                "prop": "destination_node",
-                "group": "PERSON",
-            },
-            "top_k": 100,
-        },
-    )
-    assert resp.status_code == 200
-    nodes = GraphNodesSearchResponse.model_validate(resp.json()).nodes
     assert len(nodes) == 6
-
-    # (:Anastasia) -- implemented as an or instead of using prop=node
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/graph/nodes",
-        json={
-            "query": {
-                "or": [
-                    {
-                        "prop": "source_node",
-                        "value": "Anastasia",
-                        "group": "PERSON",
-                    },
-                    {
-                        "prop": "destination_node",
-                        "value": "Anastasia",
-                        "group": "PERSON",
-                    },
-                ],
-            },
-            "top_k": 100,
-        },
-    )
-    assert resp.status_code == 200
-    nodes = GraphNodesSearchResponse.model_validate(resp.json()).nodes
-    assert len(nodes) == 4
