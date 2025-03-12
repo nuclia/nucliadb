@@ -37,7 +37,6 @@ pub type RelationId = (String, u64);
 
 #[derive(Clone, Copy)]
 pub enum NodeSelector {
-    AnyNode,
     SourceNodes,
     DestinationNodes,
 }
@@ -142,9 +141,6 @@ impl Collector for TopUniqueRelationCollector {
         &self,
         segment_fruits: Vec<<Self::Child as SegmentCollector>::Fruit>,
     ) -> tantivy::Result<Self::Fruit> {
-        // 1. Merge de hash maps
-        // 2. Build a vec of documents for unique relations
-
         let mut unique = HashSet::new();
         let mut docs = Vec::new();
         let mut fruits = segment_fruits.into_iter().flatten();
@@ -179,20 +175,21 @@ impl SegmentCollector for TopUniqueNodeSegmentCollector {
             }
         };
 
-        if matches!(self.selector, NodeSelector::SourceNodes) || matches!(self.selector, NodeSelector::AnyNode) {
-            let source_value = self.schema.source_value(&doc).to_string();
-            let source_type = io_maps::u64_to_node_type::<i32>(self.schema.source_type(&doc));
-            let source_subtype = self.schema.source_subtype(&doc).to_string();
-            self.unique.insert((source_value, source_type, source_subtype));
-        }
-
-        if matches!(self.selector, NodeSelector::DestinationNodes) || matches!(self.selector, NodeSelector::AnyNode) {
-            let destination_value = self.schema.target_value(&doc).to_string();
-            let destination_type = io_maps::u64_to_node_type::<i32>(self.schema.target_type(&doc));
-            let destination_subtype = self.schema.target_subtype(&doc).to_string();
-            self.unique
-                .insert((destination_value, destination_type, destination_subtype));
-        }
+        let node = match self.selector {
+            NodeSelector::SourceNodes => {
+                let source_value = self.schema.source_value(&doc).to_string();
+                let source_type = io_maps::u64_to_node_type::<i32>(self.schema.source_type(&doc));
+                let source_subtype = self.schema.source_subtype(&doc).to_string();
+                (source_value, source_type, source_subtype)
+            }
+            NodeSelector::DestinationNodes => {
+                let destination_value = self.schema.target_value(&doc).to_string();
+                let destination_type = io_maps::u64_to_node_type::<i32>(self.schema.target_type(&doc));
+                let destination_subtype = self.schema.target_subtype(&doc).to_string();
+                (destination_value, destination_type, destination_subtype)
+            }
+        };
+        self.unique.insert(node);
     }
 
     fn harvest(self) -> Self::Fruit {

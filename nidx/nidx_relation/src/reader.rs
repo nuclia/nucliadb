@@ -86,9 +86,7 @@ impl RelationsReaderService {
 
         let response = match request.kind() {
             QueryKind::Path => self.paths_graph_search(&index_query, top_k),
-            QueryKind::Nodes => self.nodes_graph_search(&index_query, top_k, NodeSelector::AnyNode),
-            QueryKind::SourceNodes => self.nodes_graph_search(&index_query, top_k, NodeSelector::SourceNodes),
-            QueryKind::DestinationNodes => self.nodes_graph_search(&index_query, top_k, NodeSelector::DestinationNodes),
+            QueryKind::Nodes => self.nodes_graph_search(&index_query, top_k),
             QueryKind::Relations => self.relations_graph_search(&index_query, top_k),
         };
         response
@@ -125,22 +123,39 @@ impl RelationsReaderService {
     fn nodes_graph_search(
         &self,
         query: &dyn Query,
-        top_k: usize,
-        selector: NodeSelector,
+        top_k: usize
     ) -> anyhow::Result<GraphSearchResponse> {
-        // Node search returns unique nodes using a custom collector
-        let collector = TopUniqueNodeCollector::new(selector, top_k);
-        let searcher = self.reader.searcher();
-        let results = searcher.search(query, &collector)?;
+        let mut nodes = Vec::new();
 
-        let nodes = results
-            .into_iter()
-            .map(|(value, node_type, node_subtype)| RelationNode {
-                value,
-                ntype: node_type,
-                subtype: node_subtype,
-            })
-            .collect();
+        let collector = TopUniqueNodeCollector::new(NodeSelector::SourceNodes, top_k);
+        let searcher = self.reader.searcher();
+        let source_nodes = searcher.search(query, &collector)?;
+        nodes.extend(
+            source_nodes
+                .into_iter()
+                .map(|(value, node_type, node_subtype)| RelationNode {
+                    value,
+                    ntype: node_type,
+                    subtype: node_subtype,
+                })
+        );
+
+        let remaining_k = top_k - nodes.len();
+        if remaining_k > 0 {
+            let collector = TopUniqueNodeCollector::new(NodeSelector::DestinationNodes, remaining_k);
+            let searcher = self.reader.searcher();
+            let destination_nodes = searcher.search(query, &collector)?;
+            nodes.extend(
+                destination_nodes
+                    .into_iter()
+                    .map(|(value, node_type, node_subtype)| RelationNode {
+                        value,
+                        ntype: node_type,
+                        subtype: node_subtype,
+                    })
+            );
+        }
+
 
         let response = nidx_protos::GraphSearchResponse {
             nodes,

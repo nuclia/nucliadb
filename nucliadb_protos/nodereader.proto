@@ -232,14 +232,12 @@ message GraphSearchRequest {
     string shard = 1;
     GraphQuery query = 2;
 
-    // decides what do we want in return: paths (triplets), nodes or relations.
+    // Decides what do we want in return: paths (triplets), nodes or relations.
     // Returning paths implies returning nodes and relations.
     enum QueryKind {
         PATH = 0;
         NODES = 1;
         RELATIONS = 2;
-        SOURCE_NODES = 3;
-        DESTINATION_NODES = 4;
     }
     QueryKind kind = 3;
 

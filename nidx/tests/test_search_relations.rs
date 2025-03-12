@@ -748,7 +748,7 @@ async fn test_graph_search_relations(pool: PgPool) -> anyhow::Result<()> {
     assert_eq!(relations.len(), 1);
     assert!(relations.iter().any(|r| r.label == "LIVE_IN"));
 
-    // Does PLAYEDrelation exist?
+    // Does PLAYED relation exist?
     // ()-[:PLAYED]->()
     let response = fixture
         .searcher_client
