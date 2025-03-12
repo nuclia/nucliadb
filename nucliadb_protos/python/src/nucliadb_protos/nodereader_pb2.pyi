@@ -840,19 +840,15 @@ class GraphSearchRequest(google.protobuf.message.Message):
         PATH: GraphSearchRequest._QueryKind.ValueType  # 0
         NODES: GraphSearchRequest._QueryKind.ValueType  # 1
         RELATIONS: GraphSearchRequest._QueryKind.ValueType  # 2
-        SOURCE_NODES: GraphSearchRequest._QueryKind.ValueType  # 3
-        DESTINATION_NODES: GraphSearchRequest._QueryKind.ValueType  # 4
 
     class QueryKind(_QueryKind, metaclass=_QueryKindEnumTypeWrapper):
-        """decides what do we want in return: paths (triplets), nodes or relations.
+        """Decides what do we want in return: paths (triplets), nodes or relations.
         Returning paths implies returning nodes and relations.
         """
 
     PATH: GraphSearchRequest.QueryKind.ValueType  # 0
     NODES: GraphSearchRequest.QueryKind.ValueType  # 1
     RELATIONS: GraphSearchRequest.QueryKind.ValueType  # 2
-    SOURCE_NODES: GraphSearchRequest.QueryKind.ValueType  # 3
-    DESTINATION_NODES: GraphSearchRequest.QueryKind.ValueType  # 4
 
     SHARD_FIELD_NUMBER: builtins.int
     QUERY_FIELD_NUMBER: builtins.int
