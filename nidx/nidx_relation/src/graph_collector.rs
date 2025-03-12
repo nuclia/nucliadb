@@ -91,7 +91,7 @@ impl Collector for TopUniqueNodeCollector {
     type Child = TopUniqueNodeSegmentCollector;
 
     fn requires_scoring(&self) -> bool {
-        true
+        false
     }
 
     fn for_segment(&self, _segment_local_id: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
@@ -125,7 +125,7 @@ impl Collector for TopUniqueRelationCollector {
     type Child = TopUniqueRelationSegmentCollector;
 
     fn requires_scoring(&self) -> bool {
-        true
+        false
     }
 
     fn for_segment(&self, _segment_local_id: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
