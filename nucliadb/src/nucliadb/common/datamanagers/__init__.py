@@ -39,6 +39,7 @@ from . import (
     processing,
     resources,
     rollover,
+    search_configurations,
     synonyms,
     vectorsets,
 )
@@ -55,6 +56,7 @@ __all__ = (
     "processing",
     "resources",
     "rollover",
+    "search_configurations",
     "synonyms",
     "vectorsets",
     "with_transaction",

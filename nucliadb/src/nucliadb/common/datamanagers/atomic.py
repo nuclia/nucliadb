@@ -45,6 +45,7 @@ from nucliadb.common.maindb.driver import Transaction
 from . import kb as kb_dm
 from . import labels as labels_dm
 from . import resources as resources_dm
+from . import search_configurations as search_configurations_dm
 from . import synonyms as synonyms_dm
 from .utils import with_ro_transaction, with_transaction
 
@@ -94,3 +95,7 @@ class labelset:
 class synonyms:
     get = ro_txn_wrap(synonyms_dm.get)
     set = rw_txn_wrap(synonyms_dm.set)
+
+
+class search_configurations:
+    get = ro_txn_wrap(search_configurations_dm.get)

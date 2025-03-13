@@ -104,10 +104,13 @@ async def test_ask_endpoint_handles_errors(ask_mock, ask_error, http_error_respo
             "headers": [],
         }
     )
+
+    mock_ask_request = Mock()
+    mock_ask_request.search_configuration = None
     response = await ask_knowledgebox_endpoint(
         request=request,
         kbid="kbid",
-        item=Mock(),
+        item=mock_ask_request,
         x_ndb_client=None,
         x_nucliadb_user="",
         x_forwarded_for="",

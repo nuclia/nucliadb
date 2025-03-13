@@ -25,6 +25,7 @@ from fastapi.openapi.models import Example
 from fastapi_versioning import version
 from pydantic import ValidationError
 
+from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
@@ -35,6 +36,7 @@ from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.utils import maybe_log_request_payload, min_score_from_query_params
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.configuration import FindConfig
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
@@ -129,6 +131,9 @@ async def find_knowledgebox(
     show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
     rank_fusion: RankFusionName = fastapi_query(SearchParamDefaults.rank_fusion),
     reranker: Union[RerankerName, Reranker] = fastapi_query(SearchParamDefaults.reranker),
+    search_configuration: Optional[str] = Query(
+        default=None, description="Load find parameters from this configuration"
+    ),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -203,6 +208,22 @@ async def _find_endpoint(
     x_nucliadb_user: str,
     x_forwarded_for: str,
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
+    if item.search_configuration is not None:
+        search_config = await datamanagers.atomic.search_configurations.get(
+            kbid=kbid, name=item.search_configuration
+        )
+        if search_config is None:
+            return HTTPClientError(status_code=400, detail="Search configuration not found")
+
+        if not isinstance(search_config.config, FindConfig):
+            return HTTPClientError(
+                status_code=400, detail="This search configuration is not valid for `find`"
+            )
+
+        item = FindRequest.model_validate(
+            search_config.config.model_dump(exclude_unset=True) | item.model_dump(exclude_unset=True)
+        )
+
     try:
         maybe_log_request_payload(kbid, "/find", item)
         with cache.request_caches():

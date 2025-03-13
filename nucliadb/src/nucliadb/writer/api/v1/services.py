@@ -30,6 +30,7 @@ from nucliadb.models.responses import (
     HTTPNotFound,
 )
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
+from nucliadb_models.configuration import SearchConfiguration
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
     UpdateEntitiesGroupPayload,
@@ -269,6 +270,80 @@ async def delete_custom_synonyms(request: Request, kbid: str):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         await datamanagers.synonyms.delete(txn, kbid=kbid)
+        await txn.commit()
+
+    return Response(status_code=204)
+
+
+@api.post(
+    f"/{KB_PREFIX}/{{kbid}}/search_configurations/{{config_name}}",
+    status_code=201,
+    summary="Create search configuration",
+    tags=["Knowledge Box Services"],
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def create_search_configuration(
+    request: Request, kbid: str, config_name: str, search_configuration: SearchConfiguration
+):
+    async with datamanagers.with_transaction() as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+
+        if await datamanagers.search_configurations.get(txn, kbid=kbid, name=config_name) is not None:
+            raise HTTPException(status_code=409, detail="Search configuration already exists")
+
+        await datamanagers.search_configurations.set(
+            txn, kbid=kbid, name=config_name, config=search_configuration
+        )
+        await txn.commit()
+
+    return Response(status_code=201)
+
+
+@api.patch(
+    f"/{KB_PREFIX}/{{kbid}}/search_configurations/{{config_name}}",
+    status_code=200,
+    summary="Update search configuration",
+    tags=["Knowledge Box Services"],
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def update_search_configuration(
+    request: Request, kbid: str, config_name: str, search_configuration: SearchConfiguration
+):
+    async with datamanagers.with_transaction() as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+
+        if await datamanagers.search_configurations.get(txn, kbid=kbid, name=config_name) is None:
+            raise HTTPException(status_code=404, detail="Search configuration does not exist")
+
+        await datamanagers.search_configurations.set(
+            txn, kbid=kbid, name=config_name, config=search_configuration
+        )
+        await txn.commit()
+
+    return Response(status_code=200)
+
+
+@api.delete(
+    f"/{KB_PREFIX}/{{kbid}}/search_configurations/{{config_name}}",
+    status_code=204,
+    summary="Delete search configuration",
+    tags=["Knowledge Box Services"],
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def delete_search_configuration(request: Request, kbid: str, config_name: str):
+    async with datamanagers.with_transaction() as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+
+        if await datamanagers.search_configurations.get(txn, kbid=kbid, name=config_name) is None:
+            raise HTTPException(status_code=404, detail="Search configuration does not exist")
+
+        await datamanagers.search_configurations.delete(txn, kbid=kbid, name=config_name)
         await txn.commit()
 
     return Response(status_code=204)
