@@ -147,3 +147,4 @@ class PushMessage(BaseModel):
 
 class PushConversation(BaseModel):
     messages: List[PushMessage] = []
+    extract_strategy: Optional[str] = None
