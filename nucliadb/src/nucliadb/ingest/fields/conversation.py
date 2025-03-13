@@ -56,6 +56,7 @@ class Conversation(Field[PBConversation]):
     async def set_value(self, payload: PBConversation):
         last_page: Optional[PBConversation] = None
         metadata = await self.get_metadata()
+        metadata.extract_strategy = payload.extract_strategy
         if self._created is False and metadata.pages > 0:
             try:
                 last_page = await self.db_get_value(page=metadata.pages)
