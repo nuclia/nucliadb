@@ -45,8 +45,8 @@ BinaryStream = AsyncIterator[bytes]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
 
 
-# Map that indicates which fields are written by the writer and which are written by the processor
-# The keys are the fields of the BrokerMessage proto
+# Map that indicates which fields are written by the writer
+# and which are written by the processor.
 BM_FIELDS = {
     "common": [
         "kbid",
@@ -77,6 +77,8 @@ BM_FIELDS = {
         "question_answers",
         "relations",
     ],
+    # These fields are mostly used for internal purposes and they are not part of
+    # the representation of the exported resource as broker message.
     "ignored": [
         "audit",
         "multiid",
@@ -89,6 +91,7 @@ BM_FIELDS = {
         "delete_fields",
         "delete_question_answers",
     ],
+    # No longer used fields
     "deprecated": [
         "txseqid",
         "user_vectors",
