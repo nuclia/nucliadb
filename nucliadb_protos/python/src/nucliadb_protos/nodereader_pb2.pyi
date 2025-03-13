@@ -842,7 +842,7 @@ class GraphSearchRequest(google.protobuf.message.Message):
         RELATIONS: GraphSearchRequest._QueryKind.ValueType  # 2
 
     class QueryKind(_QueryKind, metaclass=_QueryKindEnumTypeWrapper):
-        """decides what do we want in return: paths (triplets), nodes or relations.
+        """Decides what do we want in return: paths (triplets), nodes or relations.
         Returning paths implies returning nodes and relations.
         """
 

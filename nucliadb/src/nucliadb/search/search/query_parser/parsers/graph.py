@@ -29,6 +29,7 @@ def parse_graph_search(item: graph_requests.GraphSearchRequest) -> GraphRetrieva
     pb = nodereader_pb2.GraphSearchRequest()
     pb.query.path.CopyFrom(_parse_path_query(item.query))
     pb.top_k = item.top_k
+    pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.PATH
     return pb
 
 
@@ -36,6 +37,7 @@ def parse_graph_node_search(item: graph_requests.GraphNodesSearchRequest) -> Gra
     pb = nodereader_pb2.GraphSearchRequest()
     pb.query.path.CopyFrom(_parse_node_query(item.query))
     pb.top_k = item.top_k
+    pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.NODES
     return pb
 
 
@@ -43,6 +45,7 @@ def parse_graph_relation_search(item: graph_requests.GraphRelationsSearchRequest
     pb = nodereader_pb2.GraphSearchRequest()
     pb.query.path.CopyFrom(_parse_relation_query(item.query))
     pb.top_k = item.top_k
+    pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.RELATIONS
     return pb
 
 
@@ -109,12 +112,6 @@ def _parse_node_query(expr: graph_requests.GraphNodesQuery) -> nodereader_pb2.Gr
 
     elif isinstance(expr, graph_requests.Not):
         pb.bool_not.CopyFrom(_parse_node_query(expr.operand))
-
-    elif isinstance(expr, graph_requests.SourceNode):
-        _set_node_to_pb(expr, pb.path.source)
-
-    elif isinstance(expr, graph_requests.DestinationNode):
-        _set_node_to_pb(expr, pb.path.destination)
 
     elif isinstance(expr, graph_requests.AnyNode):
         _set_node_to_pb(expr, pb.path.source)
