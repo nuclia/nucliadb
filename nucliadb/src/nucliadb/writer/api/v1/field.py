@@ -44,6 +44,7 @@ from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.field import (
     extract_file_field,
+    get_field_classification_labels,
     parse_conversation_field,
     parse_file_field,
     parse_link_field,
@@ -193,7 +194,7 @@ async def delete_resource_field_by_slug(
 # Adapters for each parse function
 
 
-def parse_text_field_adapter(
+async def parse_text_field_adapter(
     _kbid: str,
     _rid: str,
     field_id: FieldIdString,
@@ -201,10 +202,10 @@ def parse_text_field_adapter(
     writer: BrokerMessage,
     toprocess: PushPayload,
 ):
-    return parse_text_field(field_id, field_payload, writer, toprocess)
+    return await parse_text_field(field_id, field_payload, writer, toprocess)
 
 
-def parse_link_field_adapter(
+async def parse_link_field_adapter(
     _kbid: str,
     _rid: str,
     field_id: FieldIdString,
@@ -212,7 +213,7 @@ def parse_link_field_adapter(
     writer: BrokerMessage,
     toprocess: PushPayload,
 ):
-    return parse_link_field(field_id, field_payload, writer, toprocess)
+    return await parse_link_field(field_id, field_payload, writer, toprocess)
 
 
 async def parse_conversation_field_adapter(
@@ -240,7 +241,7 @@ async def parse_file_field_adapter(
     )
 
 
-FIELD_PARSERS_MAP: dict[Type, Union[Callable]] = {
+FIELD_PARSERS_MAP: dict[Type, Callable] = {
     models.TextField: parse_text_field_adapter,
     models.LinkField: parse_link_field_adapter,
     models.InputConversationField: parse_conversation_field_adapter,
@@ -537,12 +538,17 @@ async def reprocess_file_field(
         if resource.basic is not None:
             toprocess.title = resource.basic.title
 
+        classif_labels = await get_field_classification_labels(
+            txn, kbid=kbid, rid=rid, field_type=resources_pb2.FieldType.FILE, field_id=field_id
+        )
+
         try:
             await extract_file_field(
                 field_id,
                 resource=resource,
                 toprocess=toprocess,
                 password=x_file_password,
+                classif_labels=classif_labels,
             )
         except KeyError:
             raise HTTPException(status_code=404, detail="Field does not exist")

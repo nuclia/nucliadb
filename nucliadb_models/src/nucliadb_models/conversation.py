@@ -24,6 +24,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from nucliadb_models import CloudLink, FieldRef, FileB64
+from nucliadb_models.labels import ClassificationLabel
 from nucliadb_models.utils import DateTime
 
 # Shared classes
@@ -142,3 +143,4 @@ class PushMessage(BaseModel):
 
 class PushConversation(BaseModel):
     messages: List[PushMessage] = []
+    classification_labels: list[ClassificationLabel] = []

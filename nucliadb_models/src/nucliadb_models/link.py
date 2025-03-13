@@ -22,6 +22,8 @@ from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
+from nucliadb_models.labels import ClassificationLabel
+
 # Shared classes
 
 # NOTHING TO SEE HERE
@@ -80,3 +82,4 @@ class LinkUpload(BaseModel):
         description="Xpath to parse the link",
     )
     extract_strategy: Optional[str] = None
+    classification_labels: list[ClassificationLabel] = []
