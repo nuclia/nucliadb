@@ -125,6 +125,7 @@ message MessageContent {
         MARKDOWN = 2;
         RST = 3;
         KEEP_MARKDOWN = 4;
+        JSON = 5;
     }
     string text = 1;
     Format format = 2;
