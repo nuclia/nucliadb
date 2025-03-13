@@ -401,7 +401,9 @@ async def parse_conversation_field(
             processing_message.to.append(to)
         convs.messages.append(processing_message)
         field_value.messages.append(cm)
-
+    if conversation_field.extract_strategy:
+        field_value.extract_strategy = conversation_field.extract_strategy
+        convs.extract_strategy = conversation_field.extract_strategy
     toprocess.conversationfield[key] = convs
     writer.conversations[key].CopyFrom(field_value)
     writer.field_statuses.append(
