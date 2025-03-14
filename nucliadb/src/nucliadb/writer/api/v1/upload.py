@@ -45,7 +45,9 @@ from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_man
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import parse_basic_creation
-from nucliadb.writer.resource.field import parse_fields
+from nucliadb.writer.resource.field import (
+    parse_fields,
+)
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_dm, get_storage_manager
 from nucliadb.writer.tus.exceptions import (
@@ -704,6 +706,7 @@ async def _upload(
     x_md5: Optional[str] = None,
     x_extract_strategy: Optional[str] = None,
 ) -> ResourceFileUploaded:
+    breakpoint()
     if path_rid is not None:
         await validate_rid_exists_or_raise_error(kbid, path_rid)
 

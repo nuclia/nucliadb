@@ -50,12 +50,12 @@ from nucliadb_utils.utilities import get_storage
 @dataclass
 class ResourceClassifications:
     resource_level: list[ClassificationLabel]
-    field_level: dict[resources_pb2.FieldID, list[ClassificationLabel]]
+    field_level: dict[tuple[resources_pb2.FieldType.ValueType, str], list[ClassificationLabel]]
 
     def get_field_classifications(
         self, field_key: str, field_type: resources_pb2.FieldType.ValueType
     ) -> list[ClassificationLabel]:
-        field_id = resources_pb2.FieldID(field_type=field_type, field=field_key)
+        field_id = (field_type, field_key)
         return list(set(self.resource_level).union(set(self.field_level.get(field_id, []))))
 
 
@@ -523,7 +523,7 @@ async def get_resource_classifications(
 
     # Computed field-level classifications
     for field_classif in basic.computedmetadata.field_classifications:
-        fid = field_classif.field
+        fid = (field_classif.field.field_type, field_classif.field.field)
         rc.field_level.setdefault(fid, [])
         for f_classif in field_classif.classifications:
             classif = ClassificationLabel(labelset=f_classif.labelset, label=f_classif.label)

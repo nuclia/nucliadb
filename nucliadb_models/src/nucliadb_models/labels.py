@@ -139,3 +139,6 @@ class ClassificationLabel(BaseModel):
 
     labelset: str
     label: str
+
+    def __hash__(self):
+        return hash((self.labelset, self.label))
