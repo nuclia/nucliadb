@@ -85,7 +85,7 @@ async def restore_resources(context: ApplicationContext, kbid: str, backup_id: s
     tasks = []
     async for object_info in context.blob_storage.iterate_objects(
         bucket=settings.backups_bucket,
-        prefix=StorageKeys.RESOURCES_PREFIX.format(kbid=kbid, backup_id=backup_id),
+        prefix=StorageKeys.RESOURCES_PREFIX.format(backup_id=backup_id),
         start=last_restored,
     ):
         key = object_info.name
@@ -218,7 +218,7 @@ class ResourceBackupReader:
 async def restore_resource(context: ApplicationContext, kbid: str, backup_id: str, resource_id: str):
     download_stream = context.blob_storage.download(
         bucket=settings.backups_bucket,
-        key=StorageKeys.RESOURCE.format(kbid=kbid, backup_id=backup_id, resource_id=resource_id),
+        key=StorageKeys.RESOURCE.format(backup_id=backup_id, resource_id=resource_id),
     )
     reader = ResourceBackupReader(download_stream)
     bm = None
@@ -250,7 +250,7 @@ async def restore_resource(context: ApplicationContext, kbid: str, backup_id: st
 async def restore_labels(context: ApplicationContext, kbid: str, backup_id: str):
     raw = await context.blob_storage.downloadbytes(
         bucket=settings.backups_bucket,
-        key=StorageKeys.LABELS.format(kbid=kbid, backup_id=backup_id),
+        key=StorageKeys.LABELS.format(backup_id=backup_id),
     )
     labels = kb_pb2.Labels()
     labels.ParseFromString(raw.getvalue())
@@ -260,7 +260,7 @@ async def restore_labels(context: ApplicationContext, kbid: str, backup_id: str)
 async def restore_entities(context: ApplicationContext, kbid: str, backup_id: str):
     raw = await context.blob_storage.downloadbytes(
         bucket=settings.backups_bucket,
-        key=StorageKeys.ENTITIES.format(kbid=kbid, backup_id=backup_id),
+        key=StorageKeys.ENTITIES.format(backup_id=backup_id),
     )
     entities = kb_pb2.EntitiesGroups()
     entities.ParseFromString(raw.getvalue())
@@ -270,7 +270,7 @@ async def restore_entities(context: ApplicationContext, kbid: str, backup_id: st
 async def restore_synonyms(context: ApplicationContext, kbid: str, backup_id: str):
     raw = await context.blob_storage.downloadbytes(
         bucket=settings.backups_bucket,
-        key=StorageKeys.SYNONYMS.format(kbid=kbid, backup_id=backup_id),
+        key=StorageKeys.SYNONYMS.format(backup_id=backup_id),
     )
     synonyms = kb_pb2.Synonyms()
     synonyms.ParseFromString(raw.getvalue())
@@ -280,7 +280,7 @@ async def restore_synonyms(context: ApplicationContext, kbid: str, backup_id: st
 async def restore_search_configurations(context: ApplicationContext, kbid: str, backup_id: str):
     raw = await context.blob_storage.downloadbytes(
         bucket=settings.backups_bucket,
-        key=StorageKeys.SEARCH_CONFIGURATIONS.format(kbid=kbid, backup_id=backup_id),
+        key=StorageKeys.SEARCH_CONFIGURATIONS.format(backup_id=backup_id),
     )
     as_dict: dict[str, dict[str, Any]] = json.loads(raw.getvalue())
     search_configurations: dict[str, SearchConfiguration] = {}
