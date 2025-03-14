@@ -34,6 +34,7 @@ from nucliadb.export_import.utils import (
     restore_broker_message,
     set_entities_groups,
     set_labels,
+    set_synonyms,
 )
 from nucliadb.tasks.retries import TaskRetryHandler
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
@@ -69,6 +70,8 @@ async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
     await restore_resources(context, kbid, backup_id)
     await restore_labels(context, kbid, backup_id)
     await restore_entities(context, kbid, backup_id)
+    await restore_synonyms(context, kbid, backup_id)
+    await restore_search_configurations(context, kbid, backup_id)
     await delete_last_restored(context, kbid, backup_id)
 
 
@@ -257,3 +260,13 @@ async def restore_entities(context: ApplicationContext, kbid: str, backup_id: st
     entities = kb_pb2.EntitiesGroups()
     entities.ParseFromString(raw.getvalue())
     await set_entities_groups(context, kbid, entities)
+
+
+async def restore_synonyms(context: ApplicationContext, kbid: str, backup_id: str):
+    raw = await context.blob_storage.downloadbytes(
+        bucket=settings.backups_bucket,
+        key=StorageKeys.SYNONYMS.format(kbid=kbid, backup_id=backup_id),
+    )
+    synonyms = kb_pb2.Synonyms()
+    synonyms.ParseFromString(raw.getvalue())
+    await set_synonyms(context, kbid, synonyms)

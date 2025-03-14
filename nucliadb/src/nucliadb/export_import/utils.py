@@ -214,6 +214,17 @@ async def set_entities_groups(
         await txn.commit()
 
 
+async def set_synonyms(context: ApplicationContext, kbid: str, synonyms: kb_pb2.Synonyms) -> None:
+    async with datamanagers.with_transaction() as txn:
+        await datamanagers.synonyms.set(txn, kbid=kbid, synonyms=synonyms)
+        await txn.commit()
+
+
+async def set_search_configurations(
+    context: ApplicationContext, kbid: str, search_configurations
+) -> None:
+    pass
+
 async def set_labels(context: ApplicationContext, kbid: str, labels: kb_pb2.Labels) -> None:
     async with datamanagers.with_transaction() as txn:
         await datamanagers.labels.set_labels(txn, kbid=kbid, labels=labels)
@@ -312,6 +323,11 @@ async def get_entities(context: ApplicationContext, kbid: str) -> kb_pb2.Entitie
 async def get_labels(context: ApplicationContext, kbid: str) -> kb_pb2.Labels:
     async with datamanagers.with_ro_transaction() as txn:
         return await datamanagers.labels.get_labels(txn, kbid=kbid)
+
+
+async def get_synonyms(context: ApplicationContext, kbid: str) -> kb_pb2.Synonyms:
+    async with datamanagers.with_ro_transaction() as txn:
+        return await datamanagers.synonyms.get(txn, kbid=kbid)
 
 
 class EndOfStream(Exception): ...

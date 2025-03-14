@@ -38,6 +38,7 @@ from nucliadb.export_import.utils import (
     get_cloud_files,
     get_entities,
     get_labels,
+    get_synonyms,
 )
 from nucliadb.tasks.retries import TaskRetryHandler
 from nucliadb_protos import backups_pb2, resources_pb2, writer_pb2
@@ -74,6 +75,7 @@ async def backup_kb(context: ApplicationContext, kbid: str, backup_id: str):
     await backup_resources(context, kbid, backup_id)
     await backup_labels(context, kbid, backup_id)
     await backup_entities(context, kbid, backup_id)
+    await backup_synonyms(context, kbid, backup_id)
     await notify_backup_completed(context, kbid, backup_id)
     await delete_metadata(context, kbid, backup_id)
 
@@ -236,6 +238,15 @@ async def backup_entities(context: ApplicationContext, kbid: str, backup_id: str
         bucket=settings.backups_bucket,
         key=StorageKeys.ENTITIES.format(kbid=kbid, backup_id=backup_id),
         data=entities.SerializeToString(),
+    )
+
+
+async def backup_synonyms(context: ApplicationContext, kbid: str, backup_id: str):
+    synonyms = await get_synonyms(context, kbid)
+    await context.blob_storage.upload_object(
+        bucket=settings.backups_bucket,
+        key=StorageKeys.SYNONYMS.format(kbid=kbid, backup_id=backup_id),
+        data=synonyms.SerializeToString(),
     )
 
 
