@@ -255,10 +255,14 @@ async def backup_synonyms(context: ApplicationContext, kbid: str, backup_id: str
 
 async def backup_search_configurations(context: ApplicationContext, kbid: str, backup_id: str):
     search_configurations = await get_search_configurations(context, kbid=kbid)
+    serialized_search_configs = {
+        config_id: config.model_dump(mode="python", exclude_unset=True)
+        for config_id, config in search_configurations.items()
+    }
     await context.blob_storage.upload_object(
         bucket=settings.backups_bucket,
         key=StorageKeys.SEARCH_CONFIGURATIONS.format(backup_id=backup_id),
-        data=json.dumps(search_configurations).encode(),
+        data=json.dumps(serialized_search_configs).encode(),
     )
 
 

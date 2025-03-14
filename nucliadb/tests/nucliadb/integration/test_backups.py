@@ -63,6 +63,24 @@ async def src_kb(
 ):
     kbid = await create_kb(nucliadb_writer_manager)
 
+    # Create a search configuration
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/search_configurations/myconfig",
+        json={"kind": "find", "config": {"features": ["keyword"]}},
+    )
+    assert resp.status_code == 201
+
+    # Create some synonyms
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/custom-synonyms",
+        json={
+            "synonyms": {
+                "foo": ["bar", "baz"],
+            }
+        },
+    )
+    assert resp.status_code == 204
+
     # Create some simple resources with a text field
     for i in range(N_RESOURCES):
         resp = await nucliadb_writer.post(
@@ -172,8 +190,8 @@ async def test_backup(
     assert await get_last_restored(context, dst_kb, backup_id) is None
 
     # Check that the resources were restored
-    await check_resources(nucliadb_reader, src_kb)
-    await check_resources(nucliadb_reader, dst_kb)
+    await check_kb(nucliadb_reader, src_kb)
+    await check_kb(nucliadb_reader, dst_kb)
 
     # Check that the entities were restored
     resp = await nucliadb_reader.get(f"/kb/{dst_kb}/entitiesgroups")
@@ -189,6 +207,53 @@ async def test_backup(
     await delete_backup_task(context, DeleteBackupRequest(backup_id=backup_id))
 
     assert await exists_backup(context.blob_storage, backup_id) is False
+
+
+async def check_kb(nucliadb_reader: AsyncClient, kbid: str):
+    await check_resources(nucliadb_reader, kbid)
+    await check_synonyms(nucliadb_reader, kbid)
+    await check_search_configuration(nucliadb_reader, kbid)
+    await check_entities(nucliadb_reader, kbid)
+    await check_labelset(nucliadb_reader, kbid)
+
+
+async def check_synonyms(nucliadb_reader: AsyncClient, kbid: str):
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/custom-synonyms")
+    assert resp.status_code == 200
+    synonyms = resp.json()["synonyms"]
+    assert synonyms == {"foo": ["bar", "baz"]}
+
+
+async def check_search_configuration(nucliadb_reader: AsyncClient, kbid: str):
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/search_configurations/myconfig")
+    assert resp.status_code == 200
+    config = resp.json()
+    assert config == {"kind": "find", "config": {"features": ["keyword"]}}
+
+
+async def check_entities(nucliadb_reader: AsyncClient, kbid: str):
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
+    assert resp.status_code == 200
+    groups = resp.json()["groups"]
+    assert len(groups) == 1
+    group = groups["foo"]
+    assert group["title"] == "Foo title"
+    assert group["color"] == "red"
+
+
+async def check_labelset(nucliadb_reader: AsyncClient, kbid: str):
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/labelset/foo")
+    assert resp.status_code == 200
+    labelset = resp.json()
+    assert labelset["title"] == "Foo title"
+    assert labelset["color"] == "red"
+    assert labelset["multiple"] is True
+    assert labelset["kind"] == ["RESOURCES"]
+    labels = labelset["labels"]
+    assert len(labels) == 1
+    label = labels[0]
+    assert label["title"] == "Foo title"
+    assert label["text"] == "Foo text"
 
 
 async def check_resources(nucliadb_reader: AsyncClient, kbid: str):
