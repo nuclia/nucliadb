@@ -35,6 +35,7 @@ from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
+from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.constants import X_EXTRACT_STRATEGY, X_FILENAME, X_LANGUAGE, X_MD5, X_PASSWORD
 from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.resource import (
@@ -46,6 +47,7 @@ from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import parse_basic_creation
 from nucliadb.writer.resource.field import (
+    atomic_get_resource_classifications,
     parse_fields,
 )
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
@@ -65,6 +67,7 @@ from nucliadb_models import content_types
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
+from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, FieldID, FieldType, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
 from nucliadb_utils.authentication import requires_one
@@ -72,6 +75,7 @@ from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
 from nucliadb_utils.utilities import (
     get_partitioning,
+    get_storage,
 )
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX, RSLUG_PREFIX, api
@@ -706,7 +710,6 @@ async def _upload(
     x_md5: Optional[str] = None,
     x_extract_strategy: Optional[str] = None,
 ) -> ResourceFileUploaded:
-    breakpoint()
     if path_rid is not None:
         await validate_rid_exists_or_raise_error(kbid, path_rid)
 
@@ -864,7 +867,7 @@ async def store_file_on_nuclia_db(
     # File is on NucliaDB Storage at path
     partitioning = get_partitioning()
     processing = get_processing()
-
+    storage = await get_storage(service_name=SERVICE_NAME)
     partition = partitioning.generate_partition(kbid, rid)
 
     writer = BrokerMessage()
@@ -951,6 +954,12 @@ async def store_file_on_nuclia_db(
                 id=FieldID(field_type=FieldType.FILE, field=field),
                 status=FieldStatus.Status.PENDING,
             )
+        )
+
+        rclassif = await atomic_get_resource_classifications(kbid, rid)
+        classif_labels = rclassif.get_field_classifications(field, resources_pb2.FieldType.FILE)
+        toprocess.filefield[field] = await processing.convert_internal_filefield_to_str(
+            file_field, storage=storage, classif_labels=classif_labels
         )
 
         writer.source = BrokerMessage.MessageSource.WRITER

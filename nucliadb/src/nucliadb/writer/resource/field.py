@@ -545,25 +545,24 @@ async def parse_resource_classifications(
     kbid: str,
     uuid: str,
 ) -> ResourceClassifications:
-    """
-    Fetch all classification labels for the field and merge them with the new ones, then send them to processing.
-    This includes existing labels at the resource level -- as they are inherited by all fields.
-    This is needed to be able to apply certaing data augmentation strategies based on the classification labels.
-    """
-    resource_classifications = ResourceClassifications(
+    classifications = ResourceClassifications(
         resource_level=[],
         field_level={},
     )
+    # First off, we parse the user classifications on the payload
     on_payload_classif_labels = parse_user_classifications(item)
-    resource_classifications.resource_level.extend(on_payload_classif_labels)
-    if isinstance(item, UpdateResourcePayload):
-        existing_classif_labels = await atomic_get_resource_classifications(kbid=kbid, rid=uuid)
-        resource_classifications.resource_level.extend(existing_classif_labels.resource_level)
-        for field_id, field_classif_labels in existing_classif_labels.field_level.items():
-            resource_classifications.field_level.setdefault(field_id, []).extend(field_classif_labels)
+    classifications.resource_level.extend(on_payload_classif_labels)
 
-    # Make sure they are unique
-    resource_classifications.resource_level = list(set(resource_classifications.resource_level))
-    for field_id, field in resource_classifications.field_level.items():
-        resource_classifications.field_level[field_id] = list(set(field))
-    return resource_classifications
+    # If we're updating a resource, we need to get the existing classifications, both at the resource and field level, and
+    # merge them with the ones on the payload
+    if isinstance(item, UpdateResourcePayload):
+        existing_classifications = await atomic_get_resource_classifications(kbid=kbid, rid=uuid)
+        classifications.resource_level.extend(existing_classifications.resource_level)
+        for field_id, field_classif_labels in existing_classifications.field_level.items():
+            classifications.field_level.setdefault(field_id, []).extend(field_classif_labels)
+
+    # Make sure they are unique after merge
+    classifications.resource_level = list(set(classifications.resource_level))
+    for field_id, field in classifications.field_level.items():
+        classifications.field_level[field_id] = list(set(field))
+    return classifications

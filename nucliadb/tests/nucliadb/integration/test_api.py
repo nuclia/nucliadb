@@ -1337,17 +1337,14 @@ async def test_classification_labels_are_sent_to_processing(
     assert isinstance(processing, DummyProcessingEngine)
     processing.calls.clear()
     processing.values.clear()
+    expected_labels = [ClassificationLabel(labelset="foo", label="bar")]
 
     # Create a resource with a field of each type and some labels
     resp = await nucliadb_writer.post(
         f"kb/{standalone_knowledgebox}/resources",
         json={
             "title": "My title",
-            "usermetadata": {
-                "classifications": [
-                    {"labelset": "foo", "label": "bar"},
-                ]
-            },
+            "usermetadata": {"classifications": [expected_labels[0].model_dump()]},
             "texts": {
                 "text": {
                     "body": "My text",
@@ -1387,7 +1384,6 @@ async def test_classification_labels_are_sent_to_processing(
 
     # Check that push payload has been sent to processing with the right classification labels
     def validate_processing_call(processing: DummyProcessingEngine):
-        expected_labels = [ClassificationLabel(labelset="foo", label="bar")]
         assert len(processing.values["send_to_process"]) == 1
         send_to_process_call = cast(PushPayload, processing.values["send_to_process"][0][0])
         assert send_to_process_call.textfield.popitem()[1].classification_labels == expected_labels
@@ -1435,56 +1431,16 @@ async def test_classification_labels_are_sent_to_processing(
     processing.calls.clear()
     processing.values.clear()
 
-    # Upload a file with the tus upload endpoint, and set the extract strategy via a header
-    def header_encode(some_string):
-        return base64.b64encode(some_string.encode()).decode()
-
-    encoded_filename = header_encode("image.jpeg")
-    encoded_language = header_encode("ca")
-    upload_metadata = ",".join(
-        [
-            f"filename {encoded_filename}",
-            f"language {encoded_language}",
-        ]
-    )
-    file_content = b"file content"
+    # Upload a file with the upload endpoint, and set the extract strategy via a header
     resp = await nucliadb_writer.post(
-        f"kb/{standalone_knowledgebox}/tusupload",
-        headers={
-            "x-extract-strategy": "barbafoo-tus",
-            "tus-resumable": "1.0.0",
-            "upload-metadata": upload_metadata,
-            "content-type": "image/jpeg",
-            "upload-length": str(len(file_content)),
-        },
+        f"kb/{standalone_knowledgebox}/resource/{rid}/file/file2/upload",
+        headers={"x-extract-strategy": "barbafoo"},
+        content=b"file content",
     )
     assert resp.status_code == 201, resp.text
-    url = resp.headers["location"]
+    rid = resp.json()["uuid"]
 
-    resp = await nucliadb_writer.patch(
-        url,
-        content=file_content,
-        headers={
-            "upload-offset": "0",
-        },
-    )
-    assert resp.status_code == 200, resp.text
-    assert resp.headers["Tus-Upload-Finished"] == "1"
-    rid = resp.headers["NDB-Resource"].split("/")[-1]
-    field_id = resp.headers["NDB-Field"].split("/")[-1]
-
-    # Check that the extract strategy is stored
-    resp = await nucliadb_reader.get(
-        f"kb/{standalone_knowledgebox}/resource/{rid}?show=values",
-    )
-    assert resp.status_code == 200, resp.text
-    data = resp.json()
-    assert data["data"]["files"][field_id]["value"]["extract_strategy"] == "barbafoo-tus"
-
-    # Check processing
     assert len(processing.values["send_to_process"]) == 1
-    send_to_process_call = processing.values["send_to_process"][0][0]
+    send_to_process_call = cast(PushPayload, processing.values["send_to_process"][0][0])
     assert len(send_to_process_call.filefield) == 1
-    assert (
-        processing.values["convert_internal_filefield_to_str"][0][0].extract_strategy == "barbafoo-tus"
-    )
+    assert processing.values["convert_internal_filefield_to_str"][0][-1] == expected_labels
