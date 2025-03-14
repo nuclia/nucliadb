@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import json
 import logging
 import tarfile
 from datetime import datetime, timezone
@@ -38,6 +39,7 @@ from nucliadb.export_import.utils import (
     get_cloud_files,
     get_entities,
     get_labels,
+    get_search_configurations,
     get_synonyms,
 )
 from nucliadb.tasks.retries import TaskRetryHandler
@@ -76,6 +78,7 @@ async def backup_kb(context: ApplicationContext, kbid: str, backup_id: str):
     await backup_labels(context, kbid, backup_id)
     await backup_entities(context, kbid, backup_id)
     await backup_synonyms(context, kbid, backup_id)
+    await backup_search_configurations(context, kbid, backup_id)
     await notify_backup_completed(context, kbid, backup_id)
     await delete_metadata(context, kbid, backup_id)
 
@@ -218,7 +221,7 @@ async def backup_resource_with_binaries(
     await upload_to_bucket(
         context,
         resource_data_iterator(),
-        key=StorageKeys.RESOURCE.format(kbid=kbid, backup_id=backup_id, resource_id=rid),
+        key=StorageKeys.RESOURCE.format(backup_id=backup_id, resource_id=rid),
     )
     return total_size
 
@@ -227,7 +230,7 @@ async def backup_labels(context: ApplicationContext, kbid: str, backup_id: str):
     labels = await get_labels(context, kbid)
     await context.blob_storage.upload_object(
         bucket=settings.backups_bucket,
-        key=StorageKeys.LABELS.format(kbid=kbid, backup_id=backup_id),
+        key=StorageKeys.LABELS.format(backup_id=backup_id),
         data=labels.SerializeToString(),
     )
 
@@ -236,7 +239,7 @@ async def backup_entities(context: ApplicationContext, kbid: str, backup_id: str
     entities = await get_entities(context, kbid)
     await context.blob_storage.upload_object(
         bucket=settings.backups_bucket,
-        key=StorageKeys.ENTITIES.format(kbid=kbid, backup_id=backup_id),
+        key=StorageKeys.ENTITIES.format(backup_id=backup_id),
         data=entities.SerializeToString(),
     )
 
@@ -245,8 +248,17 @@ async def backup_synonyms(context: ApplicationContext, kbid: str, backup_id: str
     synonyms = await get_synonyms(context, kbid)
     await context.blob_storage.upload_object(
         bucket=settings.backups_bucket,
-        key=StorageKeys.SYNONYMS.format(kbid=kbid, backup_id=backup_id),
+        key=StorageKeys.SYNONYMS.format(backup_id=backup_id),
         data=synonyms.SerializeToString(),
+    )
+
+
+async def backup_search_configurations(context: ApplicationContext, kbid: str, backup_id: str):
+    search_configurations = await get_search_configurations(context, kbid=kbid)
+    await context.blob_storage.upload_object(
+        bucket=settings.backups_bucket,
+        key=StorageKeys.SEARCH_CONFIGURATIONS.format(backup_id=backup_id),
+        data=json.dumps(search_configurations).encode(),
     )
 
 

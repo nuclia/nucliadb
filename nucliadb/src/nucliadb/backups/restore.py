@@ -21,9 +21,12 @@
 
 import asyncio
 import functools
+import json
 import logging
 import tarfile
-from typing import AsyncIterator, Callable, Optional, Union
+from typing import Any, AsyncIterator, Callable, Optional, Union
+
+from pydantic import TypeAdapter
 
 from nucliadb.backups.const import MaindbKeys, StorageKeys
 from nucliadb.backups.models import RestoreBackupRequest
@@ -34,9 +37,11 @@ from nucliadb.export_import.utils import (
     restore_broker_message,
     set_entities_groups,
     set_labels,
+    set_search_configurations,
     set_synonyms,
 )
 from nucliadb.tasks.retries import TaskRetryHandler
+from nucliadb_models.configuration import SearchConfiguration
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -270,3 +275,16 @@ async def restore_synonyms(context: ApplicationContext, kbid: str, backup_id: st
     synonyms = kb_pb2.Synonyms()
     synonyms.ParseFromString(raw.getvalue())
     await set_synonyms(context, kbid, synonyms)
+
+
+async def restore_search_configurations(context: ApplicationContext, kbid: str, backup_id: str):
+    raw = await context.blob_storage.downloadbytes(
+        bucket=settings.backups_bucket,
+        key=StorageKeys.SEARCH_CONFIGURATIONS.format(kbid=kbid, backup_id=backup_id),
+    )
+    as_dict: dict[str, dict[str, Any]] = json.loads(raw.getvalue())
+    search_configurations: dict[str, SearchConfiguration] = {}
+    for name, data in as_dict.items():
+        config: SearchConfiguration = TypeAdapter(SearchConfiguration).validate_python(data)
+        search_configurations[name] = config
+    await set_search_configurations(context, kbid, search_configurations)

@@ -34,6 +34,7 @@ from nucliadb.export_import.exceptions import (
 )
 from nucliadb.export_import.models import ExportedItemType, ExportItem, Metadata
 from nucliadb.ingest.orm.broker_message import generate_broker_message
+from nucliadb_models.configuration import SearchConfiguration
 from nucliadb_models.export_import import Status
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
@@ -221,9 +222,13 @@ async def set_synonyms(context: ApplicationContext, kbid: str, synonyms: kb_pb2.
 
 
 async def set_search_configurations(
-    context: ApplicationContext, kbid: str, search_configurations
+    context: ApplicationContext, kbid: str, search_configurations: dict[str, SearchConfiguration]
 ) -> None:
-    pass
+    async with datamanagers.with_transaction() as txn:
+        for name, config in search_configurations.items():
+            await datamanagers.search_configurations.set(txn, kbid=kbid, name=name, config=config)
+        await txn.commit()
+
 
 async def set_labels(context: ApplicationContext, kbid: str, labels: kb_pb2.Labels) -> None:
     async with datamanagers.with_transaction() as txn:
@@ -327,7 +332,14 @@ async def get_labels(context: ApplicationContext, kbid: str) -> kb_pb2.Labels:
 
 async def get_synonyms(context: ApplicationContext, kbid: str) -> kb_pb2.Synonyms:
     async with datamanagers.with_ro_transaction() as txn:
-        return await datamanagers.synonyms.get(txn, kbid=kbid)
+        return await datamanagers.synonyms.get(txn, kbid=kbid) or kb_pb2.Synonyms()
+
+
+async def get_search_configurations(
+    context: ApplicationContext, kbid: str
+) -> dict[str, SearchConfiguration]:
+    async with datamanagers.with_ro_transaction() as txn:
+        return await datamanagers.search_configurations.list(txn, kbid=kbid)
 
 
 class EndOfStream(Exception): ...
