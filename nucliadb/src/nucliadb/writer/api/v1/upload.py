@@ -45,7 +45,7 @@ from nucliadb.writer.api.v1.resource import (
 from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_manager
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
-from nucliadb.writer.resource.basic import parse_basic_creation
+from nucliadb.writer.resource.basic import parse_basic_creation, parse_user_classifications
 from nucliadb.writer.resource.field import atomic_get_field_classification_labels, parse_fields
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_dm, get_storage_manager
@@ -954,9 +954,16 @@ async def store_file_on_nuclia_db(
             )
         )
 
+        # Fetch all classification labels for the field and merge them with the new ones, then send them to processing.
+        # This includes existing labels at the resource level -- as they are inherited by all fields.
+        # This is needed to be able to apply certaing data augmentation strategies based on the classification labels.
         classif_labels = await atomic_get_field_classification_labels(
             kbid=kbid, rid=rid, field_type=resources_pb2.FieldType.FILE, field_id=field
         )
+        if item is not None:
+            # Add any resource-level classification labels from the user's request
+            on_payload_classif_labels = parse_user_classifications(item)
+            classif_labels = list(set(classif_labels).union(set(on_payload_classif_labels)))
         toprocess.filefield[field] = await processing.convert_internal_filefield_to_str(
             file_field, storage=storage, classif_labels=classif_labels
         )

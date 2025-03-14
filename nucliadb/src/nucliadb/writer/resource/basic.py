@@ -31,6 +31,7 @@ from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
 from nucliadb_models.file import FileField
+from nucliadb_models.labels import ClassificationLabel
 from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
     ParagraphAnnotation,
@@ -290,3 +291,18 @@ def build_question_answer_annotation_pb(
         answer.ids_paragraphs.extend(answer_annotation.ids_paragraphs)
         pb.question_answer.answers.append(answer)
     return pb
+
+
+def parse_user_classifications(item: CreateResourcePayload) -> list[ClassificationLabel]:
+    return (
+        [
+            ClassificationLabel(
+                labelset=classification.labelset,
+                label=classification.label,
+            )
+            for classification in item.usermetadata.classifications
+            if classification.cancelled_by_user is False
+        ]
+        if item.usermetadata is not None
+        else []
+    )
