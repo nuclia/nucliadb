@@ -42,6 +42,8 @@ from nucliadb.backups.settings import BackupSettings
 from nucliadb.backups.settings import settings as backups_settings
 from nucliadb.backups.utils import exists_backup
 from nucliadb.common.context import ApplicationContext
+from nucliadb.export_import.utils import BM_FIELDS
+from nucliadb_protos.writer_pb2 import BrokerMessage
 
 N_RESOURCES = 10
 
@@ -62,6 +64,24 @@ async def src_kb(
     nucliadb_writer_manager: AsyncClient,
 ):
     kbid = await create_kb(nucliadb_writer_manager)
+
+    # Create a search configuration
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/search_configurations/myconfig",
+        json={"kind": "find", "config": {"features": ["keyword"]}},
+    )
+    assert resp.status_code == 201
+
+    # Create some synonyms
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/custom-synonyms",
+        json={
+            "synonyms": {
+                "foo": ["bar", "baz"],
+            }
+        },
+    )
+    assert resp.status_code == 204
 
     # Create some simple resources with a text field
     for i in range(N_RESOURCES):
@@ -172,8 +192,8 @@ async def test_backup(
     assert await get_last_restored(context, dst_kb, backup_id) is None
 
     # Check that the resources were restored
-    await check_resources(nucliadb_reader, src_kb)
-    await check_resources(nucliadb_reader, dst_kb)
+    await check_kb(nucliadb_reader, src_kb)
+    await check_kb(nucliadb_reader, dst_kb)
 
     # Check that the entities were restored
     resp = await nucliadb_reader.get(f"/kb/{dst_kb}/entitiesgroups")
@@ -189,6 +209,53 @@ async def test_backup(
     await delete_backup_task(context, DeleteBackupRequest(backup_id=backup_id))
 
     assert await exists_backup(context.blob_storage, backup_id) is False
+
+
+async def check_kb(nucliadb_reader: AsyncClient, kbid: str):
+    await check_resources(nucliadb_reader, kbid)
+    await check_synonyms(nucliadb_reader, kbid)
+    await check_search_configuration(nucliadb_reader, kbid)
+    await check_entities(nucliadb_reader, kbid)
+    await check_labelset(nucliadb_reader, kbid)
+
+
+async def check_synonyms(nucliadb_reader: AsyncClient, kbid: str):
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/custom-synonyms")
+    assert resp.status_code == 200
+    synonyms = resp.json()["synonyms"]
+    assert synonyms == {"foo": ["bar", "baz"]}
+
+
+async def check_search_configuration(nucliadb_reader: AsyncClient, kbid: str):
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/search_configurations/myconfig")
+    assert resp.status_code == 200
+    config = resp.json()
+    assert config == {"kind": "find", "config": {"features": ["keyword"]}}
+
+
+async def check_entities(nucliadb_reader: AsyncClient, kbid: str):
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
+    assert resp.status_code == 200
+    groups = resp.json()["groups"]
+    assert len(groups) == 1
+    group = groups["foo"]
+    assert group["title"] == "Foo title"
+    assert group["color"] == "red"
+
+
+async def check_labelset(nucliadb_reader: AsyncClient, kbid: str):
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/labelset/foo")
+    assert resp.status_code == 200
+    labelset = resp.json()
+    assert labelset["title"] == "Foo title"
+    assert labelset["color"] == "red"
+    assert labelset["multiple"] is True
+    assert labelset["kind"] == ["RESOURCES"]
+    labels = labelset["labels"]
+    assert len(labels) == 1
+    label = labels[0]
+    assert label["title"] == "Foo title"
+    assert label["text"] == "Foo text"
 
 
 async def check_resources(nucliadb_reader: AsyncClient, kbid: str):
@@ -277,3 +344,21 @@ async def test_restore_resumed(
     resources = resp.json()["resources"]
     assert len(resources) == 9
     assert sorted([r["id"] for r in resources]) == rids[1:]
+
+
+def test_all_broker_message_fields_are_backed_up():
+    """
+    Hi developer! If this test fails is because you added a new field in the BrokerMessage proto and it is not
+    handled in the backup logic. If the field relates to some new data that needs to be preserved in the backup, please
+    make sure to extend the backup logic to handle it. If the field is not relevant for the backup, please add it to the
+    ignored fields in the BM_FIELDS dictionary in nucliadb/export_import/utils.py.
+    """
+    bm = BrokerMessage()
+    for field_name in bm.DESCRIPTOR.fields_by_name:
+        assert (
+            field_name in BM_FIELDS["writer"]
+            or field_name in BM_FIELDS["processor"]
+            or field_name in BM_FIELDS["ignored"]
+            or field_name in BM_FIELDS["common"]
+            or field_name in BM_FIELDS["deprecated"]
+        ), f"Field {field_name} is not being taken into account in the backup!"
