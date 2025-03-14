@@ -518,7 +518,7 @@ class DummyProcessingEngine(ProcessingEngine):
     ) -> str:
         self.calls.append([file])
         index = len(self.values["convert_filefield_to_str"])
-        self.values["convert_filefield_to_str"].append(file)
+        self.values["convert_filefield_to_str"].append((file, classif_labels))
         return f"convert_filefield_to_str,{index}"
 
     def convert_external_filefield_to_str(
@@ -526,7 +526,7 @@ class DummyProcessingEngine(ProcessingEngine):
     ) -> str:
         self.calls.append([file_field])
         index = len(self.values["convert_external_filefield_to_str"])
-        self.values["convert_external_filefield_to_str"].append(file_field)
+        self.values["convert_external_filefield_to_str"].append((file_field, classif_labels))
         return f"convert_external_filefield_to_str,{index}"
 
     async def convert_internal_filefield_to_str(
@@ -534,7 +534,7 @@ class DummyProcessingEngine(ProcessingEngine):
     ) -> str:
         self.calls.append([file, storage])
         index = len(self.values["convert_internal_filefield_to_str"])
-        self.values["convert_internal_filefield_to_str"].append([file, storage])
+        self.values["convert_internal_filefield_to_str"].append((file, storage, classif_labels))
         return f"convert_internal_filefield_to_str,{index}"
 
     async def convert_internal_cf_to_str(self, cf: CloudFile, storage: Storage) -> str:

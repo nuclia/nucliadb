@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
 from fastapi import HTTPException
 
@@ -293,7 +293,9 @@ def build_question_answer_annotation_pb(
     return pb
 
 
-def parse_user_classifications(item: CreateResourcePayload) -> list[ClassificationLabel]:
+def parse_user_classifications(
+    item: Union[CreateResourcePayload, UpdateResourcePayload],
+) -> list[ClassificationLabel]:
     return (
         [
             ClassificationLabel(

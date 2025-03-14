@@ -1317,3 +1317,215 @@ async def test_extract_strategy_on_fields(
     assert (
         processing.values["convert_internal_filefield_to_str"][0][0].extract_strategy == "barbafoo-tus"
     )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_classification_labels_are_sent_to_processing(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox,
+):
+    """
+    We aim to test that whenever a new resource is created or a new field is created on an existing resource,
+    all the classification labels are sent to the processing engine request so that they can apply data augmentation
+    agents depending on labels criteria.
+    """
+
+    processing = get_processing()
+    assert isinstance(processing, DummyProcessingEngine)
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Create a resource with a field of each type and some labels
+    breakpoint()
+    resp = await nucliadb_writer.post(
+        f"kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": "My title",
+            "usermetadata": {
+                "classifications": [
+                    {"labelset": "foo", "label": "bar"},
+                ]
+            },
+            "texts": {
+                "text": {
+                    "body": "My text",
+                }
+            },
+            "links": {
+                "link": {
+                    "uri": "https://www.example.com",
+                }
+            },
+            "files": {
+                "file": {
+                    "language": "en",
+                    "file": {
+                        "filename": "my_file.pdf",
+                        "payload": base64.b64encode(b"file content").decode(),
+                        "content_type": "application/pdf",
+                    },
+                }
+            },
+            "conversations": {
+                "conv": {
+                    "messages": [
+                        {
+                            "ident": "1",
+                            "content": {
+                                "text": "My message",
+                            },
+                        }
+                    ]
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    # Check that push payload has been sent to processing with the right classification labels
+    def validate_processing_call(processing: DummyProcessingEngine):
+        assert len(processing.values["send_to_process"]) == 1
+        send_to_process_call = processing.values["send_to_process"][0][0]
+        breakpoint()
+        assert len(send_to_process_call.filefield) == 1
+        assert processing.values["convert_internal_filefield_to_str"][0][0].extract_strategy == "baz"
+
+    validate_processing_call(processing)
+
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Reprocess resource should also send the extract strategies
+    resp = await nucliadb_writer.post(
+        f"kb/{standalone_knowledgebox}/resource/{rid}/reprocess",
+    )
+    assert resp.status_code == 202, resp.text
+
+    validate_processing_call(processing)
+
+    # Update them to make sure they are stored correctly
+    resp = await nucliadb_writer.patch(
+        f"kb/{standalone_knowledgebox}/resource/{rid}",
+        json={
+            "texts": {
+                "text": {
+                    "body": "My text",
+                    "extract_strategy": "foo1",
+                }
+            },
+            "links": {
+                "link": {
+                    "uri": "https://www.example.com",
+                    "extract_strategy": "bar1",
+                }
+            },
+            "files": {
+                "file": {
+                    "language": "en",
+                    "file": {
+                        "filename": "my_file.pdf",
+                        "payload": base64.b64encode(b"file content").decode(),
+                        "content_type": "application/pdf",
+                    },
+                    "extract_strategy": "baz1",
+                }
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Check that the extract strategies are stored
+    resp = await nucliadb_reader.get(
+        f"kb/{standalone_knowledgebox}/resource/{rid}?show=values",
+    )
+    assert resp.status_code == 200, resp.text
+
+    data = resp.json()
+    assert data["data"]["texts"]["text"]["value"]["extract_strategy"] == "foo1"
+    assert data["data"]["links"]["link"]["value"]["extract_strategy"] == "bar1"
+    assert data["data"]["files"]["file"]["value"]["extract_strategy"] == "baz1"
+
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Upload a file with the upload endpoint, and set the extract strategy via a header
+    resp = await nucliadb_writer.post(
+        f"kb/{standalone_knowledgebox}/resource/{rid}/file/file2/upload",
+        headers={"x-extract-strategy": "barbafoo"},
+        content=b"file content",
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    # Check that the extract strategy is stored
+    resp = await nucliadb_reader.get(
+        f"kb/{standalone_knowledgebox}/resource/{rid}?show=values",
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["data"]["files"]["file2"]["value"]["extract_strategy"] == "barbafoo"
+
+    # Check processing
+    assert len(processing.values["send_to_process"]) == 1
+    send_to_process_call = processing.values["send_to_process"][0][0]
+    assert len(send_to_process_call.filefield) == 1
+    assert processing.values["convert_internal_filefield_to_str"][0][0].extract_strategy == "barbafoo"
+
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Upload a file with the tus upload endpoint, and set the extract strategy via a header
+    def header_encode(some_string):
+        return base64.b64encode(some_string.encode()).decode()
+
+    encoded_filename = header_encode("image.jpeg")
+    encoded_language = header_encode("ca")
+    upload_metadata = ",".join(
+        [
+            f"filename {encoded_filename}",
+            f"language {encoded_language}",
+        ]
+    )
+    file_content = b"file content"
+    resp = await nucliadb_writer.post(
+        f"kb/{standalone_knowledgebox}/tusupload",
+        headers={
+            "x-extract-strategy": "barbafoo-tus",
+            "tus-resumable": "1.0.0",
+            "upload-metadata": upload_metadata,
+            "content-type": "image/jpeg",
+            "upload-length": str(len(file_content)),
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    url = resp.headers["location"]
+
+    resp = await nucliadb_writer.patch(
+        url,
+        content=file_content,
+        headers={
+            "upload-offset": "0",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["Tus-Upload-Finished"] == "1"
+    rid = resp.headers["NDB-Resource"].split("/")[-1]
+    field_id = resp.headers["NDB-Field"].split("/")[-1]
+
+    # Check that the extract strategy is stored
+    resp = await nucliadb_reader.get(
+        f"kb/{standalone_knowledgebox}/resource/{rid}?show=values",
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["data"]["files"][field_id]["value"]["extract_strategy"] == "barbafoo-tus"
+
+    # Check processing
+    assert len(processing.values["send_to_process"]) == 1
+    send_to_process_call = processing.values["send_to_process"][0][0]
+    assert len(send_to_process_call.filefield) == 1
+    assert (
+        processing.values["convert_internal_filefield_to_str"][0][0].extract_strategy == "barbafoo-tus"
+    )

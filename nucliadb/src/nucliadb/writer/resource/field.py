@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Union
 
@@ -30,6 +31,7 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.ingest.processing import PushPayload
 from nucliadb.writer import SERVICE_NAME
+from nucliadb.writer.resource.basic import parse_user_classifications
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
@@ -43,6 +45,18 @@ from nucliadb_protos import resources_pb2
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
 from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_storage
+
+
+@dataclass
+class ResourceClassifications:
+    resource_level: list[ClassificationLabel]
+    field_level: dict[resources_pb2.FieldID, list[ClassificationLabel]]
+
+    def get_field_classifications(
+        self, field_key: str, field_type: resources_pb2.FieldType.ValueType
+    ) -> list[ClassificationLabel]:
+        field_id = resources_pb2.FieldID(field_type=field_type, field=field_key)
+        return list(set(self.resource_level).union(set(self.field_level.get(field_id, []))))
 
 
 async def extract_file_field_from_pb(
@@ -66,7 +80,7 @@ async def extract_file_field(
     field_id: str,
     resource: ORMResource,
     toprocess: PushPayload,
-    classif_labels: list[ClassificationLabel],
+    resource_classifications: ResourceClassifications,
     password: Optional[str] = None,
 ):
     field_type = resources_pb2.FieldType.FILE
@@ -78,6 +92,9 @@ async def extract_file_field(
     if password is not None:
         field_pb.password = password
 
+    classif_labels = resource_classifications.get_field_classifications(
+        field_id, resources_pb2.FieldType.FILE
+    )
     toprocess.filefield[field_id] = await extract_file_field_from_pb(field_pb, classif_labels)
 
 
@@ -85,6 +102,11 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
     processing = get_processing()
     storage = await get_storage(service_name=SERVICE_NAME)
     await resource.get_fields()
+
+    resource_classifications = await atomic_get_resource_classifications(
+        kbid=toprocess.kbid,
+        rid=toprocess.uuid,
+    )
     for (field_type, field_id), field in resource.fields.items():
         field_type_name = from_proto.field_type_name(field_type)
 
@@ -97,12 +119,7 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
             continue
 
         field_pb = await field.get_value()
-        classif_labels = await atomic_get_field_classification_labels(
-            kbid=toprocess.kbid,
-            rid=toprocess.uuid,
-            field_type=field_type,
-            field_id=field_id,
-        )
+        classif_labels = resource_classifications.get_field_classifications(field_id, field_type)
         if field_type_name is FieldTypeName.FILE:
             toprocess.filefield[field_id] = await extract_file_field_from_pb(field_pb, classif_labels)
 
@@ -166,25 +183,59 @@ async def parse_fields(
     uuid: str,
     x_skip_store: bool,
 ):
+    rclassif = await parse_resource_classifications(item, kbid, uuid)
     for key, file_field in item.files.items():
-        await parse_file_field(key, file_field, writer, toprocess, kbid, uuid, skip_store=x_skip_store)
+        await parse_file_field(
+            key,
+            file_field,
+            writer,
+            toprocess,
+            kbid,
+            uuid,
+            rclassif,
+            skip_store=x_skip_store,
+        )
 
     for key, link_field in item.links.items():
-        await parse_link_field(key, link_field, writer, toprocess)
+        parse_link_field(
+            key,
+            link_field,
+            writer,
+            toprocess,
+            rclassif,
+        )
 
     for key, text_field in item.texts.items():
-        await parse_text_field(key, text_field, writer, toprocess)
+        parse_text_field(
+            key,
+            text_field,
+            writer,
+            toprocess,
+            rclassif,
+        )
 
     for key, conversation_field in item.conversations.items():
-        await parse_conversation_field(key, conversation_field, writer, toprocess, kbid, uuid)
+        await parse_conversation_field(
+            key,
+            conversation_field,
+            writer,
+            toprocess,
+            kbid,
+            uuid,
+            rclassif,
+        )
 
 
-async def parse_text_field(
+def parse_text_field(
     key: str,
     text_field: models.TextField,
     writer: BrokerMessage,
     toprocess: PushPayload,
+    resource_classifications: ResourceClassifications,
 ) -> None:
+    classif_labels = resource_classifications.get_field_classifications(
+        key, resources_pb2.FieldType.TEXT
+    )
     if text_field.extract_strategy is not None:
         writer.texts[key].extract_strategy = text_field.extract_strategy
     writer.texts[key].body = text_field.body
@@ -194,10 +245,6 @@ async def parse_text_field(
     etw.field.field_type = resources_pb2.FieldType.TEXT
     etw.body.text = text_field.body
     writer.extracted_text.append(etw)
-
-    classif_labels = await atomic_get_field_classification_labels(
-        kbid=writer.kbid, rid=writer.uuid, field_type=resources_pb2.FieldType.TEXT, field_id=key
-    )
     toprocess.textfield[key] = models.Text(
         body=text_field.body,
         format=getattr(models.PushTextFormat, text_field.format.value),
@@ -219,13 +266,21 @@ async def parse_file_field(
     toprocess: PushPayload,
     kbid: str,
     uuid: str,
+    resource_classifications: ResourceClassifications,
     skip_store: bool = False,
 ):
     if file_field.file.is_external:
-        await parse_external_file_field(key, file_field, writer, toprocess)
+        parse_external_file_field(key, file_field, writer, toprocess, resource_classifications)
     else:
         await parse_internal_file_field(
-            key, file_field, writer, toprocess, kbid, uuid, skip_store=skip_store
+            key,
+            file_field,
+            writer,
+            toprocess,
+            kbid,
+            uuid,
+            resource_classifications,
+            skip_store=skip_store,
         )
 
     writer.field_statuses.append(
@@ -243,8 +298,12 @@ async def parse_internal_file_field(
     toprocess: PushPayload,
     kbid: str,
     uuid: str,
+    resource_classifications: ResourceClassifications,
     skip_store: bool = False,
 ) -> None:
+    classif_labels = resource_classifications.get_field_classifications(
+        key, resources_pb2.FieldType.FILE
+    )
     writer.files[key].added.FromDatetime(datetime.now())
     if file_field.language:
         writer.files[key].language = file_field.language
@@ -252,9 +311,6 @@ async def parse_internal_file_field(
         writer.files[key].extract_strategy = file_field.extract_strategy
 
     processing = get_processing()
-    classif_labels = await atomic_get_field_classification_labels(
-        kbid=writer.kbid, rid=writer.uuid, field_type=resources_pb2.FieldType.FILE, field_id=key
-    )
     if skip_store:
         # Does not store file on nuclia's blob storage. Only sends it to process
         toprocess.filefield[key] = await processing.convert_filefield_to_str(file_field, classif_labels)
@@ -278,12 +334,16 @@ async def parse_internal_file_field(
         )
 
 
-async def parse_external_file_field(
+def parse_external_file_field(
     key: str,
     file_field: models.FileField,
     writer: BrokerMessage,
     toprocess: PushPayload,
+    resource_classifications: ResourceClassifications,
 ) -> None:
+    classif_labels = resource_classifications.get_field_classifications(
+        key, resources_pb2.FieldType.FILE
+    )
     writer.files[key].added.FromDatetime(datetime.now())
     if file_field.language:
         writer.files[key].language = file_field.language
@@ -296,19 +356,20 @@ async def parse_external_file_field(
     writer.files[key].file.content_type = file_field.file.content_type
     if file_field.file.content_type and writer.basic.icon == GENERIC_MIME_TYPE:
         writer.basic.icon = file_field.file.content_type
-    classif_labels = await atomic_get_field_classification_labels(
-        kbid=writer.kbid, rid=writer.uuid, field_type=resources_pb2.FieldType.FILE, field_id=key
-    )
     processing = get_processing()
     toprocess.filefield[key] = processing.convert_external_filefield_to_str(file_field, classif_labels)
 
 
-async def parse_link_field(
+def parse_link_field(
     key: str,
     link_field: models.LinkField,
     writer: BrokerMessage,
     toprocess: PushPayload,
+    resource_classifications: ResourceClassifications,
 ) -> None:
+    classif_labels = resource_classifications.get_field_classifications(
+        key, resources_pb2.FieldType.LINK
+    )
     writer.links[key].added.FromDatetime(datetime.now())
 
     writer.links[key].uri = link_field.uri
@@ -336,9 +397,6 @@ async def parse_link_field(
     if link_field.extract_strategy is not None:
         writer.links[key].extract_strategy = link_field.extract_strategy
 
-    classif_labels = await atomic_get_field_classification_labels(
-        kbid=writer.kbid, rid=writer.uuid, field_type=resources_pb2.FieldType.LINK, field_id=key
-    )
     toprocess.linkfield[key] = models.LinkUpload(
         link=link_field.uri,
         headers=link_field.headers or {},
@@ -364,7 +422,11 @@ async def parse_conversation_field(
     toprocess: PushPayload,
     kbid: str,
     uuid: str,
+    resource_classifications: ResourceClassifications,
 ) -> None:
+    classif_labels = resource_classifications.get_field_classifications(
+        key, resources_pb2.FieldType.CONVERSATION
+    )
     storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
     field_value = resources_pb2.Conversation()
@@ -427,10 +489,6 @@ async def parse_conversation_field(
             processing_message.to.append(to)
         convs.messages.append(processing_message)
         field_value.messages.append(cm)
-
-    classif_labels = await atomic_get_field_classification_labels(
-        kbid=writer.kbid, rid=writer.uuid, field_type=resources_pb2.FieldType.CONVERSATION, field_id=key
-    )
     convs.classification_labels = classif_labels
     toprocess.conversationfield[key] = convs
     writer.conversations[key].CopyFrom(field_value)
@@ -442,43 +500,70 @@ async def parse_conversation_field(
     )
 
 
-async def atomic_get_field_classification_labels(
-    kbid: str,
-    rid: str,
-    field_type: resources_pb2.FieldType.ValueType,
-    field_id: str,
-) -> list[ClassificationLabel]:
-    async with datamanagers.with_ro_transaction() as txn:
-        return await get_field_classification_labels(
-            txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id
-        )
-
-
-async def get_field_classification_labels(
+async def get_resource_classifications(
     txn: Transaction,
     *,
     kbid: str,
     rid: str,
-    field_type: resources_pb2.FieldType.ValueType,
-    field_id: str,
-) -> list[ClassificationLabel]:
+) -> ResourceClassifications:
     """
     Gets a unique list of classification labels for a given field, including those inherited from the resource.
     """
-
-    classif_labels = set()
+    rc = ResourceClassifications(resource_level=[], field_level={})
     basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
     if basic is None:
         # Resource not found
-        return []
-    # First, fetch the resource's classification labels added by the user
+        return rc
+
+    # User resource-level classifications
     for u_classif in basic.usermetadata.classifications:
-        classif_labels.add(ClassificationLabel(labelset=u_classif.labelset, label=u_classif.label))
-    # Then, fetch the field's classification labels coming from processing
-    field_id_pb = resources_pb2.FieldID(field=field_id, field_type=field_type)
+        classif = ClassificationLabel(labelset=u_classif.labelset, label=u_classif.label)
+        if classif not in rc.resource_level:
+            rc.resource_level.append(classif)
+
+    # Computed field-level classifications
     for field_classif in basic.computedmetadata.field_classifications:
-        if field_classif.field != field_id_pb:
-            continue
+        fid = field_classif.field
+        rc.field_level.setdefault(fid, [])
         for f_classif in field_classif.classifications:
-            classif_labels.add(ClassificationLabel(labelset=f_classif.labelset, label=f_classif.label))
-    return list(classif_labels)
+            classif = ClassificationLabel(labelset=f_classif.labelset, label=f_classif.label)
+            if classif not in rc.field_level[fid]:
+                rc.field_level[fid].append(classif)
+    return rc
+
+
+async def atomic_get_resource_classifications(
+    kbid: str,
+    rid: str,
+) -> ResourceClassifications:
+    async with datamanagers.with_ro_transaction() as txn:
+        return await get_resource_classifications(txn, kbid=kbid, rid=rid)
+
+
+async def parse_resource_classifications(
+    item: Union[CreateResourcePayload, UpdateResourcePayload],
+    kbid: str,
+    uuid: str,
+) -> ResourceClassifications:
+    """
+    Fetch all classification labels for the field and merge them with the new ones, then send them to processing.
+    This includes existing labels at the resource level -- as they are inherited by all fields.
+    This is needed to be able to apply certaing data augmentation strategies based on the classification labels.
+    """
+    resource_classifications = ResourceClassifications(
+        resource_level=[],
+        field_level={},
+    )
+    on_payload_classif_labels = parse_user_classifications(item)
+    resource_classifications.resource_level.extend(on_payload_classif_labels)
+    if isinstance(item, UpdateResourcePayload):
+        existing_classif_labels = await atomic_get_resource_classifications(kbid=kbid, rid=uuid)
+        resource_classifications.resource_level.extend(existing_classif_labels.resource_level)
+        for field_id, field_classif_labels in existing_classif_labels.field_level.items():
+            resource_classifications.field_level.setdefault(field_id, []).extend(field_classif_labels)
+
+    # Make sure they are unique
+    resource_classifications.resource_level = list(set(resource_classifications.resource_level))
+    for field_id, field in resource_classifications.field_level.items():
+        resource_classifications.field_level[field_id] = list(set(field))
+    return resource_classifications

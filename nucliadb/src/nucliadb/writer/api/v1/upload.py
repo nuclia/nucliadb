@@ -35,7 +35,6 @@ from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.constants import X_EXTRACT_STRATEGY, X_FILENAME, X_LANGUAGE, X_MD5, X_PASSWORD
 from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.resource import (
@@ -45,8 +44,8 @@ from nucliadb.writer.api.v1.resource import (
 from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_manager
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
-from nucliadb.writer.resource.basic import parse_basic_creation, parse_user_classifications
-from nucliadb.writer.resource.field import atomic_get_field_classification_labels, parse_fields
+from nucliadb.writer.resource.basic import parse_basic_creation
+from nucliadb.writer.resource.field import parse_fields
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_dm, get_storage_manager
 from nucliadb.writer.tus.exceptions import (
@@ -64,7 +63,6 @@ from nucliadb_models import content_types
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
-from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, FieldID, FieldType, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
 from nucliadb_utils.authentication import requires_one
@@ -72,7 +70,6 @@ from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
 from nucliadb_utils.utilities import (
     get_partitioning,
-    get_storage,
 )
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX, RSLUG_PREFIX, api
@@ -864,7 +861,6 @@ async def store_file_on_nuclia_db(
     # File is on NucliaDB Storage at path
     partitioning = get_partitioning()
     processing = get_processing()
-    storage = await get_storage(service_name=SERVICE_NAME)
 
     partition = partitioning.generate_partition(kbid, rid)
 
@@ -952,20 +948,6 @@ async def store_file_on_nuclia_db(
                 id=FieldID(field_type=FieldType.FILE, field=field),
                 status=FieldStatus.Status.PENDING,
             )
-        )
-
-        # Fetch all classification labels for the field and merge them with the new ones, then send them to processing.
-        # This includes existing labels at the resource level -- as they are inherited by all fields.
-        # This is needed to be able to apply certaing data augmentation strategies based on the classification labels.
-        classif_labels = await atomic_get_field_classification_labels(
-            kbid=kbid, rid=rid, field_type=resources_pb2.FieldType.FILE, field_id=field
-        )
-        if item is not None:
-            # Add any resource-level classification labels from the user's request
-            on_payload_classif_labels = parse_user_classifications(item)
-            classif_labels = list(set(classif_labels).union(set(on_payload_classif_labels)))
-        toprocess.filefield[field] = await processing.convert_internal_filefield_to_str(
-            file_field, storage=storage, classif_labels=classif_labels
         )
 
         writer.source = BrokerMessage.MessageSource.WRITER
