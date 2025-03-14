@@ -957,7 +957,7 @@ async def store_file_on_nuclia_db(
         )
 
         rclassif = await atomic_get_resource_classifications(kbid, rid)
-        classif_labels = rclassif.get_field_classifications(field, resources_pb2.FieldType.FILE)
+        classif_labels = rclassif.get_for_field(field, resources_pb2.FieldType.FILE)
         toprocess.filefield[field] = await processing.convert_internal_filefield_to_str(
             file_field, storage=storage, classif_labels=classif_labels
         )

@@ -52,7 +52,7 @@ class ResourceClassifications:
     resource_level: list[ClassificationLabel]
     field_level: dict[tuple[resources_pb2.FieldType.ValueType, str], list[ClassificationLabel]]
 
-    def get_field_classifications(
+    def get_for_field(
         self, field_key: str, field_type: resources_pb2.FieldType.ValueType
     ) -> list[ClassificationLabel]:
         field_id = (field_type, field_key)
@@ -92,9 +92,7 @@ async def extract_file_field(
     if password is not None:
         field_pb.password = password
 
-    classif_labels = resource_classifications.get_field_classifications(
-        field_id, resources_pb2.FieldType.FILE
-    )
+    classif_labels = resource_classifications.get_for_field(field_id, resources_pb2.FieldType.FILE)
     toprocess.filefield[field_id] = await extract_file_field_from_pb(field_pb, classif_labels)
 
 
@@ -119,7 +117,7 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
             continue
 
         field_pb = await field.get_value()
-        classif_labels = resource_classifications.get_field_classifications(field_id, field_type)
+        classif_labels = resource_classifications.get_for_field(field_id, field_type)
         if field_type_name is FieldTypeName.FILE:
             toprocess.filefield[field_id] = await extract_file_field_from_pb(field_pb, classif_labels)
 
@@ -233,9 +231,7 @@ def parse_text_field(
     toprocess: PushPayload,
     resource_classifications: ResourceClassifications,
 ) -> None:
-    classif_labels = resource_classifications.get_field_classifications(
-        key, resources_pb2.FieldType.TEXT
-    )
+    classif_labels = resource_classifications.get_for_field(key, resources_pb2.FieldType.TEXT)
     if text_field.extract_strategy is not None:
         writer.texts[key].extract_strategy = text_field.extract_strategy
     writer.texts[key].body = text_field.body
@@ -301,9 +297,7 @@ async def parse_internal_file_field(
     resource_classifications: ResourceClassifications,
     skip_store: bool = False,
 ) -> None:
-    classif_labels = resource_classifications.get_field_classifications(
-        key, resources_pb2.FieldType.FILE
-    )
+    classif_labels = resource_classifications.get_for_field(key, resources_pb2.FieldType.FILE)
     writer.files[key].added.FromDatetime(datetime.now())
     if file_field.language:
         writer.files[key].language = file_field.language
@@ -341,9 +335,7 @@ def parse_external_file_field(
     toprocess: PushPayload,
     resource_classifications: ResourceClassifications,
 ) -> None:
-    classif_labels = resource_classifications.get_field_classifications(
-        key, resources_pb2.FieldType.FILE
-    )
+    classif_labels = resource_classifications.get_for_field(key, resources_pb2.FieldType.FILE)
     writer.files[key].added.FromDatetime(datetime.now())
     if file_field.language:
         writer.files[key].language = file_field.language
@@ -367,9 +359,7 @@ def parse_link_field(
     toprocess: PushPayload,
     resource_classifications: ResourceClassifications,
 ) -> None:
-    classif_labels = resource_classifications.get_field_classifications(
-        key, resources_pb2.FieldType.LINK
-    )
+    classif_labels = resource_classifications.get_for_field(key, resources_pb2.FieldType.LINK)
     writer.links[key].added.FromDatetime(datetime.now())
 
     writer.links[key].uri = link_field.uri
@@ -424,9 +414,7 @@ async def parse_conversation_field(
     uuid: str,
     resource_classifications: ResourceClassifications,
 ) -> None:
-    classif_labels = resource_classifications.get_field_classifications(
-        key, resources_pb2.FieldType.CONVERSATION
-    )
+    classif_labels = resource_classifications.get_for_field(key, resources_pb2.FieldType.CONVERSATION)
     storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
     field_value = resources_pb2.Conversation()
