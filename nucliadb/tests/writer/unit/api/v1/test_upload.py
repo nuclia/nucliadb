@@ -27,11 +27,19 @@ from nucliadb.writer.api.v1.upload import (
     store_file_on_nuclia_db,
     validate_field_upload,
 )
+from nucliadb.writer.resource.field import ResourceClassifications
 from nucliadb.writer.tus.exceptions import HTTPConflict, HTTPNotFound
 from nucliadb_models.resource import QueueType
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig
 
 UPLOAD_PACKAGE = "nucliadb.writer.api.v1.upload"
+
+
+@pytest.fixture(scope="function")
+def driver_mock():
+    driver = Mock()
+    with patch(f"{UPLOAD_PACKAGE}.get_driver"):
+        yield driver
 
 
 @pytest.fixture(scope="function")
@@ -72,8 +80,15 @@ async def kb_config_mock():
         yield mock
 
 
+@pytest.fixture(scope="function", autouse=True)
+async def atomic_get_resource_classifications_mock():
+    with patch(f"{UPLOAD_PACKAGE}.atomic_get_resource_classifications") as mock:
+        mock.return_value = ResourceClassifications(resource_level=[], field_level={})
+        yield mock
+
+
 async def test_store_file_on_nucliadb_does_not_store_passwords(
-    processing_mock, partitioning_mock, transaction_mock
+    processing_mock, partitioning_mock, transaction_mock, atomic_get_resource_classifications_mock
 ):
     field = "myfield"
 
@@ -136,7 +151,11 @@ async def test_validate_field_upload(rid, field, md5, exists: bool, result):
 
 
 async def test_store_file_on_nucliadb_sets_hidden(
-    processing_mock, partitioning_mock, transaction_mock, kb_config_mock
+    processing_mock,
+    partitioning_mock,
+    transaction_mock,
+    kb_config_mock,
+    atomic_get_resource_classifications_mock,
 ):
     field = "myfield"
 
