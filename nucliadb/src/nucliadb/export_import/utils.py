@@ -34,6 +34,7 @@ from nucliadb.export_import.exceptions import (
 )
 from nucliadb.export_import.models import ExportedItemType, ExportItem, Metadata
 from nucliadb.ingest.orm.broker_message import generate_broker_message
+from nucliadb_models.configuration import SearchConfiguration
 from nucliadb_models.export_import import Status
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
@@ -45,23 +46,61 @@ BinaryStream = AsyncIterator[bytes]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
 
 
-# Broker message fields that are populated by the processing pipeline
-PROCESSING_BM_FIELDS = [
-    "link_extracted_data",
-    "file_extracted_data",
-    "extracted_text",
-    "field_metadata",
-    "field_vectors",
-    "field_large_metadata",
-]
-
-# Broker message fields that are populated by the nucliadb writer component
-WRITER_BM_FIELDS = [
-    "links",
-    "files",
-    "texts",
-    "conversations",
-]
+# Map that indicates which fields are written by the writer
+# and which are written by the processor.
+BM_FIELDS = {
+    "common": [
+        "kbid",
+        "uuid",
+        "type",
+        "source",
+        "reindex",
+    ],
+    "writer": [
+        "slug",
+        "basic",
+        "origin",
+        "user_relations",
+        "conversations",
+        "texts",
+        "links",
+        "files",
+        "extra",
+        "security",
+    ],
+    "processor": [
+        "link_extracted_data",
+        "file_extracted_data",
+        "extracted_text",
+        "field_metadata",
+        "field_vectors",
+        "field_large_metadata",
+        "question_answers",
+        "relations",
+        "field_statuses",
+    ],
+    # These fields are mostly used for internal purposes and they are not part of
+    # the representation of the exported resource as broker message.
+    "ignored": [
+        "audit",
+        "multiid",
+        "origin_seq",
+        "slow_processing_time",
+        "pre_processing_time",
+        "done_time",
+        "processing_id",
+        "account_seq",
+        "delete_fields",
+        "delete_question_answers",
+        "errors",
+        "generated_by",
+    ],
+    # No longer used fields
+    "deprecated": [
+        "txseqid",
+        "user_vectors",
+    ],
+}
 
 
 async def import_broker_message(
@@ -125,7 +164,7 @@ async def transaction_commit(
 def get_writer_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
     wbm = writer_pb2.BrokerMessage()
     wbm.CopyFrom(bm)
-    for field in PROCESSING_BM_FIELDS:
+    for field in BM_FIELDS["processor"]:
         wbm.ClearField(field)  # type: ignore
     wbm.type = writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT
     wbm.source = writer_pb2.BrokerMessage.MessageSource.WRITER
@@ -135,7 +174,7 @@ def get_writer_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
 def get_processor_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
     pbm = writer_pb2.BrokerMessage()
     pbm.CopyFrom(bm)
-    for field in WRITER_BM_FIELDS:
+    for field in BM_FIELDS["writer"]:
         pbm.ClearField(field)  # type: ignore
     pbm.type = writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT
     pbm.source = writer_pb2.BrokerMessage.MessageSource.PROCESSOR
@@ -170,6 +209,21 @@ async def set_entities_groups(
 ) -> None:
     async with datamanagers.with_transaction() as txn:
         await datamanagers.entities.set_entities_groups(txn, kbid=kbid, entities_groups=entities_groups)
+        await txn.commit()
+
+
+async def set_synonyms(context: ApplicationContext, kbid: str, synonyms: kb_pb2.Synonyms) -> None:
+    async with datamanagers.with_transaction() as txn:
+        await datamanagers.synonyms.set(txn, kbid=kbid, synonyms=synonyms)
+        await txn.commit()
+
+
+async def set_search_configurations(
+    context: ApplicationContext, kbid: str, search_configurations: dict[str, SearchConfiguration]
+) -> None:
+    async with datamanagers.with_transaction() as txn:
+        for name, config in search_configurations.items():
+            await datamanagers.search_configurations.set(txn, kbid=kbid, name=name, config=config)
         await txn.commit()
 
 
@@ -271,6 +325,18 @@ async def get_entities(context: ApplicationContext, kbid: str) -> kb_pb2.Entitie
 async def get_labels(context: ApplicationContext, kbid: str) -> kb_pb2.Labels:
     async with datamanagers.with_ro_transaction() as txn:
         return await datamanagers.labels.get_labels(txn, kbid=kbid)
+
+
+async def get_synonyms(context: ApplicationContext, kbid: str) -> kb_pb2.Synonyms:
+    async with datamanagers.with_ro_transaction() as txn:
+        return await datamanagers.synonyms.get(txn, kbid=kbid) or kb_pb2.Synonyms()
+
+
+async def get_search_configurations(
+    context: ApplicationContext, kbid: str
+) -> dict[str, SearchConfiguration]:
+    async with datamanagers.with_ro_transaction() as txn:
+        return await datamanagers.search_configurations.list(txn, kbid=kbid)
 
 
 class EndOfStream(Exception): ...

@@ -37,6 +37,8 @@ class StorageKeys:
     RESOURCE = "backups/{backup_id}/resources/{resource_id}.tar"
     ENTITIES = "backups/{backup_id}/entities.pb"
     LABELS = "backups/{backup_id}/labels.pb"
+    SYNONYMS = "backups/{backup_id}/synonyms.pb"
+    SEARCH_CONFIGURATIONS = "backups/{backup_id}/search_configurations.pb"
 
 
 class BackupFinishedStream:
