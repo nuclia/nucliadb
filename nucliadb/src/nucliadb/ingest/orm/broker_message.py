@@ -102,7 +102,18 @@ class _BrokerMessageBuilder:
             # Large metadata
             await self.generate_field_large_computed_metadata(type_id, field_id, field)
 
+            # Field status
+            await self.generate_field_status(field)
+
         return self.bm
+
+    async def generate_field_status(
+        self,
+        field: Field,
+    ):
+        status = await field.get_status()
+        if status is not None:
+            self.bm.field_statuses.add(status)
 
     async def generate_field(
         self,

@@ -77,6 +77,7 @@ BM_FIELDS = {
         "field_large_metadata",
         "question_answers",
         "relations",
+        "field_statuses",
     ],
     # These fields are mostly used for internal purposes and they are not part of
     # the representation of the exported resource as broker message.
@@ -91,17 +92,13 @@ BM_FIELDS = {
         "account_seq",
         "delete_fields",
         "delete_question_answers",
+        "errors",
+        "generated_by",
     ],
     # No longer used fields
     "deprecated": [
         "txseqid",
         "user_vectors",
-    ],
-    # TODO!!!!
-    "to_check": [
-        "errors",
-        "generated_by",
-        "field_statuses",
     ],
 }
 

@@ -42,6 +42,8 @@ from nucliadb.backups.settings import BackupSettings
 from nucliadb.backups.settings import settings as backups_settings
 from nucliadb.backups.utils import exists_backup
 from nucliadb.common.context import ApplicationContext
+from nucliadb.export_import.utils import BM_FIELDS
+from nucliadb_protos.writer_pb2 import BrokerMessage
 
 N_RESOURCES = 10
 
@@ -342,3 +344,21 @@ async def test_restore_resumed(
     resources = resp.json()["resources"]
     assert len(resources) == 9
     assert sorted([r["id"] for r in resources]) == rids[1:]
+
+
+def test_all_broker_message_fields_are_backed_up():
+    """
+    Hi developer! If this test fails is because you added a new field in the BrokerMessage proto and it is not
+    handled in the backup logic. If the field relates to some new data that needs to be preserved in the backup, please
+    make sure to extend the backup logic to handle it. If the field is not relevant for the backup, please add it to the
+    ignored fields in the BM_FIELDS dictionary in nucliadb/export_import/utils.py.
+    """
+    bm = BrokerMessage()
+    for field_name in bm.DESCRIPTOR.fields_by_name:
+        assert (
+            field_name in BM_FIELDS["writer"]
+            or field_name in BM_FIELDS["processor"]
+            or field_name in BM_FIELDS["ignored"]
+            or field_name in BM_FIELDS["common"]
+            or field_name in BM_FIELDS["deprecated"]
+        ), f"Field {field_name} is not being taken into account in the backup!"
