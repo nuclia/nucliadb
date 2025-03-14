@@ -26,6 +26,7 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.resource import Resource
+from nucliadb_protos import writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
@@ -34,7 +35,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
     LargeComputedMetadataWrapper,
 )
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus
 
 
 async def generate_broker_message(resource: Resource) -> BrokerMessage:
@@ -103,17 +104,23 @@ class _BrokerMessageBuilder:
             await self.generate_field_large_computed_metadata(type_id, field_id, field)
 
             # Field status
-            await self.generate_field_status(field)
+            await self.generate_field_status(type_id, field_id, field)
 
         return self.bm
 
     async def generate_field_status(
         self,
+        type_id: FieldType.ValueType,
+        field_id: str,
         field: Field,
     ):
+        fid = writer_pb2.FieldID(field_type=type_id, field=field_id)
         status = await field.get_status()
         if status is not None:
-            self.bm.field_statuses.add(status)
+            field_id_status = FieldIDStatus()
+            field_id_status.id.CopyFrom(fid)
+            field_id_status.status = status.status
+            self.bm.field_statuses.append(field_id_status)
 
     async def generate_field(
         self,
