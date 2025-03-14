@@ -261,8 +261,8 @@ async def parse_file_field_adapter(
     field_payload: models.FileField,
     writer: BrokerMessage,
     toprocess: PushPayload,
-    skip_store: bool,
     resource_classifications: ResourceClassifications,
+    skip_store: bool,
 ):
     return await parse_file_field(
         field_id,
