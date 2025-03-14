@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from dataclasses import dataclass
+import dataclasses
 from datetime import datetime
 from typing import Optional, Union
 
@@ -47,10 +47,12 @@ from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_storage
 
 
-@dataclass
+@dataclasses.dataclass
 class ResourceClassifications:
-    resource_level: list[ClassificationLabel]
-    field_level: dict[tuple[resources_pb2.FieldType.ValueType, str], list[ClassificationLabel]]
+    resource_level: list[ClassificationLabel] = dataclasses.field(default_factory=list)
+    field_level: dict[tuple[resources_pb2.FieldType.ValueType, str], list[ClassificationLabel]] = (
+        dataclasses.field(default_factory=dict)
+    )
 
     def get_for_field(
         self, field_key: str, field_type: resources_pb2.FieldType.ValueType

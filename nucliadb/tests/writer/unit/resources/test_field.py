@@ -22,7 +22,11 @@ from unittest import mock
 import pytest
 
 from nucliadb.ingest.processing import PushPayload
-from nucliadb.writer.resource.field import parse_conversation_field, parse_file_field
+from nucliadb.writer.resource.field import (
+    ResourceClassifications,
+    parse_conversation_field,
+    parse_file_field,
+)
 from nucliadb_models import File, FileField
 from nucliadb_models.common import FileB64
 from nucliadb_models.conversation import (
@@ -84,6 +88,7 @@ async def test_parse_file_field_does_not_store_password(processing_mock, file_fi
         PushPayload(kbid=kbid, uuid=uuid, partition=1, userid="user"),
         kbid,
         uuid,
+        ResourceClassifications(),
         skip_store=True,
     )
 
@@ -122,7 +127,9 @@ async def test_parse_conversation_field(storage_mock, processing_mock):
 
     conversation_field = InputConversationField(messages=[m1, m2])
 
-    await parse_conversation_field(key, conversation_field, bm, pp, kbid, uuid)
+    await parse_conversation_field(
+        key, conversation_field, bm, pp, kbid, uuid, ResourceClassifications()
+    )
 
     # Check push payload
     assert len(pp.conversationfield[key].messages) == 2
