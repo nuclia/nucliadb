@@ -36,6 +36,7 @@ class MessageFormat(Enum):
     RST = "RST"
     MARKDOWN = "MARKDOWN"
     KEEP_MARKDOWN = "KEEP_MARKDOWN"
+    JSON = "JSON"
 
 
 # Visualization classes (Those used on reader endpoints)
@@ -125,6 +126,7 @@ class PushMessageFormat(int, Enum):
     HTML = 1
     MARKDOWN = 2
     RST = 3
+    JSON = 4
 
 
 class PushMessageContent(BaseModel):
