@@ -393,6 +393,7 @@ class MessageContent(google.protobuf.message.Message):
         MARKDOWN: MessageContent._Format.ValueType  # 2
         RST: MessageContent._Format.ValueType  # 3
         KEEP_MARKDOWN: MessageContent._Format.ValueType  # 4
+        JSON: MessageContent._Format.ValueType  # 5
 
     class Format(_Format, metaclass=_FormatEnumTypeWrapper): ...
     PLAIN: MessageContent.Format.ValueType  # 0
@@ -400,6 +401,7 @@ class MessageContent(google.protobuf.message.Message):
     MARKDOWN: MessageContent.Format.ValueType  # 2
     RST: MessageContent.Format.ValueType  # 3
     KEEP_MARKDOWN: MessageContent.Format.ValueType  # 4
+    JSON: MessageContent.Format.ValueType  # 5
 
     TEXT_FIELD_NUMBER: builtins.int
     FORMAT_FIELD_NUMBER: builtins.int
