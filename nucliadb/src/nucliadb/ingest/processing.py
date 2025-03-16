@@ -312,9 +312,7 @@ class ProcessingEngine:
                 text = await resp.text()
                 raise Exception(f"STATUS: {resp.status} - {text}")
 
-    def encode_classif_labels(self, classif_labels: Optional[list[ClassificationLabel]]) -> str:
-        if not classif_labels:
-            return ""
+    def encode_classif_labels(self, classif_labels: list[ClassificationLabel]) -> str:
         return base64.b64encode(
             json.dumps([label.model_dump(mode="python") for label in classif_labels]).encode()
         ).decode()
