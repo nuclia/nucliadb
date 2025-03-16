@@ -44,9 +44,9 @@ from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.field import (
     ResourceClassifications,
-    atomic_get_resource_classifications,
+    atomic_get_stored_resource_classifications,
     extract_file_field,
-    get_resource_classifications,
+    get_stored_resource_classifications,
     parse_conversation_field,
     parse_file_field,
     parse_link_field,
@@ -117,7 +117,7 @@ async def add_field_to_resource(
 
     parse_audit(writer.audit, request)
 
-    resource_classifications = await atomic_get_resource_classifications(kbid=kbid, rid=rid)
+    resource_classifications = await atomic_get_stored_resource_classifications(kbid=kbid, rid=rid)
 
     parse_field = FIELD_PARSERS_MAP[type(field_payload)]
     if iscoroutinefunction(parse_field):
@@ -573,7 +573,7 @@ async def reprocess_file_field(
         if resource.basic is not None:
             toprocess.title = resource.basic.title
 
-        rclassif = await get_resource_classifications(txn, kbid=kbid, rid=rid)
+        rclassif = await get_stored_resource_classifications(txn, kbid=kbid, rid=rid)
 
         try:
             await extract_file_field(

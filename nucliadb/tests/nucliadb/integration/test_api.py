@@ -1328,9 +1328,13 @@ async def test_classification_labels_are_sent_to_processing(
     standalone_knowledgebox,
 ):
     """
-    We aim to test that whenever a new resource is created or a new field is created on an existing resource,
-    all the classification labels are sent to the processing engine request so that they can apply data augmentation
-    agents depending on labels criteria.
+    We aim to test all the classification labels are sent to the processing engine request so that they
+    can apply data augmentation agents depending on labels criteria. Tests this on:
+    - Resource creation
+    - Resource patch
+    - File upload
+    - Reprocess resource
+    - Reprocess field
     """
 
     processing = get_processing()
@@ -1339,7 +1343,7 @@ async def test_classification_labels_are_sent_to_processing(
     processing.values.clear()
     expected_labels = [ClassificationLabel(labelset="foo", label="bar")]
 
-    # Create a resource with a field of each type and some labels
+    # Resource creation
     resp = await nucliadb_writer.post(
         f"kb/{standalone_knowledgebox}/resources",
         json={
@@ -1382,7 +1386,6 @@ async def test_classification_labels_are_sent_to_processing(
     assert resp.status_code == 201, resp.text
     rid = resp.json()["uuid"]
 
-    # Check that push payload has been sent to processing with the right classification labels
     def validate_processing_call(processing: DummyProcessingEngine):
         assert len(processing.values["send_to_process"]) == 1
         send_to_process_call = cast(PushPayload, processing.values["send_to_process"][0][0])
@@ -1398,7 +1401,7 @@ async def test_classification_labels_are_sent_to_processing(
     processing.calls.clear()
     processing.values.clear()
 
-    # Reprocess resource should also send the extract strategies
+    # Reprocess resource
     resp = await nucliadb_writer.post(
         f"kb/{standalone_knowledgebox}/resource/{rid}/reprocess",
     )
@@ -1409,7 +1412,7 @@ async def test_classification_labels_are_sent_to_processing(
     processing.calls.clear()
     processing.values.clear()
 
-    # Patching the resource with a new field should also be handled
+    # Resource patch
     resp = await nucliadb_writer.patch(
         f"kb/{standalone_knowledgebox}/resource/{rid}",
         json={
@@ -1431,7 +1434,7 @@ async def test_classification_labels_are_sent_to_processing(
     processing.calls.clear()
     processing.values.clear()
 
-    # Upload a file with the upload endpoint, and set the extract strategy via a header
+    # Field upload
     resp = await nucliadb_writer.post(
         f"kb/{standalone_knowledgebox}/resource/{rid}/file/file2/upload",
         headers={"x-extract-strategy": "barbafoo"},
@@ -1439,6 +1442,20 @@ async def test_classification_labels_are_sent_to_processing(
     )
     assert resp.status_code == 201, resp.text
     rid = resp.json()["uuid"]
+
+    assert len(processing.values["send_to_process"]) == 1
+    send_to_process_call = cast(PushPayload, processing.values["send_to_process"][0][0])
+    assert len(send_to_process_call.filefield) == 1
+    assert processing.values["convert_internal_filefield_to_str"][0][-1] == expected_labels
+
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Reprocess field
+    resp = await nucliadb_writer.post(
+        f"kb/{standalone_knowledgebox}/resource/{rid}/file/file2/reprocess",
+    )
+    assert resp.status_code == 202, resp.text
 
     assert len(processing.values["send_to_process"]) == 1
     send_to_process_call = cast(PushPayload, processing.values["send_to_process"][0][0])

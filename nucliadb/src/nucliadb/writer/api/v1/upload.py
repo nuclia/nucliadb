@@ -47,7 +47,7 @@ from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import parse_basic_creation
 from nucliadb.writer.resource.field import (
-    atomic_get_resource_classifications,
+    atomic_get_stored_resource_classifications,
     parse_fields,
 )
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
@@ -904,6 +904,7 @@ async def store_file_on_nuclia_db(
 
         toprocess.title = writer.basic.title
 
+        resource_classifications = await atomic_get_stored_resource_classifications(kbid, rid)
         await parse_fields(
             writer=writer,
             item=item,
@@ -911,6 +912,7 @@ async def store_file_on_nuclia_db(
             kbid=kbid,
             uuid=rid,
             x_skip_store=False,
+            resource_classifications=resource_classifications,
         )
     else:
         # Use defaults for everything, but don't forget hidden which depends on KB config
@@ -956,8 +958,8 @@ async def store_file_on_nuclia_db(
             )
         )
 
-        rclassif = await atomic_get_resource_classifications(kbid, rid)
-        classif_labels = rclassif.get_for_field(field, resources_pb2.FieldType.FILE)
+        rclassif = await atomic_get_stored_resource_classifications(kbid, rid)
+        classif_labels = rclassif.for_field(field, resources_pb2.FieldType.FILE)
         toprocess.filefield[field] = await processing.convert_internal_filefield_to_str(
             file_field, storage=storage, classif_labels=classif_labels
         )

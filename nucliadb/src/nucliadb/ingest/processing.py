@@ -269,8 +269,9 @@ class ProcessingEngine:
             "password": file.password,
             "language": file.language,
             "extract_strategy": file.extract_strategy,
-            "classification_labels": self.encode_classif_labels(classif_labels),
         }
+        if classif_labels:
+            payload["classification_labels"] = self.encode_classif_labels(classif_labels)
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
     @backoff.on_exception(
@@ -342,8 +343,9 @@ class ProcessingEngine:
             "language": file_field.language,
             "password": file_field.password,
             "extract_strategy": file_field.extract_strategy,
-            "classification_labels": self.encode_classif_labels(classif_labels),
         }
+        if classif_labels:
+            payload["classification_labels"] = self.encode_classif_labels(classif_labels)
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
     @backoff.on_exception(

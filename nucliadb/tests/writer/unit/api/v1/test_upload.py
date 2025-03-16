@@ -81,14 +81,14 @@ async def kb_config_mock():
 
 
 @pytest.fixture(scope="function", autouse=True)
-async def atomic_get_resource_classifications_mock():
-    with patch(f"{UPLOAD_PACKAGE}.atomic_get_resource_classifications") as mock:
+async def atomic_get_stored_resource_classifications_mock():
+    with patch(f"{UPLOAD_PACKAGE}.atomic_get_stored_resource_classifications") as mock:
         mock.return_value = ResourceClassifications(resource_level=[], field_level={})
         yield mock
 
 
 async def test_store_file_on_nucliadb_does_not_store_passwords(
-    processing_mock, partitioning_mock, transaction_mock, atomic_get_resource_classifications_mock
+    processing_mock, partitioning_mock, transaction_mock, atomic_get_stored_resource_classifications_mock
 ):
     field = "myfield"
 
@@ -155,7 +155,7 @@ async def test_store_file_on_nucliadb_sets_hidden(
     partitioning_mock,
     transaction_mock,
     kb_config_mock,
-    atomic_get_resource_classifications_mock,
+    atomic_get_stored_resource_classifications_mock,
 ):
     field = "myfield"
 

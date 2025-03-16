@@ -50,10 +50,16 @@ from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
     parse_basic_creation,
     parse_basic_modify,
+    parse_user_classifications,
     set_status,
     set_status_modify,
 )
-from nucliadb.writer.resource.field import extract_fields, parse_fields
+from nucliadb.writer.resource.field import (
+    ResourceClassifications,
+    atomic_get_stored_resource_classifications,
+    extract_fields,
+    parse_fields,
+)
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
@@ -139,6 +145,11 @@ async def create_resource(
         if item.extra is not None:
             parse_extra(writer.extra, item.extra)
 
+        # Since this is a resource creation, we need to care only about the user-provided
+        # classifications in the request.
+        resource_classifications = ResourceClassifications(
+            resource_level=set(parse_user_classifications(item))
+        )
         await parse_fields(
             writer=writer,
             item=item,
@@ -146,6 +157,7 @@ async def create_resource(
             kbid=kbid,
             uuid=uuid,
             x_skip_store=x_skip_store,
+            resource_classifications=resource_classifications,
         )
 
         set_status(writer.basic, item)
@@ -296,6 +308,15 @@ async def modify_resource(
     if item.extra is not None:
         parse_extra(writer.extra, item.extra)
 
+    if item.usermetadata is not None:
+        # If usermetadata is set in the request payload, this means that stored resource classifications
+        # are not valid and we need to use the ones provided by the user in the request
+        resource_classifications = ResourceClassifications(
+            resource_level=set(parse_user_classifications(item))
+        )
+    else:
+        resource_classifications = await atomic_get_stored_resource_classifications(kbid, rid)
+
     await parse_fields(
         writer=writer,
         item=item,
@@ -303,6 +324,7 @@ async def modify_resource(
         kbid=kbid,
         uuid=rid,
         x_skip_store=x_skip_store,
+        resource_classifications=resource_classifications,
     )
     set_status_modify(writer.basic, item)
 
