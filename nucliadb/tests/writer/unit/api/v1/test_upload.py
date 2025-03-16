@@ -83,7 +83,7 @@ async def kb_config_mock():
 @pytest.fixture(scope="function", autouse=True)
 async def atomic_get_stored_resource_classifications_mock():
     with patch(f"{UPLOAD_PACKAGE}.atomic_get_stored_resource_classifications") as mock:
-        mock.return_value = ResourceClassifications(resource_level=[], field_level={})
+        mock.return_value = ResourceClassifications()
         yield mock
 
 
