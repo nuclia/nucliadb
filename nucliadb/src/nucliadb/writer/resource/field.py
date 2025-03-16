@@ -508,9 +508,6 @@ async def get_stored_resource_classifications(
     kbid: str,
     rid: str,
 ) -> ResourceClassifications:
-    """
-    Gets a unique list of classification labels for a given field, including those inherited from the resource.
-    """
     rc = ResourceClassifications()
     basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
     if basic is None:
