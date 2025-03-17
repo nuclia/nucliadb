@@ -53,8 +53,3 @@ class FileField(BaseModel):
         default=None,
         description="Id of the Nuclia extract strategy to use at processing time. If not set, the default strategy will be used. Extract strategies are defined at the learning configuration api.",
     )
-
-
-# Processing classes (Those used to sent to push endpoints)
-# - No class used, all files are send to push as opaque string tokens
-#   set directly in the files dict on PushPayload

@@ -22,8 +22,6 @@ from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
-from nucliadb_models.labels import ClassificationLabel
-
 # Shared classes
 
 # NOTHING TO SEE HERE
@@ -61,25 +59,3 @@ class LinkField(BaseModel):
         default=None,
         description="Id of the Nuclia extract strategy to use at processing time. If not set, the default strategy will be used. Extract strategies are defined at the learning configuration api.",
     )
-
-
-# Processing classes (Those used to sent to push endpoints)
-
-
-class LinkUpload(BaseModel):
-    link: str
-    headers: Dict[str, str] = {}
-    cookies: Dict[str, str] = {}
-    localstorage: Dict[str, str] = {}
-    css_selector: Optional[str] = Field(
-        None,
-        title="Css selector",
-        description="Css selector to parse the link",
-    )
-    xpath: Optional[str] = Field(
-        None,
-        title="Xpath",
-        description="Xpath to parse the link",
-    )
-    extract_strategy: Optional[str] = None
-    classification_labels: list[ClassificationLabel] = []

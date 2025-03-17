@@ -28,8 +28,8 @@ from nucliadb.ingest.processing import (
     ProcessingEngine,
     PushPayload,
 )
+from nucliadb.models.internal.processing import ClassificationLabel
 from nucliadb_models import File, FileField
-from nucliadb_models.labels import ClassificationLabel
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from tests.utils.aiohttp_session import get_mocked_session

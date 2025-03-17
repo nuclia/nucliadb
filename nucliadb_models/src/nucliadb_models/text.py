@@ -23,7 +23,6 @@ from typing import Optional
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
-from nucliadb_models.labels import ClassificationLabel
 from nucliadb_models.utils import validate_json
 
 MB = 1024 * 1024
@@ -92,24 +91,3 @@ If you need to store more text, consider using a file field instead or splitting
         if self.format == TextFormat.JSON:
             validate_json(self.body or "")
         return self
-
-
-# Processing classes (Those used to sent to push endpoints)
-
-
-class PushTextFormat(int, Enum):
-    PLAIN = 0
-    HTML = 1
-    MARKDOWN = 2
-    RST = 3
-    JSON = 4
-    KEEP_MARKDOWN = 5
-    JSONL = 6
-    PLAIN_BLANKLINE_SPLIT = 7
-
-
-class Text(BaseModel):
-    body: str
-    format: PushTextFormat
-    extract_strategy: Optional[str] = None
-    classification_labels: list[ClassificationLabel] = []

@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from fastapi.requests import Request
 
-from nucliadb.ingest.processing import ProcessingInfo, Source
+from nucliadb.models.internal.processing import ProcessingInfo, Source
 from nucliadb.writer.api.v1.upload import (
     store_file_on_nuclia_db,
     validate_field_upload,
