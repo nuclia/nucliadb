@@ -404,7 +404,7 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
     };
 
     let segment_meta = RelationIndexer
-        .index_resource(dir.path(), RelationConfig::default(), &resource)
+        .index_resource(dir.path(), &RelationConfig::default(), &resource)
         .unwrap()
         .unwrap();
     RelationSearcher::open(

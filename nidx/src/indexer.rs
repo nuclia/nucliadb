@@ -356,7 +356,7 @@ fn index_resource_to_index(
             .index_resource(output_dir, resource)?
             .map(|x| x.into()),
         IndexKind::Relation => nidx_relation::RelationIndexer
-            .index_resource(output_dir, resource)?
+            .index_resource(output_dir, &index.config()?, resource)?
             .map(|x| x.into()),
     };
 

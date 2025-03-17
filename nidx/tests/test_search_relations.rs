@@ -33,7 +33,7 @@ use nidx_protos::relation_node::NodeType;
 use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::resource::ResourceStatus;
 use nidx_protos::{
-    EntitiesSubgraphRequest, GraphQuery, GraphSearchRequest, IndexMetadata, NewShardRequest, Relation,
+    EntitiesSubgraphRequest, GraphQuery, GraphSearchRequest, IndexMetadata, IndexRelation, NewShardRequest,
     RelationMetadata, RelationNode, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest,
     RelationSearchResponse, Resource, ResourceId, graph_query,
 };
@@ -1132,7 +1132,7 @@ async fn create_knowledge_graph(fixture: &mut NidxFixture, shard_id: String) -> 
             .expect(&format!("Expecting to find relation '{relation}'"));
         let (destination_type, destination_subtype) = entities.get(destination).unwrap();
 
-        relation_edges.push(Relation {
+        relation_edges.push(IndexRelation {
             source: Some(RelationNode {
                 value: source.to_string(),
                 ntype: *source_type as i32,
@@ -1146,7 +1146,7 @@ async fn create_knowledge_graph(fixture: &mut NidxFixture, shard_id: String) -> 
             relation: *relation_type as i32,
             relation_label: relation.to_string(),
             metadata: relation_metadata.clone(),
-            resource_id: None,
+            ..Default::default()
         });
     }
 

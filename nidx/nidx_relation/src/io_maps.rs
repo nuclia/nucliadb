@@ -18,10 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use nidx_protos::index_relation::RelationType;
 use nidx_protos::prost::*;
-use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
-use nidx_protos::{Relation as ProtosRelation, RelationMetadata, RelationNode};
+use nidx_protos::{IndexRelation as ProtosRelation, RelationMetadata, RelationNode};
 use tantivy::TantivyDocument;
 
 use crate::schema::Schema;
@@ -105,6 +105,7 @@ pub fn doc_to_relation(schema: &Schema, doc: &TantivyDocument) -> ProtosRelation
         source: Some(source_to_relation_node(schema, doc)),
         to: Some(target_to_relation_node(schema, doc)),
         resource_id: Some(schema.resource_id(doc)),
+        ..Default::default()
     }
 }
 

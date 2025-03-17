@@ -25,6 +25,7 @@ from nucliadb_protos.noderesources_pb2 import (
     IndexMetadata as IndexMetadata,
     IndexParagraph as IndexParagraph,
     IndexParagraphs as IndexParagraphs,
+    IndexRelation as IndexRelation,
     NodeMetadata as NodeMetadata,
     ParagraphMetadata as ParagraphMetadata,
     Position as Position,
@@ -665,11 +666,11 @@ class EntitiesSubgraphResponse(google.protobuf.message.Message):
 
     RELATIONS_FIELD_NUMBER: builtins.int
     @property
-    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
+    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.noderesources_pb2.IndexRelation]: ...
     def __init__(
         self,
         *,
-        relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
+        relations: collections.abc.Iterable[nucliadb_protos.noderesources_pb2.IndexRelation] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["relations", b"relations"]) -> None: ...
 

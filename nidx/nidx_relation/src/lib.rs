@@ -98,7 +98,7 @@ impl RelationIndexer {
     pub fn index_resource(
         &self,
         output_dir: &Path,
-        config: RelationConfig,
+        config: &RelationConfig,
         resource: &nidx_protos::Resource,
     ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
         let field_schema = RelationSchema::new(config.version);

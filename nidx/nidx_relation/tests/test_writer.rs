@@ -66,7 +66,7 @@ fn test_index_docs() -> anyhow::Result<()> {
     };
 
     let meta = RelationIndexer
-        .index_resource(dir.path(), RelationConfig::default(), &resource)?
+        .index_resource(dir.path(), &RelationConfig::default(), &resource)?
         .unwrap();
 
     assert_eq!(meta.records, 2);
