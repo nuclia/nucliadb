@@ -71,6 +71,8 @@ from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.storages.storage import Storage
 
+from .brain import relation_to_index
+
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
@@ -681,8 +683,9 @@ class Resource:
         for field_large_metadata in message.field_large_metadata:
             await self._apply_field_large_metadata(field_large_metadata)
 
+        # TODO: Can this be removed?
         for relation in message.relations:
-            self.indexer.brain.relations.append(relation)
+            self.indexer.brain.relations.append(relation_to_index(relation))
         await self.set_relations(message.relations)  # type: ignore
 
         # Basic proto may have been modified in some apply functions but we only

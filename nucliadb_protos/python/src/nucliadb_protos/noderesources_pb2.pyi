@@ -965,9 +965,11 @@ class IndexRelation(google.protobuf.message.Message):
     RELATION_FIELD_NUMBER: builtins.int
     RELATION_LABEL_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     resource_field_id: builtins.str
     relation: global___IndexRelation.RelationType.ValueType
     relation_label: builtins.str
+    resource_id: builtins.str
     @property
     def base_relation(self) -> nucliadb_protos.utils_pb2.Relation: ...
     @property
@@ -989,9 +991,13 @@ class IndexRelation(google.protobuf.message.Message):
         relation: global___IndexRelation.RelationType.ValueType = ...,
         relation_label: builtins.str = ...,
         metadata: nucliadb_protos.utils_pb2.RelationMetadata | None = ...,
+        resource_id: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_resource_field_id", b"_resource_field_id", "base_relation", b"base_relation", "metadata", b"metadata", "resource_field_id", b"resource_field_id", "source", b"source", "to", b"to"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_resource_field_id", b"_resource_field_id", "base_relation", b"base_relation", "facets", b"facets", "metadata", b"metadata", "relation", b"relation", "relation_label", b"relation_label", "resource_field_id", b"resource_field_id", "source", b"source", "to", b"to"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_resource_field_id", b"_resource_field_id", "_resource_id", b"_resource_id", "base_relation", b"base_relation", "metadata", b"metadata", "resource_field_id", b"resource_field_id", "resource_id", b"resource_id", "source", b"source", "to", b"to"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_resource_field_id", b"_resource_field_id", "_resource_id", b"_resource_id", "base_relation", b"base_relation", "facets", b"facets", "metadata", b"metadata", "relation", b"relation", "relation_label", b"relation_label", "resource_field_id", b"resource_field_id", "resource_id", b"resource_id", "source", b"source", "to", b"to"]) -> None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_resource_field_id", b"_resource_field_id"]) -> typing.Literal["resource_field_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_resource_id", b"_resource_id"]) -> typing.Literal["resource_id"] | None: ...
 
 global___IndexRelation = IndexRelation

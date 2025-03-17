@@ -30,6 +30,7 @@ from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import (
+    IndexRelation,
     ParagraphMetadata,
     Representation,
     ResourceID,
@@ -60,6 +61,17 @@ METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
     Metadata.Status.BLOCKED: ResourceProcessingStatus.BLOCKED.name,
     Metadata.Status.EXPIRED: ResourceProcessingStatus.EXPIRED.name,
 }
+
+
+def relation_to_index(relation: Relation) -> IndexRelation:
+    index = IndexRelation()
+    index.source.CopyFrom(relation.source)
+    index.to.CopyFrom(relation.to)
+    index.relation = relation.relation  # type: ignore
+    index.relation_label = relation.relation_label
+    index.metadata.CopyFrom(relation.metadata)
+
+    return index
 
 
 @dataclass
@@ -234,7 +246,7 @@ class ResourceBrain:
 
         for relations in metadata.metadata.relations:
             for relation in relations.relations:
-                self.brain.relations.append(relation)
+                self.brain.relations.append(relation_to_index(relation))
 
     def delete_field(self, field_key: str):
         ftype, fkey = field_key.split("/")
@@ -409,8 +421,8 @@ class ResourceBrain:
             for contrib in origin.colaborators:
                 relationnodeuser = RelationNode(value=contrib, ntype=RelationNode.NodeType.USER)
                 self.brain.relations.append(
-                    Relation(
-                        relation=Relation.COLAB,
+                    IndexRelation(
+                        relation=IndexRelation.COLAB,
                         source=relationnodedocument,
                         to=relationnodeuser,
                     )
@@ -423,15 +435,16 @@ class ResourceBrain:
                 ntype=RelationNode.NodeType.LABEL,
             )
             self.brain.relations.append(
-                Relation(
-                    relation=Relation.ABOUT,
+                IndexRelation(
+                    relation=IndexRelation.ABOUT,
                     source=relationnodedocument,
                     to=relation_node_label,
                 )
             )
 
         # relations
-        self.brain.relations.extend(user_relations.relations)
+        for relation in user_relations.relations:
+            self.brain.relations.append(relation_to_index(relation))
 
     def _set_resource_labels(self, basic: Basic, origin: Optional[Origin]):
         if origin is not None:
@@ -492,8 +505,8 @@ class ResourceBrain:
         if metadata.mime_type != "":
             labels["mt"].add(metadata.mime_type)
 
-        base_classification_relation = Relation(
-            relation=Relation.ABOUT,
+        base_classification_relation = IndexRelation(
+            relation=IndexRelation.ABOUT,
             source=relation_node_document,
             to=RelationNode(
                 ntype=RelationNode.NodeType.LABEL,
@@ -503,14 +516,14 @@ class ResourceBrain:
             label = f"{classification.labelset}/{classification.label}"
             if label not in user_canceled_labels:
                 labels["l"].add(label)
-                relation = Relation()
+                relation = IndexRelation()
                 relation.CopyFrom(base_classification_relation)
                 relation.to.value = label
                 self.brain.relations.append(relation)
 
         # Data Augmentation + Processor entities
-        base_entity_relation = Relation(
-            relation=Relation.ENTITY,
+        base_entity_relation = IndexRelation(
+            relation=IndexRelation.ENTITY,
             source=relation_node_document,
             to=RelationNode(ntype=RelationNode.NodeType.ENTITY),
         )
@@ -529,7 +542,7 @@ class ResourceBrain:
                 labels["e"].add(
                     f"{entity_label}/{entity_text}"
                 )  # Add data_augmentation_task_id as a prefix?
-                relation = Relation()
+                relation = IndexRelation()
                 relation.CopyFrom(base_entity_relation)
                 relation.to.value = entity_text
                 relation.to.subtype = entity_label
@@ -548,7 +561,7 @@ class ResourceBrain:
             for klass_entity in metadata.positions.keys():
                 labels["e"].add(klass_entity)
                 klass, entity = _parse_entity(klass_entity)
-                relation = Relation()
+                relation = IndexRelation()
                 relation.CopyFrom(base_entity_relation)
                 relation.to.value = entity
                 relation.to.subtype = klass
@@ -603,8 +616,8 @@ class ResourceBrain:
                         ntype=RelationNode.NodeType.ENTITY,
                         subtype=token.klass,
                     )
-                    rel = Relation(
-                        relation=Relation.ENTITY,
+                    rel = IndexRelation(
+                        relation=IndexRelation.ENTITY,
                         source=relation_node_resource,
                         to=relation_node_entity,
                     )
