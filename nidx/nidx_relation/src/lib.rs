@@ -38,6 +38,7 @@ use nidx_types::OpenIndexMetadata;
 use reader::{HashedRelationNode, RelationsReaderService};
 use resource_indexer::index_relations;
 pub use schema::Schema as RelationSchema;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::Path};
 use tantivy::{
     Term,
@@ -53,6 +54,28 @@ use tracing::instrument;
 /// remove important words from suggestion
 const MIN_SUGGEST_PREFIX_LENGTH: usize = 2;
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RelationConfig {
+    #[serde(default = "default_version")]
+    pub version: u64,
+}
+
+impl Default for RelationConfig {
+    fn default() -> Self {
+        Self {
+            // This is the default version when creating a new index.
+            // Should typically be set to the latest supported version
+            version: 2,
+        }
+    }
+}
+
+// This is the default version when reading from serde, i.e: no info on database
+// This should always be 1
+fn default_version() -> u64 {
+    1
+}
+
 pub struct RelationIndexer;
 
 pub struct RelationDeletionQueryBuilder(Field);
@@ -65,7 +88,11 @@ impl DeletionQueryBuilder for RelationDeletionQueryBuilder {
 }
 impl RelationDeletionQueryBuilder {
     fn new(schema: &RelationSchema) -> Self {
-        RelationDeletionQueryBuilder(schema.resource_id)
+        if let Some(resource_id) = schema.resource_id {
+            RelationDeletionQueryBuilder(resource_id)
+        } else {
+            todo!()
+        }
     }
 }
 
@@ -74,9 +101,10 @@ impl RelationIndexer {
     pub fn index_resource(
         &self,
         output_dir: &Path,
+        config: RelationConfig,
         resource: &nidx_protos::Resource,
     ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
-        let field_schema = RelationSchema::new();
+        let field_schema = RelationSchema::new(config.version);
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
         if resource.status == ResourceStatus::Delete as i32 {
@@ -95,9 +123,10 @@ impl RelationIndexer {
     pub fn merge(
         &self,
         work_dir: &Path,
+        config: RelationConfig,
         open_index: impl OpenIndexMetadata<TantivyMeta>,
     ) -> anyhow::Result<TantivySegmentMetadata> {
-        let schema = RelationSchema::new();
+        let schema = RelationSchema::new(config.version);
         let deletions_query = RelationDeletionQueryBuilder::new(&schema);
         let index = open_index_with_deletions(schema.schema, open_index, deletions_query)?;
 
@@ -120,15 +149,15 @@ pub struct RelationSearcher {
 
 impl RelationSearcher {
     #[instrument(name = "relation::open", skip_all)]
-    pub fn open(open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
-        let schema = RelationSchema::new();
+    pub fn open(config: RelationConfig, open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
+        let schema = RelationSchema::new(config.version);
         let deletions_query = RelationDeletionQueryBuilder::new(&schema);
         let index = open_index_with_deletions(schema.schema, open_index, deletions_query)?;
 
         Ok(Self {
             reader: RelationsReaderService {
                 index: index.clone(),
-                schema: RelationSchema::new(),
+                schema: RelationSchema::new(config.version),
                 reader: index
                     .reader_builder()
                     .reload_policy(tantivy::ReloadPolicy::Manual)

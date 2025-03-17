@@ -20,7 +20,7 @@
 mod common;
 
 use nidx_protos::{RelationMetadata, Resource, ResourceId, relation::RelationType, relation_node::NodeType};
-use nidx_relation::RelationIndexer;
+use nidx_relation::{RelationConfig, RelationIndexer};
 use tempfile::TempDir;
 
 #[test]
@@ -65,7 +65,9 @@ fn test_index_docs() -> anyhow::Result<()> {
         ..Default::default()
     };
 
-    let meta = RelationIndexer.index_resource(dir.path(), &resource)?.unwrap();
+    let meta = RelationIndexer
+        .index_resource(dir.path(), RelationConfig::default(), &resource)?
+        .unwrap();
 
     assert_eq!(meta.records, 2);
 

@@ -36,7 +36,7 @@ use crate::graph_query_parser::{
     BoolGraphQuery, BoolNodeQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
 };
 use crate::schema::Schema;
-use crate::{io_maps, schema};
+use crate::{RelationConfig, io_maps, schema};
 
 const FUZZY_DISTANCE: u8 = 1;
 // Search for entities of these many words of length
@@ -79,16 +79,15 @@ impl RelationsReaderService {
 
         let top_k = request.top_k as usize;
 
-        let response = match request.kind() {
+        match request.kind() {
             QueryKind::Path => self.paths_graph_search(query, top_k),
             QueryKind::Nodes => self.nodes_graph_search(query, top_k),
             QueryKind::Relations => self.relations_graph_search(query, top_k),
-        };
-        response
+        }
     }
 
     pub fn inner_graph_search(&self, query: GraphQuery) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
-        let parser = GraphQueryParser::new();
+        let parser = GraphQueryParser::new(&self.schema);
         let index_query: Box<dyn Query> = parser.parse(query);
 
         // TODO: parametrize this magic constant
@@ -109,7 +108,7 @@ impl RelationsReaderService {
         top_k: usize,
     ) -> anyhow::Result<GraphSearchResponse> {
         let query = BoolGraphQuery::try_from(query)?;
-        let parser = GraphQueryParser::new();
+        let parser = GraphQueryParser::new(&self.schema);
         let index_query = parser.parse_bool(query);
 
         let collector = TopDocs::with_limit(top_k);
@@ -127,17 +126,17 @@ impl RelationsReaderService {
         top_k: usize,
     ) -> anyhow::Result<GraphSearchResponse> {
         let query = BoolNodeQuery::try_from(query)?;
-        let parser = GraphQueryParser::new();
+        let parser = GraphQueryParser::new(&self.schema);
         let (source_query, destination_query) = parser.parse_bool_node(query);
 
         let mut unique_nodes = HashSet::new();
 
-        let collector = TopUniqueNodeCollector::new(NodeSelector::SourceNodes, top_k);
+        let collector = TopUniqueNodeCollector::new(self.schema.clone(), NodeSelector::SourceNodes, top_k);
         let searcher = self.reader.searcher();
         let mut source_nodes = searcher.search(&source_query, &collector)?;
         unique_nodes.extend(source_nodes.drain());
 
-        let collector = TopUniqueNodeCollector::new(NodeSelector::DestinationNodes, top_k);
+        let collector = TopUniqueNodeCollector::new(self.schema.clone(), NodeSelector::DestinationNodes, top_k);
         let searcher = self.reader.searcher();
         let mut destination_nodes = searcher.search(&destination_query, &collector)?;
         unique_nodes.extend(destination_nodes.drain());
@@ -165,10 +164,10 @@ impl RelationsReaderService {
         top_k: usize,
     ) -> anyhow::Result<GraphSearchResponse> {
         let query = BoolGraphQuery::try_from(query)?;
-        let parser = GraphQueryParser::new();
+        let parser = GraphQueryParser::new(&self.schema);
         let index_query = parser.parse_bool(query);
 
-        let collector = TopUniqueRelationCollector::new(top_k);
+        let collector = TopUniqueRelationCollector::new(self.schema.clone(), top_k);
         let searcher = self.reader.searcher();
         let matching_docs = searcher.search(&index_query, &collector)?;
 
@@ -228,11 +227,11 @@ impl RelationsReaderService {
 }
 
 impl RelationsReaderService {
-    pub fn open(path: &Path) -> anyhow::Result<Self> {
+    pub fn open(path: &Path, config: RelationConfig) -> anyhow::Result<Self> {
         if !path.exists() {
             return Err(anyhow::anyhow!("Invalid path {:?}", path));
         }
-        let field_schema = Schema::new();
+        let field_schema = Schema::new(config.version);
         let index = Index::open_in_dir(path)?;
 
         let reader = index.reader_builder().try_into()?;
@@ -260,7 +259,7 @@ impl RelationsReaderService {
             return Ok(Some(EntitiesSubgraphResponse::default()));
         }
 
-        let query_parser = GraphQueryParser::new();
+        let query_parser = GraphQueryParser::new(&self.schema);
         let mut statements = vec![];
 
         // Entry points are source or target nodes we want to search for. We want any undirected
@@ -312,7 +311,7 @@ impl RelationsReaderService {
             })
             .collect();
 
-        if excluded_subtypes.len() > 0 {
+        if !excluded_subtypes.is_empty() {
             statements.push((
                 Occur::MustNot,
                 query_parser.parse(GraphQuery::NodeQuery(NodeQuery::Node(Expression::Or(
@@ -346,7 +345,7 @@ impl RelationsReaderService {
             return Err(anyhow::anyhow!("Search terms needed"));
         };
 
-        let query_parser = GraphQueryParser::new();
+        let query_parser = GraphQueryParser::new(&self.schema);
 
         let mut source_q: Vec<(Occur, Box<dyn Query>)> = Vec::new();
         let mut target_q: Vec<(Occur, Box<dyn Query>)> = Vec::new();

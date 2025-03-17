@@ -24,7 +24,7 @@ use nidx_protos::{Resource, ResourceId};
 use nidx_relation::graph_query_parser::{
     Expression, FuzzyTerm, GraphQuery, Node, NodeQuery, PathQuery, Relation, RelationQuery, Term,
 };
-use nidx_relation::{RelationIndexer, RelationSearcher};
+use nidx_relation::{RelationConfig, RelationIndexer, RelationSearcher};
 use nidx_tests::graph::friendly_parse;
 use nidx_tests::graph::friendly_print;
 use tempfile::TempDir;
@@ -411,10 +411,16 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
             uuid: "uuid".to_string(),
             shard_id: "shard_id".to_string(),
         }),
-        relations: relations,
+        relations,
         ..Default::default()
     };
 
-    let segment_meta = RelationIndexer.index_resource(dir.path(), &resource).unwrap().unwrap();
-    RelationSearcher::open(TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]))
+    let segment_meta = RelationIndexer
+        .index_resource(dir.path(), RelationConfig::default(), &resource)
+        .unwrap()
+        .unwrap();
+    RelationSearcher::open(
+        RelationConfig::default(),
+        TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]),
+    )
 }

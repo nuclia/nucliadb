@@ -124,13 +124,13 @@ struct NodeSchemaFields {
     node_subtype: Field,
 }
 
-pub struct GraphQueryParser {
-    schema: Schema,
+pub struct GraphQueryParser<'a> {
+    schema: &'a Schema,
 }
 
-impl GraphQueryParser {
-    pub fn new() -> Self {
-        Self { schema: Schema::new() }
+impl<'a> GraphQueryParser<'a> {
+    pub fn new(schema: &'a Schema) -> Self {
+        Self { schema }
     }
 
     pub fn parse_bool(&self, query: BoolGraphQuery) -> Box<dyn Query> {
@@ -272,7 +272,7 @@ impl GraphQueryParser {
         self.has_node_expression(
             expression,
             NodeSchemaFields {
-                normalized_value: self.schema.normalized_source_value,
+                normalized_value: self.schema.normalized_source_value.unwrap(),
                 node_type: self.schema.source_type,
                 node_subtype: self.schema.source_subtype,
             },
@@ -284,7 +284,7 @@ impl GraphQueryParser {
         self.has_node_expression(
             expression,
             NodeSchemaFields {
-                normalized_value: self.schema.normalized_target_value,
+                normalized_value: self.schema.normalized_target_value.unwrap(),
                 node_type: self.schema.target_type,
                 node_subtype: self.schema.target_subtype,
             },
@@ -642,7 +642,7 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
         let value = node_pb.value.clone().map(|value| match node_pb.match_kind() {
             nidx_protos::graph_query::node::MatchKind::Exact => Term::Exact(value),
             nidx_protos::graph_query::node::MatchKind::Fuzzy => Term::Fuzzy(FuzzyTerm {
-                value: value,
+                value,
                 fuzzy_distance: DEFAULT_NODE_VALUE_FUZZY_DISTANCE,
                 is_prefix: true,
             }),

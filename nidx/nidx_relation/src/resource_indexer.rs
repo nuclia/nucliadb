@@ -57,9 +57,6 @@ pub fn index_relations(
         let normalized_target_value = normalize(target_value);
 
         let mut new_doc = doc!(
-            schema.normalized_source_value => normalized_source_value,
-            schema.normalized_target_value => normalized_target_value,
-            schema.resource_id => resource_id,
             schema.source_value => source_value,
             schema.source_type => source_type,
             schema.source_subtype => source_subtype,
@@ -69,6 +66,14 @@ pub fn index_relations(
             schema.relationship => relationship,
             schema.label => label,
         );
+
+        if schema.version == 1 {
+            new_doc.add_text(schema.normalized_source_value.unwrap(), normalized_source_value);
+            new_doc.add_text(schema.normalized_target_value.unwrap(), normalized_target_value);
+            new_doc.add_text(schema.resource_id.unwrap(), resource_id);
+        } else {
+            todo!();
+        }
 
         if let Some(metadata) = relation.metadata.as_ref() {
             let encoded_metadata = metadata.encode_to_vec();

@@ -27,7 +27,7 @@ use nidx_protos::{
     EntitiesSubgraphRequest, RelationMetadata, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest,
     Resource, ResourceId,
 };
-use nidx_relation::{RelationIndexer, RelationSearcher};
+use nidx_relation::{RelationConfig, RelationIndexer, RelationSearcher};
 use tempfile::TempDir;
 
 use common::TestOpener;
@@ -163,8 +163,14 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
         ..Default::default()
     };
 
-    let segment_meta = RelationIndexer.index_resource(dir.path(), &resource).unwrap().unwrap();
-    RelationSearcher::open(TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]))
+    let segment_meta = RelationIndexer
+        .index_resource(dir.path(), RelationConfig::default(), &resource)
+        .unwrap()
+        .unwrap();
+    RelationSearcher::open(
+        RelationConfig::default(),
+        TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]),
+    )
 }
 
 #[test]
