@@ -42,7 +42,6 @@ fn test_graph_node_query() -> anyhow::Result<()> {
             value: None,
             node_type: None,
             node_subtype: None,
-            ..Default::default()
         }))))?;
     assert_eq!(result.graph.len(), 16);
 
@@ -53,7 +52,6 @@ fn test_graph_node_query() -> anyhow::Result<()> {
             value: None,
             node_type: Some(NodeType::Entity),
             node_subtype: Some("PERSON".to_string()),
-            ..Default::default()
         }))))?;
     assert_eq!(result.graph.len(), 12);
 
@@ -64,7 +62,6 @@ fn test_graph_node_query() -> anyhow::Result<()> {
             value: Some("Anna".into()),
             node_type: Some(NodeType::Entity),
             node_subtype: Some("PERSON".to_string()),
-            ..Default::default()
         }))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 4);
@@ -81,7 +78,6 @@ fn test_graph_node_query() -> anyhow::Result<()> {
                 value: Some("Anna".into()),
                 node_type: Some(NodeType::Entity),
                 node_subtype: Some("PERSON".to_string()),
-                ..Default::default()
             },
         ))))?;
     let relations = friendly_parse(&result);
@@ -95,7 +91,6 @@ fn test_graph_node_query() -> anyhow::Result<()> {
             value: Some("Anna".into()),
             node_type: Some(NodeType::Entity),
             node_subtype: Some("PERSON".to_string()),
-            ..Default::default()
         }))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 5);
@@ -269,14 +264,12 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
                 value: None,
                 node_type: Some(NodeType::Entity),
                 node_subtype: Some("PERSON".to_string()),
-                ..Default::default()
             }),
             Expression::Value(Relation { value: None }),
             Expression::Value(Node {
                 value: None,
                 node_type: None,
                 node_subtype: Some("PLACE".to_string()),
-                ..Default::default()
             }),
         ))))?;
     let relations = friendly_parse(&result);
@@ -294,7 +287,6 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
                 value: None,
                 node_type: None,
                 node_subtype: Some("PERSON".to_string()),
-                ..Default::default()
             }),
             Expression::Value(Relation {
                 value: Some("LIVE_IN".to_string()),
@@ -303,7 +295,6 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
                 value: None,
                 node_type: None,
                 node_subtype: Some("PLACE".to_string()),
-                ..Default::default()
             }),
         ))))?;
     let relations = friendly_parse(&result);
@@ -319,7 +310,6 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
                 value: Some("Anna".into()),
                 node_type: Some(NodeType::Entity),
                 node_subtype: Some("PERSON".to_string()),
-                ..Default::default()
             }),
             Expression::Or(vec![
                 Relation {
@@ -333,7 +323,6 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
                 value: None,
                 node_type: None,
                 node_subtype: None,
-                ..Default::default()
             }),
         ))))?;
     let relations = friendly_parse(&result);
@@ -357,7 +346,6 @@ fn test_graph_undirected_path_query() -> anyhow::Result<()> {
                 value: Some("Anna".into()),
                 node_type: Some(NodeType::Entity),
                 node_subtype: Some("PERSON".to_string()),
-                ..Default::default()
             }),
             Expression::Value(Relation {
                 value: Some("IS_FRIEND".to_string()),

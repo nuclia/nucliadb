@@ -55,6 +55,7 @@ pub fn create_relation_node(source: String, node_type: NodeType, subtype: String
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_relation(
     source: String,
     source_node_type: NodeType,

@@ -25,7 +25,7 @@ use nidx_protos::{GraphSearchResponse, Relation, RelationNode, relation::Relatio
 /// Parse a graph search response and return a list of triplets (source,
 /// relation, target). This is a simplified view but yet useful view of the
 /// response.
-pub fn friendly_parse<'a>(relations: &'a GraphSearchResponse) -> Vec<(&'a str, &'a str, &'a str)> {
+pub fn friendly_parse(relations: &GraphSearchResponse) -> Vec<(&str, &str, &str)> {
     relations
         .graph
         .iter()

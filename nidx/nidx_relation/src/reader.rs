@@ -36,7 +36,7 @@ use crate::graph_query_parser::{
     BoolGraphQuery, BoolNodeQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
 };
 use crate::schema::Schema;
-use crate::{RelationConfig, io_maps, schema};
+use crate::{RelationConfig, io_maps};
 
 const FUZZY_DISTANCE: u8 = 1;
 // Search for entities of these many words of length

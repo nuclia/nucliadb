@@ -20,12 +20,12 @@
 use anyhow::anyhow;
 use nidx_protos::relation_node::NodeType;
 use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator};
-use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, PhraseQuery, Query, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
 use tantivy::schema::{Field, IndexRecordOption};
 use tantivy::tokenizer::TokenizerManager;
 
+use crate::io_maps;
 use crate::schema::Schema;
-use crate::{io_maps, schema};
 
 const DEFAULT_NODE_VALUE_FUZZY_DISTANCE: u8 = 1;
 
@@ -154,9 +154,10 @@ impl<'a> GraphQueryParser<'a> {
         match query {
             BooleanExpression::Literal(query) => self.parse(query),
             BooleanExpression::Not(subquery) => {
-                let mut subqueries = vec![];
-                subqueries.push((Occur::Must, Box::new(AllQuery) as Box<dyn Query>));
-                subqueries.push((Occur::MustNot, self.inner_parse_bool(*subquery)));
+                let subqueries = vec![
+                    (Occur::Must, Box::new(AllQuery) as Box<dyn Query>),
+                    (Occur::MustNot, self.inner_parse_bool(*subquery)),
+                ];
                 Box::new(BooleanQuery::new(subqueries))
             }
             BooleanExpression::Operation(operation) => {
@@ -191,9 +192,10 @@ impl<'a> GraphQueryParser<'a> {
                 ))),
             },
             BooleanExpression::Not(subquery) => {
-                let mut subqueries = vec![];
-                subqueries.push((Occur::Must, Box::new(AllQuery) as Box<dyn Query>));
-                subqueries.push((Occur::MustNot, self.inner_parse_bool_node(*subquery, position)));
+                let subqueries = vec![
+                    (Occur::Must, Box::new(AllQuery) as Box<dyn Query>),
+                    (Occur::MustNot, self.inner_parse_bool_node(*subquery, position)),
+                ];
                 Box::new(BooleanQuery::new(subqueries))
             }
             BooleanExpression::Operation(operation) => {
@@ -258,7 +260,7 @@ impl<'a> GraphQueryParser<'a> {
                 let mut subqueries = vec![];
 
                 subqueries.extend(self.has_node_expression_as_source(&source_expression));
-                subqueries.extend(self.has_relation(&relation_expression).into_iter());
+                subqueries.extend(self.has_relation(&relation_expression));
                 subqueries.extend(self.has_node_expression_as_destination(&destination_expression));
 
                 // Due to implementation details on tantivy, a query containing only MustNot won't
@@ -342,16 +344,16 @@ impl<'a> GraphQueryParser<'a> {
             Expression::Not(query) => {
                 // NOT granularity is a node, so we to use a Must { MustNot { X } } instead of
                 // unnest it in multiple MustNot { x }
-                let subquery: Box<dyn Query> = Box::new(BooleanQuery::intersection(self.has_node(&query, fields)));
+                let subquery: Box<dyn Query> = Box::new(BooleanQuery::intersection(self.has_node(query, fields)));
                 queries.push((Occur::MustNot, subquery));
             }
             Expression::Or(nodes) => {
                 // OR needs careful treatment. If there's only one node query matching, we can
                 // behave as it was a Value(Node). Otherwise we need a nested query with its parts
                 let mut subqueries: Vec<_> = nodes
-                    .into_iter()
+                    .iter()
                     .flat_map(|node| {
-                        let node_queries = self.has_node(&node, fields);
+                        let node_queries = self.has_node(node, fields);
                         if node_queries.is_empty() {
                             // We don't care about nodes that match everything as they don't provide any
                             // filtering value
@@ -373,7 +375,7 @@ impl<'a> GraphQueryParser<'a> {
                         // When there's multiple nodes to match, we must do a nested query and force
                         // that any of these matches
                         let or_subqueries = subqueries.into_iter().map(|mut node_queries| {
-                            debug_assert!(node_queries.len() > 0, "already validated above");
+                            debug_assert!(!node_queries.is_empty(), "already validated above");
                             let node_query: (Occur, Box<dyn Query>) = if node_queries.len() == 1 {
                                 // To avoid a nested boolean query for a node matching only in
                                 // one field, we can directly add a subquery
@@ -435,7 +437,7 @@ impl<'a> GraphQueryParser<'a> {
             }
 
             Expression::Or(relations) => {
-                subqueries.extend(relations.into_iter().flat_map(|relation| {
+                subqueries.extend(relations.iter().flat_map(|relation| {
                     if let Some(label) = &relation.value {
                         if label.is_empty() {
                             None
@@ -464,7 +466,7 @@ impl<'a> GraphQueryParser<'a> {
             NodeValueField::Normalized(field) => {
                 tantivy::Term::from_field_text(field, &self.schema.normalize(text_value))
             }
-            NodeValueField::Tokenized(TokenizedNodeFields { exact, tokenized }) => {
+            NodeValueField::Tokenized(TokenizedNodeFields { exact, .. }) => {
                 tantivy::Term::from_field_text(exact, &self.schema.normalize(text_value))
             }
         };
@@ -475,7 +477,7 @@ impl<'a> GraphQueryParser<'a> {
                     &self.schema.normalize(text_value),
                 )]
             }
-            NodeValueField::Tokenized(TokenizedNodeFields { exact, tokenized }) => {
+            NodeValueField::Tokenized(TokenizedNodeFields { tokenized, .. }) => {
                 let mut tokenizer = TokenizerManager::default().get("default").unwrap();
                 let mut token_stream = tokenizer.token_stream(text_value);
                 let mut terms = Vec::new();
@@ -486,14 +488,14 @@ impl<'a> GraphQueryParser<'a> {
             }
         };
 
-        // TODO: Rething this
+        // TODO: Rethink this
         // Current logic:
         // - Exact match always match the search term against the full field
         // - Fuzzy + prefix search works does a prefix fuzzy match of the whole entity name
         // - Fuzzy search looks for entities containing all words in the term with a fuzzy match (tokenized)
         //
         // Questions:
-        // - Do we want exact match of a word in the entity? (Supported by setting fuzzy distance = 0)
+        // - Do we want exact match of a word in the entity? (kind of supported by setting fuzzy distance = 0)
         let query: Box<dyn Query> = match value {
             Term::Exact(_) => Box::new(TermQuery::new(exact_term, IndexRecordOption::Basic)),
             Term::Fuzzy(fuzzy) => match fuzzy {
@@ -544,7 +546,7 @@ impl<'a> GraphQueryParser<'a> {
 
     fn has_relation_label(&self, label: &str) -> Box<dyn Query> {
         Box::new(TermQuery::new(
-            tantivy::Term::from_field_text(self.schema.label, &label),
+            tantivy::Term::from_field_text(self.schema.label, label),
             IndexRecordOption::Basic,
         ))
     }
@@ -572,7 +574,7 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolNodeQuery {
                     if !(path.source.is_some()
                         && path.relation.is_none()
                         && path.destination.is_none()
-                        && path.undirected == true)
+                        && path.undirected)
                     {
                         // We are doing something wrong between search API and nidx
                         return Err(anyhow!(
