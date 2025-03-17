@@ -19,6 +19,7 @@
 #
 import base64
 import datetime
+import json
 import logging
 import uuid
 from collections import defaultdict
@@ -32,6 +33,7 @@ import jwt
 from pydantic import BaseModel, Field
 
 import nucliadb_models as models
+from nucliadb_models.labels import ClassificationLabel
 from nucliadb_models.resource import QueueType
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
@@ -93,7 +95,10 @@ class PushPayload(BaseModel):
     genericfield: dict[str, models.Text] = {}
 
     # New File
-    filefield: dict[str, str] = {}
+    filefield: dict[str, str] = Field(
+        default={},
+        description="Map of each file field to the jwt token computed in ProcessingEngine methods",
+    )
 
     # New Link
     linkfield: dict[str, models.LinkUpload] = {}
@@ -238,7 +243,9 @@ class ProcessingEngine:
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
-    def generate_file_token_from_fieldfile(self, file: FieldFilePB) -> str:
+    def generate_file_token_from_fieldfile(
+        self, file: FieldFilePB, classif_labels: Optional[list[ClassificationLabel]] = None
+    ) -> str:
         if self.nuclia_jwt_key is None:
             raise AttributeError("Nuclia JWT key not set")
         now = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -263,6 +270,8 @@ class ProcessingEngine:
             "language": file.language,
             "extract_strategy": file.extract_strategy,
         }
+        if classif_labels:
+            payload["classification_labels"] = self.encode_classif_labels(classif_labels)
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
     @backoff.on_exception(
@@ -272,7 +281,9 @@ class ProcessingEngine:
         max_tries=MAX_TRIES,
     )
     @processing_observer.wrap({"type": "file_field_upload"})
-    async def convert_filefield_to_str(self, file: models.FileField) -> str:
+    async def convert_filefield_to_str(
+        self, file: models.FileField, classif_labels: Optional[list[ClassificationLabel]] = None
+    ) -> str:
         # Upload file without storing on Nuclia DB
         headers = {}
         headers["X-PASSWORD"] = file.password
@@ -281,6 +292,8 @@ class ProcessingEngine:
         headers["X-MD5"] = file.file.md5
         if file.extract_strategy is not None:
             headers["X-EXTRACT-STRATEGY"] = file.extract_strategy
+        if classif_labels:
+            headers["X-CLASSIFICATION-LABELS"] = self.encode_classif_labels(classif_labels)
         headers["CONTENT_TYPE"] = file.file.content_type
         headers["CONTENT-LENGTH"] = str(len(file.file.payload))  # type: ignore
         headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
@@ -299,7 +312,14 @@ class ProcessingEngine:
                 text = await resp.text()
                 raise Exception(f"STATUS: {resp.status} - {text}")
 
-    def convert_external_filefield_to_str(self, file_field: models.FileField) -> str:
+    def encode_classif_labels(self, classif_labels: list[ClassificationLabel]) -> str:
+        return base64.b64encode(
+            json.dumps([label.model_dump(mode="python") for label in classif_labels]).encode()
+        ).decode()
+
+    def convert_external_filefield_to_str(
+        self, file_field: models.FileField, classif_labels: Optional[list[ClassificationLabel]] = None
+    ) -> str:
         if self.nuclia_jwt_key is None:
             raise AttributeError("Nuclia JWT key not set")
 
@@ -322,6 +342,8 @@ class ProcessingEngine:
             "password": file_field.password,
             "extract_strategy": file_field.extract_strategy,
         }
+        if classif_labels:
+            payload["classification_labels"] = self.encode_classif_labels(classif_labels)
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
     @backoff.on_exception(
@@ -331,11 +353,16 @@ class ProcessingEngine:
         max_tries=MAX_TRIES,
     )
     @processing_observer.wrap({"type": "file_field_upload_internal"})
-    async def convert_internal_filefield_to_str(self, file: FieldFilePB, storage: Storage) -> str:
+    async def convert_internal_filefield_to_str(
+        self,
+        file: FieldFilePB,
+        storage: Storage,
+        classif_labels: Optional[list[ClassificationLabel]] = None,
+    ) -> str:
         """It's already an internal file that needs to be uploaded"""
         if self.onprem is False:
             # Upload the file to processing upload
-            jwttoken = self.generate_file_token_from_fieldfile(file)
+            jwttoken = self.generate_file_token_from_fieldfile(file, classif_labels)
         else:
             headers = {}
             headers["X-PASSWORD"] = file.password
@@ -347,6 +374,8 @@ class ProcessingEngine:
                 headers["CONTENT-LENGTH"] = str(file.file.size)
             if file.extract_strategy != "":
                 headers["X-EXTRACT-STRATEGY"] = file.extract_strategy
+            if classif_labels:
+                headers["X-CLASSIFICATION-LABELS"] = self.encode_classif_labels(classif_labels)
             headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
 
             iterator = storage.downloadbytescf_iterator(file.file)
@@ -488,22 +517,31 @@ class DummyProcessingEngine(ProcessingEngine):
     async def finalize(self):
         pass
 
-    async def convert_filefield_to_str(self, file: models.FileField) -> str:
+    async def convert_filefield_to_str(
+        self, file: models.FileField, classif_labels: Optional[list[ClassificationLabel]] = None
+    ) -> str:
         self.calls.append([file])
         index = len(self.values["convert_filefield_to_str"])
-        self.values["convert_filefield_to_str"].append(file)
+        self.values["convert_filefield_to_str"].append((file, classif_labels))
         return f"convert_filefield_to_str,{index}"
 
-    def convert_external_filefield_to_str(self, file_field: models.FileField) -> str:
+    def convert_external_filefield_to_str(
+        self, file_field: models.FileField, classif_labels: Optional[list[ClassificationLabel]] = None
+    ) -> str:
         self.calls.append([file_field])
         index = len(self.values["convert_external_filefield_to_str"])
-        self.values["convert_external_filefield_to_str"].append(file_field)
+        self.values["convert_external_filefield_to_str"].append((file_field, classif_labels))
         return f"convert_external_filefield_to_str,{index}"
 
-    async def convert_internal_filefield_to_str(self, file: FieldFilePB, storage: Storage) -> str:
+    async def convert_internal_filefield_to_str(
+        self,
+        file: FieldFilePB,
+        storage: Storage,
+        classif_labels: Optional[list[ClassificationLabel]] = None,
+    ) -> str:
         self.calls.append([file, storage])
         index = len(self.values["convert_internal_filefield_to_str"])
-        self.values["convert_internal_filefield_to_str"].append([file, storage])
+        self.values["convert_internal_filefield_to_str"].append((file, storage, classif_labels))
         return f"convert_internal_filefield_to_str,{index}"
 
     async def convert_internal_cf_to_str(self, cf: CloudFile, storage: Storage) -> str:

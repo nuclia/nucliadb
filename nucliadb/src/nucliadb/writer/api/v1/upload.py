@@ -46,7 +46,10 @@ from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_man
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import parse_basic_creation
-from nucliadb.writer.resource.field import parse_fields
+from nucliadb.writer.resource.field import (
+    atomic_get_stored_resource_classifications,
+    parse_fields,
+)
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_dm, get_storage_manager
 from nucliadb.writer.tus.exceptions import (
@@ -64,6 +67,7 @@ from nucliadb_models import content_types
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
+from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, FieldID, FieldType, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
 from nucliadb_utils.authentication import requires_one
@@ -864,7 +868,6 @@ async def store_file_on_nuclia_db(
     partitioning = get_partitioning()
     processing = get_processing()
     storage = await get_storage(service_name=SERVICE_NAME)
-
     partition = partitioning.generate_partition(kbid, rid)
 
     writer = BrokerMessage()
@@ -901,6 +904,7 @@ async def store_file_on_nuclia_db(
 
         toprocess.title = writer.basic.title
 
+        resource_classifications = await atomic_get_stored_resource_classifications(kbid, rid)
         await parse_fields(
             writer=writer,
             item=item,
@@ -908,6 +912,7 @@ async def store_file_on_nuclia_db(
             kbid=kbid,
             uuid=rid,
             x_skip_store=False,
+            resource_classifications=resource_classifications,
         )
     else:
         # Use defaults for everything, but don't forget hidden which depends on KB config
@@ -953,8 +958,10 @@ async def store_file_on_nuclia_db(
             )
         )
 
+        rclassif = await atomic_get_stored_resource_classifications(kbid, rid)
+        classif_labels = rclassif.for_field(field, resources_pb2.FieldType.FILE)
         toprocess.filefield[field] = await processing.convert_internal_filefield_to_str(
-            file_field, storage=storage
+            file_field, storage=storage, classif_labels=classif_labels
         )
 
         writer.source = BrokerMessage.MessageSource.WRITER

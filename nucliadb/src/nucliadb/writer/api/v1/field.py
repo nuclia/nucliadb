@@ -43,7 +43,10 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREF
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.field import (
+    ResourceClassifications,
+    atomic_get_stored_resource_classifications,
     extract_file_field,
+    get_stored_resource_classifications,
     parse_conversation_field,
     parse_file_field,
     parse_link_field,
@@ -114,11 +117,31 @@ async def add_field_to_resource(
 
     parse_audit(writer.audit, request)
 
+    resource_classifications = await atomic_get_stored_resource_classifications(kbid=kbid, rid=rid)
+
     parse_field = FIELD_PARSERS_MAP[type(field_payload)]
     if iscoroutinefunction(parse_field):
-        await parse_field(kbid, rid, field_id, field_payload, writer, toprocess, **parser_kwargs)
+        await parse_field(
+            kbid,
+            rid,
+            field_id,
+            field_payload,
+            writer,
+            toprocess,
+            resource_classifications,
+            **parser_kwargs,
+        )
     else:
-        parse_field(kbid, rid, field_id, field_payload, writer, toprocess, **parser_kwargs)
+        parse_field(
+            kbid,
+            rid,
+            field_id,
+            field_payload,
+            writer,
+            toprocess,
+            resource_classifications,
+            **parser_kwargs,
+        )
 
     processing = get_processing()
     await transaction.commit(writer, partition)
@@ -200,8 +223,9 @@ def parse_text_field_adapter(
     field_payload: models.TextField,
     writer: BrokerMessage,
     toprocess: PushPayload,
+    resource_classifications: ResourceClassifications,
 ):
-    return parse_text_field(field_id, field_payload, writer, toprocess)
+    return parse_text_field(field_id, field_payload, writer, toprocess, resource_classifications)
 
 
 def parse_link_field_adapter(
@@ -211,8 +235,9 @@ def parse_link_field_adapter(
     field_payload: models.LinkField,
     writer: BrokerMessage,
     toprocess: PushPayload,
+    resource_classifications: ResourceClassifications,
 ):
-    return parse_link_field(field_id, field_payload, writer, toprocess)
+    return parse_link_field(field_id, field_payload, writer, toprocess, resource_classifications)
 
 
 async def parse_conversation_field_adapter(
@@ -222,8 +247,11 @@ async def parse_conversation_field_adapter(
     field_payload: models.InputConversationField,
     writer: BrokerMessage,
     toprocess: PushPayload,
+    resource_classifications: ResourceClassifications,
 ):
-    return await parse_conversation_field(field_id, field_payload, writer, toprocess, kbid, rid)
+    return await parse_conversation_field(
+        field_id, field_payload, writer, toprocess, kbid, rid, resource_classifications
+    )
 
 
 async def parse_file_field_adapter(
@@ -233,14 +261,22 @@ async def parse_file_field_adapter(
     field_payload: models.FileField,
     writer: BrokerMessage,
     toprocess: PushPayload,
+    resource_classifications: ResourceClassifications,
     skip_store: bool,
 ):
     return await parse_file_field(
-        field_id, field_payload, writer, toprocess, kbid, rid, skip_store=skip_store
+        field_id,
+        field_payload,
+        writer,
+        toprocess,
+        kbid,
+        rid,
+        resource_classifications,
+        skip_store=skip_store,
     )
 
 
-FIELD_PARSERS_MAP: dict[Type, Union[Callable]] = {
+FIELD_PARSERS_MAP: dict[Type, Callable] = {
     models.TextField: parse_text_field_adapter,
     models.LinkField: parse_link_field_adapter,
     models.InputConversationField: parse_conversation_field_adapter,
@@ -537,12 +573,15 @@ async def reprocess_file_field(
         if resource.basic is not None:
             toprocess.title = resource.basic.title
 
+        rclassif = await get_stored_resource_classifications(txn, kbid=kbid, rid=rid)
+
         try:
             await extract_file_field(
                 field_id,
                 resource=resource,
                 toprocess=toprocess,
                 password=x_file_password,
+                resource_classifications=rclassif,
             )
         except KeyError:
             raise HTTPException(status_code=404, detail="Field does not exist")

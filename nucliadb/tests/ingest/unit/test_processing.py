@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
+import json
 from unittest.mock import Mock
 
 import pytest
@@ -27,6 +29,7 @@ from nucliadb.ingest.processing import (
     PushPayload,
 )
 from nucliadb_models import File, FileField
+from nucliadb_models.labels import ClassificationLabel
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from tests.utils.aiohttp_session import get_mocked_session
@@ -49,7 +52,7 @@ async def test_dummy_processing_engine():
     engine = DummyProcessingEngine()
     await engine.initialize()
     await engine.finalize()
-    await engine.convert_filefield_to_str(None)
+    await engine.convert_filefield_to_str(None, [])
     engine.convert_external_filefield_to_str(None)
     await engine.convert_internal_filefield_to_str(None, None)
     await engine.convert_internal_cf_to_str(None, None)
@@ -162,3 +165,21 @@ async def test_send_to_process_500(engine):
 
     with pytest.raises(SendToProcessError):
         await engine.send_to_process(TEST_ITEM, 1)
+
+
+def test_encode_classif_labels(engine):
+    # Just one label
+    encoded = engine.encode_classif_labels([ClassificationLabel(labelset="foo", label="bar")])
+    obj = json.loads(base64.b64decode(encoded).decode())
+    ClassificationLabel.model_validate(obj[0])
+
+    # Two labels
+    encoded = engine.encode_classif_labels(
+        [
+            ClassificationLabel(labelset="foo", label="bar"),
+            ClassificationLabel(labelset="baz", label="qux"),
+        ]
+    )
+    obj = json.loads(base64.b64decode(encoded).decode())
+    ClassificationLabel.model_validate(obj[0])
+    ClassificationLabel.model_validate(obj[1])

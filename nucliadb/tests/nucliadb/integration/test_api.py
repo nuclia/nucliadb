@@ -19,12 +19,13 @@
 #
 import base64
 import json
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.ingest.processing import DummyProcessingEngine
+from nucliadb.ingest.processing import DummyProcessingEngine, PushPayload
 from nucliadb.learning_proxy import (
     LearningConfiguration,
     SemanticConfig,
@@ -32,6 +33,7 @@ from nucliadb.learning_proxy import (
 )
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models import common, metadata
+from nucliadb_models.labels import ClassificationLabel
 from nucliadb_models.resource import Resource
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import writer_pb2 as wpb
@@ -1317,3 +1319,145 @@ async def test_extract_strategy_on_fields(
     assert (
         processing.values["convert_internal_filefield_to_str"][0][0].extract_strategy == "barbafoo-tus"
     )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_classification_labels_are_sent_to_processing(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox,
+):
+    """
+    We aim to test all the classification labels are sent to the processing engine request so that they
+    can apply data augmentation agents depending on labels criteria. Tests this on:
+    - Resource creation
+    - Resource patch
+    - File upload
+    - Reprocess resource
+    - Reprocess field
+    """
+
+    processing = get_processing()
+    assert isinstance(processing, DummyProcessingEngine)
+    processing.calls.clear()
+    processing.values.clear()
+    expected_labels = [ClassificationLabel(labelset="foo", label="bar")]
+
+    # Resource creation
+    resp = await nucliadb_writer.post(
+        f"kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": "My title",
+            "usermetadata": {"classifications": [expected_labels[0].model_dump()]},
+            "texts": {
+                "text": {
+                    "body": "My text",
+                }
+            },
+            "links": {
+                "link": {
+                    "uri": "https://www.example.com",
+                }
+            },
+            "files": {
+                "file": {
+                    "language": "en",
+                    "file": {
+                        "filename": "my_file.pdf",
+                        "payload": base64.b64encode(b"file content").decode(),
+                        "content_type": "application/pdf",
+                    },
+                }
+            },
+            "conversations": {
+                "conv": {
+                    "messages": [
+                        {
+                            "ident": "1",
+                            "content": {
+                                "text": "My message",
+                            },
+                        }
+                    ]
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    def validate_processing_call(processing: DummyProcessingEngine):
+        assert len(processing.values["send_to_process"]) == 1
+        send_to_process_call = cast(PushPayload, processing.values["send_to_process"][0][0])
+        assert send_to_process_call.textfield.popitem()[1].classification_labels == expected_labels
+        assert send_to_process_call.linkfield.popitem()[1].classification_labels == expected_labels
+        assert (
+            send_to_process_call.conversationfield.popitem()[1].classification_labels == expected_labels
+        )
+        assert processing.values["convert_internal_filefield_to_str"][0][-1] == expected_labels
+
+    validate_processing_call(processing)
+
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Reprocess resource
+    resp = await nucliadb_writer.post(
+        f"kb/{standalone_knowledgebox}/resource/{rid}/reprocess",
+    )
+    assert resp.status_code == 202, resp.text
+
+    validate_processing_call(processing)
+
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Resource patch
+    resp = await nucliadb_writer.patch(
+        f"kb/{standalone_knowledgebox}/resource/{rid}",
+        json={
+            "texts": {
+                "text2": {
+                    "body": "My text",
+                }
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    assert len(processing.values["send_to_process"]) == 1
+    send_to_process_call = cast(PushPayload, processing.values["send_to_process"][0][0])
+    assert send_to_process_call.textfield["text2"].classification_labels == [
+        ClassificationLabel(labelset="foo", label="bar")
+    ]
+
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Field upload
+    resp = await nucliadb_writer.post(
+        f"kb/{standalone_knowledgebox}/resource/{rid}/file/file2/upload",
+        headers={"x-extract-strategy": "barbafoo"},
+        content=b"file content",
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    assert len(processing.values["send_to_process"]) == 1
+    send_to_process_call = cast(PushPayload, processing.values["send_to_process"][0][0])
+    assert len(send_to_process_call.filefield) == 1
+    assert processing.values["convert_internal_filefield_to_str"][0][-1] == expected_labels
+
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Reprocess field
+    resp = await nucliadb_writer.post(
+        f"kb/{standalone_knowledgebox}/resource/{rid}/file/file2/reprocess",
+    )
+    assert resp.status_code == 202, resp.text
+
+    assert len(processing.values["send_to_process"]) == 1
+    send_to_process_call = cast(PushPayload, processing.values["send_to_process"][0][0])
+    assert len(send_to_process_call.filefield) == 1
+    assert processing.values["convert_internal_filefield_to_str"][0][-1] == expected_labels
