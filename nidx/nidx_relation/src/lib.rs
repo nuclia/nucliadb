@@ -88,11 +88,8 @@ impl DeletionQueryBuilder for RelationDeletionQueryBuilder {
 }
 impl RelationDeletionQueryBuilder {
     fn new(schema: &RelationSchema) -> Self {
-        if let Some(resource_id) = schema.resource_id {
-            RelationDeletionQueryBuilder(resource_id)
-        } else {
-            todo!()
-        }
+        // todo()! Deletion of fields
+        RelationDeletionQueryBuilder(schema.resource_id)
     }
 }
 

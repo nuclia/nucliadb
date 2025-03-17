@@ -342,7 +342,16 @@ fn test_prefix_query_search() -> anyhow::Result<()> {
         }),
         ..Default::default()
     })?;
-    assert_eq!(result.prefix.unwrap().nodes.len(), 0);
+    assert_eq!(result.prefix.unwrap().nodes.len(), 1);
+
+    let result = reader.search(&RelationSearchRequest {
+        prefix: Some(RelationPrefixSearchRequest {
+            search: Some(Search::Query("Just Bond".to_string())),
+            ..Default::default()
+        }),
+        ..Default::default()
+    })?;
+    assert_eq!(result.prefix.unwrap().nodes.len(), 1);
 
     let result = reader.search(&RelationSearchRequest {
         prefix: Some(RelationPrefixSearchRequest {

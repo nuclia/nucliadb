@@ -386,36 +386,50 @@ impl RelationsReaderService {
 
         match search {
             Search::Query(query) => {
-                // This search is intended to do a normal tokenized search on entities names. However, since we
-                // do some custom normalization for these fields, we need to do some custom handling here.
-                // Feel free to replace this with something better if we start indexing entities name with tokenization.
                 let mut prefix_nodes_q = Vec::new();
+                if schema.version == 1 {
+                    // This search is intended to do a normal tokenized search on entities names. However, since we
+                    // do some custom normalization for these fields, we need to do some custom handling here.
+                    // Feel free to replace this with something better if we start indexing entities name with tokenization.
 
-                // Search for all groups of words in the query, e.g:
-                // query "Films with James Bond"
-                // returns:
-                // "Films", "with", "James", "Bond"
-                // "Films with", "with James", "James Bond"
-                // "Films with James", "with James Bond"
-                let words: Vec<_> = query.split_whitespace().collect();
-                for end in 1..=words.len() {
-                    for len in 1..=ENTITY_WORD_SIZE {
-                        if len > end {
-                            break;
+                    // Search for all groups of words in the query, e.g:
+                    // query "Films with James Bond"
+                    // returns:
+                    // "Films", "with", "James", "Bond"
+                    // "Films with", "with James", "James Bond"
+                    // "Films with James", "with James Bond"
+                    let words: Vec<_> = query.split_whitespace().collect();
+                    for end in 1..=words.len() {
+                        for len in 1..=ENTITY_WORD_SIZE {
+                            if len > end {
+                                break;
+                            }
+                            let start = end - len;
+                            let prefix = &words[start..end];
+
+                            let normalized_prefix = schema.normalize_words(prefix.iter().copied());
+                            prefix_nodes_q.push(Node {
+                                value: Some(Term::Fuzzy(FuzzyTerm {
+                                    value: normalized_prefix,
+                                    fuzzy_distance: FUZZY_DISTANCE,
+                                    // BUG: this should be true if we want prefix search
+                                    is_prefix: false,
+                                })),
+                                ..Default::default()
+                            });
                         }
-                        let start = end - len;
-                        let prefix = &words[start..end];
-
-                        let normalized_prefix = schema::normalize_words(prefix.iter().copied());
+                    }
+                } else {
+                    let words: Vec<_> = query.split_whitespace().collect();
+                    for word in words {
                         prefix_nodes_q.push(Node {
                             value: Some(Term::Fuzzy(FuzzyTerm {
-                                value: normalized_prefix,
+                                value: word.to_string(),
                                 fuzzy_distance: FUZZY_DISTANCE,
-                                // BUG: this should be true if we want prefix search
                                 is_prefix: false,
                             })),
                             ..Default::default()
-                        });
+                        })
                     }
                 }
 
@@ -434,7 +448,7 @@ impl RelationsReaderService {
                 ));
             }
             Search::Prefix(prefix) => {
-                let normalized_prefix = schema::normalize(prefix);
+                let normalized_prefix = schema.normalize(prefix);
                 let node_filter = Node {
                     value: Some(Term::Fuzzy(FuzzyTerm {
                         value: normalized_prefix.clone(),

@@ -19,28 +19,14 @@
 //
 
 use tantivy::TantivyDocument;
-use tantivy::schema::{FAST, Field, INDEXED, STORED, STRING, Schema as TantivySchema};
+use tantivy::schema::{FAST, FacetOptions, Field, INDEXED, STORED, STRING, Schema as TantivySchema, TextOptions};
 use tantivy::schema::{TEXT, Value};
-
-/// The source will be deunicoded, se
-pub fn normalize(source: &str) -> String {
-    normalize_words(source.split_whitespace())
-}
-
-pub fn normalize_words<'a>(source: impl Iterator<Item = &'a str>) -> String {
-    let mut normalized = String::new();
-    for segment in source {
-        let deunicoded = deunicode::deunicode(segment);
-        let ascii_lower_cased = deunicoded.to_ascii_lowercase();
-        normalized.push_str(&ascii_lower_cased);
-    }
-    normalized
-}
 
 #[derive(Clone, Debug)]
 pub struct Schema {
     pub version: u64,
     pub schema: TantivySchema,
+    pub resource_id: Field,
     pub source_value: Field,
     pub source_type: Field,
     pub source_subtype: Field,
@@ -52,55 +38,40 @@ pub struct Schema {
     pub metadata: Field,
 
     // v1 fields
-    pub resource_id: Option<Field>,
-
     /// Indexed only fields used for storing strings that have been normalized through
     /// [`normalize`]. This fields can be used to provide fuzzy and exact match searchability
     /// without the need of tokenizing. This fields are not stored, therefore not meant to be
     /// returned, just queried.
-    pub normalized_source_value: Option<Field>,
-    pub normalized_target_value: Option<Field>,
+    pub normalized_source_value: Field,
+    pub normalized_target_value: Field,
 
     // v2 fields
     pub resource_field_id: Option<Field>,
     pub encoded_source_id: Option<Field>,
     pub encoded_target_id: Option<Field>,
+    pub facets: Option<Field>,
 }
 
 impl Schema {
     pub fn new(version: u64) -> Self {
         let mut builder = TantivySchema::builder();
 
-        let resource_id = if version == 1 {
-            Some(builder.add_text_field("resource_id", STRING | STORED))
-        } else {
-            None
-        };
+        let resource_id = builder.add_text_field("resource_id", STRING | STORED);
 
-        let (normalized_source_value, source_value) = if version == 1 {
-            // Special field for searches and don't tokenize values
-            (
-                Some(builder.add_text_field("indexed_source_value", STRING)),
-                builder.add_text_field("source_value", STORED),
-            )
-        } else {
-            // Tokenize values and use tantivy search
-            (None, builder.add_text_field("source_value", TEXT | STORED))
-        };
+        let value_options: TextOptions = if version == 1 { STORED.into() } else { TEXT | STORED };
+
+        // Special field for searches and don't tokenize values
+        let normalized_source_value = builder.add_text_field("indexed_source_value", STRING);
+        let source_value = builder.add_text_field("source_value", value_options.clone());
         let source_type = builder.add_u64_field("source_type", INDEXED | STORED);
         let source_subtype = builder.add_text_field("source_subtype", STRING | STORED);
-        let (normalized_target_value, target_value) = if version == 1 {
-            // Special field for searches and don't tokenize values
-            (
-                Some(builder.add_text_field("indexed_target_value", STRING)),
-                builder.add_text_field("target_value", STORED),
-            )
-        } else {
-            // Tokenize values and use tantivy search
-            (None, builder.add_text_field("target_value", TEXT | STORED))
-        };
+
+        // Special field for searches and don't tokenize values
+        let normalized_target_value = builder.add_text_field("indexed_target_value", STRING);
+        let target_value = builder.add_text_field("target_value", value_options);
         let target_type = builder.add_u64_field("to_type", INDEXED | STORED);
         let target_subtype = builder.add_text_field("to_subtype", STRING | STORED);
+
         let relationship = builder.add_u64_field("relationship", INDEXED | STORED);
         let label = builder.add_text_field("label", STRING | STORED);
         let metadata = builder.add_bytes_field("metadata", STORED);
@@ -108,10 +79,12 @@ impl Schema {
         let mut resource_field_id = None;
         let mut encoded_source_id = None;
         let mut encoded_target_id = None;
+        let mut facets = None;
         if version == 2 {
             resource_field_id = Some(builder.add_text_field("resource_field_id", STRING | STORED));
             encoded_source_id = Some(builder.add_u64_field("encoded_source_id", FAST));
             encoded_target_id = Some(builder.add_u64_field("encoded_target_id", FAST));
+            facets = Some(builder.add_facet_field("facets", FacetOptions::default()));
         }
 
         let schema = builder.build();
@@ -134,14 +107,29 @@ impl Schema {
             resource_field_id,
             encoded_source_id,
             encoded_target_id,
+            facets,
         }
     }
 
-    pub fn resource_id(&self, doc: &TantivyDocument) -> String {
-        if self.version != 1 {
-            todo!()
+    /// The source will be deunicoded, se
+    pub fn normalize(&self, source: &str) -> String {
+        self.normalize_words(source.split_whitespace())
+    }
+
+    pub fn normalize_words<'a>(&self, source: impl Iterator<Item = &'a str>) -> String {
+        let mut normalized = Vec::new();
+        for segment in source {
+            let deunicoded = deunicode::deunicode(segment);
+            let ascii_lower_cased = deunicoded.to_ascii_lowercase();
+            normalized.push(ascii_lower_cased);
         }
-        doc.get_first(self.resource_id.unwrap())
+
+        let separator = if self.version == 1 { "" } else { " " };
+        normalized.join(separator)
+    }
+
+    pub fn resource_id(&self, doc: &TantivyDocument) -> String {
+        doc.get_first(self.resource_id)
             .and_then(|i| i.as_str().map(String::from))
             .expect("Documents must have a resource id")
     }
@@ -216,9 +204,9 @@ mod tests {
 
         let mut index_writer: IndexWriter = index.writer(30_000_000)?;
         index_writer.add_document(doc!(
-            schema.resource_id.unwrap() => "uuid1",
+            schema.resource_id => "uuid1",
             schema.source_value => node_value,
-            schema.normalized_source_value.unwrap() => normalize(node_value),
+            schema.normalized_source_value => schema.normalize(node_value),
             schema.target_value => "to2",
             schema.relationship => 0u64,
         ))?;
@@ -227,7 +215,7 @@ mod tests {
 
         let reader = index.reader()?;
         let searcher = reader.searcher();
-        let term = Term::from_field_text(schema.normalized_source_value.unwrap(), &normalize(node_value));
+        let term = Term::from_field_text(schema.normalized_source_value, &schema.normalize(node_value));
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
         let results = searcher.search(&term_query, &DocSetCollector)?;
 

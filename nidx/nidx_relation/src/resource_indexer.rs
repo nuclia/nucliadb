@@ -19,7 +19,7 @@
 //
 
 use crate::io_maps;
-use crate::schema::{Schema, normalize};
+use crate::schema::Schema;
 use nidx_protos::prost::*;
 use nidx_tantivy::TantivyIndexer;
 use tantivy::doc;
@@ -53,10 +53,11 @@ pub fn index_relations(
 
         let label = relation.relation_label.as_str();
         let relationship = io_maps::relation_type_to_u64(relation.relation());
-        let normalized_source_value = normalize(source_value);
-        let normalized_target_value = normalize(target_value);
+        let normalized_source_value = schema.normalize(source_value);
+        let normalized_target_value = schema.normalize(target_value);
 
         let mut new_doc = doc!(
+            schema.resource_id => resource_id,
             schema.source_value => source_value,
             schema.source_type => source_type,
             schema.source_subtype => source_subtype,
@@ -65,14 +66,16 @@ pub fn index_relations(
             schema.target_subtype => target_subtype,
             schema.relationship => relationship,
             schema.label => label,
+            schema.normalized_source_value => normalized_source_value,
+            schema.normalized_target_value => normalized_target_value,
         );
 
-        if schema.version == 1 {
-            new_doc.add_text(schema.normalized_source_value.unwrap(), normalized_source_value);
-            new_doc.add_text(schema.normalized_target_value.unwrap(), normalized_target_value);
-            new_doc.add_text(schema.resource_id.unwrap(), resource_id);
-        } else {
-            todo!();
+        if schema.version == 2 {
+            // resource_field_id = Some(builder.add_text_field("resource_field_id", STRING | STORED));
+            // encoded_source_id = Some(builder.add_u64_field("encoded_source_id", FAST));
+            // encoded_target_id = Some(builder.add_u64_field("encoded_target_id", FAST));
+            // facets
+            // todo!();
         }
 
         if let Some(metadata) = relation.metadata.as_ref() {
