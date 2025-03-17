@@ -29,13 +29,12 @@ from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.resource import Resource as ORMResource
-from nucliadb.ingest.processing import PushPayload
+from nucliadb.models.internal import processing as processing_models
+from nucliadb.models.internal.processing import ClassificationLabel, PushConversation, PushPayload
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
-from nucliadb_models.conversation import PushConversation
-from nucliadb_models.labels import ClassificationLabel
 from nucliadb_models.writer import (
     CreateResourcePayload,
     UpdateResourcePayload,
@@ -134,7 +133,7 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
                 including_default_value_fields=True,
             )
             parsed_link["link"] = parsed_link.pop("uri", None)
-            toprocess.linkfield[field_id] = models.LinkUpload(**parsed_link)
+            toprocess.linkfield[field_id] = processing_models.LinkUpload(**parsed_link)
             toprocess.linkfield[field_id].classification_labels = classif_labels
 
         if field_type_name is FieldTypeName.TEXT:
@@ -143,8 +142,8 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
                 preserving_proto_field_name=True,
                 including_default_value_fields=True,
             )
-            parsed_text["format"] = models.PushTextFormat[parsed_text["format"]]
-            toprocess.textfield[field_id] = models.Text(**parsed_text)
+            parsed_text["format"] = processing_models.PushTextFormat[parsed_text["format"]]
+            toprocess.textfield[field_id] = processing_models.Text(**parsed_text)
             toprocess.textfield[field_id].classification_labels = classif_labels
 
         if field_type_name is FieldTypeName.CONVERSATION and isinstance(field, Conversation):
@@ -174,7 +173,7 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
                     parsed_message["content"]["format"] = resources_pb2.MessageContent.Format.Value(
                         parsed_message["content"]["format"]
                     )
-                    full_conversation.messages.append(models.PushMessage(**parsed_message))
+                    full_conversation.messages.append(processing_models.PushMessage(**parsed_message))
             toprocess.conversationfield[field_id] = full_conversation
             toprocess.conversationfield[field_id].classification_labels = classif_labels
 
@@ -247,9 +246,9 @@ def parse_text_field(
     etw.field.field_type = resources_pb2.FieldType.TEXT
     etw.body.text = text_field.body
     writer.extracted_text.append(etw)
-    toprocess.textfield[key] = models.Text(
+    toprocess.textfield[key] = processing_models.Text(
         body=text_field.body,
-        format=getattr(models.PushTextFormat, text_field.format.value),
+        format=getattr(processing_models.PushTextFormat, text_field.format.value),
         extract_strategy=text_field.extract_strategy,
         classification_labels=classif_labels,
     )
@@ -393,7 +392,7 @@ def parse_link_field(
     if link_field.extract_strategy is not None:
         writer.links[key].extract_strategy = link_field.extract_strategy
 
-    toprocess.linkfield[key] = models.LinkUpload(
+    toprocess.linkfield[key] = processing_models.LinkUpload(
         link=link_field.uri,
         headers=link_field.headers or {},
         cookies=link_field.cookies or {},
@@ -424,7 +423,7 @@ async def parse_conversation_field(
     storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
     field_value = resources_pb2.Conversation()
-    convs = models.PushConversation()
+    convs = processing_models.PushConversation()
     for message in conversation_field.messages:
         cm = resources_pb2.Message()
         if message.timestamp:
@@ -437,9 +436,9 @@ async def parse_conversation_field(
         if message.type_ is not None:
             cm.type = resources_pb2.Message.MessageType.Value(message.type_.value)
 
-        processing_message_content = models.PushMessageContent(
+        processing_message_content = processing_models.PushMessageContent(
             text=message.content.text,
-            format=getattr(models.PushMessageFormat, message.content.format.value),
+            format=getattr(processing_models.PushMessageFormat, message.content.format.value),
         )
 
         cm.content.text = message.content.text
@@ -472,7 +471,7 @@ async def parse_conversation_field(
                 await processing.convert_internal_cf_to_str(cf_conv_field, storage)
             )
 
-        processing_message = models.PushMessage(
+        processing_message = processing_models.PushMessage(
             timestamp=message.timestamp,
             content=processing_message_content,
             ident=message.ident,

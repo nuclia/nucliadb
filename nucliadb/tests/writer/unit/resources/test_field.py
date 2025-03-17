@@ -21,7 +21,7 @@ from unittest import mock
 
 import pytest
 
-from nucliadb.ingest.processing import PushPayload
+from nucliadb.models.internal.processing import PushMessageFormat, PushPayload
 from nucliadb.writer.resource.field import (
     ResourceClassifications,
     parse_conversation_field,
@@ -33,7 +33,6 @@ from nucliadb_models.conversation import (
     InputConversationField,
     InputMessage,
     InputMessageContent,
-    PushMessageFormat,
 )
 from nucliadb_protos.resources_pb2 import CloudFile, MessageContent
 from nucliadb_protos.writer_pb2 import BrokerMessage

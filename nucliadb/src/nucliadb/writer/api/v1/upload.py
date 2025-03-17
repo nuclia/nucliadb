@@ -33,7 +33,7 @@ from starlette.requests import Request as StarletteRequest
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.utils import set_title
-from nucliadb.ingest.processing import PushPayload, Source
+from nucliadb.models.internal.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.constants import X_EXTRACT_STRATEGY, X_FILENAME, X_LANGUAGE, X_MD5, X_PASSWORD

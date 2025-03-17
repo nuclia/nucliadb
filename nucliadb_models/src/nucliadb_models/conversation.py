@@ -24,7 +24,6 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from nucliadb_models import CloudLink, FieldRef, FileB64
-from nucliadb_models.labels import ClassificationLabel
 from nucliadb_models.utils import DateTime
 
 # Shared classes
@@ -116,33 +115,3 @@ class InputMessage(BaseModel):
 
 class InputConversationField(BaseModel):
     messages: List[InputMessage] = []
-
-
-# Processing classes (Those used to sent to push endpoints)
-
-
-class PushMessageFormat(int, Enum):
-    PLAIN = 0
-    HTML = 1
-    MARKDOWN = 2
-    RST = 3
-    JSON = 4
-
-
-class PushMessageContent(BaseModel):
-    text: Optional[str] = None
-    format: PushMessageFormat
-    attachments: List[str] = []
-
-
-class PushMessage(BaseModel):
-    timestamp: Optional[datetime] = None
-    who: Optional[str] = None
-    to: List[str] = []
-    content: PushMessageContent
-    ident: str
-
-
-class PushConversation(BaseModel):
-    messages: List[PushMessage] = []
-    classification_labels: list[ClassificationLabel] = []

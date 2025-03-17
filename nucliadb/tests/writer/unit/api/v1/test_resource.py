@@ -21,7 +21,7 @@ from datetime import datetime
 
 import pytest
 
-from nucliadb.ingest.processing import PushPayload
+from nucliadb.models.internal.processing import PushPayload
 from nucliadb.writer.api.v1.resource import needs_reprocess, needs_resource_reindex
 from nucliadb_models import File
 from nucliadb_models.conversation import Conversation

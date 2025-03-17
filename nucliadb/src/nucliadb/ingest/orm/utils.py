@@ -20,8 +20,7 @@
 import urllib.parse
 from typing import Sequence
 
-from nucliadb.ingest.processing import PushPayload
-from nucliadb_models.text import PushTextFormat, Text
+from nucliadb.models.internal.processing import PushPayload, PushTextFormat, Text
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     FieldComputedMetadataWrapper,

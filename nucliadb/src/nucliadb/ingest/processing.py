@@ -25,15 +25,14 @@ import uuid
 from collections import defaultdict
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional, TypeVar
+from typing import Any, Optional, TypeVar
 
 import aiohttp
 import backoff
 import jwt
-from pydantic import BaseModel, Field
 
 import nucliadb_models as models
-from nucliadb_models.labels import ClassificationLabel
+from nucliadb.models.internal.processing import ClassificationLabel, ProcessingInfo, PushPayload
 from nucliadb_models.resource import QueueType
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
@@ -52,10 +51,6 @@ logger = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
 
-if TYPE_CHECKING:  # pragma: no cover
-    SourceValue = CloudFile.Source.V
-else:
-    SourceValue = int
 
 RETRIABLE_EXCEPTIONS = (aiohttp.client_exceptions.ClientConnectorError,)
 MAX_TRIES = 4
@@ -69,53 +64,6 @@ processing_observer = metrics.Observer(
         "processing_api_error": SendToProcessError,
     },
 )
-
-
-class Source(SourceValue, Enum):  # type: ignore
-    HTTP = 0
-    INGEST = 1
-
-
-class ProcessingInfo(BaseModel):
-    seqid: Optional[int] = None
-    account_seq: Optional[int] = None
-    queue: Optional[QueueType] = None
-
-
-class PushPayload(BaseModel):
-    # There are multiple options of payload
-    uuid: str
-    slug: Optional[str] = None
-    kbid: str
-    source: Optional[Source] = None
-    userid: str
-
-    title: Optional[str] = None
-
-    genericfield: dict[str, models.Text] = {}
-
-    # New File
-    filefield: dict[str, str] = Field(
-        default={},
-        description="Map of each file field to the jwt token computed in ProcessingEngine methods",
-    )
-
-    # New Link
-    linkfield: dict[str, models.LinkUpload] = {}
-
-    # Diff on Text Field
-    textfield: dict[str, models.Text] = {}
-
-    # New conversations to process
-    conversationfield: dict[str, models.PushConversation] = {}
-
-    # Only internal
-    partition: int
-
-    # List of available processing options (with default values)
-    processing_options: Optional[models.PushProcessingOptions] = Field(
-        default_factory=models.PushProcessingOptions
-    )
 
 
 async def start_processing_engine():

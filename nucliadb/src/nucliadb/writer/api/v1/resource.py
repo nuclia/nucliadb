@@ -33,7 +33,7 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.processing import ProcessingInfo, PushPayload, Source
+from nucliadb.models.internal.processing import ProcessingInfo, PushPayload, Source
 from nucliadb.writer import SERVICE_NAME, logger
 from nucliadb.writer.api.constants import X_NUCLIADB_USER, X_SKIP_STORE
 from nucliadb.writer.api.v1 import transaction

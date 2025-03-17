@@ -23,8 +23,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.ingest.processing import ProcessingEngine, PushPayload, Source
-from nucliadb_models.text import PushTextFormat, Text
+from nucliadb.ingest.processing import ProcessingEngine
+from nucliadb.models.internal.processing import PushPayload, PushTextFormat, Source, Text
 from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_utils.utilities import Utility, get_partitioning, get_utility
