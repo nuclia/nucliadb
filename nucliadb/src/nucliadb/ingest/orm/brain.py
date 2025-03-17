@@ -69,7 +69,8 @@ def relation_to_index(relation: Relation) -> IndexRelation:
     index.to.CopyFrom(relation.to)
     index.relation = relation.relation  # type: ignore
     index.relation_label = relation.relation_label
-    index.metadata.CopyFrom(relation.metadata)
+    if relation.HasField("metadata"):
+        index.metadata.CopyFrom(relation.metadata)
 
     return index
 
