@@ -140,6 +140,7 @@ class GraphNodesSearchRequest(BaseGraphSearchRequest):
 
 GraphRelationsQuery = Annotated[
     Union[
+        Annotated[And["GraphRelationsQuery"], Tag("and")],
         Annotated[Or["GraphRelationsQuery"], Tag("or")],
         Annotated[Not["GraphRelationsQuery"], Tag("not")],
         Annotated[Relation, Tag("relation")],
