@@ -344,7 +344,7 @@ async def knowledge_graph(
     bm = BrokerMessage()
     bm.uuid = rid
     bm.kbid = standalone_knowledgebox
-    bm.field_metadata[0].metadata.metadata.relations.append(Relations(relations=edges))
+    bm.user_relations.relations.extend(edges)
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
 
