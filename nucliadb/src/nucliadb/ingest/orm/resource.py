@@ -42,6 +42,7 @@ from nucliadb_models import content_types
 from nucliadb_models.common import CloudLink
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
 from nucliadb_protos import utils_pb2, writer_pb2
+from nucliadb_protos.noderesources_pb2 import IndexRelation
 from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import (
     Basic,
@@ -681,9 +682,13 @@ class Resource:
         for field_large_metadata in message.field_large_metadata:
             await self._apply_field_large_metadata(field_large_metadata)
 
-        # TODO: Can this be removed?
+        # TODO: Can this be removed? Not a single resource in prod has this set
+        # It also does not make sense to store relations in maindb
         for relation in message.relations:
             self.indexer.brain.relations.append(relation)
+            self.indexer.brain.field_relations["a/metadata"].relations.append(
+                IndexRelation(relation=relation)
+            )
         await self.set_relations(message.relations)  # type: ignore
 
         # Basic proto may have been modified in some apply functions but we only

@@ -30,6 +30,7 @@ from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import (
+    IndexRelation,
     ParagraphMetadata,
     Representation,
     ResourceID,
@@ -232,15 +233,22 @@ class ResourceBrain:
             full_field_id = ids.FieldId(rid=self.rid, type=field_type, key=field_name).full()
             self.brain.paragraphs_to_delete.append(full_field_id)
 
+        field_relations = self.brain.field_relations[field_key].relations
         for relations in metadata.metadata.relations:
             for relation in relations.relations:
                 self.brain.relations.append(relation)
+
+                index_relation = IndexRelation(relation=relation)
+                if relation.metadata.HasField("data_augmentation_task_id"):
+                    index_relation.facets.append("/g/da/{relation.metadata.data_augmentation_task_id}")
+                field_relations.append(index_relation)
 
     def delete_field(self, field_key: str):
         ftype, fkey = field_key.split("/")
         full_field_id = ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
         self.brain.paragraphs_to_delete.append(full_field_id)
         self.brain.sentences_to_delete.append(full_field_id)
+        self.brain.relation_fields_to_delete.append(full_field_id)
 
     def apply_field_vectors(
         self,
@@ -408,12 +416,14 @@ class ResourceBrain:
             # origin contributors
             for contrib in origin.colaborators:
                 relationnodeuser = RelationNode(value=contrib, ntype=RelationNode.NodeType.USER)
-                self.brain.relations.append(
-                    Relation(
-                        relation=Relation.COLAB,
-                        source=relationnodedocument,
-                        to=relationnodeuser,
-                    )
+                relation = Relation(
+                    relation=Relation.COLAB,
+                    source=relationnodedocument,
+                    to=relationnodeuser,
+                )
+                self.brain.relations.append(relation)
+                self.brain.field_relations["a/metadata"].relations.append(
+                    IndexRelation(relation=relation)
                 )
 
         # labels
@@ -422,17 +432,20 @@ class ResourceBrain:
                 value=f"{classification.labelset}/{classification.label}",
                 ntype=RelationNode.NodeType.LABEL,
             )
-            self.brain.relations.append(
-                Relation(
-                    relation=Relation.ABOUT,
-                    source=relationnodedocument,
-                    to=relation_node_label,
-                )
+            relation = Relation(
+                relation=Relation.ABOUT,
+                source=relationnodedocument,
+                to=relation_node_label,
             )
+            self.brain.relations.append(relation)
+            self.brain.field_relations["a/metadata"].relations.append(IndexRelation(relation=relation))
 
         # relations
         for relation in user_relations.relations:
             self.brain.relations.append(relation)
+            self.brain.field_relations["a/metadata"].relations.append(
+                IndexRelation(relation=relation, facets=["/g/u"])
+            )
 
     def _set_resource_labels(self, basic: Basic, origin: Optional[Origin]):
         if origin is not None:
@@ -508,6 +521,7 @@ class ResourceBrain:
                 relation.CopyFrom(base_classification_relation)
                 relation.to.value = label
                 self.brain.relations.append(relation)
+                self.brain.field_relations[field_key].relations.append(IndexRelation(relation=relation))
 
         # Data Augmentation + Processor entities
         base_entity_relation = Relation(
@@ -535,6 +549,7 @@ class ResourceBrain:
                 relation.to.value = entity_text
                 relation.to.subtype = entity_label
                 self.brain.relations.append(relation)
+                self.brain.field_relations[field_key].relations.append(IndexRelation(relation=relation))
 
         # Legacy processor entities
         # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
@@ -554,6 +569,7 @@ class ResourceBrain:
                 relation.to.value = entity
                 relation.to.subtype = klass
                 self.brain.relations.append(relation)
+                self.brain.field_relations[field_key].relations.append(IndexRelation(relation=relation))
 
     def apply_field_labels(
         self,
@@ -610,6 +626,7 @@ class ResourceBrain:
                         to=relation_node_entity,
                     )
                     self.brain.relations.append(rel)
+                    self.brain.field_relations[field_key].relations.append(IndexRelation(relation=rel))
             for paragraph_annotation in basic_user_fieldmetadata.paragraphs:
                 for classification in paragraph_annotation.classifications:
                     if not classification.cancelled_by_user:

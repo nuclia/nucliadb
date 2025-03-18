@@ -83,7 +83,7 @@ message BrokerMessage {
 
     resources.Origin origin = 9;
 
-    repeated utils.Relation relations = 10;
+    repeated utils.Relation relations = 10; // Can this be deleted? Does not seem to be in use
     optional resources.Relations user_relations = 43;
 
     // Field Conversations

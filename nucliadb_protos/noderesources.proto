@@ -171,11 +171,12 @@ message Resource {
     repeated string sentences_to_delete = 8 [deprecated = true];
     // vectorset_id -> [vector_key_prefix, ...]
     map<string, StringList> vector_prefixes_to_delete = 15;
+    repeated string relation_fields_to_delete = 16;
 
 
     // Relations
     repeated utils.Relation relations = 9; // Soon deprecated
-    repeated IndexRelation new_relations = 10;
+    map<string, IndexRelations> field_relations = 10;
 
     string shard_id = 11;
 
@@ -210,7 +211,11 @@ message StringList {
 
 // Relations as sent and retrieved from the index, with some additional metadata
 message IndexRelation {
-    utils.Relation base_relation = 1;
+    utils.Relation relation = 1;
     optional string resource_field_id = 2;
     repeated string facets = 3;
+}
+
+message IndexRelations {
+    repeated IndexRelation relations = 1;
 }
