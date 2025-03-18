@@ -37,9 +37,11 @@ use common::TestOpener;
 fn create_versioned_reader(version: u64) -> anyhow::Result<RelationSearcher> {
     let dir = TempDir::new().unwrap();
 
+    let rid = "01808bbd8e784552967a4fb0d8b6e584".to_string();
+
     let resource = Resource {
         resource: Some(ResourceId {
-            uuid: "01808bbd8e784552967a4fb0d8b6e584".to_string(),
+            uuid: rid.clone(),
             shard_id: "shard_id".to_string(),
         }),
         field_relations: HashMap::from([(
@@ -67,7 +69,7 @@ fn create_versioned_reader(version: u64) -> anyhow::Result<RelationSearcher> {
                         "IS".to_string(),
                     ),
                     common::create_relation(
-                        "01808bbd8e784552967a4fb0d8b6e584".to_string(),
+                        rid.clone(),
                         NodeType::Resource,
                         "".to_string(),
                         "dog".to_string(),
@@ -77,7 +79,7 @@ fn create_versioned_reader(version: u64) -> anyhow::Result<RelationSearcher> {
                         "TALKS_ABOUT".to_string(),
                     ),
                     common::create_relation(
-                        "01808bbd8e784552967a4fb0d8b6e584".to_string(),
+                        rid.clone(),
                         NodeType::Resource,
                         "".to_string(),
                         "bird".to_string(),

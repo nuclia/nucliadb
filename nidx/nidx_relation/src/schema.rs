@@ -131,11 +131,11 @@ impl Schema {
         }
     }
 
-    /// The source will be deunicoded, se
     pub fn normalize(&self, source: &str) -> String {
         self.normalize_words(source.split_whitespace())
     }
 
+    /// Normalize some words, remove special characters and turn to lowercase
     pub fn normalize_words<'a>(&self, source: impl Iterator<Item = &'a str>) -> String {
         let mut normalized = Vec::new();
         for segment in source {

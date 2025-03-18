@@ -240,7 +240,7 @@ class ResourceBrain:
 
                 index_relation = IndexRelation(relation=relation)
                 if relation.metadata.HasField("data_augmentation_task_id"):
-                    index_relation.facets.append("/g/da/{relation.metadata.data_augmentation_task_id}")
+                    index_relation.facets.append(f"/g/da/{relation.metadata.data_augmentation_task_id}")
                 field_relations.append(index_relation)
 
     def delete_field(self, field_key: str):
