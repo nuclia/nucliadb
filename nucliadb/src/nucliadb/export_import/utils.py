@@ -76,7 +76,6 @@ BM_FIELDS = {
         "field_vectors",
         "field_large_metadata",
         "question_answers",
-        "relations",
         "field_statuses",
     ],
     # These fields are mostly used for internal purposes and they are not part of
