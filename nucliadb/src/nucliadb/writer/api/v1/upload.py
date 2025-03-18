@@ -45,7 +45,7 @@ from nucliadb.writer.api.v1.resource import (
 from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_manager
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
-from nucliadb.writer.resource.basic import parse_basic_creation
+from nucliadb.writer.resource.basic import parse_basic_creation, parse_user_classifications
 from nucliadb.writer.resource.field import (
     atomic_get_stored_resource_classifications,
     parse_fields,
@@ -905,6 +905,9 @@ async def store_file_on_nuclia_db(
         toprocess.title = writer.basic.title
 
         resource_classifications = await atomic_get_stored_resource_classifications(kbid, rid)
+        if item.usermetadata:
+            # Any resource level classification that comes on the request payload overrides the stored ones
+            resource_classifications.resource_level = set(parse_user_classifications(item))
         await parse_fields(
             writer=writer,
             item=item,
