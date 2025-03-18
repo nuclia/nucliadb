@@ -78,6 +78,7 @@ pub fn knowledge_graph_as_relations() -> Vec<Relation> {
         ("Dimitri", "PERSON"),
         ("Erin", "PERSON"),
         ("Jerry", "ANIMAL"),
+        ("Mr. P", "AGENT"),
         ("Margaret", "PERSON"),
         ("Mouse", "ANIMAL"),
         ("New York", "PLACE"),
@@ -86,6 +87,19 @@ pub fn knowledge_graph_as_relations() -> Vec<Relation> {
         ("Rocket", "VEHICLE"),
         ("Tom", "ANIMAL"),
         ("UK", "PLACE"),
+    ]);
+
+    let relations = HashMap::from([
+        ("ALIAS", RelationType::Synonym),
+        ("BORN_IN", RelationType::Entity),
+        ("CHASE", RelationType::Entity),
+        ("DEVELOPED", RelationType::Entity),
+        ("FOLLOW", RelationType::Entity),
+        ("IS", RelationType::Entity),
+        ("IS_FRIEND", RelationType::Entity),
+        ("LIVE_IN", RelationType::Entity),
+        ("LOVE", RelationType::Entity),
+        ("WORK_IN", RelationType::Entity),
     ]);
 
     let graph = vec![
@@ -102,20 +116,21 @@ pub fn knowledge_graph_as_relations() -> Vec<Relation> {
         ("Jerry", "IS", "Mouse"),
         ("Margaret", "DEVELOPED", "Apollo"),
         ("Margaret", "WORK_IN", "Computer science"),
+        ("Mr. P", "ALIAS", "Peter"),
         ("Peter", "LIVE_IN", "New York"),
         ("Tom", "CHASE", "Jerry"),
         ("Tom", "IS", "Cat"),
     ];
 
-    let mut relations = vec![];
+    let mut pb_relations = vec![];
     for (source, relation, target) in graph {
-        relations.push(Relation {
+        pb_relations.push(Relation {
             source: Some(RelationNode {
                 value: source.to_string(),
                 ntype: NodeType::Entity as i32,
                 subtype: entities.get(source).unwrap().to_string(),
             }),
-            relation: RelationType::Entity.into(),
+            relation: *relations.get(relation).unwrap() as i32,
             relation_label: relation.to_string(),
             to: Some(RelationNode {
                 value: target.to_string(),
@@ -127,5 +142,5 @@ pub fn knowledge_graph_as_relations() -> Vec<Relation> {
         })
     }
 
-    relations
+    pb_relations
 }
