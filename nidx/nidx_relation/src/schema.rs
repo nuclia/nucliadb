@@ -101,7 +101,7 @@ impl Schema {
         let mut encoded_target_id = None;
         let mut facets = None;
         if version == 2 {
-            resource_field_id = Some(builder.add_text_field("resource_field_id", STRING | STORED));
+            resource_field_id = Some(builder.add_bytes_field("resource_field_id", INDEXED | STORED));
             encoded_source_id = Some(builder.add_u64_field("encoded_source_id", FAST));
             encoded_target_id = Some(builder.add_u64_field("encoded_target_id", FAST));
             facets = Some(builder.add_facet_field("facets", STORED));
