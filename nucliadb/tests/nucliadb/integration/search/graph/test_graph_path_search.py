@@ -216,41 +216,41 @@ async def test_graph_search__relation_queries(
 ):
     kbid = kb_with_entity_graph
 
-    # # ()-[LIVE_IN]->()
-    # resp = await nucliadb_reader.post(
-    #     f"/kb/{kbid}/graph",
-    #     json={
-    #         "query": {
-    #             "prop": "relation",
-    #             "label": "LIVE_IN",
-    #         },
-    #         "top_k": 100,
-    #     },
-    # )
-    # assert resp.status_code == 200
-    # paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
-    # assert len(paths) == 2
-    # assert ("Anna", "LIVE_IN", "New York") in paths
-    # assert ("Peter", "LIVE_IN", "New York") in paths
+    # ()-[LIVE_IN]->()
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "relation",
+                "label": "LIVE_IN",
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 2
+    assert ("Anna", "LIVE_IN", "New York") in paths
+    assert ("Peter", "LIVE_IN", "New York") in paths
 
-    # # ()-[LIVE_IN]->()
-    # resp = await nucliadb_reader.post(
-    #     f"/kb/{kbid}/graph",
-    #     json={
-    #         "query": {
-    #             "prop": "path",
-    #             "relation": {
-    #                 "label": "LIVE_IN",
-    #             },
-    #         },
-    #         "top_k": 100,
-    #     },
-    # )
-    # assert resp.status_code == 200
-    # paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
-    # assert len(paths) == 2
-    # assert ("Anna", "LIVE_IN", "New York") in paths
-    # assert ("Peter", "LIVE_IN", "New York") in paths
+    # ()-[LIVE_IN]->()
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "relation": {
+                    "label": "LIVE_IN",
+                },
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 2
+    assert ("Anna", "LIVE_IN", "New York") in paths
+    assert ("Peter", "LIVE_IN", "New York") in paths
 
     # ()-[LIVE_IN]->()
     resp = await nucliadb_reader.post(
