@@ -43,7 +43,7 @@ async def test_graph_nodes_search(
     )
     assert resp.status_code == 200
     nodes = GraphNodesSearchResponse.model_validate(resp.json()).nodes
-    assert len(nodes) == 17
+    assert len(nodes) == 18
 
     # Search PERSON nodes
     # (n:PERSON)

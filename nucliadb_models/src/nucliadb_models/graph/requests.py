@@ -24,7 +24,7 @@ from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
 from typing_extensions import Self
 
 from nucliadb_models.filters import And, Not, Or, filter_discriminator
-from nucliadb_models.metadata import RelationNodeType
+from nucliadb_models.metadata import RelationNodeType, RelationType
 
 ## Models for graph nodes and relations
 
@@ -55,6 +55,7 @@ class GraphNode(BaseModel, extra="forbid"):
 
 class GraphRelation(BaseModel, extra="forbid"):
     label: Optional[str] = None
+    type: Optional[RelationType] = None
 
 
 ## Models for query expressions

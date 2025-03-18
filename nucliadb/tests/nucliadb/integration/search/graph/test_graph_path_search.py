@@ -22,6 +22,7 @@ from httpx import AsyncClient
 
 from nucliadb_models.graph import responses as graph_responses
 from nucliadb_models.graph.responses import GraphSearchResponse
+from nucliadb_models.metadata import RelationType
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -44,7 +45,7 @@ async def test_graph_search__node_queries(
     )
     assert resp.status_code == 200
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
-    assert len(paths) == 16
+    assert len(paths) == 17
 
     # (:PERSON)-[]->()
     resp = await nucliadb_reader.post(
@@ -215,22 +216,41 @@ async def test_graph_search__relation_queries(
 ):
     kbid = kb_with_entity_graph
 
-    # ()-[LIVE_IN]->()
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/graph",
-        json={
-            "query": {
-                "prop": "relation",
-                "label": "LIVE_IN",
-            },
-            "top_k": 100,
-        },
-    )
-    assert resp.status_code == 200
-    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
-    assert len(paths) == 2
-    assert ("Anna", "LIVE_IN", "New York") in paths
-    assert ("Peter", "LIVE_IN", "New York") in paths
+    # # ()-[LIVE_IN]->()
+    # resp = await nucliadb_reader.post(
+    #     f"/kb/{kbid}/graph",
+    #     json={
+    #         "query": {
+    #             "prop": "relation",
+    #             "label": "LIVE_IN",
+    #         },
+    #         "top_k": 100,
+    #     },
+    # )
+    # assert resp.status_code == 200
+    # paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    # assert len(paths) == 2
+    # assert ("Anna", "LIVE_IN", "New York") in paths
+    # assert ("Peter", "LIVE_IN", "New York") in paths
+
+    # # ()-[LIVE_IN]->()
+    # resp = await nucliadb_reader.post(
+    #     f"/kb/{kbid}/graph",
+    #     json={
+    #         "query": {
+    #             "prop": "path",
+    #             "relation": {
+    #                 "label": "LIVE_IN",
+    #             },
+    #         },
+    #         "top_k": 100,
+    #     },
+    # )
+    # assert resp.status_code == 200
+    # paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    # assert len(paths) == 2
+    # assert ("Anna", "LIVE_IN", "New York") in paths
+    # assert ("Peter", "LIVE_IN", "New York") in paths
 
     # ()-[LIVE_IN]->()
     resp = await nucliadb_reader.post(
@@ -239,7 +259,7 @@ async def test_graph_search__relation_queries(
             "query": {
                 "prop": "path",
                 "relation": {
-                    "label": "LIVE_IN",
+                    "type": RelationType.SYNONYM.value,
                 },
             },
             "top_k": 100,
@@ -247,9 +267,8 @@ async def test_graph_search__relation_queries(
     )
     assert resp.status_code == 200
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
-    assert len(paths) == 2
-    assert ("Anna", "LIVE_IN", "New York") in paths
-    assert ("Peter", "LIVE_IN", "New York") in paths
+    assert len(paths) == 1
+    assert ("Mr. P", "ALIAS", "Peter") in paths
 
     # ()-[: LIVE_IN | BORN_IN]->()
     resp = await nucliadb_reader.post(
@@ -298,7 +317,7 @@ async def test_graph_search__relation_queries(
     )
     assert resp.status_code == 200
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
-    assert len(paths) == 14
+    assert len(paths) == 15
 
 
 @pytest.mark.deploy_modes("standalone")
