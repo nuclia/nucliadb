@@ -233,13 +233,6 @@ async def managed_serialize(
                     from_proto.relation(rel) for rel in relations.relations
                 ]
 
-    if ResourceProperties.RELATIONS in show:
-        await orm_resource.get_relations()
-        if orm_resource.relations is not None:
-            resource.relations = [
-                from_proto.relation(relation) for relation in orm_resource.relations.relations
-            ]
-
     if ResourceProperties.ORIGIN in show:
         await orm_resource.get_origin()
         if orm_resource.origin is not None:

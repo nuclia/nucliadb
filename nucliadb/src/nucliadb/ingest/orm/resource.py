@@ -67,7 +67,6 @@ from nucliadb_protos.resources_pb2 import Extra as PBExtra
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
-from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.storages.storage import Storage
 
@@ -284,24 +283,6 @@ class Resource:
         self.security = payload
 
     # Relations
-    async def get_relations(self) -> Optional[PBRelations]:
-        if self.relations is None:
-            relations = await datamanagers.resources.get_relations(
-                self.txn, kbid=self.kb.kbid, rid=self.uuid
-            )
-            self.relations = relations
-        return self.relations
-
-    async def set_relations(self, payload: list[PBRelation]):
-        relations = PBRelations()
-        for relation in payload:
-            relations.relations.append(relation)
-        await datamanagers.resources.set_relations(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid, relations=relations
-        )
-        self.modified = True
-        self.relations = relations
-
     async def get_user_relations(self) -> PBRelations:
         if self.user_relations is None:
             sf = self.storage.user_relations(self.kb.kbid, self.uuid)
@@ -536,6 +517,7 @@ class Resource:
                 deleted=message.delete_fields,  # type: ignore
                 errors=message.errors,  # type: ignore
             )
+            self.modified = True
 
     @processor_observer.wrap({"type": "apply_fields_status"})
     async def apply_fields_status(self, message: BrokerMessage, updated_fields: list[FieldID]):
@@ -593,6 +575,7 @@ class Resource:
                 # status to the default value, which is PROCESSING. This covers the case of new field creation.
 
             await field_obj.set_status(status)
+            self.modified = True
 
     async def update_status(self):
         field_ids = await self.get_all_field_ids(for_update=False)
@@ -681,14 +664,11 @@ class Resource:
         for field_large_metadata in message.field_large_metadata:
             await self._apply_field_large_metadata(field_large_metadata)
 
-        for relation in message.relations:
-            self.indexer.brain.relations.append(relation)
-        await self.set_relations(message.relations)  # type: ignore
-
         # Basic proto may have been modified in some apply functions but we only
         # want to set it once
         if self.basic != previous_basic:
             await self.set_basic(self.basic)
+            self.modified = True
 
     async def _apply_extracted_text(self, extracted_text: ExtractedTextWrapper):
         field_obj = await self.get_field(
@@ -698,15 +678,18 @@ class Resource:
         self._modified_extracted_text.append(
             extracted_text.field,
         )
+        self.modified = True
 
     async def _apply_question_answers(self, question_answers: FieldQuestionAnswerWrapper):
         field = question_answers.field
         field_obj = await self.get_field(field.field, field.field_type, load=False)
         await field_obj.set_question_answers(question_answers)
+        self.modified = True
 
     async def _delete_question_answers(self, field_id: FieldID):
         field_obj = await self.get_field(field_id.field, field_id.field_type, load=False)
         await field_obj.delete_question_answers()
+        self.modified = True
 
     async def _apply_link_extracted_data(self, link_extracted_data: LinkExtractedData):
         assert self.basic is not None
@@ -722,6 +705,7 @@ class Resource:
         maybe_update_basic_icon(self.basic, "application/stf-link")
 
         maybe_update_basic_summary(self.basic, link_extracted_data.description)
+        self.modified = True
 
     async def maybe_update_resource_title_from_link(self, link_extracted_data: LinkExtractedData):
         """
@@ -736,6 +720,7 @@ class Resource:
             return
         title = link_extracted_data.title
         await self.update_resource_title(title)
+        self.modified = True
 
     async def update_resource_title(self, computed_title: str) -> None:
         assert self.basic is not None
@@ -760,6 +745,7 @@ class Resource:
         fcmw.metadata.metadata.paragraphs.append(paragraph)
 
         await field.set_field_metadata(fcmw)
+        self.modified = True
 
     async def _apply_file_extracted_data(self, file_extracted_data: FileExtractedData):
         assert self.basic is not None
@@ -772,6 +758,7 @@ class Resource:
         await field_file.set_file_extracted_data(file_extracted_data)
         maybe_update_basic_icon(self.basic, file_extracted_data.icon)
         maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail)
+        self.modified = True
 
     async def _should_update_resource_title_from_file_metadata(self) -> bool:
         """
@@ -862,6 +849,7 @@ class Resource:
         maybe_update_basic_thumbnail(self.basic, field_metadata.metadata.metadata.thumbnail)
 
         add_field_classifications(self.basic, field_metadata)
+        self.modified = True
 
     async def _apply_extracted_vectors(
         self,
@@ -906,6 +894,7 @@ class Resource:
             vo = await field_obj.set_vectors(
                 field_vectors, vectorset.vectorset_id, vectorset.storage_key_kind
             )
+            self.modified = True
             if vo is None:
                 raise AttributeError("Vector object not found on set_vectors")
 
@@ -934,6 +923,7 @@ class Resource:
             load=False,
         )
         await field_obj.set_large_field_metadata(field_large_metadata)
+        self.modified = True
 
     def generate_field_id(self, field: FieldID) -> str:
         return f"{FIELD_TYPE_PB_TO_STR[field.field_type]}/{field.field}"

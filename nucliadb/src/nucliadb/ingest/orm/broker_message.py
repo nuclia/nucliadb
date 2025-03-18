@@ -66,10 +66,10 @@ class _BrokerMessageBuilder:
         origin = await resource.get_origin()
         if origin is not None:
             self.bm.origin.CopyFrom(origin)
-        relations = await resource.get_relations()
+
+        relations = await resource.get_user_relations()
         if relations is not None:
-            for relation in relations.relations:
-                self.bm.relations.append(relation)
+            self.bm.user_relations.CopyFrom(relations)
 
         fields = await resource.get_fields(force=True)
         for (type_id, field_id), field in fields.items():

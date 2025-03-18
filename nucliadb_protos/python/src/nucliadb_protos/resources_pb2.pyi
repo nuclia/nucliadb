@@ -1762,20 +1762,14 @@ class UserMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CLASSIFICATIONS_FIELD_NUMBER: builtins.int
-    RELATIONS_FIELD_NUMBER: builtins.int
     @property
     def classifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Classification]: ...
-    @property
-    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]:
-        """Moved to BrokerMessage (outside Basic)"""
-
     def __init__(
         self,
         *,
         classifications: collections.abc.Iterable[global___Classification] | None = ...,
-        relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["classifications", b"classifications", "relations", b"relations"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["classifications", b"classifications"]) -> None: ...
 
 global___UserMetadata = UserMetadata
 

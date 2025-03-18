@@ -47,6 +47,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
     Relation,
     RelationNode,
+    Relations,
     TokenSplit,
     UserFieldMetadata,
 )
@@ -120,7 +121,8 @@ async def processing_entities(nucliadb_ingest_grpc: WriterStub, standalone_knowl
                 relation_label="itself",
             )
         )
-    bm.relations.extend(relations)
+
+    bm.field_metadata[0].metadata.metadata.relations.append(Relations(relations=relations))
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
 

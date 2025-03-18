@@ -600,14 +600,6 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox_ingest:
         cl1 = rpb.Classification(labelset="labelset1", label="label1")
         basic.usermetadata.classifications.append(cl1)
 
-        r1 = upb.Relation(
-            relation=upb.Relation.CHILD,
-            source=upb.RelationNode(value=rid, ntype=upb.RelationNode.NodeType.RESOURCE),
-            to=upb.RelationNode(value="000001", ntype=upb.RelationNode.NodeType.RESOURCE),
-        )
-
-        basic.usermetadata.relations.append(r1)
-
         ufm1 = rpb.UserFieldMetadata(
             token=[rpb.TokenSplit(token="My home", klass="Location")],
             field=rpb.FieldID(field_type=rpb.FieldType.TEXT, field="text1"),
@@ -619,7 +611,7 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox_ingest:
 
         await test_resource.set_basic(basic)
 
-        # 1.2 RELATIONS
+        # 1.2 USER RELATIONS
 
         rels = []
         r1 = upb.Relation(
@@ -629,7 +621,7 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox_ingest:
         )
 
         rels.append(r1)
-        await test_resource.set_relations(rels)
+        await test_resource.set_user_relations(rpb.Relations(relations=rels))
 
         # 1.3 ORIGIN
 

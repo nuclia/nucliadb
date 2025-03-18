@@ -138,12 +138,9 @@ async def test_get_resource_all(
 
     resource = resp.json()
 
-    # DEBUG
-    # import json  # noqa
-    # print(json.dumps(data, indent=4))
-
-    expected_root_fields = set(ID + BASIC + RELATIONS + ORIGIN + DATA)
+    expected_root_fields = set(ID + BASIC + ORIGIN + DATA)
     assert set(resource.keys()) == expected_root_fields
+    assert "relations" in resource["usermetadata"].keys()
 
     data = resource["data"]
     assert set(data.keys()) == {
