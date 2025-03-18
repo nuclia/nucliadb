@@ -481,14 +481,17 @@ class Conversation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     MESSAGES_FIELD_NUMBER: builtins.int
+    EXTRACT_STRATEGY_FIELD_NUMBER: builtins.int
+    extract_strategy: builtins.str
     @property
     def messages(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Message]: ...
     def __init__(
         self,
         *,
         messages: collections.abc.Iterable[global___Message] | None = ...,
+        extract_strategy: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["messages", b"messages"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["extract_strategy", b"extract_strategy", "messages", b"messages"]) -> None: ...
 
 global___Conversation = Conversation
 
@@ -499,20 +502,23 @@ class FieldConversation(google.protobuf.message.Message):
     PAGES_FIELD_NUMBER: builtins.int
     SIZE_FIELD_NUMBER: builtins.int
     TOTAL_FIELD_NUMBER: builtins.int
+    EXTRACT_STRATEGY_FIELD_NUMBER: builtins.int
     pages: builtins.int
     """Total number of pages"""
     size: builtins.int
     """Max page size"""
     total: builtins.int
     """Total number of messages"""
+    extract_strategy: builtins.str
     def __init__(
         self,
         *,
         pages: builtins.int = ...,
         size: builtins.int = ...,
         total: builtins.int = ...,
+        extract_strategy: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["pages", b"pages", "size", b"size", "total", b"total"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["extract_strategy", b"extract_strategy", "pages", b"pages", "size", b"size", "total", b"total"]) -> None: ...
 
 global___FieldConversation = FieldConversation
 
