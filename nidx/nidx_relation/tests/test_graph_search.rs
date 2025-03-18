@@ -19,6 +19,7 @@
 //
 mod common;
 
+use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::{Resource, ResourceId};
 use nidx_relation::graph_query_parser::{
@@ -44,7 +45,7 @@ fn test_graph_node_query() -> anyhow::Result<()> {
             node_subtype: None,
             ..Default::default()
         }))))?;
-    assert_eq!(result.graph.len(), 16);
+    assert_eq!(result.graph.len(), 17);
 
     // (:PERSON)-[]->()
     let result = reader
@@ -202,11 +203,34 @@ fn test_graph_relation_query() -> anyhow::Result<()> {
         .reader
         .inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Value(Relation {
             value: Some("LIVE_IN".to_string()),
+            ..Default::default()
         }))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 2);
     assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
     assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
+
+    // ()-[:Synonym]->()
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Value(Relation {
+            relation_type: Some(RelationType::Synonym),
+            ..Default::default()
+        }))))?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Mr. P", "ALIAS", "Peter")));
+
+    // Synonym relations with nonexistent label
+    let result = reader
+        .reader
+        .inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Value(Relation {
+            value: Some("FAKE".to_string()),
+            relation_type: Some(RelationType::Synonym),
+            ..Default::default()
+        }))))?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 0);
 
     // ()-[:LIVE_IN | BORN_IN]->()
     let result = reader
@@ -214,9 +238,11 @@ fn test_graph_relation_query() -> anyhow::Result<()> {
         .inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Or(vec![
             Relation {
                 value: Some("BORN_IN".to_string()),
+                ..Default::default()
             },
             Relation {
                 value: Some("LIVE_IN".to_string()),
+                ..Default::default()
             },
         ]))))?;
     let relations = friendly_parse(&result);
@@ -225,14 +251,15 @@ fn test_graph_relation_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Erin", "BORN_IN", "UK")));
     assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
 
-    // // ()-[:!LIVE_IN]->()
+    // ()-[:!LIVE_IN]->()
     let result = reader
         .reader
         .inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Not(Relation {
             value: Some("LIVE_IN".to_string()),
+            ..Default::default()
         }))))?;
     let relations = friendly_parse(&result);
-    assert_eq!(relations.len(), 14);
+    assert_eq!(relations.len(), 15);
 
     Ok(())
 }
@@ -250,7 +277,10 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
                 node_type: Some(NodeType::Entity),
                 node_subtype: Some("PERSON".to_string()),
             }),
-            Expression::Value(Relation { value: None }),
+            Expression::Value(Relation {
+                value: None,
+                ..Default::default()
+            }),
             Expression::Value(Node {
                 value: Some("UK".into()),
                 node_type: Some(NodeType::Entity),
@@ -271,7 +301,10 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
                 node_subtype: Some("PERSON".to_string()),
                 ..Default::default()
             }),
-            Expression::Value(Relation { value: None }),
+            Expression::Value(Relation {
+                value: None,
+                ..Default::default()
+            }),
             Expression::Value(Node {
                 value: None,
                 node_type: None,
@@ -298,6 +331,7 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
             }),
             Expression::Value(Relation {
                 value: Some("LIVE_IN".to_string()),
+                ..Default::default()
             }),
             Expression::Value(Node {
                 value: None,
@@ -324,9 +358,11 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
             Expression::Or(vec![
                 Relation {
                     value: Some("LIVE_IN".to_string()),
+                    ..Default::default()
                 },
                 Relation {
                     value: Some("LOVE".to_string()),
+                    ..Default::default()
                 },
             ]),
             Expression::Value(Node {
@@ -361,6 +397,7 @@ fn test_graph_undirected_path_query() -> anyhow::Result<()> {
             }),
             Expression::Value(Relation {
                 value: Some("IS_FRIEND".to_string()),
+                ..Default::default()
             }),
             Expression::Value(Node::default()),
         ))))?;
@@ -381,9 +418,11 @@ fn test_graph_response() -> anyhow::Result<()> {
         .inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Or(vec![
             Relation {
                 value: Some("LIVE_IN".to_string()),
+                ..Default::default()
             },
             Relation {
                 value: Some("WORK_IN".to_string()),
+                ..Default::default()
             },
         ]))))?;
     friendly_print(&result);

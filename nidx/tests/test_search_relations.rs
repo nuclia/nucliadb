@@ -446,7 +446,7 @@ async fn test_graph_search_nodes(pool: PgPool) -> anyhow::Result<()> {
         .await?
         .into_inner();
     let nodes = &response.nodes;
-    assert_eq!(nodes.len(), 17);
+    assert_eq!(nodes.len(), 18);
 
     // Search all ANIMAL nodes
     let response = fixture
@@ -522,7 +522,7 @@ async fn test_graph_search__node_query(pool: PgPool) -> anyhow::Result<()> {
         .await?
         .into_inner();
     let relations = friendly_parse(&response);
-    assert_eq!(relations.len(), 16);
+    assert_eq!(relations.len(), 17);
 
     // (:PERSON)-[]->()
     let response = fixture
@@ -744,6 +744,7 @@ async fn test_graph_search_relations(pool: PgPool) -> anyhow::Result<()> {
                     query: Some(path_query::Query::Path(graph_query::Path {
                         relation: Some(graph_query::Relation {
                             value: Some("LIVE_IN".to_string()),
+                            ..Default::default()
                         }),
                         ..Default::default()
                     })),
@@ -770,6 +771,7 @@ async fn test_graph_search_relations(pool: PgPool) -> anyhow::Result<()> {
                     query: Some(path_query::Query::Path(graph_query::Path {
                         relation: Some(graph_query::Relation {
                             value: Some("PLAYED".to_string()),
+                            ..Default::default()
                         }),
                         ..Default::default()
                     })),
@@ -833,6 +835,7 @@ async fn test_graph_search__relation_query(pool: PgPool) -> anyhow::Result<()> {
                     query: Some(path_query::Query::Path(graph_query::Path {
                         relation: Some(graph_query::Relation {
                             value: Some("LIVE_IN".to_string()),
+                            ..Default::default()
                         }),
                         ..Default::default()
                     })),
@@ -859,6 +862,7 @@ async fn test_graph_search__relation_query(pool: PgPool) -> anyhow::Result<()> {
                     query: Some(path_query::Query::Path(graph_query::Path {
                         relation: Some(graph_query::Relation {
                             value: Some("LIVE_IN".to_string()),
+                            ..Default::default()
                         }),
                         ..Default::default()
                     })),
@@ -968,6 +972,7 @@ async fn test_graph_search__directed_path_query(pool: PgPool) -> anyhow::Result<
                         }),
                         relation: Some(graph_query::Relation {
                             value: Some("LIVE_IN".to_string()),
+                            ..Default::default()
                         }),
                         destination: Some(graph_query::Node {
                             node_subtype: Some("PLACE".to_string()),
@@ -1014,6 +1019,7 @@ async fn test_graph_search__undirected_path_query(pool: PgPool) -> anyhow::Resul
                         }),
                         relation: Some(graph_query::Relation {
                             value: Some("IS_FRIEND".to_string()),
+                            ..Default::default()
                         }),
                         destination: Some(graph_query::Node::default()),
                         undirected: true,
