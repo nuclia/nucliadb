@@ -21,7 +21,7 @@
 use core::str;
 
 use tantivy::TantivyDocument;
-use tantivy::schema::{FAST, FacetOptions, Field, INDEXED, STORED, STRING, Schema as TantivySchema, TextOptions};
+use tantivy::schema::{FAST, Field, INDEXED, STORED, STRING, Schema as TantivySchema, TextOptions};
 use tantivy::schema::{TEXT, Value};
 use uuid::Uuid;
 
