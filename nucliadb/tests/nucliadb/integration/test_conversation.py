@@ -130,7 +130,7 @@ async def test_conversations(
     res_resp = ResponseResponse.model_validate(resp.json())
 
     assert res_resp.data.conversations["faq"] == ConversationFieldData(  # type: ignore
-        value=FieldConversation(pages=2, size=200, total=301),
+        value=FieldConversation(pages=2, size=200, total=301, extract_strategy=""),
         extracted=None,
         error=None,
     )
