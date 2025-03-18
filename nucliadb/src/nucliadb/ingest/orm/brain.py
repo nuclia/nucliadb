@@ -248,7 +248,7 @@ class ResourceBrain:
         full_field_id = ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
         self.brain.paragraphs_to_delete.append(full_field_id)
         self.brain.sentences_to_delete.append(full_field_id)
-        self.brain.relation_fields_to_delete.append(full_field_id)
+        self.brain.relation_fields_to_delete.append(field_key)
 
     def apply_field_vectors(
         self,
@@ -446,6 +446,8 @@ class ResourceBrain:
             self.brain.field_relations["a/metadata"].relations.append(
                 IndexRelation(relation=relation, facets=["/g/u"])
             )
+
+        self.brain.relation_fields_to_delete.append("a/metadata")
 
     def _set_resource_labels(self, basic: Basic, origin: Optional[Origin]):
         if origin is not None:

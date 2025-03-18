@@ -89,16 +89,21 @@ impl DeletionQueryBuilder for RelationDeletionQueryBuilder {
         if let Some(field) = self.field {
             Box::new(TermSetQuery::new(keys.filter_map(|k| {
                 // Our keys can be resource or field ids, match the corresponding tantivy field
-                if let Ok(rid) = Uuid::parse_str(&k[..32]) {
-                    let is_field = k.len() > 32;
-                    if is_field {
-                        Some(Term::from_field_bytes(field, &encode_field_id(rid, &k[32..])))
-                    } else {
-                        Some(Term::from_field_bytes(self.resource, rid.as_bytes()))
-                    }
-                } else {
+                if k.len() < 32 {
                     error!(?k, "Invalid deletion key for nidx_relation");
-                    None
+                    return None;
+                }
+
+                let Ok(rid) = Uuid::parse_str(&k[..32]) else {
+                    error!(?k, "Invalid deletion key for nidx_relation");
+                    return None;
+                };
+
+                let is_field = k.len() > 32;
+                if is_field {
+                    Some(Term::from_field_bytes(field, &encode_field_id(rid, &k[33..])))
+                } else {
+                    Some(Term::from_field_bytes(self.resource, rid.as_bytes()))
                 }
             })))
         } else {
@@ -136,8 +141,17 @@ impl RelationIndexer {
         indexer.finalize()
     }
 
-    pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
-        vec![resource.resource.as_ref().unwrap().uuid.clone()]
+    pub fn deletions_for_resource(&self, config: &RelationConfig, resource: &nidx_protos::Resource) -> Vec<String> {
+        if config.version == 2 {
+            let rid = &resource.resource.as_ref().unwrap().uuid;
+            resource
+                .relation_fields_to_delete
+                .iter()
+                .map(|f| format!("{rid}/{f}"))
+                .collect()
+        } else {
+            vec![resource.resource.as_ref().unwrap().uuid.clone()]
+        }
     }
 
     #[instrument(name = "relation::merge", skip_all)]
