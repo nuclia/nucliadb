@@ -887,6 +887,9 @@ async def store_file_on_nuclia_db(
     parse_audit(writer.audit, request)
 
     unique_slug_context_manager = noop_context_manager()
+
+    resource_classifications = await atomic_get_stored_resource_classifications(kbid, rid)
+
     if item is not None:
         if item.slug:
             unique_slug_context_manager = ensure_slug_uniqueness(kbid, item.slug)
@@ -903,8 +906,6 @@ async def store_file_on_nuclia_db(
             parse_extra(writer.extra, item.extra)
 
         toprocess.title = writer.basic.title
-
-        resource_classifications = await atomic_get_stored_resource_classifications(kbid, rid)
         if item.usermetadata:
             # Any resource level classification that comes on the request payload overrides the stored ones
             resource_classifications.resource_level = set(parse_user_classifications(item))
@@ -961,8 +962,7 @@ async def store_file_on_nuclia_db(
             )
         )
 
-        rclassif = await atomic_get_stored_resource_classifications(kbid, rid)
-        classif_labels = rclassif.for_field(field, resources_pb2.FieldType.FILE)
+        classif_labels = resource_classifications.for_field(field, resources_pb2.FieldType.FILE)
         toprocess.filefield[field] = await processing.convert_internal_filefield_to_str(
             file_field, storage=storage, classif_labels=classif_labels
         )

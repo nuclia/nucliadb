@@ -1335,6 +1335,7 @@ async def test_classification_labels_are_sent_to_processing(
     - File upload
     - Reprocess resource
     - Reprocess field
+    - Tusupload with classification labels
     """
 
     processing = get_processing()
@@ -1456,6 +1457,50 @@ async def test_classification_labels_are_sent_to_processing(
         f"kb/{standalone_knowledgebox}/resource/{rid}/file/file2/reprocess",
     )
     assert resp.status_code == 202, resp.text
+
+    assert len(processing.values["send_to_process"]) == 1
+    send_to_process_call = cast(PushPayload, processing.values["send_to_process"][0][0])
+    assert len(send_to_process_call.filefield) == 1
+    assert processing.values["convert_internal_filefield_to_str"][0][-1] == expected_labels
+
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Tusupload with classification labels
+    def header_encode(some_string):
+        return base64.b64encode(some_string.encode()).decode()
+
+    encoded_filename = header_encode("image.jpeg")
+    encoded_language = header_encode("ca")
+    upload_metadata = ",".join(
+        [
+            f"filename {encoded_filename}",
+            f"language {encoded_language}",
+        ]
+    )
+    file_content = b"file content"
+    resp = await nucliadb_writer.post(
+        f"kb/{standalone_knowledgebox}/tusupload",
+        headers={
+            "x-extract-strategy": "barbafoo-tus",
+            "tus-resumable": "1.0.0",
+            "upload-metadata": upload_metadata,
+            "upload-length": str(len(file_content)),
+        },
+        json={"usermetadata": {"classifications": [{"labelset": "foo", "label": "bar"}]}},
+    )
+    assert resp.status_code == 201, resp.text
+    url = resp.headers["location"]
+
+    resp = await nucliadb_writer.patch(
+        url,
+        content=file_content,
+        headers={
+            "upload-offset": "0",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["Tus-Upload-Finished"] == "1"
 
     assert len(processing.values["send_to_process"]) == 1
     send_to_process_call = cast(PushPayload, processing.values["send_to_process"][0][0])
