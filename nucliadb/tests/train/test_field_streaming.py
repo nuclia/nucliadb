@@ -115,3 +115,66 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     bm = bmb.build()
 
     return bm
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_generator_conversation_field_streaming(
+    nucliadb_train: aiohttp.ClientSession,
+    nucliadb_ingest_grpc: WriterStub,
+    knowledgebox: str,
+):
+    kbid = knowledgebox
+
+    await inject_resource_with_conversation_field(kbid, nucliadb_ingest_grpc)
+
+    async with nucliadb_train.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
+        assert partitions.status == 200
+        data = await partitions.json()
+        assert len(data["partitions"]) == 1
+        partition_id = data["partitions"][0]
+
+    trainset = TrainSet()
+    trainset.type = TaskType.FIELD_STREAMING
+    trainset.batch_size = 5
+
+    async with nucliadb_train.post(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}",
+        data=trainset.SerializeToString(),
+    ) as response:
+        assert response.status == 200
+        batches = []
+        async for batch in get_batches_from_train_response_stream(response, FieldStreamingBatch):
+            batches.append(batch)
+            assert len(batch.data) == 3
+            for field_split_data in batch.data:
+                assert field_split_data.text.text
+        assert len(batches) == 1
+
+
+async def inject_resource_with_conversation_field(kbid: str, nucliadb_ingest_grpc: WriterStub):
+    await inject_message(nucliadb_ingest_grpc, smb_wonder_conversation_bm(kbid))
+    await wait_for_sync()
+    await asyncio.sleep(0.1)
+
+
+def smb_wonder_conversation_bm(kbid: str) -> BrokerMessage:
+    bmb = BrokerMessageBuilder(kbid=kbid)
+    bmb.with_title("Super Mario Bros. Wonder")
+    bmb.with_summary("SMB Wonder: the new Mario game from Nintendo")
+    field_builder = FieldBuilder("smb-wonder", rpb.FieldType.CONVERSATION)
+    paragraphs = [
+        "Super Mario Bros. Wonder (SMB Wonder) is a 2023 platform game developed and published by Nintendo.\n",  # noqa
+        "SMB Wonder is a side-scrolling plaftorm game.\n",
+        "As one of eight player characters, the player completes levels across the Flower Kingdom.",  # noqa
+    ]
+    field_builder.with_extracted_text("".join(paragraphs))
+    start = 0
+    for paragraph in paragraphs:
+        end = start + len(paragraph)
+        field_builder.with_extracted_paragraph_metadata(rpb.Paragraph(start=start, end=end))
+        start = end
+    bmb.add_field_builder(field_builder)
+
+    bm = bmb.build()
+
+    return bm
