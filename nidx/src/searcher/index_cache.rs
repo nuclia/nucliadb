@@ -199,7 +199,7 @@ impl IndexCache {
             IndexKind::Text => IndexSearcher::Text(TextSearcher::open(meta.index.config()?, open_index)?),
             IndexKind::Paragraph => IndexSearcher::Paragraph(ParagraphSearcher::open(open_index)?),
             IndexKind::Vector => IndexSearcher::Vector(VectorSearcher::open(meta.index.config()?, open_index)?),
-            IndexKind::Relation => IndexSearcher::Relation(RelationSearcher::open(open_index)?),
+            IndexKind::Relation => IndexSearcher::Relation(RelationSearcher::open(meta.index.config()?, open_index)?),
         };
         INDEX_LOAD_TIME
             .get_or_create(&IndexKindLabels::new(meta.index.kind))

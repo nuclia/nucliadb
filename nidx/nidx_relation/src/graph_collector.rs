@@ -68,21 +68,18 @@ pub struct TopUniqueRelationSegmentCollector {
 }
 
 impl TopUniqueNodeCollector {
-    pub fn new(selector: NodeSelector, limit: usize) -> Self {
+    pub fn new(schema: crate::schema::Schema, selector: NodeSelector, limit: usize) -> Self {
         Self {
             limit,
             selector,
-            schema: crate::schema::Schema::new(),
+            schema,
         }
     }
 }
 
 impl TopUniqueRelationCollector {
-    pub fn new(limit: usize) -> Self {
-        Self {
-            limit,
-            schema: crate::schema::Schema::new(),
-        }
+    pub fn new(schema: crate::schema::Schema, limit: usize) -> Self {
+        Self { limit, schema }
     }
 }
 

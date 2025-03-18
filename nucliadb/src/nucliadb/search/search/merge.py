@@ -488,7 +488,7 @@ def _merge_relations_results(
         for relation in relation_response.subgraph.relations:
             origin = relation.source
             destination = relation.to
-            relation_type = RelationTypePbMap[relation.relation]
+            relation_type = RelationTypePbMap[relation.relation]  # type: ignore
             relation_label = relation.relation_label
             metadata = relation.metadata if relation.HasField("metadata") else None
             # If only_with_metadata is True, we check that metadata for the relation is not None

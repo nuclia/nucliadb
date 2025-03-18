@@ -20,12 +20,14 @@
 
 use std::collections::HashMap;
 
-use nidx_protos::{GraphSearchResponse, Relation, RelationNode, relation::RelationType, relation_node::NodeType};
+use nidx_protos::{
+    GraphSearchResponse, IndexRelation, Relation, RelationNode, relation::RelationType, relation_node::NodeType,
+};
 
 /// Parse a graph search response and return a list of triplets (source,
 /// relation, target). This is a simplified view but yet useful view of the
 /// response.
-pub fn friendly_parse<'a>(relations: &'a GraphSearchResponse) -> Vec<(&'a str, &'a str, &'a str)> {
+pub fn friendly_parse(relations: &GraphSearchResponse) -> Vec<(&str, &str, &str)> {
     relations
         .graph
         .iter()
@@ -67,7 +69,7 @@ pub fn friendly_print(result: &nidx_protos::GraphSearchResponse) {
 }
 
 /// Returns a simple knowledge graph as a list of relations
-pub fn knowledge_graph_as_relations() -> Vec<Relation> {
+pub fn knowledge_graph_as_relations() -> Vec<IndexRelation> {
     let entities = HashMap::from([
         ("Anastasia", "PERSON"),
         ("Anna", "PERSON"),
@@ -124,21 +126,24 @@ pub fn knowledge_graph_as_relations() -> Vec<Relation> {
 
     let mut pb_relations = vec![];
     for (source, relation, target) in graph {
-        pb_relations.push(Relation {
-            source: Some(RelationNode {
-                value: source.to_string(),
-                ntype: NodeType::Entity as i32,
-                subtype: entities.get(source).unwrap().to_string(),
+        pb_relations.push(IndexRelation {
+            relation: Some(Relation {
+                source: Some(RelationNode {
+                    value: source.to_string(),
+                    ntype: NodeType::Entity as i32,
+                    subtype: entities.get(source).unwrap().to_string(),
+                }),
+                relation: *relations.get(relation).unwrap() as i32,
+                relation_label: relation.to_string(),
+                to: Some(RelationNode {
+                    value: target.to_string(),
+                    ntype: NodeType::Entity as i32,
+                    subtype: entities.get(target).unwrap().to_string(),
+                }),
+                metadata: None,
+                ..Default::default()
             }),
-            relation: *relations.get(relation).unwrap() as i32,
-            relation_label: relation.to_string(),
-            to: Some(RelationNode {
-                value: target.to_string(),
-                ntype: NodeType::Entity as i32,
-                subtype: entities.get(target).unwrap().to_string(),
-            }),
-            metadata: None,
-            resource_id: None,
+            ..Default::default()
         })
     }
 

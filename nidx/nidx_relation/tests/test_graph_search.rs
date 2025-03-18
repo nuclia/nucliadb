@@ -19,13 +19,15 @@
 //
 mod common;
 
+use std::collections::HashMap;
+
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
-use nidx_protos::{Resource, ResourceId};
+use nidx_protos::{IndexRelations, Resource, ResourceId};
 use nidx_relation::graph_query_parser::{
     Expression, FuzzyTerm, GraphQuery, Node, NodeQuery, PathQuery, Relation, RelationQuery, Term,
 };
-use nidx_relation::{RelationIndexer, RelationSearcher};
+use nidx_relation::{RelationConfig, RelationIndexer, RelationSearcher};
 use nidx_tests::graph::friendly_parse;
 use nidx_tests::graph::friendly_print;
 use tempfile::TempDir;
@@ -43,7 +45,6 @@ fn test_graph_node_query() -> anyhow::Result<()> {
             value: None,
             node_type: None,
             node_subtype: None,
-            ..Default::default()
         }))))?;
     assert_eq!(result.graph.len(), 17);
 
@@ -54,7 +55,6 @@ fn test_graph_node_query() -> anyhow::Result<()> {
             value: None,
             node_type: Some(NodeType::Entity),
             node_subtype: Some("PERSON".to_string()),
-            ..Default::default()
         }))))?;
     assert_eq!(result.graph.len(), 12);
 
@@ -65,7 +65,6 @@ fn test_graph_node_query() -> anyhow::Result<()> {
             value: Some("Anna".into()),
             node_type: Some(NodeType::Entity),
             node_subtype: Some("PERSON".to_string()),
-            ..Default::default()
         }))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 4);
@@ -82,7 +81,6 @@ fn test_graph_node_query() -> anyhow::Result<()> {
                 value: Some("Anna".into()),
                 node_type: Some(NodeType::Entity),
                 node_subtype: Some("PERSON".to_string()),
-                ..Default::default()
             },
         ))))?;
     let relations = friendly_parse(&result);
@@ -96,7 +94,6 @@ fn test_graph_node_query() -> anyhow::Result<()> {
             value: Some("Anna".into()),
             node_type: Some(NodeType::Entity),
             node_subtype: Some("PERSON".to_string()),
-            ..Default::default()
         }))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 5);
@@ -299,7 +296,6 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
                 value: None,
                 node_type: Some(NodeType::Entity),
                 node_subtype: Some("PERSON".to_string()),
-                ..Default::default()
             }),
             Expression::Value(Relation {
                 value: None,
@@ -309,7 +305,6 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
                 value: None,
                 node_type: None,
                 node_subtype: Some("PLACE".to_string()),
-                ..Default::default()
             }),
         ))))?;
     let relations = friendly_parse(&result);
@@ -327,7 +322,6 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
                 value: None,
                 node_type: None,
                 node_subtype: Some("PERSON".to_string()),
-                ..Default::default()
             }),
             Expression::Value(Relation {
                 value: Some("LIVE_IN".to_string()),
@@ -337,7 +331,6 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
                 value: None,
                 node_type: None,
                 node_subtype: Some("PLACE".to_string()),
-                ..Default::default()
             }),
         ))))?;
     let relations = friendly_parse(&result);
@@ -353,7 +346,6 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
                 value: Some("Anna".into()),
                 node_type: Some(NodeType::Entity),
                 node_subtype: Some("PERSON".to_string()),
-                ..Default::default()
             }),
             Expression::Or(vec![
                 Relation {
@@ -369,7 +361,6 @@ fn test_graph_directed_path_query() -> anyhow::Result<()> {
                 value: None,
                 node_type: None,
                 node_subtype: None,
-                ..Default::default()
             }),
         ))))?;
     let relations = friendly_parse(&result);
@@ -393,7 +384,6 @@ fn test_graph_undirected_path_query() -> anyhow::Result<()> {
                 value: Some("Anna".into()),
                 node_type: Some(NodeType::Entity),
                 node_subtype: Some("PERSON".to_string()),
-                ..Default::default()
             }),
             Expression::Value(Relation {
                 value: Some("IS_FRIEND".to_string()),
@@ -445,15 +435,22 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
     let dir = TempDir::new().unwrap();
 
     let relations = nidx_tests::graph::knowledge_graph_as_relations();
+    let field_relations = HashMap::from([("a/metadata".to_string(), IndexRelations { relations })]);
     let resource = Resource {
         resource: Some(ResourceId {
-            uuid: "uuid".to_string(),
+            uuid: "0123456789abcdef0123456789abcdef".to_string(),
             shard_id: "shard_id".to_string(),
         }),
-        relations: relations,
+        field_relations,
         ..Default::default()
     };
 
-    let segment_meta = RelationIndexer.index_resource(dir.path(), &resource).unwrap().unwrap();
-    RelationSearcher::open(TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]))
+    let segment_meta = RelationIndexer
+        .index_resource(dir.path(), &RelationConfig::default(), &resource)
+        .unwrap()
+        .unwrap();
+    RelationSearcher::open(
+        RelationConfig::default(),
+        TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]),
+    )
 }

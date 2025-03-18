@@ -356,7 +356,7 @@ fn index_resource_to_index(
             .index_resource(output_dir, resource)?
             .map(|x| x.into()),
         IndexKind::Relation => nidx_relation::RelationIndexer
-            .index_resource(output_dir, resource)?
+            .index_resource(output_dir, &index.config()?, resource)?
             .map(|x| x.into()),
     };
 
@@ -364,7 +364,7 @@ fn index_resource_to_index(
         IndexKind::Vector => nidx_vector::VectorIndexer.deletions_for_resource(resource, &index.name),
         IndexKind::Text => nidx_text::TextIndexer.deletions_for_resource(resource),
         IndexKind::Paragraph => nidx_paragraph::ParagraphIndexer.deletions_for_resource(resource),
-        IndexKind::Relation => nidx_relation::RelationIndexer.deletions_for_resource(resource),
+        IndexKind::Relation => nidx_relation::RelationIndexer.deletions_for_resource(&index.config()?, resource),
     };
     PER_INDEX_INDEXING_TIME
         .get_or_create(&IndexKindLabels::new(index.kind))

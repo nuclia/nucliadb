@@ -182,7 +182,8 @@ message EntitiesSubgraphRequest {
 }
 
 message EntitiesSubgraphResponse {
-    repeated utils.Relation relations = 1;
+    repeated utils.Relation relations = 1; // Soon deprecated
+    repeated noderesources.IndexRelation new_relations = 2;
 }
 
 

@@ -38,6 +38,8 @@ use nidx_types::OpenIndexMetadata;
 use reader::{HashedRelationNode, RelationsReaderService};
 use resource_indexer::index_relations;
 pub use schema::Schema as RelationSchema;
+use schema::encode_field_id;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::Path};
 use tantivy::{
     Term,
@@ -46,26 +48,77 @@ use tantivy::{
     query::{Query, TermSetQuery},
     schema::Field,
 };
-use tracing::instrument;
+use tracing::{error, instrument};
+use uuid::Uuid;
 
 /// Minimum length for a word to be accepted as a entity to search for
 /// suggestions. Low values can provide too much noise and higher ones can
 /// remove important words from suggestion
 const MIN_SUGGEST_PREFIX_LENGTH: usize = 2;
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RelationConfig {
+    #[serde(default = "default_version")]
+    pub version: u64,
+}
+
+impl Default for RelationConfig {
+    fn default() -> Self {
+        Self {
+            // This is the default version when creating a new index.
+            // Should typically be set to the latest supported version
+            version: 1,
+        }
+    }
+}
+
+// This is the default version when reading from serde, i.e: no info on database
+// This should always be 1
+fn default_version() -> u64 {
+    1
+}
+
 pub struct RelationIndexer;
 
-pub struct RelationDeletionQueryBuilder(Field);
+pub struct RelationDeletionQueryBuilder {
+    resource: Field,
+    field: Option<Field>,
+}
 impl DeletionQueryBuilder for RelationDeletionQueryBuilder {
     fn query<'a>(&self, keys: impl Iterator<Item = &'a String>) -> Box<dyn Query> {
-        Box::new(TermSetQuery::new(
-            keys.map(|k| Term::from_field_bytes(self.0, k.as_bytes())),
-        ))
+        if let Some(field) = self.field {
+            Box::new(TermSetQuery::new(keys.filter_map(|k| {
+                // Our keys can be resource or field ids, match the corresponding tantivy field
+                if k.len() < 32 {
+                    error!(?k, "Invalid deletion key for nidx_relation");
+                    return None;
+                }
+
+                let Ok(rid) = Uuid::parse_str(&k[..32]) else {
+                    error!(?k, "Invalid deletion key for nidx_relation");
+                    return None;
+                };
+
+                let is_field = k.len() > 32;
+                if is_field {
+                    Some(Term::from_field_bytes(field, &encode_field_id(rid, &k[33..])))
+                } else {
+                    Some(Term::from_field_bytes(self.resource, rid.as_bytes()))
+                }
+            })))
+        } else {
+            Box::new(TermSetQuery::new(
+                keys.map(|k| Term::from_field_bytes(self.resource, k.as_bytes())),
+            ))
+        }
     }
 }
 impl RelationDeletionQueryBuilder {
     fn new(schema: &RelationSchema) -> Self {
-        RelationDeletionQueryBuilder(schema.resource_id)
+        RelationDeletionQueryBuilder {
+            resource: schema.resource_id,
+            field: schema.resource_field_id,
+        }
     }
 }
 
@@ -74,9 +127,10 @@ impl RelationIndexer {
     pub fn index_resource(
         &self,
         output_dir: &Path,
+        config: &RelationConfig,
         resource: &nidx_protos::Resource,
     ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
-        let field_schema = RelationSchema::new();
+        let field_schema = RelationSchema::new(config.version);
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
         if resource.status == ResourceStatus::Delete as i32 {
@@ -87,17 +141,27 @@ impl RelationIndexer {
         indexer.finalize()
     }
 
-    pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
-        vec![resource.resource.as_ref().unwrap().uuid.clone()]
+    pub fn deletions_for_resource(&self, config: &RelationConfig, resource: &nidx_protos::Resource) -> Vec<String> {
+        if config.version == 2 {
+            let rid = &resource.resource.as_ref().unwrap().uuid;
+            resource
+                .relation_fields_to_delete
+                .iter()
+                .map(|f| format!("{rid}/{f}"))
+                .collect()
+        } else {
+            vec![resource.resource.as_ref().unwrap().uuid.clone()]
+        }
     }
 
     #[instrument(name = "relation::merge", skip_all)]
     pub fn merge(
         &self,
         work_dir: &Path,
+        config: RelationConfig,
         open_index: impl OpenIndexMetadata<TantivyMeta>,
     ) -> anyhow::Result<TantivySegmentMetadata> {
-        let schema = RelationSchema::new();
+        let schema = RelationSchema::new(config.version);
         let deletions_query = RelationDeletionQueryBuilder::new(&schema);
         let index = open_index_with_deletions(schema.schema, open_index, deletions_query)?;
 
@@ -120,15 +184,15 @@ pub struct RelationSearcher {
 
 impl RelationSearcher {
     #[instrument(name = "relation::open", skip_all)]
-    pub fn open(open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
-        let schema = RelationSchema::new();
+    pub fn open(config: RelationConfig, open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
+        let schema = RelationSchema::new(config.version);
         let deletions_query = RelationDeletionQueryBuilder::new(&schema);
         let index = open_index_with_deletions(schema.schema, open_index, deletions_query)?;
 
         Ok(Self {
             reader: RelationsReaderService {
                 index: index.clone(),
-                schema: RelationSchema::new(),
+                schema: RelationSchema::new(config.version),
                 reader: index
                     .reader_builder()
                     .reload_policy(tantivy::ReloadPolicy::Manual)
