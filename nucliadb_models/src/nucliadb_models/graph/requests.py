@@ -34,7 +34,7 @@ class NodeMatchKind(str, Enum):
     FUZZY = "fuzzy"
 
 
-class GraphNode(BaseModel):
+class GraphNode(BaseModel, extra="forbid"):
     value: Optional[str] = None
     match: NodeMatchKind = NodeMatchKind.EXACT
     type: Optional[RelationNodeType] = RelationNodeType.ENTITY
@@ -53,7 +53,7 @@ class GraphNode(BaseModel):
         return self
 
 
-class GraphRelation(BaseModel):
+class GraphRelation(BaseModel, extra="forbid"):
     label: Optional[str] = None
 
 
