@@ -48,6 +48,7 @@ from nucliadb_models.search import (
     RagStrategies,
     SyncAskResponse,
 )
+from nucliadb_protos.resources_pb2 import Relations
 from nucliadb_protos.utils_pb2 import Relation, RelationMetadata, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from tests.utils import inject_message
@@ -197,7 +198,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
     bm = BrokerMessage()
     bm.uuid = rid
     bm.kbid = standalone_knowledgebox
-    bm.relations.extend(edges)
+    bm.field_metadata[0].metadata.metadata.relations.append(Relations(relations=edges))
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
     return rid

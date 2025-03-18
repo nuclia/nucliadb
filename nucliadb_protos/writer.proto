@@ -83,7 +83,6 @@ message BrokerMessage {
 
     resources.Origin origin = 9;
 
-    repeated utils.Relation relations = 10;
     optional resources.Relations user_relations = 43;
 
     // Field Conversations

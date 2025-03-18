@@ -67,7 +67,6 @@ from nucliadb_protos.resources_pb2 import Extra as PBExtra
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
-from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.storages.storage import Storage
 
@@ -284,24 +283,6 @@ class Resource:
         self.security = payload
 
     # Relations
-    async def get_relations(self) -> Optional[PBRelations]:
-        if self.relations is None:
-            relations = await datamanagers.resources.get_relations(
-                self.txn, kbid=self.kb.kbid, rid=self.uuid
-            )
-            self.relations = relations
-        return self.relations
-
-    async def set_relations(self, payload: list[PBRelation]):
-        relations = PBRelations()
-        for relation in payload:
-            relations.relations.append(relation)
-        await datamanagers.resources.set_relations(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid, relations=relations
-        )
-        self.modified = True
-        self.relations = relations
-
     async def get_user_relations(self) -> PBRelations:
         if self.user_relations is None:
             sf = self.storage.user_relations(self.kb.kbid, self.uuid)
@@ -680,10 +661,6 @@ class Resource:
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
             await self._apply_field_large_metadata(field_large_metadata)
-
-        for relation in message.relations:
-            self.indexer.brain.relations.append(relation)
-        await self.set_relations(message.relations)  # type: ignore
 
         # Basic proto may have been modified in some apply functions but we only
         # want to set it once

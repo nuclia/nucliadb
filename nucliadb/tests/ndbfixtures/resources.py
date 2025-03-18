@@ -37,6 +37,7 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb_models.metadata import RelationEntity, RelationNodeType
 from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
+from nucliadb_protos.resources_pb2 import Relations
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -343,7 +344,7 @@ async def knowledge_graph(
     bm = BrokerMessage()
     bm.uuid = rid
     bm.kbid = standalone_knowledgebox
-    bm.relations.extend(edges)
+    bm.field_metadata[0].metadata.metadata.relations.append(Relations(relations=edges))
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
 
