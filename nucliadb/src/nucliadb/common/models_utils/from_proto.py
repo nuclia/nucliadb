@@ -121,7 +121,6 @@ def user_metadata(message: resources_pb2.UserMetadata) -> UserMetadata:
         preserving_proto_field_name=True,
         including_default_value_fields=True,
     )
-    value["relations"] = [convert_pb_relation_to_api(rel) for rel in message.relations]
     return UserMetadata(**value)
 
 

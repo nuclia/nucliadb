@@ -46,7 +46,7 @@ async def test_ingest_relations_indexing(
     r1 = Relation(relation=Relation.RelationType.ENTITY, source=e0, to=e2, relation_label="R1")
     r2 = Relation(relation=Relation.RelationType.CHILD, source=e0, to=e1, relation_label="R2")
 
-    bm.relations.extend([r0, r1, r2])
+    bm.user_relations.relations.extend([r0, r1, r2])
 
     await processor.process(message=bm, seqid=1)
 
@@ -244,7 +244,7 @@ async def test_ingest_field_relations_relation_extraction(
             ),
         ),
     ]
-    bm.relations.extend(test_relations)
+    bm.user_relations.relations.extend(test_relations)
 
     await processor.process(message=bm, seqid=1)
 

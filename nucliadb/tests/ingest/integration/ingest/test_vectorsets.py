@@ -19,6 +19,7 @@
 #
 import random
 import uuid
+from datetime import datetime
 from typing import Optional
 
 from nucliadb.common import datamanagers
@@ -111,6 +112,7 @@ async def test_ingest_broker_message_with_vectorsets(
     # from the stored resource
     bm = writer_pb2.BrokerMessage(kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT)
     bm.reindex = True
+    bm.basic.modified.FromDatetime(datetime.now())
 
     await processor.process(message=bm, seqid=2)
 

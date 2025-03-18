@@ -41,7 +41,6 @@ KB_RESOURCE_BASIC_FS = "/kbs/{kbid}/r/{uuid}/basic"  # Only used on FS driver
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
 KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
 KB_RESOURCE_SECURITY = "/kbs/{kbid}/r/{uuid}/security"
-KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
 
 KB_RESOURCE_SLUG_BASE = "/kbs/{kbid}/s/"
 KB_RESOURCE_SLUG = f"{KB_RESOURCE_SLUG_BASE}{{slug}}"
@@ -185,19 +184,6 @@ async def get_security(txn: Transaction, *, kbid: str, rid: str) -> Optional[res
 async def set_security(txn: Transaction, *, kbid: str, rid: str, security: resources_pb2.Security):
     key = KB_RESOURCE_SECURITY.format(kbid=kbid, uuid=rid)
     await txn.set(key, security.SerializeToString())
-
-
-# Relations
-
-
-async def get_relations(txn: Transaction, *, kbid: str, rid: str) -> Optional[resources_pb2.Relations]:
-    key = KB_RESOURCE_RELATIONS.format(kbid=kbid, uuid=rid)
-    return await get_kv_pb(txn, key, resources_pb2.Relations)
-
-
-async def set_relations(txn: Transaction, *, kbid: str, rid: str, relations: resources_pb2.Relations):
-    key = KB_RESOURCE_RELATIONS.format(kbid=kbid, uuid=rid)
-    await txn.set(key, relations.SerializeToString())
 
 
 # KB resource ids (this functions use internal transactions, breaking the

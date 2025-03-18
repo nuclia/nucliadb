@@ -19,7 +19,7 @@
 #
 
 
-from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
+from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap, RelationTypeMap
 from nucliadb.search.search.query_parser.models import GraphRetrieval
 from nucliadb_models.graph import requests as graph_requests
 from nucliadb_protos import nodereader_pb2
@@ -71,9 +71,7 @@ def _parse_path_query(expr: graph_requests.GraphPathQuery) -> nodereader_pb2.Gra
             _set_node_to_pb(expr.destination, pb.path.destination)
 
         if expr.relation is not None:
-            relation = expr.relation
-            if relation.label is not None:
-                pb.path.relation.value = relation.label
+            _set_relation_to_pb(expr.relation, pb.path.relation)
 
         pb.path.undirected = expr.undirected
 
@@ -88,8 +86,7 @@ def _parse_path_query(expr: graph_requests.GraphPathQuery) -> nodereader_pb2.Gra
         pb.path.undirected = True
 
     elif isinstance(expr, graph_requests.Relation):
-        if expr.label is not None:
-            pb.path.relation.value = expr.label
+        _set_relation_to_pb(expr, pb.path.relation)
 
     else:  # pragma: nocover
         # This is a trick so mypy generates an error if this branch can be reached,
@@ -142,8 +139,7 @@ def _parse_relation_query(
         pb.bool_not.CopyFrom(_parse_relation_query(expr.operand))
 
     elif isinstance(expr, graph_requests.Relation):
-        if expr.label is not None:
-            pb.path.relation.value = expr.label
+        _set_relation_to_pb(expr, pb.path.relation)
 
     else:  # pragma: nocover
         # This is a trick so mypy generates an error if this branch can be reached,
@@ -172,3 +168,10 @@ def _set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuer
 
     if node.group is not None:
         pb.node_subtype = node.group
+
+
+def _set_relation_to_pb(relation: graph_requests.GraphRelation, pb: nodereader_pb2.GraphQuery.Relation):
+    if relation.label is not None:
+        pb.value = relation.label
+    if relation.type is not None:
+        pb.relation_type = RelationTypeMap[relation.type]

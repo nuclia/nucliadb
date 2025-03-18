@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use anyhow::anyhow;
+use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator};
 use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
@@ -52,6 +53,7 @@ pub struct Node {
 #[derive(Default, Clone)]
 pub struct Relation {
     pub value: Option<String>,
+    pub relation_type: Option<RelationType>,
 }
 
 // Generic (simple) boolean expression for graph querying
@@ -424,16 +426,28 @@ impl<'a> GraphQueryParser<'a> {
         let mut subqueries = vec![];
 
         match expression {
-            Expression::Value(Relation { value: None }) => {}
-            Expression::Value(Relation { value: Some(value) }) if value.is_empty() => {}
-            Expression::Value(Relation { value: Some(value) }) => {
-                subqueries.push((Occur::Must, self.has_relation_label(value)));
+            Expression::Value(Relation { value, relation_type }) => {
+                value.as_ref().map(|value| {
+                    if !value.is_empty() {
+                        subqueries.push((Occur::Must, self.has_relation_label(value)));
+                    }
+                });
+
+                relation_type.map(|relation_type| {
+                    subqueries.push((Occur::Must, self.has_relation_type(relation_type)));
+                });
             }
 
-            Expression::Not(Relation { value: None }) => {}
-            Expression::Not(Relation { value: Some(value) }) if value.is_empty() => {}
-            Expression::Not(Relation { value: Some(value) }) => {
-                subqueries.push((Occur::MustNot, self.has_relation_label(value)));
+            Expression::Not(Relation { value, relation_type }) => {
+                value.as_ref().map(|value| {
+                    if !value.is_empty() {
+                        subqueries.push((Occur::MustNot, self.has_relation_label(value)));
+                    }
+                });
+
+                relation_type.map(|relation_type| {
+                    subqueries.push((Occur::MustNot, self.has_relation_type(relation_type)));
+                });
             }
 
             Expression::Or(relations) => {
@@ -547,6 +561,14 @@ impl<'a> GraphQueryParser<'a> {
     fn has_relation_label(&self, label: &str) -> Box<dyn Query> {
         Box::new(TermQuery::new(
             tantivy::Term::from_field_text(self.schema.label, label),
+            IndexRecordOption::Basic,
+        ))
+    }
+
+    fn has_relation_type(&self, relation_type: RelationType) -> Box<dyn Query> {
+        let relation_type = io_maps::relation_type_to_u64(relation_type);
+        Box::new(TermQuery::new(
+            tantivy::Term::from_field_u64(self.schema.relationship, relation_type),
             IndexRecordOption::Basic,
         ))
     }
@@ -726,7 +748,8 @@ impl TryFrom<&nidx_protos::graph_query::Relation> for Relation {
 
     fn try_from(relation_pb: &nidx_protos::graph_query::Relation) -> Result<Self, Self::Error> {
         let value = relation_pb.value.clone();
+        let relation_type = relation_pb.relation_type.map(RelationType::try_from).transpose()?;
 
-        Ok(Relation { value })
+        Ok(Relation { value, relation_type })
     }
 }

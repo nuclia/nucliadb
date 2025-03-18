@@ -152,6 +152,7 @@ message Message {
 
 message Conversation {
     repeated Message messages = 1;
+    string extract_strategy = 2;
 }
 
 message FieldConversation {
@@ -161,6 +162,7 @@ message FieldConversation {
     int32 size = 2;
     // Total number of messages
     int32 total = 3;
+    string extract_strategy = 4;
 }
 
 message NestedPosition {
@@ -450,7 +452,6 @@ message Classification {
 
 message UserMetadata {
     repeated Classification classifications = 1;
-    repeated utils.Relation relations = 3 [deprecated=true]; // Moved to BrokerMessage (outside Basic)
 }
 
 message FieldClassifications {

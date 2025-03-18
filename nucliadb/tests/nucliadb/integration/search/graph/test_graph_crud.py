@@ -21,7 +21,7 @@
 import pytest
 from httpx import AsyncClient
 
-from nucliadb_models.metadata import RelationEntity
+from nucliadb_models.metadata import RelationEntity, RelationType
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -29,10 +29,10 @@ async def test_user_defined_knowledge_graph(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     standalone_knowledgebox: str,
-    entity_graph: tuple[dict[str, RelationEntity], list[tuple[str, str, str]]],
+    entity_graph: tuple[dict[str, RelationEntity], dict[str, RelationType], list[tuple[str, str, str]]],
 ):
     kbid = standalone_knowledgebox
-    entities, paths = entity_graph
+    entities, relations, paths = entity_graph
 
     graph = paths[:3]
     resp = await nucliadb_writer.post(
@@ -44,7 +44,7 @@ async def test_user_defined_knowledge_graph(
             "usermetadata": {
                 "relations": [
                     {
-                        "relation": "ENTITY",
+                        "relation": relations[relation].value,
                         "label": relation,
                         "from": entities[source].model_dump(),
                         "to": entities[target].model_dump(),

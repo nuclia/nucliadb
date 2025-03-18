@@ -202,6 +202,7 @@ message GraphQuery {
 
     message Relation {
         optional string value = 1;
+        optional utils.Relation.RelationType relation_type = 2;
     }
 
     message Path {

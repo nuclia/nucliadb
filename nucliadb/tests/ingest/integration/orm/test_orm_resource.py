@@ -26,7 +26,6 @@ from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2
-from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
@@ -37,8 +36,6 @@ from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import TokenSplit as PBTokenSplit
 from nucliadb_protos.resources_pb2 import UserFieldMetadata as PBUserFieldMetadata
-from nucliadb_protos.utils_pb2 import Relation as PBRelation
-from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     Classification,
@@ -65,14 +62,6 @@ async def test_create_resource_orm_with_basic(
 
     cl1 = PBClassification(labelset="labelset1", label="label")
     basic.usermetadata.classifications.append(cl1)
-
-    r1 = PBRelation(
-        relation=PBRelation.CHILD,
-        source=RelationNode(value="000000", ntype=RelationNode.NodeType.RESOURCE),
-        to=RelationNode(value="000001", ntype=RelationNode.NodeType.RESOURCE),
-    )
-
-    basic.usermetadata.relations.append(r1)
 
     ufm1 = PBUserFieldMetadata(
         token=[PBTokenSplit(token="My home", klass="Location")],
@@ -284,21 +273,15 @@ async def test_generate_broker_message(
     assert len(basic_usermetadata.classifications) == 1
     assert basic_usermetadata.classifications[0].label == "label1"
     assert basic_usermetadata.classifications[0].labelset == "labelset1"
-    assert len(basic_usermetadata.relations) == 1
-    assert basic_usermetadata.relations[0].to.value == "000001"
     basic_fieldmetadata = basic.fieldmetadata
     assert len(basic_fieldmetadata) == 1
     assert basic_fieldmetadata[0].field.field == "text1"
     assert basic_fieldmetadata[0].token[0].token == "My home"
     assert basic_fieldmetadata[0].token[0].klass == "Location"
 
-    # 1.2 RELATIONS
-    assert len(bm.relations) == 1
-    assert bm.relations[0].relation == upb.Relation.CHILD
-    assert bm.relations[0].source.value == resource.uuid
-    assert bm.relations[0].source.ntype == upb.RelationNode.NodeType.RESOURCE
-    assert bm.relations[0].to.value == "000001"
-    assert bm.relations[0].to.ntype == upb.RelationNode.NodeType.RESOURCE
+    # 1.2 USER RELATIONS
+    assert len(bm.user_relations.relations) == 1
+    assert bm.user_relations.relations[0].to.value == "000001"
 
     # 1.3 ORIGIN
     assert bm.origin.source_id == "My Source"
