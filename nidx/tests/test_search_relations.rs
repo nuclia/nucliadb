@@ -446,7 +446,7 @@ async fn test_graph_search_nodes(pool: PgPool) -> anyhow::Result<()> {
         .await?
         .into_inner();
     let nodes = &response.nodes;
-    assert_eq!(nodes.len(), 17);
+    assert_eq!(nodes.len(), 18);
 
     // Search all ANIMAL nodes
     let response = fixture
@@ -522,7 +522,7 @@ async fn test_graph_search__node_query(pool: PgPool) -> anyhow::Result<()> {
         .await?
         .into_inner();
     let relations = friendly_parse(&response);
-    assert_eq!(relations.len(), 16);
+    assert_eq!(relations.len(), 17);
 
     // (:PERSON)-[]->()
     let response = fixture
