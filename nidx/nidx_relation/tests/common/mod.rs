@@ -22,7 +22,7 @@
 
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
-use nidx_protos::{IndexRelation, RelationMetadata, RelationNode};
+use nidx_protos::{Relation, RelationMetadata, RelationNode};
 use nidx_tantivy::{TantivyMeta, TantivySegmentMetadata};
 use nidx_types::{OpenIndexMetadata, Seq};
 
@@ -65,8 +65,8 @@ pub fn create_relation(
     to_subtype: String,
     rel_type: RelationType,
     rel_label: String,
-) -> IndexRelation {
-    IndexRelation {
+) -> Relation {
+    Relation {
         source: Some(create_relation_node(source, source_node_type, source_subtype)),
         to: Some(create_relation_node(to, to_node_type, to_subtype)),
         relation: rel_type.into(),
@@ -87,7 +87,7 @@ pub fn create_relation_with_metadata(
     rel_type: RelationType,
     rel_label: String,
     metadata: RelationMetadata,
-) -> IndexRelation {
+) -> Relation {
     let mut relation = create_relation(
         source,
         source_node_type,

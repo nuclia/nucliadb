@@ -20,7 +20,6 @@
 import uuid
 
 from nucliadb.ingest import SERVICE_NAME
-from nucliadb.ingest.orm.brain import relation_to_index
 from nucliadb_protos.resources_pb2 import (
     Classification,
     FieldComputedMetadataWrapper,
@@ -56,9 +55,9 @@ async def test_ingest_relations_indexing(
     pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
 
     assert len(pb.relations) == 3
-    assert pb.relations[0] == relation_to_index(r0)
-    assert pb.relations[1] == relation_to_index(r1)
-    assert pb.relations[2] == relation_to_index(r2)
+    assert pb.relations[0] == r0
+    assert pb.relations[1] == r1
+    assert pb.relations[2] == r2
 
 
 async def test_ingest_label_relation_extraction(
@@ -193,7 +192,7 @@ async def test_ingest_field_metadata_relation_extraction(
         ),
     ]
     for generated_relation in generated_relations:
-        assert relation_to_index(generated_relation) in pb.relations
+        assert generated_relation in pb.relations
 
 
 async def test_ingest_field_relations_relation_extraction(
@@ -255,4 +254,4 @@ async def test_ingest_field_relations_relation_extraction(
 
     assert len(pb.relations) == len(test_relations)
     for relation in test_relations:
-        assert relation_to_index(relation) in pb.relations
+        assert relation in pb.relations

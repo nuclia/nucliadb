@@ -732,6 +732,7 @@ class Resource(google.protobuf.message.Message):
     SENTENCES_TO_DELETE_FIELD_NUMBER: builtins.int
     VECTOR_PREFIXES_TO_DELETE_FIELD_NUMBER: builtins.int
     RELATIONS_FIELD_NUMBER: builtins.int
+    NEW_RELATIONS_FIELD_NUMBER: builtins.int
     SHARD_ID_FIELD_NUMBER: builtins.int
     VECTORS_FIELD_NUMBER: builtins.int
     VECTORS_TO_DELETE_FIELD_NUMBER: builtins.int
@@ -775,9 +776,13 @@ class Resource(google.protobuf.message.Message):
         """vectorset_id -> [vector_key_prefix, ...]"""
 
     @property
-    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___IndexRelation]:
-        """Relations"""
+    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]:
+        """Relations
+        Soon deprecated
+        """
 
+    @property
+    def new_relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___IndexRelation]: ...
     @property
     def vectors(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.utils_pb2.UserVectors]:
         """vectorset is the key"""
@@ -800,14 +805,15 @@ class Resource(google.protobuf.message.Message):
         paragraphs_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
         sentences_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
         vector_prefixes_to_delete: collections.abc.Mapping[builtins.str, global___StringList] | None = ...,
-        relations: collections.abc.Iterable[global___IndexRelation] | None = ...,
+        relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
+        new_relations: collections.abc.Iterable[global___IndexRelation] | None = ...,
         shard_id: builtins.str = ...,
         vectors: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectors] | None = ...,
         vectors_to_delete: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectorsList] | None = ...,
         security: nucliadb_protos.utils_pb2.Security | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_security", b"_security", "metadata", b"metadata", "resource", b"resource", "security", b"security"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_security", b"_security", "labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relations", b"relations", "resource", b"resource", "security", b"security", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "vector_prefixes_to_delete", b"vector_prefixes_to_delete", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_security", b"_security", "labels", b"labels", "metadata", b"metadata", "new_relations", b"new_relations", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relations", b"relations", "resource", b"resource", "security", b"security", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "vector_prefixes_to_delete", b"vector_prefixes_to_delete", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["_security", b"_security"]) -> typing.Literal["security"] | None: ...
 
 global___Resource = Resource
@@ -922,82 +928,23 @@ class IndexRelation(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    class _RelationType:
-        ValueType = typing.NewType("ValueType", builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-
-    class _RelationTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[IndexRelation._RelationType.ValueType], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        CHILD: IndexRelation._RelationType.ValueType  # 0
-        """Child resource"""
-        ABOUT: IndexRelation._RelationType.ValueType  # 1
-        """related with label (GENERATED)"""
-        ENTITY: IndexRelation._RelationType.ValueType  # 2
-        """related with an entity (GENERATED)"""
-        COLAB: IndexRelation._RelationType.ValueType  # 3
-        """related with user (GENERATED)"""
-        SYNONYM: IndexRelation._RelationType.ValueType  # 4
-        """Synonym relation"""
-        OTHER: IndexRelation._RelationType.ValueType  # 5
-        """related with something"""
-
-    class RelationType(_RelationType, metaclass=_RelationTypeEnumTypeWrapper):
-        """The following fields are here to be compatible with the `Relation` message during the migration"""
-
-    CHILD: IndexRelation.RelationType.ValueType  # 0
-    """Child resource"""
-    ABOUT: IndexRelation.RelationType.ValueType  # 1
-    """related with label (GENERATED)"""
-    ENTITY: IndexRelation.RelationType.ValueType  # 2
-    """related with an entity (GENERATED)"""
-    COLAB: IndexRelation.RelationType.ValueType  # 3
-    """related with user (GENERATED)"""
-    SYNONYM: IndexRelation.RelationType.ValueType  # 4
-    """Synonym relation"""
-    OTHER: IndexRelation.RelationType.ValueType  # 5
-    """related with something"""
-
     BASE_RELATION_FIELD_NUMBER: builtins.int
     RESOURCE_FIELD_ID_FIELD_NUMBER: builtins.int
     FACETS_FIELD_NUMBER: builtins.int
-    SOURCE_FIELD_NUMBER: builtins.int
-    TO_FIELD_NUMBER: builtins.int
-    RELATION_FIELD_NUMBER: builtins.int
-    RELATION_LABEL_FIELD_NUMBER: builtins.int
-    METADATA_FIELD_NUMBER: builtins.int
-    RESOURCE_ID_FIELD_NUMBER: builtins.int
     resource_field_id: builtins.str
-    relation: global___IndexRelation.RelationType.ValueType
-    relation_label: builtins.str
-    resource_id: builtins.str
     @property
     def base_relation(self) -> nucliadb_protos.utils_pb2.Relation: ...
     @property
     def facets(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
-    @property
-    def source(self) -> nucliadb_protos.utils_pb2.RelationNode: ...
-    @property
-    def to(self) -> nucliadb_protos.utils_pb2.RelationNode: ...
-    @property
-    def metadata(self) -> nucliadb_protos.utils_pb2.RelationMetadata: ...
     def __init__(
         self,
         *,
         base_relation: nucliadb_protos.utils_pb2.Relation | None = ...,
         resource_field_id: builtins.str | None = ...,
         facets: collections.abc.Iterable[builtins.str] | None = ...,
-        source: nucliadb_protos.utils_pb2.RelationNode | None = ...,
-        to: nucliadb_protos.utils_pb2.RelationNode | None = ...,
-        relation: global___IndexRelation.RelationType.ValueType = ...,
-        relation_label: builtins.str = ...,
-        metadata: nucliadb_protos.utils_pb2.RelationMetadata | None = ...,
-        resource_id: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_resource_field_id", b"_resource_field_id", "_resource_id", b"_resource_id", "base_relation", b"base_relation", "metadata", b"metadata", "resource_field_id", b"resource_field_id", "resource_id", b"resource_id", "source", b"source", "to", b"to"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_resource_field_id", b"_resource_field_id", "_resource_id", b"_resource_id", "base_relation", b"base_relation", "facets", b"facets", "metadata", b"metadata", "relation", b"relation", "relation_label", b"relation_label", "resource_field_id", b"resource_field_id", "resource_id", b"resource_id", "source", b"source", "to", b"to"]) -> None: ...
-    @typing.overload
+    def HasField(self, field_name: typing.Literal["_resource_field_id", b"_resource_field_id", "base_relation", b"base_relation", "resource_field_id", b"resource_field_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_resource_field_id", b"_resource_field_id", "base_relation", b"base_relation", "facets", b"facets", "resource_field_id", b"resource_field_id"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["_resource_field_id", b"_resource_field_id"]) -> typing.Literal["resource_field_id"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_resource_id", b"_resource_id"]) -> typing.Literal["resource_id"] | None: ...
 
 global___IndexRelation = IndexRelation

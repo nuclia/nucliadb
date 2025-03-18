@@ -665,14 +665,20 @@ class EntitiesSubgraphResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RELATIONS_FIELD_NUMBER: builtins.int
+    NEW_RELATIONS_FIELD_NUMBER: builtins.int
     @property
-    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.noderesources_pb2.IndexRelation]: ...
+    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]:
+        """Soon deprecated"""
+
+    @property
+    def new_relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.noderesources_pb2.IndexRelation]: ...
     def __init__(
         self,
         *,
-        relations: collections.abc.Iterable[nucliadb_protos.noderesources_pb2.IndexRelation] | None = ...,
+        relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
+        new_relations: collections.abc.Iterable[nucliadb_protos.noderesources_pb2.IndexRelation] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["relations", b"relations"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["new_relations", b"new_relations", "relations", b"relations"]) -> None: ...
 
 global___EntitiesSubgraphResponse = EntitiesSubgraphResponse
 

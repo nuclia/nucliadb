@@ -174,7 +174,8 @@ message Resource {
 
 
     // Relations
-    repeated IndexRelation relations = 9;
+    repeated utils.Relation relations = 9; // Soon deprecated
+    repeated IndexRelation new_relations = 10;
 
     string shard_id = 11;
 
@@ -212,23 +213,4 @@ message IndexRelation {
     utils.Relation base_relation = 1;
     optional string resource_field_id = 2;
     repeated string facets = 3;
-
-    // The following fields are here to be compatible with the `Relation` message during the migration
-    enum RelationType {
-        CHILD = 0;  // Child resource
-        ABOUT = 1;  // related with label (GENERATED)
-        ENTITY = 2;  // related with an entity (GENERATED)
-        COLAB = 3;  // related with user (GENERATED)
-        SYNONYM = 4;  // Synonym relation
-        OTHER = 5;  // related with something
-    }
-
-    utils.RelationNode source = 6;
-    utils.RelationNode to = 7;
-
-    RelationType relation = 5;
-    string relation_label = 8;
-
-    utils.RelationMetadata metadata = 9;
-    optional string resource_id = 10;
 }

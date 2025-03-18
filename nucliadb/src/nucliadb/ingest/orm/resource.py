@@ -71,8 +71,6 @@ from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.storages.storage import Storage
 
-from .brain import relation_to_index
-
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
@@ -685,7 +683,7 @@ class Resource:
 
         # TODO: Can this be removed?
         for relation in message.relations:
-            self.indexer.brain.relations.append(relation_to_index(relation))
+            self.indexer.brain.relations.append(relation)
         await self.set_relations(message.relations)  # type: ignore
 
         # Basic proto may have been modified in some apply functions but we only

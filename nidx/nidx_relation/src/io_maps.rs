@@ -21,7 +21,7 @@
 use nidx_protos::index_relation::RelationType;
 use nidx_protos::prost::*;
 use nidx_protos::relation_node::NodeType;
-use nidx_protos::{IndexRelation as ProtosRelation, RelationMetadata, RelationNode};
+use nidx_protos::{Relation as ProtosRelation, RelationMetadata, RelationNode};
 use tantivy::TantivyDocument;
 
 use crate::schema::Schema;
