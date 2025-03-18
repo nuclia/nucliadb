@@ -19,8 +19,10 @@
 //
 mod common;
 
+use std::collections::HashMap;
+
 use nidx_protos::relation_node::NodeType;
-use nidx_protos::{Resource, ResourceId};
+use nidx_protos::{IndexRelations, Resource, ResourceId};
 use nidx_relation::graph_query_parser::{
     Expression, FuzzyTerm, GraphQuery, Node, NodeQuery, PathQuery, Relation, RelationQuery, Term,
 };
@@ -394,12 +396,13 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
     let dir = TempDir::new().unwrap();
 
     let relations = nidx_tests::graph::knowledge_graph_as_relations();
+    let field_relations = HashMap::from([("a/metadata".to_string(), IndexRelations { relations })]);
     let resource = Resource {
         resource: Some(ResourceId {
-            uuid: "uuid".to_string(),
+            uuid: "0123456789abcdef0123456789abcdef".to_string(),
             shard_id: "shard_id".to_string(),
         }),
-        relations,
+        field_relations,
         ..Default::default()
     };
 

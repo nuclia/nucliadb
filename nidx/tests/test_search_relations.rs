@@ -33,9 +33,9 @@ use nidx_protos::relation_node::NodeType;
 use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::resource::ResourceStatus;
 use nidx_protos::{
-    EntitiesSubgraphRequest, GraphQuery, GraphSearchRequest, IndexMetadata, NewShardRequest, Relation,
-    RelationMetadata, RelationNode, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest,
-    RelationSearchResponse, Resource, ResourceId, graph_query,
+    EntitiesSubgraphRequest, GraphQuery, GraphSearchRequest, IndexMetadata, IndexRelation, IndexRelations,
+    NewShardRequest, Relation, RelationMetadata, RelationNode, RelationNodeFilter, RelationPrefixSearchRequest,
+    RelationSearchRequest, RelationSearchResponse, Resource, ResourceId, graph_query,
 };
 use nidx_protos::{SearchRequest, VectorIndexConfig};
 use nidx_tests::graph::friendly_parse;
@@ -385,7 +385,12 @@ async fn setup_knowledge_graph(fixture: &mut NidxFixture) -> anyhow::Result<Stri
                     uuid: rid.to_string(),
                 }),
                 status: ResourceStatus::Processed as i32,
-                relations: knowledge_graph,
+                field_relations: HashMap::from([(
+                    "a/metadata".to_string(),
+                    IndexRelations {
+                        relations: knowledge_graph,
+                    },
+                )]),
                 metadata: Some(IndexMetadata {
                     created: Some(timestamp),
                     modified: Some(timestamp),
@@ -1129,23 +1134,26 @@ async fn create_knowledge_graph(fixture: &mut NidxFixture, shard_id: String) -> 
         let (source_type, source_subtype) = entities.get(source).unwrap();
         let relation_type = relations
             .get(relation)
-            .expect(&format!("Expecting to find relation '{relation}'"));
+            .unwrap_or_else(|| panic!("Expecting to find relation '{relation}'"));
         let (destination_type, destination_subtype) = entities.get(destination).unwrap();
 
-        relation_edges.push(Relation {
-            source: Some(RelationNode {
-                value: source.to_string(),
-                ntype: *source_type as i32,
-                subtype: source_subtype.clone(),
+        relation_edges.push(IndexRelation {
+            relation: Some(Relation {
+                source: Some(RelationNode {
+                    value: source.to_string(),
+                    ntype: *source_type as i32,
+                    subtype: source_subtype.clone(),
+                }),
+                to: Some(RelationNode {
+                    value: destination.to_string(),
+                    ntype: *destination_type as i32,
+                    subtype: destination_subtype.clone(),
+                }),
+                relation: *relation_type as i32,
+                relation_label: relation.to_string(),
+                metadata: relation_metadata.clone(),
+                ..Default::default()
             }),
-            to: Some(RelationNode {
-                value: destination.to_string(),
-                ntype: *destination_type as i32,
-                subtype: destination_subtype.clone(),
-            }),
-            relation: *relation_type as i32,
-            relation_label: relation.to_string(),
-            metadata: relation_metadata.clone(),
             ..Default::default()
         });
     }
@@ -1166,7 +1174,12 @@ async fn create_knowledge_graph(fixture: &mut NidxFixture, shard_id: String) -> 
                     uuid: rid.to_string(),
                 }),
                 status: ResourceStatus::Processed as i32,
-                relations: relation_edges.clone(),
+                field_relations: HashMap::from([(
+                    "a/metadata".to_string(),
+                    IndexRelations {
+                        relations: relation_edges,
+                    },
+                )]),
                 metadata: Some(IndexMetadata {
                     created: Some(timestamp),
                     modified: Some(timestamp),

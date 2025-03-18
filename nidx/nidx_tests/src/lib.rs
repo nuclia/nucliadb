@@ -194,20 +194,26 @@ pub fn people_and_places(shard_id: impl Into<String>) -> Resource {
     let entities = people.chain(cities).chain(countries);
 
     let mut relations = vec![];
-    relations.extend(collaborators.map(|node| Relation {
-        relation: RelationType::Colab as i32,
-        source: Some(resource_node.clone()),
-        to: Some(node),
+    relations.extend(collaborators.map(|node| IndexRelation {
+        relation: Some(Relation {
+            relation: RelationType::Colab as i32,
+            source: Some(resource_node.clone()),
+            to: Some(node),
+            ..Default::default()
+        }),
         ..Default::default()
     }));
-    relations.extend(entities.map(|node| Relation {
-        relation: RelationType::Entity as i32,
-        source: Some(resource_node.clone()),
-        to: Some(node),
+    relations.extend(entities.map(|node| IndexRelation {
+        relation: Some(Relation {
+            relation: RelationType::Entity as i32,
+            source: Some(resource_node.clone()),
+            to: Some(node),
+            ..Default::default()
+        }),
         ..Default::default()
     }));
 
-    resource.relations.extend(relations);
+    resource.field_relations = HashMap::from([("a/metadata".to_string(), IndexRelations { relations })]);
 
     resource
 }

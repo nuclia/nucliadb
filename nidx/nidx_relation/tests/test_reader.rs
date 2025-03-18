@@ -19,158 +19,167 @@
 //
 mod common;
 
+use std::collections::HashMap;
+
 use nidx_protos::entities_subgraph_request::DeletedEntities;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::{
-    EntitiesSubgraphRequest, RelationMetadata, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest,
-    Resource, ResourceId,
+    EntitiesSubgraphRequest, IndexRelations, RelationMetadata, RelationNodeFilter, RelationPrefixSearchRequest,
+    RelationSearchRequest, Resource, ResourceId,
 };
 use nidx_relation::{RelationConfig, RelationIndexer, RelationSearcher};
 use tempfile::TempDir;
 
 use common::TestOpener;
 
-fn create_reader() -> anyhow::Result<RelationSearcher> {
+fn create_versioned_reader(version: u64) -> anyhow::Result<RelationSearcher> {
     let dir = TempDir::new().unwrap();
 
     let resource = Resource {
         resource: Some(ResourceId {
-            uuid: "uuid".to_string(),
+            uuid: "01808bbd8e784552967a4fb0d8b6e584".to_string(),
             shard_id: "shard_id".to_string(),
         }),
-        relations: vec![
-            common::create_relation(
-                "cat".to_string(),
-                NodeType::Entity,
-                "ANIMALS".to_string(),
-                "cat".to_string(),
-                NodeType::Entity,
-                "ANIMALS".to_string(),
-                RelationType::Entity,
-                "IS".to_string(),
-            ),
-            common::create_relation(
-                "dolphin".to_string(),
-                NodeType::Entity,
-                "ANIMALS".to_string(),
-                "dolphin".to_string(),
-                NodeType::Entity,
-                "ANIMALS".to_string(),
-                RelationType::Entity,
-                "IS".to_string(),
-            ),
-            common::create_relation(
-                "01808bbd8e784552967a4fb0d8b6e584".to_string(),
-                NodeType::Resource,
-                "".to_string(),
-                "dog".to_string(),
-                NodeType::Entity,
-                "ANIMALS".to_string(),
-                RelationType::Entity,
-                "TALKS_ABOUT".to_string(),
-            ),
-            common::create_relation(
-                "01808bbd8e784552967a4fb0d8b6e584".to_string(),
-                NodeType::Resource,
-                "".to_string(),
-                "bird".to_string(),
-                NodeType::Entity,
-                "ANIMALS".to_string(),
-                RelationType::Entity,
-                "TALKS_ABOUT".to_string(),
-            ),
-            common::create_relation(
-                "Anastasia".to_string(),
-                NodeType::Entity,
-                "PEOPLE".to_string(),
-                "Anna".to_string(),
-                NodeType::Entity,
-                "PEOPLE".to_string(),
-                RelationType::Entity,
-                "IS_FRIEND".to_string(),
-            ),
-            common::create_relation_with_metadata(
-                "Anthony".to_string(),
-                NodeType::Entity,
-                "PEOPLE".to_string(),
-                "Netherlands".to_string(),
-                NodeType::Entity,
-                "PLACES".to_string(),
-                RelationType::Entity,
-                "LIVES_IN".to_string(),
-                RelationMetadata {
-                    paragraph_id: Some("myresource/0/myresource/100-200".to_string()),
-                    source_start: Some(0),
-                    source_end: Some(10),
-                    to_start: Some(11),
-                    to_end: Some(20),
-                    data_augmentation_task_id: Some("mytask".to_string()),
-                },
-            ),
-            common::create_relation(
-                "Anna".to_string(),
-                NodeType::Entity,
-                "PEOPLE".to_string(),
-                "New York".to_string(),
-                NodeType::Entity,
-                "PLACES".to_string(),
-                RelationType::Entity,
-                "LIVES_IN".to_string(),
-            ),
-            common::create_relation(
-                "Peter".to_string(),
-                NodeType::Entity,
-                "PEOPLE".to_string(),
-                "New York".to_string(),
-                NodeType::Entity,
-                "PLACES".to_string(),
-                RelationType::Entity,
-                "LIVES_IN".to_string(),
-            ),
-            common::create_relation(
-                "Anna".to_string(),
-                NodeType::Entity,
-                "PEOPLE".to_string(),
-                "cat".to_string(),
-                NodeType::Entity,
-                "ANIMAL".to_string(),
-                RelationType::Entity,
-                "LOVES".to_string(),
-            ),
-            common::create_relation(
-                "Peter".to_string(),
-                NodeType::Entity,
-                "PEOPLE".to_string(),
-                "New York".to_string(),
-                NodeType::Entity,
-                "PLACES".to_string(),
-                RelationType::Entity,
-                "LOVES".to_string(),
-            ),
-            common::create_relation(
-                "James Bond".to_string(),
-                NodeType::Entity,
-                "PEOPLE".to_string(),
-                "Ian Fleming".to_string(),
-                NodeType::Entity,
-                "PEOPLE".to_string(),
-                RelationType::Entity,
-                "KNOWS".to_string(),
-            ),
-        ],
+        field_relations: HashMap::from([(
+            "a/metadata".to_string(),
+            IndexRelations {
+                relations: vec![
+                    common::create_relation(
+                        "cat".to_string(),
+                        NodeType::Entity,
+                        "ANIMALS".to_string(),
+                        "cat".to_string(),
+                        NodeType::Entity,
+                        "ANIMALS".to_string(),
+                        RelationType::Entity,
+                        "IS".to_string(),
+                    ),
+                    common::create_relation(
+                        "dolphin".to_string(),
+                        NodeType::Entity,
+                        "ANIMALS".to_string(),
+                        "dolphin".to_string(),
+                        NodeType::Entity,
+                        "ANIMALS".to_string(),
+                        RelationType::Entity,
+                        "IS".to_string(),
+                    ),
+                    common::create_relation(
+                        "01808bbd8e784552967a4fb0d8b6e584".to_string(),
+                        NodeType::Resource,
+                        "".to_string(),
+                        "dog".to_string(),
+                        NodeType::Entity,
+                        "ANIMALS".to_string(),
+                        RelationType::Entity,
+                        "TALKS_ABOUT".to_string(),
+                    ),
+                    common::create_relation(
+                        "01808bbd8e784552967a4fb0d8b6e584".to_string(),
+                        NodeType::Resource,
+                        "".to_string(),
+                        "bird".to_string(),
+                        NodeType::Entity,
+                        "ANIMALS".to_string(),
+                        RelationType::Entity,
+                        "TALKS_ABOUT".to_string(),
+                    ),
+                    common::create_relation(
+                        "Anastasia".to_string(),
+                        NodeType::Entity,
+                        "PEOPLE".to_string(),
+                        "Anna".to_string(),
+                        NodeType::Entity,
+                        "PEOPLE".to_string(),
+                        RelationType::Entity,
+                        "IS_FRIEND".to_string(),
+                    ),
+                    common::create_relation_with_metadata(
+                        "Anthony".to_string(),
+                        NodeType::Entity,
+                        "PEOPLE".to_string(),
+                        "Netherlands".to_string(),
+                        NodeType::Entity,
+                        "PLACES".to_string(),
+                        RelationType::Entity,
+                        "LIVES_IN".to_string(),
+                        RelationMetadata {
+                            paragraph_id: Some("myresource/0/myresource/100-200".to_string()),
+                            source_start: Some(0),
+                            source_end: Some(10),
+                            to_start: Some(11),
+                            to_end: Some(20),
+                            data_augmentation_task_id: Some("mytask".to_string()),
+                        },
+                    ),
+                    common::create_relation(
+                        "Anna".to_string(),
+                        NodeType::Entity,
+                        "PEOPLE".to_string(),
+                        "New York".to_string(),
+                        NodeType::Entity,
+                        "PLACES".to_string(),
+                        RelationType::Entity,
+                        "LIVES_IN".to_string(),
+                    ),
+                    common::create_relation(
+                        "Peter".to_string(),
+                        NodeType::Entity,
+                        "PEOPLE".to_string(),
+                        "New York".to_string(),
+                        NodeType::Entity,
+                        "PLACES".to_string(),
+                        RelationType::Entity,
+                        "LIVES_IN".to_string(),
+                    ),
+                    common::create_relation(
+                        "Anna".to_string(),
+                        NodeType::Entity,
+                        "PEOPLE".to_string(),
+                        "cat".to_string(),
+                        NodeType::Entity,
+                        "ANIMAL".to_string(),
+                        RelationType::Entity,
+                        "LOVES".to_string(),
+                    ),
+                    common::create_relation(
+                        "Peter".to_string(),
+                        NodeType::Entity,
+                        "PEOPLE".to_string(),
+                        "New York".to_string(),
+                        NodeType::Entity,
+                        "PLACES".to_string(),
+                        RelationType::Entity,
+                        "LOVES".to_string(),
+                    ),
+                    common::create_relation(
+                        "James Bond".to_string(),
+                        NodeType::Entity,
+                        "PEOPLE".to_string(),
+                        "Ian Fleming".to_string(),
+                        NodeType::Entity,
+                        "PEOPLE".to_string(),
+                        RelationType::Entity,
+                        "KNOWS".to_string(),
+                    ),
+                ],
+            },
+        )]),
         ..Default::default()
     };
 
+    let config = RelationConfig { version };
     let segment_meta = RelationIndexer
-        .index_resource(dir.path(), &RelationConfig::default(), &resource)
+        .index_resource(dir.path(), &config, &resource)
         .unwrap()
         .unwrap();
-    RelationSearcher::open(
-        RelationConfig::default(),
-        TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]),
-    )
+    RelationSearcher::open(config, TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]))
+}
+
+fn create_reader() -> anyhow::Result<RelationSearcher> {
+    create_versioned_reader(2)
 }
 
 #[test]
@@ -315,52 +324,45 @@ fn test_prefix_search() -> anyhow::Result<()> {
 
 #[test]
 fn test_prefix_query_search() -> anyhow::Result<()> {
-    let reader = create_reader()?;
+    for version in 1..=2 {
+        let reader = create_versioned_reader(version)?;
 
-    let result = reader.search(&RelationSearchRequest {
-        prefix: Some(RelationPrefixSearchRequest {
-            search: Some(Search::Query("Films with James Bond played by Roger Moore".to_string())),
+        let result = reader.search(&RelationSearchRequest {
+            prefix: Some(RelationPrefixSearchRequest {
+                search: Some(Search::Query("Films with James Bond played by Roger Moore".to_string())),
+                ..Default::default()
+            }),
             ..Default::default()
-        }),
-        ..Default::default()
-    })?;
-    assert_eq!(result.prefix.unwrap().nodes.len(), 1);
+        })?;
+        assert_eq!(result.prefix.unwrap().nodes.len(), 1);
 
-    let result = reader.search(&RelationSearchRequest {
-        prefix: Some(RelationPrefixSearchRequest {
-            search: Some(Search::Query("Films with Jomes Bond played by Roger Moore".to_string())),
+        let result = reader.search(&RelationSearchRequest {
+            prefix: Some(RelationPrefixSearchRequest {
+                search: Some(Search::Query("Films with Jomes Bond played by Roger Moore".to_string())),
+                ..Default::default()
+            }),
             ..Default::default()
-        }),
-        ..Default::default()
-    })?;
-    assert_eq!(result.prefix.unwrap().nodes.len(), 1);
+        })?;
+        assert_eq!(result.prefix.unwrap().nodes.len(), 1);
 
-    let result = reader.search(&RelationSearchRequest {
-        prefix: Some(RelationPrefixSearchRequest {
-            search: Some(Search::Query("Just James".to_string())),
+        let result = reader.search(&RelationSearchRequest {
+            prefix: Some(RelationPrefixSearchRequest {
+                search: Some(Search::Query("Just Bond".to_string())),
+                ..Default::default()
+            }),
             ..Default::default()
-        }),
-        ..Default::default()
-    })?;
-    assert_eq!(result.prefix.unwrap().nodes.len(), 1);
+        })?;
+        assert_eq!(result.prefix.unwrap().nodes.len(), if version == 1 { 0 } else { 1 });
 
-    let result = reader.search(&RelationSearchRequest {
-        prefix: Some(RelationPrefixSearchRequest {
-            search: Some(Search::Query("Just Bond".to_string())),
+        let result = reader.search(&RelationSearchRequest {
+            prefix: Some(RelationPrefixSearchRequest {
+                search: Some(Search::Query("James Bond or Anastasia".to_string())),
+                ..Default::default()
+            }),
             ..Default::default()
-        }),
-        ..Default::default()
-    })?;
-    assert_eq!(result.prefix.unwrap().nodes.len(), 1);
-
-    let result = reader.search(&RelationSearchRequest {
-        prefix: Some(RelationPrefixSearchRequest {
-            search: Some(Search::Query("James Bond or Anastasia".to_string())),
-            ..Default::default()
-        }),
-        ..Default::default()
-    })?;
-    assert_eq!(result.prefix.unwrap().nodes.len(), 2);
+        })?;
+        assert_eq!(result.prefix.unwrap().nodes.len(), 2);
+    }
 
     Ok(())
 }
