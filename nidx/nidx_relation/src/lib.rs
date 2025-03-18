@@ -78,18 +78,32 @@ fn default_version() -> u64 {
 
 pub struct RelationIndexer;
 
-pub struct RelationDeletionQueryBuilder(Field);
+pub struct RelationDeletionQueryBuilder {
+    resource: Field,
+    field: Option<Field>,
+}
 impl DeletionQueryBuilder for RelationDeletionQueryBuilder {
     fn query<'a>(&self, keys: impl Iterator<Item = &'a String>) -> Box<dyn Query> {
-        Box::new(TermSetQuery::new(
-            keys.map(|k| Term::from_field_bytes(self.0, k.as_bytes())),
-        ))
+        if let Some(field) = self.field {
+            Box::new(TermSetQuery::new(keys.map(|k| {
+                // Our keys can be resource or field ids, match the corresponding tantivy field
+                let is_field = k.len() > 32;
+                let tantivy_field = if is_field { field } else { self.resource };
+                Term::from_field_bytes(tantivy_field, k.as_bytes())
+            })))
+        } else {
+            Box::new(TermSetQuery::new(
+                keys.map(|k| Term::from_field_bytes(self.resource, k.as_bytes())),
+            ))
+        }
     }
 }
 impl RelationDeletionQueryBuilder {
     fn new(schema: &RelationSchema) -> Self {
-        // todo()! Deletion of fields
-        RelationDeletionQueryBuilder(schema.resource_id)
+        RelationDeletionQueryBuilder {
+            resource: schema.resource_id,
+            field: schema.resource_field_id,
+        }
     }
 }
 

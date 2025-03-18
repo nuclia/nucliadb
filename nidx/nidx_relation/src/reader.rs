@@ -331,6 +331,8 @@ impl RelationsReaderService {
             let source = searcher.doc(doc_addr)?;
             let relation = io_maps::doc_to_relation(&self.schema, &source);
             response.relations.push(relation);
+            let new_relation = io_maps::doc_to_index_relation(&self.schema, &source);
+            response.new_relations.push(new_relation);
         }
 
         Ok(Some(response))

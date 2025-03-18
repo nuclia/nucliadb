@@ -525,7 +525,9 @@ class BrokerMessage(google.protobuf.message.Message):
     @property
     def origin(self) -> nucliadb_protos.resources_pb2.Origin: ...
     @property
-    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
+    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]:
+        """Can this be deleted? Does not seem to be in use"""
+
     @property
     def user_relations(self) -> nucliadb_protos.resources_pb2.Relations: ...
     @property

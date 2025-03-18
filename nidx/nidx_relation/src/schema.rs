@@ -18,9 +18,25 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use core::str;
+
 use tantivy::TantivyDocument;
 use tantivy::schema::{FAST, FacetOptions, Field, INDEXED, STORED, STRING, Schema as TantivySchema, TextOptions};
 use tantivy::schema::{TEXT, Value};
+use uuid::Uuid;
+
+pub fn encode_field_id(rid: Uuid, fid: &str) -> Vec<u8> {
+    let mut bytes = rid.as_bytes().to_vec();
+    bytes.extend_from_slice(fid.as_bytes());
+    bytes
+}
+
+pub fn decode_field_id(bytes: &[u8]) -> (Uuid, &str) {
+    (
+        Uuid::from_bytes(bytes[..16].try_into().unwrap()),
+        str::from_utf8(&bytes[16..]).unwrap(),
+    )
+}
 
 #[derive(Clone, Debug)]
 pub struct Schema {
@@ -56,7 +72,11 @@ impl Schema {
     pub fn new(version: u64) -> Self {
         let mut builder = TantivySchema::builder();
 
-        let resource_id = builder.add_text_field("resource_id", STRING | STORED);
+        let resource_id = if version == 1 {
+            builder.add_text_field("resource_id", STRING | STORED)
+        } else {
+            builder.add_bytes_field("resource_id", INDEXED)
+        };
 
         let value_options: TextOptions = if version == 1 { STORED.into() } else { TEXT | STORED };
 
@@ -84,7 +104,7 @@ impl Schema {
             resource_field_id = Some(builder.add_text_field("resource_field_id", STRING | STORED));
             encoded_source_id = Some(builder.add_u64_field("encoded_source_id", FAST));
             encoded_target_id = Some(builder.add_u64_field("encoded_target_id", FAST));
-            facets = Some(builder.add_facet_field("facets", FacetOptions::default()));
+            facets = Some(builder.add_facet_field("facets", STORED));
         }
 
         let schema = builder.build();
@@ -129,9 +149,18 @@ impl Schema {
     }
 
     pub fn resource_id(&self, doc: &TantivyDocument) -> String {
-        doc.get_first(self.resource_id)
-            .and_then(|i| i.as_str().map(String::from))
-            .expect("Documents must have a resource id")
+        if let Some(field_id) = self.resource_field_id {
+            let encoded = doc
+                .get_first(field_id)
+                .expect("Documents must have a resource_field id")
+                .as_bytes()
+                .unwrap();
+            decode_field_id(encoded).0.simple().to_string()
+        } else {
+            doc.get_first(self.resource_id)
+                .and_then(|i| i.as_str().map(String::from))
+                .expect("Documents must have a resource id")
+        }
     }
 
     pub fn source_value<'a>(&self, doc: &'a TantivyDocument) -> &'a str {
