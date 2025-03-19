@@ -427,11 +427,11 @@ impl<'a> GraphQueryParser<'a> {
 
         match expression {
             Expression::Value(Relation { value, relation_type }) => {
-                value.as_ref().map(|value| {
+                if let Some(value) = value {
                     if !value.is_empty() {
                         subqueries.push((Occur::Must, self.has_relation_label(value)));
                     }
-                });
+                };
 
                 relation_type.map(|relation_type| {
                     subqueries.push((Occur::Must, self.has_relation_type(relation_type)));
@@ -439,11 +439,11 @@ impl<'a> GraphQueryParser<'a> {
             }
 
             Expression::Not(Relation { value, relation_type }) => {
-                value.as_ref().map(|value| {
+                if let Some(value) = value {
                     if !value.is_empty() {
                         subqueries.push((Occur::MustNot, self.has_relation_label(value)));
                     }
-                });
+                };
 
                 relation_type.map(|relation_type| {
                     subqueries.push((Occur::MustNot, self.has_relation_type(relation_type)));
