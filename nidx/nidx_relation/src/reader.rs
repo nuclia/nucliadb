@@ -112,22 +112,6 @@ impl RelationsReaderService {
         })
     }
 
-    pub fn inner_graph_search(&self, query: GraphQuery) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
-        let parser = GraphQueryParser::new(&self.schema);
-        let index_query: Box<dyn Query> = parser.parse(query);
-
-        // TODO: parametrize this magic constant
-        let collector = TopDocs::with_limit(1000);
-
-        let searcher = self.reader.searcher();
-        let matching_docs = searcher.search(&index_query, &collector)?;
-
-        self.build_graph_response(
-            &searcher,
-            matching_docs.into_iter().map(|(_score, doc_address)| doc_address),
-        )
-    }
-
     pub fn graph_search(
         &self,
         request: &GraphSearchRequest,
