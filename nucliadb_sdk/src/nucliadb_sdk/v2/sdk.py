@@ -1025,7 +1025,7 @@ class NucliaDB(_NucliaDBBase):
 
     # Vectorsets
     add_vector_set = _request_sync_builder("add_vector_set", type(None), CreatedVectorSet)
-    delete_vector_set = _request_sync_builder("delete_vector_set", type(None), CreatedVectorSet)
+    delete_vector_set = _request_sync_builder("delete_vector_set", type(None), type(None))
     list_vector_sets = _request_sync_builder("list_vector_sets", type(None), VectorSetList)
 
     # Predict proxy endpoints
@@ -1211,7 +1211,7 @@ class NucliaDBAsync(_NucliaDBBase):
 
     # Vectorsets
     add_vector_set = _request_async_builder("add_vector_set", type(None), CreatedVectorSet)
-    delete_vector_set = _request_async_builder("delete_vector_set", type(None), CreatedVectorSet)
+    delete_vector_set = _request_async_builder("delete_vector_set", type(None), type(None))
     list_vector_sets = _request_async_builder("list_vector_sets", type(None), VectorSetList)
 
     # Predict proxy endpoints
