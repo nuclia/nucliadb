@@ -24,6 +24,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
 use common::services::NidxFixture;
+use nidx_protos::filter_expression::{Expr, ResourceFilter};
 use nidx_protos::graph_query::node::MatchKind;
 use nidx_protos::graph_query::path_query;
 use nidx_protos::graph_search_request::QueryKind;
@@ -33,12 +34,14 @@ use nidx_protos::relation_node::NodeType;
 use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::resource::ResourceStatus;
 use nidx_protos::{
-    EntitiesSubgraphRequest, GraphQuery, GraphSearchRequest, IndexMetadata, IndexRelation, IndexRelations,
-    NewShardRequest, Relation, RelationMetadata, RelationNode, RelationNodeFilter, RelationPrefixSearchRequest,
-    RelationSearchRequest, RelationSearchResponse, Resource, ResourceId, graph_query,
+    EntitiesSubgraphRequest, FilterExpression, GraphQuery, GraphSearchRequest, IndexMetadata, IndexRelation,
+    IndexRelations, NewShardRequest, Relation, RelationMetadata, RelationNode, RelationNodeFilter,
+    RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, Resource, ResourceId, TextInformation,
+    graph_query,
 };
 use nidx_protos::{SearchRequest, VectorIndexConfig};
 use nidx_tests::graph::friendly_parse;
+use nidx_tests::people_and_places;
 use sqlx::PgPool;
 use tonic::Request;
 use uuid::Uuid;
@@ -382,7 +385,7 @@ async fn setup_knowledge_graph(fixture: &mut NidxFixture) -> anyhow::Result<Stri
                 shard_id: shard_id.clone(),
                 resource: Some(ResourceId {
                     shard_id: shard_id.clone(),
-                    uuid: rid.to_string(),
+                    uuid: rid.simple().to_string(),
                 }),
                 status: ResourceStatus::Processed as i32,
                 field_relations: HashMap::from([(
@@ -395,7 +398,13 @@ async fn setup_knowledge_graph(fixture: &mut NidxFixture) -> anyhow::Result<Stri
                     created: Some(timestamp),
                     modified: Some(timestamp),
                 }),
-                texts: HashMap::new(),
+                texts: HashMap::from([(
+                    "a/title".to_string(),
+                    TextInformation {
+                        text: "Knowledge graph".to_string(),
+                        ..Default::default()
+                    },
+                )]),
                 ..Default::default()
             },
         )
@@ -1039,6 +1048,73 @@ async fn test_graph_search__undirected_path_query(pool: PgPool) -> anyhow::Resul
     let relations = friendly_parse(&response);
     assert_eq!(relations.len(), 1);
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn test_graph_search_prefilter(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
+    let shard_id = setup_knowledge_graph(&mut fixture).await?;
+    let other_relations = people_and_places(shard_id.clone());
+    let pap_id = other_relations.resource.as_ref().unwrap().uuid.clone();
+    fixture.index_resource(&shard_id, other_relations).await?;
+    fixture.wait_sync().await;
+
+    // Search both resources
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery::default()),
+            }),
+            top_k: 100,
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    assert_eq!(response.relations.len(), 30);
+
+    // Search people_and_places
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery::default()),
+            }),
+            field_filter: Some(FilterExpression {
+                expr: Some(Expr::Resource(ResourceFilter {
+                    resource_id: pap_id.clone(),
+                })),
+            }),
+            top_k: 100,
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    assert_eq!(response.relations.len(), 13);
+
+    // Search not people_and_places
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery::default()),
+            }),
+            field_filter: Some(FilterExpression {
+                expr: Some(Expr::BoolNot(Box::new(FilterExpression {
+                    expr: Some(Expr::Resource(ResourceFilter { resource_id: pap_id })),
+                }))),
+            }),
+            top_k: 100,
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    assert_eq!(response.relations.len(), 17);
 
     Ok(())
 }
