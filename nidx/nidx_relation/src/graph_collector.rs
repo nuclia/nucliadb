@@ -41,14 +41,11 @@ pub enum NodeSelector {
     DestinationNodes,
 }
 
+// Node collector for schema v1
+
 pub struct TopUniqueNodeCollector {
     limit: usize,
     selector: NodeSelector,
-    schema: crate::schema::Schema,
-}
-
-pub struct TopUniqueRelationCollector {
-    limit: usize,
     schema: crate::schema::Schema,
 }
 
@@ -58,6 +55,13 @@ pub struct TopUniqueNodeSegmentCollector {
     unique: HashSet<NodeId>,
     schema: crate::schema::Schema,
     store_reader: StoreReader,
+}
+
+// Relations collector
+
+pub struct TopUniqueRelationCollector {
+    limit: usize,
+    schema: crate::schema::Schema,
 }
 
 pub struct TopUniqueRelationSegmentCollector {
@@ -74,12 +78,6 @@ impl TopUniqueNodeCollector {
             selector,
             schema,
         }
-    }
-}
-
-impl TopUniqueRelationCollector {
-    pub fn new(schema: crate::schema::Schema, limit: usize) -> Self {
-        Self { limit, schema }
     }
 }
 
@@ -114,43 +112,6 @@ impl Collector for TopUniqueNodeCollector {
             fruit = fruits.next();
         }
         Ok(unique)
-    }
-}
-
-impl Collector for TopUniqueRelationCollector {
-    type Fruit = Vec<TantivyDocument>;
-    type Child = TopUniqueRelationSegmentCollector;
-
-    fn requires_scoring(&self) -> bool {
-        false
-    }
-
-    fn for_segment(&self, _segment_local_id: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
-        Ok(TopUniqueRelationSegmentCollector {
-            limit: self.limit,
-            unique: HashMap::new(),
-            store_reader: segment.get_store_reader(STORE_READER_CACHED_BLOCKS)?,
-            schema: self.schema.clone(),
-        })
-    }
-
-    fn merge_fruits(
-        &self,
-        segment_fruits: Vec<<Self::Child as SegmentCollector>::Fruit>,
-    ) -> tantivy::Result<Self::Fruit> {
-        let mut unique = HashSet::new();
-        let mut docs = Vec::new();
-        let mut fruits = segment_fruits.into_iter().flatten();
-        let mut fruit = fruits.next();
-
-        while fruit.is_some() && unique.len() < self.limit {
-            let (relation_id, doc) = fruit.unwrap();
-            if unique.insert(relation_id) {
-                docs.push(doc);
-            }
-            fruit = fruits.next();
-        }
-        Ok(docs)
     }
 }
 
@@ -191,6 +152,49 @@ impl SegmentCollector for TopUniqueNodeSegmentCollector {
 
     fn harvest(self) -> Self::Fruit {
         self.unique
+    }
+}
+
+impl TopUniqueRelationCollector {
+    pub fn new(schema: crate::schema::Schema, limit: usize) -> Self {
+        Self { limit, schema }
+    }
+}
+
+impl Collector for TopUniqueRelationCollector {
+    type Fruit = Vec<TantivyDocument>;
+    type Child = TopUniqueRelationSegmentCollector;
+
+    fn requires_scoring(&self) -> bool {
+        false
+    }
+
+    fn for_segment(&self, _segment_local_id: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
+        Ok(TopUniqueRelationSegmentCollector {
+            limit: self.limit,
+            unique: HashMap::new(),
+            store_reader: segment.get_store_reader(STORE_READER_CACHED_BLOCKS)?,
+            schema: self.schema.clone(),
+        })
+    }
+
+    fn merge_fruits(
+        &self,
+        segment_fruits: Vec<<Self::Child as SegmentCollector>::Fruit>,
+    ) -> tantivy::Result<Self::Fruit> {
+        let mut unique = HashSet::new();
+        let mut docs = Vec::new();
+        let mut fruits = segment_fruits.into_iter().flatten();
+        let mut fruit = fruits.next();
+
+        while fruit.is_some() && unique.len() < self.limit {
+            let (relation_id, doc) = fruit.unwrap();
+            if unique.insert(relation_id) {
+                docs.push(doc);
+            }
+            fruit = fruits.next();
+        }
+        Ok(docs)
     }
 }
 
