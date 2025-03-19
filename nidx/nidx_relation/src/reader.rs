@@ -34,11 +34,13 @@ use tantivy::schema::Field;
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
 use uuid::Uuid;
 
-use crate::graph_collector::{NodeSelector, TopUniqueNodeCollector, TopUniqueRelationCollector};
+use crate::graph_collector::{
+    NodeSelector, TopUniqueNodeCollector, TopUniqueNodeCollector2, TopUniqueRelationCollector,
+};
 use crate::graph_query_parser::{
     BoolGraphQuery, BoolNodeQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
 };
-use crate::schema::{Schema, encode_field_id};
+use crate::schema::{Schema, encode_field_id, decode_node};
 use crate::{RelationConfig, io_maps};
 
 const FUZZY_DISTANCE: u8 = 1;
@@ -168,31 +170,58 @@ impl RelationsReaderService {
 
         let mut unique_nodes = HashSet::new();
 
-        let collector = TopUniqueNodeCollector::new(self.schema.clone(), NodeSelector::SourceNodes, top_k);
         let searcher = self.reader.searcher();
-        let mut source_nodes = searcher.search(&source_query, &collector)?;
-        unique_nodes.extend(source_nodes.drain());
 
-        let collector = TopUniqueNodeCollector::new(self.schema.clone(), NodeSelector::DestinationNodes, top_k);
-        let searcher = self.reader.searcher();
-        let mut destination_nodes = searcher.search(&destination_query, &collector)?;
-        unique_nodes.extend(destination_nodes.drain());
+        if self.schema.version == 1 {
+            let collector = TopUniqueNodeCollector::new(self.schema.clone(), NodeSelector::SourceNodes, top_k);
+            let mut source_nodes = searcher.search(&source_query, &collector)?;
+            unique_nodes.extend(source_nodes.drain());
 
-        let nodes = unique_nodes
-            .into_iter()
-            .map(|(value, node_type, node_subtype)| RelationNode {
-                value,
-                ntype: node_type,
-                subtype: node_subtype,
-            })
-            .take(top_k)
-            .collect();
+            let collector = TopUniqueNodeCollector::new(self.schema.clone(), NodeSelector::DestinationNodes, top_k);
+            let mut destination_nodes = searcher.search(&destination_query, &collector)?;
+            unique_nodes.extend(destination_nodes.drain());
 
-        let response = nidx_protos::GraphSearchResponse {
-            nodes,
-            ..Default::default()
-        };
-        Ok(response)
+            let nodes = unique_nodes
+                .into_iter()
+                .map(|(value, node_type, node_subtype)| RelationNode {
+                    value,
+                    ntype: node_type,
+                    subtype: node_subtype,
+                })
+                .take(top_k)
+                .collect();
+
+            let response = nidx_protos::GraphSearchResponse {
+                nodes,
+                ..Default::default()
+            };
+            Ok(response)
+        } else {
+            let collector = TopUniqueNodeCollector2::new(NodeSelector::SourceNodes, top_k);
+            let mut source_nodes = searcher.search(&source_query, &collector)?;
+            unique_nodes.extend(source_nodes.drain());
+
+            let collector = TopUniqueNodeCollector2::new(NodeSelector::DestinationNodes, top_k);
+            let mut destination_nodes = searcher.search(&destination_query, &collector)?;
+            unique_nodes.extend(destination_nodes.drain());
+
+            let nodes = unique_nodes
+                .into_iter()
+                .map(|encoded_node| decode_node(&encoded_node))
+                .map(|(value, node_type, node_subtype)| RelationNode {
+                    value,
+                    ntype: io_maps::u64_to_node_type(node_type),
+                    subtype: node_subtype,
+                })
+                .take(top_k)
+                .collect();
+
+            let response = nidx_protos::GraphSearchResponse {
+                nodes,
+                ..Default::default()
+            };
+            Ok(response)
+        }
     }
 
     fn relations_graph_search(

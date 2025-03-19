@@ -23,6 +23,7 @@ use std::collections::{HashMap, HashSet};
 use tantivy::{
     DocId, Score, SegmentOrdinal, SegmentReader, TantivyDocument,
     collector::{Collector, SegmentCollector},
+    columnar::Column,
     store::StoreReader,
 };
 use tracing::warn;
@@ -55,6 +56,21 @@ pub struct TopUniqueNodeSegmentCollector {
     unique: HashSet<NodeId>,
     schema: crate::schema::Schema,
     store_reader: StoreReader,
+}
+
+// Node collector for schema v2
+//
+// We can now use fast fields to uniquely identify nodes.
+
+pub struct TopUniqueNodeCollector2 {
+    limit: usize,
+    selector: NodeSelector,
+}
+
+pub struct TopUniqueNodeSegmentCollector2 {
+    limit: usize,
+    unique: HashSet<Vec<u64>>,
+    encoded_node_reader: Column<u64>,
 }
 
 // Relations collector
@@ -148,6 +164,65 @@ impl SegmentCollector for TopUniqueNodeSegmentCollector {
             }
         };
         self.unique.insert(node);
+    }
+
+    fn harvest(self) -> Self::Fruit {
+        self.unique
+    }
+}
+
+impl TopUniqueNodeCollector2 {
+    pub fn new(selector: NodeSelector, limit: usize) -> Self {
+        Self { limit, selector }
+    }
+}
+
+impl Collector for TopUniqueNodeCollector2 {
+    type Fruit = HashSet<Vec<u64>>;
+    type Child = TopUniqueNodeSegmentCollector2;
+
+    fn requires_scoring(&self) -> bool {
+        false
+    }
+
+    fn for_segment(&self, _segment_local_id: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
+        let fast_field_reader = match self.selector {
+            NodeSelector::SourceNodes => segment.fast_fields().u64("encoded_source_id")?,
+            NodeSelector::DestinationNodes => segment.fast_fields().u64("encoded_target_id")?,
+        };
+        Ok(TopUniqueNodeSegmentCollector2 {
+            limit: self.limit,
+            unique: HashSet::new(),
+            encoded_node_reader: fast_field_reader,
+        })
+    }
+
+    fn merge_fruits(
+        &self,
+        segment_fruits: Vec<<Self::Child as SegmentCollector>::Fruit>,
+    ) -> tantivy::Result<Self::Fruit> {
+        let mut unique = HashSet::new();
+        let mut fruits = segment_fruits.into_iter().flatten();
+        let mut fruit = fruits.next();
+
+        while fruit.is_some() && unique.len() < self.limit {
+            unique.insert(fruit.unwrap());
+            fruit = fruits.next();
+        }
+        Ok(unique)
+    }
+}
+
+impl SegmentCollector for TopUniqueNodeSegmentCollector2 {
+    type Fruit = HashSet<Vec<u64>>;
+
+    fn collect(&mut self, doc_id: DocId, _score: Score) {
+        // we already have all unique results we need
+        if self.unique.len() >= self.limit {
+            return;
+        }
+        let encoded_node = self.encoded_node_reader.values_for_doc(doc_id).collect::<Vec<u64>>();
+        self.unique.insert(encoded_node);
     }
 
     fn harvest(self) -> Self::Fruit {
