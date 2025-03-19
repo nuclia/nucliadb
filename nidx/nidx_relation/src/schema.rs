@@ -228,6 +228,15 @@ impl Schema {
 ///
 /// Node value and subtype are encoded by converting them to bytes, batch them
 /// in sets of 8 and store them as an array of u64.
+//
+// TODO: this format could be more compact. Improve it before we start using it!
+// We could instead do:
+// - value and subtype lengths (u32, u32)
+// - node_type
+// - encoded value and subtype
+//
+// This would reduce 1 u64 per node (as size is in one) and remove the need for padding in both
+// strings, potentially reducing another u64
 pub fn encode_node(node_value: &str, node_type: u64, node_subtype: &str) -> Vec<u64> {
     // precompute final encoded size to avoid any extra allocation
     let value_size = node_value.len().div_ceil(8) as u64;
