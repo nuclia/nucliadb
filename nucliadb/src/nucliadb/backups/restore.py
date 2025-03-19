@@ -282,7 +282,11 @@ async def restore_search_configurations(context: ApplicationContext, kbid: str, 
         bucket=settings.backups_bucket,
         key=StorageKeys.SEARCH_CONFIGURATIONS.format(backup_id=backup_id),
     )
-    as_dict: dict[str, dict[str, Any]] = json.loads(raw.getvalue())
+    value = raw.getvalue()
+    if not value:
+        # No search configurations to restore
+        return
+    as_dict: dict[str, Any] = json.loads(value)
     search_configurations: dict[str, SearchConfiguration] = {}
     for name, data in as_dict.items():
         config: SearchConfiguration = TypeAdapter(SearchConfiguration).validate_python(data)
