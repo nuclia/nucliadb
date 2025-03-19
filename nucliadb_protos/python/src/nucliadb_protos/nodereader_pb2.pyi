@@ -868,12 +868,15 @@ class GraphSearchRequest(google.protobuf.message.Message):
     QUERY_FIELD_NUMBER: builtins.int
     KIND_FIELD_NUMBER: builtins.int
     TOP_K_FIELD_NUMBER: builtins.int
+    SECURITY_FIELD_NUMBER: builtins.int
     FIELD_FILTER_FIELD_NUMBER: builtins.int
     shard: builtins.str
     kind: global___GraphSearchRequest.QueryKind.ValueType
     top_k: builtins.int
     @property
     def query(self) -> global___GraphQuery: ...
+    @property
+    def security(self) -> nucliadb_protos.utils_pb2.Security: ...
     @property
     def field_filter(self) -> global___FilterExpression: ...
     def __init__(
@@ -883,11 +886,15 @@ class GraphSearchRequest(google.protobuf.message.Message):
         query: global___GraphQuery | None = ...,
         kind: global___GraphSearchRequest.QueryKind.ValueType = ...,
         top_k: builtins.int = ...,
+        security: nucliadb_protos.utils_pb2.Security | None = ...,
         field_filter: global___FilterExpression | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "field_filter", b"field_filter", "query", b"query"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "field_filter", b"field_filter", "kind", b"kind", "query", b"query", "shard", b"shard", "top_k", b"top_k"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "_security", b"_security", "field_filter", b"field_filter", "query", b"query", "security", b"security"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "_security", b"_security", "field_filter", b"field_filter", "kind", b"kind", "query", b"query", "security", b"security", "shard", b"shard", "top_k", b"top_k"]) -> None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_field_filter", b"_field_filter"]) -> typing.Literal["field_filter"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_security", b"_security"]) -> typing.Literal["security"] | None: ...
 
 global___GraphSearchRequest = GraphSearchRequest
 
