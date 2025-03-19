@@ -216,12 +216,102 @@ impl Schema {
     }
 }
 
+/// Encode a graph node as a series of u64. This value is stored in
+/// `encoded_source_id` and `encoded_target_id` fast fields.
+///
+/// We use the following format:
+/// - node value length (u64, 8 bytes)
+/// - encoded node value
+/// - node type (u64, 8 bytes)
+/// - node subtype length (u64, 8 bytes)
+/// - encoded node subtype
+///
+/// Node value and subtype are encoded by converting them to bytes, batch them
+/// in sets of 8 and store them as an array of u64.
+pub fn encode_node(node_value: &str, node_type: u64, node_subtype: &str) -> Vec<u64> {
+    // precompute final encoded size to avoid any extra allocation
+    let value_size = node_value.len().div_ceil(8) as u64;
+    let subtype_size = node_subtype.len().div_ceil(8) as u64;
+    let encoded_size = (1 + value_size + 1 + 1 + subtype_size) as usize;
+    let mut out = Vec::with_capacity(encoded_size);
+
+    out.push(value_size);
+
+    let mut slice = node_value.as_bytes();
+    while !slice.is_empty() {
+        let take = std::cmp::min(8, slice.len());
+        let mut data = [0; 8];
+        data[..take].copy_from_slice(&slice[..take]);
+        slice = &slice[take..];
+        out.push(u64::from_le_bytes(data));
+    }
+
+    out.push(node_type);
+
+    out.push(subtype_size);
+
+    let mut slice = node_subtype.as_bytes();
+    while !slice.is_empty() {
+        let take = std::cmp::min(8, slice.len());
+        let mut data = [0; 8];
+        data[..take].copy_from_slice(&slice[..take]);
+        slice = &slice[take..];
+        out.push(u64::from_le_bytes(data));
+    }
+
+    debug_assert_eq!(
+        out.capacity(),
+        encoded_size,
+        "encoded size estimation for node id is wrong!"
+    );
+
+    out
+}
+
+/// Decodes a node from a series of u64. This is retrieved from
+/// `encoded_source_id` and `encoded_target_id` fast fields and used for value
+/// deduplication in the graph Collector
+pub fn decode_node(data: &[u64]) -> (String, u64, String) {
+    let value_size = data[0] as usize;
+    let value_slice = &data[1..(1 + value_size)];
+    let node_type = data[1 + value_size];
+    let subtype_size = data[1 + value_size + 1] as usize;
+    let subtype_slice = &data[(1 + value_size + 2)..];
+
+    let mut value_encoded = Vec::with_capacity(value_size);
+    for chunk in value_slice {
+        let chunk = chunk.to_le_bytes();
+        let mut i = 7;
+        while chunk[i] == 0 {
+            i -= 1;
+        }
+        value_encoded.extend_from_slice(&chunk[0..=i]);
+    }
+    let value = String::from_utf8(value_encoded).unwrap();
+
+    let mut subtype_encoded = Vec::with_capacity(subtype_size);
+    for chunk in subtype_slice {
+        let chunk = chunk.to_le_bytes();
+        let mut i = 7;
+        while chunk[i] == 0 {
+            i -= 1;
+        }
+        subtype_encoded.extend_from_slice(&chunk[0..=i]);
+    }
+    let subtype = String::from_utf8(subtype_encoded).unwrap();
+
+    (value, node_type, subtype)
+}
+
 #[cfg(test)]
 mod tests {
+    use nidx_protos::relation_node::NodeType;
     use tantivy::collector::DocSetCollector;
     use tantivy::query::TermQuery;
     use tantivy::schema::IndexRecordOption;
     use tantivy::{Index, IndexWriter, Term, doc};
+
+    use crate::io_maps;
 
     use super::*;
 
@@ -256,5 +346,32 @@ mod tests {
         assert_eq!(node_value, source_value);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_encode_decode_graph_nodes() {
+        // test different string lengths combinations to ensure encoding works
+        // crossing 8-byte block length
+        let node_value = "Anna";
+        let node_type = NodeType::Entity;
+        let node_subtype = "PERSON";
+
+        for i in 0..7 {
+            for j in 0..7 {
+                let value_suffix = "x".repeat(i);
+                let subtype_suffix = "x".repeat(j);
+
+                let node_value = format!("{node_value}{value_suffix}");
+                let node_type = io_maps::node_type_to_u64(node_type);
+                let node_subtype = format!("{node_subtype}{subtype_suffix}");
+
+                let encoded = encode_node(&node_value, node_type, &node_subtype);
+                let decoded = decode_node(&encoded);
+
+                assert_eq!(node_value, decoded.0);
+                assert_eq!(node_type, decoded.1);
+                assert_eq!(node_subtype, decoded.2);
+            }
+        }
     }
 }
