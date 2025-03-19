@@ -1002,7 +1002,10 @@ async def get_file_page_positions(field: File) -> FilePagePositions:
 
 def delete_basic_computedmetadata_classifications(basic: PBBasic, deleted_fields: list[FieldID]) -> bool:
     """
-    Clean basic.computedmetadata classifications for the deleted fields.
+    We keep a copy of field classifications computed by the processing engine at the basic object
+    so that users can easily access them without having to load the field metadata from the storage.
+
+    This funcion removes the field classifications for the fields that have been deleted.
     Returns whether the basic was modified.
     """
     if len(deleted_fields) == 0:
@@ -1024,7 +1027,10 @@ def update_basic_computedmetadata_classifications(
     basic: PBBasic, fcmw: FieldComputedMetadataWrapper
 ) -> bool:
     """
-    Update basic.computedmetadata with the new field classifications
+    We keep a copy of field classifications computed by the processing engine at the basic object
+    so that users can easily access them without having to load the field metadata from the storage.
+
+    This function updates the basic object with the new field computed metadata.
     Returns whether the basic was modified.
     """
     some_deleted = delete_basic_computedmetadata_classifications(basic, [fcmw.field])
