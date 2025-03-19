@@ -11,6 +11,7 @@ spec:
   selector:
     matchLabels:
       app: ingest
-      release: "{{ .Release.Name }}"
-      heritage: "{{ .Release.Service }}"
+      app.kubernetes.io/name: ingest
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/managed-by: {{ .Release.Service }}
   minAvailable: 1  # simple for now, we can add more complex rules later
