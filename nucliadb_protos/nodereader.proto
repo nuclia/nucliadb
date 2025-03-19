@@ -244,6 +244,9 @@ message GraphSearchRequest {
     QueryKind kind = 3;
 
     uint32 top_k = 4;
+
+    optional utils.Security security = 5;
+    optional FilterExpression field_filter = 6;
 }
 
 message GraphSearchResponse {

@@ -23,7 +23,8 @@ use std::sync::Arc;
 use nidx_paragraph::ParagraphSearcher;
 use nidx_protos::{GraphSearchRequest, GraphSearchResponse, SearchRequest, SearchResponse};
 use nidx_relation::RelationSearcher;
-use nidx_text::TextSearcher;
+use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
+use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::VectorSearcher;
 use tracing::{Span, instrument};
 
@@ -187,17 +188,42 @@ pub async fn graph_search(
         return Err(NidxError::NotFound);
     };
 
-    let Some(index_id) = indexes.relation_index() else {
+    let Some(relation_index_id) = indexes.relation_index() else {
         return Err(NidxError::NotFound);
     };
 
-    let relation_searcher = index_cache.get(&index_id).await?;
+    // If we got prefilter params, apply prefilter
+    let prefilter = if graph_request.security.is_some() || graph_request.field_filter.is_some() {
+        let prefilter_request = PreFilterRequest {
+            security: graph_request.security.clone(),
+            filter_expression: graph_request.field_filter.clone(),
+        };
+        let Some(text_index_id) = indexes.text_index() else {
+            return Err(NidxError::NotFound);
+        };
+        let text_searcher = index_cache.get(&text_index_id).await?;
+        let current = Span::current();
+        tokio::task::spawn_blocking(move || {
+            current.in_scope(|| {
+                let searcher: &TextSearcher = text_searcher.as_ref().into();
+                searcher.prefilter(&prefilter_request)
+            })
+        })
+        .await??
+    } else {
+        PrefilterResult::All
+    };
 
+    if matches!(prefilter, PrefilterResult::None) {
+        return Ok(GraphSearchResponse::default());
+    }
+
+    let relation_searcher = index_cache.get(&relation_index_id).await?;
     let current = Span::current();
     let results = tokio::task::spawn_blocking(move || {
         current.in_scope(|| {
             let searcher: &RelationSearcher = relation_searcher.as_ref().into();
-            searcher.graph_search(&graph_request)
+            searcher.graph_search(&graph_request, prefilter)
         })
     })
     .await??;

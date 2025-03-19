@@ -224,7 +224,6 @@ fn test_graph_relation_query() -> anyhow::Result<()> {
         .inner_graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Value(Relation {
             value: Some("FAKE".to_string()),
             relation_type: Some(RelationType::Synonym),
-            ..Default::default()
         }))))?;
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 0);

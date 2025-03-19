@@ -868,11 +868,14 @@ class GraphSearchRequest(google.protobuf.message.Message):
     QUERY_FIELD_NUMBER: builtins.int
     KIND_FIELD_NUMBER: builtins.int
     TOP_K_FIELD_NUMBER: builtins.int
+    FIELD_FILTER_FIELD_NUMBER: builtins.int
     shard: builtins.str
     kind: global___GraphSearchRequest.QueryKind.ValueType
     top_k: builtins.int
     @property
     def query(self) -> global___GraphQuery: ...
+    @property
+    def field_filter(self) -> global___FilterExpression: ...
     def __init__(
         self,
         *,
@@ -880,9 +883,11 @@ class GraphSearchRequest(google.protobuf.message.Message):
         query: global___GraphQuery | None = ...,
         kind: global___GraphSearchRequest.QueryKind.ValueType = ...,
         top_k: builtins.int = ...,
+        field_filter: global___FilterExpression | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["query", b"query"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["kind", b"kind", "query", b"query", "shard", b"shard", "top_k", b"top_k"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "field_filter", b"field_filter", "query", b"query"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "field_filter", b"field_filter", "kind", b"kind", "query", b"query", "shard", b"shard", "top_k", b"top_k"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_field_filter", b"_field_filter"]) -> typing.Literal["field_filter"] | None: ...
 
 global___GraphSearchRequest = GraphSearchRequest
 
