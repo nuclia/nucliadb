@@ -233,7 +233,7 @@ class Resource:
         # Some basic fields are computed off field metadata.
         # This means we need to recompute upon field deletions.
         if deleted_fields is not None and len(deleted_fields) > 0:
-            remove_field_classifications(self.basic, deleted_fields=deleted_fields)
+            delete_basic_computedmetadata_classifications(self.basic, deleted_fields=deleted_fields)
 
         await datamanagers.resources.set_basic(
             self.txn, kbid=self.kb.kbid, rid=self.uuid, basic=self.basic
@@ -848,7 +848,7 @@ class Resource:
 
         maybe_update_basic_thumbnail(self.basic, field_metadata.metadata.metadata.thumbnail)
 
-        add_field_classifications(self.basic, field_metadata)
+        update_basic_computedmetadata_classifications(self.basic, field_metadata)
         self.modified = True
 
     async def _apply_extracted_vectors(
@@ -1000,37 +1000,51 @@ async def get_file_page_positions(field: File) -> FilePagePositions:
     return positions
 
 
-def remove_field_classifications(basic: PBBasic, deleted_fields: list[FieldID]):
+def delete_basic_computedmetadata_classifications(basic: PBBasic, deleted_fields: list[FieldID]) -> bool:
     """
-    Clean classifications of fields that have been deleted
+    Clean basic.computedmetadata classifications for the deleted fields.
+    Returns whether the basic was modified.
     """
-    field_classifications = [
+    if len(deleted_fields) == 0:
+        # Nothing to delete
+        return False
+    new_field_classifications = [
         fc for fc in basic.computedmetadata.field_classifications if fc.field not in deleted_fields
     ]
-    basic.computedmetadata.ClearField("field_classifications")
-    basic.computedmetadata.field_classifications.extend(field_classifications)
-
-
-def add_field_classifications(basic: PBBasic, fcmw: FieldComputedMetadataWrapper) -> bool:
-    """
-    Returns whether some new field classifications were added
-    """
-    if len(fcmw.metadata.metadata.classifications) == 0 and all(
-        len(split.classifications) == 0 for split in fcmw.metadata.split_metadata.values()
-    ):
+    if len(new_field_classifications) == len(basic.computedmetadata.field_classifications):
+        # No changes
         return False
 
-    remove_field_classifications(basic, [fcmw.field])
+    basic.computedmetadata.ClearField("field_classifications")
+    basic.computedmetadata.field_classifications.extend(new_field_classifications)
+    return True
+
+
+def update_basic_computedmetadata_classifications(
+    basic: PBBasic, fcmw: FieldComputedMetadataWrapper
+) -> bool:
+    """
+    Update basic.computedmetadata with the new field classifications
+    Returns whether the basic was modified.
+    """
+    some_deleted = delete_basic_computedmetadata_classifications(basic, [fcmw.field])
+
     fcfs = FieldClassifications()
     fcfs.field.CopyFrom(fcmw.field)
-    fcfs.classifications.extend(fcmw.metadata.metadata.classifications)
+
+    some_added = False
+    if len(fcmw.metadata.metadata.classifications) > 0:
+        some_added = True
+        fcfs.classifications.extend(fcmw.metadata.metadata.classifications)
 
     for split_id, split in fcmw.metadata.split_metadata.items():
         if split_id not in fcmw.metadata.deleted_splits:
-            fcfs.classifications.extend(split.classifications)
-
-    basic.computedmetadata.field_classifications.append(fcfs)
-    return True
+            if len(split.classifications) > 0:
+                some_added = True
+                fcfs.classifications.extend(split.classifications)
+    if some_added:
+        basic.computedmetadata.field_classifications.append(fcfs)
+    return some_added or some_deleted
 
 
 def maybe_update_basic_summary(basic: PBBasic, summary_text: str) -> bool:
