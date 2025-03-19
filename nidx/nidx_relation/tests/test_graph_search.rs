@@ -29,12 +29,21 @@ use nidx_protos::relation_node::NodeType;
 use nidx_protos::{GraphQuery, GraphSearchRequest, GraphSearchResponse, IndexRelations, Resource, ResourceId};
 use nidx_relation::{RelationConfig, RelationIndexer, RelationSearcher};
 use nidx_tests::graph::friendly_parse;
-use nidx_types::prefilter::PrefilterResult;
+use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tempfile::TempDir;
 
 use common::TestOpener;
+use uuid::Uuid;
 
 fn search(reader: &RelationSearcher, query: Query) -> anyhow::Result<GraphSearchResponse> {
+    search_with_prefilter(reader, query, PrefilterResult::All)
+}
+
+fn search_with_prefilter(
+    reader: &RelationSearcher,
+    query: Query,
+    prefilter: PrefilterResult,
+) -> anyhow::Result<GraphSearchResponse> {
     reader.graph_search(
         &GraphSearchRequest {
             query: Some(GraphQuery {
@@ -43,7 +52,7 @@ fn search(reader: &RelationSearcher, query: Query) -> anyhow::Result<GraphSearch
             top_k: 100,
             ..Default::default()
         },
-        PrefilterResult::All,
+        prefilter,
     )
 }
 
@@ -507,6 +516,55 @@ fn test_graph_response() -> anyhow::Result<()> {
     assert_eq!(result.graph.len(), 4);
     assert_eq!(result.nodes.len(), 8); // this could be 5 with dedup
     assert_eq!(result.relations.len(), 4); // this could be 2 with dedup
+
+    Ok(())
+}
+
+#[test]
+fn test_prefilter() -> anyhow::Result<()> {
+    // Basic prefilter tests, other tests are done at upper levels with access to the text index
+    let reader = create_reader()?;
+
+    // All
+    let result = search_with_prefilter(&reader, Query::Path(Path::default()), PrefilterResult::All)?;
+    assert_eq!(result.graph.len(), 17);
+
+    // None
+    let result = search_with_prefilter(&reader, Query::Path(Path::default()), PrefilterResult::None)?;
+    assert_eq!(result.graph.len(), 0);
+
+    // Some excludes our result
+    let result = search_with_prefilter(
+        &reader,
+        Query::Path(Path::default()),
+        PrefilterResult::Some(vec![FieldId {
+            resource_id: Uuid::nil(),
+            field_id: "f/fake".to_string(),
+        }]),
+    )?;
+    assert_eq!(result.graph.len(), 0);
+
+    // Some includes our result
+    let result = search_with_prefilter(
+        &reader,
+        Query::Path(Path::default()),
+        PrefilterResult::Some(vec![FieldId {
+            resource_id: Uuid::parse_str("0123456789abcdef0123456789abcdef").unwrap(),
+            field_id: "a/metadata".to_string(),
+        }]),
+    )?;
+    assert_eq!(result.graph.len(), 17);
+
+    // Some includes a/metadata
+    let result = search_with_prefilter(
+        &reader,
+        Query::Path(Path::default()),
+        PrefilterResult::Some(vec![FieldId {
+            resource_id: Uuid::parse_str("0123456789abcdef0123456789abcdef").unwrap(),
+            field_id: "f/fake".to_string(),
+        }]),
+    )?;
+    assert_eq!(result.graph.len(), 17);
 
     Ok(())
 }
