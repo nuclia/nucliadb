@@ -17,16 +17,16 @@ will walk you through various NucliaDB features.
 
 ## Setup nucliadb for developing
 
-We currently use `pdm` to manage all our dependencies, please, make sure you
+We currently use `uv` to manage all our dependencies, please, make sure you
 have it installed before starting.
 
-`pdm` will automatically create a new virtual environment for you (it defaults
-to .venv/). If you want a different virtual environment setup, refer to pdm's
+`uv` will automatically create a new virtual environment for you (it defaults
+to .venv/). If you want a different virtual environment setup, refer to uv's
 documentation.
 
 Let's install everything with:
 ``` shell
-pdm sync -d --clean
+uv sync
 ```
 
 Activate the virtual environment and have fun! You can test the installation by
