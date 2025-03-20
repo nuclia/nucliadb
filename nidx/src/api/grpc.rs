@@ -111,9 +111,7 @@ impl NidxApi for ApiServer {
             );
         }
 
-        let shard = shards::create_shard(&self.meta, kbid, vector_configs)
-            .await
-            .map_err(NidxError::from)?;
+        let shard = shards::create_shard(&self.meta, kbid, vector_configs).await?;
 
         Ok(Response::new(ShardCreated {
             id: shard.id.to_string(),

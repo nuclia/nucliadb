@@ -109,7 +109,7 @@ fn queryp_map(queries: Vec<QueryP>, distance: u8, as_prefix: Option<usize>, term
         .enumerate()
         .map(|(id, (_, query))| {
             let query = if query.is::<TermQuery>() {
-                term_to_fuzzy(query, distance, termc.clone(), as_prefix.map_or(false, |v| id == v))
+                term_to_fuzzy(query, distance, termc.clone(), as_prefix == Some(id))
             } else {
                 query
             };

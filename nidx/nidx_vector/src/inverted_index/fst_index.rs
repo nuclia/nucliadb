@@ -147,7 +147,7 @@ mod tests {
 #[derive(Clone, Debug)]
 pub struct StartsWithBytes<'a>(&'a [u8]);
 
-impl<'a> Automaton for StartsWithBytes<'a> {
+impl Automaton for StartsWithBytes<'_> {
     type State = Option<usize>;
 
     fn start(&self) -> Option<usize> {

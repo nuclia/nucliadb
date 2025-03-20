@@ -284,7 +284,7 @@ impl<'a> Retriever<'a> {
     }
 }
 
-impl<'a> DataRetriever for Retriever<'a> {
+impl DataRetriever for Retriever<'_> {
     fn will_need(&self, Address(x): Address) {
         data_store::will_need(self.nodes, x, self.vector_len_bytes);
     }

@@ -101,7 +101,7 @@ struct HeaderMapWrapper<'a> {
     inner: &'a http::header::HeaderMap,
 }
 
-impl<'a> Extractor for HeaderMapWrapper<'a> {
+impl Extractor for HeaderMapWrapper<'_> {
     fn get(&self, key: &str) -> Option<&str> {
         self.inner
             .get(key)
@@ -129,7 +129,7 @@ struct MetadataMapWrapper<'a> {
     inner: &'a mut tonic::metadata::MetadataMap,
 }
 
-impl<'a> Injector for MetadataMapWrapper<'a> {
+impl Injector for MetadataMapWrapper<'_> {
     fn set(&mut self, key: &str, value: String) {
         self.inner.insert(
             MetadataKey::from_bytes(key.to_lowercase().as_bytes()).unwrap(),

@@ -121,7 +121,7 @@ pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
 
 struct NatsHeaders<'a>(&'a async_nats::HeaderMap);
 
-impl<'a> Extractor for NatsHeaders<'a> {
+impl Extractor for NatsHeaders<'_> {
     fn get(&self, key: &str) -> Option<&str> {
         self.0.get(key).map(|v| v.as_str())
     }

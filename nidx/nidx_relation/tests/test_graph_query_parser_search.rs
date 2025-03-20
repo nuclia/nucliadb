@@ -63,7 +63,7 @@ fn inner_graph_search(reader: &RelationSearcher, query: GraphQuery) -> anyhow::R
     let parser = GraphQueryParser::new(schema);
     let index_query = parser.parse(query);
 
-    let collector = TopDocs::with_limit(1000);
+    let collector = TopDocs::with_limit(1000_usize);
 
     let searcher = reader.reader.reader.searcher();
     let matching_docs = searcher.search(&index_query, &collector)?;
