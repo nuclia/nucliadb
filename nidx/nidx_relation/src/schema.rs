@@ -244,7 +244,9 @@ pub fn encode_node(node_value: &str, node_type: u64, node_subtype: &str) -> Vec<
     let encoded_size = (1 + value_size + 1 + 1 + subtype_size) as usize;
     let mut out = Vec::with_capacity(encoded_size);
 
+    out.push(node_type);
     out.push(value_size);
+    out.push(subtype_size);
 
     let mut slice = node_value.as_bytes();
     while !slice.is_empty() {
@@ -254,10 +256,6 @@ pub fn encode_node(node_value: &str, node_type: u64, node_subtype: &str) -> Vec<
         slice = &slice[take..];
         out.push(u64::from_le_bytes(data));
     }
-
-    out.push(node_type);
-
-    out.push(subtype_size);
 
     let mut slice = node_subtype.as_bytes();
     while !slice.is_empty() {
@@ -281,11 +279,11 @@ pub fn encode_node(node_value: &str, node_type: u64, node_subtype: &str) -> Vec<
 /// `encoded_source_id` and `encoded_target_id` fast fields and used for value
 /// deduplication in the graph Collector
 pub fn decode_node(data: &[u64]) -> (String, u64, String) {
-    let value_size = data[0] as usize;
-    let value_slice = &data[1..(1 + value_size)];
-    let node_type = data[1 + value_size];
-    let subtype_size = data[1 + value_size + 1] as usize;
-    let subtype_slice = &data[(1 + value_size + 2)..];
+    let node_type = data[0];
+    let value_size = data[1] as usize;
+    let subtype_size = data[2] as usize;
+    let value_slice = &data[3..(3 + value_size)];
+    let subtype_slice = &data[(3 + value_size)..];
 
     let mut value_encoded = Vec::with_capacity(value_size);
     for chunk in value_slice {
