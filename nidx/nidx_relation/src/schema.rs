@@ -220,49 +220,61 @@ impl Schema {
 /// `encoded_source_id` and `encoded_target_id` fast fields.
 ///
 /// We use the following format:
-/// - node value length (u64, 8 bytes)
-/// - encoded node value
-/// - node type (u64, 8 bytes)
-/// - node subtype length (u64, 8 bytes)
-/// - encoded node subtype
+/// - node type (1 byte)
+/// - node subtype length (2 bytes)
+/// - node subtype (N bytes)
+/// - node value (M bytes)
+/// - optional 0 padding
 ///
-/// Node value and subtype are encoded by converting them to bytes, batch them
-/// in sets of 8 and store them as an array of u64.
-//
-// TODO: this format could be more compact. Improve it before we start using it!
-// We could instead do:
-// - value and subtype lengths (u32, u32)
-// - node_type
-// - encoded value and subtype
-//
-// This would reduce 1 u64 per node (as size is in one) and remove the need for padding in both
-// strings, potentially reducing another u64
+/// This encoding tries to minimize length as much as possible (while being reasonable)
+///
 pub fn encode_node(node_value: &str, node_type: u64, node_subtype: &str) -> Vec<u64> {
     // precompute final encoded size to avoid any extra allocation
-    let value_size = node_value.len().div_ceil(8) as u64;
-    let subtype_size = node_subtype.len().div_ceil(8) as u64;
-    let encoded_size = (1 + value_size + 1 + 1 + subtype_size) as usize;
+    let encoded_size = (1 + 2 + node_subtype.len() + node_value.len()).div_ceil(8);
     let mut out = Vec::with_capacity(encoded_size);
 
-    out.push(node_type);
-    out.push(subtype_size);
+    // we'll reuse this to convert from [u8; 8] to u64
+    let mut buffer = [0; 8];
+
+    buffer[0] = node_type as u8;
+
+    let subtype_len = (node_subtype.len() as u16).to_le_bytes();
+    buffer[1..3].copy_from_slice(&subtype_len);
+
+    let mut free = 5;
 
     let mut slice = node_subtype.as_bytes();
-    while !slice.is_empty() {
-        let take = std::cmp::min(8, slice.len());
-        let mut data = [0; 8];
-        data[..take].copy_from_slice(&slice[..take]);
-        slice = &slice[take..];
-        out.push(u64::from_le_bytes(data));
+    while slice.len() >= free {
+        buffer[(8 - free)..].copy_from_slice(&slice[..free]);
+        slice = &slice[free..];
+
+        out.push(u64::from_le_bytes(buffer));
+        buffer = [0; 8];
+        free = 8;
     }
 
-    let mut slice = node_value.as_bytes();
+    if !slice.is_empty() {
+        // we can write some bytes but not enough to fill the buffer
+        buffer[(8 - free)..(8 - free + slice.len())].copy_from_slice(&slice[..]);
+        free -= slice.len();
+    }
+
+    // concat the node value immediately after the subtype
+    slice = node_value.as_bytes();
     while !slice.is_empty() {
-        let take = std::cmp::min(8, slice.len());
-        let mut data = [0; 8];
-        data[..take].copy_from_slice(&slice[..take]);
+        let take = std::cmp::min(free, slice.len());
+        buffer[(8 - free)..(8 - free + take)].copy_from_slice(&slice[..take]);
         slice = &slice[take..];
-        out.push(u64::from_le_bytes(data));
+
+        out.push(u64::from_le_bytes(buffer));
+        buffer = [0; 8];
+        free = 8;
+    }
+
+    if free < 8 {
+        // the buffer has some written bytes but some of the strings were empty and we haven't
+        // pushed it to the encoded vector
+        out.push(u64::from_le_bytes(buffer));
     }
 
     debug_assert_eq!(
@@ -278,32 +290,95 @@ pub fn encode_node(node_value: &str, node_type: u64, node_subtype: &str) -> Vec<
 /// `encoded_source_id` and `encoded_target_id` fast fields and used for value
 /// deduplication in the graph Collector
 pub fn decode_node(data: &[u64]) -> (String, u64, String) {
-    let node_type = data[0];
-    let subtype_size = data[1] as usize;
-    let subtype_slice = &data[2..(2 + subtype_size)];
-    let value_slice = &data[(2 + subtype_size)..];
-    let value_size = value_slice.len();
+    // we'll reuse this buffer for decoding u64 to [u8; 8]
+    let mut buffer = data[0].to_le_bytes();
 
-    let mut subtype_encoded = Vec::with_capacity(subtype_size);
-    for chunk in subtype_slice {
-        let chunk = chunk.to_le_bytes();
-        let mut i = 7;
-        while chunk[i] == 0 {
-            i -= 1;
+    let node_type = buffer[0] as u64;
+
+    let mut encoded_subtype_len = [0; 2];
+    encoded_subtype_len.copy_from_slice(&buffer[1..3]);
+    let encoded_subtype_len = u16::from_le_bytes(encoded_subtype_len) as usize;
+    // value length + extra padding (if needed)
+    let encoded_value_len = data.len() * 8 - (1 + 2 + encoded_subtype_len);
+
+    let mut subtype_encoded = Vec::with_capacity(encoded_subtype_len);
+    let mut value_encoded = Vec::with_capacity(encoded_value_len);
+
+    let mut slice = &data[..];
+    let mut filled = 3;
+
+    if encoded_subtype_len > 0 {
+        let mut remaining = encoded_subtype_len;
+
+        if remaining < 8 - filled {
+            // we share the u64 with node_value
+            subtype_encoded.extend_from_slice(&buffer[filled..(filled + remaining)]);
+            filled = 3 + remaining;
+        } else {
+            // subtype spans across this and maybe more u64 values
+            subtype_encoded.extend_from_slice(&buffer[filled..]);
+            remaining -= 8 - filled;
+
+            while remaining >= 8 {
+                slice = &slice[1..];
+                buffer = slice[0].to_le_bytes();
+                subtype_encoded.extend_from_slice(&buffer);
+                remaining -= 8;
+            }
+
+            if remaining == 0 {
+                // we finished in the last byte, we'll start in the next u64
+                filled = 0;
+                slice = &slice[1..];
+            } else {
+                slice = &slice[1..];
+                buffer = slice[0].to_le_bytes();
+                subtype_encoded.extend_from_slice(&buffer[..remaining]);
+                filled = remaining;
+            }
         }
-        subtype_encoded.extend_from_slice(&chunk[0..=i]);
     }
+    debug_assert_eq!(
+        subtype_encoded.capacity(),
+        encoded_subtype_len,
+        "wrong encoded length estimation"
+    );
     let subtype = String::from_utf8(subtype_encoded).unwrap();
 
-    let mut value_encoded = Vec::with_capacity(value_size);
-    for chunk in value_slice {
-        let chunk = chunk.to_le_bytes();
-        let mut i = 7;
-        while chunk[i] == 0 {
-            i -= 1;
+    if encoded_value_len > 0 {
+        // if we start in a new u64, we must get it from the slice
+        if filled == 0 {
+            buffer = slice[0].to_le_bytes();
         }
-        value_encoded.extend_from_slice(&chunk[0..=i]);
+
+        let remaining = encoded_value_len;
+
+        if remaining <= 8 - filled {
+            // don't copy padding
+            let mut i = 7;
+            while buffer[i] == 0 && i >= filled {
+                i -= 1;
+            }
+            value_encoded.extend_from_slice(&buffer[filled..=i]);
+        } else {
+            value_encoded.extend_from_slice(&buffer[filled..]);
+
+            for buffer in &slice[1..] {
+                let buffer = buffer.to_le_bytes();
+                // don't copy padding
+                let mut i = 7;
+                while buffer[i] == 0 {
+                    i -= 1;
+                }
+                value_encoded.extend_from_slice(&buffer[..=i]);
+            }
+        }
     }
+    debug_assert_eq!(
+        value_encoded.capacity(),
+        encoded_value_len,
+        "wrong encoded length estimation"
+    );
     let value = String::from_utf8(value_encoded).unwrap();
 
     (value, node_type, subtype)
@@ -358,14 +433,14 @@ mod tests {
     fn test_encode_decode_graph_nodes() {
         // test different string lengths combinations to ensure encoding works
         // crossing 8-byte block length
-        let node_value = "Anna";
+        let node_value = "";
         let node_type = NodeType::Entity;
-        let node_subtype = "PERSON";
+        let node_subtype = "";
 
-        for i in 0..7 {
-            for j in 0..7 {
-                let value_suffix = "x".repeat(i);
-                let subtype_suffix = "x".repeat(j);
+        for i in 0..9 {
+            for j in 0..9 {
+                let value_suffix = ('A'..='Z').take(i).collect::<String>();
+                let subtype_suffix = ('A'..='Z').take(j).collect::<String>();
 
                 let node_value = format!("{node_value}{value_suffix}");
                 let node_type = io_maps::node_type_to_u64(node_type);
