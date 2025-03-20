@@ -34,7 +34,7 @@ use nidx_tantivy::{
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
     index_reader::{DeletionQueryBuilder, open_index_with_deletions},
 };
-use nidx_types::OpenIndexMetadata;
+use nidx_types::{OpenIndexMetadata, prefilter::PrefilterResult};
 use reader::{HashedRelationNode, RelationsReaderService};
 use resource_indexer::index_relations;
 pub use schema::Schema as RelationSchema;
@@ -207,8 +207,12 @@ impl RelationSearcher {
     }
 
     #[instrument(name = "relation::graph_searcher", skip_all)]
-    pub fn graph_search(&self, request: &GraphSearchRequest) -> anyhow::Result<GraphSearchResponse> {
-        self.reader.graph_search(request)
+    pub fn graph_search(
+        &self,
+        request: &GraphSearchRequest,
+        prefilter: PrefilterResult,
+    ) -> anyhow::Result<GraphSearchResponse> {
+        self.reader.graph_search(request, &prefilter)
     }
 
     #[instrument(name = "relation::suggest", skip_all)]

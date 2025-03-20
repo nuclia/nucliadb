@@ -27,15 +27,18 @@ use nidx_protos::{
     EntitiesSubgraphResponse, GraphSearchRequest, GraphSearchResponse, RelationNode, RelationPrefixSearchResponse,
     RelationSearchRequest, RelationSearchResponse,
 };
+use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::TopDocs;
-use tantivy::query::{BooleanQuery, Occur, Query};
+use tantivy::query::{BooleanQuery, EmptyQuery, Occur, Query, TermSetQuery};
+use tantivy::schema::Field;
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
+use uuid::Uuid;
 
 use crate::graph_collector::{NodeSelector, TopUniqueNodeCollector, TopUniqueRelationCollector};
 use crate::graph_query_parser::{
     BoolGraphQuery, BoolNodeQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
 };
-use crate::schema::Schema;
+use crate::schema::{Schema, encode_field_id};
 use crate::{RelationConfig, io_maps};
 
 const FUZZY_DISTANCE: u8 = 1;
@@ -60,6 +63,47 @@ impl Debug for RelationsReaderService {
     }
 }
 
+struct AddMetadataFieldIterator<'a, I: Iterator<Item = &'a FieldId>> {
+    buffer: Option<tantivy::Term>,
+    prev: Uuid,
+    field: Field,
+    iter: I,
+}
+
+impl<'a, I: Iterator<Item = &'a FieldId>> AddMetadataFieldIterator<'a, I> {
+    fn new(field: Field, iter: I) -> Self {
+        Self {
+            buffer: None,
+            prev: Uuid::nil(),
+            field,
+            iter,
+        }
+    }
+}
+
+impl<'a, I: Iterator<Item = &'a FieldId>> Iterator for AddMetadataFieldIterator<'a, I> {
+    type Item = tantivy::Term;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(buf) = self.buffer.take() {
+            return Some(buf);
+        }
+        let next = self.iter.next()?;
+
+        let term = tantivy::Term::from_field_bytes(self.field, &encode_field_id(next.resource_id, &next.field_id));
+        if self.prev != next.resource_id {
+            // New resource, emit the metadata field (and save the actual field for next iteration)
+            self.buffer = Some(term);
+            Some(tantivy::Term::from_field_bytes(
+                self.field,
+                &encode_field_id(next.resource_id, "a/metadata"),
+            ))
+        } else {
+            Some(term)
+        }
+    }
+}
+
 impl RelationsReaderService {
     pub fn relation_search(&self, request: &RelationSearchRequest) -> anyhow::Result<RelationSearchResponse> {
         Ok(RelationSearchResponse {
@@ -68,7 +112,11 @@ impl RelationsReaderService {
         })
     }
 
-    pub fn graph_search(&self, request: &GraphSearchRequest) -> anyhow::Result<GraphSearchResponse> {
+    pub fn graph_search(
+        &self,
+        request: &GraphSearchRequest,
+        prefilter: &PrefilterResult,
+    ) -> anyhow::Result<GraphSearchResponse> {
         // No query? Empty graph
         let Some(query) = &request.query else {
             return Ok(GraphSearchResponse::default());
@@ -80,36 +128,22 @@ impl RelationsReaderService {
         let top_k = request.top_k as usize;
 
         match request.kind() {
-            QueryKind::Path => self.paths_graph_search(query, top_k),
-            QueryKind::Nodes => self.nodes_graph_search(query, top_k),
-            QueryKind::Relations => self.relations_graph_search(query, top_k),
+            QueryKind::Path => self.paths_graph_search(query, prefilter, top_k),
+            QueryKind::Nodes => self.nodes_graph_search(query, prefilter, top_k),
+            QueryKind::Relations => self.relations_graph_search(query, prefilter, top_k),
         }
-    }
-
-    pub fn inner_graph_search(&self, query: GraphQuery) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
-        let parser = GraphQueryParser::new(&self.schema);
-        let index_query: Box<dyn Query> = parser.parse(query);
-
-        // TODO: parametrize this magic constant
-        let collector = TopDocs::with_limit(1000);
-
-        let searcher = self.reader.searcher();
-        let matching_docs = searcher.search(&index_query, &collector)?;
-
-        self.build_graph_response(
-            &searcher,
-            matching_docs.into_iter().map(|(_score, doc_address)| doc_address),
-        )
     }
 
     fn paths_graph_search(
         &self,
         query: &nidx_protos::graph_query::PathQuery,
+        prefilter: &PrefilterResult,
         top_k: usize,
     ) -> anyhow::Result<GraphSearchResponse> {
         let query = BoolGraphQuery::try_from(query)?;
         let parser = GraphQueryParser::new(&self.schema);
         let index_query = parser.parse_bool(query);
+        let index_query = self.apply_prefilter(index_query, prefilter);
 
         let collector = TopDocs::with_limit(top_k);
         let searcher = self.reader.searcher();
@@ -123,11 +157,14 @@ impl RelationsReaderService {
     fn nodes_graph_search(
         &self,
         query: &nidx_protos::graph_query::PathQuery,
+        prefilter: &PrefilterResult,
         top_k: usize,
     ) -> anyhow::Result<GraphSearchResponse> {
         let query = BoolNodeQuery::try_from(query)?;
         let parser = GraphQueryParser::new(&self.schema);
         let (source_query, destination_query) = parser.parse_bool_node(query);
+        let source_query = self.apply_prefilter(source_query, prefilter);
+        let destination_query = self.apply_prefilter(destination_query, prefilter);
 
         let mut unique_nodes = HashSet::new();
 
@@ -161,11 +198,13 @@ impl RelationsReaderService {
     fn relations_graph_search(
         &self,
         query: &nidx_protos::graph_query::PathQuery,
+        prefilter: &PrefilterResult,
         top_k: usize,
     ) -> anyhow::Result<GraphSearchResponse> {
         let query = BoolGraphQuery::try_from(query)?;
         let parser = GraphQueryParser::new(&self.schema);
         let index_query = parser.parse_bool(query);
+        let index_query = self.apply_prefilter(index_query, prefilter);
 
         let collector = TopUniqueRelationCollector::new(self.schema.clone(), top_k);
         let searcher = self.reader.searcher();
@@ -181,6 +220,27 @@ impl RelationsReaderService {
             ..Default::default()
         };
         Ok(response)
+    }
+
+    fn apply_prefilter(&self, query: Box<dyn Query>, prefilter: &PrefilterResult) -> Box<dyn Query> {
+        match prefilter {
+            PrefilterResult::All => query,
+            PrefilterResult::None => Box::new(EmptyQuery),
+            PrefilterResult::Some(fields) => {
+                let prefilter_query = if let Some(resource_field_id) = self.schema.resource_field_id {
+                    // Schema v2, by field
+                    let terms = AddMetadataFieldIterator::new(resource_field_id, fields.iter());
+                    Box::new(TermSetQuery::new(terms))
+                } else {
+                    // Schema v1, by resource
+                    let resources: HashSet<_> = fields.iter().map(|x| x.resource_id).collect();
+                    Box::new(TermSetQuery::new(resources.iter().map(|rid| {
+                        tantivy::Term::from_field_text(self.schema.resource_id, &rid.simple().to_string())
+                    })))
+                };
+                Box::new(BooleanQuery::intersection(vec![prefilter_query, query]))
+            }
+        }
     }
 
     fn build_graph_response(

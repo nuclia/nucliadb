@@ -24,11 +24,15 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use common::services::NidxFixture;
-use nidx_protos::Security;
 use nidx_protos::nodewriter::VectorIndexConfig;
 use nidx_protos::prost_types::Timestamp;
+use nidx_protos::relation::RelationType;
+use nidx_protos::relation_node::NodeType;
 use nidx_protos::resource::ResourceStatus;
-use nidx_protos::{IndexMetadata, NewShardRequest, Resource, ResourceId, SearchRequest};
+use nidx_protos::{
+    GraphSearchRequest, IndexMetadata, NewShardRequest, RelationNode, Resource, ResourceId, SearchRequest,
+};
+use nidx_protos::{IndexRelation, IndexRelations, Relation, Security};
 use sqlx::PgPool;
 use tonic::Request;
 use uuid::Uuid;
@@ -76,6 +80,29 @@ async fn create_dummy_resources(total: u8, fixture: &mut NidxFixture, shard_id: 
                     labels,
                     texts,
                     security: Some(security),
+                    field_relations: HashMap::from([(
+                        "f/file".to_string(),
+                        IndexRelations {
+                            relations: vec![IndexRelation {
+                                relation: Some(Relation {
+                                    source: Some(RelationNode {
+                                        value: rid.to_string(),
+                                        ntype: NodeType::Resource.into(),
+                                        subtype: "RESOURCE".to_string(),
+                                    }),
+                                    to: Some(RelationNode {
+                                        value: "/l/a/b".to_string(),
+                                        ntype: NodeType::Label.into(),
+                                        subtype: "LABEL".to_string(),
+                                    }),
+                                    relation: RelationType::About.into(),
+                                    relation_label: "LABEL".to_string(),
+                                    ..Default::default()
+                                }),
+                                ..Default::default()
+                            }],
+                        },
+                    )]),
                     ..Default::default()
                 },
             )
@@ -121,8 +148,22 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
         })
         .await
         .unwrap();
-
     assert_eq!(response.get_ref().document.as_ref().unwrap().total, 1);
+
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(nidx_protos::GraphQuery {
+                path: Some(Default::default()),
+            }),
+            top_k: 100,
+            security: Some(Security { access_groups: vec![] }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(response.get_ref().relations.len(), 1);
 
     // Searching with an unknown group should return no results
     let response = fixture
@@ -138,8 +179,24 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
         })
         .await
         .unwrap();
-
     assert_eq!(response.get_ref().document.as_ref(), None);
+
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(nidx_protos::GraphQuery {
+                path: Some(Default::default()),
+            }),
+            top_k: 100,
+            security: Some(Security {
+                access_groups: vec!["unknown".to_string()],
+            }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(response.get_ref().relations.len(), 0);
 
     // Searching with engineering group should return only one result
     let response = fixture
@@ -155,8 +212,24 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
         })
         .await
         .unwrap();
-
     assert_eq!(response.get_ref().document.as_ref().unwrap().total, 1);
+
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(nidx_protos::GraphQuery {
+                path: Some(Default::default()),
+            }),
+            top_k: 100,
+            security: Some(Security {
+                access_groups: vec![group_engineering.to_string()],
+            }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(response.get_ref().relations.len(), 1);
 
     // Searching with engineering group and another unknown group
     // should return 1 result, as the results are expected to be the union of the groups.
@@ -173,8 +246,24 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
         })
         .await
         .unwrap();
-
     assert_eq!(response.get_ref().document.as_ref().unwrap().total, 1);
+
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(nidx_protos::GraphQuery {
+                path: Some(Default::default()),
+            }),
+            top_k: 100,
+            security: Some(Security {
+                access_groups: vec!["/unknown".to_string(), group_engineering.clone()],
+            }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(response.get_ref().relations.len(), 1);
 
     Ok(())
 }
