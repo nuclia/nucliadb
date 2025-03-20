@@ -245,10 +245,9 @@ pub fn encode_node(node_value: &str, node_type: u64, node_subtype: &str) -> Vec<
     let mut out = Vec::with_capacity(encoded_size);
 
     out.push(node_type);
-    out.push(value_size);
     out.push(subtype_size);
 
-    let mut slice = node_value.as_bytes();
+    let mut slice = node_subtype.as_bytes();
     while !slice.is_empty() {
         let take = std::cmp::min(8, slice.len());
         let mut data = [0; 8];
@@ -257,7 +256,7 @@ pub fn encode_node(node_value: &str, node_type: u64, node_subtype: &str) -> Vec<
         out.push(u64::from_le_bytes(data));
     }
 
-    let mut slice = node_subtype.as_bytes();
+    let mut slice = node_value.as_bytes();
     while !slice.is_empty() {
         let take = std::cmp::min(8, slice.len());
         let mut data = [0; 8];
@@ -280,21 +279,10 @@ pub fn encode_node(node_value: &str, node_type: u64, node_subtype: &str) -> Vec<
 /// deduplication in the graph Collector
 pub fn decode_node(data: &[u64]) -> (String, u64, String) {
     let node_type = data[0];
-    let value_size = data[1] as usize;
-    let subtype_size = data[2] as usize;
-    let value_slice = &data[3..(3 + value_size)];
-    let subtype_slice = &data[(3 + value_size)..];
-
-    let mut value_encoded = Vec::with_capacity(value_size);
-    for chunk in value_slice {
-        let chunk = chunk.to_le_bytes();
-        let mut i = 7;
-        while chunk[i] == 0 {
-            i -= 1;
-        }
-        value_encoded.extend_from_slice(&chunk[0..=i]);
-    }
-    let value = String::from_utf8(value_encoded).unwrap();
+    let subtype_size = data[1] as usize;
+    let subtype_slice = &data[2..(2 + subtype_size)];
+    let value_slice = &data[(2 + subtype_size)..];
+    let value_size = value_slice.len();
 
     let mut subtype_encoded = Vec::with_capacity(subtype_size);
     for chunk in subtype_slice {
@@ -306,6 +294,17 @@ pub fn decode_node(data: &[u64]) -> (String, u64, String) {
         subtype_encoded.extend_from_slice(&chunk[0..=i]);
     }
     let subtype = String::from_utf8(subtype_encoded).unwrap();
+
+    let mut value_encoded = Vec::with_capacity(value_size);
+    for chunk in value_slice {
+        let chunk = chunk.to_le_bytes();
+        let mut i = 7;
+        while chunk[i] == 0 {
+            i -= 1;
+        }
+        value_encoded.extend_from_slice(&chunk[0..=i]);
+    }
+    let value = String::from_utf8(value_encoded).unwrap();
 
     (value, node_type, subtype)
 }
