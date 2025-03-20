@@ -472,6 +472,226 @@ async def test_graph_search__undirected_path_queries(
     assert ("Anastasia", "IS_FRIEND", "Anna") in paths
 
 
+@pytest.mark.deploy_modes("standalone")
+async def test_graph_search__security(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    kb_with_entity_graph: str,
+):
+    kbid = kb_with_entity_graph
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resources",
+    )
+    assert resp.status_code == 200
+    rid = resp.json()["resources"][0]["id"]
+
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{rid}",
+        json={
+            "security": {
+                "access_groups": ["secret"],
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Without groups, returns it
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+
+    # With the proper group, returns it
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+            "security": {"groups": ["secret"]},
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+
+    # With other groups, returns nothing
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+            "security": {"groups": ["fake"]},
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_graph_search__hidden(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
+    kb_with_entity_graph: str,
+):
+    kbid = kb_with_entity_graph
+
+    resp = await nucliadb_writer_manager.patch(
+        f"/kb/{kb_with_entity_graph}", json={"hidden_resources_enabled": True}
+    )
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resources",
+    )
+    assert resp.status_code == 200
+    rid = resp.json()["resources"][0]["id"]
+
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{rid}",
+        json={
+            "hidden": True,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # By default, does not return hidden
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+    # It returns them with show_hidden
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+            "show_hidden": True,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_graph_search__filtering(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    kb_with_entity_graph: str,
+):
+    kbid = kb_with_entity_graph
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resources",
+    )
+    assert resp.status_code == 200
+    rid = resp.json()["resources"][0]["id"]
+
+    # Filter to include the result
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+            "filter_expression": {"field": {"prop": "resource", "id": rid}},
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+
+    # Filter to exclude the result
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+            "filter_expression": {"field": {"not": {"prop": "resource", "id": rid}}},
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+
 def simple_paths(paths: list[graph_responses.GraphPath]) -> list[tuple[str, str, str]]:
     simple_paths = []
     for path in paths:

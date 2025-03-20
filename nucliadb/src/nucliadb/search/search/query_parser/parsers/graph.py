@@ -18,35 +18,95 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import Optional, Union
 
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap, RelationTypeMap
+from nucliadb.search.search.query_parser.filter_expression import add_and_expression, parse_expression
 from nucliadb.search.search.query_parser.models import GraphRetrieval
+from nucliadb.search.search.utils import filter_hidden_resources
 from nucliadb_models.graph import requests as graph_requests
-from nucliadb_protos import nodereader_pb2
+from nucliadb_models.labels import LABEL_HIDDEN
+from nucliadb_protos import nodereader_pb2, utils_pb2
 
 
-def parse_graph_search(item: graph_requests.GraphSearchRequest) -> GraphRetrieval:
-    pb = nodereader_pb2.GraphSearchRequest()
+async def parse_graph_search(kbid: str, item: graph_requests.GraphSearchRequest) -> GraphRetrieval:
+    pb = await _parse_common(kbid, item)
     pb.query.path.CopyFrom(_parse_path_query(item.query))
-    pb.top_k = item.top_k
     pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.PATH
     return pb
 
 
-def parse_graph_node_search(item: graph_requests.GraphNodesSearchRequest) -> GraphRetrieval:
-    pb = nodereader_pb2.GraphSearchRequest()
+async def parse_graph_node_search(
+    kbid: str, item: graph_requests.GraphNodesSearchRequest
+) -> GraphRetrieval:
+    pb = await _parse_common(kbid, item)
     pb.query.path.CopyFrom(_parse_node_query(item.query))
-    pb.top_k = item.top_k
     pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.NODES
     return pb
 
 
-def parse_graph_relation_search(item: graph_requests.GraphRelationsSearchRequest) -> GraphRetrieval:
-    pb = nodereader_pb2.GraphSearchRequest()
+async def parse_graph_relation_search(
+    kbid: str, item: graph_requests.GraphRelationsSearchRequest
+) -> GraphRetrieval:
+    pb = await _parse_common(kbid, item)
     pb.query.path.CopyFrom(_parse_relation_query(item.query))
-    pb.top_k = item.top_k
     pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.RELATIONS
     return pb
+
+
+AnyGraphRequest = Union[
+    graph_requests.GraphSearchRequest,
+    graph_requests.GraphNodesSearchRequest,
+    graph_requests.GraphRelationsSearchRequest,
+]
+
+
+async def _parse_common(kbid: str, item: AnyGraphRequest) -> nodereader_pb2.GraphSearchRequest:
+    pb = nodereader_pb2.GraphSearchRequest()
+    pb.top_k = item.top_k
+
+    filter_expr = await _parse_filters(kbid, item)
+    if filter_expr is not None:
+        pb.field_filter.CopyFrom(filter_expr)
+
+    security = _parse_security(kbid, item)
+    if security is not None:
+        pb.security.CopyFrom(security)
+
+    return pb
+
+
+async def _parse_filters(kbid: str, item: AnyGraphRequest) -> Optional[nodereader_pb2.FilterExpression]:
+    filter_expr = nodereader_pb2.FilterExpression()
+    if item.filter_expression:
+        if item.filter_expression.field:
+            filter_expr = await parse_expression(item.filter_expression.field, kbid)
+
+    hidden = await filter_hidden_resources(kbid, item.show_hidden)
+    if hidden is not None:
+        expr = nodereader_pb2.FilterExpression()
+        if hidden:
+            expr.facet.facet = LABEL_HIDDEN
+        else:
+            expr.bool_not.facet.facet = LABEL_HIDDEN
+
+        add_and_expression(filter_expr, expr)
+
+    if filter_expr.HasField("expr"):
+        return filter_expr
+    else:
+        return None
+
+
+def _parse_security(kbid: str, item: AnyGraphRequest) -> Optional[utils_pb2.Security]:
+    if item.security is not None and len(item.security.groups) > 0:
+        security_pb = utils_pb2.Security()
+        for group_id in item.security.groups:
+            if group_id not in security_pb.access_groups:
+                security_pb.access_groups.append(group_id)
+        return security_pb
+    else:
+        return None
 
 
 def _parse_path_query(expr: graph_requests.GraphPathQuery) -> nodereader_pb2.GraphQuery.PathQuery:

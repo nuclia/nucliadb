@@ -23,8 +23,10 @@ from typing import Annotated, Literal, Optional, Union
 from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
 from typing_extensions import Self
 
-from nucliadb_models.filters import And, Not, Or, filter_discriminator
+from nucliadb_models.filters import And, FieldFilterExpression, Not, Or, filter_discriminator
 from nucliadb_models.metadata import RelationNodeType, RelationType
+from nucliadb_models.search import SearchParamDefaults
+from nucliadb_models.security import RequestSecurity
 
 ## Models for graph nodes and relations
 
@@ -116,8 +118,26 @@ GraphPathQuery = Annotated[
 ]
 
 
+class GraphFilterExpression(BaseModel, extra="forbid"):
+    """Returns only relations from documents that match this filter expression.
+    Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters
+    """
+
+    field: FieldFilterExpression = Field(description="Filter to apply to fields")
+
+
 class GraphSearchRequest(BaseGraphSearchRequest):
     query: GraphPathQuery
+    filter_expression: Optional[GraphFilterExpression] = Field(
+        default=None,
+        title="Filter resource by an expression",
+        description=(
+            "Returns only relations from documents that match this filter expression."
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters "
+        ),
+    )
+    security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
+    show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
 
 
 # Nodes search
@@ -135,6 +155,16 @@ GraphNodesQuery = Annotated[
 
 class GraphNodesSearchRequest(BaseGraphSearchRequest):
     query: GraphNodesQuery
+    filter_expression: Optional[GraphFilterExpression] = Field(
+        default=None,
+        title="Filter resource by an expression",
+        description=(
+            "Returns only relations from documents that match this filter expression."
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters "
+        ),
+    )
+    security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
+    show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
 
 
 # Relations search
@@ -152,6 +182,16 @@ GraphRelationsQuery = Annotated[
 
 class GraphRelationsSearchRequest(BaseGraphSearchRequest):
     query: GraphRelationsQuery
+    filter_expression: Optional[GraphFilterExpression] = Field(
+        default=None,
+        title="Filter resource by an expression",
+        description=(
+            "Returns only relations from documents that match this filter expression."
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters "
+        ),
+    )
+    security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
+    show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
 
 
 # We need this to avoid issues with pydantic and generic types defined in another module
