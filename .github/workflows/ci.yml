@@ -38,7 +38,9 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: clippy
-        run: cd nidx && cargo clippy --workspace --tests
+        run: cd nidx && cargo clippy --workspace --all-targets --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
 
   updated-protos:
     name: "Pre-checks: Protos up-to-date"

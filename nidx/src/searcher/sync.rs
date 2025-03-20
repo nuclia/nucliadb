@@ -484,7 +484,7 @@ impl SyncMetadata {
         }
     }
 
-    pub async fn get<'a>(&self, index_id: &IndexId) -> GuardedIndexMetadata {
+    pub async fn get(&self, index_id: &IndexId) -> GuardedIndexMetadata {
         GuardedIndexMetadata::new(self.synced_metadata.clone().read_owned().await, *index_id)
     }
 

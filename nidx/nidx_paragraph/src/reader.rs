@@ -282,7 +282,7 @@ struct Searcher<'a> {
     text: &'a str,
     only_faceted: bool,
 }
-impl<'a> Searcher<'a> {
+impl Searcher<'_> {
     fn custom_order_collector(
         &self,
         order: OrderBy,
