@@ -468,32 +468,31 @@ class Processor:
         This function is responsible for generating the index message that will be sent to nidx.
         It takes the resource object and the broker messages of the current processor transaction to decide how to create it.
         """
+        deleted_fields = self.get_bm_deleted_fields(messages)
         reindex = any(message.reindex for message in messages)
         if reindex:
-            # When reindexing the whole resource, let's just generate full new index message
-            # TODO - This should be improved in the future as it's not optimal for very large resources:
-            # As of now, there are some API operations that require fully reindexing all the fields of a resource.
-            # An example of this is classification label changes - we need to reindex all the fields of a resource to
-            # propagate the label changes to the index.
-            return await resource.generate_index_message(reindex=True)
+            return await resource.generate_index_message(
+                reindex=True,
+                updated_fields=None,
+                deleted_fields=deleted_fields,
+            )
         else:
-            # modified_fields = self.get_bm_modified_fields(messages)
-            deleted_fields = self.get_bm_deleted_fields(messages)
             return await resource.generate_index_message(
                 reindex=False,
-                # for_fields=modified_fields,
-                for_fields=None,
+                # updated_fields=self.get_bm_modified_fields(messages),
+                updated_fields=None,
                 deleted_fields=deleted_fields,
             )
 
     def get_bm_deleted_fields(
         self, messages: list[writer_pb2.BrokerMessage]
     ) -> list[resources_pb2.FieldID]:
-        deleted = set()
+        deleted = []
         for message in messages:
             for field in message.delete_fields:
-                deleted.add(field)
-        return list(deleted)
+                if field not in deleted:
+                    deleted.append(field)
+        return deleted
 
     def get_bm_modified_fields(
         self, messages: list[writer_pb2.BrokerMessage]

@@ -270,11 +270,11 @@ class Resource:
     async def generate_index_message(
         self,
         reindex: bool,
-        for_fields: Optional[list[FieldID]] = None,
+        updated_fields: Optional[list[FieldID]] = None,
         deleted_fields: Optional[list[FieldID]] = None,
     ) -> noderesources_pb2.Resource:
         """
-        Generates the index message for the resource's fields. If for_fields is None, it will generate the index message
+        Generates the index message for the resource's fields. If updated_fields is None, it will generate the index message
         for all fields. If reindex is True, it adds the necessary metadata to the index message so that nidx deletes previously
         indexed data for the resource fields.
         """
@@ -302,14 +302,14 @@ class Resource:
         brain.set_resource_metadata(basic=basic, origin=origin, user_relations=user_relations)
 
         # Handle field-specific metadata (texts, pargraphs, vectors, etc)
-        if for_fields is None:
+        if updated_fields is None:
             # Fetch all fields
             all_fields = await self.get_fields_ids(force=True)
             fields_to_index = [
                 FieldID(field_type=type_id, field=field_id) for (type_id, field_id) in all_fields
             ]
         else:
-            fields_to_index = for_fields
+            fields_to_index = updated_fields
 
         for fieldid in fields_to_index:
             field = await self.get_field(fieldid.field, fieldid.field_type, load=False)
