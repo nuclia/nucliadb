@@ -134,7 +134,7 @@ async def test_paragraphs_with_page(storage, txn, cache, dummy_nidx_utility, kno
     fcmw.metadata.metadata.paragraphs.append(p2)
     bm.field_metadata.append(fcmw)
     await r.apply_extracted(bm)
-    resource_brain = await r.generate_index_message()
+    resource_brain = await r.generate_index_message(reindex=False)
     for metadata in resource_brain.brain.paragraphs["t/field1"].paragraphs.values():
         if metadata.start == 84:
             assert metadata.metadata.position.in_page is False
@@ -384,7 +384,7 @@ async def test_generate_index_message_contains_all_metadata(
 
     async with maindb_driver.transaction() as txn:
         resource.txn = txn  # I don't like this but this is the API we have...
-        resource_brain = await resource.generate_index_message()
+        resource_brain = await resource.generate_index_message(reindex=False)
     index_message = resource_brain.brain
 
     # Global resource labels
@@ -469,7 +469,7 @@ async def test_generate_index_message_vectorsets(
 
     async with maindb_driver.transaction() as txn:
         resource.txn = txn  # I don't like this but this is the API we have...
-        resource_brain = await resource.generate_index_message()
+        resource_brain = await resource.generate_index_message(reindex=False)
     index_message = resource_brain.brain
 
     # Check length of vectorsets of first sentence of first paragraph. In the fixture, we set the vector
@@ -500,7 +500,7 @@ async def test_generate_index_message_cancels_labels(
 
     async with maindb_driver.transaction() as txn:
         resource.txn = txn  # I don't like this but this is the API we have...
-        resource_brain = await resource.generate_index_message()
+        resource_brain = await resource.generate_index_message(reindex=False)
 
         # There is a label in the generated resource
         assert "/l/labelset1/label1" in resource_brain.brain.texts["a/title"].labels
@@ -511,7 +511,7 @@ async def test_generate_index_message_cancels_labels(
         resource.basic.usermetadata.classifications.add(
             labelset="labelset1", label="label1", cancelled_by_user=True
         )
-        resource_brain = await resource.generate_index_message()
+        resource_brain = await resource.generate_index_message(reindex=False)
 
         # Label is not generated anymore
         assert "/l/labelset1/label1" not in resource_brain.brain.texts["a/title"].labels

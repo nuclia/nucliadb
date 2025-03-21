@@ -299,7 +299,7 @@ class Resource:
         self.user_relations = payload
 
     @processor_observer.wrap({"type": "generate_index_message"})
-    async def generate_index_message(self, reindex: bool = False) -> ResourceBrain:
+    async def generate_index_message(self, reindex: bool) -> ResourceBrain:
         brain = ResourceBrain(rid=self.uuid)
         basic = await self.get_basic()
         await self.compute_security(brain)
