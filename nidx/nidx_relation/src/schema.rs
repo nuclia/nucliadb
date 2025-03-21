@@ -65,6 +65,7 @@ pub struct Schema {
     pub resource_field_id: Option<Field>,
     pub encoded_source_id: Option<Field>,
     pub encoded_target_id: Option<Field>,
+    pub encoded_relation_id: Option<Field>,
     pub facets: Option<Field>,
 }
 
@@ -99,11 +100,13 @@ impl Schema {
         let mut resource_field_id = None;
         let mut encoded_source_id = None;
         let mut encoded_target_id = None;
+        let mut encoded_relation_id = None;
         let mut facets = None;
         if version == 2 {
             resource_field_id = Some(builder.add_bytes_field("resource_field_id", INDEXED | STORED));
             encoded_source_id = Some(builder.add_u64_field("encoded_source_id", FAST));
             encoded_target_id = Some(builder.add_u64_field("encoded_target_id", FAST));
+            encoded_relation_id = Some(builder.add_u64_field("encoded_relation_id", FAST));
             facets = Some(builder.add_facet_field("facets", STORED));
         }
 
@@ -127,6 +130,7 @@ impl Schema {
             resource_field_id,
             encoded_source_id,
             encoded_target_id,
+            encoded_relation_id,
             facets,
         }
     }
@@ -277,11 +281,7 @@ pub fn encode_node(node_value: &str, node_type: u64, node_subtype: &str) -> Vec<
         out.push(u64::from_le_bytes(buffer));
     }
 
-    debug_assert_eq!(
-        out.capacity(),
-        encoded_size,
-        "encoded size estimation for node id is wrong!"
-    );
+    debug_assert_eq!(out.capacity(), encoded_size, "wrong encoded size estimation");
 
     out
 }
@@ -384,8 +384,65 @@ pub fn decode_node(data: &[u64]) -> (String, u64, String) {
     (value, node_type, subtype)
 }
 
+pub fn encode_relation(relation_type: u64, relation_label: &str) -> Vec<u64> {
+    let encoded_size = (1 + relation_label.len()).div_ceil(8);
+    let mut out = Vec::with_capacity(encoded_size);
+
+    let mut buffer = [0; 8];
+    buffer[0] = relation_type as u8;
+
+    let mut slice = relation_label.as_bytes();
+
+    let take = std::cmp::min(7, slice.len());
+    buffer[1..(1 + take)].copy_from_slice(&slice[..take]);
+    slice = &slice[take..];
+    out.push(u64::from_le_bytes(buffer));
+
+    while !slice.is_empty() {
+        let take = std::cmp::min(8, slice.len());
+        let mut buffer = [0; 8];
+        buffer[..take].copy_from_slice(&slice[..take]);
+        slice = &slice[take..];
+        out.push(u64::from_le_bytes(buffer));
+    }
+
+    debug_assert_eq!(out.capacity(), encoded_size, "wrong encoded size estimation");
+
+    out
+}
+
+pub fn decode_relation(data: &[u64]) -> (u64, String) {
+    let buffer = data[0].to_le_bytes();
+    let relation_type = buffer[0] as u64;
+
+    let label_len = data.len() * 8 - 1;
+    let mut encoded_label = Vec::with_capacity(label_len);
+
+    // don't copy padding
+    let mut i = 7;
+    while buffer[i] == 0 && i >= 1 {
+        i -= 1;
+    }
+    encoded_label.extend_from_slice(&buffer[1..=i]);
+
+    for buffer in &data[1..] {
+        let buffer = buffer.to_le_bytes();
+        // don't copy padding
+        let mut i = 7;
+        while buffer[i] == 0 {
+            i -= 1;
+        }
+        encoded_label.extend_from_slice(&buffer[..=i]);
+    }
+
+    let relation_label = String::from_utf8(encoded_label).unwrap();
+
+    (relation_type, relation_label)
+}
+
 #[cfg(test)]
 mod tests {
+    use nidx_protos::relation::RelationType;
     use nidx_protos::relation_node::NodeType;
     use tantivy::collector::DocSetCollector;
     use tantivy::query::TermQuery;
@@ -433,25 +490,39 @@ mod tests {
     fn test_encode_decode_graph_nodes() {
         // test different string lengths combinations to ensure encoding works
         // crossing 8-byte block length
-        let node_value = "";
-        let node_type = NodeType::Entity;
-        let node_subtype = "";
+        for node_type in [NodeType::Entity, NodeType::User] {
+            for i in 0..9 {
+                for j in 0..9 {
+                    let node_type = io_maps::node_type_to_u64(node_type);
+                    let node_value = ('A'..='Z').take(i).collect::<String>();
+                    let node_subtype = ('A'..='Z').take(j).collect::<String>();
 
-        for i in 0..9 {
-            for j in 0..9 {
-                let value_suffix = ('A'..='Z').take(i).collect::<String>();
-                let subtype_suffix = ('A'..='Z').take(j).collect::<String>();
+                    let encoded = encode_node(&node_value, node_type, &node_subtype);
+                    let decoded = decode_node(&encoded);
 
-                let node_value = format!("{node_value}{value_suffix}");
-                let node_type = io_maps::node_type_to_u64(node_type);
-                let node_subtype = format!("{node_subtype}{subtype_suffix}");
+                    assert_eq!(node_value, decoded.0);
+                    assert_eq!(node_type, decoded.1);
+                    assert_eq!(node_subtype, decoded.2);
+                }
+            }
+        }
+    }
 
-                let encoded = encode_node(&node_value, node_type, &node_subtype);
-                let decoded = decode_node(&encoded);
+    #[test]
+    fn test_encode_decode_graph_relations() {
+        // test different string lengths combinations to ensure encoding works
+        // crossing 8-byte block length
 
-                assert_eq!(node_value, decoded.0);
-                assert_eq!(node_type, decoded.1);
-                assert_eq!(node_subtype, decoded.2);
+        for relation_type in [RelationType::Child, RelationType::Other] {
+            for i in 0..9 {
+                let relation_type = io_maps::relation_type_to_u64(relation_type);
+                let relation_label = ('A'..='Z').take(i).collect::<String>();
+
+                let encoded = encode_relation(relation_type, &relation_label);
+                let decoded = decode_relation(&encoded);
+
+                assert_eq!(relation_type, decoded.0);
+                assert_eq!(relation_label, decoded.1);
             }
         }
     }
