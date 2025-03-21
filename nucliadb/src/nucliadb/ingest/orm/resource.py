@@ -39,7 +39,7 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb_models import content_types
 from nucliadb_models.common import CloudLink
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
-from nucliadb_protos import utils_pb2, writer_pb2
+from nucliadb_protos import noderesources_pb2, utils_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import (
     Basic,
@@ -299,21 +299,65 @@ class Resource:
         self.user_relations = payload
 
     @processor_observer.wrap({"type": "generate_index_message"})
-    async def generate_index_message(self, reindex: bool) -> ResourceBrain:
-        brain = ResourceBrain(rid=self.uuid)
+    async def generate_index_message(
+        self,
+        reindex: bool,
+        for_fields: Optional[list[FieldID]] = None,
+        deleted_fields: Optional[list[FieldID]] = None,
+    ) -> noderesources_pb2.Resource:
+        """
+        Generates the index message for the resource's fields. If for_fields is None, it will generate the index message
+        for all fields. If reindex is True, it adds the necessary metadata to the index message so that nidx deletes previously
+        indexed data for the resource fields.
+        """
         basic = await self.get_basic()
-        await self.compute_security(brain)
-        await self.compute_global_tags(brain)
-        fields = await self.get_fields(force=True)
-        for (type_id, field_id), field in fields.items():
-            fieldid = FieldID(field_type=type_id, field=field_id)
-            await self.compute_global_text_field(fieldid, brain)
+        if basic is None:  # pragma: no cover
+            raise KeyError("Resource not found")
+
+        brain = ResourceBrain(rid=self.uuid)
+
+        # Deleted fields first
+        for fid in deleted_fields or []:
+            brain.delete_field(fid)
+
+        # Security
+        security = await self.get_security()
+        if security is not None:
+            brain.set_security(security)
+
+        # Processing status
+        brain.set_processing_status(basic=basic, previous_status=self._previous_status)
+
+        # Origin and relations
+        origin = await self.get_origin()
+        user_relations = await self.get_user_relations()
+        brain.set_resource_metadata(basic=basic, origin=origin, user_relations=user_relations)
+
+        # Handle field-specific metadata (texts, pargraphs, vectors, etc)
+        if for_fields is None:
+            # Fetch all fields
+            all_fields = await self.get_fields_ids(force=True)
+            fields_to_index = [
+                FieldID(field_type=type_id, field=field_id) for (type_id, field_id) in all_fields
+            ]
+        else:
+            fields_to_index = for_fields
+
+        for fieldid in fields_to_index:
+            field = await self.get_field(fieldid.field, fieldid.field_type, load=False)
+
+            # Add extracted text
+            extracted_text = await field.get_extracted_text()
+            if extracted_text is not None:
+                field_text = extracted_text.text
+                for _, split in extracted_text.split_text.items():
+                    field_text += f" {split} "
+                brain.apply_field_text(fieldid, field_text)
 
             field_metadata = await field.get_field_metadata()
-            field_key = self.generate_field_id(fieldid)
             if field_metadata is not None:
                 page_positions: Optional[FilePagePositions] = None
-                if type_id == FieldType.FILE and isinstance(field, File):
+                if fieldid.field_type == FieldType.FILE and isinstance(field, File):
                     page_positions = await get_file_page_positions(field)
 
                 user_field_metadata = None
@@ -322,12 +366,13 @@ class Resource:
                         (
                             fm
                             for fm in basic.fieldmetadata
-                            if fm.field.field == field_id and fm.field.field_type == type_id
+                            if fm.field.field == fieldid.field
+                            and fm.field.field_type == fieldid.field_type
                         ),
                         None,
                     )
                 brain.apply_field_metadata(
-                    field_key,
+                    fieldid,
                     field_metadata,
                     page_positions=page_positions,
                     extracted_text=await field.get_extracted_text(),
@@ -337,7 +382,7 @@ class Resource:
 
             if self.disable_vectors is False:
                 vectorset_configs = []
-                async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(
+                async for _, vectorset_config in datamanagers.vectorsets.iter(
                     self.txn, kbid=self.kb.kbid
                 ):
                     vectorset_configs.append(vectorset_config)
@@ -350,13 +395,13 @@ class Resource:
                     if vo is not None:
                         dimension = vectorset_config.vectorset_index_config.vector_dimension
                         brain.apply_field_vectors(
-                            field_key,
+                            fieldid,
                             vo,
                             vectorset=vectorset_config.vectorset_id,
                             vector_dimension=dimension,
                             replace_field=reindex,
                         )
-        return brain
+        return brain.brain
 
     # Fields
     async def get_fields(self, force: bool = False) -> dict[tuple[FieldType.ValueType, str], Field]:
@@ -923,62 +968,39 @@ class Resource:
     def generate_field_id(self, field: FieldID) -> str:
         return f"{FIELD_TYPE_PB_TO_STR[field.field_type]}/{field.field}"
 
-    async def compute_security(self, brain: ResourceBrain):
-        security = await self.get_security()
-        if security is None:
-            return
-        brain.set_security(security)
+    # @processor_observer.wrap({"type": "compute_global_tags"})
+    # async def compute_global_tags(self, brain: ResourceBrain):
+    #     origin = await self.get_origin()
+    #     basic = await self.get_basic()
+    #     user_relations = await self.get_user_relations()
+    #     if basic is None:
+    #         raise KeyError("Resource not found")
 
-    @processor_observer.wrap({"type": "compute_global_tags"})
-    async def compute_global_tags(self, brain: ResourceBrain):
-        origin = await self.get_origin()
-        basic = await self.get_basic()
-        user_relations = await self.get_user_relations()
-        if basic is None:
-            raise KeyError("Resource not found")
+    #     brain.set_processing_status(basic=basic, previous_status=self._previous_status)
+    #     brain.set_resource_metadata(basic=basic, origin=origin, user_relations=user_relations)
+    #     for type, field in await self.get_fields_ids(force=True):
+    #         fieldobj = await self.get_field(field, type, load=False)
+    #         fieldid = FieldID(field_type=type, field=field)
+    #         fieldkey = self.generate_field_id(fieldid)
+    #         extracted_metadata = await fieldobj.get_field_metadata()
+    #         valid_user_field_metadata = None
+    #         for user_field_metadata in basic.fieldmetadata:
+    #             if (
+    #                 user_field_metadata.field.field == field
+    #                 and user_field_metadata.field.field_type == type
+    #             ):
+    #                 valid_user_field_metadata = user_field_metadata
+    #                 break
 
-        brain.set_processing_status(basic=basic, previous_status=self._previous_status)
-        brain.set_resource_metadata(basic=basic, origin=origin, user_relations=user_relations)
-        for type, field in await self.get_fields_ids(force=True):
-            fieldobj = await self.get_field(field, type, load=False)
-            fieldid = FieldID(field_type=type, field=field)
-            fieldkey = self.generate_field_id(fieldid)
-            extracted_metadata = await fieldobj.get_field_metadata()
-            valid_user_field_metadata = None
-            for user_field_metadata in basic.fieldmetadata:
-                if (
-                    user_field_metadata.field.field == field
-                    and user_field_metadata.field.field_type == type
-                ):
-                    valid_user_field_metadata = user_field_metadata
-                    break
-
-            generated_by = await fieldobj.generated_by()
-            brain.apply_field_labels(
-                fieldkey,
-                extracted_metadata,
-                self.uuid,
-                generated_by,
-                basic.usermetadata,
-                valid_user_field_metadata,
-            )
-
-    @processor_observer.wrap({"type": "compute_global_text"})
-    async def compute_global_text(self):
-        for type, field in await self.get_fields_ids(force=True):
-            fieldid = FieldID(field_type=type, field=field)
-            await self.compute_global_text_field(fieldid, self.indexer)
-
-    async def compute_global_text_field(self, fieldid: FieldID, brain: ResourceBrain):
-        fieldobj = await self.get_field(fieldid.field, fieldid.field_type, load=False)
-        fieldkey = self.generate_field_id(fieldid)
-        extracted_text = await fieldobj.get_extracted_text()
-        if extracted_text is None:
-            return
-        field_text = extracted_text.text
-        for _, split in extracted_text.split_text.items():
-            field_text += f" {split} "
-        brain.apply_field_text(fieldkey, field_text)
+    #         generated_by = await fieldobj.generated_by()
+    #         brain.apply_field_labels(
+    #             fieldkey,
+    #             extracted_metadata,
+    #             self.uuid,
+    #             generated_by,
+    #             basic.usermetadata,
+    #             valid_user_field_metadata,
+    #         )
 
     def clean(self):
         self._indexer = None

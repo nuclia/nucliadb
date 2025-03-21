@@ -464,6 +464,10 @@ class Processor:
     async def generate_index_message(
         self, resource: Resource, messages: list[writer_pb2.BrokerMessage]
     ) -> PBBrainResource:
+        """
+        This function is responsible for generating the index message that will be sent to nidx.
+        It takes the resource object and the broker messages of the current processor transaction to decide how to create it.
+        """
         reindex = any(message.reindex for message in messages)
         if reindex:
             # When reindexing the whole resource, let's just generate full new index message
@@ -471,13 +475,78 @@ class Processor:
             # As of now, there are some API operations that require fully reindexing all the fields of a resource.
             # An example of this is classification label changes - we need to reindex all the fields of a resource to
             # propagate the label changes to the index.
-            return (await resource.generate_index_message(reindex=True)).brain
+            return await resource.generate_index_message(reindex=True)
         else:
-            # TODO - Ideally we should only update the fields that have been changed in the current transaction.
-            await resource.compute_global_text()
-            await resource.compute_global_tags(resource.indexer)
-            await resource.compute_security(resource.indexer)
-            return resource.indexer.brain
+            modified_fields = self.get_bm_modified_fields(messages)
+            deleted_fields = self.get_bm_deleted_fields(messages)
+            return await resource.generate_index_message(
+                reindex=False,
+                for_fields=modified_fields,
+                deleted_fields=deleted_fields,
+            )
+
+    def get_bm_deleted_fields(
+        self, messages: list[writer_pb2.BrokerMessage]
+    ) -> list[resources_pb2.FieldID]:
+        deleted = set()
+        for message in messages:
+            for field in message.delete_fields:
+                deleted.add(field)
+        return list(deleted)
+
+    def get_bm_modified_fields(
+        self, messages: list[writer_pb2.BrokerMessage]
+    ) -> list[resources_pb2.FieldID]:
+        modified = set()
+        for message in messages:
+            for link in message.links:
+                modified.add(
+                    resources_pb2.FieldID(
+                        field=link,
+                        field_type=resources_pb2.FieldType.LINK,
+                    )
+                )
+            for file in message.files:
+                modified.add(
+                    resources_pb2.FieldID(
+                        field=file,
+                        field_type=resources_pb2.FieldType.FILE,
+                    )
+                )
+            for conv in message.conversations:
+                modified.add(
+                    resources_pb2.FieldID(
+                        field=conv,
+                        field_type=resources_pb2.FieldType.CONVERSATION,
+                    )
+                )
+            for text in message.texts:
+                modified.add(
+                    resources_pb2.FieldID(
+                        field=text,
+                        field_type=resources_pb2.FieldType.TEXT,
+                    )
+                )
+            if message.HasField("basic"):
+                modified.add(
+                    resources_pb2.FieldID(
+                        field="title",
+                        field_type=resources_pb2.FieldType.GENERIC,
+                    )
+                )
+                modified.add(
+                    resources_pb2.FieldID(
+                        field="summary",
+                        field_type=resources_pb2.FieldType.GENERIC,
+                    )
+                )
+            for fm in message.field_metadata:
+                modified.add(fm.field)
+            for et in message.extracted_text:
+                modified.add(et.field)
+            for fv in message.field_vectors:
+                modified.add(fv.field)
+        return list(modified)
 
     async def external_index_delete_resource(
         self, external_index_manager: ExternalIndexManager, resource_uuid: str

@@ -27,7 +27,7 @@ from nucliadb.ingest import logger
 from nucliadb.ingest.orm.utils import compute_paragraph_key
 from nucliadb_models.labels import BASE_LABELS, LABEL_HIDDEN, flatten_resource_labels
 from nucliadb_models.metadata import ResourceProcessingStatus
-from nucliadb_protos import utils_pb2
+from nucliadb_protos import resources_pb2, utils_pb2
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import (
     IndexRelation,
@@ -76,7 +76,11 @@ class ResourceBrain:
         self.brain: PBBrainResource = PBBrainResource(resource=ridobj)
         self.labels: dict[str, set[str]] = deepcopy(BASE_LABELS)
 
-    def apply_field_text(self, field_key: str, text: str):
+    def field_key(self, fid: resources_pb2.FieldID) -> str:
+        return f"{ids.FIELD_TYPE_PB_TO_STR[fid.field_type]}/{fid.field}"
+
+    def apply_field_text(self, fid: resources_pb2.FieldID, text: str):
+        field_key = self.field_key(fid)
         self.brain.texts[field_key].text = text
 
     def _get_paragraph_user_classifications(
@@ -97,7 +101,7 @@ class ResourceBrain:
 
     def apply_field_metadata(
         self,
-        field_key: str,
+        fid: resources_pb2.FieldID,
         metadata: FieldComputedMetadata,
         page_positions: Optional[FilePagePositions],
         extracted_text: Optional[ExtractedText],
@@ -105,6 +109,8 @@ class ResourceBrain:
         *,
         replace_field: bool = False,
     ):
+        field_key = self.field_key(fid)
+
         # To check for duplicate paragraphs
         unique_paragraphs: set[str] = set()
 
@@ -243,16 +249,17 @@ class ResourceBrain:
                     index_relation.facets.append(f"/g/da/{relation.metadata.data_augmentation_task_id}")
                 field_relations.append(index_relation)
 
-    def delete_field(self, field_key: str):
-        ftype, fkey = field_key.split("/")
-        full_field_id = ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
+    def delete_field(self, fid: resources_pb2.FieldID):
+        full_field_id = ids.FieldId.from_pb(
+            rid=self.rid, field_type=fid.field_type, key=fid.field
+        ).full()
         self.brain.paragraphs_to_delete.append(full_field_id)
         self.brain.sentences_to_delete.append(full_field_id)
-        self.brain.relation_fields_to_delete.append(field_key)
+        self.brain.relation_fields_to_delete.append(self.field_key(fid))
 
     def apply_field_vectors(
         self,
-        field_id: str,
+        field_id_pb: resources_pb2.FieldID,
         vo: utils_pb2.VectorObject,
         *,
         vectorset: str,
@@ -260,6 +267,7 @@ class ResourceBrain:
         # cut to specific dimension if specified
         vector_dimension: Optional[int] = None,
     ):
+        field_id = self.field_key(field_id_pb)
         fid = ids.FieldId.from_string(f"{self.rid}/{field_id}")
         for subfield, vectors in vo.split_vectors.items():
             _field_id = ids.FieldId(
