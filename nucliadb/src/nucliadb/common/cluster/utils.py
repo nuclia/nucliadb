@@ -91,8 +91,7 @@ async def get_resource_index_message(kbid: str, resource_id: str) -> Optional[no
             return None
         # We set the reindex=False because we are indexing the resource for the first time in the
         # newly created shards.
-        resource_index_message = (await resource.generate_index_message(reindex=False)).brain
-        return resource_index_message
+        return await resource.generate_index_message(reindex=False)
 
 
 @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8)
