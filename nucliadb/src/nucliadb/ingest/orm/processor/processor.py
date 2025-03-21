@@ -312,25 +312,11 @@ class Processor:
                     await self.apply_resource(message, resource, update=(not created))
 
                 # index message
-
-                if resource:
-                    if message.reindex:
-                        # when reindexing, let's just generate full new index message
-                        # TODO - This should be improved in the future as it's not optimal for very large resources:
-                        # As of now, there are some API operations that require fully reindexing all the fields of a resource.
-                        # An example of this is classification label changes - we need to reindex all the fields of a resource to
-                        # propagate the label changes to the index.
-                        resource.replace_indexer(await resource.generate_index_message(reindex=True))
-                    else:
-                        # TODO - Ideally we should only update the fields that have been changed in the current transaction.
-                        await resource.compute_global_text()
-                        await resource.compute_global_tags(resource.indexer)
-                        await resource.compute_security(resource.indexer)
-
                 if resource and resource.modified:
+                    index_message = await self.generate_index_message(resource, messages)
                     await pgcatalog_update(txn, kbid, resource)
                     await self.index_resource(  # noqa
-                        resource=resource,
+                        index_message=index_message,
                         txn=txn,
                         uuid=uuid,
                         kbid=kbid,
@@ -451,7 +437,7 @@ class Processor:
     @processor_observer.wrap({"type": "index_resource"})
     async def index_resource(
         self,
-        resource: Resource,
+        index_message: PBBrainResource,
         txn: Transaction,
         uuid: str,
         kbid: str,
@@ -460,9 +446,8 @@ class Processor:
         kb: KnowledgeBox,
         source: nodewriter_pb2.IndexMessageSource.ValueType,
     ) -> None:
-        validate_indexable_resource(resource.indexer.brain)
+        validate_indexable_resource(index_message)
         shard = await self.get_or_assign_resource_shard(txn, kb, uuid)
-        index_message = resource.indexer.brain
         external_index_manager = await get_external_index_manager(kbid=kbid)
         if external_index_manager is not None:
             await self.external_index_add_resource(external_index_manager, uuid, index_message)
@@ -475,6 +460,24 @@ class Processor:
                 kb=kbid,
                 source=source,
             )
+
+    async def generate_index_message(
+        self, resource: Resource, messages: list[writer_pb2.BrokerMessage]
+    ) -> PBBrainResource:
+        reindex = any(message.reindex for message in messages)
+        if reindex:
+            # When reindexing the whole resource, let's just generate full new index message
+            # TODO - This should be improved in the future as it's not optimal for very large resources:
+            # As of now, there are some API operations that require fully reindexing all the fields of a resource.
+            # An example of this is classification label changes - we need to reindex all the fields of a resource to
+            # propagate the label changes to the index.
+            return (await resource.generate_index_message(reindex=True)).brain
+        else:
+            # TODO - Ideally we should only update the fields that have been changed in the current transaction.
+            await resource.compute_global_text()
+            await resource.compute_global_tags(resource.indexer)
+            await resource.compute_security(resource.indexer)
+            return resource.indexer.brain
 
     async def external_index_delete_resource(
         self, external_index_manager: ExternalIndexManager, resource_uuid: str
@@ -564,7 +567,10 @@ class Processor:
         resource: Resource,
         update: bool = False,
     ):
-        """Apply broker message to resource object in the database"""
+        """
+        Apply broker message to resource object in the persistence layers (maindb and storage).
+        DO NOT add any indexing logic here.
+        """
         if update:
             await self.maybe_update_resource_basic(resource, message)
 
