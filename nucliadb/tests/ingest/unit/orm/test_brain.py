@@ -173,10 +173,10 @@ def test_set_processing_status(new_status, previous_status, expected_brain_statu
 
 def test_apply_field_metadata_populates_page_number():
     br = ResourceBrain(rid="foo")
-    field_key = "text1"
 
+    field_pb = FieldID(field_type=FieldType.TEXT, field="text1")
     fcmw = FieldComputedMetadataWrapper()
-    fcmw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_key))
+    fcmw.field.CopyFrom(field_pb)
 
     p1 = Paragraph(start=40, end=54, start_seconds=[0], end_seconds=[10], text="Some text here")
     p1.sentences.append(Sentence(start=40, end=54, key="test"))
@@ -191,12 +191,13 @@ def test_apply_field_metadata_populates_page_number():
         2: (40, 100),
     }
     br.apply_field_metadata(
-        field_key,
+        field_pb,
         fcmw.metadata,
         page_positions=page_positions,
         extracted_text=None,
     )
 
+    field_key = br.field_key(field_pb)
     assert len(br.brain.paragraphs[field_key].paragraphs) == 2
     for paragraph in br.brain.paragraphs[field_key].paragraphs.values():
         assert paragraph.metadata.position.page_number == 2
