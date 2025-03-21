@@ -27,7 +27,6 @@ import logging
 
 from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
