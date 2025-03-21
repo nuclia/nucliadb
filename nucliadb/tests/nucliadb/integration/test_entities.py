@@ -132,7 +132,6 @@ async def annotated_entities(
     nucliadb_writer: AsyncClient, text_field: tuple[str, str, str], nucliadb_ingest_grpc
 ):
     kbid, rid, field_id = text_field
-
     resp = await nucliadb_writer.patch(
         f"/kb/{kbid}/resource/{rid}",
         json={
