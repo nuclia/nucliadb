@@ -67,7 +67,7 @@ impl Default for RelationConfig {
         Self {
             // This is the default version when creating a new index.
             // Should typically be set to the latest supported version
-            version: 1,
+            version: 2,
         }
     }
 }
