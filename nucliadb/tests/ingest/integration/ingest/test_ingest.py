@@ -772,8 +772,8 @@ async def test_ingest_update_labels(
     def brain_extractor_mock(mock):
         new_mock = Mock()
 
-        def extract_brain(resource, *args, **kwargs):
-            new_mock(resource.indexer.brain)
+        def extract_brain(index_message, *args, **kwargs):
+            new_mock(index_message)
             return DEFAULT
 
         mock.side_effect = extract_brain

@@ -199,7 +199,8 @@ async def test_vector_duplicate_fields(
         bm.field_metadata.append(fcmw)
         bm.texts["field1"].body = "My text1"
 
-        for i in range(5):
+        # Add some duplicated field_vectors entries
+        for _ in range(5):
             bm.field_vectors.append(
                 ExtractedVectorsWrapper(
                     field=field,
@@ -222,7 +223,10 @@ async def test_vector_duplicate_fields(
         await resource.apply_fields(bm)
         await resource.apply_extracted(bm)
 
+        await txn.commit()
+
     index_message = await resource.generate_index_message(reindex=False)
+
     count = 0
     for field_id, field_paragraphs in index_message.paragraphs.items():
         for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
