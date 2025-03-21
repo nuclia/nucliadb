@@ -462,7 +462,9 @@ class Processor:
             )
 
     async def generate_index_message(
-        self, resource: Resource, messages: list[writer_pb2.BrokerMessage]
+        self,
+        resource: Resource,
+        messages: list[writer_pb2.BrokerMessage],
     ) -> PBBrainResource:
         """
         This function is responsible for generating the index message that will be sent to nidx.
@@ -473,19 +475,24 @@ class Processor:
         if reindex:
             return await resource.generate_index_message(
                 reindex=True,
+                # When reindexing, let's just generate full new index message.
+                # TODO - This should be improved in the future as it's not optimal for very large resources:
+                # As of now, there are some API operations that require fully reindexing all the fields of a resource.
+                # An example of this is classification label changes - we need to reindex all the fields of a resource to
+                # propagate the label changes to the index.
                 updated_fields=None,
                 deleted_fields=deleted_fields,
             )
         else:
             return await resource.generate_index_message(
                 reindex=False,
-                # updated_fields=self.get_bm_modified_fields(messages),
-                updated_fields=None,
+                updated_fields=self.get_bm_modified_fields(messages),
                 deleted_fields=deleted_fields,
             )
 
     def get_bm_deleted_fields(
-        self, messages: list[writer_pb2.BrokerMessage]
+        self,
+        messages: list[writer_pb2.BrokerMessage],
     ) -> list[resources_pb2.FieldID]:
         deleted = []
         for message in messages:
@@ -499,54 +506,36 @@ class Processor:
     ) -> list[resources_pb2.FieldID]:
         modified = set()
         for message in messages:
+            # Added or modified fields need indexing
             for link in message.links:
-                modified.add(
-                    resources_pb2.FieldID(
-                        field=link,
-                        field_type=resources_pb2.FieldType.LINK,
-                    )
-                )
+                modified.add((link, resources_pb2.FieldType.LINK))
             for file in message.files:
-                modified.add(
-                    resources_pb2.FieldID(
-                        field=file,
-                        field_type=resources_pb2.FieldType.FILE,
-                    )
-                )
+                modified.add((file, resources_pb2.FieldType.FILE))
             for conv in message.conversations:
-                modified.add(
-                    resources_pb2.FieldID(
-                        field=conv,
-                        field_type=resources_pb2.FieldType.CONVERSATION,
-                    )
-                )
+                modified.add((conv, resources_pb2.FieldType.CONVERSATION))
             for text in message.texts:
-                modified.add(
-                    resources_pb2.FieldID(
-                        field=text,
-                        field_type=resources_pb2.FieldType.TEXT,
-                    )
-                )
+                modified.add((text, resources_pb2.FieldType.TEXT))
             if message.HasField("basic"):
-                modified.add(
-                    resources_pb2.FieldID(
-                        field="title",
-                        field_type=resources_pb2.FieldType.GENERIC,
-                    )
-                )
-                modified.add(
-                    resources_pb2.FieldID(
-                        field="summary",
-                        field_type=resources_pb2.FieldType.GENERIC,
-                    )
-                )
+                # Add title and summary only if they have changed
+                if message.basic.title != "":
+                    modified.add(("title", resources_pb2.FieldType.GENERIC))
+                if message.basic.summary != "":
+                    modified.add(("summary", resources_pb2.FieldType.GENERIC))
+            # Messages with field metadata, extracted text or field vectors need indexing
             for fm in message.field_metadata:
-                modified.add(fm.field)
+                modified.add((fm.field.field, fm.field.field_type))
             for et in message.extracted_text:
-                modified.add(et.field)
+                modified.add((et.field.field, et.field.field_type))
             for fv in message.field_vectors:
-                modified.add(fv.field)
-        return list(modified)
+                modified.add((fv.field.field, fv.field.field_type))
+            # Any field that has fieldmetadata annotations should be considered as modified
+            # and needs to be reindexed
+            if message.HasField("basic"):
+                for ufm in message.basic.fieldmetadata:
+                    modified.add((ufm.field.field, ufm.field.field_type))
+        return [
+            resources_pb2.FieldID(field=field, field_type=field_type) for field, field_type in modified
+        ]
 
     async def external_index_delete_resource(
         self, external_index_manager: ExternalIndexManager, resource_uuid: str

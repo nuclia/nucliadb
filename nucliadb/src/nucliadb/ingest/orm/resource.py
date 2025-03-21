@@ -301,7 +301,7 @@ class Resource:
         user_relations = await self.get_user_relations()
         brain.set_resource_metadata(basic=basic, origin=origin, user_relations=user_relations)
 
-        # Handle field-specific metadata (texts, pargraphs, vectors, etc)
+        # Handle field-specific index message data
         if updated_fields is None:
             # Fetch all fields
             all_fields = await self.get_fields_ids(force=True)
@@ -327,23 +327,15 @@ class Resource:
                 page_positions: Optional[FilePagePositions] = None
                 if fieldid.field_type == FieldType.FILE and isinstance(field, File):
                     page_positions = await get_file_page_positions(field)
-
-                user_field_metadata = None
-                if basic is not None:
-                    user_field_metadata = next(
-                        (
-                            fm
-                            for fm in basic.fieldmetadata
-                            if fm.field.field == fieldid.field
-                            and fm.field.field_type == fieldid.field_type
-                        ),
-                        None,
-                    )
+                user_field_metadata = next(
+                    (fm for fm in basic.fieldmetadata if fm.field == fieldid),
+                    None,
+                )
                 brain.apply_field_metadata(
                     fieldid,
                     field_metadata,
                     page_positions=page_positions,
-                    extracted_text=await field.get_extracted_text(),
+                    extracted_text=extracted_text,
                     basic_user_field_metadata=user_field_metadata,
                     replace_field=reindex,
                 )
