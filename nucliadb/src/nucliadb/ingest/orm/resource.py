@@ -347,7 +347,15 @@ class Resource:
                     basic_user_field_metadata=user_field_metadata,
                     replace_field=reindex,
                 )
-
+                generated_by = await field.generated_by()
+                brain.apply_field_labels(
+                    fieldid,
+                    field_metadata,
+                    self.uuid,
+                    generated_by,
+                    basic.usermetadata,
+                    user_field_metadata,
+                )
             if self.disable_vectors is False:
                 vectorset_configs = []
                 async for _, vectorset_config in datamanagers.vectorsets.iter(

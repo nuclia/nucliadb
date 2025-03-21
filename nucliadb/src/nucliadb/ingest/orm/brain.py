@@ -583,13 +583,14 @@ class ResourceBrain:
 
     def apply_field_labels(
         self,
-        field_key: str,
+        fid: resources_pb2.FieldID,
         metadata: Optional[FieldComputedMetadata],
         uuid: str,
         generated_by: FieldAuthor,
         basic_user_metadata: Optional[UserMetadata] = None,
         basic_user_fieldmetadata: Optional[UserFieldMetadata] = None,
     ):
+        field_key = self.field_key(fid)
         user_canceled_labels: set[str] = set()
         if basic_user_metadata is not None:
             user_canceled_labels.update(
