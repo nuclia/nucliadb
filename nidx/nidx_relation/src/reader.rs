@@ -40,7 +40,7 @@ use crate::graph_collector::{
 use crate::graph_query_parser::{
     BoolGraphQuery, BoolNodeQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
 };
-use crate::schema::{Schema, encode_field_id, decode_node};
+use crate::schema::{Schema, decode_node, encode_field_id};
 use crate::{RelationConfig, io_maps};
 
 const FUZZY_DISTANCE: u8 = 1;
@@ -168,11 +168,11 @@ impl RelationsReaderService {
         let source_query = self.apply_prefilter(source_query, prefilter);
         let destination_query = self.apply_prefilter(destination_query, prefilter);
 
-        let mut unique_nodes = HashSet::new();
-
         let searcher = self.reader.searcher();
 
         if self.schema.version == 1 {
+            let mut unique_nodes = HashSet::new();
+
             let collector = TopUniqueNodeCollector::new(self.schema.clone(), NodeSelector::SourceNodes, top_k);
             let mut source_nodes = searcher.search(&source_query, &collector)?;
             unique_nodes.extend(source_nodes.drain());
@@ -197,6 +197,8 @@ impl RelationsReaderService {
             };
             Ok(response)
         } else {
+            let mut unique_nodes = HashSet::new();
+
             let collector = TopUniqueNodeCollector2::new(NodeSelector::SourceNodes, top_k);
             let mut source_nodes = searcher.search(&source_query, &collector)?;
             unique_nodes.extend(source_nodes.drain());
