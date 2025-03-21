@@ -477,11 +477,12 @@ class Processor:
             # propagate the label changes to the index.
             return await resource.generate_index_message(reindex=True)
         else:
-            modified_fields = self.get_bm_modified_fields(messages)
+            # modified_fields = self.get_bm_modified_fields(messages)
             deleted_fields = self.get_bm_deleted_fields(messages)
             return await resource.generate_index_message(
                 reindex=False,
-                for_fields=modified_fields,
+                # for_fields=modified_fields,
+                for_fields=None,
                 deleted_fields=deleted_fields,
             )
 
