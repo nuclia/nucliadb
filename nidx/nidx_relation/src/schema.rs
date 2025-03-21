@@ -66,6 +66,8 @@ pub struct Schema {
     pub encoded_source_id: Option<Field>,
     pub encoded_target_id: Option<Field>,
     pub encoded_relation_id: Option<Field>,
+    pub numeric_source_value: Option<Field>,
+    pub numeric_target_value: Option<Field>,
     pub facets: Option<Field>,
 }
 
@@ -101,12 +103,16 @@ impl Schema {
         let mut encoded_source_id = None;
         let mut encoded_target_id = None;
         let mut encoded_relation_id = None;
+        let mut numeric_source_value = None;
+        let mut numeric_target_value = None;
         let mut facets = None;
         if version == 2 {
             resource_field_id = Some(builder.add_bytes_field("resource_field_id", INDEXED | STORED));
             encoded_source_id = Some(builder.add_u64_field("encoded_source_id", FAST));
             encoded_target_id = Some(builder.add_u64_field("encoded_target_id", FAST));
             encoded_relation_id = Some(builder.add_u64_field("encoded_relation_id", FAST));
+            numeric_source_value = Some(builder.add_u64_field("numeric_source_value", INDEXED));
+            numeric_target_value = Some(builder.add_u64_field("numeric_target_value", INDEXED));
             facets = Some(builder.add_facet_field("facets", STORED));
         }
 
@@ -131,6 +137,8 @@ impl Schema {
             encoded_source_id,
             encoded_target_id,
             encoded_relation_id,
+            numeric_source_value,
+            numeric_target_value,
             facets,
         }
     }
