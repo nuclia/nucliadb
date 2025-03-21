@@ -19,7 +19,7 @@
 //
 
 use crate::io_maps;
-use crate::schema::{Schema, encode_field_id};
+use crate::schema::{Schema, encode_field_id, encode_node, encode_relation};
 use anyhow::anyhow;
 use nidx_protos::noderesources::IndexRelation;
 use nidx_protos::prost::*;
@@ -99,12 +99,24 @@ pub fn index_relations(
             let field = field_key.ok_or(anyhow!("Field ID required for v2"))?;
             new_doc.add_bytes(schema.resource_id, rid.as_bytes());
             new_doc.add_bytes(schema.resource_field_id.unwrap(), encode_field_id(rid, field));
+
             for facet in &index_relation.facets {
                 new_doc.add_facet(schema.facets.unwrap(), Facet::from_text(facet)?);
             }
-            // encoded_source_id = Some(builder.add_u64_field("encoded_source_id", FAST));
-            // encoded_target_id = Some(builder.add_u64_field("encoded_target_id", FAST));
-            // todo!();
+
+            // Encode source and target nodes and relation for faster retrieval
+            let encoded_source_id = schema.encoded_source_id.unwrap();
+            for b in encode_node(source_value, source_type, source_subtype) {
+                new_doc.add_u64(encoded_source_id, b);
+            }
+            let encoded_target_id = schema.encoded_target_id.unwrap();
+            for b in encode_node(target_value, target_type, target_subtype) {
+                new_doc.add_u64(encoded_target_id, b);
+            }
+            let encoded_relation_id = schema.encoded_relation_id.unwrap();
+            for b in encode_relation(relationship, label) {
+                new_doc.add_u64(encoded_relation_id, b);
+            }
         }
 
         if let Some(metadata) = relation.metadata.as_ref() {
