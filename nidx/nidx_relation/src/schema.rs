@@ -111,8 +111,8 @@ impl Schema {
             encoded_source_id = Some(builder.add_u64_field("encoded_source_id", FAST));
             encoded_target_id = Some(builder.add_u64_field("encoded_target_id", FAST));
             encoded_relation_id = Some(builder.add_u64_field("encoded_relation_id", FAST));
-            numeric_source_value = Some(builder.add_u64_field("numeric_source_value", INDEXED));
-            numeric_target_value = Some(builder.add_u64_field("numeric_target_value", INDEXED));
+            numeric_source_value = Some(builder.add_u64_field("numeric_source_value", INDEXED | STORED));
+            numeric_target_value = Some(builder.add_u64_field("numeric_target_value", INDEXED | STORED));
             facets = Some(builder.add_facet_field("facets", STORED));
         }
 
