@@ -314,7 +314,7 @@ class Processor:
                 # index message
                 if resource and resource.modified:
                     index_message = await self.generate_index_message(resource, messages)
-                    await pgcatalog_update(txn, kbid, resource)
+                    await pgcatalog_update(txn, kbid, resource, index_message)
                     await self.index_resource(  # noqa
                         index_message=index_message,
                         txn=txn,
@@ -767,13 +767,6 @@ class Processor:
                 resource.basic.metadata.status = resources_pb2.Metadata.Status.ERROR
                 await resource.set_basic(resource.basic)
                 await txn.commit()
-
-            resource.indexer.set_processing_status(
-                basic=resource.basic, previous_status=resource._previous_status
-            )
-            await self.index_node_shard_manager.add_resource(
-                shard, resource.indexer.brain, seqid, partition=partition, kb=kb.kbid
-            )
         except Exception:
             logger.warning("Error while marking resource as error", exc_info=True)
 

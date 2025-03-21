@@ -116,7 +116,6 @@ class Resource:
         self.extra: Optional[PBExtra] = None
         self.security: Optional[utils_pb2.Security] = None
         self.modified: bool = False
-        self._indexer: Optional[ResourceBrain] = None
         self._modified_extracted_text: list[FieldID] = []
 
         self.txn = txn
@@ -127,15 +126,6 @@ class Resource:
         self.disable_vectors = disable_vectors
         self._previous_status: Optional[Metadata.Status.ValueType] = None
         self.user_relations: Optional[PBRelations] = None
-
-    @property
-    def indexer(self) -> ResourceBrain:
-        if self._indexer is None:
-            self._indexer = ResourceBrain(rid=self.uuid)
-        return self._indexer
-
-    def replace_indexer(self, indexer: ResourceBrain) -> None:
-        self._indexer = indexer
 
     async def set_slug(self):
         basic = await self.get_basic()
@@ -205,28 +195,6 @@ class Resource:
 
                 del self.basic.fieldmetadata[:]
                 self.basic.fieldmetadata.extend(updated)
-
-                # All modified field metadata should be indexed
-                # TODO: could be improved to only index the diff
-                # for user_field_metadata in self.basic.fieldmetadata:
-                #     field_id = self.generate_field_id(fieldmetadata.field)
-                #     field_obj = await self.get_field(
-                #         fieldmetadata.field.field, fieldmetadata.field.field_type
-                #     )
-                #     field_metadata = await field_obj.get_field_metadata()
-                #     if field_metadata is not None:
-                #         page_positions: Optional[FilePagePositions] = None
-                #         if isinstance(field_obj, File):
-                #             page_positions = await get_file_page_positions(field_obj)
-
-                # self.indexer.apply_field_metadata(
-                #     field_id,
-                #     field_metadata,
-                #     page_positions=page_positions,
-                #     extracted_text=await field_obj.get_extracted_text(),
-                #     basic_user_field_metadata=user_field_metadata,
-                #     replace_field=True,
-                # )
 
         # Some basic fields are computed off field metadata.
         # This means we need to recompute upon field deletions.
@@ -474,12 +442,6 @@ class Resource:
         if self.all_fields_keys is not None:
             if field in self.all_fields_keys:
                 self.all_fields_keys.remove(field)
-
-        # field_key = self.generate_field_id(FieldID(field_type=type, field=key))
-
-        # metadata = await field_obj.get_field_metadata()
-        # if metadata is not None:
-        #     self.indexer.delete_field(field_key=field_key)
 
         await field_obj.delete()
 
@@ -857,35 +819,6 @@ class Resource:
             load=False,
         )
         await field_obj.set_field_metadata(field_metadata)
-        # field_key = self.generate_field_id(field_metadata.field)
-
-        # page_positions: Optional[FilePagePositions] = None
-        # if field_metadata.field.field_type == FieldType.FILE and isinstance(field_obj, File):
-        #     page_positions = await get_file_page_positions(field_obj)
-
-        # user_field_metadata = next(
-        #     (
-        #         fm
-        #         for fm in self.basic.fieldmetadata
-        #         if fm.field.field == field_metadata.field.field
-        #         and fm.field.field_type == field_metadata.field.field_type
-        #     ),
-        #     None,
-        # )
-
-        # extracted_text = await field_obj.get_extracted_text()
-        # apply_field_metadata = partial(
-        #     self.indexer.apply_field_metadata,
-        #     field_key,
-        #     metadata,
-        #     page_positions=page_positions,
-        #     extracted_text=extracted_text,
-        #     basic_user_field_metadata=user_field_metadata,
-        #     replace_field=True,
-        # )
-        # loop = asyncio.get_running_loop()
-        # await loop.run_in_executor(_executor, apply_field_metadata)
-
         maybe_update_basic_thumbnail(self.basic, field_metadata.metadata.metadata.thumbnail)
 
         update_basic_computedmetadata_classifications(self.basic, field_metadata)
@@ -938,24 +871,6 @@ class Resource:
             if vo is None:
                 raise AttributeError("Vector object not found on set_vectors")
 
-            # Prepare vectors to be indexed
-
-            # field_key = self.generate_field_id(field_vectors.field)
-            # dimension = vectorset.vectorset_index_config.vector_dimension
-            # if not dimension:
-            #     raise ValueError(f"Vector dimension not set for vectorset '{vectorset.vectorset_id}'")
-
-            # apply_field_vectors_partial = partial(
-            #     self.indexer.apply_field_vectors,
-            #     field_key,
-            #     vo,
-            #     vectorset=vectorset.vectorset_id,
-            #     replace_field=True,
-            #     vector_dimension=dimension,
-            # )
-            # loop = asyncio.get_running_loop()
-            # await loop.run_in_executor(_executor, apply_field_vectors_partial)
-
     async def _apply_field_large_metadata(self, field_large_metadata: LargeComputedMetadataWrapper):
         field_obj = await self.get_field(
             field_large_metadata.field.field,
@@ -968,42 +883,7 @@ class Resource:
     def generate_field_id(self, field: FieldID) -> str:
         return f"{FIELD_TYPE_PB_TO_STR[field.field_type]}/{field.field}"
 
-    # @processor_observer.wrap({"type": "compute_global_tags"})
-    # async def compute_global_tags(self, brain: ResourceBrain):
-    #     origin = await self.get_origin()
-    #     basic = await self.get_basic()
-    #     user_relations = await self.get_user_relations()
-    #     if basic is None:
-    #         raise KeyError("Resource not found")
-
-    #     brain.set_processing_status(basic=basic, previous_status=self._previous_status)
-    #     brain.set_resource_metadata(basic=basic, origin=origin, user_relations=user_relations)
-    #     for type, field in await self.get_fields_ids(force=True):
-    #         fieldobj = await self.get_field(field, type, load=False)
-    #         fieldid = FieldID(field_type=type, field=field)
-    #         fieldkey = self.generate_field_id(fieldid)
-    #         extracted_metadata = await fieldobj.get_field_metadata()
-    #         valid_user_field_metadata = None
-    #         for user_field_metadata in basic.fieldmetadata:
-    #             if (
-    #                 user_field_metadata.field.field == field
-    #                 and user_field_metadata.field.field_type == type
-    #             ):
-    #                 valid_user_field_metadata = user_field_metadata
-    #                 break
-
-    #         generated_by = await fieldobj.generated_by()
-    #         brain.apply_field_labels(
-    #             fieldkey,
-    #             extracted_metadata,
-    #             self.uuid,
-    #             generated_by,
-    #             basic.usermetadata,
-    #             valid_user_field_metadata,
-    #         )
-
     def clean(self):
-        self._indexer = None
         self.txn = None
 
 
