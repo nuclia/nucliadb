@@ -246,7 +246,11 @@ impl RelationsReaderService {
 
             let relations = matching_docs
                 .into_iter()
-                .map(|doc| io_maps::doc_to_graph_relation(&self.schema, &doc))
+                .map(|doc| nidx_protos::graph_search_response::Relation {
+                    relation_type: io_maps::u64_to_relation_type::<i32>(self.schema.relationship(&doc)),
+                    label: self.schema.relationship_label(&doc).to_string(),
+                    metadata: None,
+                })
                 .collect();
 
             let response = nidx_protos::GraphSearchResponse {
@@ -260,12 +264,12 @@ impl RelationsReaderService {
 
             let relations = matching_docs
                 .into_iter()
-                .map(|(encoded_relation, doc)| {
+                .map(|encoded_relation| {
                     let (relation_type, relation_label) = decode_relation(&encoded_relation);
                     nidx_protos::graph_search_response::Relation {
                         relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),
                         label: relation_label,
-                        metadata: io_maps::decode_metadata(&self.schema, &doc),
+                        metadata: None,
                     }
                 })
                 .collect();
