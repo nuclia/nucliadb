@@ -267,7 +267,7 @@ pub fn encode_node(node_value: &str, node_type: u64, node_subtype: &str) -> Vec<
 
     if !slice.is_empty() {
         // we can write some bytes but not enough to fill the buffer
-        buffer[(8 - free)..(8 - free + slice.len())].copy_from_slice(&slice[..]);
+        buffer[(8 - free)..(8 - free + slice.len())].copy_from_slice(slice);
         free -= slice.len();
     }
 
@@ -312,7 +312,7 @@ pub fn decode_node(data: &[u64]) -> (String, u64, String) {
     let mut subtype_encoded = Vec::with_capacity(encoded_subtype_len);
     let mut value_encoded = Vec::with_capacity(encoded_value_len);
 
-    let mut slice = &data[..];
+    let mut slice = data;
     let mut filled = 3;
 
     if encoded_subtype_len > 0 {
@@ -419,6 +419,7 @@ pub fn encode_relation(relation_type: u64, relation_label: &str) -> Vec<u64> {
     out
 }
 
+#[allow(dead_code)]
 pub fn decode_relation(data: &[u64]) -> (u64, String) {
     let buffer = data[0].to_le_bytes();
     let relation_type = buffer[0] as u64;
