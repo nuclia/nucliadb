@@ -467,6 +467,7 @@ class Processor:
         if external_index_manager is not None:
             await self.external_index_add_resource(external_index_manager, uuid, index_message)
         else:
+            breakpoint()
             await self.index_node_shard_manager.add_resource(
                 shard,
                 index_message,
