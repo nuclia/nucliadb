@@ -222,8 +222,9 @@ async def test_vector_duplicate_fields(
         await resource.apply_fields(bm)
         await resource.apply_extracted(bm)
 
+    index_message = await resource.generate_index_message(reindex=False)
     count = 0
-    for field_id, field_paragraphs in resource.indexer.brain.paragraphs.items():
+    for field_id, field_paragraphs in index_message.paragraphs.items():
         for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
             for vectorset_id, vectorset_sentences in paragraph.vectorsets_sentences.items():
                 for vector_id, sentence in vectorset_sentences.sentences.items():
