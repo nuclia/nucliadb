@@ -30,7 +30,7 @@ class Settings(pydantic_settings.BaseSettings):
         description="Maximum number of concurrent KB migrations allowed.",
     )
     max_concurrent_rollover_resources: int = pydantic.Field(
-        default=20,
+        default=5,
         description="Maximum number of concurrent index operations during rollover.",
     )
 
