@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::{hash_map::Entry, HashMap, HashSet};
+use std::collections::{HashMap, HashSet, hash_map::Entry};
 
 use tantivy::{
     DocId, Score, SegmentOrdinal, SegmentReader, TantivyDocument,
@@ -363,7 +363,10 @@ impl SegmentCollector for TopUniqueRelationSegmentCollector2 {
             return;
         }
 
-        let relation = self.encoded_relation_reader.values_for_doc(doc_id).collect::<Vec<u64>>();
+        let relation = self
+            .encoded_relation_reader
+            .values_for_doc(doc_id)
+            .collect::<Vec<u64>>();
         if let Entry::Vacant(entry) = self.unique.entry(relation) {
             // log and skip documents not in the store. This should not happen
             let doc = match self.store_reader.get::<TantivyDocument>(doc_id) {
