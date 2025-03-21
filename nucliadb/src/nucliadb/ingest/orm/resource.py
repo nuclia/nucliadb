@@ -19,11 +19,9 @@
 #
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from functools import partial
 from typing import TYPE_CHECKING, Any, Optional, Sequence, Type
 
 from nucliadb.common import datamanagers
@@ -210,25 +208,25 @@ class Resource:
 
                 # All modified field metadata should be indexed
                 # TODO: could be improved to only index the diff
-                for user_field_metadata in self.basic.fieldmetadata:
-                    field_id = self.generate_field_id(fieldmetadata.field)
-                    field_obj = await self.get_field(
-                        fieldmetadata.field.field, fieldmetadata.field.field_type
-                    )
-                    field_metadata = await field_obj.get_field_metadata()
-                    if field_metadata is not None:
-                        page_positions: Optional[FilePagePositions] = None
-                        if isinstance(field_obj, File):
-                            page_positions = await get_file_page_positions(field_obj)
+                # for user_field_metadata in self.basic.fieldmetadata:
+                #     field_id = self.generate_field_id(fieldmetadata.field)
+                #     field_obj = await self.get_field(
+                #         fieldmetadata.field.field, fieldmetadata.field.field_type
+                #     )
+                #     field_metadata = await field_obj.get_field_metadata()
+                #     if field_metadata is not None:
+                #         page_positions: Optional[FilePagePositions] = None
+                #         if isinstance(field_obj, File):
+                #             page_positions = await get_file_page_positions(field_obj)
 
-                        self.indexer.apply_field_metadata(
-                            field_id,
-                            field_metadata,
-                            page_positions=page_positions,
-                            extracted_text=await field_obj.get_extracted_text(),
-                            basic_user_field_metadata=user_field_metadata,
-                            replace_field=True,
-                        )
+                # self.indexer.apply_field_metadata(
+                #     field_id,
+                #     field_metadata,
+                #     page_positions=page_positions,
+                #     extracted_text=await field_obj.get_extracted_text(),
+                #     basic_user_field_metadata=user_field_metadata,
+                #     replace_field=True,
+                # )
 
         # Some basic fields are computed off field metadata.
         # This means we need to recompute upon field deletions.
@@ -432,11 +430,11 @@ class Resource:
             if field in self.all_fields_keys:
                 self.all_fields_keys.remove(field)
 
-        field_key = self.generate_field_id(FieldID(field_type=type, field=key))
+        # field_key = self.generate_field_id(FieldID(field_type=type, field=key))
 
-        metadata = await field_obj.get_field_metadata()
-        if metadata is not None:
-            self.indexer.delete_field(field_key=field_key)
+        # metadata = await field_obj.get_field_metadata()
+        # if metadata is not None:
+        #     self.indexer.delete_field(field_key=field_key)
 
         await field_obj.delete()
 
@@ -655,12 +653,9 @@ class Resource:
 
         update_basic_languages(self.basic, extracted_languages)
 
-        # Upload to binary storage
-        # Vector indexing
         if self.disable_vectors is False:
             await self._apply_extracted_vectors(message.field_vectors)
 
-        # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
             await self._apply_field_large_metadata(field_large_metadata)
 
@@ -816,35 +811,35 @@ class Resource:
             field_metadata.field.field_type,
             load=False,
         )
-        metadata = await field_obj.set_field_metadata(field_metadata)
-        field_key = self.generate_field_id(field_metadata.field)
+        await field_obj.set_field_metadata(field_metadata)
+        # field_key = self.generate_field_id(field_metadata.field)
 
-        page_positions: Optional[FilePagePositions] = None
-        if field_metadata.field.field_type == FieldType.FILE and isinstance(field_obj, File):
-            page_positions = await get_file_page_positions(field_obj)
+        # page_positions: Optional[FilePagePositions] = None
+        # if field_metadata.field.field_type == FieldType.FILE and isinstance(field_obj, File):
+        #     page_positions = await get_file_page_positions(field_obj)
 
-        user_field_metadata = next(
-            (
-                fm
-                for fm in self.basic.fieldmetadata
-                if fm.field.field == field_metadata.field.field
-                and fm.field.field_type == field_metadata.field.field_type
-            ),
-            None,
-        )
+        # user_field_metadata = next(
+        #     (
+        #         fm
+        #         for fm in self.basic.fieldmetadata
+        #         if fm.field.field == field_metadata.field.field
+        #         and fm.field.field_type == field_metadata.field.field_type
+        #     ),
+        #     None,
+        # )
 
-        extracted_text = await field_obj.get_extracted_text()
-        apply_field_metadata = partial(
-            self.indexer.apply_field_metadata,
-            field_key,
-            metadata,
-            page_positions=page_positions,
-            extracted_text=extracted_text,
-            basic_user_field_metadata=user_field_metadata,
-            replace_field=True,
-        )
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(_executor, apply_field_metadata)
+        # extracted_text = await field_obj.get_extracted_text()
+        # apply_field_metadata = partial(
+        #     self.indexer.apply_field_metadata,
+        #     field_key,
+        #     metadata,
+        #     page_positions=page_positions,
+        #     extracted_text=extracted_text,
+        #     basic_user_field_metadata=user_field_metadata,
+        #     replace_field=True,
+        # )
+        # loop = asyncio.get_running_loop()
+        # await loop.run_in_executor(_executor, apply_field_metadata)
 
         maybe_update_basic_thumbnail(self.basic, field_metadata.metadata.metadata.thumbnail)
 
@@ -882,7 +877,7 @@ class Resource:
             # Store vectors in the resource
 
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
-                # skipping because field does not exist
+                # Skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
                 return
 
@@ -900,21 +895,21 @@ class Resource:
 
             # Prepare vectors to be indexed
 
-            field_key = self.generate_field_id(field_vectors.field)
-            dimension = vectorset.vectorset_index_config.vector_dimension
-            if not dimension:
-                raise ValueError(f"Vector dimension not set for vectorset '{vectorset.vectorset_id}'")
+            # field_key = self.generate_field_id(field_vectors.field)
+            # dimension = vectorset.vectorset_index_config.vector_dimension
+            # if not dimension:
+            #     raise ValueError(f"Vector dimension not set for vectorset '{vectorset.vectorset_id}'")
 
-            apply_field_vectors_partial = partial(
-                self.indexer.apply_field_vectors,
-                field_key,
-                vo,
-                vectorset=vectorset.vectorset_id,
-                replace_field=True,
-                vector_dimension=dimension,
-            )
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(_executor, apply_field_vectors_partial)
+            # apply_field_vectors_partial = partial(
+            #     self.indexer.apply_field_vectors,
+            #     field_key,
+            #     vo,
+            #     vectorset=vectorset.vectorset_id,
+            #     replace_field=True,
+            #     vector_dimension=dimension,
+            # )
+            # loop = asyncio.get_running_loop()
+            # await loop.run_in_executor(_executor, apply_field_vectors_partial)
 
     async def _apply_field_large_metadata(self, field_large_metadata: LargeComputedMetadataWrapper):
         field_obj = await self.get_field(
