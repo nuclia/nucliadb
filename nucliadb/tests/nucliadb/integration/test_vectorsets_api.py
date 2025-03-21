@@ -20,6 +20,7 @@
 from typing import Optional
 from unittest.mock import patch
 
+from nucliadb_models.search import KnowledgeboxCounters
 import pytest
 from httpx import AsyncClient
 
@@ -280,6 +281,12 @@ async def test_vectorset_migration(
 
     await inject_message(nucliadb_ingest_grpc, bm)
 
+    counters = await get_counters(nucliadb_reader, kbid)
+    assert counters.resources == 1
+    assert counters.paragraphs == 2
+    assert counters.sentences == 1
+    assert counters.fields == 4
+
     # Make a search and check that the document is found
     await _check_search(nucliadb_reader, kbid)
 
@@ -312,7 +319,16 @@ async def test_vectorset_migration(
     ev.vectors.vectors.vectors.append(vector)
     bm2.field_vectors.append(ev)
 
+    breakpoint()
+
     await inject_message(nucliadb_ingest_grpc, bm2)
+
+    counters_after = await get_counters(nucliadb_reader, kbid)
+    breakpoint()
+    assert counters_after.resources == 1
+    assert counters_after.paragraphs == 2
+    assert counters_after.sentences == 1
+    assert counters_after.fields == 4
 
     # Make a search with the new vectorset and check that the document is found
     await _check_search(nucliadb_reader, kbid, vectorset="en-2024-05-06")
@@ -337,6 +353,12 @@ async def test_vectorset_migration(
     # With the default vectorset the document should also be found
     await _check_search(nucliadb_reader, kbid, vectorset="multilingual-2024-05-06")
     await _check_search(nucliadb_reader, kbid)
+
+
+async def get_counters(nucliadb_reader: AsyncClient, kbid: str) -> KnowledgeboxCounters:
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/counters")
+    assert resp.status_code == 200, resp.text
+    return KnowledgeboxCounters.model_validate(resp.json())
 
 
 async def _check_search(nucliadb_reader: AsyncClient, kbid: str, vectorset: Optional[str] = None):
