@@ -27,7 +27,6 @@ import logging
 
 from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -38,7 +37,10 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     await maybe_fix_vector_dimensions(context, kbid)
-    await rollover_kb_index(context, kbid)
+
+    # We only need 1 rollover migration defined at a time; otherwise, we will
+    # possibly run many for a kb when we only ever need to run one
+    # await rollover_kb_index(context, kbid)
 
 
 async def maybe_fix_vector_dimensions(context: ExecutionContext, kbid: str) -> None:
