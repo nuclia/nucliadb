@@ -158,11 +158,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up PDM
-        uses: pdm-project/setup-pdm@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12.5"
-          cache: "true"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
 
       # Needed for nidx_protos (rust)
       - name: Install Protoc
@@ -171,7 +171,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install nucliadb
-        run: pdm sync -d --clean --no-editable
+        run: uv sync --no-editable --no-group nidx
 
       - name: Authenticate to Google Cloud
         id: gcp-auth

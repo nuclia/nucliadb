@@ -71,7 +71,7 @@ venv:  ## Initializes an environment
 	pyenv local nucliadb
 
 install:
-	pdm sync -d
+	uv sync
 
 install__deprecated: ## Install dependencies (on the active environment)
 	pip install --upgrade pip wheel

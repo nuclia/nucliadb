@@ -8,6 +8,6 @@
 # Install and run tests
 
 ```bash
-pdm sync -d
+uv sync
 make test
 ```
