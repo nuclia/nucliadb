@@ -35,12 +35,12 @@ use tantivy::{DocAddress, Index, IndexReader, Searcher};
 use uuid::Uuid;
 
 use crate::graph_collector::{
-    NodeSelector, TopUniqueNodeCollector, TopUniqueNodeCollector2, TopUniqueRelationCollector,
+    NodeSelector, TopUniqueNodeCollector, TopUniqueNodeCollector2, TopUniqueRelationCollector, TopUniqueRelationCollector2,
 };
 use crate::graph_query_parser::{
     BoolGraphQuery, BoolNodeQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
 };
-use crate::schema::{Schema, decode_node, encode_field_id};
+use crate::schema::{decode_node, decode_relation, encode_field_id, Schema};
 use crate::{RelationConfig, io_maps};
 
 const FUZZY_DISTANCE: u8 = 1;
@@ -237,20 +237,44 @@ impl RelationsReaderService {
         let index_query = parser.parse_bool(query);
         let index_query = self.apply_prefilter(index_query, prefilter);
 
-        let collector = TopUniqueRelationCollector::new(self.schema.clone(), top_k);
         let searcher = self.reader.searcher();
-        let matching_docs = searcher.search(&index_query, &collector)?;
 
-        let relations = matching_docs
-            .into_iter()
-            .map(|doc| io_maps::doc_to_graph_relation(&self.schema, &doc))
-            .collect();
+        if self.schema.version == 1 {
+            let collector = TopUniqueRelationCollector::new(self.schema.clone(), top_k);
+            let matching_docs = searcher.search(&index_query, &collector)?;
 
-        let response = nidx_protos::GraphSearchResponse {
-            relations,
-            ..Default::default()
-        };
-        Ok(response)
+            let relations = matching_docs
+                .into_iter()
+                .map(|doc| io_maps::doc_to_graph_relation(&self.schema, &doc))
+                .collect();
+
+            let response = nidx_protos::GraphSearchResponse {
+                relations,
+                ..Default::default()
+            };
+            Ok(response)
+        } else {
+            let collector = TopUniqueRelationCollector2::new(top_k);
+            let matching_docs = searcher.search(&index_query, &collector)?;
+
+            let relations = matching_docs
+                .into_iter()
+                .map(|(encoded_relation, doc)| {
+                    let (relation_type, relation_label) = decode_relation(&encoded_relation);
+                    nidx_protos::graph_search_response::Relation {
+                        relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),
+                        label: relation_label,
+                        metadata: io_maps::decode_metadata(&self.schema, &doc),
+                    }
+                })
+                .collect();
+
+            let response = nidx_protos::GraphSearchResponse {
+                relations,
+                ..Default::default()
+            };
+            Ok(response)
+        }
     }
 
     fn apply_prefilter(&self, query: Box<dyn Query>, prefilter: &PrefilterResult) -> Box<dyn Query> {
