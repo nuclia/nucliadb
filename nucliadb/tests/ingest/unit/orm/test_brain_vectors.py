@@ -23,6 +23,7 @@ import uuid
 from nucliadb.common import ids
 from nucliadb.ingest.orm.brain import ResourceBrain
 from nucliadb_protos import utils_pb2
+from nucliadb_protos.resources_pb2 import FieldID, FieldType
 
 
 def test_apply_field_vectors_for_matryoshka_embeddings():
@@ -30,8 +31,8 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
     MATRYOSHKA_DIMENSION = 10
 
     rid = uuid.uuid4().hex
-    field_id = f"u/{uuid.uuid4().hex}"
-    fid = ids.FieldId.from_string(f"{rid}/{field_id}")
+    fid_pb = FieldID(field_type=FieldType.LINK, field=uuid.uuid4().hex)
+    fid = ids.FieldId.from_pb(rid=rid, field_type=fid_pb.field_type, key=fid_pb.field)
     vectors = utils_pb2.VectorObject(
         vectors=utils_pb2.Vectors(
             vectors=[
@@ -58,7 +59,8 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
     )
 
     brain = ResourceBrain(rid=rid)
-    brain.apply_field_vectors(field_id, vectors, vector_dimension=None, vectorset="my-vectorset")
+    brain.apply_field_vectors(fid_pb, vectors, vector_dimension=None, vectorset="my-vectorset")
+    field_id = brain.field_key(fid_pb)
     vector = (
         brain.brain.paragraphs[field_id]
         .paragraphs[paragraph_key.full()]
@@ -69,7 +71,7 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
 
     brain = ResourceBrain(rid=rid)
     brain.apply_field_vectors(
-        field_id, vectors, vector_dimension=MATRYOSHKA_DIMENSION, vectorset="my-vectorset"
+        fid_pb, vectors, vector_dimension=MATRYOSHKA_DIMENSION, vectorset="my-vectorset"
     )
     vector = (
         brain.brain.paragraphs[field_id]
