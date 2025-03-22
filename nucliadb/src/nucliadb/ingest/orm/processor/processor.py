@@ -270,6 +270,7 @@ class Processor:
                 created = False
 
                 for message in messages:
+                    breakpoint()
                     if resource is not None:
                         assert resource.uuid == message.uuid
 
