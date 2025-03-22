@@ -322,15 +322,15 @@ class Resource:
                     field_text += f" {split} "
                 brain.apply_field_text(fieldid, field_text)
 
+            user_field_metadata = next(
+                (fm for fm in basic.fieldmetadata if fm.field == fieldid),
+                None,
+            )
             field_metadata = await field.get_field_metadata()
             if field_metadata is not None:
                 page_positions: Optional[FilePagePositions] = None
                 if fieldid.field_type == FieldType.FILE and isinstance(field, File):
                     page_positions = await get_file_page_positions(field)
-                user_field_metadata = next(
-                    (fm for fm in basic.fieldmetadata if fm.field == fieldid),
-                    None,
-                )
                 brain.apply_field_metadata(
                     fieldid,
                     field_metadata,
@@ -339,15 +339,15 @@ class Resource:
                     basic_user_field_metadata=user_field_metadata,
                     replace_field=reindex,
                 )
-                generated_by = await field.generated_by()
-                brain.apply_field_labels(
-                    fieldid,
-                    field_metadata,
-                    self.uuid,
-                    generated_by,
-                    basic.usermetadata,
-                    user_field_metadata,
-                )
+            generated_by = await field.generated_by()
+            brain.apply_field_labels(
+                fieldid,
+                field_metadata,
+                self.uuid,
+                generated_by,
+                basic.usermetadata,
+                user_field_metadata,
+            )
             if self.disable_vectors is False:
                 vectorset_configs = []
                 async for _, vectorset_config in datamanagers.vectorsets.iter(
