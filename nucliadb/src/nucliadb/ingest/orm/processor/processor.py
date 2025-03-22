@@ -739,20 +739,6 @@ class Processor:
         try:
             async with self.driver.transaction() as txn:
                 kb.txn = resource.txn = txn
-
-                shard_id = await datamanagers.resources.get_resource_shard_id(
-                    txn, kbid=kb.kbid, rid=resource.uuid
-                )
-                shard = None
-                if shard_id is not None:
-                    shard = await kb.get_resource_shard(shard_id)
-                if shard is None:
-                    logger.warning(
-                        "Unable to mark resource as error, shard is None. "
-                        "This should not happen so you did something special to get here."
-                    )
-                    return
-
                 resource.basic.metadata.status = resources_pb2.Metadata.Status.ERROR
                 await resource.set_basic(resource.basic)
                 await txn.commit()
