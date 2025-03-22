@@ -311,6 +311,10 @@ class Resource:
         else:
             fields_to_index = updated_fields
 
+        # If we are reindexing a field, we need to flag the index
+        # that needs to delete old entries for that field
+        replace_field = reindex or updated_fields is not None
+
         for fieldid in fields_to_index:
             field = await self.get_field(fieldid.field, fieldid.field_type, load=True)
             if field.value is None:
@@ -339,7 +343,7 @@ class Resource:
                     page_positions=page_positions,
                     extracted_text=extracted_text,
                     basic_user_field_metadata=user_field_metadata,
-                    replace_field=reindex,
+                    replace_field=replace_field,
                 )
             generated_by = await field.generated_by()
             brain.apply_field_labels(
@@ -369,7 +373,7 @@ class Resource:
                             vo,
                             vectorset=vectorset_config.vectorset_id,
                             vector_dimension=dimension,
-                            replace_field=reindex,
+                            replace_field=replace_field,
                         )
         return brain.brain
 
