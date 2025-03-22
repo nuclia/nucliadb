@@ -40,9 +40,9 @@ from nucliadb_protos.resources_pb2 import (
 def test_apply_field_metadata_marks_duplicated_paragraphs():
     # Simulate a field with two paragraphs that contain the same text
     br = ResourceBrain(rid=str(uuid4()))
-    field_key = "text1"
+    field = FieldID(field_type=FieldType.TEXT, field="text1")
     fcmw = FieldComputedMetadataWrapper()
-    fcmw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_key))
+    fcmw.field.CopyFrom(field)
     paragraph = "Some paragraph here. "
     text_1 = f"{paragraph}{paragraph}"
     first_occurrence = [0, len(paragraph)]
@@ -57,12 +57,12 @@ def test_apply_field_metadata_marks_duplicated_paragraphs():
     fcmw.metadata.metadata.paragraphs.append(p2)
 
     br.apply_field_metadata(
-        field_key,
+        field,
         fcmw.metadata,
         page_positions={},
         extracted_text=et,
     )
-
+    field_key = br.field_key(fcmw.field)
     assert len(br.brain.paragraphs[field_key].paragraphs) == 2
     for key, paragraph in br.brain.paragraphs[field_key].paragraphs.items():
         if f"{first_occurrence[0]}-{first_occurrence[1]}" in key:
@@ -75,10 +75,10 @@ def test_apply_field_metadata_marks_duplicated_paragraphs():
 def test_apply_field_metadata_marks_duplicated_paragraphs_on_split_metadata():
     # # Test now the split text path
     br = ResourceBrain(rid=str(uuid4()))
-    field_key = "text1"
+    field = FieldID(field_type=FieldType.TEXT, field="text1")
     split_key = "subfield"
     fcmw = FieldComputedMetadataWrapper()
-    fcmw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_key))
+    fcmw.field.CopyFrom(field)
     paragraph = "Some paragraph here. "
     text_1 = f"{paragraph}{paragraph}"
     first_occurrence = [0, len(paragraph)]
@@ -94,12 +94,12 @@ def test_apply_field_metadata_marks_duplicated_paragraphs_on_split_metadata():
     fcmw.metadata.split_metadata[split_key].paragraphs.append(p2)
 
     br.apply_field_metadata(
-        field_key,
+        field,
         fcmw.metadata,
         page_positions={},
         extracted_text=et,
     )
-
+    field_key = br.field_key(field)
     assert len(br.brain.paragraphs[field_key].paragraphs) == 2
     for key, paragraph in br.brain.paragraphs[field_key].paragraphs.items():
         if f"{first_occurrence[0]}-{first_occurrence[1]}" in key:
@@ -173,10 +173,10 @@ def test_set_processing_status(new_status, previous_status, expected_brain_statu
 
 def test_apply_field_metadata_populates_page_number():
     br = ResourceBrain(rid="foo")
-    field_key = "text1"
 
+    field_pb = FieldID(field_type=FieldType.TEXT, field="text1")
     fcmw = FieldComputedMetadataWrapper()
-    fcmw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_key))
+    fcmw.field.CopyFrom(field_pb)
 
     p1 = Paragraph(start=40, end=54, start_seconds=[0], end_seconds=[10], text="Some text here")
     p1.sentences.append(Sentence(start=40, end=54, key="test"))
@@ -191,12 +191,13 @@ def test_apply_field_metadata_populates_page_number():
         2: (40, 100),
     }
     br.apply_field_metadata(
-        field_key,
+        field_pb,
         fcmw.metadata,
         page_positions=page_positions,
         extracted_text=None,
     )
 
+    field_key = br.field_key(field_pb)
     assert len(br.brain.paragraphs[field_key].paragraphs) == 2
     for paragraph in br.brain.paragraphs[field_key].paragraphs.values():
         assert paragraph.metadata.position.page_number == 2
