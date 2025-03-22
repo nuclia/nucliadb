@@ -355,7 +355,22 @@ async def test_extracted_shortened_metadata(
     - Create a resource with a field containing FieldMetadata with ner, positions and relations.
     - Check that new extracted data option filters them out
     """
-    br = broker_resource(standalone_knowledgebox)
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "slug": "myresource",
+            "title": "My resource",
+            "texts": {"text": {"body": "My text"}},
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    br = broker_resource(
+        standalone_knowledgebox,
+        rid=rid,
+        slug="myresource",
+    )
 
     field = rpb.FieldID(field_type=rpb.FieldType.TEXT, field="text")
     fcmw = FieldComputedMetadataWrapper()

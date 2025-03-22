@@ -312,8 +312,10 @@ class Resource:
             fields_to_index = updated_fields
 
         for fieldid in fields_to_index:
-            field = await self.get_field(fieldid.field, fieldid.field_type, load=False)
-
+            field = await self.get_field(fieldid.field, fieldid.field_type, load=True)
+            if field.value is None:
+                # Skip fields with no value
+                continue
             # Add extracted text
             extracted_text = await field.get_extracted_text()
             if extracted_text is not None:
