@@ -316,8 +316,8 @@ class Resource:
         replace_field = reindex or updated_fields is not None
 
         for fieldid in fields_to_index:
-            field = await self.get_field(fieldid.field, fieldid.field_type, load=True)
-            if field.value is None:
+            field = await self.get_field(fieldid.field, fieldid.field_type, load=False)
+            if await field.get_value() is None:
                 # Skip fields with no value
                 continue
             # Add extracted text
