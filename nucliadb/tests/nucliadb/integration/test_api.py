@@ -630,13 +630,17 @@ async def test_language_metadata(
     kbid = standalone_knowledgebox
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
-        json={"title": "My resource"},
+        json={
+            "title": "My resource",
+            "texts": {"text": {"body": "My text"}},
+        },
     )
     assert resp.status_code == 201
     uuid = resp.json()["uuid"]
 
     # Detected language in processing should be stored in basic metadata
     bm = BrokerMessage()
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
     bm.kbid = kbid
     bm.uuid = uuid
     field = FieldID(field_type=FieldType.TEXT, field="text")
