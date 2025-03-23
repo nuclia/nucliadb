@@ -31,6 +31,7 @@ from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FieldId
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
+from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.generic import VALID_GENERIC_FIELDS, Generic
 from nucliadb.ingest.fields.link import Link
@@ -328,9 +329,6 @@ class Resource:
 
         for fieldid in fields_to_index:
             field = await self.get_field(fieldid.field, fieldid.field_type, load=False)
-            if await field.get_value() is None:
-                # Skip fields with no value
-                continue
 
             # Add extracted text
             extracted_text = await field.get_extracted_text()
@@ -358,7 +356,10 @@ class Resource:
                     basic_user_field_metadata=user_field_metadata,
                     replace_field=replace_field,
                 )
-            generated_by = await field.generated_by()
+            try:
+                generated_by = await field.generated_by()
+            except FieldAuthorNotFound:
+                generated_by = None
             await to_executor(
                 brain.apply_field_labels,
                 fieldid,

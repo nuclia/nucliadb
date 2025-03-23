@@ -604,7 +604,7 @@ class ResourceBrain:
         fid: resources_pb2.FieldID,
         metadata: Optional[FieldComputedMetadata],
         uuid: str,
-        generated_by: FieldAuthor,
+        generated_by: Optional[FieldAuthor],
         basic_user_metadata: Optional[UserMetadata] = None,
         basic_user_fieldmetadata: Optional[UserFieldMetadata] = None,
     ):
@@ -673,7 +673,7 @@ class ResourceBrain:
                                 paragraph_annotation.key
                             ].labels.append(label)
 
-        if generated_by.WhichOneof("author") == "data_augmentation":
+        if generated_by is not None and generated_by.WhichOneof("author") == "data_augmentation":
             field_type, field_id = field_key.split("/")
             da_task_id = ids.extract_data_augmentation_id(field_id)
             if da_task_id is None:  # pragma: nocover
