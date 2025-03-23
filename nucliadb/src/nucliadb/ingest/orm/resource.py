@@ -19,10 +19,11 @@
 #
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any, Optional, Sequence, Type
+from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence, Type
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
@@ -81,8 +82,6 @@ KB_FIELDS: dict[int, Type] = {
     FieldType.CONVERSATION: Conversation,
 }
 
-_executor = ThreadPoolExecutor(10)
-
 
 PB_TEXT_FORMAT_TO_MIMETYPE = {
     FieldText.Format.PLAIN: "text/plain",
@@ -96,6 +95,13 @@ PB_TEXT_FORMAT_TO_MIMETYPE = {
 }
 
 BASIC_IMMUTABLE_FIELDS = ("icon",)
+
+
+_executor = ThreadPoolExecutor(10)
+
+
+async def to_executor(fn: Callable, *args, **kwargs):
+    return await asyncio.get_event_loop().run_in_executor(_executor, lambda: fn(*args, **kwargs))
 
 
 class Resource:
@@ -315,11 +321,17 @@ class Resource:
         # that needs to delete old entries for that field
         replace_field = reindex or updated_fields is not None
 
+        # Fetch the vectorset config once for all fields
+        vectorset_configs = []
+        async for _, vectorset_config in datamanagers.vectorsets.iter(self.txn, kbid=self.kb.kbid):
+            vectorset_configs.append(vectorset_config)
+
         for fieldid in fields_to_index:
             field = await self.get_field(fieldid.field, fieldid.field_type, load=False)
             if await field.get_value() is None:
                 # Skip fields with no value
                 continue
+
             # Add extracted text
             extracted_text = await field.get_extracted_text()
             if extracted_text is not None:
@@ -337,7 +349,8 @@ class Resource:
                 page_positions: Optional[FilePagePositions] = None
                 if fieldid.field_type == FieldType.FILE and isinstance(field, File):
                     page_positions = await get_file_page_positions(field)
-                brain.apply_field_metadata(
+                await to_executor(
+                    brain.apply_field_metadata,
                     fieldid,
                     field_metadata,
                     page_positions=page_positions,
@@ -346,7 +359,8 @@ class Resource:
                     replace_field=replace_field,
                 )
             generated_by = await field.generated_by()
-            brain.apply_field_labels(
+            await to_executor(
+                brain.apply_field_labels,
                 fieldid,
                 field_metadata,
                 self.uuid,
@@ -355,12 +369,6 @@ class Resource:
                 user_field_metadata,
             )
             if self.disable_vectors is False:
-                vectorset_configs = []
-                async for _, vectorset_config in datamanagers.vectorsets.iter(
-                    self.txn, kbid=self.kb.kbid
-                ):
-                    vectorset_configs.append(vectorset_config)
-
                 for vectorset_config in vectorset_configs:
                     vo = await field.get_vectors(
                         vectorset=vectorset_config.vectorset_id,
@@ -368,7 +376,8 @@ class Resource:
                     )
                     if vo is not None:
                         dimension = vectorset_config.vectorset_index_config.vector_dimension
-                        brain.apply_field_vectors(
+                        await to_executor(
+                            brain.apply_field_vectors,
                             fieldid,
                             vo,
                             vectorset=vectorset_config.vectorset_id,
