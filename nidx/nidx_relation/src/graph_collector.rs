@@ -172,8 +172,9 @@ impl SegmentCollector for TopUniqueRelationSegmentCollector2 {
 ///
 /// Maintain the top set of unique keys with greatest scores.
 pub struct TopUniqueN<K> {
-    top_n: usize,
     elements: HashMap<K, f32>,
+    top_n: usize,
+    threshold: f32,
 }
 
 impl<K> TopUniqueN<K>
@@ -183,27 +184,48 @@ where
     pub fn new(top_n: usize) -> Self {
         Self {
             top_n,
-            elements: HashMap::new(),
+            elements: HashMap::with_capacity(2 * top_n),
+            threshold: f32::NEG_INFINITY,
         }
     }
 
     pub fn insert(&mut self, key: K, score: f32) {
-        println!("[before] insert {key:?} ({score}) into {:?}", self.elements);
-        match self.elements.entry(key) {
-            std::collections::hash_map::Entry::Vacant(vacant) => {
-                vacant.insert(score);
-            }
-            std::collections::hash_map::Entry::Occupied(mut occupied) => {
-                if score > *occupied.get() {
-                    occupied.insert(score);
+        if score < self.threshold {
+            return;
+        }
+
+        if self.elements.len() == self.elements.capacity() {
+            let lowest_score = self.truncate_top_n();
+            self.threshold = lowest_score;
+        }
+
+        self.elements
+            .entry(key)
+            .and_modify(|s| {
+                if score > *s {
+                    *s = score
                 }
-            }
-        };
-        println!("[after] inserted: {:?}", self.elements);
-        println!();
+            })
+            .or_insert(score);
     }
 
-    pub fn into_sorted_vec(self) -> Vec<(K, f32)> {
+    // Truncate the current set of element to N leaving only the top-scoring
+    // elements. Return the smallest score across the top.
+    fn truncate_top_n(&mut self) -> f32 {
+        let mut vec = Vec::from_iter(self.elements.drain());
+        vec.sort_unstable_by(|a, b| a.1.total_cmp(&b.1).reverse());
+        vec.truncate(self.top_n);
+        let lowest_score = vec.last().expect("truncation must never be done without any element").1;
+
+        self.elements.extend(vec.into_iter());
+
+        lowest_score
+    }
+
+    pub fn into_sorted_vec(mut self) -> Vec<(K, f32)> {
+        if self.elements.len() > self.top_n {
+            self.truncate_top_n();
+        }
         let mut vec = Vec::from_iter(self.elements.into_iter());
         vec.sort_by(|a, b| a.1.total_cmp(&b.1).reverse());
         vec.truncate(self.top_n);
@@ -222,13 +244,15 @@ mod tests {
         top.insert("B", 2.0); // A=1.0, B=2.0 (insert B)
         top.insert("B", 3.0); // A=1.0, B=3.0 (replace B)
         top.insert("C", 3.0); // A=1.0, B=3.0, C=3.0 (insert C)
-        top.insert("D", 4.0); // B=3.0, C=3.0, D=4.0 (insert D, remove A)
-        top.insert("E", 1.5); // B=3.0, C=3.0, D=4.0 (do not insert E)
+        top.insert("D", 4.0); // B=3.0, C=3.0, D=4.0 (insert D, "remove" A)
+        top.insert("E", 1.5); // B=3.0, C=3.0, D=4.0 ("do not insert" E)
+        top.insert("F", 1.6); // B=3.0, C=3.0, D=4.0 ("do not insert" F)
+        top.insert("G", 1.7); // trigger a truncate
+        top.insert("H", 1.8); // skip, score too low
 
-        let r = top.into_sorted_vec();
-        println!("Result vec: {r:?}");
+        let r: HashMap<_, _> = HashMap::from_iter(top.into_sorted_vec().into_iter());
+        let expected = HashMap::from_iter([("B", 3.0), ("C", 3.0), ("D", 4.0)].into_iter());
         assert_eq!(r.len(), 3);
-        assert_eq!(r[0], ("D", 4.0));
-        assert!((r[1] == ("B", 3.0) && r[2] == ("C", 3.0)) || (r[1] == ("C", 3.0) && r[2] == ("B", 3.0)));
+        assert_eq!(r, expected);
     }
 }
