@@ -175,3 +175,64 @@ impl SegmentCollector for TopUniqueRelationSegmentCollector2 {
         self.unique
     }
 }
+
+/// Top unique N
+///
+/// Maintain the top set of unique keys with greatest scores.
+pub struct TopUniqueN<K> {
+    top_n: usize,
+    elements: HashMap<K, f32>,
+}
+
+impl<K> TopUniqueN<K>
+where
+    K: Eq + std::hash::Hash + std::fmt::Debug,
+{
+    pub fn new(top_n: usize) -> Self {
+        Self {
+            top_n,
+            elements: HashMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, key: K, score: f32) {
+        match self.elements.entry(key) {
+            std::collections::hash_map::Entry::Vacant(vacant) => {
+                vacant.insert(score);
+            }
+            std::collections::hash_map::Entry::Occupied(mut occupied) => {
+                if score > *occupied.get() {
+                    occupied.insert(score);
+                }
+            }
+        };
+    }
+
+    pub fn into_sorted_vec(self) -> Vec<(K, f32)> {
+        let mut vec = Vec::from_iter(self.elements.into_iter());
+        vec.sort_by(|a, b| a.1.total_cmp(&b.1).reverse());
+        vec.truncate(self.top_n);
+        vec
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_top_unique_n() {
+        let mut top = TopUniqueN::new(3);
+        top.insert("A", 1.0); // A=1.0 (insert A)
+        top.insert("B", 2.0); // A=1.0, B=2.0 (insert B)
+        top.insert("B", 3.0); // A=1.0, B=3.0 (replace B)
+        top.insert("C", 3.0); // A=1.0, B=3.0, C=3.0 (insert C)
+        top.insert("D", 4.0); // B=3.0, C=3.0, D=4.0 (insert D, remove A)
+        top.insert("E", 1.5); // B=3.0, C=3.0, D=4.0 (do not insert E)
+
+        let r = top.into_sorted_vec();
+        assert_eq!(r.len(), 3);
+        assert_eq!(r[0], ("D", 4.0));
+        assert!((r[1] == ("B", 3.0) && r[2] == ("C", 3.0)) || (r[1] == ("C", 3.0) && r[2] == ("B", 3.0)));
+    }
+}
