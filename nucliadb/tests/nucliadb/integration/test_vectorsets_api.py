@@ -327,11 +327,11 @@ async def test_vectorset_migration(
     await mark_dirty()
     await wait_for_sync()
 
-    # Check that the counters have been updated correctly
+    # Check that the counters have been updated correctly: that is, only the sentences counter should have increased
     counters_after = await get_counters(nucliadb_reader, kbid)
+    assert counters_after.sentences > counters.sentences
     assert counters_after.resources == counters.resources
     assert counters_after.paragraphs == counters.paragraphs
-    assert counters_after.sentences > counters.sentences
     assert counters_after.fields == counters.fields
 
     # Make a search with the new vectorset and check that the document is found
