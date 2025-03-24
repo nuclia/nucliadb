@@ -436,6 +436,9 @@ class NotEnoughContextAskResult(AskResult):
         return the find results and the messages indicating that there is not enough
         context in the corpus to answer.
         """
+        status = AnswerStatusCode.NO_RETRIEVAL_DATA
+        yield self._ndjson_encode(StatusAskResponseItem(code=status.value, status=status.prettify()))
+        yield self._ndjson_encode(AnswerAskResponseItem(text=NOT_ENOUGH_CONTEXT_ANSWER))
         yield self._ndjson_encode(RetrievalAskResponseItem(results=self.main_results))
         if self.prequeries_results:
             yield self._ndjson_encode(
@@ -446,9 +449,6 @@ class NotEnoughContextAskResult(AskResult):
                     }
                 )
             )
-        yield self._ndjson_encode(AnswerAskResponseItem(text=NOT_ENOUGH_CONTEXT_ANSWER))
-        status = AnswerStatusCode.NO_RETRIEVAL_DATA
-        yield self._ndjson_encode(StatusAskResponseItem(code=status.value, status=status.prettify()))
 
     async def json(self) -> str:
         prequeries = (
