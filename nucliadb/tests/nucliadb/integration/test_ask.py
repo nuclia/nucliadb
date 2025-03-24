@@ -257,15 +257,18 @@ async def test_ask_status_code_no_retrieval_data(
     )
     assert resp.status_code == 200
     results = parse_ask_response(resp)
-    main_results = results[0]
+    assert results[0].item.type == "status"
+    assert results[0].item.status == AnswerStatusCode.NO_RETRIEVAL_DATA.prettify()
+    answer = results[1].item
+    assert answer.type == "answer"
+    assert answer.text == "Not enough data to answer this."
+    main_results = results[2]
     assert main_results.item.type == "retrieval"
     assert len(main_results.item.results.resources) == 0
-    prequeries_results = results[1]
+    prequeries_results = results[3]
     assert prequeries_results.item.type == "prequeries"
     assert len(prequeries_results.item.results) == 1
     assert len(prequeries_results.item.results.popitem()[1].resources) == 0
-    assert results[-1].item.type == "status"
-    assert results[-1].item.status == AnswerStatusCode.NO_RETRIEVAL_DATA.prettify()
 
 
 @pytest.mark.deploy_modes("standalone")
