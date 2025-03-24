@@ -220,14 +220,8 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
             continue
 
         try:
-            async with driver.transaction(read_only=True) as txn:
-                active_vectorsets = [
-                    vectorset_id
-                    async for vectorset_id, _ in datamanagers.vectorsets.iter(txn, kbid=kbid)
-                ]
-
-            if vectorset in active_vectorsets:
-                logger.warning(f"  X Skipping purge {key}, vectorset is still active")
+            if await exists_vectorset(driver, kbid, vectorset):
+                logger.warning(f"  X Skipping purge {key}, vectorset is still active!")
                 # Finally, delete the key
                 async with driver.transaction() as txn:
                     await txn.delete(key)
@@ -276,6 +270,14 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
             continue
 
     logger.info("FINISH PURGING KB VECTORSETS")
+
+
+async def exists_vectorset(driver: Driver, kbid: str, vectorset: str) -> bool:
+    async with driver.transaction(read_only=True) as txn:
+        async for vectorset_id, _ in datamanagers.vectorsets.iter(txn, kbid=kbid):
+            if vectorset_id == vectorset:
+                return True
+        return False
 
 
 async def main():
