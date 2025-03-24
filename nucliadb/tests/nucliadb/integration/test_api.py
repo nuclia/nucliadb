@@ -363,7 +363,9 @@ async def test_extracted_shortened_metadata(
     fcmw.metadata.metadata.language = "es"
 
     # Add some relations
-    relation = rpb.Relation(relation_label="foo")
+    relation = rpb.Relation(
+        source=rpb.RelationNode(value="abc"), to=rpb.RelationNode(value="xyz"), relation_label="foo"
+    )
     relations = rpb.Relations()
     relations.relations.append(relation)
     fcmw.metadata.metadata.relations.append(relations)
