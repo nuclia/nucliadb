@@ -281,7 +281,6 @@ async def test_vectorset_migration(
 
     await inject_message(nucliadb_ingest_grpc, bm)
 
-    await mark_dirty()
     await wait_for_sync()
 
     counters = await get_counters(nucliadb_reader, kbid)
@@ -324,7 +323,6 @@ async def test_vectorset_migration(
 
     await inject_message(nucliadb_ingest_grpc, bm2)
 
-    await mark_dirty()
     await wait_for_sync()
 
     # Check that the counters have been updated correctly: that is, only the sentences counter should have increased
@@ -348,6 +346,7 @@ async def test_vectorset_migration(
     # await app_context.finalize()
 
     await rollover_kb_index(app_context, kbid)
+
     await mark_dirty()
     await wait_for_sync()
 
