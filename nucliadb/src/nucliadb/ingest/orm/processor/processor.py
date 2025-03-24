@@ -766,6 +766,13 @@ def needs_reindex(bm: writer_pb2.BrokerMessage) -> bool:
 
 
 def is_vectorset_migration_bm(bm: writer_pb2.BrokerMessage) -> bool:
+    """
+    This is a temporary solution to avoid duplicating paragraphs and text fields during vector migrations.
+    We need to reindex all the fields of a resource to avoid this issue.
+    TODO: Remove this when the index message generation logic has been decoupled into its own method.
+
+    Broker messages from semantic model migration task only contain the `field_vectors` field set.
+    """
     return (
         len(bm.field_vectors) > 0
         and not bm.HasField("basic")
