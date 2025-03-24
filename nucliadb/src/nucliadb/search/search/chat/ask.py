@@ -222,6 +222,21 @@ class AskResult:
                 self.metrics.record_first_chunk_yielded()
                 first_chunk_yielded = True
 
+        # Then the status
+        if self.status_code == AnswerStatusCode.ERROR:
+            # If predict yielded an error status, we yield it too and halt the stream immediately
+            yield StatusAskResponseItem(
+                code=self.status_code.value,
+                status=self.status_code.prettify(),
+                details=self.status_error_details or "Unknown error",
+            )
+        else:
+            yield StatusAskResponseItem(
+                code=self.status_code.value,
+                status=self.status_code.prettify(),
+            )
+
+        # Then the retrieval results
         yield RetrievalAskResponseItem(
             results=self.main_results,
             best_matches=[
@@ -239,20 +254,9 @@ class AskResult:
                 item.results[prequery_id] = result
             yield item
 
-        # Then the status
         if self.status_code == AnswerStatusCode.ERROR:
-            # If predict yielded an error status, we yield it too and halt the stream immediately
-            yield StatusAskResponseItem(
-                code=self.status_code.value,
-                status=self.status_code.prettify(),
-                details=self.status_error_details or "Unknown error",
-            )
+            # Halt the stream if there was an error
             return
-
-        yield StatusAskResponseItem(
-            code=self.status_code.value,
-            status=self.status_code.prettify(),
-        )
 
         # Audit the answer
         if self._object is None:
