@@ -53,8 +53,7 @@ pub struct TopUniqueRelationCollector2 {
 }
 
 pub struct TopUniqueRelationSegmentCollector2 {
-    limit: usize,
-    unique: HashSet<Vec<u64>>,
+    unique: TopUniqueN<Vec<u64>>,
     encoded_relation_reader: Column<u64>,
 }
 
@@ -124,7 +123,7 @@ impl TopUniqueRelationCollector2 {
 }
 
 impl Collector for TopUniqueRelationCollector2 {
-    type Fruit = HashSet<Vec<u64>>;
+    type Fruit = Vec<Vec<u64>>;
     type Child = TopUniqueRelationSegmentCollector2;
 
     fn requires_scoring(&self) -> bool {
@@ -133,8 +132,7 @@ impl Collector for TopUniqueRelationCollector2 {
 
     fn for_segment(&self, _segment_local_id: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
         Ok(TopUniqueRelationSegmentCollector2 {
-            limit: self.limit,
-            unique: HashSet::new(),
+            unique: TopUniqueN::new(self.limit),
             encoded_relation_reader: segment.fast_fields().u64("encoded_relation_id")?,
         })
     }
@@ -143,32 +141,26 @@ impl Collector for TopUniqueRelationCollector2 {
         &self,
         segment_fruits: Vec<<Self::Child as SegmentCollector>::Fruit>,
     ) -> tantivy::Result<Self::Fruit> {
-        let mut unique = HashSet::new();
-        let mut fruits = segment_fruits.into_iter().flat_map(|map| map.into_iter());
-        let mut fruit = fruits.next();
+        let fruits = segment_fruits.into_iter().flat_map(|map| map.into_sorted_vec());
 
-        while fruit.is_some() && unique.len() < self.limit {
-            unique.insert(fruit.unwrap());
-            fruit = fruits.next();
+        let mut unique = TopUniqueN::new(self.limit);
+        for (key, score) in fruits {
+            unique.insert(key, score);
         }
-        Ok(unique)
+
+        Ok(unique.into_sorted_vec().into_iter().map(|(key, _score)| key).collect())
     }
 }
 
 impl SegmentCollector for TopUniqueRelationSegmentCollector2 {
-    type Fruit = HashSet<Vec<u64>>;
+    type Fruit = TopUniqueN<Vec<u64>>;
 
-    fn collect(&mut self, doc_id: DocId, _score: Score) {
-        // we already have all unique results we need
-        if self.unique.len() >= self.limit {
-            return;
-        }
-
+    fn collect(&mut self, doc_id: DocId, score: Score) {
         let relation = self
             .encoded_relation_reader
             .values_for_doc(doc_id)
             .collect::<Vec<u64>>();
-        self.unique.insert(relation);
+        self.unique.insert(relation, score);
     }
 
     fn harvest(self) -> Self::Fruit {
@@ -196,6 +188,7 @@ where
     }
 
     pub fn insert(&mut self, key: K, score: f32) {
+        println!("[before] insert {key:?} ({score}) into {:?}", self.elements);
         match self.elements.entry(key) {
             std::collections::hash_map::Entry::Vacant(vacant) => {
                 vacant.insert(score);
@@ -206,6 +199,8 @@ where
                 }
             }
         };
+        println!("[after] inserted: {:?}", self.elements);
+        println!();
     }
 
     pub fn into_sorted_vec(self) -> Vec<(K, f32)> {
@@ -231,6 +226,7 @@ mod tests {
         top.insert("E", 1.5); // B=3.0, C=3.0, D=4.0 (do not insert E)
 
         let r = top.into_sorted_vec();
+        println!("Result vec: {r:?}");
         assert_eq!(r.len(), 3);
         assert_eq!(r[0], ("D", 4.0));
         assert!((r[1] == ("B", 3.0) && r[2] == ("C", 3.0)) || (r[1] == ("C", 3.0) && r[2] == ("B", 3.0)));
