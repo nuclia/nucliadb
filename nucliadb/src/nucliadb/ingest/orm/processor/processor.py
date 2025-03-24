@@ -314,7 +314,7 @@ class Processor:
                 # index message
 
                 if resource:
-                    if message.reindex:
+                    if any(needs_reindex(m) for m in messages):
                         # when reindexing, let's just generate full new index message
                         # TODO - This should be improved in the future as it's not optimal for very large resources:
                         # As of now, there are some API operations that require fully reindexing all the fields of a resource.
@@ -467,7 +467,6 @@ class Processor:
         if external_index_manager is not None:
             await self.external_index_add_resource(external_index_manager, uuid, index_message)
         else:
-            breakpoint()
             await self.index_node_shard_manager.add_resource(
                 shard,
                 index_message,
@@ -760,3 +759,19 @@ def has_vectors_operation(index_message: PBBrainResource) -> bool:
                 if len(vectorset_sentences.sentences) > 0:
                     return True
     return False
+
+
+def needs_reindex(bm: writer_pb2.BrokerMessage) -> bool:
+    return bm.reindex or is_vectorset_migration_bm(bm)
+
+
+def is_vectorset_migration_bm(bm: writer_pb2.BrokerMessage) -> bool:
+    return (
+        len(bm.field_vectors) > 0
+        and not bm.HasField("basic")
+        and len(bm.delete_fields) == 0
+        and len(bm.files) == 0
+        and len(bm.texts) == 0
+        and len(bm.conversations) == 0
+        and len(bm.links) == 0
+    )

@@ -20,7 +20,6 @@
 from typing import Optional
 from unittest.mock import patch
 
-from nucliadb_models.search import KnowledgeboxCounters
 import pytest
 from httpx import AsyncClient
 
@@ -33,6 +32,7 @@ from nucliadb.learning_proxy import (
     SemanticConfig,
     SimilarityFunction,
 )
+from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxSearchResults
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.nodewriter_pb2 import VectorType
 from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType, Paragraph
@@ -281,11 +281,14 @@ async def test_vectorset_migration(
 
     await inject_message(nucliadb_ingest_grpc, bm)
 
+    await mark_dirty()
+    await wait_for_sync()
+
     counters = await get_counters(nucliadb_reader, kbid)
     assert counters.resources == 1
-    assert counters.paragraphs == 2
-    assert counters.sentences == 1
-    assert counters.fields == 4
+    assert counters.paragraphs == 2  # one for the title and one for the link field
+    assert counters.sentences == 1  # only the vector of the link field
+    assert counters.fields == 2  # the title and the link field
 
     # Make a search and check that the document is found
     await _check_search(nucliadb_reader, kbid)
@@ -320,15 +323,17 @@ async def test_vectorset_migration(
     bm2.field_vectors.append(ev)
 
     breakpoint()
-
     await inject_message(nucliadb_ingest_grpc, bm2)
 
+    await mark_dirty()
+    await wait_for_sync()
+
+    # Check that the counters have been updated correctly
     counters_after = await get_counters(nucliadb_reader, kbid)
-    breakpoint()
-    assert counters_after.resources == 1
-    assert counters_after.paragraphs == 2
-    assert counters_after.sentences == 1
-    assert counters_after.fields == 4
+    assert counters_after.resources == counters.resources
+    assert counters_after.paragraphs == counters.paragraphs
+    assert counters_after.sentences > counters.sentences
+    assert counters_after.fields == counters.fields
 
     # Make a search with the new vectorset and check that the document is found
     await _check_search(nucliadb_reader, kbid, vectorset="en-2024-05-06")
@@ -356,9 +361,36 @@ async def test_vectorset_migration(
 
 
 async def get_counters(nucliadb_reader: AsyncClient, kbid: str) -> KnowledgeboxCounters:
+    # We call counters endpoint to get the sentences count only
     resp = await nucliadb_reader.get(f"/kb/{kbid}/counters")
     assert resp.status_code == 200, resp.text
-    return KnowledgeboxCounters.model_validate(resp.json())
+    counters = KnowledgeboxCounters.model_validate(resp.json())
+    n_sentences = counters.sentences
+
+    # We don't call /counters endpoint purposefully, as deletions are not guaranteed to be merged yet.
+    # Instead, we do some searches.
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/search", params={"show": ["basic", "values"]})
+    assert resp.status_code == 200, resp.text
+    search = KnowledgeboxSearchResults.model_validate(resp.json())
+    n_resources = len(search.resources)
+    n_paragraphs = search.paragraphs.total  # type: ignore
+    n_fields = sum(
+        [
+            len(resource.data.generics or {})
+            + len(resource.data.files or {})
+            + len(resource.data.links or {})
+            + len(resource.data.texts or {})
+            + len(resource.data.conversations or {})
+            for resource in search.resources.values()
+            if resource.data
+        ]
+    )
+    # Update the counters object
+    counters.resources = n_resources
+    counters.paragraphs = n_paragraphs
+    counters.sentences = n_sentences
+    counters.fields = n_fields
+    return counters
 
 
 async def _check_search(nucliadb_reader: AsyncClient, kbid: str, vectorset: Optional[str] = None):
