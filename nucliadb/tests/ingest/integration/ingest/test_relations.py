@@ -54,10 +54,10 @@ async def test_ingest_relations_indexing(
 
     pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
 
-    assert len(pb.relations) == 3
-    assert pb.relations[0] == r0
-    assert pb.relations[1] == r1
-    assert pb.relations[2] == r2
+    assert len(pb.field_relations["a/metadata"].relations) == 3
+    assert pb.field_relations["a/metadata"].relations[0].relation == r0
+    assert pb.field_relations["a/metadata"].relations[1].relation == r1
+    assert pb.field_relations["a/metadata"].relations[2].relation == r2
 
 
 async def test_ingest_label_relation_extraction(
@@ -82,10 +82,11 @@ async def test_ingest_label_relation_extraction(
 
     pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
 
+    relations = pb.field_relations["a/metadata"].relations
     for i, (labelset, label) in enumerate(labels):
-        assert pb.relations[i].relation == Relation.RelationType.ABOUT
-        assert pb.relations[i].source.value == rid
-        assert pb.relations[i].to.value == f"{labelset}/{label}"
+        assert relations[i].relation.relation == Relation.RelationType.ABOUT
+        assert relations[i].relation.source.value == rid
+        assert relations[i].relation.to.value == f"{labelset}/{label}"
 
 
 async def test_ingest_colab_relation_extraction(
@@ -103,10 +104,11 @@ async def test_ingest_colab_relation_extraction(
 
     pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
 
+    relations = pb.field_relations["a/metadata"].relations
     for i, collaborator in enumerate(collaborators):
-        assert pb.relations[i].relation == Relation.RelationType.COLAB
-        assert pb.relations[i].source.value == rid
-        assert pb.relations[i].to.value == collaborator
+        assert relations[i].relation.relation == Relation.RelationType.COLAB
+        assert relations[i].relation.source.value == rid
+        assert relations[i].relation.to.value == collaborator
 
 
 async def test_ingest_field_metadata_relation_extraction(
@@ -191,8 +193,9 @@ async def test_ingest_field_metadata_relation_extraction(
             ),
         ),
     ]
+
     for generated_relation in generated_relations:
-        assert generated_relation in pb.relations
+        assert generated_relation in [r.relation for r in pb.field_relations["t/title"].relations]
 
 
 async def test_ingest_field_relations_relation_extraction(
@@ -252,6 +255,6 @@ async def test_ingest_field_relations_relation_extraction(
 
     pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
 
-    assert len(pb.relations) == len(test_relations)
+    assert len(pb.field_relations["a/metadata"].relations) == len(test_relations)
     for relation in test_relations:
-        assert relation in pb.relations
+        assert relation in [r.relation for r in pb.field_relations["a/metadata"].relations]

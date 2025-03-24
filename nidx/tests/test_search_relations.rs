@@ -1235,7 +1235,6 @@ async fn create_knowledge_graph(fixture: &mut NidxFixture, shard_id: String) -> 
                 relation: *relation_type as i32,
                 relation_label: relation.to_string(),
                 metadata: relation_metadata.clone(),
-                ..Default::default()
             }),
             ..Default::default()
         });

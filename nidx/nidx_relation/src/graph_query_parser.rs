@@ -121,20 +121,9 @@ pub struct BoolNodeQuery(BooleanExpression<Node>);
 pub struct BoolGraphQuery(BooleanExpression<GraphQuery>);
 
 #[derive(Clone, Copy)]
-struct TokenizedNodeFields {
-    exact: Field,
-    tokenized: Field,
-}
-
-#[derive(Clone, Copy)]
-enum NodeValueField {
-    Normalized(Field),
-    Tokenized(TokenizedNodeFields),
-}
-
-#[derive(Clone, Copy)]
 struct NodeSchemaFields {
-    value: NodeValueField,
+    exact_value: Field,
+    tokenized_value: Field,
     node_type: Field,
     node_subtype: Field,
 }
@@ -286,14 +275,11 @@ impl<'a> GraphQueryParser<'a> {
 
     #[inline]
     fn has_node_expression_as_source(&self, expression: &Expression<Node>) -> Vec<(Occur, Box<dyn Query>)> {
-        let value = NodeValueField::Tokenized(TokenizedNodeFields {
-            exact: self.schema.normalized_source_value,
-            tokenized: self.schema.source_value,
-        });
         self.has_node_expression(
             expression,
             NodeSchemaFields {
-                value,
+                exact_value: self.schema.normalized_source_value,
+                tokenized_value: self.schema.source_value,
                 node_type: self.schema.source_type,
                 node_subtype: self.schema.source_subtype,
             },
@@ -302,15 +288,11 @@ impl<'a> GraphQueryParser<'a> {
 
     #[inline]
     fn has_node_expression_as_destination(&self, expression: &Expression<Node>) -> Vec<(Occur, Box<dyn Query>)> {
-        let value = NodeValueField::Tokenized(TokenizedNodeFields {
-            exact: self.schema.normalized_target_value,
-            tokenized: self.schema.target_value,
-        });
-
         self.has_node_expression(
             expression,
             NodeSchemaFields {
-                value,
+                exact_value: self.schema.normalized_target_value,
+                tokenized_value: self.schema.target_value,
                 node_type: self.schema.target_type,
                 node_subtype: self.schema.target_subtype,
             },
@@ -396,7 +378,7 @@ impl<'a> GraphQueryParser<'a> {
         let value_query = node
             .value
             .as_ref()
-            .and_then(|value| self.has_node_value(value, fields.value));
+            .and_then(|value| self.has_node_value(value, fields.exact_value, fields.tokenized_value));
         if let Some(query) = value_query {
             subqueries.push(query);
         }
@@ -461,7 +443,7 @@ impl<'a> GraphQueryParser<'a> {
         subqueries
     }
 
-    fn has_node_value(&self, value: &Term, field: NodeValueField) -> Option<Box<dyn Query>> {
+    fn has_node_value(&self, value: &Term, exact_field: Field, tokenized_field: Field) -> Option<Box<dyn Query>> {
         let text_value = match value {
             Term::Exact(value) => value,
             Term::Fuzzy(fuzzy) => &fuzzy.value,
@@ -469,31 +451,14 @@ impl<'a> GraphQueryParser<'a> {
         if text_value.is_empty() {
             return None;
         }
-        let exact_term = match field {
-            NodeValueField::Normalized(field) => {
-                tantivy::Term::from_field_text(field, &self.schema.normalize(text_value))
-            }
-            NodeValueField::Tokenized(TokenizedNodeFields { exact, .. }) => {
-                tantivy::Term::from_field_text(exact, &self.schema.normalize(text_value))
-            }
-        };
-        let tokenized_terms = match field {
-            NodeValueField::Normalized(field) => {
-                vec![tantivy::Term::from_field_text(
-                    field,
-                    &self.schema.normalize(text_value),
-                )]
-            }
-            NodeValueField::Tokenized(TokenizedNodeFields { tokenized, .. }) => {
-                let mut tokenizer = TokenizerManager::default().get("default").unwrap();
-                let mut token_stream = tokenizer.token_stream(text_value);
-                let mut terms = Vec::new();
-                while let Some(token) = token_stream.next() {
-                    terms.push(tantivy::Term::from_field_text(tokenized, &token.text));
-                }
-                terms
-            }
-        };
+        let exact_term = tantivy::Term::from_field_text(exact_field, &self.schema.normalize(text_value));
+
+        let mut tokenizer = TokenizerManager::default().get("default").unwrap();
+        let mut token_stream = tokenizer.token_stream(text_value);
+        let mut tokenized_terms = Vec::new();
+        while let Some(token) = token_stream.next() {
+            tokenized_terms.push(tantivy::Term::from_field_text(tokenized_field, &token.text));
+        }
 
         // TODO: Rethink this
         // Current logic:
