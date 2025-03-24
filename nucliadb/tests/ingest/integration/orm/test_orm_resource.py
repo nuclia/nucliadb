@@ -451,7 +451,7 @@ async def test_generate_index_message_contains_all_metadata(
             assert start <= end
 
     # relations
-    assert len(index_message.relations) > 0
+    assert len(index_message.field_relations["a/metadata"].relations) > 0
 
     # TODO: Uncomment when vectorsets is implemented
     # # vectors in vectorset

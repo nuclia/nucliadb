@@ -25,6 +25,7 @@ mod reader;
 mod resource_indexer;
 mod schema;
 
+use anyhow::anyhow;
 use nidx_protos::{
     GraphSearchRequest, GraphSearchResponse, RelationNode, RelationNodeFilter, RelationPrefixSearchRequest,
     RelationSearchRequest, RelationSearchResponse, relation_node::NodeType, relation_prefix_search_request::Search,
@@ -82,35 +83,29 @@ pub struct RelationIndexer;
 
 pub struct RelationDeletionQueryBuilder {
     resource: Field,
-    field: Option<Field>,
+    field: Field,
 }
 impl DeletionQueryBuilder for RelationDeletionQueryBuilder {
     fn query<'a>(&self, keys: impl Iterator<Item = &'a String>) -> Box<dyn Query> {
-        if let Some(field) = self.field {
-            Box::new(TermSetQuery::new(keys.filter_map(|k| {
-                // Our keys can be resource or field ids, match the corresponding tantivy field
-                if k.len() < 32 {
-                    error!(?k, "Invalid deletion key for nidx_relation");
-                    return None;
-                }
+        Box::new(TermSetQuery::new(keys.filter_map(|k| {
+            // Our keys can be resource or field ids, match the corresponding tantivy field
+            if k.len() < 32 {
+                error!(?k, "Invalid deletion key for nidx_relation");
+                return None;
+            }
 
-                let Ok(rid) = Uuid::parse_str(&k[..32]) else {
-                    error!(?k, "Invalid deletion key for nidx_relation");
-                    return None;
-                };
+            let Ok(rid) = Uuid::parse_str(&k[..32]) else {
+                error!(?k, "Invalid deletion key for nidx_relation");
+                return None;
+            };
 
-                let is_field = k.len() > 32;
-                if is_field {
-                    Some(Term::from_field_bytes(field, &encode_field_id(rid, &k[33..])))
-                } else {
-                    Some(Term::from_field_bytes(self.resource, rid.as_bytes()))
-                }
-            })))
-        } else {
-            Box::new(TermSetQuery::new(
-                keys.map(|k| Term::from_field_bytes(self.resource, k.as_bytes())),
-            ))
-        }
+            let is_field = k.len() > 32;
+            if is_field {
+                Some(Term::from_field_bytes(self.field, &encode_field_id(rid, &k[33..])))
+            } else {
+                Some(Term::from_field_bytes(self.resource, rid.as_bytes()))
+            }
+        })))
     }
 }
 impl RelationDeletionQueryBuilder {
@@ -130,6 +125,9 @@ impl RelationIndexer {
         config: &RelationConfig,
         resource: &nidx_protos::Resource,
     ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
+        if config.version != 2 {
+            return Err(anyhow!("Unsupported nidx_relation version"));
+        }
         let field_schema = RelationSchema::new(config.version);
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
@@ -141,17 +139,13 @@ impl RelationIndexer {
         indexer.finalize()
     }
 
-    pub fn deletions_for_resource(&self, config: &RelationConfig, resource: &nidx_protos::Resource) -> Vec<String> {
-        if config.version == 2 {
-            let rid = &resource.resource.as_ref().unwrap().uuid;
-            resource
-                .relation_fields_to_delete
-                .iter()
-                .map(|f| format!("{rid}/{f}"))
-                .collect()
-        } else {
-            vec![resource.resource.as_ref().unwrap().uuid.clone()]
-        }
+    pub fn deletions_for_resource(&self, _config: &RelationConfig, resource: &nidx_protos::Resource) -> Vec<String> {
+        let rid = &resource.resource.as_ref().unwrap().uuid;
+        resource
+            .relation_fields_to_delete
+            .iter()
+            .map(|f| format!("{rid}/{f}"))
+            .collect()
     }
 
     #[instrument(name = "relation::merge", skip_all)]
@@ -161,6 +155,9 @@ impl RelationIndexer {
         config: RelationConfig,
         open_index: impl OpenIndexMetadata<TantivyMeta>,
     ) -> anyhow::Result<TantivySegmentMetadata> {
+        if config.version != 2 {
+            return Err(anyhow!("Unsupported nidx_relation version"));
+        }
         let schema = RelationSchema::new(config.version);
         let deletions_query = RelationDeletionQueryBuilder::new(&schema);
         let index = open_index_with_deletions(schema.schema, open_index, deletions_query)?;
@@ -185,6 +182,9 @@ pub struct RelationSearcher {
 impl RelationSearcher {
     #[instrument(name = "relation::open", skip_all)]
     pub fn open(config: RelationConfig, open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
+        if config.version != 2 {
+            return Err(anyhow!("Unsupported nidx_relation version"));
+        }
         let schema = RelationSchema::new(config.version);
         let deletions_query = RelationDeletionQueryBuilder::new(&schema);
         let index = open_index_with_deletions(schema.schema, open_index, deletions_query)?;

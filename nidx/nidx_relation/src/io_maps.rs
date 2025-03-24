@@ -105,25 +105,18 @@ pub fn doc_to_relation(schema: &Schema, doc: &TantivyDocument) -> ProtosRelation
         relation_label: schema.relationship_label(doc).to_string(),
         source: Some(source_to_relation_node(schema, doc)),
         to: Some(target_to_relation_node(schema, doc)),
-        resource_id: Some(schema.resource_id(doc)),
     }
 }
 
 pub fn doc_to_index_relation(schema: &Schema, doc: &TantivyDocument) -> IndexRelation {
-    let resource_field_id = schema.resource_field_id.and_then(|f| {
-        doc.get_first(f).map(|v| {
-            let (rid, fid) = decode_field_id(v.as_bytes().unwrap());
-            format!("{}/{}", rid.simple(), fid)
-        })
+    let resource_field_id = doc.get_first(schema.resource_field_id).map(|v| {
+        let (rid, fid) = decode_field_id(v.as_bytes().unwrap());
+        format!("{}/{}", rid.simple(), fid)
     });
-    let facets = schema
-        .facets
-        .map(|field| {
-            doc.get_all(field)
-                .map(|f| f.as_facet().unwrap().to_path_string())
-                .collect()
-        })
-        .unwrap_or_default();
+    let facets = doc
+        .get_all(schema.facets)
+        .map(|f| f.as_facet().unwrap().to_path_string())
+        .collect();
     IndexRelation {
         relation: Some(doc_to_relation(schema, doc)),
         resource_field_id,

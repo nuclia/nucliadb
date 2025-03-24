@@ -286,14 +286,10 @@ impl<'a> GraphQueryParser<'a> {
 
     #[inline]
     fn has_node_expression_as_source(&self, expression: &Expression<Node>) -> Vec<(Occur, Box<dyn Query>)> {
-        let value = if self.schema.version == 1 {
-            NodeValueField::Normalized(self.schema.normalized_source_value)
-        } else {
-            NodeValueField::Tokenized(TokenizedNodeFields {
-                exact: self.schema.normalized_source_value,
-                tokenized: self.schema.source_value,
-            })
-        };
+        let value = NodeValueField::Tokenized(TokenizedNodeFields {
+            exact: self.schema.normalized_source_value,
+            tokenized: self.schema.source_value,
+        });
         self.has_node_expression(
             expression,
             NodeSchemaFields {
@@ -306,14 +302,11 @@ impl<'a> GraphQueryParser<'a> {
 
     #[inline]
     fn has_node_expression_as_destination(&self, expression: &Expression<Node>) -> Vec<(Occur, Box<dyn Query>)> {
-        let value = if self.schema.version == 1 {
-            NodeValueField::Normalized(self.schema.normalized_target_value)
-        } else {
-            NodeValueField::Tokenized(TokenizedNodeFields {
-                exact: self.schema.normalized_target_value,
-                tokenized: self.schema.target_value,
-            })
-        };
+        let value = NodeValueField::Tokenized(TokenizedNodeFields {
+            exact: self.schema.normalized_target_value,
+            tokenized: self.schema.target_value,
+        });
+
         self.has_node_expression(
             expression,
             NodeSchemaFields {

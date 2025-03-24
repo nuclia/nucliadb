@@ -53,35 +53,26 @@ pub struct Schema {
     pub label: Field,
     pub metadata: Field,
 
-    // v1 fields
-    /// Indexed only fields used for storing strings that have been normalized through
-    /// [`normalize`]. This fields can be used to provide fuzzy and exact match searchability
-    /// without the need of tokenizing. This fields are not stored, therefore not meant to be
-    /// returned, just queried.
     pub normalized_source_value: Field,
     pub normalized_target_value: Field,
 
     // v2 fields
-    pub resource_field_id: Option<Field>,
-    pub encoded_source_id: Option<Field>,
-    pub encoded_target_id: Option<Field>,
-    pub encoded_relation_id: Option<Field>,
-    pub numeric_source_value: Option<Field>,
-    pub numeric_target_value: Option<Field>,
-    pub facets: Option<Field>,
+    pub resource_field_id: Field,
+    pub encoded_source_id: Field,
+    pub encoded_target_id: Field,
+    pub encoded_relation_id: Field,
+    pub numeric_source_value: Field,
+    pub numeric_target_value: Field,
+    pub facets: Field,
 }
 
 impl Schema {
     pub fn new(version: u64) -> Self {
         let mut builder = TantivySchema::builder();
 
-        let resource_id = if version == 1 {
-            builder.add_text_field("resource_id", STRING | STORED)
-        } else {
-            builder.add_bytes_field("resource_id", INDEXED)
-        };
+        let resource_id = builder.add_bytes_field("resource_id", INDEXED);
 
-        let value_options: TextOptions = if version == 1 { STORED.into() } else { TEXT | STORED };
+        let value_options: TextOptions = TEXT | STORED;
 
         // Special field for searches and don't tokenize values
         let normalized_source_value = builder.add_text_field("indexed_source_value", STRING);
@@ -99,22 +90,13 @@ impl Schema {
         let label = builder.add_text_field("label", STRING | STORED);
         let metadata = builder.add_bytes_field("metadata", STORED);
 
-        let mut resource_field_id = None;
-        let mut encoded_source_id = None;
-        let mut encoded_target_id = None;
-        let mut encoded_relation_id = None;
-        let mut numeric_source_value = None;
-        let mut numeric_target_value = None;
-        let mut facets = None;
-        if version == 2 {
-            resource_field_id = Some(builder.add_bytes_field("resource_field_id", INDEXED | STORED));
-            encoded_source_id = Some(builder.add_u64_field("encoded_source_id", FAST));
-            encoded_target_id = Some(builder.add_u64_field("encoded_target_id", FAST));
-            encoded_relation_id = Some(builder.add_u64_field("encoded_relation_id", FAST));
-            numeric_source_value = Some(builder.add_u64_field("numeric_source_value", INDEXED | STORED));
-            numeric_target_value = Some(builder.add_u64_field("numeric_target_value", INDEXED | STORED));
-            facets = Some(builder.add_facet_field("facets", STORED));
-        }
+        let resource_field_id = builder.add_bytes_field("resource_field_id", INDEXED | STORED);
+        let encoded_source_id = builder.add_u64_field("encoded_source_id", FAST);
+        let encoded_target_id = builder.add_u64_field("encoded_target_id", FAST);
+        let encoded_relation_id = builder.add_u64_field("encoded_relation_id", FAST);
+        let numeric_source_value = builder.add_u64_field("numeric_source_value", INDEXED | STORED);
+        let numeric_target_value = builder.add_u64_field("numeric_target_value", INDEXED | STORED);
+        let facets = builder.add_facet_field("facets", STORED);
 
         let schema = builder.build();
 
@@ -156,23 +138,16 @@ impl Schema {
             normalized.push(ascii_lower_cased);
         }
 
-        let separator = if self.version == 1 { "" } else { " " };
-        normalized.join(separator)
+        normalized.join(" ")
     }
 
     pub fn resource_id(&self, doc: &TantivyDocument) -> String {
-        if let Some(field_id) = self.resource_field_id {
-            let encoded = doc
-                .get_first(field_id)
-                .expect("Documents must have a resource_field id")
-                .as_bytes()
-                .unwrap();
-            decode_field_id(encoded).0.simple().to_string()
-        } else {
-            doc.get_first(self.resource_id)
-                .and_then(|i| i.as_str().map(String::from))
-                .expect("Documents must have a resource id")
-        }
+        let encoded = doc
+            .get_first(self.resource_field_id)
+            .expect("Documents must have a resource_field id")
+            .as_bytes()
+            .unwrap();
+        decode_field_id(encoded).0.simple().to_string()
     }
 
     pub fn source_value<'a>(&self, doc: &'a TantivyDocument) -> &'a str {
@@ -470,7 +445,7 @@ mod tests {
 
         let mut index_writer: IndexWriter = index.writer(30_000_000)?;
         index_writer.add_document(doc!(
-            schema.resource_id => "uuid1",
+            schema.resource_id => "uuid1".as_bytes(),
             schema.source_value => node_value,
             schema.normalized_source_value => schema.normalize(node_value),
             schema.target_value => "to2",

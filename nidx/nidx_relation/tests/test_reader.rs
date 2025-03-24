@@ -273,7 +273,7 @@ fn test_search_metadata() -> anyhow::Result<()> {
     assert_eq!(subgraph.relations.len(), 1);
 
     let relation = &subgraph.relations[0];
-    let metadata = relation.metadata.as_ref().unwrap();
+    let metadata = relation.relation.as_ref().unwrap().metadata.as_ref().unwrap();
     assert_eq!(
         metadata.paragraph_id,
         Some("myresource/0/myresource/100-200".to_string())
@@ -326,45 +326,43 @@ fn test_prefix_search() -> anyhow::Result<()> {
 
 #[test]
 fn test_prefix_query_search() -> anyhow::Result<()> {
-    for version in 1..=2 {
-        let reader = create_versioned_reader(version)?;
+    let reader = create_reader()?;
 
-        let result = reader.search(&RelationSearchRequest {
-            prefix: Some(RelationPrefixSearchRequest {
-                search: Some(Search::Query("Films with James Bond played by Roger Moore".to_string())),
-                ..Default::default()
-            }),
+    let result = reader.search(&RelationSearchRequest {
+        prefix: Some(RelationPrefixSearchRequest {
+            search: Some(Search::Query("Films with James Bond played by Roger Moore".to_string())),
             ..Default::default()
-        })?;
-        assert_eq!(result.prefix.unwrap().nodes.len(), 1);
+        }),
+        ..Default::default()
+    })?;
+    assert_eq!(result.prefix.unwrap().nodes.len(), 1);
 
-        let result = reader.search(&RelationSearchRequest {
-            prefix: Some(RelationPrefixSearchRequest {
-                search: Some(Search::Query("Films with Jomes Bond played by Roger Moore".to_string())),
-                ..Default::default()
-            }),
+    let result = reader.search(&RelationSearchRequest {
+        prefix: Some(RelationPrefixSearchRequest {
+            search: Some(Search::Query("Films with Jomes Bond played by Roger Moore".to_string())),
             ..Default::default()
-        })?;
-        assert_eq!(result.prefix.unwrap().nodes.len(), 1);
+        }),
+        ..Default::default()
+    })?;
+    assert_eq!(result.prefix.unwrap().nodes.len(), 1);
 
-        let result = reader.search(&RelationSearchRequest {
-            prefix: Some(RelationPrefixSearchRequest {
-                search: Some(Search::Query("Just Bond".to_string())),
-                ..Default::default()
-            }),
+    let result = reader.search(&RelationSearchRequest {
+        prefix: Some(RelationPrefixSearchRequest {
+            search: Some(Search::Query("Just Bond".to_string())),
             ..Default::default()
-        })?;
-        assert_eq!(result.prefix.unwrap().nodes.len(), if version == 1 { 0 } else { 1 });
+        }),
+        ..Default::default()
+    })?;
+    assert_eq!(result.prefix.unwrap().nodes.len(), 1);
 
-        let result = reader.search(&RelationSearchRequest {
-            prefix: Some(RelationPrefixSearchRequest {
-                search: Some(Search::Query("James Bond or Anastasia".to_string())),
-                ..Default::default()
-            }),
+    let result = reader.search(&RelationSearchRequest {
+        prefix: Some(RelationPrefixSearchRequest {
+            search: Some(Search::Query("James Bond or Anastasia".to_string())),
             ..Default::default()
-        })?;
-        assert_eq!(result.prefix.unwrap().nodes.len(), 2);
-    }
+        }),
+        ..Default::default()
+    })?;
+    assert_eq!(result.prefix.unwrap().nodes.len(), 2);
 
     Ok(())
 }
