@@ -31,14 +31,15 @@ use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::TopDocs;
 use tantivy::query::{BooleanQuery, EmptyQuery, Occur, Query, TermSetQuery};
 use tantivy::schema::Field;
-use tantivy::{DocAddress, Index, IndexReader, Searcher};
+use tantivy::{Index, IndexReader};
 use uuid::Uuid;
 
-use crate::graph_collector::{NodeSelector, TopUniqueNodeCollector2, TopUniqueRelationCollector2};
+use crate::graph_collector::{Selector, TopUniqueCollector};
 use crate::graph_query_parser::{
     BoolGraphQuery, BoolNodeQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
 };
 use crate::schema::{Schema, decode_node, decode_relation, encode_field_id};
+use crate::top_unique_n::TopUniqueN;
 use crate::{RelationConfig, io_maps};
 
 const FUZZY_DISTANCE: u8 = 1;
@@ -146,115 +147,12 @@ impl RelationsReaderService {
         let collector = TopDocs::with_limit(top_k);
         let searcher = self.reader.searcher();
         let matching_docs = searcher.search(&index_query, &collector)?;
-        self.build_graph_response(
-            &searcher,
-            matching_docs.into_iter().map(|(_score, doc_address)| doc_address),
-        )
-    }
-
-    fn nodes_graph_search(
-        &self,
-        query: &nidx_protos::graph_query::PathQuery,
-        prefilter: &PrefilterResult,
-        top_k: usize,
-    ) -> anyhow::Result<GraphSearchResponse> {
-        let query = BoolNodeQuery::try_from(query)?;
-        let parser = GraphQueryParser::new(&self.schema);
-        let (source_query, destination_query) = parser.parse_bool_node(query);
-        let source_query = self.apply_prefilter(source_query, prefilter);
-        let destination_query = self.apply_prefilter(destination_query, prefilter);
-
-        let searcher = self.reader.searcher();
-
-        let mut unique_nodes = HashSet::new();
-
-        let collector = TopUniqueNodeCollector2::new(NodeSelector::SourceNodes, top_k);
-        let mut source_nodes = searcher.search(&source_query, &collector)?;
-        unique_nodes.extend(source_nodes.drain());
-
-        let collector = TopUniqueNodeCollector2::new(NodeSelector::DestinationNodes, top_k);
-        let mut destination_nodes = searcher.search(&destination_query, &collector)?;
-        unique_nodes.extend(destination_nodes.drain());
-
-        let nodes = unique_nodes
-            .into_iter()
-            .map(|encoded_node| decode_node(&encoded_node))
-            .map(|(value, node_type, node_subtype)| RelationNode {
-                value,
-                ntype: io_maps::u64_to_node_type(node_type),
-                subtype: node_subtype,
-            })
-            .take(top_k)
-            .collect();
-
-        let response = nidx_protos::GraphSearchResponse {
-            nodes,
-            ..Default::default()
-        };
-        Ok(response)
-    }
-
-    fn relations_graph_search(
-        &self,
-        query: &nidx_protos::graph_query::PathQuery,
-        prefilter: &PrefilterResult,
-        top_k: usize,
-    ) -> anyhow::Result<GraphSearchResponse> {
-        let query = BoolGraphQuery::try_from(query)?;
-        let parser = GraphQueryParser::new(&self.schema);
-        let index_query = parser.parse_bool(query);
-        let index_query = self.apply_prefilter(index_query, prefilter);
-
-        let searcher = self.reader.searcher();
-
-        let collector = TopUniqueRelationCollector2::new(top_k);
-        let matching_docs = searcher.search(&index_query, &collector)?;
-
-        let relations = matching_docs
-            .into_iter()
-            .map(|encoded_relation| {
-                let (relation_type, relation_label) = decode_relation(&encoded_relation);
-                nidx_protos::graph_search_response::Relation {
-                    relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),
-                    label: relation_label,
-                    metadata: None,
-                }
-            })
-            .collect();
-
-        let response = nidx_protos::GraphSearchResponse {
-            relations,
-            ..Default::default()
-        };
-        Ok(response)
-    }
-
-    fn apply_prefilter(&self, query: Box<dyn Query>, prefilter: &PrefilterResult) -> Box<dyn Query> {
-        match prefilter {
-            PrefilterResult::All => query,
-            PrefilterResult::None => Box::new(EmptyQuery),
-            PrefilterResult::Some(fields) => {
-                let terms = AddMetadataFieldIterator::new(self.schema.resource_field_id, fields.iter());
-                let prefilter_query = Box::new(TermSetQuery::new(terms));
-                Box::new(BooleanQuery::intersection(vec![prefilter_query, query]))
-            }
-        }
-    }
-
-    fn build_graph_response(
-        &self,
-        searcher: &Searcher,
-        docs: impl Iterator<Item = DocAddress>,
-    ) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
-        // We are being very naive and writing everything to the proto response. We could be smarter
-        // and deduplicates nodes and relations. As paths are pointers, this would improve proto
-        // size and ser/de time at expenses of deduplication effort.
 
         let mut nodes = Vec::new();
         let mut relations = Vec::new();
         let mut graph = Vec::new();
 
-        for doc_address in docs {
+        for (_score, doc_address) in matching_docs {
             let doc = searcher.doc(doc_address)?;
 
             let source = io_maps::source_to_relation_node(&self.schema, &doc);
@@ -281,6 +179,98 @@ impl RelationsReaderService {
             graph,
         };
         Ok(response)
+    }
+
+    fn nodes_graph_search(
+        &self,
+        query: &nidx_protos::graph_query::PathQuery,
+        prefilter: &PrefilterResult,
+        top_k: usize,
+    ) -> anyhow::Result<GraphSearchResponse> {
+        let query = BoolNodeQuery::try_from(query)?;
+        let parser = GraphQueryParser::new(&self.schema);
+        let (source_query, destination_query) = parser.parse_bool_node(query);
+        let source_query = self.apply_prefilter(source_query, prefilter);
+        let destination_query = self.apply_prefilter(destination_query, prefilter);
+
+        let searcher = self.reader.searcher();
+
+        let mut unique_nodes = TopUniqueN::new(top_k);
+
+        let collector = TopUniqueCollector::new(Selector::SourceNodes, top_k);
+        let source_nodes = searcher.search(&source_query, &collector)?;
+        unique_nodes.merge(source_nodes);
+
+        let collector = TopUniqueCollector::new(Selector::DestinationNodes, top_k);
+        let destination_nodes = searcher.search(&destination_query, &collector)?;
+        unique_nodes.merge(destination_nodes);
+
+        let nodes = unique_nodes
+            .into_sorted_vec()
+            .into_iter()
+            .map(|(encoded_node, _score)| {
+                let (value, node_type, node_subtype) = decode_node(&encoded_node);
+                RelationNode {
+                    value,
+                    ntype: io_maps::u64_to_node_type(node_type),
+                    subtype: node_subtype,
+                }
+            })
+            .collect();
+
+        let response = nidx_protos::GraphSearchResponse {
+            nodes,
+            ..Default::default()
+        };
+        Ok(response)
+    }
+
+    fn relations_graph_search(
+        &self,
+        query: &nidx_protos::graph_query::PathQuery,
+        prefilter: &PrefilterResult,
+        top_k: usize,
+    ) -> anyhow::Result<GraphSearchResponse> {
+        let query = BoolGraphQuery::try_from(query)?;
+        let parser = GraphQueryParser::new(&self.schema);
+        let index_query = parser.parse_bool(query);
+        let index_query = self.apply_prefilter(index_query, prefilter);
+
+        let searcher = self.reader.searcher();
+
+        let collector = TopUniqueCollector::new(Selector::Relations, top_k);
+        let top_relations = searcher.search(&index_query, &collector)?;
+
+        let relations = top_relations
+            .into_sorted_vec()
+            .into_iter()
+            .map(|(encoded_relation, _score)| {
+                let (relation_type, relation_label) = decode_relation(&encoded_relation);
+                nidx_protos::graph_search_response::Relation {
+                    relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),
+                    label: relation_label,
+                    metadata: None,
+                }
+            })
+            .collect();
+
+        let response = nidx_protos::GraphSearchResponse {
+            relations,
+            ..Default::default()
+        };
+        Ok(response)
+    }
+
+    fn apply_prefilter(&self, query: Box<dyn Query>, prefilter: &PrefilterResult) -> Box<dyn Query> {
+        match prefilter {
+            PrefilterResult::All => query,
+            PrefilterResult::None => Box::new(EmptyQuery),
+            PrefilterResult::Some(fields) => {
+                let terms = AddMetadataFieldIterator::new(self.schema.resource_field_id, fields.iter());
+                let prefilter_query = Box::new(TermSetQuery::new(terms));
+                Box::new(BooleanQuery::intersection(vec![prefilter_query, query]))
+            }
+        }
     }
 }
 
