@@ -96,21 +96,72 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_top_unique_n() {
-        let mut top = TopUniqueN::new(3);
-        top.insert("A", 1.0); // A=1.0 (insert A)
-        top.insert("B", 2.0); // A=1.0, B=2.0 (insert B)
-        top.insert("B", 3.0); // A=1.0, B=3.0 (replace B)
-        top.insert("C", 3.0); // A=1.0, B=3.0, C=3.0 (insert C)
-        top.insert("D", 4.0); // B=3.0, C=3.0, D=4.0 (insert D, "remove" A)
-        top.insert("E", 1.5); // B=3.0, C=3.0, D=4.0 ("do not insert" E)
-        top.insert("F", 1.6); // B=3.0, C=3.0, D=4.0 ("do not insert" F)
-        top.insert("G", 1.7); // trigger a truncate
-        top.insert("H", 1.8); // skip, score too low
+    fn test_top_n() {
+        let mut top = TopUniqueN::new(2);
+        top.insert("A", 1.0);
+        top.insert("B", 3.0);
+        top.insert("C", 2.0);
+        top.insert("D", 4.0);
+        top.insert("E", -1.0);
 
-        let r: HashMap<_, _> = HashMap::from_iter(top.into_sorted_vec().into_iter());
-        let expected = HashMap::from_iter([("B", 3.0), ("C", 3.0), ("D", 4.0)].into_iter());
-        assert_eq!(r.len(), 3);
+        let r = top.into_sorted_vec();
+        assert_eq!(r.len(), 2);
+        let r: HashMap<_, _> = HashMap::from_iter(r.into_iter());
+        let expected = HashMap::from_iter([("B", 3.0), ("D", 4.0)].into_iter());
+        assert_eq!(r, expected);
+    }
+
+    /// Validate inserting more than it's capacity, values are truncated to N.
+    #[test]
+    fn wip_test_internal_truncate() {
+        const N: usize = 2;
+        let mut top = TopUniqueN::new(N);
+
+        // capacity is at least 2 * N + 1, but in reality, it's usually more
+        let actual_capacity = top.elements.capacity();
+        assert!(actual_capacity >= 2 * N);
+
+        let mut key_id = 0;
+        let mut key_generator = std::iter::repeat_with(|| {
+            let key = key_id.to_string();
+            key_id += 1;
+            key
+        });
+
+        while top.elements.len() < top.elements.capacity() {
+            let key = key_generator.next().unwrap();
+            top.insert(key, 1.0);
+        }
+        assert_eq!(top.elements.len(), top.elements.capacity());
+        assert!(top.threshold < 0.0);
+
+        // this insert would overflow the capacity, but it truncates the internal values and don't
+        // increase it
+        top.insert("A".to_string(), 1.0);
+        assert_eq!(top.elements.capacity(), actual_capacity);
+        assert_eq!(top.elements.len(), N + 1);
+        assert_eq!(top.threshold, 1.0);
+    }
+
+    #[test]
+    fn test_merge() {
+        let mut top_a = TopUniqueN::new(4);
+        top_a.insert("A1", 1.0);
+        top_a.insert("A2", 3.0);
+
+        let mut top_b = TopUniqueN::new(3);
+        top_b.insert("B1", 1.0);
+        top_b.insert("B2", 3.0);
+        top_b.insert("B3", 4.0);
+        top_b.insert("B4", 2.0);
+
+        top_a.merge(top_b);
+
+        let r = top_a.into_sorted_vec();
+        assert_eq!(r.len(), 4);
+
+        let r: HashMap<_, _> = HashMap::from_iter(r.into_iter());
+        let expected = HashMap::from_iter([("A2", 3.0), ("B2", 3.0), ("B3", 4.0), ("B4", 2.0)].into_iter());
         assert_eq!(r, expected);
     }
 }
