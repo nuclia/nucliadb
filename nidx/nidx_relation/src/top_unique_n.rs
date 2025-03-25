@@ -113,7 +113,7 @@ mod tests {
 
     /// Validate inserting more than it's capacity, values are truncated to N.
     #[test]
-    fn wip_test_internal_truncate() {
+    fn test_internal_truncate() {
         const N: usize = 2;
         let mut top = TopUniqueN::new(N);
 
