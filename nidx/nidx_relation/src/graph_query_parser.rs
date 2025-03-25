@@ -704,13 +704,26 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
     type Error = anyhow::Error;
 
     fn try_from(node_pb: &nidx_protos::graph_query::Node) -> Result<Self, Self::Error> {
-        let value = node_pb.value.clone().map(|value| match node_pb.match_kind() {
-            nidx_protos::graph_query::node::MatchKind::Exact => Term::Exact(value),
-            nidx_protos::graph_query::node::MatchKind::Fuzzy => Term::Fuzzy(FuzzyTerm {
-                value,
-                fuzzy_distance: DEFAULT_NODE_VALUE_FUZZY_DISTANCE,
-                is_prefix: true,
-            }),
+        let value = node_pb.value.clone().map(|value| {
+            if let Some(match_kind) = node_pb.new_match_kind {
+                match match_kind {
+                    nidx_protos::graph_query::node::NewMatchKind::Exact(_) => Term::Exact(value),
+                    nidx_protos::graph_query::node::NewMatchKind::Fuzzy(_) => Term::Fuzzy(FuzzyTerm {
+                        value: value,
+                        fuzzy_distance: DEFAULT_NODE_VALUE_FUZZY_DISTANCE,
+                        is_prefix: true,
+                    }),
+                }
+            } else {
+                match node_pb.match_kind() {
+                    nidx_protos::graph_query::node::MatchKind::Exact => Term::Exact(value),
+                    nidx_protos::graph_query::node::MatchKind::Fuzzy => Term::Fuzzy(FuzzyTerm {
+                        value,
+                        fuzzy_distance: DEFAULT_NODE_VALUE_FUZZY_DISTANCE,
+                        is_prefix: true,
+                    }),
+                }
+            }
         });
         let node_type = node_pb.node_type.map(NodeType::try_from).transpose()?;
         let node_subtype = node_pb.node_subtype.clone();

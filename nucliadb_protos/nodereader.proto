@@ -196,7 +196,14 @@ message GraphQuery {
             EXACT = 0;
             FUZZY = 1;
         }
-        MatchKind match_kind = 4;
+        MatchKind match_kind = 4 [deprecated = true];
+
+        message ExactMatch {}
+        message FuzzyMatch {}
+        oneof new_match_kind {
+            ExactMatch exact = 5;
+            FuzzyMatch fuzzy = 6;
+        }
     }
 
     message Relation {

@@ -21,7 +21,7 @@ mod common;
 
 use std::collections::{HashMap, HashSet};
 
-use nidx_protos::graph_query::node::MatchKind;
+use nidx_protos::graph_query::node::{FuzzyMatch, NewMatchKind};
 use nidx_protos::graph_query::path_query::Query;
 use nidx_protos::graph_query::{BoolQuery, FacetFilter, Node, Path, PathQuery, Relation};
 use nidx_protos::graph_search_request::QueryKind;
@@ -221,7 +221,7 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
             source: Some(Node {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("Anastas".to_string()),
-                match_kind: MatchKind::Fuzzy.into(),
+                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {})),
                 ..Default::default()
             }),
             ..Default::default()
@@ -238,7 +238,7 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
             source: Some(Node {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("AnXstXsia".to_string()),
-                match_kind: MatchKind::Fuzzy.into(),
+                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {})),
                 ..Default::default()
             }),
             ..Default::default()
@@ -254,7 +254,7 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
             source: Some(Node {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("AnXstasia".to_string()),
-                match_kind: MatchKind::Fuzzy.into(),
+                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {})),
                 ..Default::default()
             }),
             ..Default::default()
@@ -271,7 +271,7 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
             source: Some(Node {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("Ana".to_string()),
-                match_kind: MatchKind::Fuzzy.into(),
+                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {})),
                 ..Default::default()
             }),
             ..Default::default()

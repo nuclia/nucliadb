@@ -698,14 +698,36 @@ class GraphQuery(google.protobuf.message.Message):
         EXACT: GraphQuery.Node.MatchKind.ValueType  # 0
         FUZZY: GraphQuery.Node.MatchKind.ValueType  # 1
 
+        @typing.final
+        class ExactMatch(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            def __init__(
+                self,
+            ) -> None: ...
+
+        @typing.final
+        class FuzzyMatch(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            def __init__(
+                self,
+            ) -> None: ...
+
         VALUE_FIELD_NUMBER: builtins.int
         NODE_TYPE_FIELD_NUMBER: builtins.int
         NODE_SUBTYPE_FIELD_NUMBER: builtins.int
         MATCH_KIND_FIELD_NUMBER: builtins.int
+        EXACT_FIELD_NUMBER: builtins.int
+        FUZZY_FIELD_NUMBER: builtins.int
         value: builtins.str
         node_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType
         node_subtype: builtins.str
         match_kind: global___GraphQuery.Node.MatchKind.ValueType
+        @property
+        def exact(self) -> global___GraphQuery.Node.ExactMatch: ...
+        @property
+        def fuzzy(self) -> global___GraphQuery.Node.FuzzyMatch: ...
         def __init__(
             self,
             *,
@@ -713,15 +735,19 @@ class GraphQuery(google.protobuf.message.Message):
             node_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType | None = ...,
             node_subtype: builtins.str | None = ...,
             match_kind: global___GraphQuery.Node.MatchKind.ValueType = ...,
+            exact: global___GraphQuery.Node.ExactMatch | None = ...,
+            fuzzy: global___GraphQuery.Node.FuzzyMatch | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "match_kind", b"match_kind", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "exact", b"exact", "fuzzy", b"fuzzy", "new_match_kind", b"new_match_kind", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "exact", b"exact", "fuzzy", b"fuzzy", "match_kind", b"match_kind", "new_match_kind", b"new_match_kind", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> None: ...
         @typing.overload
         def WhichOneof(self, oneof_group: typing.Literal["_node_subtype", b"_node_subtype"]) -> typing.Literal["node_subtype"] | None: ...
         @typing.overload
         def WhichOneof(self, oneof_group: typing.Literal["_node_type", b"_node_type"]) -> typing.Literal["node_type"] | None: ...
         @typing.overload
         def WhichOneof(self, oneof_group: typing.Literal["_value", b"_value"]) -> typing.Literal["value"] | None: ...
+        @typing.overload
+        def WhichOneof(self, oneof_group: typing.Literal["new_match_kind", b"new_match_kind"]) -> typing.Literal["exact", "fuzzy"] | None: ...
 
     @typing.final
     class Relation(google.protobuf.message.Message):
