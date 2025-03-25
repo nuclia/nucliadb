@@ -23,10 +23,13 @@ use std::collections::HashMap;
 
 use nidx_protos::graph_query::node::MatchKind;
 use nidx_protos::graph_query::path_query::Query;
-use nidx_protos::graph_query::{BoolQuery, Node, Path, PathQuery, Relation};
+use nidx_protos::graph_query::{BoolQuery, FacetFilter, Node, Path, PathQuery, Relation};
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
-use nidx_protos::{GraphQuery, GraphSearchRequest, GraphSearchResponse, IndexRelations, Resource, ResourceId};
+use nidx_protos::{
+    GraphQuery, GraphSearchRequest, GraphSearchResponse, IndexRelation, IndexRelations, RelationNode, Resource,
+    ResourceId,
+};
 use nidx_relation::{RelationConfig, RelationIndexer, RelationSearcher};
 use nidx_tests::graph::friendly_parse;
 use nidx_types::prefilter::{FieldId, PrefilterResult};
@@ -565,6 +568,147 @@ fn test_prefilter() -> anyhow::Result<()> {
         }]),
     )?;
     assert_eq!(result.graph.len(), 17);
+
+    Ok(())
+}
+
+#[test]
+fn test_facet_filter() -> anyhow::Result<()> {
+    let dir = TempDir::new().unwrap();
+
+    // Create a graph with relations with different facets
+    let relations = vec![
+        IndexRelation {
+            relation: Some(nidx_protos::Relation {
+                source: Some(RelationNode {
+                    ntype: NodeType::Entity.into(),
+                    subtype: "PERSON".to_string(),
+                    value: "Peter Processor".to_string(),
+                }),
+                to: Some(RelationNode {
+                    ntype: NodeType::Entity.into(),
+                    subtype: "PERSON".to_string(),
+                    value: "Pedro Procesador".to_string(),
+                }),
+                relation: RelationType::Entity.into(),
+                relation_label: "SAME".to_string(),
+                metadata: None,
+            }),
+            facets: vec![],
+            ..Default::default()
+        },
+        IndexRelation {
+            relation: Some(nidx_protos::Relation {
+                source: Some(RelationNode {
+                    ntype: NodeType::Entity.into(),
+                    subtype: "PERSON".to_string(),
+                    value: "Ursula User".to_string(),
+                }),
+                to: Some(RelationNode {
+                    ntype: NodeType::Entity.into(),
+                    subtype: "PERSON".to_string(),
+                    value: "Úrsula Usuaria".to_string(),
+                }),
+                relation: RelationType::Entity.into(),
+                relation_label: "SAME".to_string(),
+                metadata: None,
+            }),
+            facets: vec!["/g/u".to_string()],
+            ..Default::default()
+        },
+        IndexRelation {
+            relation: Some(nidx_protos::Relation {
+                source: Some(RelationNode {
+                    ntype: NodeType::Entity.into(),
+                    subtype: "PERSON".to_string(),
+                    value: "Alfred Agent".to_string(),
+                }),
+                to: Some(RelationNode {
+                    ntype: NodeType::Entity.into(),
+                    subtype: "PERSON".to_string(),
+                    value: "Alfred Agente".to_string(),
+                }),
+                relation: RelationType::Entity.into(),
+                relation_label: "SAME".to_string(),
+                metadata: None,
+            }),
+            facets: vec!["/g/da/mytask".to_string()],
+            ..Default::default()
+        },
+    ];
+    let field_relations = HashMap::from([("a/metadata".to_string(), IndexRelations { relations })]);
+    let resource = Resource {
+        resource: Some(ResourceId {
+            uuid: "0123456789abcdef0123456789abcdef".to_string(),
+            shard_id: "shard_id".to_string(),
+        }),
+        field_relations,
+        ..Default::default()
+    };
+
+    let segment_meta = RelationIndexer
+        .index_resource(dir.path(), &RelationConfig::default(), &resource)
+        .unwrap()
+        .unwrap();
+    let reader = RelationSearcher::open(
+        RelationConfig::default(),
+        TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]),
+    )?;
+
+    // Everything
+    let result = search(&reader, Query::Path(Path::default()))?;
+    assert_eq!(result.relations.len(), 3);
+
+    // Processor
+    let result = search(
+        &reader,
+        Query::BoolNot(Box::new(PathQuery {
+            query: Some(Query::Facet(FacetFilter {
+                facet: "/g".to_string(),
+            })),
+        })),
+    )?;
+    assert_eq!(result.relations.len(), 1);
+    assert_eq!(result.nodes[0].value, "Peter Processor");
+
+    // User
+    let result = search(
+        &reader,
+        Query::Facet(FacetFilter {
+            facet: "/g/u".to_string(),
+        }),
+    )?;
+    assert_eq!(result.relations.len(), 1);
+    assert_eq!(result.nodes[0].value, "Ursula User");
+
+    // Any DA
+    let result = search(
+        &reader,
+        Query::Facet(FacetFilter {
+            facet: "/g/da".to_string(),
+        }),
+    )?;
+    assert_eq!(result.relations.len(), 1);
+    assert_eq!(result.nodes[0].value, "Alfred Agent");
+
+    // Specific DA
+    let result = search(
+        &reader,
+        Query::Facet(FacetFilter {
+            facet: "/g/da/mytask".to_string(),
+        }),
+    )?;
+    assert_eq!(result.relations.len(), 1);
+    assert_eq!(result.nodes[0].value, "Alfred Agent");
+
+    // Non-existing facet
+    let result = search(
+        &reader,
+        Query::Facet(FacetFilter {
+            facet: "/g/da/faketask".to_string(),
+        }),
+    )?;
+    assert_eq!(result.relations.len(), 0);
 
     Ok(())
 }
