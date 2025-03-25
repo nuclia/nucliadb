@@ -75,9 +75,6 @@ where
     }
 
     pub fn into_sorted_vec(mut self) -> Vec<(K, f32)> {
-        if self.elements.len() > self.top_n {
-            self.truncate_top_n();
-        }
         let mut vec = Vec::from_iter(self.elements.into_iter());
         vec.sort_by(|a, b| a.1.total_cmp(&b.1).reverse());
         vec.truncate(self.top_n);
