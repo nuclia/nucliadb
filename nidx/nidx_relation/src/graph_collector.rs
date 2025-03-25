@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use tantivy::{
     DocId, Score, SegmentOrdinal, SegmentReader,
@@ -42,8 +42,7 @@ pub struct TopUniqueNodeCollector2 {
 }
 
 pub struct TopUniqueNodeSegmentCollector2 {
-    limit: usize,
-    unique: HashSet<Vec<u64>>,
+    unique: TopUniqueN<Vec<u64>>,
     encoded_node_reader: Column<u64>,
 }
 
@@ -64,7 +63,7 @@ impl TopUniqueNodeCollector2 {
 }
 
 impl Collector for TopUniqueNodeCollector2 {
-    type Fruit = HashSet<Vec<u64>>;
+    type Fruit = TopUniqueN<Vec<u64>>;
     type Child = TopUniqueNodeSegmentCollector2;
 
     fn requires_scoring(&self) -> bool {
@@ -77,8 +76,7 @@ impl Collector for TopUniqueNodeCollector2 {
             NodeSelector::DestinationNodes => segment.fast_fields().u64("encoded_target_id")?,
         };
         Ok(TopUniqueNodeSegmentCollector2 {
-            limit: self.limit,
-            unique: HashSet::new(),
+            unique: TopUniqueN::new(self.limit),
             encoded_node_reader: fast_field_reader,
         })
     }
@@ -87,28 +85,21 @@ impl Collector for TopUniqueNodeCollector2 {
         &self,
         segment_fruits: Vec<<Self::Child as SegmentCollector>::Fruit>,
     ) -> tantivy::Result<Self::Fruit> {
-        let mut unique = HashSet::new();
-        let mut fruits = segment_fruits.into_iter().flatten();
-        let mut fruit = fruits.next();
-
-        while fruit.is_some() && unique.len() < self.limit {
-            unique.insert(fruit.unwrap());
-            fruit = fruits.next();
+        let fruits = segment_fruits.into_iter().flat_map(|top| top.into_sorted_vec());
+        let mut unique = TopUniqueN::new(self.limit);
+        for (key, score) in fruits {
+            unique.insert(key, score);
         }
         Ok(unique)
     }
 }
 
 impl SegmentCollector for TopUniqueNodeSegmentCollector2 {
-    type Fruit = HashSet<Vec<u64>>;
+    type Fruit = TopUniqueN<Vec<u64>>;
 
-    fn collect(&mut self, doc_id: DocId, _score: Score) {
-        // we already have all unique results we need
-        if self.unique.len() >= self.limit {
-            return;
-        }
+    fn collect(&mut self, doc_id: DocId, score: Score) {
         let encoded_node = self.encoded_node_reader.values_for_doc(doc_id).collect::<Vec<u64>>();
-        self.unique.insert(encoded_node);
+        self.unique.insert(encoded_node, score);
     }
 
     fn harvest(self) -> Self::Fruit {
@@ -230,6 +221,12 @@ where
         vec.sort_by(|a, b| a.1.total_cmp(&b.1).reverse());
         vec.truncate(self.top_n);
         vec
+    }
+
+    pub fn merge(&mut self, other: Self) {
+        for (key, score) in other.elements.into_iter() {
+            self.insert(key, score);
+        }
     }
 }
 

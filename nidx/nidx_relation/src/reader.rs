@@ -34,7 +34,7 @@ use tantivy::schema::Field;
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
 use uuid::Uuid;
 
-use crate::graph_collector::{NodeSelector, TopUniqueNodeCollector2, TopUniqueRelationCollector2};
+use crate::graph_collector::{NodeSelector, TopUniqueN, TopUniqueNodeCollector2, TopUniqueRelationCollector2};
 use crate::graph_query_parser::{
     BoolGraphQuery, BoolNodeQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
 };
@@ -166,25 +166,27 @@ impl RelationsReaderService {
 
         let searcher = self.reader.searcher();
 
-        let mut unique_nodes = HashSet::new();
+        let mut unique_nodes = TopUniqueN::new(top_k);
 
         let collector = TopUniqueNodeCollector2::new(NodeSelector::SourceNodes, top_k);
-        let mut source_nodes = searcher.search(&source_query, &collector)?;
-        unique_nodes.extend(source_nodes.drain());
+        let source_nodes = searcher.search(&source_query, &collector)?;
+        unique_nodes.merge(source_nodes);
 
         let collector = TopUniqueNodeCollector2::new(NodeSelector::DestinationNodes, top_k);
-        let mut destination_nodes = searcher.search(&destination_query, &collector)?;
-        unique_nodes.extend(destination_nodes.drain());
+        let destination_nodes = searcher.search(&destination_query, &collector)?;
+        unique_nodes.merge(destination_nodes);
 
         let nodes = unique_nodes
+            .into_sorted_vec()
             .into_iter()
-            .map(|encoded_node| decode_node(&encoded_node))
-            .map(|(value, node_type, node_subtype)| RelationNode {
-                value,
-                ntype: io_maps::u64_to_node_type(node_type),
-                subtype: node_subtype,
+            .map(|(encoded_node, _score)| {
+                let (value, node_type, node_subtype) = decode_node(&encoded_node);
+                RelationNode {
+                    value,
+                    ntype: io_maps::u64_to_node_type(node_type),
+                    subtype: node_subtype,
+                }
             })
-            .take(top_k)
             .collect();
 
         let response = nidx_protos::GraphSearchResponse {
