@@ -141,7 +141,6 @@ pub fn knowledge_graph_as_relations() -> Vec<IndexRelation> {
                     subtype: entities.get(target).unwrap().to_string(),
                 }),
                 metadata: None,
-                ..Default::default()
             }),
             ..Default::default()
         })

@@ -21,7 +21,6 @@
 use crate::io_maps;
 use crate::schema::{Schema, encode_field_id, encode_node, encode_relation};
 use anyhow::anyhow;
-use nidx_protos::noderesources::IndexRelation;
 use nidx_protos::prost::*;
 use nidx_tantivy::TantivyIndexer;
 use tantivy::doc;
@@ -39,92 +38,65 @@ pub fn index_relations(
         .map(|r| r.uuid.as_str())
         .expect("Missing resource ID");
 
-    let iter: &mut dyn Iterator<Item = (Option<&str>, IndexRelation)> = if resource.field_relations.is_empty() {
-        &mut resource.relations.iter().map(|r| {
-            (
-                None,
-                IndexRelation {
-                    relation: Some(r.clone()),
-                    ..Default::default()
-                },
-            )
-        })
-    } else {
-        &mut resource.field_relations.iter().flat_map(|(field_key, relations)| {
-            relations
-                .relations
-                .iter()
-                .map(|r| (Some(field_key.as_str()), r.clone()))
-        })
-    };
-    let iter = iter.filter(|(_, rel)| {
-        rel.relation.as_ref().unwrap().to.is_some() || rel.relation.as_ref().unwrap().source.is_some()
-    });
+    for (field_key, relations) in &resource.field_relations {
+        for index_relation in &relations.relations {
+            let relation = index_relation.relation.as_ref().unwrap();
 
-    for (field_key, index_relation) in iter {
-        let relation = index_relation.relation.unwrap();
-
-        let source = relation.source.as_ref().expect("Missing source");
-        let source_value = source.value.as_str();
-        let source_type = io_maps::node_type_to_u64(source.ntype());
-        let source_subtype = source.subtype.as_str();
-
-        let target = relation.to.as_ref().expect("Missing target");
-        let target_value = target.value.as_str();
-        let target_type = io_maps::node_type_to_u64(target.ntype());
-        let target_subtype = target.subtype.as_str();
-
-        let label = relation.relation_label.as_str();
-        let relationship = io_maps::relation_type_to_u64(relation.relation());
-        let normalized_source_value = schema.normalize(source_value);
-        let normalized_target_value = schema.normalize(target_value);
-
-        let mut new_doc = doc!(
-            schema.source_value => source_value,
-            schema.source_type => source_type,
-            schema.source_subtype => source_subtype,
-            schema.target_value => target_value,
-            schema.target_type => target_type,
-            schema.target_subtype => target_subtype,
-            schema.relationship => relationship,
-            schema.label => label,
-            schema.normalized_source_value => normalized_source_value,
-            schema.normalized_target_value => normalized_target_value,
-        );
-
-        if schema.version == 1 {
-            new_doc.add_text(schema.resource_id, resource_id_str);
-        } else {
             let rid = Uuid::parse_str(resource_id_str)?;
-            let field = field_key.ok_or(anyhow!("Field ID required for v2"))?;
-            new_doc.add_bytes(schema.resource_id, rid.as_bytes());
-            new_doc.add_bytes(schema.resource_field_id.unwrap(), encode_field_id(rid, field));
+
+            let source = relation.source.as_ref().ok_or(anyhow!("Missing source"))?;
+            let source_value = source.value.as_str();
+            let source_type = io_maps::node_type_to_u64(source.ntype());
+            let source_subtype = source.subtype.as_str();
+
+            let target = relation.to.as_ref().ok_or(anyhow!("Missing target"))?;
+            let target_value = target.value.as_str();
+            let target_type = io_maps::node_type_to_u64(target.ntype());
+            let target_subtype = target.subtype.as_str();
+
+            let label = relation.relation_label.as_str();
+            let relationship = io_maps::relation_type_to_u64(relation.relation());
+            let normalized_source_value = schema.normalize(source_value);
+            let normalized_target_value = schema.normalize(target_value);
+
+            let mut new_doc = doc!(
+                schema.source_value => source_value,
+                schema.source_type => source_type,
+                schema.source_subtype => source_subtype,
+                schema.target_value => target_value,
+                schema.target_type => target_type,
+                schema.target_subtype => target_subtype,
+                schema.relationship => relationship,
+                schema.label => label,
+                schema.normalized_source_value => normalized_source_value,
+                schema.normalized_target_value => normalized_target_value,
+                schema.resource_id => rid.as_bytes().to_vec(),
+                schema.resource_field_id => encode_field_id(rid, field_key),
+
+            );
 
             for facet in &index_relation.facets {
-                new_doc.add_facet(schema.facets.unwrap(), Facet::from_text(facet)?);
+                new_doc.add_facet(schema.facets, Facet::from_text(facet)?);
             }
 
             // Encode source and target nodes and relation for faster retrieval
-            let encoded_source_id = schema.encoded_source_id.unwrap();
             for b in encode_node(source_value, source_type, source_subtype) {
-                new_doc.add_u64(encoded_source_id, b);
+                new_doc.add_u64(schema.encoded_source_id, b);
             }
-            let encoded_target_id = schema.encoded_target_id.unwrap();
             for b in encode_node(target_value, target_type, target_subtype) {
-                new_doc.add_u64(encoded_target_id, b);
+                new_doc.add_u64(schema.encoded_target_id, b);
             }
-            let encoded_relation_id = schema.encoded_relation_id.unwrap();
             for b in encode_relation(relationship, label) {
-                new_doc.add_u64(encoded_relation_id, b);
+                new_doc.add_u64(schema.encoded_relation_id, b);
             }
-        }
 
-        if let Some(metadata) = relation.metadata.as_ref() {
-            let encoded_metadata = metadata.encode_to_vec();
-            new_doc.add_bytes(schema.metadata, encoded_metadata);
-        }
+            if let Some(metadata) = relation.metadata.as_ref() {
+                let encoded_metadata = metadata.encode_to_vec();
+                new_doc.add_bytes(schema.metadata, encoded_metadata);
+            }
 
-        writer.add_document(new_doc)?;
+            writer.add_document(new_doc)?;
+        }
     }
     Ok(())
 }

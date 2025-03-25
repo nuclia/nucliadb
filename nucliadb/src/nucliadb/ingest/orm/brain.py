@@ -236,8 +236,6 @@ class ResourceBrain:
         field_relations = self.brain.field_relations[field_key].relations
         for relations in metadata.metadata.relations:
             for relation in relations.relations:
-                self.brain.relations.append(relation)
-
                 index_relation = IndexRelation(relation=relation)
                 if relation.metadata.HasField("data_augmentation_task_id"):
                     index_relation.facets.append(f"/g/da/{relation.metadata.data_augmentation_task_id}")
@@ -421,7 +419,6 @@ class ResourceBrain:
                     source=relationnodedocument,
                     to=relationnodeuser,
                 )
-                self.brain.relations.append(relation)
                 self.brain.field_relations["a/metadata"].relations.append(
                     IndexRelation(relation=relation)
                 )
@@ -437,12 +434,10 @@ class ResourceBrain:
                 source=relationnodedocument,
                 to=relation_node_label,
             )
-            self.brain.relations.append(relation)
             self.brain.field_relations["a/metadata"].relations.append(IndexRelation(relation=relation))
 
         # relations
         for relation in user_relations.relations:
-            self.brain.relations.append(relation)
             self.brain.field_relations["a/metadata"].relations.append(
                 IndexRelation(relation=relation, facets=["/g/u"])
             )
@@ -522,7 +517,6 @@ class ResourceBrain:
                 relation = Relation()
                 relation.CopyFrom(base_classification_relation)
                 relation.to.value = label
-                self.brain.relations.append(relation)
                 self.brain.field_relations[field_key].relations.append(IndexRelation(relation=relation))
 
         # Data Augmentation + Processor entities
@@ -550,7 +544,6 @@ class ResourceBrain:
                 relation.CopyFrom(base_entity_relation)
                 relation.to.value = entity_text
                 relation.to.subtype = entity_label
-                self.brain.relations.append(relation)
                 self.brain.field_relations[field_key].relations.append(IndexRelation(relation=relation))
 
         # Legacy processor entities
@@ -570,7 +563,6 @@ class ResourceBrain:
                 relation.CopyFrom(base_entity_relation)
                 relation.to.value = entity
                 relation.to.subtype = klass
-                self.brain.relations.append(relation)
                 self.brain.field_relations[field_key].relations.append(IndexRelation(relation=relation))
 
     def apply_field_labels(
@@ -627,7 +619,6 @@ class ResourceBrain:
                         source=relation_node_resource,
                         to=relation_node_entity,
                     )
-                    self.brain.relations.append(rel)
                     self.brain.field_relations[field_key].relations.append(IndexRelation(relation=rel))
             for paragraph_annotation in basic_user_fieldmetadata.paragraphs:
                 for classification in paragraph_annotation.classifications:

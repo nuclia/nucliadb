@@ -750,7 +750,6 @@ class Resource(google.protobuf.message.Message):
     SENTENCES_TO_DELETE_FIELD_NUMBER: builtins.int
     VECTOR_PREFIXES_TO_DELETE_FIELD_NUMBER: builtins.int
     RELATION_FIELDS_TO_DELETE_FIELD_NUMBER: builtins.int
-    RELATIONS_FIELD_NUMBER: builtins.int
     FIELD_RELATIONS_FIELD_NUMBER: builtins.int
     SHARD_ID_FIELD_NUMBER: builtins.int
     VECTORS_FIELD_NUMBER: builtins.int
@@ -797,13 +796,9 @@ class Resource(google.protobuf.message.Message):
     @property
     def relation_fields_to_delete(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
-    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]:
-        """Relations
-        Soon deprecated
-        """
+    def field_relations(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___IndexRelations]:
+        """Relations"""
 
-    @property
-    def field_relations(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___IndexRelations]: ...
     @property
     def vectors(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.utils_pb2.UserVectors]:
         """vectorset is the key"""
@@ -827,7 +822,6 @@ class Resource(google.protobuf.message.Message):
         sentences_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
         vector_prefixes_to_delete: collections.abc.Mapping[builtins.str, global___StringList] | None = ...,
         relation_fields_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
-        relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
         field_relations: collections.abc.Mapping[builtins.str, global___IndexRelations] | None = ...,
         shard_id: builtins.str = ...,
         vectors: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectors] | None = ...,
@@ -835,7 +829,7 @@ class Resource(google.protobuf.message.Message):
         security: nucliadb_protos.utils_pb2.Security | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_security", b"_security", "metadata", b"metadata", "resource", b"resource", "security", b"security"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_security", b"_security", "field_relations", b"field_relations", "labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relation_fields_to_delete", b"relation_fields_to_delete", "relations", b"relations", "resource", b"resource", "security", b"security", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "vector_prefixes_to_delete", b"vector_prefixes_to_delete", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_security", b"_security", "field_relations", b"field_relations", "labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relation_fields_to_delete", b"relation_fields_to_delete", "resource", b"resource", "security", b"security", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "vector_prefixes_to_delete", b"vector_prefixes_to_delete", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["_security", b"_security"]) -> typing.Literal["security"] | None: ...
 
 global___Resource = Resource

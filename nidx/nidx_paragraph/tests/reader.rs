@@ -156,7 +156,6 @@ fn create_resource(shard_id: String, timestamp: Timestamp) -> Resource {
         labels: vec!["/l/mylabel_resource".to_string()],
         paragraphs,
         paragraphs_to_delete: vec![],
-        relations: vec![],
         vectors: HashMap::default(),
         vectors_to_delete: HashMap::default(),
         shard_id,

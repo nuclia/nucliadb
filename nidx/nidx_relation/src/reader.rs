@@ -34,10 +34,7 @@ use tantivy::schema::Field;
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
 use uuid::Uuid;
 
-use crate::graph_collector::{
-    NodeSelector, TopUniqueNodeCollector, TopUniqueNodeCollector2, TopUniqueRelationCollector,
-    TopUniqueRelationCollector2,
-};
+use crate::graph_collector::{NodeSelector, TopUniqueNodeCollector2, TopUniqueRelationCollector2};
 use crate::graph_query_parser::{
     BoolGraphQuery, BoolNodeQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
 };
@@ -45,8 +42,6 @@ use crate::schema::{Schema, decode_node, decode_relation, encode_field_id};
 use crate::{RelationConfig, io_maps};
 
 const FUZZY_DISTANCE: u8 = 1;
-// Search for entities of these many words of length
-const ENTITY_WORD_SIZE: usize = 3;
 const NUMBER_OF_RESULTS_SUGGEST: usize = 10;
 // Hard limit until we have pagination in place
 const MAX_NUM_RELATIONS_RESULTS: usize = 500;
@@ -171,60 +166,32 @@ impl RelationsReaderService {
 
         let searcher = self.reader.searcher();
 
-        if self.schema.version == 1 {
-            let mut unique_nodes = HashSet::new();
+        let mut unique_nodes = HashSet::new();
 
-            let collector = TopUniqueNodeCollector::new(self.schema.clone(), NodeSelector::SourceNodes, top_k);
-            let mut source_nodes = searcher.search(&source_query, &collector)?;
-            unique_nodes.extend(source_nodes.drain());
+        let collector = TopUniqueNodeCollector2::new(NodeSelector::SourceNodes, top_k);
+        let mut source_nodes = searcher.search(&source_query, &collector)?;
+        unique_nodes.extend(source_nodes.drain());
 
-            let collector = TopUniqueNodeCollector::new(self.schema.clone(), NodeSelector::DestinationNodes, top_k);
-            let mut destination_nodes = searcher.search(&destination_query, &collector)?;
-            unique_nodes.extend(destination_nodes.drain());
+        let collector = TopUniqueNodeCollector2::new(NodeSelector::DestinationNodes, top_k);
+        let mut destination_nodes = searcher.search(&destination_query, &collector)?;
+        unique_nodes.extend(destination_nodes.drain());
 
-            let nodes = unique_nodes
-                .into_iter()
-                .map(|(value, node_type, node_subtype)| RelationNode {
-                    value,
-                    ntype: node_type,
-                    subtype: node_subtype,
-                })
-                .take(top_k)
-                .collect();
+        let nodes = unique_nodes
+            .into_iter()
+            .map(|encoded_node| decode_node(&encoded_node))
+            .map(|(value, node_type, node_subtype)| RelationNode {
+                value,
+                ntype: io_maps::u64_to_node_type(node_type),
+                subtype: node_subtype,
+            })
+            .take(top_k)
+            .collect();
 
-            let response = nidx_protos::GraphSearchResponse {
-                nodes,
-                ..Default::default()
-            };
-            Ok(response)
-        } else {
-            let mut unique_nodes = HashSet::new();
-
-            let collector = TopUniqueNodeCollector2::new(NodeSelector::SourceNodes, top_k);
-            let mut source_nodes = searcher.search(&source_query, &collector)?;
-            unique_nodes.extend(source_nodes.drain());
-
-            let collector = TopUniqueNodeCollector2::new(NodeSelector::DestinationNodes, top_k);
-            let mut destination_nodes = searcher.search(&destination_query, &collector)?;
-            unique_nodes.extend(destination_nodes.drain());
-
-            let nodes = unique_nodes
-                .into_iter()
-                .map(|encoded_node| decode_node(&encoded_node))
-                .map(|(value, node_type, node_subtype)| RelationNode {
-                    value,
-                    ntype: io_maps::u64_to_node_type(node_type),
-                    subtype: node_subtype,
-                })
-                .take(top_k)
-                .collect();
-
-            let response = nidx_protos::GraphSearchResponse {
-                nodes,
-                ..Default::default()
-            };
-            Ok(response)
-        }
+        let response = nidx_protos::GraphSearchResponse {
+            nodes,
+            ..Default::default()
+        };
+        Ok(response)
     }
 
     fn relations_graph_search(
@@ -240,46 +207,26 @@ impl RelationsReaderService {
 
         let searcher = self.reader.searcher();
 
-        if self.schema.version == 1 {
-            let collector = TopUniqueRelationCollector::new(self.schema.clone(), top_k);
-            let matching_docs = searcher.search(&index_query, &collector)?;
+        let collector = TopUniqueRelationCollector2::new(top_k);
+        let matching_docs = searcher.search(&index_query, &collector)?;
 
-            let relations = matching_docs
-                .into_iter()
-                .map(|doc| nidx_protos::graph_search_response::Relation {
-                    relation_type: io_maps::u64_to_relation_type::<i32>(self.schema.relationship(&doc)),
-                    label: self.schema.relationship_label(&doc).to_string(),
+        let relations = matching_docs
+            .into_iter()
+            .map(|encoded_relation| {
+                let (relation_type, relation_label) = decode_relation(&encoded_relation);
+                nidx_protos::graph_search_response::Relation {
+                    relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),
+                    label: relation_label,
                     metadata: None,
-                })
-                .collect();
+                }
+            })
+            .collect();
 
-            let response = nidx_protos::GraphSearchResponse {
-                relations,
-                ..Default::default()
-            };
-            Ok(response)
-        } else {
-            let collector = TopUniqueRelationCollector2::new(top_k);
-            let matching_docs = searcher.search(&index_query, &collector)?;
-
-            let relations = matching_docs
-                .into_iter()
-                .map(|encoded_relation| {
-                    let (relation_type, relation_label) = decode_relation(&encoded_relation);
-                    nidx_protos::graph_search_response::Relation {
-                        relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),
-                        label: relation_label,
-                        metadata: None,
-                    }
-                })
-                .collect();
-
-            let response = nidx_protos::GraphSearchResponse {
-                relations,
-                ..Default::default()
-            };
-            Ok(response)
-        }
+        let response = nidx_protos::GraphSearchResponse {
+            relations,
+            ..Default::default()
+        };
+        Ok(response)
     }
 
     fn apply_prefilter(&self, query: Box<dyn Query>, prefilter: &PrefilterResult) -> Box<dyn Query> {
@@ -287,17 +234,8 @@ impl RelationsReaderService {
             PrefilterResult::All => query,
             PrefilterResult::None => Box::new(EmptyQuery),
             PrefilterResult::Some(fields) => {
-                let prefilter_query = if let Some(resource_field_id) = self.schema.resource_field_id {
-                    // Schema v2, by field
-                    let terms = AddMetadataFieldIterator::new(resource_field_id, fields.iter());
-                    Box::new(TermSetQuery::new(terms))
-                } else {
-                    // Schema v1, by resource
-                    let resources: HashSet<_> = fields.iter().map(|x| x.resource_id).collect();
-                    Box::new(TermSetQuery::new(resources.iter().map(|rid| {
-                        tantivy::Term::from_field_text(self.schema.resource_id, &rid.simple().to_string())
-                    })))
-                };
+                let terms = AddMetadataFieldIterator::new(self.schema.resource_field_id, fields.iter());
+                let prefilter_query = Box::new(TermSetQuery::new(terms));
                 Box::new(BooleanQuery::intersection(vec![prefilter_query, query]))
             }
         }
@@ -449,10 +387,8 @@ impl RelationsReaderService {
 
         for (_, doc_addr) in matching_docs {
             let source = searcher.doc(doc_addr)?;
-            let relation = io_maps::doc_to_relation(&self.schema, &source);
-            response.relations.push(relation);
-            let new_relation = io_maps::doc_to_index_relation(&self.schema, &source);
-            response.new_relations.push(new_relation);
+            let index_relation = io_maps::doc_to_index_relation(&self.schema, &source);
+            response.relations.push(index_relation);
         }
 
         Ok(Some(response))
@@ -509,50 +445,17 @@ impl RelationsReaderService {
         match search {
             Search::Query(query) => {
                 let mut prefix_nodes_q = Vec::new();
-                if schema.version == 1 {
-                    // This search is intended to do a normal tokenized search on entities names. However, since we
-                    // do some custom normalization for these fields, we need to do some custom handling here.
-                    // Feel free to replace this with something better if we start indexing entities name with tokenization.
 
-                    // Search for all groups of words in the query, e.g:
-                    // query "Films with James Bond"
-                    // returns:
-                    // "Films", "with", "James", "Bond"
-                    // "Films with", "with James", "James Bond"
-                    // "Films with James", "with James Bond"
-                    let words: Vec<_> = query.split_whitespace().collect();
-                    for end in 1..=words.len() {
-                        for len in 1..=ENTITY_WORD_SIZE {
-                            if len > end {
-                                break;
-                            }
-                            let start = end - len;
-                            let prefix = &words[start..end];
-
-                            let normalized_prefix = schema.normalize_words(prefix.iter().copied());
-                            prefix_nodes_q.push(Node {
-                                value: Some(Term::Fuzzy(FuzzyTerm {
-                                    value: normalized_prefix,
-                                    fuzzy_distance: FUZZY_DISTANCE,
-                                    // BUG: this should be true if we want prefix search
-                                    is_prefix: false,
-                                })),
-                                ..Default::default()
-                            });
-                        }
-                    }
-                } else {
-                    let words: Vec<_> = query.split_whitespace().collect();
-                    for word in words {
-                        prefix_nodes_q.push(Node {
-                            value: Some(Term::Fuzzy(FuzzyTerm {
-                                value: word.to_string(),
-                                fuzzy_distance: FUZZY_DISTANCE,
-                                is_prefix: false,
-                            })),
-                            ..Default::default()
-                        })
-                    }
+                let words: Vec<_> = query.split_whitespace().collect();
+                for word in words {
+                    prefix_nodes_q.push(Node {
+                        value: Some(Term::Fuzzy(FuzzyTerm {
+                            value: word.to_string(),
+                            fuzzy_distance: FUZZY_DISTANCE,
+                            is_prefix: false,
+                        })),
+                        ..Default::default()
+                    })
                 }
 
                 // add fuzzy query for all prefixes

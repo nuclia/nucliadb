@@ -232,6 +232,7 @@ async fn test_search_relations_neighbours(pool: PgPool) -> Result<(), Box<dyn st
             .iter()
             .flat_map(|neighbours| neighbours.relations.iter())
             .flat_map(|node| {
+                let node = node.relation.as_ref().unwrap();
                 [(
                     node.source.as_ref().unwrap().value.to_owned(),
                     node.to.as_ref().unwrap().value.to_owned(),
@@ -344,7 +345,7 @@ async fn test_search_relations_neighbours(pool: PgPool) -> Result<(), Box<dyn st
     // Check that the relation obtained as response has appropiate metadata
     let subgraph = response.subgraph.clone().unwrap();
     let first_relation = &subgraph.relations[0];
-    let metadata = first_relation.metadata.as_ref().unwrap();
+    let metadata = first_relation.relation.as_ref().unwrap().metadata.as_ref().unwrap();
 
     assert_eq!(
         metadata.paragraph_id,
@@ -1234,7 +1235,6 @@ async fn create_knowledge_graph(fixture: &mut NidxFixture, shard_id: String) -> 
                 relation: *relation_type as i32,
                 relation_label: relation.to_string(),
                 metadata: relation_metadata.clone(),
-                ..Default::default()
             }),
             ..Default::default()
         });
