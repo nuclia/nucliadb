@@ -18,11 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use anyhow::anyhow;
+use nidx_protos::graph_query::FacetFilter;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator};
 use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
-use tantivy::schema::{Field, IndexRecordOption};
+use tantivy::schema::{Facet, Field, IndexRecordOption};
 use tantivy::tokenizer::TokenizerManager;
 
 use crate::io_maps;
@@ -109,6 +110,8 @@ pub enum GraphQuery {
     RelationQuery(RelationQuery),
     // (:A)-[:R]->(:B)
     PathQuery(PathQuery),
+
+    Facet(String),
 }
 
 #[derive(Clone, Copy)]
@@ -117,7 +120,13 @@ enum NodePosition {
     Destination,
 }
 
-pub struct BoolNodeQuery(BooleanExpression<Node>);
+#[derive(Clone)]
+enum NodeExpression {
+    Node(Node),
+    Facet(String),
+}
+
+pub struct BoolNodeQuery(BooleanExpression<NodeExpression>);
 pub struct BoolGraphQuery(BooleanExpression<GraphQuery>);
 
 #[derive(Clone, Copy)]
@@ -172,9 +181,13 @@ impl<'a> GraphQueryParser<'a> {
         )
     }
 
-    fn inner_parse_bool_node(&self, query: BooleanExpression<Node>, position: NodePosition) -> Box<dyn Query> {
+    fn inner_parse_bool_node(
+        &self,
+        query: BooleanExpression<NodeExpression>,
+        position: NodePosition,
+    ) -> Box<dyn Query> {
         match query {
-            BooleanExpression::Literal(node) => match position {
+            BooleanExpression::Literal(NodeExpression::Node(node)) => match position {
                 NodePosition::Source => {
                     self.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(node))))
                 }
@@ -182,6 +195,7 @@ impl<'a> GraphQueryParser<'a> {
                     Expression::Value(node),
                 ))),
             },
+            BooleanExpression::Literal(NodeExpression::Facet(facet)) => self.parse_facet(&facet),
             BooleanExpression::Not(subquery) => {
                 let subqueries = vec![
                     (Occur::Must, Box::new(AllQuery) as Box<dyn Query>),
@@ -210,6 +224,7 @@ impl<'a> GraphQueryParser<'a> {
             GraphQuery::NodeQuery(query) => self.parse_node_query(query),
             GraphQuery::RelationQuery(query) => self.parse_relation_query(query),
             GraphQuery::PathQuery(query) => self.parse_path_query(query),
+            GraphQuery::Facet(facet) => self.parse_facet(&facet),
         }
     }
 
@@ -243,6 +258,13 @@ impl<'a> GraphQueryParser<'a> {
             Expression::Value(Node::default()),
         ));
         self.parse_path_query(equivalent_path_query)
+    }
+
+    fn parse_facet(&self, facet: &str) -> Box<dyn Query> {
+        Box::new(TermQuery::new(
+            tantivy::Term::from_facet(self.schema.facets, &Facet::from_text(facet).expect("Invalid facet")),
+            IndexRecordOption::Basic,
+        ))
     }
 
     fn parse_path_query(&self, query: PathQuery) -> Box<dyn Query> {
@@ -564,14 +586,12 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolNodeQuery {
 
                     let pb_node = path.source.as_ref().unwrap();
                     let node = Node::try_from(pb_node)?;
-                    BooleanExpression::Literal(node)
+                    BooleanExpression::Literal(NodeExpression::Node(node))
                 }
-
                 nidx_protos::graph_query::path_query::Query::BoolNot(bool_not) => {
                     let subquery = BoolNodeQuery::try_from(bool_not.as_ref())?.0;
                     BooleanExpression::Not(Box::new(subquery))
                 }
-
                 nidx_protos::graph_query::path_query::Query::BoolAnd(bool_and) => {
                     BooleanExpression::Operation(BooleanOperation {
                         operator: Operator::And,
@@ -582,7 +602,6 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolNodeQuery {
                             .collect::<anyhow::Result<Vec<_>>>()?,
                     })
                 }
-
                 nidx_protos::graph_query::path_query::Query::BoolOr(bool_or) => {
                     BooleanExpression::Operation(BooleanOperation {
                         operator: Operator::Or,
@@ -593,9 +612,12 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolNodeQuery {
                             .collect::<anyhow::Result<Vec<_>>>()?,
                     })
                 }
+                nidx_protos::graph_query::path_query::Query::Facet(FacetFilter { facet }) => {
+                    BooleanExpression::Literal(NodeExpression::Facet(facet.clone()))
+                }
             },
 
-            None => BooleanExpression::Literal(Node::default()),
+            None => BooleanExpression::Literal(NodeExpression::Node(Node::default())),
         };
 
         Ok(BoolNodeQuery(bool_expr))
@@ -638,12 +660,10 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolGraphQuery {
 
                     BooleanExpression::Literal(path_query)
                 }
-
                 nidx_protos::graph_query::path_query::Query::BoolNot(bool_not) => {
                     let subquery = BoolGraphQuery::try_from(bool_not.as_ref())?.0;
                     BooleanExpression::Not(Box::new(subquery))
                 }
-
                 nidx_protos::graph_query::path_query::Query::BoolAnd(bool_and) => {
                     BooleanExpression::Operation(BooleanOperation {
                         operator: Operator::And,
@@ -654,7 +674,6 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolGraphQuery {
                             .collect::<anyhow::Result<Vec<_>>>()?,
                     })
                 }
-
                 nidx_protos::graph_query::path_query::Query::BoolOr(bool_or) => {
                     BooleanExpression::Operation(BooleanOperation {
                         operator: Operator::Or,
@@ -664,6 +683,9 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolGraphQuery {
                             .map(|o| BoolGraphQuery::try_from(o).map(|x| x.0))
                             .collect::<anyhow::Result<Vec<_>>>()?,
                     })
+                }
+                nidx_protos::graph_query::path_query::Query::Facet(FacetFilter { facet }) => {
+                    BooleanExpression::Literal(GraphQuery::Facet(facet.clone()))
                 }
             },
 

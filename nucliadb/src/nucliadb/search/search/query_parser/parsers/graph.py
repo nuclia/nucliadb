@@ -148,6 +148,9 @@ def _parse_path_query(expr: graph_requests.GraphPathQuery) -> nodereader_pb2.Gra
     elif isinstance(expr, graph_requests.Relation):
         _set_relation_to_pb(expr, pb.path.relation)
 
+    elif isinstance(expr, graph_requests.Generated):
+        _set_generated_to_pb(expr, pb)
+
     else:  # pragma: nocover
         # This is a trick so mypy generates an error if this branch can be reached,
         # that is, if we are missing some ifs
@@ -173,6 +176,9 @@ def _parse_node_query(expr: graph_requests.GraphNodesQuery) -> nodereader_pb2.Gr
     elif isinstance(expr, graph_requests.AnyNode):
         _set_node_to_pb(expr, pb.path.source)
         pb.path.undirected = True
+
+    elif isinstance(expr, graph_requests.Generated):
+        _set_generated_to_pb(expr, pb)
 
     else:  # pragma: nocover
         # This is a trick so mypy generates an error if this branch can be reached,
@@ -200,6 +206,9 @@ def _parse_relation_query(
 
     elif isinstance(expr, graph_requests.Relation):
         _set_relation_to_pb(expr, pb.path.relation)
+
+    elif isinstance(expr, graph_requests.Generated):
+        _set_generated_to_pb(expr, pb)
 
     else:  # pragma: nocover
         # This is a trick so mypy generates an error if this branch can be reached,
@@ -235,3 +244,23 @@ def _set_relation_to_pb(relation: graph_requests.GraphRelation, pb: nodereader_p
         pb.value = relation.label
     if relation.type is not None:
         pb.relation_type = RelationTypeMap[relation.type]
+
+
+def _set_generated_to_pb(generated: graph_requests.Generated, pb: nodereader_pb2.GraphQuery.PathQuery):
+    if generated.by == graph_requests.Generator.USER:
+        pb.facet.facet = "/g/u"
+
+    elif generated.by == graph_requests.Generator.PROCESSOR:
+        pb.bool_not.facet.facet = "/g"
+
+    elif generated.by == graph_requests.Generator.DATA_AUGMENTATION:
+        facet = "/g/da"
+        if generated.da_task is not None:
+            facet += f"/{generated.da_task}"
+
+        pb.facet.facet = facet
+
+    else:  # pragma: nocover
+        # This is a trick so mypy generates an error if this branch can be reached,
+        # that is, if we are missing some ifs
+        _a: int = "a"

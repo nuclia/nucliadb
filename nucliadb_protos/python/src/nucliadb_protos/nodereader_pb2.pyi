@@ -791,6 +791,19 @@ class GraphQuery(google.protobuf.message.Message):
         def ClearField(self, field_name: typing.Literal["operands", b"operands"]) -> None: ...
 
     @typing.final
+    class FacetFilter(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        FACET_FIELD_NUMBER: builtins.int
+        facet: builtins.str
+        def __init__(
+            self,
+            *,
+            facet: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["facet", b"facet"]) -> None: ...
+
+    @typing.final
     class PathQuery(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -798,6 +811,7 @@ class GraphQuery(google.protobuf.message.Message):
         BOOL_NOT_FIELD_NUMBER: builtins.int
         BOOL_AND_FIELD_NUMBER: builtins.int
         BOOL_OR_FIELD_NUMBER: builtins.int
+        FACET_FIELD_NUMBER: builtins.int
         @property
         def path(self) -> global___GraphQuery.Path: ...
         @property
@@ -806,6 +820,8 @@ class GraphQuery(google.protobuf.message.Message):
         def bool_and(self) -> global___GraphQuery.BoolQuery: ...
         @property
         def bool_or(self) -> global___GraphQuery.BoolQuery: ...
+        @property
+        def facet(self) -> global___GraphQuery.FacetFilter: ...
         def __init__(
             self,
             *,
@@ -813,10 +829,11 @@ class GraphQuery(google.protobuf.message.Message):
             bool_not: global___GraphQuery.PathQuery | None = ...,
             bool_and: global___GraphQuery.BoolQuery | None = ...,
             bool_or: global___GraphQuery.BoolQuery | None = ...,
+            facet: global___GraphQuery.FacetFilter | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "path", b"path", "query", b"query"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "path", b"path", "query", b"query"]) -> None: ...
-        def WhichOneof(self, oneof_group: typing.Literal["query", b"query"]) -> typing.Literal["path", "bool_not", "bool_and", "bool_or"] | None: ...
+        def HasField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "facet", b"facet", "path", b"path", "query", b"query"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "facet", b"facet", "path", b"path", "query", b"query"]) -> None: ...
+        def WhichOneof(self, oneof_group: typing.Literal["query", b"query"]) -> typing.Literal["path", "bool_not", "bool_and", "bool_or", "facet"] | None: ...
 
     PATH_FIELD_NUMBER: builtins.int
     @property
