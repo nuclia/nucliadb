@@ -69,13 +69,13 @@ where
         vec.truncate(self.top_n);
         let lowest_score = vec.last().map(|(_, score)| *score).unwrap_or(f32::NEG_INFINITY);
 
-        self.elements.extend(vec.into_iter());
+        self.elements.extend(vec);
 
         lowest_score
     }
 
     pub fn into_sorted_vec(self) -> Vec<(K, f32)> {
-        let mut vec = Vec::from_iter(self.elements.into_iter());
+        let mut vec = Vec::from_iter(self.elements);
         vec.sort_by(|a, b| a.1.total_cmp(&b.1).reverse());
         vec.truncate(self.top_n);
         vec
@@ -103,8 +103,8 @@ mod tests {
 
         let r = top.into_sorted_vec();
         assert_eq!(r.len(), 2);
-        let r: HashMap<_, _> = HashMap::from_iter(r.into_iter());
-        let expected = HashMap::from_iter([("B", 3.0), ("D", 4.0)].into_iter());
+        let r: HashMap<_, _> = HashMap::from_iter(r);
+        let expected = HashMap::from_iter([("B", 3.0), ("D", 4.0)]);
         assert_eq!(r, expected);
     }
 
@@ -157,8 +157,8 @@ mod tests {
         let r = top_a.into_sorted_vec();
         assert_eq!(r.len(), 4);
 
-        let r: HashMap<_, _> = HashMap::from_iter(r.into_iter());
-        let expected = HashMap::from_iter([("A2", 3.0), ("B2", 3.0), ("B3", 4.0), ("B4", 2.0)].into_iter());
+        let r: HashMap<_, _> = HashMap::from_iter(r);
+        let expected = HashMap::from_iter([("A2", 3.0), ("B2", 3.0), ("B3", 4.0), ("B4", 2.0)]);
         assert_eq!(r, expected);
     }
 }

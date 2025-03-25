@@ -31,7 +31,7 @@ use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::TopDocs;
 use tantivy::query::{BooleanQuery, EmptyQuery, Occur, Query, TermSetQuery};
 use tantivy::schema::Field;
-use tantivy::{DocAddress, Index, IndexReader, Searcher};
+use tantivy::{Index, IndexReader};
 use uuid::Uuid;
 
 use crate::graph_collector::{Selector, TopUniqueCollector};
@@ -147,10 +147,38 @@ impl RelationsReaderService {
         let collector = TopDocs::with_limit(top_k);
         let searcher = self.reader.searcher();
         let matching_docs = searcher.search(&index_query, &collector)?;
-        self.build_graph_response(
-            &searcher,
-            matching_docs.into_iter().map(|(_score, doc_address)| doc_address),
-        )
+
+        let mut nodes = Vec::new();
+        let mut relations = Vec::new();
+        let mut graph = Vec::new();
+
+        for (_score, doc_address) in matching_docs {
+            let doc = searcher.doc(doc_address)?;
+
+            let source = io_maps::source_to_relation_node(&self.schema, &doc);
+            let relation = io_maps::doc_to_graph_relation(&self.schema, &doc);
+            let destination = io_maps::target_to_relation_node(&self.schema, &doc);
+
+            let source_idx = nodes.len();
+            nodes.push(source);
+            let relation_idx = relations.len();
+            relations.push(relation);
+            let destination_idx = nodes.len();
+            nodes.push(destination);
+
+            graph.push(nidx_protos::graph_search_response::Path {
+                source: source_idx as u32,
+                relation: relation_idx as u32,
+                destination: destination_idx as u32,
+            })
+        }
+
+        let response = nidx_protos::GraphSearchResponse {
+            nodes,
+            relations,
+            graph,
+        };
+        Ok(response)
     }
 
     fn nodes_graph_search(
@@ -243,48 +271,6 @@ impl RelationsReaderService {
                 Box::new(BooleanQuery::intersection(vec![prefilter_query, query]))
             }
         }
-    }
-
-    fn build_graph_response(
-        &self,
-        searcher: &Searcher,
-        docs: impl Iterator<Item = DocAddress>,
-    ) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
-        // We are being very naive and writing everything to the proto response. We could be smarter
-        // and deduplicates nodes and relations. As paths are pointers, this would improve proto
-        // size and ser/de time at expenses of deduplication effort.
-
-        let mut nodes = Vec::new();
-        let mut relations = Vec::new();
-        let mut graph = Vec::new();
-
-        for doc_address in docs {
-            let doc = searcher.doc(doc_address)?;
-
-            let source = io_maps::source_to_relation_node(&self.schema, &doc);
-            let relation = io_maps::doc_to_graph_relation(&self.schema, &doc);
-            let destination = io_maps::target_to_relation_node(&self.schema, &doc);
-
-            let source_idx = nodes.len();
-            nodes.push(source);
-            let relation_idx = relations.len();
-            relations.push(relation);
-            let destination_idx = nodes.len();
-            nodes.push(destination);
-
-            graph.push(nidx_protos::graph_search_response::Path {
-                source: source_idx as u32,
-                relation: relation_idx as u32,
-                destination: destination_idx as u32,
-            })
-        }
-
-        let response = nidx_protos::GraphSearchResponse {
-            nodes,
-            relations,
-            graph,
-        };
-        Ok(response)
     }
 }
 

@@ -19,11 +19,12 @@
 //
 mod common;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use nidx_protos::graph_query::node::MatchKind;
 use nidx_protos::graph_query::path_query::Query;
 use nidx_protos::graph_query::{BoolQuery, FacetFilter, Node, Path, PathQuery, Relation};
+use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::{
@@ -39,12 +40,29 @@ use common::TestOpener;
 use uuid::Uuid;
 
 fn search(reader: &RelationSearcher, query: Query) -> anyhow::Result<GraphSearchResponse> {
-    search_with_prefilter(reader, query, PrefilterResult::All)
+    _search(reader, query, QueryKind::Path, PrefilterResult::All)
+}
+
+fn search_nodes(reader: &RelationSearcher, query: Query) -> anyhow::Result<GraphSearchResponse> {
+    _search(reader, query, QueryKind::Nodes, PrefilterResult::All)
+}
+
+fn search_relations(reader: &RelationSearcher, query: Query) -> anyhow::Result<GraphSearchResponse> {
+    _search(reader, query, QueryKind::Relations, PrefilterResult::All)
 }
 
 fn search_with_prefilter(
     reader: &RelationSearcher,
     query: Query,
+    prefilter: PrefilterResult,
+) -> anyhow::Result<GraphSearchResponse> {
+    _search(reader, query, QueryKind::Path, prefilter)
+}
+
+fn _search(
+    reader: &RelationSearcher,
+    query: Query,
+    kind: QueryKind,
     prefilter: PrefilterResult,
 ) -> anyhow::Result<GraphSearchResponse> {
     reader.graph_search(
@@ -53,6 +71,7 @@ fn search_with_prefilter(
                 path: Some(PathQuery { query: Some(query) }),
             }),
             top_k: 100,
+            kind: kind.into(),
             ..Default::default()
         },
         prefilter,
@@ -60,11 +79,60 @@ fn search_with_prefilter(
 }
 
 #[test]
+fn test_node_search() -> anyhow::Result<()> {
+    let reader = create_reader()?;
+
+    // (:PLACE)
+    let result = search_nodes(
+        &reader,
+        Query::Path(Path {
+            source: Some(Node {
+                node_subtype: Some("PLACE".to_string()),
+                ..Default::default()
+            }),
+            undirected: true,
+            ..Default::default()
+        }),
+    )?;
+    assert_eq!(result.nodes.len(), 2);
+    let nodes: HashSet<&str> = result.nodes.iter().map(|node| node.value.as_str()).collect();
+    assert!(nodes.contains(&"New York"));
+    assert!(nodes.contains(&"UK"));
+
+    Ok(())
+}
+
+#[test]
+fn test_relation_search() -> anyhow::Result<()> {
+    let reader = create_reader()?;
+
+    // (:Synonym)
+    let result = search_relations(
+        &reader,
+        Query::Path(Path {
+            relation: Some(Relation {
+                relation_type: Some(RelationType::Synonym.into()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    assert_eq!(result.relations.len(), 1);
+    let relations: HashSet<&str> = result
+        .relations
+        .iter()
+        .map(|relation| relation.label.as_str())
+        .collect();
+    assert!(relations.contains(&"ALIAS"));
+
+    Ok(())
+}
+
+#[test]
 fn test_graph_node_query() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
     // (s)-[]->()
-
     let result = search(&reader, Query::Path(Path::default()))?;
     assert_eq!(result.graph.len(), 17);
 
