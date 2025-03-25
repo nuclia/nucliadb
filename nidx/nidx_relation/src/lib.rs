@@ -24,6 +24,7 @@ mod io_maps;
 mod reader;
 mod resource_indexer;
 mod schema;
+mod top_unique_n;
 
 use anyhow::anyhow;
 use nidx_protos::{

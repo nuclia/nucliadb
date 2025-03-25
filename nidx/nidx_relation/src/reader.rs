@@ -34,11 +34,12 @@ use tantivy::schema::Field;
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
 use uuid::Uuid;
 
-use crate::graph_collector::{NodeSelector, TopUniqueN, TopUniqueNodeCollector2, TopUniqueRelationCollector2};
+use crate::graph_collector::{NodeSelector, TopUniqueNodeCollector2, TopUniqueRelationCollector2};
 use crate::graph_query_parser::{
     BoolGraphQuery, BoolNodeQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
 };
 use crate::schema::{Schema, decode_node, decode_relation, encode_field_id};
+use crate::top_unique_n::TopUniqueN;
 use crate::{RelationConfig, io_maps};
 
 const FUZZY_DISTANCE: u8 = 1;
