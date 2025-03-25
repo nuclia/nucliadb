@@ -34,7 +34,7 @@ use tantivy::schema::Field;
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
 use uuid::Uuid;
 
-use crate::graph_collector::{NodeSelector, TopUniqueNodeCollector2, TopUniqueRelationCollector2};
+use crate::graph_collector::{Selector, TopUniqueCollector};
 use crate::graph_query_parser::{
     BoolGraphQuery, BoolNodeQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
 };
@@ -169,11 +169,11 @@ impl RelationsReaderService {
 
         let mut unique_nodes = TopUniqueN::new(top_k);
 
-        let collector = TopUniqueNodeCollector2::new(NodeSelector::SourceNodes, top_k);
+        let collector = TopUniqueCollector::new(Selector::SourceNodes, top_k);
         let source_nodes = searcher.search(&source_query, &collector)?;
         unique_nodes.merge(source_nodes);
 
-        let collector = TopUniqueNodeCollector2::new(NodeSelector::DestinationNodes, top_k);
+        let collector = TopUniqueCollector::new(Selector::DestinationNodes, top_k);
         let destination_nodes = searcher.search(&destination_query, &collector)?;
         unique_nodes.merge(destination_nodes);
 
@@ -210,12 +210,13 @@ impl RelationsReaderService {
 
         let searcher = self.reader.searcher();
 
-        let collector = TopUniqueRelationCollector2::new(top_k);
-        let matching_docs = searcher.search(&index_query, &collector)?;
+        let collector = TopUniqueCollector::new(Selector::Relations, top_k);
+        let top_relations = searcher.search(&index_query, &collector)?;
 
-        let relations = matching_docs
+        let relations = top_relations
+            .into_sorted_vec()
             .into_iter()
-            .map(|encoded_relation| {
+            .map(|(encoded_relation, _score)| {
                 let (relation_type, relation_label) = decode_relation(&encoded_relation);
                 nidx_protos::graph_search_response::Relation {
                     relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),

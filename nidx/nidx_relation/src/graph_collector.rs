@@ -27,58 +27,47 @@ use tantivy::{
 use crate::top_unique_n::TopUniqueN;
 
 #[derive(Clone, Copy)]
-pub enum NodeSelector {
+pub enum Selector {
     SourceNodes,
     DestinationNodes,
+    Relations,
 }
 
-// Node collector for schema v2
-//
-// We can now use fast fields to uniquely identify nodes.
-
-pub struct TopUniqueNodeCollector2 {
+pub struct TopUniqueCollector {
     limit: usize,
-    selector: NodeSelector,
+    selector: Selector,
 }
 
-pub struct TopUniqueNodeSegmentCollector2 {
+pub struct TopUniqueSegmentCollector {
     unique: TopUniqueN<Vec<u64>>,
-    encoded_node_reader: Column<u64>,
+    encoded_field: Column<u64>,
 }
 
-// Relations collector for schema v2
-pub struct TopUniqueRelationCollector2 {
-    limit: usize,
-}
-
-pub struct TopUniqueRelationSegmentCollector2 {
-    unique: TopUniqueN<Vec<u64>>,
-    encoded_relation_reader: Column<u64>,
-}
-
-impl TopUniqueNodeCollector2 {
-    pub fn new(selector: NodeSelector, limit: usize) -> Self {
-        Self { limit, selector }
+impl TopUniqueCollector {
+    pub fn new(selector: Selector, top_k: usize) -> Self {
+        Self { limit: top_k, selector }
     }
 }
 
-impl Collector for TopUniqueNodeCollector2 {
+impl Collector for TopUniqueCollector {
     type Fruit = TopUniqueN<Vec<u64>>;
-    type Child = TopUniqueNodeSegmentCollector2;
+    type Child = TopUniqueSegmentCollector;
 
     fn requires_scoring(&self) -> bool {
         true
     }
 
     fn for_segment(&self, _segment_local_id: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
-        let fast_field_reader = match self.selector {
-            NodeSelector::SourceNodes => segment.fast_fields().u64("encoded_source_id")?,
-            NodeSelector::DestinationNodes => segment.fast_fields().u64("encoded_target_id")?,
+        let fast_field = match self.selector {
+            Selector::SourceNodes => segment.fast_fields().u64("encoded_source_id")?,
+            Selector::DestinationNodes => segment.fast_fields().u64("encoded_target_id")?,
+            Selector::Relations => segment.fast_fields().u64("encoded_relation_id")?,
         };
-        Ok(TopUniqueNodeSegmentCollector2 {
+        let segment_collector = TopUniqueSegmentCollector {
             unique: TopUniqueN::new(self.limit),
-            encoded_node_reader: fast_field_reader,
-        })
+            encoded_field: fast_field,
+        };
+        Ok(segment_collector)
     }
 
     fn merge_fruits(
@@ -94,64 +83,12 @@ impl Collector for TopUniqueNodeCollector2 {
     }
 }
 
-impl SegmentCollector for TopUniqueNodeSegmentCollector2 {
+impl SegmentCollector for TopUniqueSegmentCollector {
     type Fruit = TopUniqueN<Vec<u64>>;
 
     fn collect(&mut self, doc_id: DocId, score: Score) {
-        let encoded_node = self.encoded_node_reader.values_for_doc(doc_id).collect::<Vec<u64>>();
-        self.unique.insert(encoded_node, score);
-    }
-
-    fn harvest(self) -> Self::Fruit {
-        self.unique
-    }
-}
-
-impl TopUniqueRelationCollector2 {
-    pub fn new(limit: usize) -> Self {
-        Self { limit }
-    }
-}
-
-impl Collector for TopUniqueRelationCollector2 {
-    type Fruit = Vec<Vec<u64>>;
-    type Child = TopUniqueRelationSegmentCollector2;
-
-    fn requires_scoring(&self) -> bool {
-        true
-    }
-
-    fn for_segment(&self, _segment_local_id: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
-        Ok(TopUniqueRelationSegmentCollector2 {
-            unique: TopUniqueN::new(self.limit),
-            encoded_relation_reader: segment.fast_fields().u64("encoded_relation_id")?,
-        })
-    }
-
-    fn merge_fruits(
-        &self,
-        segment_fruits: Vec<<Self::Child as SegmentCollector>::Fruit>,
-    ) -> tantivy::Result<Self::Fruit> {
-        let fruits = segment_fruits.into_iter().flat_map(|map| map.into_sorted_vec());
-
-        let mut unique = TopUniqueN::new(self.limit);
-        for (key, score) in fruits {
-            unique.insert(key, score);
-        }
-
-        Ok(unique.into_sorted_vec().into_iter().map(|(key, _score)| key).collect())
-    }
-}
-
-impl SegmentCollector for TopUniqueRelationSegmentCollector2 {
-    type Fruit = TopUniqueN<Vec<u64>>;
-
-    fn collect(&mut self, doc_id: DocId, score: Score) {
-        let relation = self
-            .encoded_relation_reader
-            .values_for_doc(doc_id)
-            .collect::<Vec<u64>>();
-        self.unique.insert(relation, score);
+        let value = self.encoded_field.values_for_doc(doc_id).collect::<Vec<u64>>();
+        self.unique.insert(value, score);
     }
 
     fn harvest(self) -> Self::Fruit {
