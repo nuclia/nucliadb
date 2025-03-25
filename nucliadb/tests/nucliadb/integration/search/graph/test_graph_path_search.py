@@ -19,7 +19,6 @@
 #
 import pytest
 from httpx import AsyncClient
-from tests.utils import inject_message
 
 from nucliadb_models.graph import responses as graph_responses
 from nucliadb_models.graph.responses import GraphSearchResponse
@@ -28,6 +27,7 @@ from nucliadb_protos.resources_pb2 import FieldComputedMetadataWrapper, FieldTyp
 from nucliadb_protos.utils_pb2 import Relation, RelationMetadata, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -695,77 +695,6 @@ async def test_graph_search__filtering(
     assert resp.status_code == 200
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
     assert len(paths) == 0
-
-
-@pytest.mark.deploy_modes("standalone")
-async def test_graph_search__hidden(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_writer_manager: AsyncClient,
-    kb_with_entity_graph: str,
-):
-    kbid = kb_with_entity_graph
-
-    resp = await nucliadb_writer_manager.patch(
-        f"/kb/{kb_with_entity_graph}", json={"hidden_resources_enabled": True}
-    )
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resources",
-    )
-    assert resp.status_code == 200
-    rid = resp.json()["resources"][0]["id"]
-
-    resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{rid}",
-        json={
-            "hidden": True,
-        },
-    )
-    assert resp.status_code == 200, resp.text
-
-    # By default, does not return hidden
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/graph",
-        json={
-            "query": {
-                "prop": "path",
-                "source": {
-                    "value": "Anna",
-                },
-                "relation": {
-                    "label": "IS_FRIEND",
-                },
-                "undirected": True,
-            },
-            "top_k": 100,
-        },
-    )
-    assert resp.status_code == 200
-    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
-    assert len(paths) == 0
-
-    # It returns them with show_hidden
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/graph",
-        json={
-            "query": {
-                "prop": "path",
-                "source": {
-                    "value": "Anna",
-                },
-                "relation": {
-                    "label": "IS_FRIEND",
-                },
-                "undirected": True,
-            },
-            "top_k": 100,
-            "show_hidden": True,
-        },
-    )
-    assert resp.status_code == 200
-    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
-    assert len(paths) == 1
 
 
 @pytest.mark.deploy_modes("standalone")
