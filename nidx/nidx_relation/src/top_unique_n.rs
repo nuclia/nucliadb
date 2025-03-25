@@ -67,14 +67,14 @@ where
         let mut vec = Vec::from_iter(self.elements.drain());
         vec.sort_unstable_by(|a, b| a.1.total_cmp(&b.1).reverse());
         vec.truncate(self.top_n);
-        let lowest_score = vec.last().expect("truncation must never be done without any element").1;
+        let lowest_score = vec.last().map(|(_, score)| *score).unwrap_or(f32::NEG_INFINITY);
 
         self.elements.extend(vec.into_iter());
 
         lowest_score
     }
 
-    pub fn into_sorted_vec(mut self) -> Vec<(K, f32)> {
+    pub fn into_sorted_vec(self) -> Vec<(K, f32)> {
         let mut vec = Vec::from_iter(self.elements.into_iter());
         vec.sort_by(|a, b| a.1.total_cmp(&b.1).reverse());
         vec.truncate(self.top_n);
