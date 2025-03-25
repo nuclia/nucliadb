@@ -215,12 +215,17 @@ message GraphQuery {
         repeated PathQuery operands = 1;
     }
 
+    message FacetFilter {
+        string facet = 1;
+    }
+
     message PathQuery {
         oneof query {
             GraphQuery.Path path = 1;
             PathQuery bool_not = 2;
             BoolQuery bool_and = 3;
             BoolQuery bool_or = 4;
+            FacetFilter facet = 5;
         }
     }
 
