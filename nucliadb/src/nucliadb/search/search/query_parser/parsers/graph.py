@@ -248,17 +248,17 @@ def _set_relation_to_pb(relation: graph_requests.GraphRelation, pb: nodereader_p
 
 def _set_generated_to_pb(generated: graph_requests.Generated, pb: nodereader_pb2.GraphQuery.PathQuery):
     if generated.by == graph_requests.Generator.USER:
-        pb.facet.facet = "g/u"
+        pb.facet.facet = "/g/u"
 
     elif generated.by == graph_requests.Generator.PROCESSOR:
-        pb.bool_not.facet.facet = "g"
+        pb.bool_not.facet.facet = "/g"
 
     elif generated.by == graph_requests.Generator.DATA_AUGMENTATION:
-        facet = "g/da"
+        facet = "/g/da"
         if generated.da_task is not None:
             facet += f"/{generated.da_task}"
 
-        pb.bool_not.facet.facet = facet
+        pb.facet.facet = facet
 
     else:  # pragma: nocover
         # This is a trick so mypy generates an error if this branch can be reached,
