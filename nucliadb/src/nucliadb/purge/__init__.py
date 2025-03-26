@@ -220,14 +220,6 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
             continue
 
         try:
-            if await exists_vectorset(driver, kbid, vectorset):
-                logger.warning(f"  X Skipping purge {key}, vectorset is still active!")
-                # Finally, delete the key
-                async with driver.transaction() as txn:
-                    await txn.delete(key)
-                    await txn.commit()
-                continue
-
             async with driver.transaction(read_only=True) as txn:
                 value = await txn.get(key)
                 assert value is not None, "Key must exist or we wouldn't had fetch it iterating keys"
@@ -270,14 +262,6 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
             continue
 
     logger.info("FINISH PURGING KB VECTORSETS")
-
-
-async def exists_vectorset(driver: Driver, kbid: str, vectorset: str) -> bool:
-    async with driver.transaction(read_only=True) as txn:
-        async for vectorset_id, _ in datamanagers.vectorsets.iter(txn, kbid=kbid):
-            if vectorset_id == vectorset:
-                return True
-        return False
 
 
 async def main():

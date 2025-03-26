@@ -502,6 +502,11 @@ class KnowledgeBox:
         shard_manager = get_shard_manager()
         await shard_manager.create_vectorset(self.kbid, config)
 
+    async def vectorset_marked_for_deletion(self, vectorset_id: str) -> bool:
+        key = KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id)
+        value = await self.txn.get(key)
+        return value is not None
+
     async def delete_vectorset(self, vectorset_id: str):
         vectorset_count = await datamanagers.vectorsets.count(self.txn, kbid=self.kbid)
         if vectorset_count == 1:
