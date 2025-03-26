@@ -500,35 +500,24 @@ impl<'a> GraphQueryParser<'a> {
 
             Term::FuzzyWord(fuzzy) =>
             {
-                #[allow(clippy::collapsible_else_if)]
-                if fuzzy.is_prefix {
-                    if tokenized_terms.len() == 1 {
-                        let tokenized_term = tokenized_terms.into_iter().next().unwrap();
-                        Box::new(FuzzyTermQuery::new_prefix(tokenized_term, fuzzy.fuzzy_distance, true))
-                    } else {
-                        Box::new(BooleanQuery::intersection(
-                            tokenized_terms
-                                .into_iter()
-                                .map(|term| -> Box<dyn Query> {
-                                    Box::new(FuzzyTermQuery::new_prefix(term, fuzzy.fuzzy_distance, true))
-                                })
-                                .collect(),
-                        ))
-                    }
+                let query_builder = if fuzzy.is_prefix {
+                    FuzzyTermQuery::new_prefix
                 } else {
-                    if tokenized_terms.len() == 1 {
-                        let tokenized_term = tokenized_terms.into_iter().next().unwrap();
-                        Box::new(FuzzyTermQuery::new(tokenized_term, fuzzy.fuzzy_distance, true))
-                    } else {
-                        Box::new(BooleanQuery::intersection(
-                            tokenized_terms
-                                .into_iter()
-                                .map(|term| -> Box<dyn Query> {
-                                    Box::new(FuzzyTermQuery::new(term, fuzzy.fuzzy_distance, true))
-                                })
-                                .collect(),
-                        ))
-                    }
+                    FuzzyTermQuery::new
+                };
+
+                if tokenized_terms.len() == 1 {
+                    let tokenized_term = tokenized_terms.into_iter().next().unwrap();
+                    Box::new(query_builder(tokenized_term, fuzzy.fuzzy_distance, true))
+                } else {
+                    Box::new(BooleanQuery::intersection(
+                        tokenized_terms
+                            .into_iter()
+                            .map(|term| -> Box<dyn Query> {
+                                Box::new(query_builder(term, fuzzy.fuzzy_distance, true))
+                            })
+                            .collect(),
+                    ))
                 }
             }
         };
