@@ -215,13 +215,14 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
     // (:~Anastas)
+    #[allow(deprecated)]
     let result = search(
         &reader,
         Query::Path(Path {
             source: Some(Node {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("Anastas".to_string()),
-                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {})),
+                match_kind: MatchKind::DeprecatedFuzzy.into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -232,13 +233,14 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
 
     // (:~AnXstXsia) with fuzzy=1
+    #[allow(deprecated)]
     let result = search(
         &reader,
         Query::Path(Path {
             source: Some(Node {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("AnXstXsia".to_string()),
-                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {})),
+                match_kind: MatchKind::DeprecatedFuzzy.into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -248,13 +250,14 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     assert_eq!(relations.len(), 0);
 
     // (:~AnXstasia) with fuzzy=1
+    #[allow(deprecated)]
     let result = search(
         &reader,
         Query::Path(Path {
             source: Some(Node {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("AnXstasia".to_string()),
-                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {})),
+                match_kind: MatchKind::DeprecatedFuzzy.into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -265,13 +268,14 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
 
     // (:^~Ana) matches Anna & Anastasia
+    #[allow(deprecated)]
     let result = search(
         &reader,
         Query::Path(Path {
             source: Some(Node {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("Ana".to_string()),
-                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {})),
+                match_kind: MatchKind::DeprecatedFuzzy.into(),
                 ..Default::default()
             }),
             ..Default::default()
