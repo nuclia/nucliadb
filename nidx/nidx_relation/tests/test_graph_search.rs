@@ -21,7 +21,8 @@ mod common;
 
 use std::collections::{HashMap, HashSet};
 
-use nidx_protos::graph_query::node::{FuzzyMatch, NewMatchKind};
+use nidx_protos::graph_query::node::{ExactMatch, FuzzyMatch, NewMatchKind};
+use nidx_protos::graph_query::node::{MatchKind, MatchLocation};
 use nidx_protos::graph_query::path_query::Query;
 use nidx_protos::graph_query::{BoolQuery, FacetFilter, Node, Path, PathQuery, Relation};
 use nidx_protos::graph_search_request::QueryKind;
@@ -132,9 +133,23 @@ fn test_relation_search() -> anyhow::Result<()> {
 fn test_graph_node_query() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
-    // (s)-[]->()
-    let result = search(&reader, Query::Path(Path::default()))?;
-    assert_eq!(result.graph.len(), 17);
+    // (:Anna)-[]->()
+    let result = search(
+        &reader,
+        Query::Path(Path {
+            source: Some(Node {
+                value: Some("Anna".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 4);
+    assert!(relations.contains(&("Anna", "FOLLOW", "Erin")));
+    assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
+    assert!(relations.contains(&("Anna", "LOVE", "Cat")));
+    assert!(relations.contains(&("Anna", "WORK_IN", "New York")));
 
     // (:PERSON)-[]->()
     let result = search(
@@ -148,25 +163,6 @@ fn test_graph_node_query() -> anyhow::Result<()> {
         }),
     )?;
     assert_eq!(result.graph.len(), 12);
-
-    // (:Anna)-[]->()
-    let result = search(
-        &reader,
-        Query::Path(Path {
-            source: Some(Node {
-                node_subtype: Some("PERSON".to_string()),
-                value: Some("Anna".to_string()),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }),
-    )?;
-    let relations = friendly_parse(&result);
-    assert_eq!(relations.len(), 4);
-    assert!(relations.contains(&("Anna", "FOLLOW", "Erin")));
-    assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
-    assert!(relations.contains(&("Anna", "LOVE", "Cat")));
-    assert!(relations.contains(&("Anna", "WORK_IN", "New York")));
 
     // ()-[]->(:Anna)
     let result = search(
@@ -206,6 +202,123 @@ fn test_graph_node_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Anna", "LOVE", "Cat")));
     assert!(relations.contains(&("Anna", "WORK_IN", "New York")));
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
+
+    Ok(())
+}
+
+#[test]
+fn test_graph_node_exact_matches() -> anyhow::Result<()> {
+    let reader = create_reader()?;
+
+    // Exact match (full)
+
+    let result = search(
+        &reader,
+        Query::Path(Path {
+            destination: Some(Node {
+                value: Some("Computer science".to_string()),
+                new_match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                    kind: MatchLocation::Full.into(),
+                })),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
+
+    // Prefix
+
+    let result = search(
+        &reader,
+        Query::Path(Path {
+            destination: Some(Node {
+                value: Some("Computer sci".to_string()),
+                new_match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                    kind: MatchLocation::Prefix.into(),
+                })),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
+
+    let result = search(
+        &reader,
+        Query::Path(Path {
+            destination: Some(Node {
+                value: Some("Compu".to_string()),
+                new_match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                    kind: MatchLocation::Prefix.into(),
+                })),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
+
+    // Exact words
+
+    let result = search(
+        &reader,
+        Query::Path(Path {
+            destination: Some(Node {
+                value: Some("Computer".to_string()),
+                new_match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                    kind: MatchLocation::Words.into(),
+                })),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
+
+    let result = search(
+        &reader,
+        Query::Path(Path {
+            destination: Some(Node {
+                value: Some("science".to_string()),
+                new_match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                    kind: MatchLocation::Words.into(),
+                })),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
+
+    // Prefix words
+
+    let result = search(
+        &reader,
+        Query::Path(Path {
+            destination: Some(Node {
+                value: Some("sci".to_string()),
+                new_match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                    kind: MatchLocation::PrefixWords.into(),
+                })),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
 
     Ok(())
 }
@@ -288,6 +401,129 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
     assert!(relations.contains(&("Anna", "LOVE", "Cat")));
     assert!(relations.contains(&("Anna", "WORK_IN", "New York")));
+
+    Ok(())
+}
+
+#[test]
+fn test_graph_node_fuzzy_matches() -> anyhow::Result<()> {
+    let reader = create_reader()?;
+
+    // Fuzzy (full)
+
+    let result = search(
+        &reader,
+        Query::Path(Path {
+            destination: Some(Node {
+                value: Some("Computer scXence".to_string()),
+                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                    kind: MatchLocation::Full.into(),
+                    distance: 1,
+                })),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
+
+    // Fuzzy prefix
+
+    let result = search(
+        &reader,
+        Query::Path(Path {
+            destination: Some(Node {
+                value: Some("CompuXer sci".to_string()),
+                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                    kind: MatchLocation::Prefix.into(),
+                    distance: 1,
+                })),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
+
+    let result = search(
+        &reader,
+        Query::Path(Path {
+            destination: Some(Node {
+                value: Some("CoXpu".to_string()),
+                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                    kind: MatchLocation::Prefix.into(),
+                    distance: 1,
+                })),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
+
+    // Fuzzy words
+
+    let result = search(
+        &reader,
+        Query::Path(Path {
+            destination: Some(Node {
+                value: Some("ComXuter".to_string()),
+                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                    kind: MatchLocation::Words.into(),
+                    distance: 1,
+                })),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
+
+    let result = search(
+        &reader,
+        Query::Path(Path {
+            destination: Some(Node {
+                value: Some("sciXnce".to_string()),
+                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                    kind: MatchLocation::Words.into(),
+                    distance: 1,
+                })),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
+
+    // Fuzzy prefix words
+
+    let result = search(
+        &reader,
+        Query::Path(Path {
+            destination: Some(Node {
+                value: Some("scXen".to_string()),
+                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                    kind: MatchLocation::PrefixWords.into(),
+                    distance: 1,
+                })),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
 
     Ok(())
 }
@@ -395,6 +631,10 @@ fn test_graph_relation_query() -> anyhow::Result<()> {
 #[test]
 fn test_graph_directed_path_query() -> anyhow::Result<()> {
     let reader = create_reader()?;
+
+    // ()-[]->()
+    let result = search(&reader, Query::Path(Path::default()))?;
+    assert_eq!(result.graph.len(), 17);
 
     // (:Erin)-[]->(:UK)
     let result = search(
