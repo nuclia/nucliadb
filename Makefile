@@ -7,15 +7,6 @@ license-check:
 license-fix:
 	docker run -it --rm -v $(shell pwd):/github/workspace ghcr.io/apache/skywalking-eyes/license-eye header fix
 
-fmt-all:
-	@echo "Formatting Rust files"
-	cargo fmt
-
-fmt-check-package:
-	@echo "Formatting Rust files from specific package"
-	cargo fmt -p $(PACKAGE) --check
-
-
 protos: proto-py
 
 proto-py:
@@ -57,13 +48,9 @@ python-code-lint:
 	make -C nucliadb_dataset/ lint
 	make -C nucliadb_models/ lint
 
-
-rust-code-lint: fmt-all
-	cargo clippy --tests
-
-
-test-rust:
-	cargo test --workspace --all-features --no-fail-fast
+rust-code-lint:
+	cargo fmt --all --manifest-path nidx/Cargo.toml
+	cargo clippy --all-features --manifest-path nidx/Cargo.toml
 
 
 venv:  ## Initializes an environment
