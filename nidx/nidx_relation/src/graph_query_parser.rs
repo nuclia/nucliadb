@@ -498,8 +498,7 @@ impl<'a> GraphQueryParser<'a> {
                 }
             }
 
-            Term::FuzzyWord(fuzzy) =>
-            {
+            Term::FuzzyWord(fuzzy) => {
                 let query_builder = if fuzzy.is_prefix {
                     FuzzyTermQuery::new_prefix
                 } else {
@@ -513,9 +512,7 @@ impl<'a> GraphQueryParser<'a> {
                     Box::new(BooleanQuery::intersection(
                         tokenized_terms
                             .into_iter()
-                            .map(|term| -> Box<dyn Query> {
-                                Box::new(query_builder(term, fuzzy.fuzzy_distance, true))
-                            })
+                            .map(|term| -> Box<dyn Query> { Box::new(query_builder(term, fuzzy.fuzzy_distance, true)) })
                             .collect(),
                     ))
                 }
