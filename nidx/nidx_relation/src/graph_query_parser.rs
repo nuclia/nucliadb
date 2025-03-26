@@ -42,9 +42,9 @@ pub struct FuzzyTerm {
 #[derive(Clone)]
 pub enum Term {
     Exact(String),
-    ExactWords(String),
+    ExactWord(String),
     Fuzzy(FuzzyTerm),
-    FuzzyWords(FuzzyTerm),
+    FuzzyWord(FuzzyTerm),
 }
 
 #[derive(Default, Clone)]
@@ -470,8 +470,8 @@ impl<'a> GraphQueryParser<'a> {
 
     fn has_node_value(&self, value: &Term, exact_field: Field, tokenized_field: Field) -> Option<Box<dyn Query>> {
         let text_value = match value {
-            Term::Exact(value) | Term::ExactWords(value) => value,
-            Term::Fuzzy(fuzzy) | Term::FuzzyWords(fuzzy) => &fuzzy.value,
+            Term::Exact(value) | Term::ExactWord(value) => value,
+            Term::Fuzzy(fuzzy) | Term::FuzzyWord(fuzzy) => &fuzzy.value,
         };
         if text_value.is_empty() {
             return None;
@@ -488,37 +488,24 @@ impl<'a> GraphQueryParser<'a> {
         let query: Box<dyn Query> = match value {
             Term::Exact(_) => Box::new(TermQuery::new(exact_term, IndexRecordOption::Basic)),
 
-            Term::ExactWords(_) => Box::new(TermSetQuery::new(tokenized_terms)),
+            Term::ExactWord(_) => Box::new(TermSetQuery::new(tokenized_terms)),
 
             Term::Fuzzy(fuzzy) => {
                 if fuzzy.is_prefix {
                     Box::new(FuzzyTermQuery::new_prefix(exact_term, fuzzy.fuzzy_distance, true))
                 } else {
-                    // TODO we shouldn't be using tokenized terms here, fuzzy should apply to exact_term instead
-                    if tokenized_terms.len() > 1 {
-                        Box::new(BooleanQuery::intersection(
-                            tokenized_terms
-                                .into_iter()
-                                .map(|term| -> Box<dyn Query> {
-                                    Box::new(FuzzyTermQuery::new(term, fuzzy.fuzzy_distance, true))
-                                })
-                                .collect(),
-                        ))
-                    } else {
-                        Box::new(FuzzyTermQuery::new(
-                            tokenized_terms.into_iter().next().unwrap(),
-                            fuzzy.fuzzy_distance,
-                            true,
-                        ))
-                    }
+                    Box::new(FuzzyTermQuery::new(exact_term, fuzzy.fuzzy_distance, true))
                 }
             }
 
-            Term::FuzzyWords(fuzzy) =>
+            Term::FuzzyWord(fuzzy) =>
             {
                 #[allow(clippy::collapsible_else_if)]
                 if fuzzy.is_prefix {
-                    if tokenized_terms.len() > 1 {
+                    if tokenized_terms.len() == 1 {
+                        let tokenized_term = tokenized_terms.into_iter().next().unwrap();
+                        Box::new(FuzzyTermQuery::new_prefix(tokenized_term, fuzzy.fuzzy_distance, true))
+                    } else {
                         Box::new(BooleanQuery::intersection(
                             tokenized_terms
                                 .into_iter()
@@ -527,15 +514,12 @@ impl<'a> GraphQueryParser<'a> {
                                 })
                                 .collect(),
                         ))
-                    } else {
-                        Box::new(FuzzyTermQuery::new_prefix(
-                            tokenized_terms.into_iter().next().unwrap(),
-                            fuzzy.fuzzy_distance,
-                            true,
-                        ))
                     }
                 } else {
-                    if tokenized_terms.len() > 1 {
+                    if tokenized_terms.len() == 1 {
+                        let tokenized_term = tokenized_terms.into_iter().next().unwrap();
+                        Box::new(FuzzyTermQuery::new(tokenized_term, fuzzy.fuzzy_distance, true))
+                    } else {
                         Box::new(BooleanQuery::intersection(
                             tokenized_terms
                                 .into_iter()
@@ -543,12 +527,6 @@ impl<'a> GraphQueryParser<'a> {
                                     Box::new(FuzzyTermQuery::new(term, fuzzy.fuzzy_distance, true))
                                 })
                                 .collect(),
-                        ))
-                    } else {
-                        Box::new(FuzzyTermQuery::new(
-                            tokenized_terms.into_iter().next().unwrap(),
-                            fuzzy.fuzzy_distance,
-                            true,
                         ))
                     }
                 }
@@ -749,8 +727,8 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
                             fuzzy_distance: 0,
                             is_prefix: true,
                         }),
-                        MatchLocation::Words => Term::ExactWords(value),
-                        MatchLocation::PrefixWords => Term::FuzzyWords(FuzzyTerm {
+                        MatchLocation::Words => Term::ExactWord(value),
+                        MatchLocation::PrefixWords => Term::FuzzyWord(FuzzyTerm {
                             value,
                             fuzzy_distance: 0,
                             is_prefix: true,
@@ -767,12 +745,12 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
                             fuzzy_distance: fuzzy.distance as u8,
                             is_prefix: true,
                         }),
-                        MatchLocation::Words => Term::FuzzyWords(FuzzyTerm {
+                        MatchLocation::Words => Term::FuzzyWord(FuzzyTerm {
                             value,
                             fuzzy_distance: fuzzy.distance as u8,
                             is_prefix: false,
                         }),
-                        MatchLocation::PrefixWords => Term::FuzzyWords(FuzzyTerm {
+                        MatchLocation::PrefixWords => Term::FuzzyWord(FuzzyTerm {
                             value,
                             fuzzy_distance: fuzzy.distance as u8,
                             is_prefix: true,
