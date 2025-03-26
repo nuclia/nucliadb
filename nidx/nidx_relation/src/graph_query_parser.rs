@@ -19,10 +19,11 @@
 //
 use anyhow::anyhow;
 use nidx_protos::graph_query::FacetFilter;
+use nidx_protos::graph_query::node::MatchLocation;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator};
-use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery, TermSetQuery};
 use tantivy::schema::{Facet, Field, IndexRecordOption};
 use tantivy::tokenizer::TokenizerManager;
 
@@ -41,7 +42,9 @@ pub struct FuzzyTerm {
 #[derive(Clone)]
 pub enum Term {
     Exact(String),
+    ExactWord(String),
     Fuzzy(FuzzyTerm),
+    FuzzyWord(FuzzyTerm),
 }
 
 #[derive(Default, Clone)]
@@ -467,8 +470,8 @@ impl<'a> GraphQueryParser<'a> {
 
     fn has_node_value(&self, value: &Term, exact_field: Field, tokenized_field: Field) -> Option<Box<dyn Query>> {
         let text_value = match value {
-            Term::Exact(value) => value,
-            Term::Fuzzy(fuzzy) => &fuzzy.value,
+            Term::Exact(value) | Term::ExactWord(value) => value,
+            Term::Fuzzy(fuzzy) | Term::FuzzyWord(fuzzy) => &fuzzy.value,
         };
         if text_value.is_empty() {
             return None;
@@ -482,42 +485,38 @@ impl<'a> GraphQueryParser<'a> {
             tokenized_terms.push(tantivy::Term::from_field_text(tokenized_field, &token.text));
         }
 
-        // TODO: Rethink this
-        // Current logic:
-        // - Exact match always match the search term against the full field
-        // - Fuzzy + prefix search works does a prefix fuzzy match of the whole entity name
-        // - Fuzzy search looks for entities containing all words in the term with a fuzzy match (tokenized)
-        //
-        // Questions:
-        // - Do we want exact match of a word in the entity? (kind of supported by setting fuzzy distance = 0)
         let query: Box<dyn Query> = match value {
             Term::Exact(_) => Box::new(TermQuery::new(exact_term, IndexRecordOption::Basic)),
-            Term::Fuzzy(fuzzy) => match fuzzy {
-                FuzzyTerm {
-                    fuzzy_distance,
-                    is_prefix: true,
-                    ..
-                } => Box::new(FuzzyTermQuery::new_prefix(exact_term, *fuzzy_distance, true)),
 
-                FuzzyTerm { fuzzy_distance, .. } => {
-                    if tokenized_terms.len() > 1 {
-                        Box::new(BooleanQuery::intersection(
-                            tokenized_terms
-                                .into_iter()
-                                .map(|term| -> Box<dyn Query> {
-                                    Box::new(FuzzyTermQuery::new(term, *fuzzy_distance, true))
-                                })
-                                .collect(),
-                        ))
-                    } else {
-                        Box::new(FuzzyTermQuery::new(
-                            tokenized_terms.into_iter().next().unwrap(),
-                            *fuzzy_distance,
-                            true,
-                        ))
-                    }
+            Term::ExactWord(_) => Box::new(TermSetQuery::new(tokenized_terms)),
+
+            Term::Fuzzy(fuzzy) => {
+                if fuzzy.is_prefix {
+                    Box::new(FuzzyTermQuery::new_prefix(exact_term, fuzzy.fuzzy_distance, true))
+                } else {
+                    Box::new(FuzzyTermQuery::new(exact_term, fuzzy.fuzzy_distance, true))
                 }
-            },
+            }
+
+            Term::FuzzyWord(fuzzy) => {
+                let query_builder = if fuzzy.is_prefix {
+                    FuzzyTermQuery::new_prefix
+                } else {
+                    FuzzyTermQuery::new
+                };
+
+                if tokenized_terms.len() == 1 {
+                    let tokenized_term = tokenized_terms.into_iter().next().unwrap();
+                    Box::new(query_builder(tokenized_term, fuzzy.fuzzy_distance, true))
+                } else {
+                    Box::new(BooleanQuery::intersection(
+                        tokenized_terms
+                            .into_iter()
+                            .map(|term| -> Box<dyn Query> { Box::new(query_builder(term, fuzzy.fuzzy_distance, true)) })
+                            .collect(),
+                    ))
+                }
+            }
         };
 
         Some(query)
@@ -704,13 +703,56 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
     type Error = anyhow::Error;
 
     fn try_from(node_pb: &nidx_protos::graph_query::Node) -> Result<Self, Self::Error> {
-        let value = node_pb.value.clone().map(|value| match node_pb.match_kind() {
-            nidx_protos::graph_query::node::MatchKind::Exact => Term::Exact(value),
-            nidx_protos::graph_query::node::MatchKind::Fuzzy => Term::Fuzzy(FuzzyTerm {
-                value,
-                fuzzy_distance: DEFAULT_NODE_VALUE_FUZZY_DISTANCE,
-                is_prefix: true,
-            }),
+        let value = node_pb.value.clone().map(|value| {
+            if let Some(match_kind) = node_pb.new_match_kind {
+                match match_kind {
+                    nidx_protos::graph_query::node::NewMatchKind::Exact(exact) => match exact.kind() {
+                        MatchLocation::Full => Term::Exact(value),
+                        MatchLocation::Prefix => Term::Fuzzy(FuzzyTerm {
+                            value,
+                            fuzzy_distance: 0,
+                            is_prefix: true,
+                        }),
+                        MatchLocation::Words => Term::ExactWord(value),
+                        MatchLocation::PrefixWords => Term::FuzzyWord(FuzzyTerm {
+                            value,
+                            fuzzy_distance: 0,
+                            is_prefix: true,
+                        }),
+                    },
+                    nidx_protos::graph_query::node::NewMatchKind::Fuzzy(fuzzy) => match fuzzy.kind() {
+                        MatchLocation::Full => Term::Fuzzy(FuzzyTerm {
+                            value,
+                            fuzzy_distance: fuzzy.distance as u8,
+                            is_prefix: false,
+                        }),
+                        MatchLocation::Prefix => Term::Fuzzy(FuzzyTerm {
+                            value,
+                            fuzzy_distance: fuzzy.distance as u8,
+                            is_prefix: true,
+                        }),
+                        MatchLocation::Words => Term::FuzzyWord(FuzzyTerm {
+                            value,
+                            fuzzy_distance: fuzzy.distance as u8,
+                            is_prefix: false,
+                        }),
+                        MatchLocation::PrefixWords => Term::FuzzyWord(FuzzyTerm {
+                            value,
+                            fuzzy_distance: fuzzy.distance as u8,
+                            is_prefix: true,
+                        }),
+                    },
+                }
+            } else {
+                match node_pb.match_kind() {
+                    nidx_protos::graph_query::node::MatchKind::DeprecatedExact => Term::Exact(value),
+                    nidx_protos::graph_query::node::MatchKind::DeprecatedFuzzy => Term::Fuzzy(FuzzyTerm {
+                        value,
+                        fuzzy_distance: DEFAULT_NODE_VALUE_FUZZY_DISTANCE,
+                        is_prefix: true,
+                    }),
+                }
+            }
         });
         let node_type = node_pb.node_type.map(NodeType::try_from).transpose()?;
         let node_subtype = node_pb.node_subtype.clone();

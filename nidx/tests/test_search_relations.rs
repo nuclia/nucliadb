@@ -663,6 +663,7 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
     let shard_id = setup_knowledge_graph(&mut fixture).await?;
 
     // (:~Anastas)
+    #[allow(deprecated)]
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
@@ -672,7 +673,7 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
                     query: Some(path_query::Query::Path(graph_query::Path {
                         source: Some(graph_query::Node {
                             value: Some("Anastas".to_string()),
-                            match_kind: MatchKind::Fuzzy.into(),
+                            match_kind: MatchKind::DeprecatedFuzzy.into(),
                             ..Default::default()
                         }),
                         ..Default::default()
@@ -689,6 +690,7 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
 
     // (:~AnXstXsiX)
+    #[allow(deprecated)]
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
@@ -698,7 +700,7 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
                     query: Some(path_query::Query::Path(graph_query::Path {
                         source: Some(graph_query::Node {
                             value: Some("AnXstXsiX".to_string()),
-                            match_kind: MatchKind::Fuzzy.into(),
+                            match_kind: MatchKind::DeprecatedFuzzy.into(),
                             ..Default::default()
                         }),
                         ..Default::default()
@@ -714,6 +716,7 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
     assert_eq!(relations.len(), 0);
 
     // (:~Ansatasia)
+    #[allow(deprecated)]
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
@@ -723,7 +726,7 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
                     query: Some(path_query::Query::Path(graph_query::Path {
                         source: Some(graph_query::Node {
                             value: Some("Ansatasia".to_string()),
-                            match_kind: MatchKind::Fuzzy.into(),
+                            match_kind: MatchKind::DeprecatedFuzzy.into(),
                             ..Default::default()
                         }),
                         ..Default::default()

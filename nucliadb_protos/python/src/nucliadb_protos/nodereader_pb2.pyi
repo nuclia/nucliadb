@@ -691,21 +691,81 @@ class GraphQuery(google.protobuf.message.Message):
 
         class _MatchKindEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GraphQuery.Node._MatchKind.ValueType], builtins.type):
             DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-            EXACT: GraphQuery.Node._MatchKind.ValueType  # 0
-            FUZZY: GraphQuery.Node._MatchKind.ValueType  # 1
+            DEPRECATED_EXACT: GraphQuery.Node._MatchKind.ValueType  # 0
+            DEPRECATED_FUZZY: GraphQuery.Node._MatchKind.ValueType  # 1
 
         class MatchKind(_MatchKind, metaclass=_MatchKindEnumTypeWrapper): ...
-        EXACT: GraphQuery.Node.MatchKind.ValueType  # 0
-        FUZZY: GraphQuery.Node.MatchKind.ValueType  # 1
+        DEPRECATED_EXACT: GraphQuery.Node.MatchKind.ValueType  # 0
+        DEPRECATED_FUZZY: GraphQuery.Node.MatchKind.ValueType  # 1
+
+        class _MatchLocation:
+            ValueType = typing.NewType("ValueType", builtins.int)
+            V: typing_extensions.TypeAlias = ValueType
+
+        class _MatchLocationEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GraphQuery.Node._MatchLocation.ValueType], builtins.type):
+            DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+            FULL: GraphQuery.Node._MatchLocation.ValueType  # 0
+            """Match full value. Search "Rosa Parks" to find "Rosa Parks" """
+            PREFIX: GraphQuery.Node._MatchLocation.ValueType  # 1
+            """Match prefix. Search "Rosa P" or "Ros" to find "Rosa Parks" """
+            WORDS: GraphQuery.Node._MatchLocation.ValueType  # 2
+            """Match individual words. Search "Rosa" or "Parks" to find "Rosa Parks" """
+            PREFIX_WORDS: GraphQuery.Node._MatchLocation.ValueType  # 3
+            """Match individual word by prefix. Search "Ros" or "Par" to find "Rosa Parks" """
+
+        class MatchLocation(_MatchLocation, metaclass=_MatchLocationEnumTypeWrapper): ...
+        FULL: GraphQuery.Node.MatchLocation.ValueType  # 0
+        """Match full value. Search "Rosa Parks" to find "Rosa Parks" """
+        PREFIX: GraphQuery.Node.MatchLocation.ValueType  # 1
+        """Match prefix. Search "Rosa P" or "Ros" to find "Rosa Parks" """
+        WORDS: GraphQuery.Node.MatchLocation.ValueType  # 2
+        """Match individual words. Search "Rosa" or "Parks" to find "Rosa Parks" """
+        PREFIX_WORDS: GraphQuery.Node.MatchLocation.ValueType  # 3
+        """Match individual word by prefix. Search "Ros" or "Par" to find "Rosa Parks" """
+
+        @typing.final
+        class ExactMatch(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            KIND_FIELD_NUMBER: builtins.int
+            kind: global___GraphQuery.Node.MatchLocation.ValueType
+            def __init__(
+                self,
+                *,
+                kind: global___GraphQuery.Node.MatchLocation.ValueType = ...,
+            ) -> None: ...
+            def ClearField(self, field_name: typing.Literal["kind", b"kind"]) -> None: ...
+
+        @typing.final
+        class FuzzyMatch(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            KIND_FIELD_NUMBER: builtins.int
+            DISTANCE_FIELD_NUMBER: builtins.int
+            kind: global___GraphQuery.Node.MatchLocation.ValueType
+            distance: builtins.int
+            def __init__(
+                self,
+                *,
+                kind: global___GraphQuery.Node.MatchLocation.ValueType = ...,
+                distance: builtins.int = ...,
+            ) -> None: ...
+            def ClearField(self, field_name: typing.Literal["distance", b"distance", "kind", b"kind"]) -> None: ...
 
         VALUE_FIELD_NUMBER: builtins.int
         NODE_TYPE_FIELD_NUMBER: builtins.int
         NODE_SUBTYPE_FIELD_NUMBER: builtins.int
         MATCH_KIND_FIELD_NUMBER: builtins.int
+        EXACT_FIELD_NUMBER: builtins.int
+        FUZZY_FIELD_NUMBER: builtins.int
         value: builtins.str
         node_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType
         node_subtype: builtins.str
         match_kind: global___GraphQuery.Node.MatchKind.ValueType
+        @property
+        def exact(self) -> global___GraphQuery.Node.ExactMatch: ...
+        @property
+        def fuzzy(self) -> global___GraphQuery.Node.FuzzyMatch: ...
         def __init__(
             self,
             *,
@@ -713,15 +773,19 @@ class GraphQuery(google.protobuf.message.Message):
             node_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType | None = ...,
             node_subtype: builtins.str | None = ...,
             match_kind: global___GraphQuery.Node.MatchKind.ValueType = ...,
+            exact: global___GraphQuery.Node.ExactMatch | None = ...,
+            fuzzy: global___GraphQuery.Node.FuzzyMatch | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "match_kind", b"match_kind", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "exact", b"exact", "fuzzy", b"fuzzy", "new_match_kind", b"new_match_kind", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "exact", b"exact", "fuzzy", b"fuzzy", "match_kind", b"match_kind", "new_match_kind", b"new_match_kind", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> None: ...
         @typing.overload
         def WhichOneof(self, oneof_group: typing.Literal["_node_subtype", b"_node_subtype"]) -> typing.Literal["node_subtype"] | None: ...
         @typing.overload
         def WhichOneof(self, oneof_group: typing.Literal["_node_type", b"_node_type"]) -> typing.Literal["node_type"] | None: ...
         @typing.overload
         def WhichOneof(self, oneof_group: typing.Literal["_value", b"_value"]) -> typing.Literal["value"] | None: ...
+        @typing.overload
+        def WhichOneof(self, oneof_group: typing.Literal["new_match_kind", b"new_match_kind"]) -> typing.Literal["exact", "fuzzy"] | None: ...
 
     @typing.final
     class Relation(google.protobuf.message.Message):

@@ -439,13 +439,13 @@ impl RelationsReaderService {
                 let words: Vec<_> = query.split_whitespace().collect();
                 for word in words {
                     prefix_nodes_q.push(Node {
-                        value: Some(Term::Fuzzy(FuzzyTerm {
+                        value: Some(Term::FuzzyWord(FuzzyTerm {
                             value: word.to_string(),
                             fuzzy_distance: FUZZY_DISTANCE,
                             is_prefix: false,
                         })),
                         ..Default::default()
-                    })
+                    });
                 }
 
                 // add fuzzy query for all prefixes

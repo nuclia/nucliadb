@@ -222,10 +222,10 @@ def _set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuer
     if node.value is not None:
         pb.value = node.value
         if node.match == graph_requests.NodeMatchKind.EXACT:
-            pb.match_kind = nodereader_pb2.GraphQuery.Node.MatchKind.EXACT
+            pb.match_kind = nodereader_pb2.GraphQuery.Node.MatchKind.DEPRECATED_EXACT
 
         elif node.match == graph_requests.NodeMatchKind.FUZZY:
-            pb.match_kind = nodereader_pb2.GraphQuery.Node.MatchKind.FUZZY
+            pb.match_kind = nodereader_pb2.GraphQuery.Node.MatchKind.DEPRECATED_FUZZY
 
         else:  # pragma: nocover
             # This is a trick so mypy generates an error if this branch can be reached,
