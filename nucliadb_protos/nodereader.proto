@@ -198,8 +198,37 @@ message GraphQuery {
         }
         MatchKind match_kind = 4 [deprecated = true];
 
-        message ExactMatch {}
-        message FuzzyMatch {}
+        enum ExactMatchKind {
+            // Match exact value. Search "Rosa Parks" to find "Rosa Parks"
+            EXACT_FULL = 0;
+            // Match prefix. Search "Rosa P" or "Ros" to find "Rosa Parks"
+            PREFIX = 1;
+            // Match individual words. Search "Rosa" or "Parks" to find "Rosa Parks"
+            WORDS = 2;
+            // Match individual word by prefix. Search "Ros" or "Par" to find "Rosa Parks"
+            PREFIX_WORDS = 3;
+        }
+
+        enum FuzzyMatchKind {
+            // Fuzzy match. Search "Rosa Pargs" to find "Rosa Parks"
+            FUZZY_FULL = 0;
+            // Match fuzzy prefix. Search "Roza P" or "Roz" to find "Rosa Parks"
+            FUZZY_PREFIX = 1;
+            // Match individual words with fuzzy. Search "Roza" or "Pargs" to find "Rosa Parks"
+            FUZZY_WORDS = 2;
+            // Match individual words by fuzzy prefix. Search "Roz" or "Parg" to find "Rosa Parks"
+            FUZZY_PREFIX_WORDS = 3;
+        }
+
+        message ExactMatch {
+            ExactMatchKind kind = 1;
+        }
+
+        message FuzzyMatch {
+            FuzzyMatchKind kind = 1;
+            uint32 distance = 2;
+        }
+
         oneof new_match_kind {
             ExactMatch exact = 5;
             FuzzyMatch fuzzy = 6;
