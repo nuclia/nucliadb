@@ -691,73 +691,48 @@ class GraphQuery(google.protobuf.message.Message):
 
         class _MatchKindEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GraphQuery.Node._MatchKind.ValueType], builtins.type):
             DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-            EXACT: GraphQuery.Node._MatchKind.ValueType  # 0
-            FUZZY: GraphQuery.Node._MatchKind.ValueType  # 1
+            DEPRECATED_EXACT: GraphQuery.Node._MatchKind.ValueType  # 0
+            DEPRECATED_FUZZY: GraphQuery.Node._MatchKind.ValueType  # 1
 
         class MatchKind(_MatchKind, metaclass=_MatchKindEnumTypeWrapper): ...
-        EXACT: GraphQuery.Node.MatchKind.ValueType  # 0
-        FUZZY: GraphQuery.Node.MatchKind.ValueType  # 1
+        DEPRECATED_EXACT: GraphQuery.Node.MatchKind.ValueType  # 0
+        DEPRECATED_FUZZY: GraphQuery.Node.MatchKind.ValueType  # 1
 
-        class _ExactMatchKind:
+        class _MatchLocation:
             ValueType = typing.NewType("ValueType", builtins.int)
             V: typing_extensions.TypeAlias = ValueType
 
-        class _ExactMatchKindEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GraphQuery.Node._ExactMatchKind.ValueType], builtins.type):
+        class _MatchLocationEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GraphQuery.Node._MatchLocation.ValueType], builtins.type):
             DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-            EXACT_FULL: GraphQuery.Node._ExactMatchKind.ValueType  # 0
-            """Match exact value. Search "Rosa Parks" to find "Rosa Parks" """
-            PREFIX: GraphQuery.Node._ExactMatchKind.ValueType  # 1
+            FULL: GraphQuery.Node._MatchLocation.ValueType  # 0
+            """Match full value. Search "Rosa Parks" to find "Rosa Parks" """
+            PREFIX: GraphQuery.Node._MatchLocation.ValueType  # 1
             """Match prefix. Search "Rosa P" or "Ros" to find "Rosa Parks" """
-            WORDS: GraphQuery.Node._ExactMatchKind.ValueType  # 2
+            WORDS: GraphQuery.Node._MatchLocation.ValueType  # 2
             """Match individual words. Search "Rosa" or "Parks" to find "Rosa Parks" """
-            PREFIX_WORDS: GraphQuery.Node._ExactMatchKind.ValueType  # 3
+            PREFIX_WORDS: GraphQuery.Node._MatchLocation.ValueType  # 3
             """Match individual word by prefix. Search "Ros" or "Par" to find "Rosa Parks" """
 
-        class ExactMatchKind(_ExactMatchKind, metaclass=_ExactMatchKindEnumTypeWrapper): ...
-        EXACT_FULL: GraphQuery.Node.ExactMatchKind.ValueType  # 0
-        """Match exact value. Search "Rosa Parks" to find "Rosa Parks" """
-        PREFIX: GraphQuery.Node.ExactMatchKind.ValueType  # 1
+        class MatchLocation(_MatchLocation, metaclass=_MatchLocationEnumTypeWrapper): ...
+        FULL: GraphQuery.Node.MatchLocation.ValueType  # 0
+        """Match full value. Search "Rosa Parks" to find "Rosa Parks" """
+        PREFIX: GraphQuery.Node.MatchLocation.ValueType  # 1
         """Match prefix. Search "Rosa P" or "Ros" to find "Rosa Parks" """
-        WORDS: GraphQuery.Node.ExactMatchKind.ValueType  # 2
+        WORDS: GraphQuery.Node.MatchLocation.ValueType  # 2
         """Match individual words. Search "Rosa" or "Parks" to find "Rosa Parks" """
-        PREFIX_WORDS: GraphQuery.Node.ExactMatchKind.ValueType  # 3
+        PREFIX_WORDS: GraphQuery.Node.MatchLocation.ValueType  # 3
         """Match individual word by prefix. Search "Ros" or "Par" to find "Rosa Parks" """
-
-        class _FuzzyMatchKind:
-            ValueType = typing.NewType("ValueType", builtins.int)
-            V: typing_extensions.TypeAlias = ValueType
-
-        class _FuzzyMatchKindEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GraphQuery.Node._FuzzyMatchKind.ValueType], builtins.type):
-            DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-            FUZZY_FULL: GraphQuery.Node._FuzzyMatchKind.ValueType  # 0
-            """Fuzzy match. Search "Rosa Pargs" to find "Rosa Parks" """
-            FUZZY_PREFIX: GraphQuery.Node._FuzzyMatchKind.ValueType  # 1
-            """Match fuzzy prefix. Search "Roza P" or "Roz" to find "Rosa Parks" """
-            FUZZY_WORDS: GraphQuery.Node._FuzzyMatchKind.ValueType  # 2
-            """Match individual words with fuzzy. Search "Roza" or "Pargs" to find "Rosa Parks" """
-            FUZZY_PREFIX_WORDS: GraphQuery.Node._FuzzyMatchKind.ValueType  # 3
-            """Match individual words by fuzzy prefix. Search "Roz" or "Parg" to find "Rosa Parks" """
-
-        class FuzzyMatchKind(_FuzzyMatchKind, metaclass=_FuzzyMatchKindEnumTypeWrapper): ...
-        FUZZY_FULL: GraphQuery.Node.FuzzyMatchKind.ValueType  # 0
-        """Fuzzy match. Search "Rosa Pargs" to find "Rosa Parks" """
-        FUZZY_PREFIX: GraphQuery.Node.FuzzyMatchKind.ValueType  # 1
-        """Match fuzzy prefix. Search "Roza P" or "Roz" to find "Rosa Parks" """
-        FUZZY_WORDS: GraphQuery.Node.FuzzyMatchKind.ValueType  # 2
-        """Match individual words with fuzzy. Search "Roza" or "Pargs" to find "Rosa Parks" """
-        FUZZY_PREFIX_WORDS: GraphQuery.Node.FuzzyMatchKind.ValueType  # 3
-        """Match individual words by fuzzy prefix. Search "Roz" or "Parg" to find "Rosa Parks" """
 
         @typing.final
         class ExactMatch(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
             KIND_FIELD_NUMBER: builtins.int
-            kind: global___GraphQuery.Node.ExactMatchKind.ValueType
+            kind: global___GraphQuery.Node.MatchLocation.ValueType
             def __init__(
                 self,
                 *,
-                kind: global___GraphQuery.Node.ExactMatchKind.ValueType = ...,
+                kind: global___GraphQuery.Node.MatchLocation.ValueType = ...,
             ) -> None: ...
             def ClearField(self, field_name: typing.Literal["kind", b"kind"]) -> None: ...
 
@@ -767,12 +742,12 @@ class GraphQuery(google.protobuf.message.Message):
 
             KIND_FIELD_NUMBER: builtins.int
             DISTANCE_FIELD_NUMBER: builtins.int
-            kind: global___GraphQuery.Node.FuzzyMatchKind.ValueType
+            kind: global___GraphQuery.Node.MatchLocation.ValueType
             distance: builtins.int
             def __init__(
                 self,
                 *,
-                kind: global___GraphQuery.Node.FuzzyMatchKind.ValueType = ...,
+                kind: global___GraphQuery.Node.MatchLocation.ValueType = ...,
                 distance: builtins.int = ...,
             ) -> None: ...
             def ClearField(self, field_name: typing.Literal["distance", b"distance", "kind", b"kind"]) -> None: ...
