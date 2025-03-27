@@ -447,8 +447,8 @@ async def fuzzy_search_entities(
     # node in any position. I.e., for the query "Rose Hamiltn", it'll match
     # "Rosa Parks" and "Margaret Hamilton"
     request = nodereader_pb2.GraphSearchRequest()
-    # XXX: on the rust side, we had this value hardcoded, we should parametrize it though
-    request.top_k = 10
+    # XXX Are those enough results? Too many?
+    request.top_k = 50
     request.kind = nodereader_pb2.GraphSearchRequest.QueryKind.NODES
     for word in query.split():
         subquery = nodereader_pb2.GraphQuery.PathQuery()
