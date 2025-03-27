@@ -221,10 +221,10 @@ def _parse_relation_query(
 def _set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuery.Node):
     if node.value is not None:
         pb.value = node.value
-        if node.match == graph_requests.NodeMatchKind.EXACT:
+        if node.match == graph_requests.NodeMatchKindName.EXACT:
             pb.exact.kind = nodereader_pb2.GraphQuery.Node.MatchLocation.FULL
 
-        elif node.match == graph_requests.NodeMatchKind.FUZZY:
+        elif node.match == graph_requests.NodeMatchKindName.FUZZY:
             pb.fuzzy.kind = nodereader_pb2.GraphQuery.Node.MatchLocation.PREFIX
             pb.fuzzy.distance = 1
 
