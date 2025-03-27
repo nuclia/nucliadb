@@ -239,7 +239,11 @@ class PredictEngine:
         ):
             detail = await resp.text()
 
-        log_level = logging.ERROR if str(resp.status).startswith("5") else logging.INFO
+        is_5xx_error = resp.status > 499
+        # NOTE: 512 is a special status code sent by learning predict api indicating that the error
+        # is related to an external generative model, so we don't want to log it as an error
+        is_external_generative_error = resp.status == 512
+        log_level = logging.ERROR if is_5xx_error and not is_external_generative_error else logging.INFO
         logger.log(
             log_level,
             "Predict API error",
