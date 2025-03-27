@@ -23,8 +23,6 @@ import time
 import pyarrow as pa  # type: ignore
 
 from nucliadb_dataset.dataset import NucliaDBDataset, download_all_partitions
-from nucliadb_models.common import FieldID
-from nucliadb_models.metadata import TokenSplit, UserFieldMetadata
 from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdString
@@ -38,24 +36,12 @@ def test_datascientist_tokens(sdk: NucliaDB, temp_folder, kb: KnowledgeBoxObj):
         kbid=kb.uuid,
         content=CreateResourcePayload(
             texts={FieldIdString("text"): TextField(body="I'm Ramon")},
-            fieldmetadata=[
-                UserFieldMetadata(
-                    token=[TokenSplit(klass="NAME", token="Ramon", start=5, end=9)],
-                    field=FieldID(field_type=FieldID.FieldType.TEXT, field="text"),
-                )
-            ],
         ),
     )
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
             texts={FieldIdString("text"): TextField(body="I'm not Ramon")},
-            fieldmetadata=[
-                UserFieldMetadata(
-                    token=[TokenSplit(klass="NAME", token="Ramon", start=8, end=13)],
-                    field=FieldID(field_type=FieldID.FieldType.TEXT, field="text"),
-                )
-            ],
         ),
     )
 
@@ -63,12 +49,6 @@ def test_datascientist_tokens(sdk: NucliaDB, temp_folder, kb: KnowledgeBoxObj):
         kbid=kb.uuid,
         content=CreateResourcePayload(
             texts={FieldIdString("text"): TextField(body="I'm Aleix")},
-            fieldmetadata=[
-                UserFieldMetadata(
-                    token=[TokenSplit(klass="NAME", token="Aleix", start=5, end=9)],
-                    field=FieldID(field_type=FieldID.FieldType.TEXT, field="text"),
-                )
-            ],
         ),
     )
 

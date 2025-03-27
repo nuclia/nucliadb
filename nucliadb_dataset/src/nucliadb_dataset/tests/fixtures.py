@@ -26,10 +26,10 @@ import grpc
 import pytest
 from grpc import aio
 
-from nucliadb_models.common import FieldID, UserClassification
+from nucliadb_models.common import UserClassification
 from nucliadb_models.entities import CreateEntitiesGroupPayload, Entity
 from nucliadb_models.labels import Label, LabelSet, LabelSetKind
-from nucliadb_models.metadata import TokenSplit, UserFieldMetadata, UserMetadata
+from nucliadb_models.metadata import UserMetadata
 from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdString, SlugString
@@ -195,12 +195,6 @@ def upload_data_token_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
         content=CreateResourcePayload(
             slug=SlugString("doc1"),
             texts={FieldIdString("text"): TextField(body="Ramon This is my lovely text")},
-            fieldmetadata=[
-                UserFieldMetadata(
-                    token=[TokenSplit(klass="PERSON", token="Ramon", start=0, end=5)],
-                    field=FieldID(field_type=FieldID.FieldType.TEXT, field="text"),
-                )
-            ],
         ),
     )
 
@@ -213,15 +207,6 @@ def upload_data_token_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
                     body="Carmen Iniesta shows an amazing classifier to Eudald Camprubi"
                 )
             },
-            fieldmetadata=[
-                UserFieldMetadata(
-                    token=[
-                        TokenSplit(klass="PERSON", token="Carmen Iniesta", start=0, end=14),
-                        TokenSplit(klass="PERSON", token="Eudald Camprubi", start=46, end=61),
-                    ],
-                    field=FieldID(field_type=FieldID.FieldType.TEXT, field="text"),
-                )
-            ],
         ),
     )
 
@@ -234,16 +219,6 @@ def upload_data_token_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
                     body="Which is the fastest animal, a lion, a tiger or a cheetah?"
                 )
             },
-            fieldmetadata=[
-                UserFieldMetadata(
-                    token=[
-                        TokenSplit(klass="ANIMAL", token="lion", start=31, end=35),
-                        TokenSplit(klass="ANIMAL", token="tiger", start=39, end=44),
-                        TokenSplit(klass="ANIMAL", token="cheetah", start=50, end=57),
-                    ],
-                    field=FieldID(field_type=FieldID.FieldType.TEXT, field="text"),
-                )
-            ],
         ),
     )
 

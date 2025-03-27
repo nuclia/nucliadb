@@ -114,12 +114,6 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     file_field.with_extracted_paragraph_metadata(rpb.Paragraph(start=91, end=135))
     file_field.with_extracted_paragraph_metadata(rpb.Paragraph(start=136, end=166))
 
-    file_field.with_user_entity("PERSON", "Ramon", start=12, end=17)
-    file_field.with_user_entity("ORG", "Nuclia", start=42, end=48)
-    file_field.with_user_entity("ORG", "Generalitat de Catalunya", start=65, end=89)
-    file_field.with_user_entity("PERSON", "Eudald", start=91, end=106)
-    file_field.with_user_entity("PERSON", "Carmen Iniesta", start=151, end=165)
-
     bmb.add_field_builder(file_field)
 
     bm = bmb.build()

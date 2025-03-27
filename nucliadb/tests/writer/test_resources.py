@@ -67,7 +67,6 @@ async def test_resource_crud(nucliadb_writer: AsyncClient, knowledgebox_writer: 
                             "classifications": [{"labelset": "ls1", "label": "label1"}],
                         }
                     ],
-                    "token": [{"token": "token1", "klass": "klass1", "start": 1, "end": 2}],
                     "field": {"field": "text1", "field_type": "text"},
                 }
             ],
@@ -152,7 +151,6 @@ async def test_resource_crud_sync(nucliadb_writer: AsyncClient, knowledgebox_wri
                             "classifications": [{"labelset": "ls1", "label": "label1"}],
                         }
                     ],
-                    "token": [{"token": "token1", "klass": "klass1", "start": 1, "end": 2}],
                     "field": {"field": "text1", "field_type": "text"},
                 }
             ],
