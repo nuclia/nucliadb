@@ -58,16 +58,23 @@ async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Creat
             detail=err.content,
         )
 
-    except VectorSetConflict:
+    except VectorSetConflict as err:
         raise HTTPException(
             status_code=409,
-            detail="A vectorset with this embedding model already exists in your KB",
+            detail=str(err),
         )
 
     return CreatedVectorSet(id=vectorset_id)
 
 
 async def _add_vectorset(kbid: str, vectorset_id: str) -> None:
+    storage = await get_storage()
+
+    async with datamanagers.with_ro_transaction() as txn:
+        kbobj = KnowledgeBox(txn, storage, kbid)
+        if await kbobj.vectorset_marked_for_deletion(vectorset_id):
+            raise VectorSetConflict("Vectorset is already being deleted. Please try again later.")
+
     # First off, add the vectorset to the learning configuration if it's not already there
     lconfig = await learning_proxy.get_configuration(kbid)
     assert lconfig is not None
@@ -79,7 +86,6 @@ async def _add_vectorset(kbid: str, vectorset_id: str) -> None:
         assert lconfig is not None
 
     # Then, add the vectorset to the index if it's not already there
-    storage = await get_storage()
     vectorset_config = get_vectorset_config(lconfig, vectorset_id)
     async with datamanagers.with_rw_transaction() as txn:
         kbobj = KnowledgeBox(txn, storage, kbid)

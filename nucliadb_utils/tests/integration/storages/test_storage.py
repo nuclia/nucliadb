@@ -75,6 +75,9 @@ async def storage_test(storage: Storage):
     # Now delete the file
     await storage.delete_upload(key0, bucket)
 
+    # Make sure that deleting an unexisting upload is handled
+    await storage.delete_upload("unexisting_object", bucket)
+
     # Add a file with size larger than the chunk size
     bigfile = b"mytestinfo" * storage.chunk_size
     key1 = "mytest1"
