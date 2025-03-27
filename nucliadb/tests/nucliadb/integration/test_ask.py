@@ -1533,3 +1533,23 @@ async def test_ask_skip_answer_generation(
     assert results[2].item.type == "debug"
     assert results[2].item.metadata["prompt_context"] is not None
     assert results[2].item.metadata["predict_request"] is not None
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_calls_predict_query_once(
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource
+):
+    predict = get_predict()
+    assert isinstance(predict, DummyPredictEngine), "dummy is expected in this test"
+    assert len(predict.calls) == 0
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={"query": "title", "reranker": "noop"},
+        headers={"X-Synchronous": "true"},
+    )
+    assert resp.status_code == 200
+
+    assert len(predict.calls) == 2
+    assert predict.calls[0][0] == "query"
+    assert predict.calls[1][0] == "chat_query_ndjson"
