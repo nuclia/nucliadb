@@ -204,8 +204,8 @@ class EntitiesManager:
 
         async def do_entities_search(node: AbstractIndexNode, shard_id: str) -> GraphSearchResponse:
             request = GraphSearchRequest()
-            # FIXME: this was hardcoded in the rust side but we want them all, not 10!!
-            request.top_k = 10
+            # XXX: this is a wild guess. Are those enough or too many?
+            request.top_k = 500
             request.kind = GraphSearchRequest.QueryKind.NODES
             request.query.path.path.source.node_type = RelationNode.NodeType.ENTITY
             request.query.path.path.source.node_subtype = group
