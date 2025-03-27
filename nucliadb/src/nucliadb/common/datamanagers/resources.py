@@ -103,7 +103,7 @@ async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -
 async def get_resource_shard_id(
     txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
 ) -> Optional[str]:
-    shard = await txn.get(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid, for_update=for_update))
+    shard = await txn.get(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid), for_update=for_update)
     if shard is not None:
         return shard.decode()
     else:

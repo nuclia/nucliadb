@@ -338,6 +338,7 @@ class Processor:
                         partition=partition,
                         kb=kb,
                         source=messages_source(messages),
+                        assign_shard=created,
                     )
                     if transaction_check:
                         await sequence_manager.set_last_seqid(txn, partition, seqid)
@@ -420,32 +421,34 @@ class Processor:
 
         return None
 
-    async def get_or_assign_resource_shard(
-        self, txn: Transaction, kb: KnowledgeBox, uuid: str
-    ) -> writer_pb2.ShardObject:
-        kbid = kb.kbid
+    async def get_resource_shard(self, kbid: str, uuid: str) -> writer_pb2.ShardObject:
         async with locking.distributed_lock(
             locking.RESOURCE_INDEX_LOCK.format(kbid=kbid, resource_id=uuid)
         ):
             # we need to have a lock at indexing time because we don't know if
             # a resource was move to another shard while it was being indexed
-            shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
+            async with datamanagers.with_ro_transaction() as txn:
+                shard_id = await datamanagers.resources.get_resource_shard_id(
+                    txn, kbid=kbid, rid=uuid, for_update=False
+                )
+                if shard_id is None:
+                    raise AttributeError("Resource shard not found")
+                shard = await datamanagers.cluster.get_kb_shard(
+                    txn, kbid=kbid, shardid=shard_id, for_update=False
+                )
+                if shard is None:
+                    raise AttributeError("Resource shard not found")
+                return shard
 
-        shard = None
-        if shard_id is not None:
-            # Resource already has a shard assigned
-            shard = await kb.get_resource_shard(shard_id)
-            if shard is None:
-                raise AttributeError("Shard not available")
-        else:
-            # It's a new resource, get KB's current active shard to place new resource on
-            shard = await self.index_node_shard_manager.get_current_active_shard(txn, kbid)
-            if shard is None:
-                # No current shard available, create a new one
-                shard = await self.index_node_shard_manager.create_shard_by_kbid(txn, kbid)
-            await datamanagers.resources.set_resource_shard_id(
-                txn, kbid=kbid, rid=uuid, shard=shard.shard
-            )
+    async def assign_shard_to_resource(
+        self, txn: Transaction, kbid: str, uuid: str
+    ) -> writer_pb2.ShardObject:
+        # It's a new resource, get KB's current active shard to place new resource on
+        shard = await self.index_node_shard_manager.get_current_active_shard(txn, kbid)
+        if shard is None:
+            # No current shard available, create a new one
+            shard = await self.index_node_shard_manager.create_shard_by_kbid(txn, kbid)
+        await datamanagers.resources.set_resource_shard_id(txn, kbid=kbid, rid=uuid, shard=shard.shard)
         return shard
 
     @processor_observer.wrap({"type": "index_resource"})
@@ -459,9 +462,13 @@ class Processor:
         partition: str,
         kb: KnowledgeBox,
         source: nodewriter_pb2.IndexMessageSource.ValueType,
+        assign_shard: bool,
     ) -> None:
         validate_indexable_resource(resource.indexer.brain)
-        shard = await self.get_or_assign_resource_shard(txn, kb, uuid)
+        if assign_shard:
+            shard = await self.assign_shard_to_resource(txn, kb.kbid, uuid)
+        else:
+            shard = await self.get_resource_shard(kb.kbid, uuid)
         index_message = resource.indexer.brain
         external_index_manager = await get_external_index_manager(kbid=kbid)
         if external_index_manager is not None:
