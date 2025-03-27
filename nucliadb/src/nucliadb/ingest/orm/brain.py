@@ -606,20 +606,6 @@ class ResourceBrain:
             )
 
         if basic_user_fieldmetadata is not None:
-            for token in basic_user_fieldmetadata.token:
-                if token.cancelled_by_user is False:
-                    labels["e"].add(f"{token.klass}/{token.token}")
-                    relation_node_entity = RelationNode(
-                        value=token.token,
-                        ntype=RelationNode.NodeType.ENTITY,
-                        subtype=token.klass,
-                    )
-                    rel = Relation(
-                        relation=Relation.ENTITY,
-                        source=relation_node_resource,
-                        to=relation_node_entity,
-                    )
-                    self.brain.field_relations[field_key].relations.append(IndexRelation(relation=rel))
             for paragraph_annotation in basic_user_fieldmetadata.paragraphs:
                 for classification in paragraph_annotation.classifications:
                     if not classification.cancelled_by_user:

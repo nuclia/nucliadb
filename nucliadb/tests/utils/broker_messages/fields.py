@@ -138,15 +138,6 @@ class FieldBuilder:
     def with_extracted_paragraph_metadata(self, paragraph: rpb.Paragraph):
         self._extracted_metadata.metadata.metadata.paragraphs.append(paragraph)
 
-    def with_user_entity(self, klass: str, name: str, *, start: int, end: int):
-        entity = rpb.TokenSplit(
-            klass=klass,
-            token=name,
-            start=start,
-            end=end,
-        )
-        self._user_metadata.token.append(entity)
-
     def with_extracted_entity(
         self,
         klass: str,

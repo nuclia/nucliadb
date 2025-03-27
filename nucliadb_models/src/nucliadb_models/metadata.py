@@ -141,14 +141,6 @@ class UserMetadata(BaseModel):
     relations: List[Relation] = []
 
 
-class TokenSplit(BaseModel):
-    token: str
-    klass: str
-    start: int
-    end: int
-    cancelled_by_user: bool = False
-
-
 class ParagraphAnnotation(BaseModel):
     classifications: List[UserClassification] = []
     key: str
@@ -178,7 +170,6 @@ class UserFieldMetadata(BaseModel):
     Field-level metadata set by the user via the rest api
     """
 
-    token: List[TokenSplit] = []
     paragraphs: List[ParagraphAnnotation] = []
     selections: List[PageSelections] = []
     question_answers: List[QuestionAnswerAnnotation] = []
