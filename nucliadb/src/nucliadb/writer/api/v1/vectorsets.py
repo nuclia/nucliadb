@@ -58,10 +58,10 @@ async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Creat
             detail=err.content,
         )
 
-    except VectorSetConflict:
+    except VectorSetConflict as err:
         raise HTTPException(
             status_code=409,
-            detail="A vectorset with this embedding model already exists in your KB",
+            detail=str(err),
         )
 
     return CreatedVectorSet(id=vectorset_id)

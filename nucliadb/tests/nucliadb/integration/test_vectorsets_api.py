@@ -26,12 +26,14 @@ from httpx import AsyncClient
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.common.context import ApplicationContext
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.learning_proxy import (
     LearningConfiguration,
     ProxiedLearningConfigError,
     SemanticConfig,
     SimilarityFunction,
 )
+from nucliadb.purge import purge_kb_vectorsets
 from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxSearchResults
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.nodewriter_pb2 import VectorType
@@ -41,6 +43,7 @@ from nucliadb_protos.writer_pb2 import (
     FieldID,
 )
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_utils.utilities import get_storage
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
@@ -159,9 +162,7 @@ async def test_vectorsets_crud(
         ):
             # But deleting twice is okay
             resp = await nucliadb_writer.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
-            # XXX: however, we get the same error as before due to our lazy
-            # check strategy. This shuold be a 200
-            assert resp.status_code == 409, resp.text
+            assert resp.status_code == 204, resp.text
 
         with patch(
             f"{MODULE}.learning_proxy.get_configuration",
@@ -171,9 +172,18 @@ async def test_vectorsets_crud(
                 existing_lconfig,  # Initial configuration
             ],
         ):
+            # Trying to add the vectorset that has just been deleted is not allowed until
+            # purge has run
+            resp = await nucliadb_writer.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
+            assert resp.status_code == 409, resp.text
+
+            # Purge the vectorsets that are marked for deletion
+            await purge_kb_vectorsets(get_driver(), await get_storage())
+
             # Add and delete the vectorset again
             resp = await nucliadb_writer.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
             assert resp.status_code == 201, resp.text
+
             resp = await nucliadb_writer.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
             assert resp.status_code == 204, resp.text
 
