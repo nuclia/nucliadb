@@ -421,7 +421,24 @@ class Processor:
 
         return None
 
-    async def get_resource_shard(self, kbid: str, uuid: str) -> writer_pb2.ShardObject:
+    async def get_or_assign_shard(
+        self, txn: Transaction, kbid: str, uuid: str, force_assign: bool
+    ) -> writer_pb2.ShardObject:
+        if force_assign:
+            return await self.assign_shard_to_resource(txn, kbid, uuid)
+        shard = await self.get_resource_shard(kbid, uuid)
+        if shard is None:
+            logger.warning(
+                "Shard not found for existing resource, assigning a new one",
+                extra={
+                    "kbid": kbid,
+                    "rid": uuid,
+                },
+            )
+            shard = await self.assign_shard_to_resource(txn, kbid, uuid)
+        return shard
+
+    async def get_resource_shard(self, kbid: str, uuid: str) -> Optional[writer_pb2.ShardObject]:
         async with locking.distributed_lock(
             locking.RESOURCE_INDEX_LOCK.format(kbid=kbid, resource_id=uuid)
         ):
@@ -431,14 +448,12 @@ class Processor:
                 shard_id = await datamanagers.resources.get_resource_shard_id(
                     txn, kbid=kbid, rid=uuid, for_update=False
                 )
-                if shard_id is None:
-                    raise AttributeError("Resource shard not found")
-                shard = await datamanagers.cluster.get_kb_shard(
-                    txn, kbid=kbid, shardid=shard_id, for_update=False
-                )
-                if shard is None:
-                    raise AttributeError("Resource shard not found")
-                return shard
+                if shard_id is not None:
+                    shard = await datamanagers.cluster.get_kb_shard(
+                        txn, kbid=kbid, shardid=shard_id, for_update=False
+                    )
+                    return shard
+        return None
 
     async def assign_shard_to_resource(
         self, txn: Transaction, kbid: str, uuid: str
@@ -465,10 +480,7 @@ class Processor:
         assign_shard: bool,
     ) -> None:
         validate_indexable_resource(resource.indexer.brain)
-        if assign_shard:
-            shard = await self.assign_shard_to_resource(txn, kb.kbid, uuid)
-        else:
-            shard = await self.get_resource_shard(kb.kbid, uuid)
+        shard = await self.get_or_assign_shard(txn, kbid, uuid, force_assign=assign_shard)
         index_message = resource.indexer.brain
         external_index_manager = await get_external_index_manager(kbid=kbid)
         if external_index_manager is not None:
