@@ -39,7 +39,6 @@ from nucliadb_protos.resources_pb2 import (
     Paragraph,
     ParagraphAnnotation,
     Position,
-    TokenSplit,
     UserFieldMetadata,
 )
 from nucliadb_protos.utils_pb2 import Vector
@@ -95,13 +94,6 @@ def broker_message_with_entities(kbid):
     field = FieldID()
     field.field = field_id
     field.field_type = FieldType.TEXT
-
-    # Add annotated entity
-    ufm = UserFieldMetadata()
-    ufm.field.CopyFrom(field)
-    family, entity = EntityLabels.ANNOTATED.split("/")
-    ufm.token.append(TokenSplit(token=entity, klass=family, start=11, end=16, cancelled_by_user=False))
-    bm.basic.fieldmetadata.append(ufm)
 
     # Add a couple of paragraphs to a text field
     p1 = PARAGRAPH1
