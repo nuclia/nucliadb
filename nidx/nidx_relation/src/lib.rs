@@ -27,22 +27,27 @@ mod schema;
 mod top_unique_n;
 
 use anyhow::anyhow;
+use nidx_protos::graph_query;
+use nidx_protos::graph_query::node::FuzzyMatch;
+use nidx_protos::graph_query::node::MatchLocation;
+use nidx_protos::graph_query::node::NewMatchKind;
+use nidx_protos::graph_query::path_query;
+use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::{
-    GraphSearchRequest, GraphSearchResponse, RelationNode, RelationNodeFilter, RelationPrefixSearchRequest,
-    RelationSearchRequest, RelationSearchResponse, relation_node::NodeType, relation_prefix_search_request::Search,
-    resource::ResourceStatus,
+    GraphSearchRequest, GraphSearchResponse, RelationNode, RelationSearchRequest, RelationSearchResponse,
+    relation_node::NodeType, resource::ResourceStatus,
 };
 use nidx_tantivy::{
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
     index_reader::{DeletionQueryBuilder, open_index_with_deletions},
 };
 use nidx_types::{OpenIndexMetadata, prefilter::PrefilterResult};
-use reader::{HashedRelationNode, RelationsReaderService};
+use reader::{FUZZY_DISTANCE, NUMBER_OF_RESULTS_SUGGEST, RelationsReaderService};
 use resource_indexer::index_relations;
 pub use schema::Schema as RelationSchema;
 use schema::encode_field_id;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, path::Path};
+use std::path::Path;
 use tantivy::{
     Term,
     directory::MmapDirectory,
@@ -218,35 +223,44 @@ impl RelationSearcher {
 
     #[instrument(name = "relation::suggest", skip_all)]
     pub fn suggest(&self, prefixes: Vec<String>) -> Vec<RelationNode> {
-        let requests = prefixes
-            .iter()
-            .filter(|prefix| prefix.len() >= MIN_SUGGEST_PREFIX_LENGTH)
-            .cloned()
-            .map(|prefix| RelationSearchRequest {
-                prefix: Some(RelationPrefixSearchRequest {
-                    search: Some(Search::Prefix(prefix)),
-                    node_filters: vec![RelationNodeFilter {
-                        node_type: NodeType::Entity.into(),
-                        ..Default::default()
-                    }],
-                }),
-                ..Default::default()
-            });
-
-        let responses: Vec<_> = requests.map(|request| self.search(&request)).collect();
-
-        // REVIEW: we are ignoring errors on search, we may want to, at least, log something
-        let entities = responses
+        let subqueries: Vec<_> = prefixes
             .into_iter()
-            .flatten() // unwrap errors and continue with successful results
-            .flat_map(|response| response.prefix)
-            .flat_map(|prefix_response| prefix_response.nodes.into_iter());
+            .filter(|prefix| prefix.len() >= MIN_SUGGEST_PREFIX_LENGTH)
+            .map(|prefix| graph_query::PathQuery {
+                query: Some(path_query::Query::Path(graph_query::Path {
+                    source: Some(graph_query::Node {
+                        value: Some(prefix),
+                        node_type: Some(NodeType::Entity.into()),
+                        new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                            kind: MatchLocation::Prefix.into(),
+                            distance: FUZZY_DISTANCE as u32,
+                        })),
+                        ..Default::default()
+                    }),
+                    undirected: true,
+                    ..Default::default()
+                })),
+            })
+            .collect();
 
-        // remove duplicate entities
-        let mut seen: HashSet<HashedRelationNode> = HashSet::new();
-        let mut ent_result = entities.collect::<Vec<_>>();
-        ent_result.retain(|e| seen.insert(e.clone().into()));
+        if subqueries.is_empty() {
+            return vec![];
+        }
 
-        ent_result
+        let request = GraphSearchRequest {
+            kind: QueryKind::Nodes.into(),
+            top_k: NUMBER_OF_RESULTS_SUGGEST as u32,
+            query: Some(nidx_protos::GraphQuery {
+                path: Some(graph_query::PathQuery {
+                    query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
+                        operands: subqueries,
+                    })),
+                }),
+            }),
+            ..Default::default()
+        };
+        // REVIEW: we are ignoring errors on search, we may want to, at least, log something
+        let response = self.graph_search(&request, PrefilterResult::All).unwrap_or_default();
+        response.nodes
     }
 }

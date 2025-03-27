@@ -42,8 +42,8 @@ use crate::schema::{Schema, decode_node, decode_relation, encode_field_id};
 use crate::top_unique_n::TopUniqueN;
 use crate::{RelationConfig, io_maps};
 
-const FUZZY_DISTANCE: u8 = 1;
-const NUMBER_OF_RESULTS_SUGGEST: usize = 10;
+pub const FUZZY_DISTANCE: u8 = 1;
+pub const NUMBER_OF_RESULTS_SUGGEST: usize = 10;
 // Hard limit until we have pagination in place
 const MAX_NUM_RELATIONS_RESULTS: usize = 500;
 
@@ -433,6 +433,7 @@ impl RelationsReaderService {
         let schema = &self.schema;
 
         match search {
+            // TODO: no longer used, we can remove it
             Search::Query(query) => {
                 let mut prefix_nodes_q = Vec::new();
 
