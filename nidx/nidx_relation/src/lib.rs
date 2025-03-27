@@ -222,7 +222,7 @@ impl RelationSearcher {
     }
 
     #[instrument(name = "relation::suggest", skip_all)]
-    pub fn suggest(&self, prefixes: Vec<String>) -> Vec<RelationNode> {
+    pub fn suggest(&self, prefixes: Vec<String>) -> anyhow::Result<Vec<RelationNode>> {
         let subqueries: Vec<_> = prefixes
             .into_iter()
             .filter(|prefix| prefix.len() >= MIN_SUGGEST_PREFIX_LENGTH)
@@ -244,7 +244,7 @@ impl RelationSearcher {
             .collect();
 
         if subqueries.is_empty() {
-            return vec![];
+            return Ok(vec![]);
         }
 
         let request = GraphSearchRequest {
@@ -259,8 +259,7 @@ impl RelationSearcher {
             }),
             ..Default::default()
         };
-        // REVIEW: we are ignoring errors on search, we may want to, at least, log something
-        let response = self.graph_search(&request, PrefilterResult::All).unwrap_or_default();
-        response.nodes
+        let response = self.graph_search(&request, PrefilterResult::All)?;
+        Ok(response.nodes)
     }
 }
