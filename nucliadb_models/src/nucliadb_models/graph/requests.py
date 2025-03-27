@@ -31,20 +31,20 @@ from nucliadb_models.security import RequestSecurity
 ## Models for graph nodes and relations
 
 
-class NodeMatchKind(str, Enum):
+class NodeMatchKindName(str, Enum):
     EXACT = "exact"
     FUZZY = "fuzzy"
 
 
 class GraphNode(BaseModel, extra="forbid"):
     value: Optional[str] = None
-    match: NodeMatchKind = NodeMatchKind.EXACT
+    match: NodeMatchKindName = NodeMatchKindName.EXACT
     type: Optional[RelationNodeType] = RelationNodeType.ENTITY
     group: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_fuzzy_usage(self) -> Self:
-        if self.match == NodeMatchKind.FUZZY:
+        if self.match == NodeMatchKindName.FUZZY:
             if self.value is None:
                 raise ValueError("Fuzzy match can only be used if a node value is provided")
             else:

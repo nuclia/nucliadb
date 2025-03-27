@@ -1299,7 +1299,9 @@ class SearchRequest(google.protobuf.message.Message):
         """Embedded vector search."""
 
     @property
-    def relation_prefix(self) -> global___RelationPrefixSearchRequest: ...
+    def relation_prefix(self) -> global___RelationPrefixSearchRequest:
+        """TODO: remove this field as it's not used anymore"""
+
     @property
     def relation_subgraph(self) -> global___EntitiesSubgraphRequest: ...
     @property

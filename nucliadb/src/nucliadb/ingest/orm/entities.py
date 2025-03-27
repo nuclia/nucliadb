@@ -36,7 +36,7 @@ from nucliadb.common.datamanagers.entities import (
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.settings import settings
-from nucliadb.search.search.shards import query_shard
+from nucliadb.search.search.shards import graph_search_shard, query_shard
 from nucliadb_protos.knowledgebox_pb2 import (
     DeletedEntitiesGroups,
     EntitiesGroup,
@@ -45,9 +45,8 @@ from nucliadb_protos.knowledgebox_pb2 import (
 )
 from nucliadb_protos.nodereader_pb2 import (
     Faceted,
-    RelationNodeFilter,
-    RelationPrefixSearchRequest,
-    RelationSearchResponse,
+    GraphSearchRequest,
+    GraphSearchResponse,
     SearchRequest,
     SearchResponse,
 )
@@ -203,18 +202,16 @@ class EntitiesManager:
     async def get_indexed_entities_group(self, group: str) -> Optional[EntitiesGroup]:
         shard_manager = get_shard_manager()
 
-        async def do_entities_search(node: AbstractIndexNode, shard_id: str) -> RelationSearchResponse:
-            request = SearchRequest(
-                shard=shard_id,
-                relation_prefix=RelationPrefixSearchRequest(
-                    prefix="",
-                    node_filters=[
-                        RelationNodeFilter(node_type=RelationNode.NodeType.ENTITY, node_subtype=group)
-                    ],
-                ),
-            )
-            response = await query_shard(node, shard_id, request)
-            return response.relation
+        async def do_entities_search(node: AbstractIndexNode, shard_id: str) -> GraphSearchResponse:
+            request = GraphSearchRequest()
+            # XXX: this is a wild guess. Are those enough or too many?
+            request.top_k = 500
+            request.kind = GraphSearchRequest.QueryKind.NODES
+            request.query.path.path.source.node_type = RelationNode.NodeType.ENTITY
+            request.query.path.path.source.node_subtype = group
+            request.query.path.path.undirected = True
+            response = await graph_search_shard(node, shard_id, request)
+            return response
 
         results = await shard_manager.apply_for_all_shards(
             self.kbid,
@@ -224,7 +221,7 @@ class EntitiesManager:
 
         entities = {}
         for result in results:
-            entities.update({node.value: Entity(value=node.value) for node in result.prefix.nodes})
+            entities.update({node.value: Entity(value=node.value) for node in result.nodes})
 
         if not entities:
             return None

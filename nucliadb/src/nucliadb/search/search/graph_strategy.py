@@ -44,7 +44,6 @@ from nucliadb.search.search.find_merge import (
     hydrate_and_rerank,
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
-from nucliadb.search.search.merge import merge_relation_prefix_results
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.rerankers import Reranker, RerankingOptions
 from nucliadb.search.utilities import get_predict
@@ -65,6 +64,7 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     QueryEntityDetection,
     RelatedEntities,
+    RelatedEntity,
     RelationDirection,
     RelationRanking,
     Relations,
@@ -443,25 +443,34 @@ async def fuzzy_search_entities(
 ) -> Optional[RelatedEntities]:
     """Fuzzy find entities in KB given a query using the same methodology as /suggest, but split by words."""
 
-    request = nodereader_pb2.SearchRequest()
-    request.relation_prefix.query = query
+    # Build an OR for each word in the query matching with fuzzy any word in any
+    # node in any position. I.e., for the query "Rose Hamiltn", it'll match
+    # "Rosa Parks" and "Margaret Hamilton"
+    request = nodereader_pb2.GraphSearchRequest()
+    # XXX Are those enough results? Too many?
+    request.top_k = 50
+    request.kind = nodereader_pb2.GraphSearchRequest.QueryKind.NODES
+    for word in query.split():
+        subquery = nodereader_pb2.GraphQuery.PathQuery()
+        subquery.path.source.value = word
+        subquery.path.source.fuzzy.kind = nodereader_pb2.GraphQuery.Node.MatchLocation.WORDS
+        subquery.path.source.fuzzy.distance = 1
+        subquery.path.undirected = True
+        request.query.path.bool_or.operands.append(subquery)
 
-    results: list[nodereader_pb2.SearchResponse]
     try:
-        (
-            results,
-            _,
-            _,
-        ) = await node_query(
-            kbid,
-            Method.SEARCH,
-            request,
-        )
-        return merge_relation_prefix_results(results)
-    except Exception as e:
-        capture_exception(e)
+        results, _, _ = await node_query(kbid, Method.GRAPH, request)
+    except Exception as exc:
+        capture_exception(exc)
         logger.exception("Error in finding entities in query for graph strategy")
         return None
+
+    # merge shard results while deduplicating repeated entities across shards
+    unique_entities: set[RelatedEntity] = set()
+    for response in results:
+        unique_entities.update((RelatedEntity(family=e.subtype, value=e.value) for e in response.nodes))
+
+    return RelatedEntities(entities=list(unique_entities), total=len(unique_entities))
 
 
 async def rank_relations_reranker(

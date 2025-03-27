@@ -387,6 +387,7 @@ message SearchRequest {
 
     optional string advanced_query = 18;
 
+    // TODO: remove this field as it's not used anymore
     RelationPrefixSearchRequest relation_prefix = 20;
     EntitiesSubgraphRequest relation_subgraph = 21;
 
