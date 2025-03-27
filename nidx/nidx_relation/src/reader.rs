@@ -43,7 +43,7 @@ use crate::top_unique_n::TopUniqueN;
 use crate::{RelationConfig, io_maps};
 
 pub const FUZZY_DISTANCE: u8 = 1;
-pub const NUMBER_OF_RESULTS_SUGGEST: usize = 10;
+pub const NUMBER_OF_RESULTS_SUGGEST: usize = 20;
 // Hard limit until we have pagination in place
 const MAX_NUM_RELATIONS_RESULTS: usize = 500;
 

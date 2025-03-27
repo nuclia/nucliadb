@@ -73,10 +73,11 @@ async fn test_search_relations_by_prefix(pool: PgPool) -> Result<(), Box<dyn std
     assert!(response.prefix.is_some());
     let prefix_response = response.prefix.as_ref().unwrap();
     let results = &prefix_response.nodes;
-    // TODO this constants is spread between relations and paragraphs. It should
-    // be in a single place and common for everyone
-    const MAX_SUGGEST_RESULTS: usize = 10;
-    assert_eq!(results.len(), MAX_SUGGEST_RESULTS);
+    // This test will be removed soon, no need to update this
+    // // TODO this constants is spread between relations and paragraphs. It should
+    // // be in a single place and common for everyone
+    // const MAX_SUGGEST_RESULTS: usize = 20;
+    assert_eq!(results.len(), 15);
 
     // --------------------------------------------------------------
     // Test: prefixed search with "cat" term (some results)
