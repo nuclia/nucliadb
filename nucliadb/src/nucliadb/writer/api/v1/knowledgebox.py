@@ -66,7 +66,7 @@ async def create_kb_endpoint(request: Request, item: KnowledgeBoxConfig) -> Know
     except KnowledgeBoxConflict:
         raise HTTPException(status_code=419, detail="Knowledge box already exists")
     except ExternalIndexCreationError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=512, detail=str(exc))
     except Exception:
         logger.exception("Could not create KB")
         raise HTTPException(status_code=500, detail="Error creating knowledge box")

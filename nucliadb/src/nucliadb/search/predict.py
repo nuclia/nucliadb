@@ -19,6 +19,7 @@
 #
 import base64
 import json
+import logging
 import os
 import random
 from enum import Enum
@@ -216,13 +217,16 @@ class PredictEngine:
         else:
             return {"X-STF-KBID": kbid}
 
-    async def check_response(self, resp: aiohttp.ClientResponse, expected_status: int = 200) -> None:
+    async def check_response(
+        self, kbid: str, resp: aiohttp.ClientResponse, expected_status: int = 200
+    ) -> None:
         if resp.status == expected_status:
             return
 
         if resp.status == 402:
             data = await resp.json()
             raise LimitsExceededError(402, data["detail"])
+
         try:
             data = await resp.json()
             try:
@@ -234,10 +238,22 @@ class PredictEngine:
             aiohttp.client_exceptions.ContentTypeError,
         ):
             detail = await resp.text()
-        if str(resp.status).startswith("5"):
-            logger.error(f"Predict API error at {resp.url}: {detail}")
-        else:
-            logger.info(f"Predict API error at {resp.url}: {detail}")
+
+        is_5xx_error = resp.status > 499
+        # NOTE: 512 is a special status code sent by learning predict api indicating that the error
+        # is related to an external generative model, so we don't want to log it as an error
+        is_external_generative_error = resp.status == 512
+        log_level = logging.ERROR if is_5xx_error and not is_external_generative_error else logging.INFO
+        logger.log(
+            log_level,
+            "Predict API error",
+            extra=dict(
+                kbid=kbid,
+                url=resp.url,
+                status_code=resp.status,
+                detail=detail,
+            ),
+        )
         raise ProxiedPredictAPIError(status=resp.status, detail=detail)
 
     @backoff.on_exception(
@@ -265,7 +281,7 @@ class PredictEngine:
             json=item.model_dump(),
             headers=self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected_status=200)
+        await self.check_response(kbid, resp, expected_status=200)
         return await _parse_rephrase_response(resp)
 
     @predict_observer.wrap({"type": "chat_ndjson"})
@@ -294,7 +310,7 @@ class PredictEngine:
             headers=headers,
             timeout=None,
         )
-        await self.check_response(resp, expected_status=200)
+        await self.check_response(kbid, resp, expected_status=200)
         ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER)
         model = resp.headers.get(NUCLIA_LEARNING_MODEL_HEADER)
         return ident, model, get_chat_ndjson_generator(resp)
@@ -348,7 +364,7 @@ class PredictEngine:
             params=params,
             headers=self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected_status=200)
+        await self.check_response(kbid, resp, expected_status=200)
         data = await resp.json()
         return QueryInfo(**data)
 
@@ -368,7 +384,7 @@ class PredictEngine:
             params={"text": sentence},
             headers=self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected_status=200)
+        await self.check_response(kbid, resp, expected_status=200)
         data = await resp.json()
         return convert_relations(data)
 
@@ -387,7 +403,7 @@ class PredictEngine:
             headers=self.get_predict_headers(kbid),
             timeout=None,
         )
-        await self.check_response(resp, expected_status=200)
+        await self.check_response(kbid, resp, expected_status=200)
         data = await resp.json()
         return SummarizedResponse.model_validate(data)
 
@@ -405,7 +421,7 @@ class PredictEngine:
             json=item.model_dump(),
             headers=self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected_status=200)
+        await self.check_response(kbid, resp, expected_status=200)
         data = await resp.json()
         return RerankResponse.model_validate(data)
 
@@ -423,7 +439,7 @@ class PredictEngine:
             json=item.model_dump(),
             headers=self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected_status=200)
+        await self.check_response(kbid, resp, expected_status=200)
         data = await resp.json()
         return RunAgentsResponse.model_validate(data)
 
