@@ -445,7 +445,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
                 resobj.disable_vectors = not request.reindex_vectors
                 brain = await resobj.generate_index_message(reindex=True)
-                shard = await self.proc.get_or_assign_resource_shard(txn, kbobj, request.rid)
+                shard = await self.proc.get_resource_shard(kbobj.kbid, request.rid)
                 index_message = brain.brain
                 external_index_manager = await get_external_index_manager(kbid=request.kbid)
                 if external_index_manager is not None:
