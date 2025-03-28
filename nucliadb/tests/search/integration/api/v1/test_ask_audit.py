@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import Optional
+
 import nats
 from httpx import AsyncClient
 from nats.aio.client import Client
@@ -27,8 +29,11 @@ from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_protos.audit_pb2 import AuditRequest
 
 
-async def get_audit_messages(sub):
-    msg = await sub.fetch(1)
+async def get_audit_message(sub: JetStreamContext.PullSubscription) -> Optional[AuditRequest]:
+    try:
+        msg = await sub.fetch(1, timeout=0.2)
+    except nats.errors.TimeoutError:
+        return None
     auditreq = AuditRequest()
     auditreq.ParseFromString(msg[0].data)
     return auditreq
@@ -72,7 +77,8 @@ async def test_ask_sends_only_one_audit(
     assert stream_audit.js.publish.call_count == 2
     stream_audit.send.assert_called_once()
 
-    auditreq = await get_audit_messages(psub)
+    auditreq = await get_audit_message(psub)
+    assert auditreq is not None
     assert auditreq.type == AuditRequest.AuditType.CHAT
     assert auditreq.kbid == kbid
     assert auditreq.HasField("chat")
@@ -81,12 +87,17 @@ async def test_ask_sends_only_one_audit(
     assert auditreq.generative_answer_time > 0
     assert auditreq.retrieval_time > 0
     assert (auditreq.generative_answer_time + auditreq.retrieval_time) < auditreq.request_time
-    try:
-        auditreq = await get_audit_messages(psub)
-    except nats.errors.TimeoutError:
-        pass
-    else:
-        assert "There was an unexpected extra audit message in nats"
+
+    assert await get_audit_message(psub) is None, "There was an unexpected extra audit message in nats"
+
+    # Send a request that will not return a 2xx error and make sure it does not send an audit
+    resp = await cluster_nucliadb_search.post(
+        f"/{KB_PREFIX}/unexisting-kb/ask",
+        json={"query": "title"},
+    )
+    assert resp.status_code == 404
+    assert await get_audit_message(psub) is None, "There was an unexpected extra audit message in nats"
+
     await psub.unsubscribe()
     await nats_client.flush()
     await nats_client.close()
