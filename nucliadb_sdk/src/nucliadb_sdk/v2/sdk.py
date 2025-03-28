@@ -58,6 +58,16 @@ from nucliadb_models.export_import import (
     NewImportedKbResponse,
     StatusResponse,
 )
+from nucliadb_models.graph.requests import (
+    GraphNodesSearchRequest,
+    GraphRelationsSearchRequest,
+    GraphSearchRequest,
+)
+from nucliadb_models.graph.responses import (
+    GraphNodesSearchResponse,
+    GraphRelationsSearchResponse,
+    GraphSearchResponse,
+)
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
@@ -315,6 +325,21 @@ SDK_DEFINITION = {
         path_template="/v1/kb/{kbid}/slug/{slug}/ask",
         method="POST",
         path_params=("kbid", "slug"),
+    ),
+    "graph_path_search": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/graph",
+        method="POST",
+        path_params=("kbid",),
+    ),
+    "graph_node_search": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/graph/nodes",
+        method="POST",
+        path_params=("kbid",),
+    ),
+    "graph_relation_search": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/graph/relations",
+        method="POST",
+        path_params=("kbid",),
     ),
     "summarize": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/summarize",
@@ -997,6 +1022,14 @@ class NucliaDB(_NucliaDBBase):
     ask_on_resource_by_slug = _request_sync_builder(
         "ask_on_resource_by_slug", AskRequest, SyncAskResponse
     )
+    graph_search = _request_sync_builder("graph_path_search", GraphSearchRequest, GraphSearchResponse)
+    graph_nodes = _request_sync_builder(
+        "graph_node_search", GraphNodesSearchRequest, GraphNodesSearchResponse
+    )
+    graph_relations = _request_sync_builder(
+        "graph_relation_search", GraphRelationsSearchRequest, GraphRelationsSearchResponse
+    )
+
     summarize = _request_sync_builder("summarize", SummarizeRequest, SummarizedResponse)
     feedback = _request_sync_builder("feedback", FeedbackRequest, type(None))
     start_export = _request_sync_builder("start_export", type(None), CreateExportResponse)
@@ -1183,6 +1216,14 @@ class NucliaDBAsync(_NucliaDBBase):
     ask_on_resource_by_slug = _request_async_builder(
         "ask_on_resource_by_slug", AskRequest, SyncAskResponse
     )
+    graph_search = _request_async_builder("graph_path_search", GraphSearchRequest, GraphSearchResponse)
+    graph_nodes = _request_async_builder(
+        "graph_node_search", GraphNodesSearchRequest, GraphNodesSearchResponse
+    )
+    graph_relations = _request_async_builder(
+        "graph_relation_search", GraphRelationsSearchRequest, GraphRelationsSearchResponse
+    )
+
     summarize = _request_async_builder("summarize", SummarizeRequest, SummarizedResponse)
     feedback = _request_async_builder("feedback", FeedbackRequest, type(None))
     start_export = _request_async_builder("start_export", type(None), CreateExportResponse)
