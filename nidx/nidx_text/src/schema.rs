@@ -84,7 +84,7 @@ impl TextSchema {
         // Using a bytes field is slow due to tantivy's implementation being slow with many unique values.
         // A better implementation is tracked in https://github.com/quickwit-oss/tantivy/issues/2090
         let encoded_field_id = if version >= 2 {
-            Some(sb.add_u64_field("encoded_field_id", FAST))
+            Some(sb.add_u64_field("encoded_field_id", FAST | INDEXED))
         } else {
             None
         };
