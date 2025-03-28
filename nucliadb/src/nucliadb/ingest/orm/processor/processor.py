@@ -312,25 +312,11 @@ class Processor:
                     await self.apply_resource(message, resource, update=(not created))
 
                 # index message
-
-                if resource:
-                    if any(needs_reindex(m) for m in messages):
-                        # when reindexing, let's just generate full new index message
-                        # TODO - This should be improved in the future as it's not optimal for very large resources:
-                        # As of now, there are some API operations that require fully reindexing all the fields of a resource.
-                        # An example of this is classification label changes - we need to reindex all the fields of a resource to
-                        # propagate the label changes to the index.
-                        resource.replace_indexer(await resource.generate_index_message(reindex=True))
-                    else:
-                        # TODO - Ideally we should only update the fields that have been changed in the current transaction.
-                        await resource.compute_global_text()
-                        await resource.compute_global_tags(resource.indexer)
-                        await resource.compute_security(resource.indexer)
-
                 if resource and resource.modified:
-                    await pgcatalog_update(txn, kbid, resource)
+                    index_message = await self.generate_index_message(resource, messages)
+                    await pgcatalog_update(txn, kbid, resource, index_message)
                     await self.index_resource(  # noqa
-                        resource=resource,
+                        index_message=index_message,
                         txn=txn,
                         uuid=uuid,
                         kbid=kbid,
@@ -451,7 +437,7 @@ class Processor:
     @processor_observer.wrap({"type": "index_resource"})
     async def index_resource(
         self,
-        resource: Resource,
+        index_message: PBBrainResource,
         txn: Transaction,
         uuid: str,
         kbid: str,
@@ -460,9 +446,8 @@ class Processor:
         kb: KnowledgeBox,
         source: nodewriter_pb2.IndexMessageSource.ValueType,
     ) -> None:
-        validate_indexable_resource(resource.indexer.brain)
+        validate_indexable_resource(index_message)
         shard = await self.get_or_assign_resource_shard(txn, kb, uuid)
-        index_message = resource.indexer.brain
         external_index_manager = await get_external_index_manager(kbid=kbid)
         if external_index_manager is not None:
             await self.external_index_add_resource(external_index_manager, uuid, index_message)
@@ -475,6 +460,82 @@ class Processor:
                 kb=kbid,
                 source=source,
             )
+
+    async def generate_index_message(
+        self,
+        resource: Resource,
+        messages: list[writer_pb2.BrokerMessage],
+    ) -> PBBrainResource:
+        """
+        This function is responsible for generating the index message that will be sent to nidx.
+        It takes the resource object and the broker messages of the current processor transaction to decide how to create it.
+        """
+        deleted_fields = self.get_bm_deleted_fields(messages)
+        reindex = any(needs_reindex(message) for message in messages)
+        if reindex:
+            return await resource.generate_index_message(
+                reindex=True,
+                # When reindexing, let's just generate full new index message.
+                # TODO - This should be improved in the future as it's not optimal for very large resources:
+                # As of now, there are some API operations that require fully reindexing all the fields of a resource.
+                # An example of this is classification label changes - we need to reindex all the fields of a resource to
+                # propagate the label changes to the index.
+                updated_fields=None,
+                deleted_fields=deleted_fields,
+            )
+        else:
+            return await resource.generate_index_message(
+                reindex=False,
+                updated_fields=self.get_bm_modified_fields(messages),
+                deleted_fields=deleted_fields,
+            )
+
+    def get_bm_deleted_fields(
+        self,
+        messages: list[writer_pb2.BrokerMessage],
+    ) -> list[resources_pb2.FieldID]:
+        deleted = []
+        for message in messages:
+            for field in message.delete_fields:
+                if field not in deleted:
+                    deleted.append(field)
+        return deleted
+
+    def get_bm_modified_fields(
+        self, messages: list[writer_pb2.BrokerMessage]
+    ) -> list[resources_pb2.FieldID]:
+        modified = set()
+        for message in messages:
+            # Added or modified fields need indexing
+            for link in message.links:
+                modified.add((link, resources_pb2.FieldType.LINK))
+            for file in message.files:
+                modified.add((file, resources_pb2.FieldType.FILE))
+            for conv in message.conversations:
+                modified.add((conv, resources_pb2.FieldType.CONVERSATION))
+            for text in message.texts:
+                modified.add((text, resources_pb2.FieldType.TEXT))
+            if message.HasField("basic"):
+                # Add title and summary only if they have changed
+                if message.basic.title != "":
+                    modified.add(("title", resources_pb2.FieldType.GENERIC))
+                if message.basic.summary != "":
+                    modified.add(("summary", resources_pb2.FieldType.GENERIC))
+            # Messages with field metadata, extracted text or field vectors need indexing
+            for fm in message.field_metadata:
+                modified.add((fm.field.field, fm.field.field_type))
+            for et in message.extracted_text:
+                modified.add((et.field.field, et.field.field_type))
+            for fv in message.field_vectors:
+                modified.add((fv.field.field, fv.field.field_type))
+            # Any field that has fieldmetadata annotations should be considered as modified
+            # and needs to be reindexed
+            if message.HasField("basic"):
+                for ufm in message.basic.fieldmetadata:
+                    modified.add((ufm.field.field, ufm.field.field_type))
+        return [
+            resources_pb2.FieldID(field=field, field_type=field_type) for field, field_type in modified
+        ]
 
     async def external_index_delete_resource(
         self, external_index_manager: ExternalIndexManager, resource_uuid: str
@@ -564,7 +625,10 @@ class Processor:
         resource: Resource,
         update: bool = False,
     ):
-        """Apply broker message to resource object in the database"""
+        """
+        Apply broker message to resource object in the persistence layers (maindb and storage).
+        DO NOT add any indexing logic here.
+        """
         if update:
             await self.maybe_update_resource_basic(resource, message)
 
@@ -675,30 +739,9 @@ class Processor:
         try:
             async with self.driver.transaction() as txn:
                 kb.txn = resource.txn = txn
-
-                shard_id = await datamanagers.resources.get_resource_shard_id(
-                    txn, kbid=kb.kbid, rid=resource.uuid
-                )
-                shard = None
-                if shard_id is not None:
-                    shard = await kb.get_resource_shard(shard_id)
-                if shard is None:
-                    logger.warning(
-                        "Unable to mark resource as error, shard is None. "
-                        "This should not happen so you did something special to get here."
-                    )
-                    return
-
                 resource.basic.metadata.status = resources_pb2.Metadata.Status.ERROR
                 await resource.set_basic(resource.basic)
                 await txn.commit()
-
-            resource.indexer.set_processing_status(
-                basic=resource.basic, previous_status=resource._previous_status
-            )
-            await self.index_node_shard_manager.add_resource(
-                shard, resource.indexer.brain, seqid, partition=partition, kb=kb.kbid
-            )
         except Exception:
             logger.warning("Error while marking resource as error", exc_info=True)
 

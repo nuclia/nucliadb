@@ -73,8 +73,8 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                         logger.warning(f"Could not load resource {rid} for kbid {kbid}")
                         continue
 
-                    await resource.compute_global_tags(resource.indexer)
-                    await pgcatalog_update(txn, kbid, resource)
+                    index_message = await resource.generate_index_message(reindex=False)
+                    await pgcatalog_update(txn, kbid, resource, index_message)
 
                 await txn.commit()
                 continue_sql = f"AND key > '/kbs/{kbid}/r/{rid}'"
