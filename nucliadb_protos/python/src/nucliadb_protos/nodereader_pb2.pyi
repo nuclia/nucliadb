@@ -983,20 +983,15 @@ class GraphSearchResponse(google.protobuf.message.Message):
 
         RELATION_TYPE_FIELD_NUMBER: builtins.int
         LABEL_FIELD_NUMBER: builtins.int
-        METADATA_FIELD_NUMBER: builtins.int
         relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType
         label: builtins.str
-        @property
-        def metadata(self) -> nucliadb_protos.utils_pb2.RelationMetadata: ...
         def __init__(
             self,
             *,
             relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType = ...,
             label: builtins.str = ...,
-            metadata: nucliadb_protos.utils_pb2.RelationMetadata | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing.Literal["metadata", b"metadata"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["label", b"label", "metadata", b"metadata", "relation_type", b"relation_type"]) -> None: ...
+        def ClearField(self, field_name: typing.Literal["label", b"label", "relation_type", b"relation_type"]) -> None: ...
 
     @typing.final
     class Path(google.protobuf.message.Message):
@@ -1010,17 +1005,23 @@ class GraphSearchResponse(google.protobuf.message.Message):
         SOURCE_FIELD_NUMBER: builtins.int
         RELATION_FIELD_NUMBER: builtins.int
         DESTINATION_FIELD_NUMBER: builtins.int
+        METADATA_FIELD_NUMBER: builtins.int
         source: builtins.int
         relation: builtins.int
         destination: builtins.int
+        @property
+        def metadata(self) -> nucliadb_protos.utils_pb2.RelationMetadata: ...
         def __init__(
             self,
             *,
             source: builtins.int = ...,
             relation: builtins.int = ...,
             destination: builtins.int = ...,
+            metadata: nucliadb_protos.utils_pb2.RelationMetadata | None = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing.Literal["destination", b"destination", "relation", b"relation", "source", b"source"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["_metadata", b"_metadata", "metadata", b"metadata"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["_metadata", b"_metadata", "destination", b"destination", "metadata", b"metadata", "relation", b"relation", "source", b"source"]) -> None: ...
+        def WhichOneof(self, oneof_group: typing.Literal["_metadata", b"_metadata"]) -> typing.Literal["metadata"] | None: ...
 
     NODES_FIELD_NUMBER: builtins.int
     RELATIONS_FIELD_NUMBER: builtins.int
