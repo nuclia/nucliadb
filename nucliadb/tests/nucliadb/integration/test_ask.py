@@ -1175,6 +1175,34 @@ async def test_ask_graph_strategy_with_user_relations(
 
 
 @pytest.mark.deploy_modes("standalone")
+async def test_ask_graph_strategy_inner_fuzzy_prefix_search(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    graph_resource,
+    dummy_predict,
+):
+    from nucliadb.search.search.graph_strategy import fuzzy_search_entities
+
+    kbid = standalone_knowledgebox
+
+    related = await fuzzy_search_entities(
+        kbid, "Which actors have been in movies directed by Christopher Nolan?"
+    )
+    assert related is not None
+    assert related.total == 1 == len(related.entities)
+    related.entities[0].value == "Christopher Nolan"
+    related.entities[0].family == "DIRECTOR"
+
+    related = await fuzzy_search_entities(kbid, "Did Leonard and Joseph perform in the same film?")
+    assert related is not None
+    assert related.total == 2 == len(related.entities)
+    assert set((r.value, r.family) for r in related.entities) == {
+        ("Leonardo DiCaprio", "ACTOR"),
+        ("Joseph Gordon-Levitt", "ACTOR"),
+    }
+
+
+@pytest.mark.deploy_modes("standalone")
 async def test_ask_rag_strategy_prequeries(
     nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
 ):

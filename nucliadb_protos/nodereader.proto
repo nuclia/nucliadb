@@ -306,9 +306,10 @@ message GraphSearchResponse {
 // - graph search:
 //   - given some entry vertices, get the filtered subgraph around them
 message RelationSearchRequest {
+    reserved 11;
+
     string shard_id = 1;
 
-    RelationPrefixSearchRequest prefix = 11;
     EntitiesSubgraphRequest subgraph = 12;
 }
 
@@ -363,6 +364,8 @@ enum FilterOperator {
 }
 
 message SearchRequest {
+    reserved 20;
+
     string shard = 1;
 
     // query this text in all the paragraphs
@@ -387,8 +390,6 @@ message SearchRequest {
 
     optional string advanced_query = 18;
 
-    // TODO: remove this field as it's not used anymore
-    RelationPrefixSearchRequest relation_prefix = 20;
     EntitiesSubgraphRequest relation_subgraph = 21;
 
     float min_score_semantic = 23;
