@@ -282,7 +282,6 @@ message GraphSearchResponse {
     message Relation {
         utils.Relation.RelationType relation_type = 1;
         string label = 2;
-        utils.RelationMetadata metadata = 3;
     }
 
     // To optimize proto size, paths are built using pointers to nodes and
@@ -292,6 +291,7 @@ message GraphSearchResponse {
         uint32 source = 1;
         uint32 relation = 2;
         uint32 destination = 3;
+        optional utils.RelationMetadata metadata = 4;
     }
 
     repeated utils.RelationNode nodes = 1;

@@ -168,6 +168,7 @@ impl RelationsReaderService {
                 source: source_idx as u32,
                 relation: relation_idx as u32,
                 destination: destination_idx as u32,
+                metadata: io_maps::decode_metadata(&self.schema, &doc),
             })
         }
 
@@ -247,7 +248,6 @@ impl RelationsReaderService {
                 nidx_protos::graph_search_response::Relation {
                     relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),
                     label: relation_label,
-                    metadata: None,
                 }
             })
             .collect();
