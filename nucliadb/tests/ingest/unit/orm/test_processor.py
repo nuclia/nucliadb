@@ -79,17 +79,10 @@ async def test_commit_slug(processor: Processor, txn, resource):
     assert resource.txn is another_txn
 
 
-async def test_mark_resource_error(processor: Processor, txn, resource, kb, sm):
+async def test_mark_resource_error(processor: Processor, txn, resource, kb):
     await processor._mark_resource_error(kb, resource, partition="partition", seqid=1)
     txn.commit.assert_called_once()
     resource.set_basic.assert_awaited_once()
-    sm.add_resource.assert_awaited_once_with(
-        kb.get_resource_shard.return_value,
-        resource.indexer.brain,
-        1,
-        partition="partition",
-        kb="kbid",
-    )
 
 
 async def test_mark_resource_error_handle_error(processor: Processor, kb, resource, txn):
