@@ -29,3 +29,7 @@ class InvalidPBClass(Exception):
         self.source = source
         self.destination = destination
         super().__init__(f"Source and destination does not match {self.source} - {self.destination}")
+
+
+class FieldAuthorNotFound(Exception):
+    pass
