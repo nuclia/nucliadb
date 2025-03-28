@@ -323,12 +323,6 @@ mod tests {
                 .await?,
             3
         );
-        assert_eq!(
-            sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM deletions")
-                .fetch_one(&meta_source.pool)
-                .await?,
-            1
-        );
 
         // Create destination DB
         let config_dest = Postgres::test_context(&TestArgs::new("test_export_and_import_dest")).await?;

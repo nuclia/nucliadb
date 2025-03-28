@@ -74,12 +74,27 @@ fn default_version() -> u64 {
 
 pub struct TextIndexer;
 
-pub struct TextDeletionQueryBuilder(Field);
+pub struct TextDeletionQueryBuilder {
+    encoded_field_id: Field,
+    resource: Field,
+}
 impl DeletionQueryBuilder for TextDeletionQueryBuilder {
     fn query<'a>(&self, keys: impl Iterator<Item = &'a String>) -> Box<dyn Query> {
-        Box::new(TermSetQuery::new(
-            keys.map(|k| Term::from_field_bytes(self.0, k.as_bytes())),
-        ))
+        Box::new(TermSetQuery::new(keys.map(|k| {
+            // Our keys can be resource ids or encoded field ids (e.g: uuid/t/text)
+            // match the corresponding tantivy field
+            let is_field = k.len() > 32;
+            let tantivy_field = if is_field { self.encoded_field_id } else { self.resource };
+            Term::from_field_bytes(tantivy_field, k.as_bytes())
+        })))
+    }
+}
+impl TextDeletionQueryBuilder {
+    fn new(schema: &TextSchema) -> Self {
+        TextDeletionQueryBuilder {
+            resource: schema.schema.get_field("uuid").unwrap(),
+            encoded_field_id: schema.schema.get_field("encoded_field_id").unwrap(),
+        }
     }
 }
 
@@ -99,7 +114,7 @@ impl TextIndexer {
     }
 
     pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
-        vec![resource.resource.as_ref().unwrap().uuid.clone()]
+        resource.text_fields_to_delete.clone()
     }
 
     #[instrument(name = "text::merge", skip_all)]
@@ -109,8 +124,9 @@ impl TextIndexer {
         config: TextConfig,
         open_index: impl OpenIndexMetadata<TantivyMeta>,
     ) -> anyhow::Result<TantivySegmentMetadata> {
-        let schema = TextSchema::new(config.version).schema;
-        let query_builder = TextDeletionQueryBuilder(schema.get_field("uuid").unwrap());
+        let text_schema = TextSchema::new(config.version);
+        let query_builder = TextDeletionQueryBuilder::new(&text_schema);
+        let schema = text_schema.clone().schema;
         let index = open_index_with_deletions(schema, open_index, query_builder)?;
 
         let output_index = merge_indices(&[index], MmapDirectory::open(work_dir)?)?;
@@ -134,8 +150,11 @@ impl TextSearcher {
     #[instrument(name = "text::open", skip_all)]
     pub fn open(config: TextConfig, open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
         let schema = TextSchema::new(config.version);
-        let index =
-            open_index_with_deletions(schema.schema.clone(), open_index, TextDeletionQueryBuilder(schema.uuid))?;
+        let index = open_index_with_deletions(
+            schema.schema.clone(),
+            open_index,
+            TextDeletionQueryBuilder::new(&schema),
+        )?;
 
         Ok(Self {
             reader: TextReaderService {

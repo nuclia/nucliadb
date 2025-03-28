@@ -78,6 +78,8 @@ class ResourceBrain:
 
     def apply_field_text(self, field_key: str, text: str):
         self.brain.texts[field_key].text = text
+        if field_key not in self.brain.text_fields_to_delete:
+            self.brain.text_fields_to_delete.append(field_key)
 
     def _get_paragraph_user_classifications(
         self, basic_user_field_metadata: Optional[UserFieldMetadata]
@@ -247,6 +249,8 @@ class ResourceBrain:
         self.brain.paragraphs_to_delete.append(full_field_id)
         self.brain.sentences_to_delete.append(full_field_id)
         self.brain.relation_fields_to_delete.append(field_key)
+        if field_key not in self.brain.text_fields_to_delete:
+            self.brain.text_fields_to_delete.append(field_key)
 
     def apply_field_vectors(
         self,
