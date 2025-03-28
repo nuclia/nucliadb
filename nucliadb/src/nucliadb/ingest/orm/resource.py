@@ -350,7 +350,7 @@ class Resource:
                     page_positions = await get_file_page_positions(field)
                 await to_executor(
                     brain.apply_field_metadata,
-                    fieldid,
+                    self.generate_field_id(fieldid),
                     field_metadata,
                     page_positions=page_positions,
                     extracted_text=extracted_text,
@@ -363,7 +363,7 @@ class Resource:
                 generated_by = None
             await to_executor(
                 brain.apply_field_labels,
-                fieldid,
+                self.generate_field_id(fieldid),
                 field_metadata,
                 self.uuid,
                 generated_by,
@@ -380,7 +380,7 @@ class Resource:
                         dimension = vectorset_config.vectorset_index_config.vector_dimension
                         await to_executor(
                             brain.apply_field_vectors,
-                            fieldid,
+                            self.generate_field_id(fieldid),
                             vo,
                             vectorset=vectorset_config.vectorset_id,
                             vector_dimension=dimension,
