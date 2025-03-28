@@ -105,6 +105,10 @@ class ResourceBrain:
         *,
         replace_field: bool = False,
     ):
+        """
+        Applies processor-computed field metadata to the brain object.
+        It needs the user field metadata to apply user-defined paragraph classifications.
+        """
         # To check for duplicate paragraphs
         unique_paragraphs: set[str] = set()
 
@@ -388,6 +392,10 @@ class ResourceBrain:
         self._set_resource_relations(basic, origin, user_relations)
 
     def _set_resource_dates(self, basic: Basic, origin: Optional[Origin]):
+        """
+        Adds the user-defined dates to the brain object. This is at resource level and applies to
+        all fields of the resource.
+        """
         if basic.created.seconds > 0:
             self.brain.metadata.created.CopyFrom(basic.created)
         else:
@@ -409,6 +417,12 @@ class ResourceBrain:
                 self.brain.metadata.modified.CopyFrom(origin.modified)
 
     def _set_resource_relations(self, basic: Basic, origin: Optional[Origin], user_relations: Relations):
+        """
+        Adds the relations to the brain object corresponding to the user-defined metadata at the resource level:
+        - Contributors of the document
+        - Classificatin labels
+        - Relations
+        """
         relationnodedocument = RelationNode(value=self.rid, ntype=RelationNode.NodeType.RESOURCE)
         if origin is not None:
             # origin contributors
@@ -445,6 +459,10 @@ class ResourceBrain:
         self.brain.relation_fields_to_delete.append("a/metadata")
 
     def _set_resource_labels(self, basic: Basic, origin: Optional[Origin]):
+        """
+        Adds the resource-level labels to the brain object.
+        These levels are user-defined in basic or origin metadata.
+        """
         if origin is not None:
             if origin.source_id:
                 self.labels["o"] = {origin.source_id}
@@ -570,7 +588,7 @@ class ResourceBrain:
         field_key: str,
         metadata: Optional[FieldComputedMetadata],
         uuid: str,
-        generated_by: FieldAuthor,
+        generated_by: Optional[FieldAuthor],
         basic_user_metadata: Optional[UserMetadata] = None,
         basic_user_fieldmetadata: Optional[UserFieldMetadata] = None,
     ):
@@ -637,7 +655,7 @@ class ResourceBrain:
                                 paragraph_annotation.key
                             ].labels.append(label)
 
-        if generated_by.WhichOneof("author") == "data_augmentation":
+        if generated_by is not None and generated_by.WhichOneof("author") == "data_augmentation":
             field_type, field_id = field_key.split("/")
             da_task_id = ids.extract_data_augmentation_id(field_id)
             if da_task_id is None:  # pragma: nocover
@@ -646,6 +664,7 @@ class ResourceBrain:
                     extra={
                         "rid": uuid,
                         "field_id": field_id,
+                        "field_type": field_type,
                     },
                 )
             else:
