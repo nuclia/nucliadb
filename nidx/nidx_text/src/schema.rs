@@ -80,11 +80,14 @@ impl TextSchema {
         let groups_public = sb.add_u64_field("groups_public", num_options);
         let groups_with_access = sb.add_facet_field("groups_with_access", facet_options);
 
-        // v2: Field ID encoded as array of u64 for faster retrieval during prefilter
-        // Using a bytes field is slow due to tantivy's implementation being slow with many unique values.
-        // A better implementation is tracked in https://github.com/quickwit-oss/tantivy/issues/2090
-        let encoded_field_id = if version >= 2 {
+        let encoded_field_id = if version >= 3 {
+            // v3: We index the encoded_field_id to allow optimal field-level deletions
             Some(sb.add_u64_field("encoded_field_id", FAST | INDEXED))
+        } else if version == 2 {
+            // v2: Field ID encoded as array of u64 for faster retrieval during prefilter
+            // Using a bytes field is slow due to tantivy's implementation being slow with many unique values.
+            // A better implementation is tracked in https://github.com/quickwit-oss/tantivy/issues/2090
+            Some(sb.add_u64_field("encoded_field_id", FAST))
         } else {
             None
         };
