@@ -103,11 +103,13 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
 
-        # This task will run when the response finishes streaming
-        # When dealing with streaming responses, AND if we depend on any state that only will be available once
-        # the request is fully finished, the response we have after the dispatch call_next is not enough, as
-        # there, no iteration of the streaming response has been done yet.
-        response.background = BackgroundTask(self.enqueue_pending, context)
+        # Do not audit 4xx and 5xx errors
+        if response.status_code < 399:
+            # This task will run when the response finishes streaming
+            # When dealing with streaming responses, AND if we depend on any state that only will be available once
+            # the request is fully finished, the response we have after the dispatch call_next is not enough, as
+            # there, no iteration of the streaming response has been done yet.
+            response.background = BackgroundTask(self.enqueue_pending, context)
 
         # It is safe to reset the context here since the asyncio task for generating the streaming response is
         # already running. If we want to spawn a different task during streaming and we want that task be able

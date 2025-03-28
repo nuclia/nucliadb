@@ -22,6 +22,7 @@ import base64
 import uuid
 from datetime import datetime
 from os.path import dirname, getsize
+from typing import Optional
 from unittest import mock
 from unittest.mock import DEFAULT, Mock, patch
 from uuid import uuid4
@@ -341,8 +342,11 @@ def make_message(kbid: str, rid: str, slug: str = "resource", message_type=Broke
     return message
 
 
-async def get_audit_messages(sub):
-    msg = await sub.fetch(1)
+async def get_audit_message(sub: JetStreamContext.PullSubscription) -> Optional[AuditRequest]:
+    try:
+        msg = await sub.fetch(1, timeout=0.2)
+    except nats.errors.TimeoutError:
+        return None
     auditreq = AuditRequest()
     auditreq.ParseFromString(msg[0].data)
     return auditreq
@@ -392,8 +396,8 @@ async def test_ingest_audit_stream_files_only(
     )
     await processor.process(message=message, seqid=1)
 
-    auditreq = await get_audit_messages(psub)
-
+    auditreq = await get_audit_message(psub)
+    assert auditreq is not None
     # Minimal assert to make sure we get the information from the node on the audit
     # gets from the sidecar to the audit report when adding or modifying a resource
     # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
@@ -424,7 +428,8 @@ async def test_ingest_audit_stream_files_only(
     message.delete_fields.append(fieldid)
 
     await processor.process(message=message, seqid=2)
-    auditreq = await get_audit_messages(psub)
+    auditreq = await get_audit_message(psub)
+    assert auditreq is not None
 
     # Minimal assert to make sure we get the information from the node on the audit
     # gets from the sidecar to the audit report when adding or modifying a resource
@@ -444,7 +449,8 @@ async def test_ingest_audit_stream_files_only(
     message.delete_fields.append(fieldid)
 
     await processor.process(message=message, seqid=3)
-    auditreq = await get_audit_messages(psub)
+    auditreq = await get_audit_message(psub)
+    assert auditreq is not None
 
     # Minimal assert to make sure we get the information from the node on the audit
     # gets from the sidecar to the audit report when adding or modifying a resource
@@ -468,7 +474,8 @@ async def test_ingest_audit_stream_files_only(
 
     message = make_message(knowledgebox_ingest, rid, message_type=BrokerMessage.MessageType.DELETE)
     await processor.process(message=message, seqid=4)
-    auditreq = await get_audit_messages(psub)
+    auditreq = await get_audit_message(psub)
+    assert auditreq is not None
 
     assert auditreq.type == AuditRequest.AuditType.DELETED
 
@@ -574,7 +581,8 @@ async def test_ingest_audit_stream_mixed(
     message.delete_fields.append(fieldid)
     await processor.process(message=message, seqid=1)
 
-    auditreq = await get_audit_messages(psub)
+    auditreq = await get_audit_message(psub)
+    assert auditreq is not None
 
     # Minimal assert to make sure we get the information from the node on the audit
     # gets from the sidecar to the audit report when adding or modifying a resource
@@ -596,7 +604,8 @@ async def test_ingest_audit_stream_mixed(
 
     message = make_message(kbid, rid, message_type=BrokerMessage.MessageType.DELETE)
     await processor.process(message=message, seqid=2)
-    auditreq = await get_audit_messages(psub)
+    auditreq = await get_audit_message(psub)
+    assert auditreq is not None
 
     assert auditreq.type == AuditRequest.AuditType.DELETED
 
