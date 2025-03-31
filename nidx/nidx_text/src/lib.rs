@@ -61,7 +61,7 @@ impl Default for TextConfig {
         Self {
             // This is the default version when creating a new index.
             // Should typically be set to the latest supported version
-            version: 2,
+            version: 3,
         }
     }
 }

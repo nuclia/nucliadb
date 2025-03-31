@@ -31,13 +31,11 @@ use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
-use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::resource::ResourceStatus;
 use nidx_protos::{
     EntitiesSubgraphRequest, FilterExpression, GraphQuery, GraphSearchRequest, IndexMetadata, IndexRelation,
-    IndexRelations, NewShardRequest, Relation, RelationMetadata, RelationNode, RelationNodeFilter,
-    RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, Resource, ResourceId, TextInformation,
-    graph_query,
+    IndexRelations, NewShardRequest, Relation, RelationMetadata, RelationNode, RelationSearchRequest,
+    RelationSearchResponse, Resource, ResourceId, TextInformation, graph_query,
 };
 use nidx_protos::{SearchRequest, VectorIndexConfig};
 use nidx_tests::graph::friendly_parse;
@@ -45,180 +43,6 @@ use nidx_tests::people_and_places;
 use sqlx::PgPool;
 use tonic::Request;
 use uuid::Uuid;
-
-#[sqlx::test]
-async fn test_search_relations_by_prefix(pool: PgPool) -> Result<(), Box<dyn std::error::Error>> {
-    let mut fixture = NidxFixture::new(pool).await?;
-    let shard_id = create_shard(&mut fixture).await?;
-    create_knowledge_graph(&mut fixture, shard_id.clone()).await;
-    fixture.wait_sync().await;
-
-    // --------------------------------------------------------------
-    // Test: prefixed search with empty term. Results are limited
-    // --------------------------------------------------------------
-
-    let response = relation_search(
-        &mut fixture,
-        RelationSearchRequest {
-            shard_id: shard_id.clone(),
-            prefix: Some(RelationPrefixSearchRequest {
-                search: Some(Search::Prefix(String::new())),
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
-    )
-    .await?;
-
-    assert!(response.prefix.is_some());
-    let prefix_response = response.prefix.as_ref().unwrap();
-    let results = &prefix_response.nodes;
-    // This test will be removed soon, no need to update this
-    // // TODO this constants is spread between relations and paragraphs. It should
-    // // be in a single place and common for everyone
-    // const MAX_SUGGEST_RESULTS: usize = 20;
-    assert_eq!(results.len(), 15);
-
-    // --------------------------------------------------------------
-    // Test: prefixed search with "cat" term (some results)
-    // --------------------------------------------------------------
-
-    let response = relation_search(
-        &mut fixture,
-        RelationSearchRequest {
-            shard_id: shard_id.clone(),
-            prefix: Some(RelationPrefixSearchRequest {
-                search: Some(Search::Prefix("cat".to_string())),
-                node_filters: vec![RelationNodeFilter {
-                    node_subtype: None,
-                    node_type: NodeType::Entity as i32,
-                }],
-            }),
-            ..Default::default()
-        },
-    )
-    .await?;
-
-    let expected = HashSet::from_iter(["Cat".to_string(), "Catwoman".to_string(), "Batman".to_string()]);
-    assert!(response.prefix.is_some());
-    let prefix_response = response.prefix.as_ref().unwrap();
-    let results = prefix_response
-        .nodes
-        .iter()
-        .map(|node| node.value.to_owned())
-        .collect::<HashSet<_>>();
-    assert_eq!(results, expected);
-
-    // --------------------------------------------------------------
-    // Test: prefixed search with "cat" and filters
-    // --------------------------------------------------------------
-
-    let response = relation_search(
-        &mut fixture,
-        RelationSearchRequest {
-            shard_id: shard_id.clone(),
-            prefix: Some(RelationPrefixSearchRequest {
-                search: Some(Search::Prefix("cat".to_string())),
-                node_filters: vec![RelationNodeFilter {
-                    node_subtype: Some("animal".to_string()),
-                    node_type: NodeType::Entity as i32,
-                }],
-            }),
-            ..Default::default()
-        },
-    )
-    .await?;
-
-    let expected = HashSet::from_iter(["Cat".to_string()]);
-    assert!(response.prefix.is_some());
-    let prefix_response = response.prefix.as_ref().unwrap();
-    let results = prefix_response
-        .nodes
-        .iter()
-        .map(|node| node.value.to_owned())
-        .collect::<HashSet<_>>();
-    assert_eq!(results, expected);
-
-    let response = relation_search(
-        &mut fixture,
-        RelationSearchRequest {
-            shard_id: shard_id.clone(),
-            prefix: Some(RelationPrefixSearchRequest {
-                search: Some(Search::Prefix("cat".to_string())),
-                node_filters: vec![RelationNodeFilter {
-                    node_subtype: Some("superhero".to_string()),
-                    node_type: NodeType::Entity as i32,
-                }],
-            }),
-            ..Default::default()
-        },
-    )
-    .await?;
-
-    let expected = HashSet::from_iter(["Catwoman".to_string()]);
-    assert!(response.prefix.is_some());
-    let prefix_response = response.prefix.as_ref().unwrap();
-    let results = prefix_response
-        .nodes
-        .iter()
-        .map(|node| node.value.to_owned())
-        .collect::<HashSet<_>>();
-    assert_eq!(results, expected);
-
-    // --------------------------------------------------------------
-    // Test: prefixed search with node filters and empty query
-    // --------------------------------------------------------------
-
-    let response = relation_search(
-        &mut fixture,
-        RelationSearchRequest {
-            shard_id: shard_id.clone(),
-            prefix: Some(RelationPrefixSearchRequest {
-                search: Some(Search::Prefix(String::new())),
-                node_filters: vec![RelationNodeFilter {
-                    node_type: NodeType::Entity as i32,
-                    node_subtype: Some("animal".to_string()),
-                }],
-            }),
-            ..Default::default()
-        },
-    )
-    .await?;
-
-    let expected = HashSet::from_iter(["Cat".to_string()]);
-    assert!(response.prefix.is_some());
-    let prefix_response = response.prefix.as_ref().unwrap();
-    let results = prefix_response
-        .nodes
-        .iter()
-        .map(|node| node.value.to_owned())
-        .collect::<HashSet<_>>();
-    assert_eq!(results, expected);
-
-    // --------------------------------------------------------------
-    // Test: prefixed search with "zzz" term (empty results)
-    // --------------------------------------------------------------
-
-    let response = relation_search(
-        &mut fixture,
-        RelationSearchRequest {
-            shard_id: shard_id.clone(),
-            prefix: Some(RelationPrefixSearchRequest {
-                search: Some(Search::Prefix("zzz".to_string())),
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
-    )
-    .await?;
-
-    assert!(response.prefix.is_some());
-    let prefix_response = response.prefix.as_ref().unwrap();
-    let results = &prefix_response.nodes;
-    assert!(results.is_empty());
-
-    Ok(())
-}
 
 #[sqlx::test]
 async fn test_search_relations_neighbours(pool: PgPool) -> Result<(), Box<dyn std::error::Error>> {
@@ -255,7 +79,6 @@ async fn test_search_relations_neighbours(pool: PgPool) -> Result<(), Box<dyn st
                 depth: Some(1),
                 ..Default::default()
             }),
-            ..Default::default()
         },
     )
     .await?;
@@ -284,7 +107,6 @@ async fn test_search_relations_neighbours(pool: PgPool) -> Result<(), Box<dyn st
                 depth: Some(1),
                 ..Default::default()
             }),
-            ..Default::default()
         },
     )
     .await?;
@@ -315,7 +137,6 @@ async fn test_search_relations_neighbours(pool: PgPool) -> Result<(), Box<dyn st
                 depth: Some(1),
                 ..Default::default()
             }),
-            ..Default::default()
         },
     )
     .await?;
@@ -336,7 +157,6 @@ async fn test_search_relations_neighbours(pool: PgPool) -> Result<(), Box<dyn st
                 depth: Some(1),
                 ..Default::default()
             }),
-            ..Default::default()
         },
     )
     .await?;
@@ -464,6 +284,29 @@ async fn test_graph_search_nodes(pool: PgPool) -> anyhow::Result<()> {
     let nodes = &response.nodes;
     assert_eq!(nodes.len(), 18);
 
+    // Limit by top_k
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node::default()),
+                        undirected: true,
+                        ..Default::default()
+                    })),
+                }),
+            }),
+            top_k: 10,
+            kind: QueryKind::Nodes.into(),
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    let nodes = &response.nodes;
+    assert_eq!(nodes.len(), 10);
+
     // Search all ANIMAL nodes
     let response = fixture
         .searcher_client
@@ -489,29 +332,6 @@ async fn test_graph_search_nodes(pool: PgPool) -> anyhow::Result<()> {
         .into_inner();
     let nodes = &response.nodes;
     assert_eq!(nodes.len(), 4);
-
-    // Limit by top_k
-    let response = fixture
-        .searcher_client
-        .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
-            query: Some(GraphQuery {
-                path: Some(graph_query::PathQuery {
-                    query: Some(path_query::Query::Path(graph_query::Path {
-                        source: Some(graph_query::Node::default()),
-                        undirected: true,
-                        ..Default::default()
-                    })),
-                }),
-            }),
-            top_k: 10,
-            kind: QueryKind::Nodes.into(),
-            ..Default::default()
-        })
-        .await?
-        .into_inner();
-    let nodes = &response.nodes;
-    assert_eq!(nodes.len(), 10);
 
     Ok(())
 }
@@ -1298,7 +1118,6 @@ async fn relation_search(
     let request = SearchRequest {
         shard: request.shard_id,
         vectorset: "english".to_string(),
-        relation_prefix: request.prefix,
         relation_subgraph: request.subgraph,
         ..Default::default()
     };

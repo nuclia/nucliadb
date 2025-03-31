@@ -983,20 +983,15 @@ class GraphSearchResponse(google.protobuf.message.Message):
 
         RELATION_TYPE_FIELD_NUMBER: builtins.int
         LABEL_FIELD_NUMBER: builtins.int
-        METADATA_FIELD_NUMBER: builtins.int
         relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType
         label: builtins.str
-        @property
-        def metadata(self) -> nucliadb_protos.utils_pb2.RelationMetadata: ...
         def __init__(
             self,
             *,
             relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType = ...,
             label: builtins.str = ...,
-            metadata: nucliadb_protos.utils_pb2.RelationMetadata | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing.Literal["metadata", b"metadata"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["label", b"label", "metadata", b"metadata", "relation_type", b"relation_type"]) -> None: ...
+        def ClearField(self, field_name: typing.Literal["label", b"label", "relation_type", b"relation_type"]) -> None: ...
 
     @typing.final
     class Path(google.protobuf.message.Message):
@@ -1010,17 +1005,23 @@ class GraphSearchResponse(google.protobuf.message.Message):
         SOURCE_FIELD_NUMBER: builtins.int
         RELATION_FIELD_NUMBER: builtins.int
         DESTINATION_FIELD_NUMBER: builtins.int
+        METADATA_FIELD_NUMBER: builtins.int
         source: builtins.int
         relation: builtins.int
         destination: builtins.int
+        @property
+        def metadata(self) -> nucliadb_protos.utils_pb2.RelationMetadata: ...
         def __init__(
             self,
             *,
             source: builtins.int = ...,
             relation: builtins.int = ...,
             destination: builtins.int = ...,
+            metadata: nucliadb_protos.utils_pb2.RelationMetadata | None = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing.Literal["destination", b"destination", "relation", b"relation", "source", b"source"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["_metadata", b"_metadata", "metadata", b"metadata"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["_metadata", b"_metadata", "destination", b"destination", "metadata", b"metadata", "relation", b"relation", "source", b"source"]) -> None: ...
+        def WhichOneof(self, oneof_group: typing.Literal["_metadata", b"_metadata"]) -> typing.Literal["metadata"] | None: ...
 
     NODES_FIELD_NUMBER: builtins.int
     RELATIONS_FIELD_NUMBER: builtins.int
@@ -1055,22 +1056,18 @@ class RelationSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SHARD_ID_FIELD_NUMBER: builtins.int
-    PREFIX_FIELD_NUMBER: builtins.int
     SUBGRAPH_FIELD_NUMBER: builtins.int
     shard_id: builtins.str
-    @property
-    def prefix(self) -> global___RelationPrefixSearchRequest: ...
     @property
     def subgraph(self) -> global___EntitiesSubgraphRequest: ...
     def __init__(
         self,
         *,
         shard_id: builtins.str = ...,
-        prefix: global___RelationPrefixSearchRequest | None = ...,
         subgraph: global___EntitiesSubgraphRequest | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["prefix", b"prefix", "subgraph", b"subgraph"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["prefix", b"prefix", "shard_id", b"shard_id", "subgraph", b"subgraph"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["subgraph", b"subgraph"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["shard_id", b"shard_id", "subgraph", b"subgraph"]) -> None: ...
 
 global___RelationSearchRequest = RelationSearchRequest
 
@@ -1268,7 +1265,6 @@ class SearchRequest(google.protobuf.message.Message):
     WITH_DUPLICATES_FIELD_NUMBER: builtins.int
     ONLY_FACETED_FIELD_NUMBER: builtins.int
     ADVANCED_QUERY_FIELD_NUMBER: builtins.int
-    RELATION_PREFIX_FIELD_NUMBER: builtins.int
     RELATION_SUBGRAPH_FIELD_NUMBER: builtins.int
     MIN_SCORE_SEMANTIC_FIELD_NUMBER: builtins.int
     MIN_SCORE_BM25_FIELD_NUMBER: builtins.int
@@ -1299,10 +1295,6 @@ class SearchRequest(google.protobuf.message.Message):
         """Embedded vector search."""
 
     @property
-    def relation_prefix(self) -> global___RelationPrefixSearchRequest:
-        """TODO: remove this field as it's not used anymore"""
-
-    @property
     def relation_subgraph(self) -> global___EntitiesSubgraphRequest: ...
     @property
     def security(self) -> nucliadb_protos.utils_pb2.Security: ...
@@ -1326,7 +1318,6 @@ class SearchRequest(google.protobuf.message.Message):
         with_duplicates: builtins.bool = ...,
         only_faceted: builtins.bool = ...,
         advanced_query: builtins.str | None = ...,
-        relation_prefix: global___RelationPrefixSearchRequest | None = ...,
         relation_subgraph: global___EntitiesSubgraphRequest | None = ...,
         min_score_semantic: builtins.float = ...,
         min_score_bm25: builtins.float = ...,
@@ -1335,8 +1326,8 @@ class SearchRequest(google.protobuf.message.Message):
         paragraph_filter: global___FilterExpression | None = ...,
         filter_operator: global___FilterOperator.ValueType = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "advanced_query", b"advanced_query", "faceted", b"faceted", "field_filter", b"field_filter", "order", b"order", "paragraph_filter", b"paragraph_filter", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "security", b"security"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "field_filter", b"field_filter", "filter_operator", b"filter_operator", "min_score_bm25", b"min_score_bm25", "min_score_semantic", b"min_score_semantic", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "paragraph_filter", b"paragraph_filter", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "result_per_page", b"result_per_page", "security", b"security", "shard", b"shard", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "advanced_query", b"advanced_query", "faceted", b"faceted", "field_filter", b"field_filter", "order", b"order", "paragraph_filter", b"paragraph_filter", "relation_subgraph", b"relation_subgraph", "security", b"security"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "field_filter", b"field_filter", "filter_operator", b"filter_operator", "min_score_bm25", b"min_score_bm25", "min_score_semantic", b"min_score_semantic", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "paragraph_filter", b"paragraph_filter", "relation_subgraph", b"relation_subgraph", "result_per_page", b"result_per_page", "security", b"security", "shard", b"shard", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_advanced_query", b"_advanced_query"]) -> typing.Literal["advanced_query"] | None: ...
     @typing.overload

@@ -128,6 +128,5 @@ pub fn doc_to_graph_relation(schema: &Schema, doc: &TantivyDocument) -> nidx_pro
     nidx_protos::graph_search_response::Relation {
         relation_type: u64_to_relation_type::<i32>(schema.relationship(doc)),
         label: schema.relationship_label(doc).to_string(),
-        metadata: decode_metadata(schema, doc),
     }
 }

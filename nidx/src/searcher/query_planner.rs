@@ -172,14 +172,11 @@ fn compute_vectors_request(search_request: &SearchRequest) -> anyhow::Result<Opt
 }
 
 fn compute_relations_request(search_request: &SearchRequest) -> Option<RelationSearchRequest> {
-    if search_request.relation_prefix.is_none() && search_request.relation_subgraph.is_none() {
-        return None;
-    }
+    search_request.relation_subgraph.as_ref()?;
 
     #[allow(deprecated)]
     Some(RelationSearchRequest {
         shard_id: search_request.shard.clone(),
-        prefix: search_request.relation_prefix.clone(),
         subgraph: search_request.relation_subgraph.clone(),
     })
 }

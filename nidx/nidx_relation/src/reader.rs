@@ -17,15 +17,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::collections::HashSet;
 use std::fmt::Debug;
 use std::path::Path;
 
 use nidx_protos::graph_search_request::QueryKind;
-use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::{
-    EntitiesSubgraphResponse, GraphSearchRequest, GraphSearchResponse, RelationNode, RelationPrefixSearchResponse,
-    RelationSearchRequest, RelationSearchResponse,
+    EntitiesSubgraphResponse, GraphSearchRequest, GraphSearchResponse, RelationNode, RelationSearchRequest,
+    RelationSearchResponse,
 };
 use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::TopDocs;
@@ -36,7 +34,7 @@ use uuid::Uuid;
 
 use crate::graph_collector::{Selector, TopUniqueCollector};
 use crate::graph_query_parser::{
-    BoolGraphQuery, BoolNodeQuery, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, Term,
+    BoolGraphQuery, BoolNodeQuery, Expression, GraphQuery, GraphQueryParser, Node, NodeQuery,
 };
 use crate::schema::{Schema, decode_node, decode_relation, encode_field_id};
 use crate::top_unique_n::TopUniqueN;
@@ -107,7 +105,7 @@ impl RelationsReaderService {
     pub fn relation_search(&self, request: &RelationSearchRequest) -> anyhow::Result<RelationSearchResponse> {
         Ok(RelationSearchResponse {
             subgraph: self.entities_subgraph_search(request)?,
-            prefix: self.prefix_search(request)?,
+            prefix: None,
         })
     }
 
@@ -170,6 +168,7 @@ impl RelationsReaderService {
                 source: source_idx as u32,
                 relation: relation_idx as u32,
                 destination: destination_idx as u32,
+                metadata: io_maps::decode_metadata(&self.schema, &doc),
             })
         }
 
@@ -249,7 +248,6 @@ impl RelationsReaderService {
                 nidx_protos::graph_search_response::Relation {
                     relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),
                     label: relation_label,
-                    metadata: None,
                 }
             })
             .collect();
@@ -383,133 +381,6 @@ impl RelationsReaderService {
 
         Ok(Some(response))
     }
-
-    fn prefix_search(&self, request: &RelationSearchRequest) -> anyhow::Result<Option<RelationPrefixSearchResponse>> {
-        let Some(prefix_request) = request.prefix.as_ref() else {
-            return Ok(None);
-        };
-
-        let Some(search) = &prefix_request.search else {
-            return Err(anyhow::anyhow!("Search terms needed"));
-        };
-
-        let query_parser = GraphQueryParser::new(&self.schema);
-
-        let mut source_q: Vec<(Occur, Box<dyn Query>)> = Vec::new();
-        let mut target_q: Vec<(Occur, Box<dyn Query>)> = Vec::new();
-
-        // Node filters: only search nodes with the specified type/subtype
-        let node_filters: Vec<Node> = prefix_request
-            .node_filters
-            .iter()
-            .map(|node_filter| Node {
-                node_type: Some(node_filter.node_type()),
-                node_subtype: node_filter.node_subtype.clone(),
-                ..Default::default()
-            })
-            .collect();
-
-        if !node_filters.is_empty() {
-            source_q.push((
-                Occur::Must,
-                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(
-                    node_filters.clone(),
-                )))),
-            ));
-            target_q.push((
-                Occur::Must,
-                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(
-                    node_filters,
-                )))),
-            ))
-        }
-
-        let searcher = self.reader.searcher();
-        // FIXME: we are using a topdocs collector to get prefix results from source and target
-        // nodes. However, we are deduplicating afterwards, and this means we could end up with less
-        // results although results may exist. As a quick fix, we increase here the limit of the
-        // collector. The proper solution would be implementing a custom collector for this task
-        let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST * 2);
-        let schema = &self.schema;
-
-        match search {
-            // TODO: no longer used, we can remove it
-            Search::Query(query) => {
-                let mut prefix_nodes_q = Vec::new();
-
-                let words: Vec<_> = query.split_whitespace().collect();
-                for word in words {
-                    prefix_nodes_q.push(Node {
-                        value: Some(Term::FuzzyWord(FuzzyTerm {
-                            value: word.to_string(),
-                            fuzzy_distance: FUZZY_DISTANCE,
-                            is_prefix: false,
-                        })),
-                        ..Default::default()
-                    });
-                }
-
-                // add fuzzy query for all prefixes
-                source_q.push((
-                    Occur::Must,
-                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(
-                        prefix_nodes_q.clone(),
-                    )))),
-                ));
-                target_q.push((
-                    Occur::Must,
-                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(
-                        prefix_nodes_q,
-                    )))),
-                ));
-            }
-            Search::Prefix(prefix) => {
-                let normalized_prefix = schema.normalize(prefix);
-                let node_filter = Node {
-                    value: Some(Term::Fuzzy(FuzzyTerm {
-                        value: normalized_prefix.clone(),
-                        fuzzy_distance: FUZZY_DISTANCE,
-                        is_prefix: true,
-                    })),
-                    ..Default::default()
-                };
-                source_q.push((
-                    Occur::Must,
-                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(
-                        node_filter.clone(),
-                    )))),
-                ));
-                target_q.push((
-                    Occur::Must,
-                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Value(
-                        node_filter,
-                    )))),
-                ));
-            }
-        }
-
-        let source_prefix_query = BooleanQuery::new(source_q);
-        let target_prefix_query = BooleanQuery::new(target_q);
-
-        let mut response = RelationPrefixSearchResponse::default();
-        let mut results = HashSet::new();
-        for (_, source_res_addr) in searcher.search(&source_prefix_query, &topdocs)? {
-            let source_res_doc = searcher.doc(source_res_addr)?;
-            let relation_node = io_maps::source_to_relation_node(schema, &source_res_doc);
-            results.insert(HashedRelationNode(relation_node));
-        }
-        for (_, target_res_addr) in searcher.search(&target_prefix_query, &topdocs)? {
-            let target_res_doc = searcher.doc(target_res_addr)?;
-            let relation_node = io_maps::target_to_relation_node(schema, &target_res_doc);
-            results.insert(HashedRelationNode(relation_node));
-        }
-        response.nodes = results
-            .into_iter()
-            .take(NUMBER_OF_RESULTS_SUGGEST)
-            .map(Into::into)
-            .collect();
-        Ok(Some(response))
-    }
 }
 
 #[derive(Debug)]
@@ -546,7 +417,8 @@ impl std::hash::Hash for HashedRelationNode {
 
 #[cfg(test)]
 mod tests {
-    // This is the outer module
+    use std::collections::HashSet;
+
     use super::*;
 
     #[test]

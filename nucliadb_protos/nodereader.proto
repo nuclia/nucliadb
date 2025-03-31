@@ -282,7 +282,6 @@ message GraphSearchResponse {
     message Relation {
         utils.Relation.RelationType relation_type = 1;
         string label = 2;
-        utils.RelationMetadata metadata = 3;
     }
 
     // To optimize proto size, paths are built using pointers to nodes and
@@ -292,6 +291,7 @@ message GraphSearchResponse {
         uint32 source = 1;
         uint32 relation = 2;
         uint32 destination = 3;
+        optional utils.RelationMetadata metadata = 4;
     }
 
     repeated utils.RelationNode nodes = 1;
@@ -306,9 +306,10 @@ message GraphSearchResponse {
 // - graph search:
 //   - given some entry vertices, get the filtered subgraph around them
 message RelationSearchRequest {
+    reserved 11;
+
     string shard_id = 1;
 
-    RelationPrefixSearchRequest prefix = 11;
     EntitiesSubgraphRequest subgraph = 12;
 }
 
@@ -363,6 +364,8 @@ enum FilterOperator {
 }
 
 message SearchRequest {
+    reserved 20;
+
     string shard = 1;
 
     // query this text in all the paragraphs
@@ -387,8 +390,6 @@ message SearchRequest {
 
     optional string advanced_query = 18;
 
-    // TODO: remove this field as it's not used anymore
-    RelationPrefixSearchRequest relation_prefix = 20;
     EntitiesSubgraphRequest relation_subgraph = 21;
 
     float min_score_semantic = 23;
