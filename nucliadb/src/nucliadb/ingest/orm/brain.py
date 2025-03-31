@@ -77,6 +77,7 @@ class ResourceBrain:
         self.labels: dict[str, set[str]] = deepcopy(BASE_LABELS)
 
     def apply_field_text(self, field_key: str, text: str, replace_field: bool = False):
+        self.brain.index_texts = True
         self.brain.texts[field_key].text = text
         if replace_field and field_key not in self.brain.text_fields_to_delete:
             # We need to delete the field if it was previously set
