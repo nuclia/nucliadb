@@ -469,26 +469,24 @@ class Processor:
         """
         This function is responsible for generating the index message that will be sent to nidx.
         It takes the resource object and the broker messages of the current processor transaction to decide how to create it.
+
+        The texts index is used as a prefilter, so it needs to be updated when any of the metadata used for filtering is changed.
+        This is not optimal, but it's the best we can do for now, as we have a keyword filtering that prevents us from having to re-send the text on metadata/labels changes.
+
+        The paragraphs index needs to be updated only when there is new field computed metadata.
+
+        The relations index needs to be updated when there is a new relation or a new field computed metadata
+        The vectors index needs to be updated only when there are new vectors on the broker message.
         """
-        deleted_fields = self.get_bm_deleted_fields(messages)
-        reindex = any(needs_reindex(message) for message in messages)
-        if reindex:
-            return await resource.generate_index_message(
-                reindex=True,
-                # When reindexing, let's just generate full new index message.
-                # TODO - This should be improved in the future as it's not optimal for very large resources:
-                # As of now, there are some API operations that require fully reindexing all the fields of a resource.
-                # An example of this is classification label changes - we need to reindex all the fields of a resource to
-                # propagate the label changes to the index.
-                updated_fields=None,
-                deleted_fields=deleted_fields,
-            )
-        else:
-            return await resource.generate_index_message(
-                reindex=False,
-                updated_fields=self.get_bm_modified_fields(messages),
-                deleted_fields=deleted_fields,
-            )
+        return await resource.generate_index_message(
+            updated_fields=self.get_bm_modified_fields(messages),
+            deleted_fields=self.get_bm_deleted_fields(messages),
+            prefilter_updates=any(message.reindex for message in messages),
+            extracted_text_updates=any(len(message.extracted_text) > 0 for message in messages),
+            metadata_updates=any(len(message.field_metadata) > 0 for message in messages),
+            vectors_updates=any(len(message.field_vectors) > 0 for message in messages),
+            reindex=False,
+        )
 
     def get_bm_deleted_fields(
         self,
@@ -788,11 +786,7 @@ def has_vectors_operation(index_message: PBBrainResource) -> bool:
     """
     Returns True if the index message has any vectors to index or to delete.
     """
-    if (
-        len(index_message.sentences_to_delete) > 0
-        or len(index_message.paragraphs_to_delete) > 0
-        or any([len(deletions.items) for deletions in index_message.vector_prefixes_to_delete.values()])
-    ):
+    if any([len(deletions.items) for deletions in index_message.vector_prefixes_to_delete.values()]):
         return True
     for field_paragraphs in index_message.paragraphs.values():
         for paragraph in field_paragraphs.paragraphs.values():
@@ -802,26 +796,3 @@ def has_vectors_operation(index_message: PBBrainResource) -> bool:
                 if len(vectorset_sentences.sentences) > 0:
                     return True
     return False
-
-
-def needs_reindex(bm: writer_pb2.BrokerMessage) -> bool:
-    return bm.reindex or is_vectorset_migration_bm(bm)
-
-
-def is_vectorset_migration_bm(bm: writer_pb2.BrokerMessage) -> bool:
-    """
-    This is a temporary solution to avoid duplicating paragraphs and text fields during vector migrations.
-    We need to reindex all the fields of a resource to avoid this issue.
-    TODO: Remove this when the index message generation logic has been decoupled into its own method.
-
-    Broker messages from semantic model migration task only contain the `field_vectors` field set.
-    """
-    return (
-        len(bm.field_vectors) > 0
-        and not bm.HasField("basic")
-        and len(bm.delete_fields) == 0
-        and len(bm.files) == 0
-        and len(bm.texts) == 0
-        and len(bm.conversations) == 0
-        and len(bm.links) == 0
-    )

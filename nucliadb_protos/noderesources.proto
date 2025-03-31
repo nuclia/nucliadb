@@ -183,6 +183,8 @@ message Resource {
     map<string, utils.UserVectorsList> vectors_to_delete = 13 [deprecated = true];  // Vectorset prefix vector id
 
     optional utils.Security security = 14;
+
+    bool index_texts = 18;
 }
 
 message ShardMetadata {

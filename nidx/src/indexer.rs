@@ -345,6 +345,7 @@ fn index_resource_to_index(
     single_vector_index: bool,
 ) -> anyhow::Result<(Option<NewSegment>, Vec<String>)> {
     let t = Instant::now();
+
     let segment = match index.kind {
         IndexKind::Vector => nidx_vector::VectorIndexer
             .index_resource(output_dir, &index.config()?, resource, &index.name, single_vector_index)?

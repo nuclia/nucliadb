@@ -76,9 +76,10 @@ class ResourceBrain:
         self.brain: PBBrainResource = PBBrainResource(resource=ridobj)
         self.labels: dict[str, set[str]] = deepcopy(BASE_LABELS)
 
-    def apply_field_text(self, field_key: str, text: str):
+    def apply_field_text(self, field_key: str, text: str, replace_field: bool = False):
         self.brain.texts[field_key].text = text
-        if field_key not in self.brain.text_fields_to_delete:
+        if replace_field and field_key not in self.brain.text_fields_to_delete:
+            # We need to delete the field if it was previously set
             self.brain.text_fields_to_delete.append(field_key)
 
     def _get_paragraph_user_classifications(
@@ -594,7 +595,6 @@ class ResourceBrain:
         uuid: str,
         generated_by: Optional[FieldAuthor],
         basic_user_metadata: Optional[UserMetadata] = None,
-        basic_user_fieldmetadata: Optional[UserFieldMetadata] = None,
     ):
         user_canceled_labels: set[str] = set()
         if basic_user_metadata is not None:
@@ -626,38 +626,6 @@ class ResourceBrain:
                 relation_node_resource,
                 user_canceled_labels,
             )
-
-        if basic_user_fieldmetadata is not None:
-            for token in basic_user_fieldmetadata.token:
-                if token.cancelled_by_user is False:
-                    labels["e"].add(f"{token.klass}/{token.token}")
-                    relation_node_entity = RelationNode(
-                        value=token.token,
-                        ntype=RelationNode.NodeType.ENTITY,
-                        subtype=token.klass,
-                    )
-                    rel = Relation(
-                        relation=Relation.ENTITY,
-                        source=relation_node_resource,
-                        to=relation_node_entity,
-                    )
-                    self.brain.field_relations[field_key].relations.append(IndexRelation(relation=rel))
-            for paragraph_annotation in basic_user_fieldmetadata.paragraphs:
-                for classification in paragraph_annotation.classifications:
-                    if not classification.cancelled_by_user:
-                        label = f"/l/{classification.labelset}/{classification.label}"
-                        # FIXME: this condition avoid adding duplicate labels
-                        # while importing a kb. We shouldn't add duplicates on
-                        # the first place
-                        if (
-                            label
-                            not in self.brain.paragraphs[field_key]
-                            .paragraphs[paragraph_annotation.key]
-                            .labels
-                        ):
-                            self.brain.paragraphs[field_key].paragraphs[
-                                paragraph_annotation.key
-                            ].labels.append(label)
 
         if generated_by is not None and generated_by.WhichOneof("author") == "data_augmentation":
             field_type, field_id = field_key.split("/")

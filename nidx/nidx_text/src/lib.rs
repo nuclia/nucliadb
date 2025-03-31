@@ -106,6 +106,9 @@ impl TextIndexer {
         config: TextConfig,
         resource: &nidx_protos::Resource,
     ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
+        if !resource.index_texts {
+            return Ok(None);
+        }
         let field_schema = TextSchema::new(config.version);
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
