@@ -29,6 +29,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FieldId
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.models_utils.from_proto import field_text
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
@@ -282,25 +283,132 @@ class Resource:
         reindex: bool = True,
     ) -> noderesources_pb2.Resource:
         """
-        Generates the index message for the resource's fields.
+        Generates the index message for the resource's fields. By default, the full index message for the resource
+        is generated. This means that all fields are indexed, and the previously indexed data is deleted.
 
-        Parameters:
+        However, the following options are available to make the indexing process more efficient:
+
         - updated_fields: If provided, only the fields in this list will be indexed. Otherwise, all fields will be indexed.
-
+        
         - deleted_fields: If provided, these fields will be deleted from nidx (in all inner indexes)
 
-        - prefilter_updates: If the metadata we use to prefilter has been updated, we need to reindex the texts for all
-            fields of the resource.
+        - prefilter_updates: Set to False to skip updating the texts for all fields of the resource. This should be False, for instance,
+            when adding a new field to the resource -- all other fields should not be reindexed.
+        
+        - extracted_text_updates: Set to False to skip updating the extracted text for the fields. This should be False, for instance,
+            when processing broker messages coming from the writer or processing broker messages from the semantic model migrator task.
 
-        - extracted_text_updates: If True, the extracted text for the fields is indexed. This is used when we
-            have a new extracted text behaviour coming from the processor.
+        - metadata_updates: Set to False to skip updating the metadata for the fields. This should be False, for instance, when processing
+            broker messages coming from the writer or processing broker messages from the semantic model migrator task.
 
-        - metadata_updates: If True, the metadata for the fields is indexed. This is used when we have a new
-            FieldComputedMetadata behaviour coming from the processor.
+        - vectors_updates: Set to False to skip updating the vectors for the fields. This should be False, for instance, when processing broker
+            messages coming from the writer or processing broker messages from data augmentation agents that do not modify the vectors.
 
-        - reindex: If True, the index message for the resource generated includes the metadata to delete the previously
-            indexed data for the resource fields. This should be set to False only on newly created resources or when
-            we are doing a rollover.
+        - reindex: This should be set to False only on newly created resources or when we are doing a rollover.
+        """
+        brain = ResourceBrain(rid=self.uuid)
+        basic = await self.get_basic()
+        assert basic is not None, "Resource not found"
+
+        # Deleted fields first
+        for fid in deleted_fields or []:
+            brain.delete_field(self.generate_field_id(fid))
+
+        all_fields = [
+            FieldID(field_type=type_id, field=field_id)
+            for (type_id, field_id) in await self.get_fields_ids(force=True)
+        ]
+        # Remove deleted fields from all_fields so they are not processed
+        all_fields = [fid for fid in all_fields if fid not in deleted_fields]
+
+        # First off, set the metadata at the resource level
+        brain.generate_resource_indexing_metadata(
+            basic=basic,
+            user_relations=await self.get_user_relations(),
+            origin=await self.get_origin(),
+            previous_processing_status=self._previous_status,
+            security=await self.get_security(),
+        )
+
+        # Then process the fields
+        for fieldid in all_fields:
+            field = await self.get_field(fieldid.field, fieldid.field_type, load=False)
+            field_updated = updated_fields is None or fieldid in updated_fields
+            field_texts_indexing = prefilter_updates or (
+                field_updated and (
+                    extracted_text_updates or metadata_updates
+                )
+            )
+            field_paragraphs_indexing = field_updated and (
+                extracted_text_updates or metadata_updates
+            )
+            field_vectors_indexing = field_updated and vectors_updates
+            field_relations_indexing = prefilter_updates or field_updated and metadata_updates
+
+            if not any(
+                field_texts_indexing, field_paragraphs_indexing, field_vectors_indexing, field_relations_indexing
+            ):
+                # No need to generate index message for this field
+                continue
+
+            if field_texts_indexing:
+                extracted_text = await field.get_extracted_text()
+                if extracted_text is None:
+                    # No extracted text, skip this field
+                    continue
+                field_metadata = await field.get_field_metadata()
+                try:
+                    field_author = await field.generated_by()
+                except FieldAuthorNotFound:
+                    field_author = None
+                user_field_metadata = next(
+                    (fm for fm in basic.fieldmetadata if fm.field == fieldid),
+                    None,
+                )                    
+                brain.generate_texts_index_message(
+                    self.generate_field_id(fieldid),
+                    extracted_text,
+                    field_metadata,
+                    user_field_metadata,
+                    field_author,
+                    replace_field=reindex,
+                )
+        
+
+    @processor_observer.wrap({"type": "__generate_index_message"})
+    async def ____generate_index_message(
+        self,
+        updated_fields: Optional[list[FieldID]] = None,
+        deleted_fields: Optional[list[FieldID]] = None,
+        prefilter_updates: bool = True,
+        extracted_text_updates: bool = True,
+        metadata_updates: bool = True,
+        vectors_updates: bool = True,
+        reindex: bool = True,
+    ) -> noderesources_pb2.Resource:
+        """
+        Generates the index message for the resource's fields. By default, the full index message for the resource
+        is generated. This means that all fields are indexed, and the previously indexed data is deleted.
+
+        However, the following options are available to make the indexing process more efficient:
+
+        - updated_fields: If provided, only the fields in this list will be indexed. Otherwise, all fields will be indexed.
+        
+        - deleted_fields: If provided, these fields will be deleted from nidx (in all inner indexes)
+
+        - prefilter_updates: Set to False to skip updating the texts for all fields of the resource. This should be False, for instance,
+            when adding a new field to the resource -- all other fields should not be reindexed.
+        
+        - extracted_text_updates: Set to False to skip updating the extracted text for the fields. This should be False, for instance,
+            when processing broker messages coming from the writer or processing broker messages from the semantic model migrator task.
+
+        - metadata_updates: Set to False to skip updating the metadata for the fields. This should be False, for instance, when processing
+            broker messages coming from the writer or processing broker messages from the semantic model migrator task.
+
+        - vectors_updates: Set to False to skip updating the vectors for the fields. This should be False, for instance, when processing broker
+            messages coming from the writer or processing broker messages from data augmentation agents that do not modify the vectors.
+
+        - reindex: This should be set to False only on newly created resources or when we are doing a rollover.
         """
         brain = ResourceBrain(rid=self.uuid)
 
@@ -345,7 +453,13 @@ class Resource:
             extracted_text = await field.get_extracted_text()
             field_metadata = await field.get_field_metadata()
             field_updated = updated_fields is not None and fieldid in updated_fields
-            if reindex or prefilter_updates or extracted_text_updates:
+
+            should_generate_texts_index_message = reindex or prefilter_updates or (
+                field_updated and (
+                    extracted_text_updates or metadata_updates
+                )
+            )
+            if should_generate_texts_index_message:
                 if extracted_text is not None:
                     field_text = extracted_text.text
                     for _, split in extracted_text.split_text.items():
@@ -367,21 +481,27 @@ class Resource:
                     generated_by,
                     basic.usermetadata,
                 )
+            should_generate_paragraphs_index_message = reindex or (
+                field_updated and (extracted_text_updates or metadata_updates)
+            ) and field_metadata is not None
+            if should_generate_paragraphs_index_message:
+                # TODO: refactor into its own function
+                page_positions: Optional[FilePagePositions] = None
+                if fieldid.field_type == FieldType.FILE and isinstance(field, File):
+                    page_positions = await get_file_page_positions(field)
+                await to_executor(
+                    brain.apply_field_metadata,
+                    self.generate_field_id(fieldid),
+                    field_metadata,
+                    page_positions=page_positions,
+                    extracted_text=extracted_text,
+                    basic_user_field_metadata=user_field_metadata,
+                    replace_field=reindex,
+                )
 
-            if reindex or (field_updated and (metadata_updates or extracted_text_updates)):
-                if field_metadata is not None:
-                    page_positions: Optional[FilePagePositions] = None
-                    if fieldid.field_type == FieldType.FILE and isinstance(field, File):
-                        page_positions = await get_file_page_positions(field)
-                    await to_executor(
-                        brain.apply_field_metadata,
-                        self.generate_field_id(fieldid),
-                        field_metadata,
-                        page_positions=page_positions,
-                        extracted_text=extracted_text,
-                        basic_user_field_metadata=user_field_metadata,
-                        replace_field=reindex,
-                    )
+            should_generate_vectors_index_message = reindex or (
+                field_updated and vectors_updates) and not self.disable_vectors
+            )
 
             if reindex or (field_updated and vectors_updates) and not self.disable_vectors:
                 if vectorset_configs is None:

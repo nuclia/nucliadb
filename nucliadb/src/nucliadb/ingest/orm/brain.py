@@ -20,6 +20,7 @@
 import logging
 from copy import deepcopy
 from dataclasses import dataclass
+from os import replace
 from typing import Optional
 
 from nucliadb.common import ids
@@ -28,6 +29,7 @@ from nucliadb.ingest.orm.utils import compute_paragraph_key
 from nucliadb_models.labels import BASE_LABELS, LABEL_HIDDEN, flatten_resource_labels
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import utils_pb2
+from nucliadb_protos import resources_pb2
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import (
     IndexRelation,
@@ -76,12 +78,63 @@ class ResourceBrain:
         self.brain: PBBrainResource = PBBrainResource(resource=ridobj)
         self.labels: dict[str, set[str]] = deepcopy(BASE_LABELS)
 
-    def apply_field_text(self, field_key: str, text: str, replace_field: bool = False):
+    def generate_resource_indexing_metadata(
+        self, 
+        basic: Basic,
+        user_relations: Relations,
+        origin: Optional[Origin],
+        previous_processing_status: Optional[Metadata.Status.ValueType],
+        security: Optional[utils_pb2.Security],
+    ) -> None:
+        self._set_resource_status(basic, previous_processing_status)
+        self._set_resource_dates(basic, origin)
+        self._set_resource_labels(basic, origin)
+        self._set_resource_relations(basic, origin, user_relations)
+        if security is not None:
+            self._set_resource_security(security)
+
+    def generate_texts_index_message(
+        self,
+        field_key: str,
+        extracted_text: ExtractedText,
+        field_metadata: Optional[FieldMetadata],
+        user_field_metadata: Optional[UserFieldMetadata],
+        field_author: Optional[FieldAuthor],
+        replace_field: bool
+    ) -> None:
+        self.apply_field_text(
+            field_key,
+            extracted_text,
+            replace_field=replace_field,
+        )
+        self.apply_field_labels(
+            field_key,
+            field_metadata,
+            field_author,
+            user_field_metadata,
+        )
+
+    def apply_field_text(
+        self, 
+        field_key: str,
+        extracted_text: ExtractedText,
+        replace_field: bool = False,
+    ):
         self.brain.index_texts = True
-        self.brain.texts[field_key].text = text
+        self.brain.texts[field_key].text = extracted_text.text
         if replace_field and field_key not in self.brain.text_fields_to_delete:
             # We need to delete the field if it was previously set
             self.brain.text_fields_to_delete.append(field_key)
+
+
+    # def apply_field_text(self, field_key: str, text: str, replace_field: bool = False):
+    #     self.brain.texts[field_key].text = text
+    #     if replace_field and field_key not in self.brain.text_fields_to_delete:
+    #         # We need to delete the field if it was previously set
+    #         self.brain.text_fields_to_delete.append(field_key)
+
+    # def set_texts_indexing(self):
+    #     self.brain.index_texts = True
 
     def _get_paragraph_user_classifications(
         self, basic_user_field_metadata: Optional[UserFieldMetadata]
@@ -362,7 +415,7 @@ class ResourceBrain:
 
         sentence_pb.metadata.position.index = paragraph_pb.metadata.position.index
 
-    def set_processing_status(self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]):
+    def _set_resource_status(self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]):
         """
         We purposefully overwrite what we index as a status and DO NOT reflect
         actual status with what we index.
@@ -384,18 +437,13 @@ class ResourceBrain:
             # Means it has just been processed
             self.brain.status = PBBrainResource.PROCESSED
 
-    def set_security(self, security: utils_pb2.Security):
+    def _set_resource_security(self, security: utils_pb2.Security):
         self.brain.security.CopyFrom(security)
 
     def get_processing_status_tag(self, metadata: Metadata) -> str:
         if not metadata.useful:
             return "EMPTY"
         return METADATA_STATUS_PB_TYPE_TO_NAME_MAP[metadata.status]
-
-    def set_resource_metadata(self, basic: Basic, origin: Optional[Origin], user_relations: Relations):
-        self._set_resource_dates(basic, origin)
-        self._set_resource_labels(basic, origin)
-        self._set_resource_relations(basic, origin, user_relations)
 
     def _set_resource_dates(self, basic: Basic, origin: Optional[Origin]):
         """
@@ -589,7 +637,74 @@ class ResourceBrain:
                 relation.to.subtype = klass
                 self.brain.field_relations[field_key].relations.append(IndexRelation(relation=relation))
 
+
     def apply_field_labels(
+        self,
+        field_key: str,
+        field_computed_metadata: Optional[FieldComputedMetadata],
+        field_author: Optional[FieldAuthor],
+        user_field_metadata: Optional[UserFieldMetadata] = None,
+    ):
+        user_canceled_labels: set[str] = set()
+        if user_field_metadata is not None:
+            user_canceled_labels.update(
+                f"{classification.labelset}/{classification.label}"
+                for classification in user_field_metadata.classifications
+                if classification.cancelled_by_user
+            )
+        labels: dict[str, set[str]] = {
+            "l": set(),  # classification labels
+            "e": set(),  # entities
+            "mt": set(),  # mime type
+            "g/da": set(),  # generated by
+        }
+        if field_computed_metadata is not None:
+            metadatas = list(field_computed_metadata.split_metadata.values())
+            metadatas.append(field_computed_metadata.metadata)
+            for metadata in metadatas:
+                if metadata.mime_type != "":
+                    labels["mt"].add(metadata.mime_type)
+                for classification in metadata.classifications:
+                    label = f"{classification.labelset}/{classification.label}"
+                    if label not in user_canceled_labels:
+                        labels["l"].add(label)
+                use_legacy_entities = True
+                for data_augmentation_task_id, entities in metadata.entities.items():
+                    # If we recieved the entities from the processor here, we don't want to use the legacy entities
+                    # TODO: Remove this when processor doesn't use this anymore
+                    if data_augmentation_task_id == "processor":
+                        use_legacy_entities = False
+                    for ent in entities.entities:
+                        entity_text = ent.text
+                        entity_label = ent.label
+                        # Seems like we don't care about where the entity is in the text
+                        # entity_positions = entity.positions
+                        labels["e"].add(
+                            f"{entity_label}/{entity_text}"
+                        )  # Add data_augmentation_task_id as a prefix?
+                # Legacy processor entities
+                if use_legacy_entities:
+                    for klass_entity in metadata.positions.keys():
+                        labels["e"].add(klass_entity)
+                    
+        if field_author is not None and field_author.WhichOneof("author") == "data_augmentation":
+            field_type, field_id = field_key.split("/")
+            da_task_id = ids.extract_data_augmentation_id(field_id)
+            if da_task_id is None:  # pragma: nocover
+                logger.warning(
+                    "Data augmentation field id has an unexpected format! Skipping label",
+                    extra={
+                        "field_id": field_id,
+                        "field_type": field_type,
+                    },
+                )
+            else:
+                labels["g/da"].add(da_task_id)
+
+        self.brain.texts[field_key].labels.extend(flatten_resource_labels(labels))
+
+
+    def __apply_field_labels(
         self,
         field_key: str,
         metadata: Optional[FieldComputedMetadata],
