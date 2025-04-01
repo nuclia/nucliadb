@@ -462,7 +462,7 @@ class Processor:
                 source=source,
             )
 
-    async def generate_index_message(
+    async def generate_index_message_v2(
         self,
         resource: Resource,
         messages: list[writer_pb2.BrokerMessage],
@@ -470,7 +470,6 @@ class Processor:
     ) -> PBBrainResource:
         builder = IndexMessageBuilder(resource)
         message_source = messages_source(messages)
-        breakpoint()
         if message_source == nodewriter_pb2.IndexMessageSource.WRITER:
             with processor_observer({"type": "generate_index_message", "source": "writer"}):
                 return await builder.for_writer_bm(messages, resource_created)
@@ -479,6 +478,39 @@ class Processor:
                 return await builder.for_processor_bm(messages)
         else:  # pragma: no cover
             raise InvalidBrokerMessage(f"Unknown broker message source: {message_source}")
+
+    async def generate_index_message_v1(
+        self,
+        resource: Resource,
+        messages: list[writer_pb2.BrokerMessage],
+    ) -> PBBrainResource:
+        if any(needs_reindex(m) for m in messages):
+            # when reindexing, let's just generate full new index message
+            # TODO - This should be improved in the future as it's not optimal for very large resources:
+            # As of now, there are some API operations that require fully reindexing all the fields of a resource.
+            # An example of this is classification label changes - we need to reindex all the fields of a resource to
+            # propagate the label changes to the index.
+            resource.replace_indexer(await resource.generate_index_message(reindex=True))
+        else:
+            # TODO - Ideally we should only update the fields that have been changed in the current transaction.
+            await resource.compute_global_text()
+            await resource.compute_global_tags(resource.indexer)
+            await resource.compute_security(resource.indexer)
+        return resource.indexer.brain
+
+    async def generate_index_message(
+        self,
+        resource: Resource,
+        messages: list[writer_pb2.BrokerMessage],
+        resource_created: bool = False,
+    ) -> PBBrainResource:
+        if has_feature(
+            const.Features.INDEX_MESSAGE_GENERATION_V2,
+            context={"kbid": resource.kb.kbid},
+        ):
+            return await self.generate_index_message_v2(resource, messages, resource_created)
+        else:
+            return await self.generate_index_message_v1(resource, messages)
 
     async def external_index_delete_resource(
         self, external_index_manager: ExternalIndexManager, resource_uuid: str
@@ -741,3 +773,26 @@ def has_vectors_operation(index_message: PBBrainResource) -> bool:
                 if len(vectorset_sentences.sentences) > 0:
                     return True
     return False
+
+
+def needs_reindex(bm: writer_pb2.BrokerMessage) -> bool:
+    return bm.reindex or is_vectorset_migration_bm(bm)
+
+
+def is_vectorset_migration_bm(bm: writer_pb2.BrokerMessage) -> bool:
+    """
+    This is a temporary solution to avoid duplicating paragraphs and text fields during vector migrations.
+    We need to reindex all the fields of a resource to avoid this issue.
+    TODO: Remove this when the index message generation logic has been decoupled into its own method.
+
+    Broker messages from semantic model migration task only contain the `field_vectors` field set.
+    """
+    return (
+        len(bm.field_vectors) > 0
+        and not bm.HasField("basic")
+        and len(bm.delete_fields) == 0
+        and len(bm.files) == 0
+        and len(bm.texts) == 0
+        and len(bm.conversations) == 0
+        and len(bm.links) == 0
+    )
