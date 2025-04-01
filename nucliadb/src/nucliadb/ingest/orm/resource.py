@@ -393,7 +393,7 @@ class Resource:
                     extracted_text,
                     page_positions,
                     user_field_metadata,
-                    replace_field=reindex,
+                    replace_field=reindex and ,
                     index=field_paragraphs_indexing,
                 )
     
