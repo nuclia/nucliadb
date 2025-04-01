@@ -983,7 +983,7 @@ class Resource:
         field_text = extracted_text.text
         for _, split in extracted_text.split_text.items():
             field_text += f" {split} "
-        brain.apply_field_text(fieldkey, field_text)
+        brain.apply_field_text(fieldkey, field_text, replace_field=True)
 
     def clean(self):
         self._indexer = None

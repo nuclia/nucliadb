@@ -76,8 +76,12 @@ class ResourceBrain:
         self.brain: PBBrainResource = PBBrainResource(resource=ridobj)
         self.labels: dict[str, set[str]] = deepcopy(BASE_LABELS)
 
-    def apply_field_text(self, field_key: str, text: str):
+    def apply_field_text(self, field_key: str, text: str, replace_field: bool):
         self.brain.texts[field_key].text = text
+        if replace_field:
+            field_type, field_name = field_key.split("/")
+            full_field_id = ids.FieldId(rid=self.rid, type=field_type, key=field_name).full()
+            self.brain.text_fields_to_delete.append(full_field_id)
 
     def _get_paragraph_user_classifications(
         self, basic_user_field_metadata: Optional[UserFieldMetadata]
@@ -244,6 +248,7 @@ class ResourceBrain:
     def delete_field(self, field_key: str):
         ftype, fkey = field_key.split("/")
         full_field_id = ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
+        self.brain.text_fields_to_delete.append(full_field_id)
         self.brain.paragraphs_to_delete.append(full_field_id)
         self.brain.sentences_to_delete.append(full_field_id)
         self.brain.relation_fields_to_delete.append(field_key)
