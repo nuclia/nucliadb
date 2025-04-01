@@ -330,6 +330,8 @@ class Resource:
             security=await self.get_security(),
         )
 
+        vectorset_configs = None
+
         # Then process the fields
         for fieldid in all_fields:
             field = await self.get_field(fieldid.field, fieldid.field_type, load=False)
@@ -356,7 +358,7 @@ class Resource:
                 if extracted_text is None:
                     # No extracted text, skip this field
                     continue
-                field_metadata = await field.get_field_metadata()
+                field_computed_metadata = await field.get_field_metadata()
                 try:
                     field_author = await field.generated_by()
                 except FieldAuthorNotFound:
@@ -368,12 +370,57 @@ class Resource:
                 brain.generate_texts_index_message(
                     self.generate_field_id(fieldid),
                     extracted_text,
-                    field_metadata,
+                    field_computed_metadata,
                     user_field_metadata,
                     field_author,
                     replace_field=reindex,
                 )
-        
+
+            if field_paragraphs_indexing or field_vectors_indexing:
+                # When updating the vectors, we also need to populate the paragraphs part of the
+                # index message, but without needing to actually reindex
+                extracted_text = await field.get_extracted_text()
+                field_computed_metadata = await field.get_field_metadata()
+                if extracted_text is None or field_computed_metadata is None:
+                    # No extracted text or field metadata, skip this field
+                    continue
+                page_positions = None
+                if fieldid.field_type == FieldType.FILE and isinstance(field, File):
+                    page_positions = await get_file_page_positions(field)
+                brain.generate_paragraphs_index_message(
+                    self.generate_field_id(fieldid),
+                    field_computed_metadata,
+                    extracted_text,
+                    page_positions,
+                    user_field_metadata,
+                    replace_field=reindex,
+                    index=field_paragraphs_indexing,
+                )
+    
+            if field_vectors_indexing:
+                if vectorset_configs is None:
+                    # Get the vectorset config once for all fields
+                    vectorset_configs = [
+                        vectorset_config
+                        async for _, vectorset_config in datamanagers.vectorsets.iter(
+                            self.txn, kbid=self.kb.kbid
+                        )
+                    ]
+                for vectorset_config in vectorset_configs:
+                    vo = await field.get_vectors(
+                        vectorset=vectorset_config.vectorset_id,
+                        storage_key_kind=vectorset_config.storage_key_kind,
+                    )
+                    if vo is not None:
+                        dimension = vectorset_config.vectorset_index_config.vector_dimension
+                        brain.generate_vectors_index_message(
+                            self.generate_field_id(fieldid),
+                            vo,
+                            vectorset=vectorset_config.vectorset_id,
+                            replace_field=reindex,
+                            vector_dimension=dimension,
+                        )
+
 
     @processor_observer.wrap({"type": "__generate_index_message"})
     async def ____generate_index_message(
@@ -451,7 +498,7 @@ class Resource:
                 None,
             )
             extracted_text = await field.get_extracted_text()
-            field_metadata = await field.get_field_metadata()
+            field_computed_metadata = await field.get_field_metadata()
             field_updated = updated_fields is not None and fieldid in updated_fields
 
             should_generate_texts_index_message = reindex or prefilter_updates or (
@@ -476,14 +523,14 @@ class Resource:
                 await to_executor(
                     brain.apply_field_labels,
                     self.generate_field_id(fieldid),
-                    field_metadata,
+                    field_computed_metadata,
                     self.uuid,
                     generated_by,
                     basic.usermetadata,
                 )
             should_generate_paragraphs_index_message = reindex or (
                 field_updated and (extracted_text_updates or metadata_updates)
-            ) and field_metadata is not None
+            ) and field_computed_metadata is not None
             if should_generate_paragraphs_index_message:
                 # TODO: refactor into its own function
                 page_positions: Optional[FilePagePositions] = None
@@ -492,7 +539,7 @@ class Resource:
                 await to_executor(
                     brain.apply_field_metadata,
                     self.generate_field_id(fieldid),
-                    field_metadata,
+                    field_computed_metadata,
                     page_positions=page_positions,
                     extracted_text=extracted_text,
                     basic_user_field_metadata=user_field_metadata,

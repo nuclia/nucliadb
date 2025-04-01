@@ -185,6 +185,7 @@ message Resource {
     optional utils.Security security = 14;
 
     bool index_texts = 18;
+    bool index_paragraphs = 19;
 }
 
 message ShardMetadata {
