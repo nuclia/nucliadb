@@ -93,16 +93,19 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardLocation]:
 
     async with driver.transaction(read_only=True) as txn:
         async for kbid, _ in datamanagers.kb.get_kbs(txn):
-            kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-            if kb_shards is not None:
-                for shard_object_pb in kb_shards.shards:
-                    stored_shards[shard_object_pb.nidx_shard_id] = ShardLocation(
-                        kbid=kbid, node_id="nidx"
-                    )
+            # we first lookup the rollover shards as otherwise, a cutover from
+            # the migration could make us miss a shard
 
             rollover_shards = await datamanagers.rollover.get_kb_rollover_shards(txn, kbid=kbid)
             if rollover_shards is not None:
                 for shard_object_pb in rollover_shards.shards:
+                    stored_shards[shard_object_pb.nidx_shard_id] = ShardLocation(
+                        kbid=kbid, node_id="nidx"
+                    )
+
+            kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+            if kb_shards is not None:
+                for shard_object_pb in kb_shards.shards:
                     stored_shards[shard_object_pb.nidx_shard_id] = ShardLocation(
                         kbid=kbid, node_id="nidx"
                     )
