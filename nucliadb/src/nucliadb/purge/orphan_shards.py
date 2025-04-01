@@ -20,7 +20,6 @@
 import argparse
 import asyncio
 import importlib.metadata
-from dataclasses import dataclass
 from typing import Optional
 
 from grpc.aio import AioRpcError
@@ -36,17 +35,13 @@ from nucliadb.ingest import logger
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 
-
-@dataclass
-class ShardLocation:
-    kbid: str
-    node_id: str
+ShardKb = str
 
 
 UNKNOWN_KB = "unknown"
 
 
-async def detect_orphan_shards(driver: Driver) -> dict[str, ShardLocation]:
+async def detect_orphan_shards(driver: Driver) -> dict[str, ShardKb]:
     """Detect orphan shards in the system. An orphan shard is one indexed but
     not referenced for any stored KB.
 
@@ -61,20 +56,19 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardLocation]:
     # between index and maindb scans, we can also see it here
     not_indexed_shards = stored_shards.keys() - indexed_shards.keys()
     for shard_id in not_indexed_shards:
-        location = stored_shards[shard_id]
+        kbid = stored_shards[shard_id]
         logger.info(
             "Found a shard on maindb not indexed in the index nodes. "
             "This can be either a shard not indexed (error) or a brand new shard. "
             "If you run purge and find it again, it's probably an error",
             extra={
                 "shard_id": shard_id,
-                "kbid": location.kbid,
-                "node_id": location.node_id,
+                "kbid": kbid,
             },
         )
 
     orphan_shard_ids = indexed_shards.keys() - stored_shards.keys()
-    orphan_shards: dict[str, ShardLocation] = {}
+    orphan_shards: dict[str, ShardKb] = {}
     node = manager.get_nidx_fake_node()
     for shard_id in orphan_shard_ids:
         kbid = await _get_kbid(node, shard_id) or UNKNOWN_KB
@@ -87,22 +81,22 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardLocation]:
                 ) or await datamanagers.cluster.is_kb_shard(txn, kbid=kbid, shard_id=shard_id)
                 if skip:
                     continue
-        orphan_shards[shard_id] = ShardLocation(kbid=kbid, node_id="nidx")
+        orphan_shards[shard_id] = kbid
 
     for shard_id in orphan_shard_ids:
         kbid = await _get_kbid(node, shard_id) or UNKNOWN_KB
-        orphan_shards[shard_id] = ShardLocation(kbid=kbid, node_id="nidx")
+        orphan_shards[shard_id] = kbid
     return orphan_shards
 
 
-async def _get_indexed_shards() -> dict[str, ShardLocation]:
+async def _get_indexed_shards() -> dict[str, ShardKb]:
     nidx = manager.get_nidx_fake_node()
     shards = await nidx.list_shards()
-    return {shard_id: ShardLocation(kbid=UNKNOWN_KB, node_id="nidx") for shard_id in shards}
+    return {shard_id: UNKNOWN_KB for shard_id in shards}
 
 
-async def _get_stored_shards(driver: Driver) -> dict[str, ShardLocation]:
-    stored_shards: dict[str, ShardLocation] = {}
+async def _get_stored_shards(driver: Driver) -> dict[str, ShardKb]:
+    stored_shards: dict[str, ShardKb] = {}
 
     async with driver.transaction(read_only=True) as txn:
         async for kbid, _ in datamanagers.kb.get_kbs(txn):
@@ -112,7 +106,7 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardLocation]:
                 continue
 
             for shard_object_pb in kb_shards.shards:
-                stored_shards[shard_object_pb.nidx_shard_id] = ShardLocation(kbid=kbid, node_id="nidx")
+                stored_shards[shard_object_pb.nidx_shard_id] = kbid
 
     return stored_shards
 
@@ -139,11 +133,11 @@ async def report_orphan_shards(driver: Driver):
     orphan_shards = await detect_orphan_shards(driver)
     logger.info(f"Found {len(orphan_shards)} orphan shards")
     async with driver.transaction(read_only=True) as txn:
-        for shard_id, location in orphan_shards.items():
-            if location.kbid == UNKNOWN_KB:
+        for shard_id, kbid in orphan_shards.items():
+            if kbid == UNKNOWN_KB:
                 msg = "Found orphan shard but could not get KB info"
             else:
-                kb_exists = await datamanagers.kb.exists_kb(txn, kbid=location.kbid)
+                kb_exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
                 if kb_exists:
                     msg = "Found orphan shard for existing KB"
                 else:
@@ -153,8 +147,7 @@ async def report_orphan_shards(driver: Driver):
                 msg,
                 extra={
                     "shard_id": shard_id,
-                    "kbid": location.kbid,
-                    "node_id": location.node_id,
+                    "kbid": kbid,
                 },
             )
 
@@ -164,13 +157,12 @@ async def purge_orphan_shards(driver: Driver):
     logger.info(f"Found {len(orphan_shards)} orphan shards. Purge starts...")
 
     node = manager.get_nidx_fake_node()
-    for shard_id, location in orphan_shards.items():
+    for shard_id, kbid in orphan_shards.items():
         logger.info(
             "Deleting orphan shard from index node",
             extra={
                 "shard_id": shard_id,
-                "kbid": location.kbid,
-                "node_id": location.node_id,
+                "kbid": kbid,
             },
         )
         await node.delete_shard(shard_id)
