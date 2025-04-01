@@ -470,6 +470,7 @@ class Processor:
     ) -> PBBrainResource:
         builder = IndexMessageBuilder(resource)
         message_source = messages_source(messages)
+        breakpoint()
         if message_source == nodewriter_pb2.IndexMessageSource.WRITER:
             with processor_observer({"type": "generate_index_message", "source": "writer"}):
                 return await builder.for_writer_bm(messages, resource_created)

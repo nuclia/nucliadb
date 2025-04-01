@@ -398,6 +398,7 @@ async def kb_with_entity_graph(
     kbid = standalone_knowledgebox
     entities, relations, paths = entity_graph
 
+    breakpoint()
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={

@@ -42,7 +42,6 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedText,
     FieldAuthor,
     FieldComputedMetadata,
-    FieldMetadata,
     Metadata,
     Origin,
     Paragraph,
@@ -69,62 +68,187 @@ class ParagraphClassifications:
     denied: dict[str, list[str]]
 
 
-class ResourceBrain:
+class ResourceBrainV2:
     def __init__(self, rid: str):
         self.rid = rid
-        ridobj = ResourceID(uuid=rid)
-        self.brain: PBBrainResource = PBBrainResource(resource=ridobj)
+        self.brain: PBBrainResource = PBBrainResource(resource=ResourceID(uuid=rid))
         self.labels: dict[str, set[str]] = deepcopy(BASE_LABELS)
 
-    def apply_field_text(self, field_key: str, text: str):
-        self.brain.texts[field_key].text = text
+    def generate_resource_indexing_metadata(
+        self,
+        basic: Basic,
+        user_relations: Relations,
+        origin: Optional[Origin],
+        previous_processing_status: Optional[Metadata.Status.ValueType],
+        security: Optional[utils_pb2.Security],
+    ) -> None:
+        self._set_resource_status(basic, previous_processing_status)
+        self._set_resource_dates(basic, origin)
+        self._set_resource_labels(basic, origin)
+        self._set_resource_relations(basic, origin, user_relations)
+        if security is not None:
+            self._set_resource_security(security)
 
-    def _get_paragraph_user_classifications(
-        self, basic_user_field_metadata: Optional[UserFieldMetadata]
-    ) -> ParagraphClassifications:
-        pc = ParagraphClassifications(valid={}, denied={})
-        if basic_user_field_metadata is None:
-            return pc
-        for annotated_paragraph in basic_user_field_metadata.paragraphs:
-            for classification in annotated_paragraph.classifications:
-                paragraph_key = compute_paragraph_key(self.rid, annotated_paragraph.key)
-                classif_label = f"/l/{classification.labelset}/{classification.label}"
-                if classification.cancelled_by_user:
-                    pc.denied.setdefault(paragraph_key, []).append(classif_label)
-                else:
-                    pc.valid.setdefault(paragraph_key, []).append(classif_label)
-        return pc
-
-    def apply_field_metadata(
+    def generate_texts_index_message(
         self,
         field_key: str,
-        metadata: FieldComputedMetadata,
-        page_positions: Optional[FilePagePositions],
-        extracted_text: Optional[ExtractedText],
-        basic_user_field_metadata: Optional[UserFieldMetadata] = None,
-        *,
-        replace_field: bool = False,
-    ):
-        # To check for duplicate paragraphs
-        unique_paragraphs: set[str] = set()
-
-        # Expose also user classifications
-        user_paragraph_classifications = self._get_paragraph_user_classifications(
-            basic_user_field_metadata
+        extracted_text: ExtractedText,
+        field_computed_metadata: Optional[FieldComputedMetadata],
+        basic_user_metadata: Optional[UserMetadata],
+        field_author: Optional[FieldAuthor],
+        replace_field: bool,
+        index: bool,
+    ) -> None:
+        self.apply_field_text(
+            field_key,
+            extracted_text,
+            replace_field=replace_field,
+            index_texts=index,
+        )
+        self.apply_field_labels(
+            field_key,
+            field_computed_metadata,
+            field_author,
+            basic_user_metadata,
         )
 
-        # We should set paragraphs and labels
+    def apply_field_text(
+        self,
+        field_key: str,
+        extracted_text: ExtractedText,
+        replace_field: bool,
+        index_texts: Optional[bool],
+    ):
+        if index_texts is not None:
+            self.brain.index_texts = index_texts
+        field_text = extracted_text.text
+        for _, split in extracted_text.split_text.items():
+            field_text += f" {split} "
+        self.brain.texts[field_key].text = field_text
+        if replace_field and field_key not in self.brain.text_fields_to_delete:
+            # We need to delete the field if it was previously set
+            self.brain.text_fields_to_delete.append(field_key)
+
+    def apply_field_labels(
+        self,
+        field_key: str,
+        field_computed_metadata: Optional[FieldComputedMetadata],
+        field_author: Optional[FieldAuthor],
+        basic_user_metadata: Optional[UserMetadata] = None,
+    ):
+        user_cancelled_labels: set[str] = (
+            set(
+                [
+                    f"{classification.labelset}/{classification.label}"
+                    for classification in basic_user_metadata.classifications
+                    if classification.cancelled_by_user
+                ]
+            )
+            if basic_user_metadata
+            else set()
+        )
+        labels: dict[str, set[str]] = {
+            "l": set(),  # classification labels
+            "e": set(),  # entities
+            "mt": set(),  # mime type
+            "g/da": set(),  # generated by
+        }
+        if field_computed_metadata is not None:
+            metadatas = list(field_computed_metadata.split_metadata.values())
+            metadatas.append(field_computed_metadata.metadata)
+            for metadata in metadatas:
+                if metadata.mime_type != "":
+                    labels["mt"].add(metadata.mime_type)
+                for classification in metadata.classifications:
+                    label = f"{classification.labelset}/{classification.label}"
+                    if label not in user_cancelled_labels:
+                        labels["l"].add(label)
+                use_legacy_entities = True
+                for data_augmentation_task_id, entities in metadata.entities.items():
+                    # If we recieved the entities from the processor here, we don't want to use the legacy entities
+                    # TODO: Remove this when processor doesn't use this anymore
+                    if data_augmentation_task_id == "processor":
+                        use_legacy_entities = False
+                    for ent in entities.entities:
+                        entity_text = ent.text
+                        entity_label = ent.label
+                        # Seems like we don't care about where the entity is in the text
+                        # entity_positions = entity.positions
+                        labels["e"].add(
+                            f"{entity_label}/{entity_text}"
+                        )  # Add data_augmentation_task_id as a prefix?
+                # Legacy processor entities
+                if use_legacy_entities:
+                    for klass_entity in metadata.positions.keys():
+                        labels["e"].add(klass_entity)
+
+        if field_author is not None and field_author.WhichOneof("author") == "data_augmentation":
+            field_type, field_id = field_key.split("/")
+            da_task_id = ids.extract_data_augmentation_id(field_id)
+            if da_task_id is None:  # pragma: nocover
+                logger.warning(
+                    "Data augmentation field id has an unexpected format! Skipping label",
+                    extra={
+                        "field_id": field_id,
+                        "field_type": field_type,
+                    },
+                )
+            else:
+                labels["g/da"].add(da_task_id)
+
+        self.brain.texts[field_key].labels.extend(flatten_resource_labels(labels))
+
+    def generate_paragraphs_index_message(
+        self,
+        field_key: str,
+        field_computed_metadata: FieldComputedMetadata,
+        extracted_text: ExtractedText,
+        page_positions: Optional[FilePagePositions],
+        user_field_metadata: Optional[UserFieldMetadata],
+        replace_field: bool,
+        index: Optional[bool],
+    ) -> None:
+        # We need to add the extracted text to the texts section of the Resource so that
+        # the paragraphs can be indexed
+        self.apply_field_text(
+            field_key,
+            extracted_text,
+            replace_field=False,
+            index_texts=None,
+        )
+        self.apply_field_paragraphs(
+            field_key,
+            field_computed_metadata,
+            extracted_text,
+            page_positions,
+            user_field_metadata,
+            replace_field=replace_field,
+            index_paragraphs=index,
+        )
+
+    def apply_field_paragraphs(
+        self,
+        field_key: str,
+        field_computed_metadata: FieldComputedMetadata,
+        extracted_text: ExtractedText,
+        page_positions: Optional[FilePagePositions],
+        user_field_metadata: Optional[UserFieldMetadata],
+        replace_field: bool,
+        index_paragraphs: Optional[bool],
+    ) -> None:
+        if index_paragraphs is not None:
+            self.brain.index_paragraphs = index_paragraphs
+        unique_paragraphs: set[str] = set()
+        user_paragraph_classifications = self._get_paragraph_user_classifications(user_field_metadata)
         paragraph_pages = ParagraphPages(page_positions) if page_positions else None
-        for subfield, metadata_split in metadata.split_metadata.items():
+        # Splits of the field
+        for subfield, field_metadata in field_computed_metadata.split_metadata.items():
             extracted_text_str = extracted_text.split_text[subfield] if extracted_text else None
-
-            # For each split of this field
-            for index, paragraph in enumerate(metadata_split.paragraphs):
+            for idx, paragraph in enumerate(field_metadata.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
-
                 denied_classifications = set(user_paragraph_classifications.denied.get(key, []))
                 position = TextPosition(
-                    index=index,
+                    index=idx,
                     start=paragraph.start,
                     end=paragraph.end,
                     start_seconds=paragraph.start_seconds,
@@ -140,18 +264,16 @@ class ResourceBrain:
                     position.in_page = True
                 else:
                     position.in_page = False
-
                 representation = Representation()
                 if paragraph.HasField("representation"):
                     representation.file = paragraph.representation.reference_file
                     representation.is_a_table = paragraph.representation.is_a_table
-
                 p = BrainParagraph(
                     start=paragraph.start,
                     end=paragraph.end,
                     field=field_key,
                     split=subfield,
-                    index=index,
+                    index=idx,
                     repeated_in_field=is_paragraph_repeated_in_field(
                         paragraph,
                         extracted_text_str,
@@ -172,15 +294,15 @@ class ResourceBrain:
                 paragraph_labels.update(set(user_paragraph_classifications.valid.get(key, [])))
                 paragraph_labels.difference_update(denied_classifications)
                 p.labels.extend(list(paragraph_labels))
-
                 self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
+        # Main field
         extracted_text_str = extracted_text.text if extracted_text else None
-        for index, paragraph in enumerate(metadata.metadata.paragraphs):
+        for idx, paragraph in enumerate(field_computed_metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
             denied_classifications = set(user_paragraph_classifications.denied.get(key, []))
             position = TextPosition(
-                index=index,
+                index=idx,
                 start=paragraph.start,
                 end=paragraph.end,
                 start_seconds=paragraph.start_seconds,
@@ -196,17 +318,15 @@ class ResourceBrain:
                 position.in_page = True
             else:
                 position.in_page = False
-
             representation = Representation()
             if paragraph.HasField("representation"):
                 representation.file = paragraph.representation.reference_file
                 representation.is_a_table = paragraph.representation.is_a_table
-
             p = BrainParagraph(
                 start=paragraph.start,
                 end=paragraph.end,
                 field=field_key,
-                index=index,
+                index=idx,
                 repeated_in_field=is_paragraph_repeated_in_field(
                     paragraph, extracted_text_str, unique_paragraphs
                 ),
@@ -233,13 +353,99 @@ class ResourceBrain:
             full_field_id = ids.FieldId(rid=self.rid, type=field_type, key=field_name).full()
             self.brain.paragraphs_to_delete.append(full_field_id)
 
+    def _get_paragraph_user_classifications(
+        self, basic_user_field_metadata: Optional[UserFieldMetadata]
+    ) -> ParagraphClassifications:
+        pc = ParagraphClassifications(valid={}, denied={})
+        if basic_user_field_metadata is None:
+            return pc
+        for annotated_paragraph in basic_user_field_metadata.paragraphs:
+            for classification in annotated_paragraph.classifications:
+                paragraph_key = compute_paragraph_key(self.rid, annotated_paragraph.key)
+                classif_label = f"/l/{classification.labelset}/{classification.label}"
+                if classification.cancelled_by_user:
+                    pc.denied.setdefault(paragraph_key, []).append(classif_label)
+                else:
+                    pc.valid.setdefault(paragraph_key, []).append(classif_label)
+        return pc
+
+    def generate_relations_index_message(
+        self,
+        field_key: str,
+        field_computed_metadata: Optional[FieldComputedMetadata],
+        user_field_metadata: Optional[UserFieldMetadata],
+        basic_user_metadata: Optional[UserMetadata],
+        replace_field: bool,
+    ) -> None:
+        user_cancelled_labels: set[str] = (
+            set(
+                [
+                    f"{classification.labelset}/{classification.label}"
+                    for classification in basic_user_metadata.classifications
+                    if classification.cancelled_by_user
+                ]
+            )
+            if basic_user_metadata
+            else set()
+        )
+
         field_relations = self.brain.field_relations[field_key].relations
-        for relations in metadata.metadata.relations:
-            for relation in relations.relations:
-                index_relation = IndexRelation(relation=relation)
-                if relation.metadata.HasField("data_augmentation_task_id"):
-                    index_relation.facets.append(f"/g/da/{relation.metadata.data_augmentation_task_id}")
-                field_relations.append(index_relation)
+
+        # Index relations that are set by the user entities
+        if user_field_metadata is not None:
+            relation_node_resource = RelationNode(
+                value=self.brain.resource.uuid, ntype=RelationNode.NodeType.RESOURCE
+            )
+            for token in user_field_metadata.token:
+                if token.cancelled_by_user is False:
+                    relation_node_entity = RelationNode(
+                        value=token.token,
+                        ntype=RelationNode.NodeType.ENTITY,
+                        subtype=token.klass,
+                    )
+                    rel = Relation(
+                        relation=Relation.ENTITY,
+                        source=relation_node_resource,
+                        to=relation_node_entity,
+                    )
+                    field_relations.append(IndexRelation(relation=rel))
+
+        # Index relations that are computed by the processor
+        if field_computed_metadata is not None:
+            relation_node_document = RelationNode(
+                value=self.brain.resource.uuid,
+                ntype=RelationNode.NodeType.RESOURCE,
+            )
+            field_metadatas = list(field_computed_metadata.split_metadata.values())
+            field_metadatas.append(field_computed_metadata.metadata)
+            for field_metadata in field_metadatas:
+                # Relations computed by the processor
+                for relations in field_metadata.relations:
+                    for relation in relations.relations:
+                        index_relation = IndexRelation(relation=relation)
+                        if relation.metadata.HasField("data_augmentation_task_id"):
+                            index_relation.facets.append(
+                                f"/g/da/{relation.metadata.data_augmentation_task_id}"
+                            )
+                        field_relations.append(index_relation)
+                # Relations from field to classifications label
+                base_classification_relation = Relation(
+                    relation=Relation.ABOUT,
+                    source=relation_node_document,
+                    to=RelationNode(
+                        ntype=RelationNode.NodeType.LABEL,
+                    ),
+                )
+                for classification in field_metadata.classifications:
+                    label = f"{classification.labelset}/{classification.label}"
+                    if label in user_cancelled_labels:
+                        continue
+                    relation = Relation()
+                    relation.CopyFrom(base_classification_relation)
+                    relation.to.value = label
+                    field_relations.append(IndexRelation(relation=relation))
+        if replace_field:
+            self.brain.relation_fields_to_delete.append(field_key)
 
     def delete_field(self, field_key: str):
         ftype, fkey = field_key.split("/")
@@ -247,8 +453,10 @@ class ResourceBrain:
         self.brain.paragraphs_to_delete.append(full_field_id)
         self.brain.sentences_to_delete.append(full_field_id)
         self.brain.relation_fields_to_delete.append(field_key)
+        if field_key not in self.brain.text_fields_to_delete:
+            self.brain.text_fields_to_delete.append(field_key)
 
-    def apply_field_vectors(
+    def generate_vectors_index_message(
         self,
         field_id: str,
         vo: utils_pb2.VectorObject,
@@ -352,7 +560,7 @@ class ResourceBrain:
 
         sentence_pb.metadata.position.index = paragraph_pb.metadata.position.index
 
-    def set_processing_status(self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]):
+    def _set_resource_status(self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]):
         """
         We purposefully overwrite what we index as a status and DO NOT reflect
         actual status with what we index.
@@ -374,7 +582,7 @@ class ResourceBrain:
             # Means it has just been processed
             self.brain.status = PBBrainResource.PROCESSED
 
-    def set_security(self, security: utils_pb2.Security):
+    def _set_resource_security(self, security: utils_pb2.Security):
         self.brain.security.CopyFrom(security)
 
     def get_processing_status_tag(self, metadata: Metadata) -> str:
@@ -382,12 +590,11 @@ class ResourceBrain:
             return "EMPTY"
         return METADATA_STATUS_PB_TYPE_TO_NAME_MAP[metadata.status]
 
-    def set_resource_metadata(self, basic: Basic, origin: Optional[Origin], user_relations: Relations):
-        self._set_resource_dates(basic, origin)
-        self._set_resource_labels(basic, origin)
-        self._set_resource_relations(basic, origin, user_relations)
-
     def _set_resource_dates(self, basic: Basic, origin: Optional[Origin]):
+        """
+        Adds the user-defined dates to the brain object. This is at resource level and applies to
+        all fields of the resource.
+        """
         if basic.created.seconds > 0:
             self.brain.metadata.created.CopyFrom(basic.created)
         else:
@@ -409,6 +616,12 @@ class ResourceBrain:
                 self.brain.metadata.modified.CopyFrom(origin.modified)
 
     def _set_resource_relations(self, basic: Basic, origin: Optional[Origin], user_relations: Relations):
+        """
+        Adds the relations to the brain object corresponding to the user-defined metadata at the resource level:
+        - Contributors of the document
+        - Classificatin labels
+        - Relations
+        """
         relationnodedocument = RelationNode(value=self.rid, ntype=RelationNode.NodeType.RESOURCE)
         if origin is not None:
             # origin contributors
@@ -425,6 +638,8 @@ class ResourceBrain:
 
         # labels
         for classification in basic.usermetadata.classifications:
+            if classification.cancelled_by_user:
+                continue
             relation_node_label = RelationNode(
                 value=f"{classification.labelset}/{classification.label}",
                 ntype=RelationNode.NodeType.LABEL,
@@ -445,6 +660,10 @@ class ResourceBrain:
         self.brain.relation_fields_to_delete.append("a/metadata")
 
     def _set_resource_labels(self, basic: Basic, origin: Optional[Origin]):
+        """
+        Adds the resource-level labels to the brain object.
+        These levels are user-defined in basic or origin metadata.
+        """
         if origin is not None:
             if origin.source_id:
                 self.labels["o"] = {origin.source_id}
@@ -482,6 +701,8 @@ class ResourceBrain:
 
         # labels
         for classification in basic.usermetadata.classifications:
+            if classification.cancelled_by_user:
+                continue
             self.labels["l"].add(f"{classification.labelset}/{classification.label}")
 
         # hidden
@@ -491,167 +712,6 @@ class ResourceBrain:
 
         self.brain.ClearField("labels")
         self.brain.labels.extend(flatten_resource_labels(self.labels))
-
-    def process_field_metadata(
-        self,
-        field_key: str,
-        metadata: FieldMetadata,
-        labels: dict[str, set[str]],
-        relation_node_document: RelationNode,
-        user_canceled_labels: set[str],
-    ):
-        if metadata.mime_type != "":
-            labels["mt"].add(metadata.mime_type)
-
-        base_classification_relation = Relation(
-            relation=Relation.ABOUT,
-            source=relation_node_document,
-            to=RelationNode(
-                ntype=RelationNode.NodeType.LABEL,
-            ),
-        )
-        for classification in metadata.classifications:
-            label = f"{classification.labelset}/{classification.label}"
-            if label not in user_canceled_labels:
-                labels["l"].add(label)
-                relation = Relation()
-                relation.CopyFrom(base_classification_relation)
-                relation.to.value = label
-                self.brain.field_relations[field_key].relations.append(IndexRelation(relation=relation))
-
-        # Data Augmentation + Processor entities
-        base_entity_relation = Relation(
-            relation=Relation.ENTITY,
-            source=relation_node_document,
-            to=RelationNode(ntype=RelationNode.NodeType.ENTITY),
-        )
-        use_legacy_entities = True
-        for data_augmentation_task_id, entities in metadata.entities.items():
-            # If we recieved the entities from the processor here, we don't want to use the legacy entities
-            # TODO: Remove this when processor doesn't use this anymore
-            if data_augmentation_task_id == "processor":
-                use_legacy_entities = False
-
-            for ent in entities.entities:
-                entity_text = ent.text
-                entity_label = ent.label
-                # Seems like we don't care about where the entity is in the text
-                # entity_positions = entity.positions
-                labels["e"].add(
-                    f"{entity_label}/{entity_text}"
-                )  # Add data_augmentation_task_id as a prefix?
-                relation = Relation()
-                relation.CopyFrom(base_entity_relation)
-                relation.to.value = entity_text
-                relation.to.subtype = entity_label
-                self.brain.field_relations[field_key].relations.append(IndexRelation(relation=relation))
-
-        # Legacy processor entities
-        # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-        def _parse_entity(klass_entity: str) -> tuple[str, str]:
-            try:
-                klass, entity = klass_entity.split("/", 1)
-                return klass, entity
-            except ValueError:
-                raise AttributeError(f"Entity should be with type {klass_entity}")
-
-        if use_legacy_entities:
-            for klass_entity in metadata.positions.keys():
-                labels["e"].add(klass_entity)
-                klass, entity = _parse_entity(klass_entity)
-                relation = Relation()
-                relation.CopyFrom(base_entity_relation)
-                relation.to.value = entity
-                relation.to.subtype = klass
-                self.brain.field_relations[field_key].relations.append(IndexRelation(relation=relation))
-
-    def apply_field_labels(
-        self,
-        field_key: str,
-        metadata: Optional[FieldComputedMetadata],
-        uuid: str,
-        generated_by: FieldAuthor,
-        basic_user_metadata: Optional[UserMetadata] = None,
-        basic_user_fieldmetadata: Optional[UserFieldMetadata] = None,
-    ):
-        user_canceled_labels: set[str] = set()
-        if basic_user_metadata is not None:
-            user_canceled_labels.update(
-                f"{classification.labelset}/{classification.label}"
-                for classification in basic_user_metadata.classifications
-                if classification.cancelled_by_user
-            )
-        relation_node_resource = RelationNode(value=uuid, ntype=RelationNode.NodeType.RESOURCE)
-        labels: dict[str, set[str]] = {
-            "l": set(),  # classification labels
-            "e": set(),  # entities
-            "mt": set(),  # mime type
-            "g/da": set(),  # generated by
-        }
-        if metadata is not None:
-            for meta in metadata.split_metadata.values():
-                self.process_field_metadata(
-                    field_key,
-                    meta,
-                    labels,
-                    relation_node_resource,
-                    user_canceled_labels,
-                )
-            self.process_field_metadata(
-                field_key,
-                metadata.metadata,
-                labels,
-                relation_node_resource,
-                user_canceled_labels,
-            )
-
-        if basic_user_fieldmetadata is not None:
-            for token in basic_user_fieldmetadata.token:
-                if token.cancelled_by_user is False:
-                    labels["e"].add(f"{token.klass}/{token.token}")
-                    relation_node_entity = RelationNode(
-                        value=token.token,
-                        ntype=RelationNode.NodeType.ENTITY,
-                        subtype=token.klass,
-                    )
-                    rel = Relation(
-                        relation=Relation.ENTITY,
-                        source=relation_node_resource,
-                        to=relation_node_entity,
-                    )
-                    self.brain.field_relations[field_key].relations.append(IndexRelation(relation=rel))
-            for paragraph_annotation in basic_user_fieldmetadata.paragraphs:
-                for classification in paragraph_annotation.classifications:
-                    if not classification.cancelled_by_user:
-                        label = f"/l/{classification.labelset}/{classification.label}"
-                        # FIXME: this condition avoid adding duplicate labels
-                        # while importing a kb. We shouldn't add duplicates on
-                        # the first place
-                        if (
-                            label
-                            not in self.brain.paragraphs[field_key]
-                            .paragraphs[paragraph_annotation.key]
-                            .labels
-                        ):
-                            self.brain.paragraphs[field_key].paragraphs[
-                                paragraph_annotation.key
-                            ].labels.append(label)
-
-        if generated_by.WhichOneof("author") == "data_augmentation":
-            field_type, field_id = field_key.split("/")
-            da_task_id = ids.extract_data_augmentation_id(field_id)
-            if da_task_id is None:  # pragma: nocover
-                logger.warning(
-                    "Data augmentation field id has an unexpected format! Skipping label",
-                    extra={
-                        "rid": uuid,
-                        "field_id": field_id,
-                    },
-                )
-            else:
-                labels["g/da"].add(da_task_id)
-
-        self.brain.texts[field_key].labels.extend(flatten_resource_labels(labels))
 
 
 def is_paragraph_repeated_in_field(
