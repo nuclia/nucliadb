@@ -31,17 +31,16 @@ from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FieldId
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
-from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.generic import VALID_GENERIC_FIELDS, Generic
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
-from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
+from nucliadb.ingest.orm.brain import FilePagePositions
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb_models import content_types
 from nucliadb_models.common import CloudLink
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
-from nucliadb_protos import noderesources_pb2, utils_pb2, writer_pb2
+from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import (
     Basic,
@@ -269,166 +268,6 @@ class Resource:
         await self.storage.upload_pb(sf, payload)
         self.modified = True
         self.user_relations = payload
-
-    @processor_observer.wrap({"type": "generate_index_message"})
-    async def generate_index_message(
-        self,
-        updated_fields: Optional[list[FieldID]] = None,
-        deleted_fields: Optional[list[FieldID]] = None,
-        prefilter_updates: bool = True,
-        extracted_text_updates: bool = True,
-        metadata_updates: bool = True,
-        vectors_updates: bool = True,
-        reindex: bool = True,
-    ) -> noderesources_pb2.Resource:
-        """
-        Generates the index message for the resource's fields. By default, the full index message for the resource
-        is generated. This means that all fields are indexed, and the previously indexed data is deleted.
-
-        However, the following options are available to make the indexing process more efficient:
-
-        - updated_fields: If provided, only the fields in this list will be indexed. Otherwise, all fields will be indexed.
-
-        - deleted_fields: If provided, these fields will be deleted from nidx (in all inner indexes)
-
-        - prefilter_updates: Set to False to skip updating the texts for all fields of the resource. This should be False, for instance,
-            when adding a new field to the resource -- all other fields should not be reindexed.
-
-        - extracted_text_updates: Set to False to skip updating the extracted text for the fields. This should be False, for instance,
-            when processing broker messages coming from the writer or processing broker messages from the semantic model migrator task.
-
-        - metadata_updates: Set to False to skip updating the metadata for the fields. This should be False, for instance, when processing
-            broker messages coming from the writer or processing broker messages from the semantic model migrator task.
-
-        - vectors_updates: Set to False to skip updating the vectors for the fields. This should be False, for instance, when processing broker
-            messages coming from the writer or processing broker messages from data augmentation agents that do not modify the vectors.
-
-        - reindex: This should be set to False only on newly created resources or when we are doing a rollover.
-        """
-        brain = ResourceBrain(rid=self.uuid)
-        basic = await self.get_basic()
-        assert basic is not None, "Resource not found"
-
-        # Deleted fields first
-        for fid in deleted_fields or []:
-            brain.delete_field(self.generate_field_id(fid))
-
-        all_fields = [
-            FieldID(field_type=type_id, field=field_id)
-            for (type_id, field_id) in await self.get_fields_ids(force=True)
-        ]
-        # Remove deleted fields from all_fields so they are not processed
-        all_fields = (
-            [fid for fid in all_fields if fid not in deleted_fields] if deleted_fields else all_fields
-        )
-
-        # First off, set the metadata at the resource level
-        brain.generate_resource_indexing_metadata(
-            basic=basic,
-            user_relations=await self.get_user_relations(),
-            origin=await self.get_origin(),
-            previous_processing_status=self._previous_status,
-            security=await self.get_security(),
-        )
-
-        vectorset_configs = None
-
-        # Then process the fields
-        for fieldid in all_fields:
-            field = await self.get_field(fieldid.field, fieldid.field_type, load=False)
-            field_updated = updated_fields is None or fieldid in updated_fields
-            field_texts_indexing = prefilter_updates or (
-                field_updated and (extracted_text_updates or metadata_updates)
-            )
-            field_paragraphs_indexing = field_updated and (extracted_text_updates or metadata_updates)
-            field_vectors_indexing = field_updated and vectors_updates
-            field_relations_indexing = prefilter_updates or field_updated and metadata_updates
-
-            if not any(
-                [
-                    field_texts_indexing,
-                    field_paragraphs_indexing,
-                    field_vectors_indexing,
-                    field_relations_indexing,
-                ]
-            ):
-                # No need to generate index message for this field
-                continue
-
-            if field_texts_indexing:
-                extracted_text = await field.get_extracted_text()
-                if extracted_text is not None:
-                    field_computed_metadata = await field.get_field_metadata()
-                    try:
-                        field_author = await field.generated_by()
-                    except FieldAuthorNotFound:
-                        field_author = None
-                    user_field_metadata = next(
-                        (fm for fm in basic.fieldmetadata if fm.field == fieldid),
-                        None,
-                    )
-                    brain.generate_texts_index_message(
-                        self.generate_field_id(fieldid),
-                        extracted_text,
-                        field_computed_metadata,
-                        basic.usermetadata,
-                        field_author,
-                        replace_field=reindex,
-                    )
-
-            if field_paragraphs_indexing or field_vectors_indexing:
-                # When updating the vectors, we also need to populate the paragraphs part of the
-                # index message, but without needing to actually reindex
-                extracted_text = await field.get_extracted_text()
-                field_computed_metadata = await field.get_field_metadata()
-                if extracted_text is not None and field_computed_metadata is not None:
-                    page_positions = None
-                    if fieldid.field_type == FieldType.FILE and isinstance(field, File):
-                        page_positions = await get_file_page_positions(field)
-                    brain.generate_paragraphs_index_message(
-                        self.generate_field_id(fieldid),
-                        field_computed_metadata,
-                        extracted_text,
-                        page_positions,
-                        user_field_metadata,
-                        replace_field=reindex and field_paragraphs_indexing,
-                        index=field_paragraphs_indexing,
-                    )
-
-            if field_vectors_indexing:
-                if vectorset_configs is None:
-                    # Get the vectorset config once for all fields
-                    vectorset_configs = [
-                        vectorset_config
-                        async for _, vectorset_config in datamanagers.vectorsets.iter(
-                            self.txn, kbid=self.kb.kbid
-                        )
-                    ]
-                for vectorset_config in vectorset_configs:
-                    vo = await field.get_vectors(
-                        vectorset=vectorset_config.vectorset_id,
-                        storage_key_kind=vectorset_config.storage_key_kind,
-                    )
-                    if vo is not None:
-                        dimension = vectorset_config.vectorset_index_config.vector_dimension
-                        brain.generate_vectors_index_message(
-                            self.generate_field_id(fieldid),
-                            vo,
-                            vectorset=vectorset_config.vectorset_id,
-                            replace_field=reindex,
-                            vector_dimension=dimension,
-                        )
-            if field_relations_indexing:
-                field_computed_metadata = await field.get_field_metadata()
-                brain.generate_relations_index_message(
-                    self.generate_field_id(fieldid),
-                    field_computed_metadata,
-                    user_field_metadata,
-                    basic.usermetadata,
-                    replace_field=reindex,
-                )
-
-        return brain.brain
 
     # Fields
     async def get_fields(self, force: bool = False) -> dict[tuple[FieldType.ValueType, str], Field]:
