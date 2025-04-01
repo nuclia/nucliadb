@@ -145,7 +145,7 @@ GraphPathQuery = Annotated[
 
 class GraphFilterExpression(BaseModel, extra="forbid"):
     """Returns only relations from documents that match this filter expression.
-    Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters
+    Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters
     """
 
     field: FieldFilterExpression = Field(description="Filter to apply to fields")
@@ -158,7 +158,7 @@ class GraphSearchRequest(BaseGraphSearchRequest):
         title="Filter resource by an expression",
         description=(
             "Returns only relations from documents that match this filter expression."
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters "
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
         ),
     )
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
@@ -186,7 +186,7 @@ class GraphNodesSearchRequest(BaseGraphSearchRequest):
         title="Filter resource by an expression",
         description=(
             "Returns only relations from documents that match this filter expression."
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters "
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
         ),
     )
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
@@ -214,7 +214,7 @@ class GraphRelationsSearchRequest(BaseGraphSearchRequest):
         title="Filter resource by an expression",
         description=(
             "Returns only relations from documents that match this filter expression."
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters "
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
         ),
     )
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
