@@ -478,14 +478,19 @@ class Processor:
         The relations index needs to be updated when there is a new relation or a new field computed metadata
         The vectors index needs to be updated only when there are new vectors on the broker message.
         """
+        # return await resource.generate_index_message(
+        #     updated_fields=self.get_bm_modified_fields(messages),
+        #     deleted_fields=self.get_bm_deleted_fields(messages),
+        #     prefilter_updates=any(message.reindex for message in messages),
+        #     extracted_text_updates=any(len(message.extracted_text) > 0 for message in messages),
+        #     metadata_updates=any(len(message.field_metadata) > 0 for message in messages),
+        #     vectors_updates=any(len(message.field_vectors) > 0 for message in messages),
+        #     reindex=False,
+        # )
         return await resource.generate_index_message(
-            updated_fields=self.get_bm_modified_fields(messages),
+            updated_fields=None,
             deleted_fields=self.get_bm_deleted_fields(messages),
-            prefilter_updates=any(message.reindex for message in messages),
-            extracted_text_updates=any(len(message.extracted_text) > 0 for message in messages),
-            metadata_updates=any(len(message.field_metadata) > 0 for message in messages),
-            vectors_updates=any(len(message.field_vectors) > 0 for message in messages),
-            reindex=False,
+            reindex=True,
         )
 
     def get_bm_deleted_fields(
