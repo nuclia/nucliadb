@@ -28,6 +28,7 @@ from nucliadb.common.cluster.manager import (
     StandaloneKBShardManager,
 )
 from nucliadb.common.cluster.settings import settings
+from nucliadb.ingest.orm.index_message import IndexMessageBuilder
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import nodereader_pb2, writer_pb2
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
@@ -89,9 +90,10 @@ async def get_resource_index_message(kbid: str, resource_id: str) -> Optional[no
                 extra={"kbid": kbid, "resource_id": resource_id},
             )
             return None
+        im_builder = IndexMessageBuilder(resource)
         # We set the reindex=False because we are indexing the resource for the first time in the
         # newly created shards.
-        return await resource.generate_index_message(reindex=False)
+        return await im_builder.full(reindex=False)
 
 
 @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8)
@@ -110,7 +112,6 @@ async def index_resource_to_shard(
         resource_index_message = await get_resource_index_message(kbid, resource_id)
         if resource_index_message is None:
             return
-
     partition = partitioning.generate_partition(kbid, resource_id)
     await sm.add_resource(shard, resource_index_message, txid=-1, partition=str(partition), kb=kbid)
 

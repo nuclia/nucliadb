@@ -98,12 +98,13 @@ class ResourceBrain:
         basic_user_metadata: Optional[UserMetadata],
         field_author: Optional[FieldAuthor],
         replace_field: bool,
+        index: bool,
     ) -> None:
         self.apply_field_text(
             field_key,
             extracted_text,
             replace_field=replace_field,
-            index_texts=True,
+            index_texts=index,
         )
         self.apply_field_labels(
             field_key,
@@ -387,6 +388,9 @@ class ResourceBrain:
             if basic_user_metadata
             else set()
         )
+
+        field_relations = self.brain.field_relations[field_key].relations
+
         # Index relations that are set by the user entities
         if user_field_metadata is not None:
             relation_node_resource = RelationNode(
@@ -404,7 +408,7 @@ class ResourceBrain:
                         source=relation_node_resource,
                         to=relation_node_entity,
                     )
-                    self.brain.field_relations[field_key].relations.append(IndexRelation(relation=rel))
+                    field_relations.append(IndexRelation(relation=rel))
 
         # Index relations that are computed by the processor
         if field_computed_metadata is not None:
@@ -412,7 +416,6 @@ class ResourceBrain:
                 value=self.brain.resource.uuid,
                 ntype=RelationNode.NodeType.RESOURCE,
             )
-            field_relations = self.brain.field_relations[field_key].relations
             field_metadatas = list(field_computed_metadata.split_metadata.values())
             field_metadatas.append(field_computed_metadata.metadata)
             for field_metadata in field_metadatas:
