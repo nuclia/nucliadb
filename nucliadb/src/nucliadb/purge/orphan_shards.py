@@ -78,6 +78,19 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardLocation]:
     node = manager.get_nidx_fake_node()
     for shard_id in orphan_shard_ids:
         kbid = await _get_kbid(node, shard_id) or UNKNOWN_KB
+        # Shards with knwon KB ids can be checked and ignore those comming from
+        # an ongoing migration/rollover (ongoing or finished)
+        if kbid != UNKNOWN_KB:
+            async with datamanagers.with_ro_transaction() as txn:
+                skip = await datamanagers.rollover.is_rollover_shard(
+                    txn, kbid=kbid, shard_id=shard_id
+                ) or await datamanagers.cluster.is_kb_shard(txn, kbid=kbid, shard_id=shard_id)
+                if skip:
+                    continue
+        orphan_shards[shard_id] = ShardLocation(kbid=kbid, node_id="nidx")
+
+    for shard_id in orphan_shard_ids:
+        kbid = await _get_kbid(node, shard_id) or UNKNOWN_KB
         orphan_shards[shard_id] = ShardLocation(kbid=kbid, node_id="nidx")
     return orphan_shards
 
@@ -93,22 +106,13 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardLocation]:
 
     async with driver.transaction(read_only=True) as txn:
         async for kbid, _ in datamanagers.kb.get_kbs(txn):
-            # we first lookup the rollover shards as otherwise, a cutover from
-            # the migration could make us miss a shard
-
-            rollover_shards = await datamanagers.rollover.get_kb_rollover_shards(txn, kbid=kbid)
-            if rollover_shards is not None:
-                for shard_object_pb in rollover_shards.shards:
-                    stored_shards[shard_object_pb.nidx_shard_id] = ShardLocation(
-                        kbid=kbid, node_id="nidx"
-                    )
-
             kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-            if kb_shards is not None:
-                for shard_object_pb in kb_shards.shards:
-                    stored_shards[shard_object_pb.nidx_shard_id] = ShardLocation(
-                        kbid=kbid, node_id="nidx"
-                    )
+            if kb_shards is None:
+                logger.warning("KB not found while looking for orphan shards", extra={"kbid": kbid})
+                continue
+
+            for shard_object_pb in kb_shards.shards:
+                stored_shards[shard_object_pb.nidx_shard_id] = ShardLocation(kbid=kbid, node_id="nidx")
 
     return stored_shards
 
