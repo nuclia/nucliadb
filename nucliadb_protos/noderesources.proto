@@ -172,7 +172,7 @@ message Resource {
     // vectorset_id -> [vector_key_prefix, ...]
     map<string, StringList> vector_prefixes_to_delete = 15;
     repeated string relation_fields_to_delete = 16;
-
+    repeated string texts_to_delete = 17;
 
     // Relations
     map<string, IndexRelations> field_relations = 10;

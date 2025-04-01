@@ -433,10 +433,7 @@ class Resource:
                 self.all_fields_keys.remove(field)
 
         field_key = self.generate_field_id(FieldID(field_type=type, field=key))
-
-        metadata = await field_obj.get_field_metadata()
-        if metadata is not None:
-            self.indexer.delete_field(field_key=field_key)
+        self.indexer.delete_field(field_key=field_key)
 
         await field_obj.delete()
 
@@ -983,7 +980,7 @@ class Resource:
         field_text = extracted_text.text
         for _, split in extracted_text.split_text.items():
             field_text += f" {split} "
-        brain.apply_field_text(fieldkey, field_text)
+        brain.apply_field_text(fieldkey, field_text, replace_field=True)
 
     def clean(self):
         self._indexer = None

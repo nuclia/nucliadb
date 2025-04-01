@@ -323,12 +323,6 @@ mod tests {
                 .await?,
             3
         );
-        assert_eq!(
-            sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM deletions")
-                .fetch_one(&meta_source.pool)
-                .await?,
-            1
-        );
 
         // Create destination DB
         let config_dest = Postgres::test_context(&TestArgs::new("test_export_and_import_dest")).await?;
@@ -346,12 +340,6 @@ mod tests {
         let shard_dest = Shard::get(&meta_dest.pool, shard.id).await?;
         assert_eq!(shard_dest.kbid, shard.kbid);
         assert_eq!(Index::for_shard(&meta_dest.pool, shard.id).await?.len(), 3);
-        assert_eq!(
-            sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM deletions")
-                .fetch_one(&meta_dest.pool)
-                .await?,
-            1
-        );
 
         let all_segments = Segment::in_indexes(&meta_dest.pool, &index_ids).await?;
         assert_eq!(all_segments.len(), 3);

@@ -19,7 +19,7 @@
 #
 import base64
 import json
-from typing import cast
+from typing import Optional, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -35,6 +35,7 @@ from nucliadb.writer.utilities import get_processing
 from nucliadb_models import common, metadata
 from nucliadb_models.labels import ClassificationLabel
 from nucliadb_models.resource import Resource
+from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxSearchResults
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import writer_pb2 as wpb
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
@@ -55,7 +56,7 @@ from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
-from tests.utils.dirty_index import wait_for_sync
+from tests.utils.dirty_index import mark_dirty, wait_for_sync
 from tests.writer.test_fields import (
     TEST_CONVERSATION_PAYLOAD,
     TEST_FILE_PAYLOAD,
@@ -1508,3 +1509,155 @@ async def test_classification_labels_are_sent_to_processing(
     send_to_process_call = cast(PushPayload, processing.values["send_to_process"][0][0])
     assert len(send_to_process_call.filefield) == 1
     assert processing.values["convert_internal_filefield_to_str"][0][-1] == expected_labels
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_deletions_on_text_index(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+
+    async def kb_search(query: str, filters: Optional[list[str]] = None):
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/search",
+            json={
+                "query": query,
+                "features": ["fulltext"],
+                "show": ["basic", "values"],
+                "filters": filters or [],
+            },
+        )
+        assert resp.status_code == 200
+        results = KnowledgeboxSearchResults.model_validate(resp.json())
+        return results
+
+    async def kb_counters(kbid: str) -> KnowledgeboxCounters:
+        # We call counters endpoint to get the sentences count only
+        resp = await nucliadb_reader.get(f"/kb/{kbid}/counters")
+        assert resp.status_code == 200, resp.text
+        counters = KnowledgeboxCounters.model_validate(resp.json())
+
+        # We don't call /counters endpoint purposefully, as deletions are not guaranteed to be merged yet.
+        # Instead, we do some searches.
+        resp = await nucliadb_reader.get(f"/kb/{kbid}/search", params={"show": ["basic", "values"]})
+        assert resp.status_code == 200, resp.text
+        search = KnowledgeboxSearchResults.model_validate(resp.json())
+        # Update paragraphs and fulltext in the counters object
+        counters.paragraphs = search.paragraphs.total  # type: ignore
+        counters.fields = search.fulltext.total  # type: ignore
+        return counters
+
+    resp = await nucliadb_writer.post(
+        f"kb/{kbid}/resources",
+        json={
+            "title": "My title",
+            "texts": {
+                "alfredo": {
+                    "body": "My name is Alfredo",
+                },
+                "salvatore": {
+                    "body": "My name is Salvatore",
+                },
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+    await mark_dirty()
+    await wait_for_sync()
+
+    results = await kb_search(query="Alfredo")
+    assert results.resources[rid].data.texts["alfredo"] is not None  # type: ignore
+    results = await kb_search(query="Salvatore")
+    assert results.resources[rid].data.texts["salvatore"] is not None  # type: ignore
+    counters = await kb_counters(kbid)
+    assert counters.resources == 1
+    assert counters.fields == 3  # the two fields plus the title
+
+    # Delete a text field now
+    resp = await nucliadb_writer.delete(
+        f"kb/{kbid}/resource/{rid}/text/alfredo",
+    )
+    assert resp.status_code == 204, resp.text
+    await mark_dirty()
+    await wait_for_sync()
+
+    results = await kb_search(query="My name is")
+    assert results.fulltext.total == 1
+    assert "alfredo" not in results.resources[rid].data.texts  # type: ignore
+    assert "salvatore" in results.resources[rid].data.texts  # type: ignore
+    counters = await kb_counters(kbid)
+    assert counters.resources == 1
+    assert counters.fields == 2  # the one field plus the title
+
+    # Add another text field
+    resp = await nucliadb_writer.patch(
+        f"kb/{kbid}/resource/{rid}",
+        json={
+            "texts": {
+                "popeye": {
+                    "body": "My name is Popeye",
+                }
+            }
+        },
+    )
+    assert resp.status_code == 200
+    await mark_dirty()
+    await wait_for_sync()
+
+    results = await kb_search(query="My name is")
+    assert results.fulltext.total == 2
+    assert len(results.resources[rid].data.texts) == 2  # type: ignore
+    assert results.resources[rid].data.texts["salvatore"] is not None  # type: ignore
+    assert results.resources[rid].data.texts["popeye"] is not None  # type: ignore
+
+    counters = await kb_counters(kbid)
+    assert counters.resources == 1
+    assert counters.fields == 3  # the two fields plus the title
+
+    # Now relabel the resource -- the label should be propagated to all fields
+    resp = await nucliadb_writer.patch(
+        f"kb/{kbid}/resource/{rid}",
+        json={"usermetadata": {"classifications": [{"labelset": "foo", "label": "bar"}]}},
+    )
+    assert resp.status_code == 200, resp.text
+    await mark_dirty()
+    await wait_for_sync()
+
+    results = await kb_search(query="My name is", filters=["/classification.labels/foo/bar"])
+    assert len(results.resources[rid].data.texts) == 2  # type: ignore
+    assert results.resources[rid].data.texts["salvatore"] is not None  # type: ignore
+    assert results.resources[rid].data.texts["popeye"] is not None  # type: ignore
+    counters = await kb_counters(kbid)
+    assert counters.resources == 1
+    assert counters.fields == 3  # the two fields plus the title
+
+    # Try now updating the title of the resource -- text field count should not increase
+    resp = await nucliadb_writer.patch(
+        f"kb/{kbid}/resource/{rid}",
+        json={"title": "My new title is about Songoku"},
+    )
+    assert resp.status_code == 200, resp.text
+    await mark_dirty()
+    await wait_for_sync()
+
+    results = await kb_search(query="Songoku")
+    assert len(results.resources) == 1
+    assert results.resources[rid].title == "My new title is about Songoku"
+    counters = await kb_counters(kbid)
+    assert counters.resources == 1
+    assert counters.fields == 3  # the two fields plus the title
+
+    # Check that updating the slug does not duplicate text fields on the index
+    resp = await nucliadb_writer.patch(
+        f"kb/{kbid}/resource/{rid}",
+        json={"slug": "my-new-slug"},
+    )
+    assert resp.status_code == 200, resp.text
+    await mark_dirty()
+    await wait_for_sync()
+    counters = await kb_counters(kbid)
+    assert counters.resources == 1
+    assert counters.fields == 3
