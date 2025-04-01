@@ -49,6 +49,8 @@ pub fn minimal_resource(shard_id: String) -> Resource {
         }),
         status: resource::ResourceStatus::Processed as i32,
         metadata: Some(metadata),
+        index_texts: true,
+        index_paragraphs: true,
         ..Default::default()
     }
 }

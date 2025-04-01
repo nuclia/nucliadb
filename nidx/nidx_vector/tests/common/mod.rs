@@ -77,6 +77,8 @@ pub fn resource(resource_labels: Vec<String>, paragraph_labels: Vec<String>) -> 
                 )]),
             },
         )]),
+        index_texts: true,
+        index_paragraphs: true,
         ..Default::default()
     }
 }

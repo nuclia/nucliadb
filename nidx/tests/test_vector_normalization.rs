@@ -162,6 +162,8 @@ fn build_resource(shard_id: String) -> noderesources::Resource {
         }),
         texts,
         paragraphs: resource_paragraphs,
+        index_texts: true,
+        index_paragraphs: true,
         ..Default::default()
     }
 }

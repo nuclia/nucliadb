@@ -227,6 +227,8 @@ async fn setup_knowledge_graph(fixture: &mut NidxFixture) -> anyhow::Result<Stri
                         ..Default::default()
                     },
                 )]),
+                index_texts: true,
+                index_paragraphs: true,
                 ..Default::default()
             },
         )
@@ -1091,6 +1093,8 @@ async fn create_knowledge_graph(fixture: &mut NidxFixture, shard_id: String) -> 
                     modified: Some(timestamp),
                 }),
                 texts: HashMap::new(),
+                index_texts: true,
+                index_paragraphs: true,
                 ..Default::default()
             },
         )

@@ -103,6 +103,8 @@ async fn create_dummy_resources(total: u8, fixture: &mut NidxFixture, shard_id: 
                             }],
                         },
                     )]),
+                    index_texts: true,
+                    index_paragraphs: true,
                     ..Default::default()
                 },
             )

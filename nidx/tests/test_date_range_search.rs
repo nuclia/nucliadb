@@ -91,6 +91,8 @@ async fn populate(fixture: &mut NidxFixture, shard_id: String, metadata: IndexMe
         status: ResourceStatus::Processed as i32,
         texts: HashMap::from([(field_id.clone(), text_content)]),
         paragraphs: HashMap::from([(format!("{raw_resource_id}/{field_id}"), paragraphs)]),
+        index_texts: true,
+        index_paragraphs: true,
         ..Default::default()
     };
 

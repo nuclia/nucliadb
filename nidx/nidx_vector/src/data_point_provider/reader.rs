@@ -343,6 +343,8 @@ mod tests {
             labels: vec!["2".to_string()],
             paragraphs: HashMap::from([("6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1".to_string(), paragraphs)]),
             shard_id: "DOC".to_string(),
+            index_texts: true,
+            index_paragraphs: true,
             ..Default::default()
         };
 
@@ -438,6 +440,8 @@ mod tests {
             labels: vec!["2".to_string()],
             paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
             shard_id: "DOC".to_string(),
+            index_texts: true,
+            index_paragraphs: true,
             ..Default::default()
         };
 
@@ -550,6 +554,8 @@ mod tests {
             labels: vec!["2".to_string()],
             paragraphs: HashMap::from([("f/field".to_string(), paragraphs)]),
             shard_id: "DOC".to_string(),
+            index_texts: true,
+            index_paragraphs: true,
             ..Default::default()
         };
 

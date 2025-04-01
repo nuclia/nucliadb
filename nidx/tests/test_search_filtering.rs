@@ -261,6 +261,8 @@ fn build_resource_with_field(shard_id: String, field_id: String) -> noderesource
         }),
         texts,
         paragraphs: resource_paragraphs,
+        index_texts: true,
+        index_paragraphs: true,
         ..Default::default()
     }
 }

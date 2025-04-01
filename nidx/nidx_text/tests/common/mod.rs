@@ -113,6 +113,8 @@ pub fn create_resource(shard_id: String) -> Resource {
         vectors: HashMap::default(),
         vectors_to_delete: HashMap::default(),
         shard_id,
+        index_texts: true,
+        index_paragraphs: true,
         ..Default::default()
     }
 }

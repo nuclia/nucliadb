@@ -68,6 +68,8 @@ async fn create_dummy_resources(total: u8, writer: &mut NidxFixture, shard_id: S
                     }),
                     labels,
                     texts,
+                    index_texts: true,
+                    index_paragraphs: true,
                     ..Default::default()
                 },
             )
