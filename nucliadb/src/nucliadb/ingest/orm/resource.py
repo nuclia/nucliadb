@@ -357,47 +357,43 @@ class Resource:
 
             if field_texts_indexing:
                 extracted_text = await field.get_extracted_text()
-                if extracted_text is None:
-                    # No extracted text, skip this field
-                    continue
-                field_computed_metadata = await field.get_field_metadata()
-                try:
-                    field_author = await field.generated_by()
-                except FieldAuthorNotFound:
-                    field_author = None
-                user_field_metadata = next(
-                    (fm for fm in basic.fieldmetadata if fm.field == fieldid),
-                    None,
-                )
-                brain.generate_texts_index_message(
-                    self.generate_field_id(fieldid),
-                    extracted_text,
-                    field_computed_metadata,
-                    basic.usermetadata,
-                    field_author,
-                    replace_field=reindex,
-                )
+                if extracted_text is not None:
+                    field_computed_metadata = await field.get_field_metadata()
+                    try:
+                        field_author = await field.generated_by()
+                    except FieldAuthorNotFound:
+                        field_author = None
+                    user_field_metadata = next(
+                        (fm for fm in basic.fieldmetadata if fm.field == fieldid),
+                        None,
+                    )
+                    brain.generate_texts_index_message(
+                        self.generate_field_id(fieldid),
+                        extracted_text,
+                        field_computed_metadata,
+                        basic.usermetadata,
+                        field_author,
+                        replace_field=reindex,
+                    )
 
             if field_paragraphs_indexing or field_vectors_indexing:
                 # When updating the vectors, we also need to populate the paragraphs part of the
                 # index message, but without needing to actually reindex
                 extracted_text = await field.get_extracted_text()
                 field_computed_metadata = await field.get_field_metadata()
-                if extracted_text is None or field_computed_metadata is None:
-                    # No extracted text or field metadata, skip this field
-                    continue
-                page_positions = None
-                if fieldid.field_type == FieldType.FILE and isinstance(field, File):
-                    page_positions = await get_file_page_positions(field)
-                brain.generate_paragraphs_index_message(
-                    self.generate_field_id(fieldid),
-                    field_computed_metadata,
-                    extracted_text,
-                    page_positions,
-                    user_field_metadata,
-                    replace_field=reindex and field_paragraphs_indexing,
-                    index=field_paragraphs_indexing,
-                )
+                if extracted_text is not None and field_computed_metadata is not None:
+                    page_positions = None
+                    if fieldid.field_type == FieldType.FILE and isinstance(field, File):
+                        page_positions = await get_file_page_positions(field)
+                    brain.generate_paragraphs_index_message(
+                        self.generate_field_id(fieldid),
+                        field_computed_metadata,
+                        extracted_text,
+                        page_positions,
+                        user_field_metadata,
+                        replace_field=reindex and field_paragraphs_indexing,
+                        index=field_paragraphs_indexing,
+                    )
 
             if field_vectors_indexing:
                 if vectorset_configs is None:
