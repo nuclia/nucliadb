@@ -45,7 +45,7 @@ pub struct TextSchema {
     pub groups_public: Field,
     pub groups_with_access: Field,
 
-    pub encoded_field_id: Field,
+    pub encoded_field_id: Option<Field>,
     pub encoded_field_id_bytes: Option<Field>,
 }
 
@@ -85,13 +85,18 @@ impl TextSchema {
             // v4: Field ID encoded as array of u64 for faster retrieval during prefilter
             // Using a bytes field is slow due to tantivy's implementation being slow with many unique values.
             // A better implementation is tracked in https://github.com/quickwit-oss/tantivy/issues/2090
-            sb.add_u64_field("encoded_field_id", FAST)
-        } else {
+            Some(sb.add_u64_field("encoded_field_id", FAST))
+        } else if version == 3 {
             // v3: Field ID encoded as array of u64 for faster retrieval during prefilter
             // Using a bytes field is slow due to tantivy's implementation being slow with many unique values.
             // A better implementation is tracked in https://github.com/quickwit-oss/tantivy/issues/2090
             // The INDEXED flag is unnecessary here, and this is backwards compatible code until we remove it in v4.
-            sb.add_u64_field("encoded_field_id", FAST | INDEXED)
+            Some(sb.add_u64_field("encoded_field_id", FAST | INDEXED))
+        } else if version == 2 {
+            // v2 did not have the field indexed
+            Some(sb.add_u64_field("encoded_field_id", FAST))
+        } else {
+            None
         };
 
         let encoded_field_id_bytes = if version >= 4 {

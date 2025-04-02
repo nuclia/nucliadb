@@ -80,8 +80,10 @@ pub fn index_document(
         field_doc.add_facet(schema.field, facet_field);
         field_doc.add_text(schema.text, &text_info.text);
 
-        for d in encode_field_id(resource_uuid, &format!("/{field}")) {
-            field_doc.add_u64(schema.encoded_field_id, d);
+        if let Some(encoded_field_id) = schema.encoded_field_id {
+            for d in encode_field_id(resource_uuid, &format!("/{field}")) {
+                field_doc.add_u64(encoded_field_id, d);
+            }
         }
 
         if let Some(encoded_field_id_bytes) = schema.encoded_field_id_bytes {

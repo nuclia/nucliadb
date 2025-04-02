@@ -35,12 +35,14 @@ use nidx_protos::{
 };
 use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
-use tantivy::columnar::Column;
+use tantivy::columnar::{BytesColumn, Column};
+use tantivy::fastfield::FacetReader;
 use tantivy::query::{AllQuery, BooleanQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::Value;
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
 use tracing::*;
+use uuid::Uuid;
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
     facets_count
@@ -89,7 +91,8 @@ impl Debug for TextReaderService {
 }
 
 struct FieldUuidSegmentCollector {
-    encoded_field_id_reader: Column,
+    uuid_reader: BytesColumn,
+    field_reader: FacetReader,
     results: Vec<FieldId>,
 }
 
@@ -97,14 +100,22 @@ impl SegmentCollector for FieldUuidSegmentCollector {
     type Fruit = Vec<FieldId>;
 
     fn collect(&mut self, doc: tantivy::DocId, _score: tantivy::Score) {
-        let mut data = Vec::new();
-        self.encoded_field_id_reader.fill_vals(doc, &mut data);
-        let (rid, fid) = decode_field_id(&data);
+        let uuid_ord = self.uuid_reader.term_ords(doc).next().unwrap();
+        let mut uuid_bytes = Vec::new();
+        self.uuid_reader.ord_to_bytes(uuid_ord, &mut uuid_bytes).unwrap();
 
-        self.results.push(FieldId {
-            resource_id: rid,
-            field_id: fid,
-        });
+        let mut facet_ords = self.field_reader.facet_ords(doc);
+        let mut facet = Facet::root();
+        self.field_reader
+            .facet_from_ord(facet_ords.next().unwrap(), &mut facet)
+            .expect("field facet not found");
+
+        if let Ok(resource_id) = Uuid::parse_str(std::str::from_utf8(&uuid_bytes).unwrap()) {
+            self.results.push(FieldId {
+                resource_id,
+                field_id: facet.to_path_string(),
+            });
+        }
     }
 
     fn harvest(self) -> Self::Fruit {
@@ -124,8 +135,71 @@ impl Collector for FieldUuidCollector {
         _segment_local_id: tantivy::SegmentOrdinal,
         segment: &tantivy::SegmentReader,
     ) -> tantivy::Result<Self::Child> {
-        let encoded_field_id_reader = segment.fast_fields().u64("encoded_field_id")?;
+        let uuid_reader = segment.fast_fields().bytes("uuid")?.unwrap();
+        let field_reader = segment.facet_reader("field")?;
         Ok(FieldUuidSegmentCollector {
+            uuid_reader,
+            field_reader,
+            results: vec![],
+        })
+    }
+
+    fn requires_scoring(&self) -> bool {
+        false
+    }
+
+    fn merge_fruits(
+        &self,
+        segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
+    ) -> tantivy::Result<Self::Fruit> {
+        Ok(segment_fruits
+            .into_iter()
+            .reduce(|mut a, mut b| {
+                a.append(&mut b);
+                a
+            })
+            .unwrap_or_default())
+    }
+}
+
+struct FieldUuidSegmentCollectorV2 {
+    encoded_field_id_reader: Column,
+    results: Vec<FieldId>,
+}
+
+impl SegmentCollector for FieldUuidSegmentCollectorV2 {
+    type Fruit = Vec<FieldId>;
+
+    fn collect(&mut self, doc: tantivy::DocId, _score: tantivy::Score) {
+        let mut data = Vec::new();
+        self.encoded_field_id_reader.fill_vals(doc, &mut data);
+        let (rid, fid) = decode_field_id(&data);
+
+        self.results.push(FieldId {
+            resource_id: rid,
+            field_id: fid,
+        });
+    }
+
+    fn harvest(self) -> Self::Fruit {
+        self.results
+    }
+}
+
+struct FieldUuidCollectorV2;
+
+impl Collector for FieldUuidCollectorV2 {
+    type Fruit = Vec<FieldId>;
+
+    type Child = FieldUuidSegmentCollectorV2;
+
+    fn for_segment(
+        &self,
+        _segment_local_id: tantivy::SegmentOrdinal,
+        segment: &tantivy::SegmentReader,
+    ) -> tantivy::Result<Self::Child> {
+        let encoded_field_id_reader = segment.fast_fields().u64("encoded_field_id")?;
+        Ok(FieldUuidSegmentCollectorV2 {
             encoded_field_id_reader,
             results: vec![],
         })
@@ -189,7 +263,11 @@ impl TextReaderService {
 
         let prefilter_query: Box<dyn Query> = Box::new(BooleanQuery::intersection(subqueries));
         let searcher = self.reader.searcher();
-        let docs_fulfilled = searcher.search(&prefilter_query, &FieldUuidCollector)?;
+        let docs_fulfilled = if schema.encoded_field_id.is_some() {
+            searcher.search(&prefilter_query, &FieldUuidCollectorV2)?
+        } else {
+            searcher.search(&prefilter_query, &FieldUuidCollector)?
+        };
         // If none of the fields match the pre-filter, thats all the query planner needs to know.
         if docs_fulfilled.is_empty() {
             return Ok(PrefilterResult::None);
