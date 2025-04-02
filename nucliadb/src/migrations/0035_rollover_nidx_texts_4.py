@@ -18,12 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""Migration #34
+"""Migration #35
 
-Rollover to update to nidx_texts v3
+Rollover to update to nidx_texts v4
 
 """
 
+from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.migrator.context import ExecutionContext
 
 
@@ -31,11 +32,4 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    """
-    We only need 1 rollover migration defined at a time; otherwise, we will
-    possibly run many for a kb when we only ever need to run one
-    """
-    # if os.environ.get("RUNNING_ENVIRONMENT") == "stage":
-    #     # Skip migration in stage environment, as we already migrated the indexes manually
-    #     return
-    # await rollover_kb_index(context, kbid)
+    await rollover_kb_index(context, kbid)
