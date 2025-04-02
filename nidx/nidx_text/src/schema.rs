@@ -45,7 +45,7 @@ pub struct TextSchema {
     pub groups_public: Field,
     pub groups_with_access: Field,
 
-    pub encoded_field_id: Option<Field>,
+    pub encoded_field_id: Field,
     pub encoded_field_id_bytes: Option<Field>,
 }
 
@@ -85,22 +85,19 @@ impl TextSchema {
             // v4: Field ID encoded as array of u64 for faster retrieval during prefilter
             // Using a bytes field is slow due to tantivy's implementation being slow with many unique values.
             // A better implementation is tracked in https://github.com/quickwit-oss/tantivy/issues/2090
-            Some(sb.add_u64_field("encoded_field_id", FAST))
-        } else if version == 3 {
+            sb.add_u64_field("encoded_field_id", FAST)
+        } else {
             // v3: Field ID encoded as array of u64 for faster retrieval during prefilter
             // Using a bytes field is slow due to tantivy's implementation being slow with many unique values.
             // A better implementation is tracked in https://github.com/quickwit-oss/tantivy/issues/2090
             // The INDEXED flag is unnecessary here, and this is backwards compatible code until we remove it in v4.
-            Some(sb.add_u64_field("encoded_field_id", FAST | INDEXED))            
-        } else {
-            None
+            sb.add_u64_field("encoded_field_id", FAST | INDEXED)
         };
 
         let encoded_field_id_bytes = if version >= 4 {
             // v4: Field ID encoded as array of u8 for faster deletions
             Some(sb.add_bytes_field("encoded_field_id_bytes", INDEXED))
-        }
-        else {
+        } else {
             None
         };
 
@@ -160,30 +157,29 @@ pub fn decode_field_id(data: &[u64]) -> (uuid::Uuid, String) {
     (rid, String::from_utf8(ubytes).unwrap())
 }
 
-
 /// Encodes a resource and field id as a series of u8
-/// This is stored in the fast field `encoded_field_id_bytes`
+/// This is stored in the indexed field `encoded_field_id_bytes`
 pub fn encode_field_id_bytes(rid: uuid::Uuid, fid: &str) -> Vec<u8> {
     let mut out = Vec::with_capacity(16 + fid.len());
-    out.extend_from_slice(rid.as_bytes()); // Encode the UUID as 16 bytes
-    out.extend_from_slice(fid.as_bytes()); // Append the `fid` as raw bytes
+    out.extend_from_slice(rid.as_bytes());
+    out.extend_from_slice(fid.as_bytes());
     out
 }
 
 /// Decodes a resource and field id from a series of u8
+#[allow(dead_code)]
 pub fn decode_field_id_bytes(data: &[u8]) -> (uuid::Uuid, String) {
     if data.len() < 16 {
         panic!("Data is too short to contain a valid UUID");
     }
-    let rid = uuid::Uuid::from_slice(&data[..16]).unwrap(); // Decode the first 16 bytes as UUID
-    let fid = String::from_utf8(data[16..].to_vec()).unwrap(); // Decode the remaining bytes as `fid`
+    let rid = uuid::Uuid::from_slice(&data[..16]).unwrap();
+    let fid = String::from_utf8(data[16..].to_vec()).unwrap();
     (rid, fid)
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::{decode_field_id, encode_field_id, encode_field_id_bytes, decode_field_id_bytes};
+    use super::{decode_field_id, decode_field_id_bytes, encode_field_id, encode_field_id_bytes};
 
     #[test]
     fn test_encode_decode_field_id() {
@@ -211,14 +207,14 @@ mod tests {
     fn test_encode_decode_field_id_bytes() {
         // Test with different lengths to ensure it works when crossing block length
         let testcases = [
-            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title"),
-            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title1"),
-            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title12"),
-            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title123"),
-            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title1234"),
-            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title12345"),
-            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title123456"),
-            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title1234567"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title1"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title12"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title123"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title1234"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title12345"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title123456"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title1234567"),
         ];
         for t in testcases {
             let rid = uuid::Uuid::parse_str(t.0).unwrap();
