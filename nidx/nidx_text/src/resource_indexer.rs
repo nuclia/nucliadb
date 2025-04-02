@@ -85,7 +85,7 @@ pub fn index_document(
         }
 
         if let Some(encoded_field_id_bytes) = schema.encoded_field_id_bytes {
-            let encoded = encode_field_id_bytes(resource_uuid, &field);
+            let encoded = encode_field_id_bytes(resource_uuid, field);
             field_doc.add_bytes(encoded_field_id_bytes, encoded.as_slice());
         }
 
