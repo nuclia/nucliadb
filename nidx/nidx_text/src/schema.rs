@@ -166,20 +166,20 @@ pub fn encode_field_id_bytes(rid: uuid::Uuid, fid: &str) -> Vec<u8> {
     out
 }
 
-/// Decodes a resource and field id from a series of u8
-#[allow(dead_code)]
-pub fn decode_field_id_bytes(data: &[u8]) -> (uuid::Uuid, String) {
-    if data.len() < 16 {
-        panic!("Data is too short to contain a valid UUID");
-    }
-    let rid = uuid::Uuid::from_slice(&data[..16]).unwrap();
-    let fid = String::from_utf8(data[16..].to_vec()).unwrap();
-    (rid, fid)
-}
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_field_id, decode_field_id_bytes, encode_field_id, encode_field_id_bytes};
+    use super::{decode_field_id, encode_field_id, encode_field_id_bytes};
+
+    /// Decodes a resource and field id from a series of u8
+    pub fn decode_field_id_bytes(data: &[u8]) -> (uuid::Uuid, String) {
+        if data.len() < 16 {
+            panic!("Data is too short to contain a valid UUID");
+        }
+        let rid = uuid::Uuid::from_slice(&data[..16]).unwrap();
+        let fid = String::from_utf8(data[16..].to_vec()).unwrap();
+        (rid, fid)
+    }
 
     #[test]
     fn test_encode_decode_field_id() {
