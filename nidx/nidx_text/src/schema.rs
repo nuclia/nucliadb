@@ -166,7 +166,6 @@ pub fn encode_field_id_bytes(rid: uuid::Uuid, fid: &str) -> Vec<u8> {
     out
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::{decode_field_id, encode_field_id, encode_field_id_bytes};
