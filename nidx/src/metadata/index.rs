@@ -345,12 +345,12 @@ mod tests {
     async fn test_text_config(pool: sqlx::PgPool) -> anyhow::Result<()> {
         let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
 
-        // Default version for new indexes is 3
+        // Default version for new indexes is 4
         let shard = Shard::create(&meta.pool, Uuid::new_v4()).await.unwrap();
         let index = Index::create(&meta.pool, shard.id, "multilingual", IndexConfig::new_text())
             .await
             .unwrap();
-        assert_eq!(index.config::<TextConfig>()?.version, 3);
+        assert_eq!(index.config::<TextConfig>()?.version, 4);
 
         // Default version if DB is empty is 1
         sqlx::query("UPDATE indexes SET configuration = NULL")
