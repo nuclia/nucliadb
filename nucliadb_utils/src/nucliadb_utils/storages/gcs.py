@@ -544,18 +544,14 @@ class GCSStorage(Storage):
             url = "{}/{}/o/{}".format(self.object_base_url, bucket_name, quote_plus(uri))
             headers = await self.get_access_headers()
             async with self.session.delete(url, headers=headers) as resp:
+                if resp.status in (200, 204, 404):
+                    return
                 try:
                     data = await resp.json()
                 except Exception:
                     text = await resp.text()
                     data = {"text": text}
-                if resp.status == 404:
-                    logger.warning(
-                        f"Attempt to delete not found gcloud: {data}, status: {resp.status}",
-                        exc_info=True,
-                    )
-                elif resp.status not in (200, 204):
-                    raise GoogleCloudException(f"{resp.status}: {json.dumps(data)}")
+                raise GoogleCloudException(f"{resp.status}: {json.dumps(data)}")
         else:
             raise AttributeError("No valid uri")
 
