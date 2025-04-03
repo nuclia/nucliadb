@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n        COUNT(*) FILTER (WHERE started_at IS NULL AND enqueued_at < NOW() - INTERVAL '1 minute') AS \"queued!\",\n        COUNT(*) FILTER (WHERE started_at IS NULL AND enqueued_at > NOW() - INTERVAL '1 minute') AS \"recently_queued!\",\n        COUNT(*) FILTER (WHERE started_at IS NOT NULL) AS \"running!\"\n        FROM merge_jobs;\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "queued!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "recently_queued!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "running!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "8d33717587c6ee8f5fc339a80b1212a73d6c03e45856b1d55457fc8074709dd0"
+}

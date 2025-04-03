@@ -162,6 +162,7 @@ pub mod scheduler {
     #[derive(Clone, Debug, EncodeLabelValue, PartialEq, Eq, Hash)]
     pub enum JobState {
         Queued,
+        RecentlyQueued,
         Running,
     }
 
