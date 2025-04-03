@@ -1229,6 +1229,7 @@ class FieldMetadata(google.protobuf.message.Message):
     LAST_UNDERSTANDING_FIELD_NUMBER: builtins.int
     LAST_EXTRACT_FIELD_NUMBER: builtins.int
     LAST_SUMMARY_FIELD_NUMBER: builtins.int
+    LAST_PROCESSING_START_FIELD_NUMBER: builtins.int
     THUMBNAIL_FIELD_NUMBER: builtins.int
     LANGUAGE_FIELD_NUMBER: builtins.int
     SUMMARY_FIELD_NUMBER: builtins.int
@@ -1261,6 +1262,8 @@ class FieldMetadata(google.protobuf.message.Message):
     @property
     def last_summary(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
+    def last_processing_start(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    @property
     def thumbnail(self) -> global___CloudFile: ...
     @property
     def positions(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___Positions]:
@@ -1280,6 +1283,7 @@ class FieldMetadata(google.protobuf.message.Message):
         last_understanding: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         last_extract: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         last_summary: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        last_processing_start: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         thumbnail: global___CloudFile | None = ...,
         language: builtins.str = ...,
         summary: builtins.str = ...,
@@ -1287,8 +1291,8 @@ class FieldMetadata(google.protobuf.message.Message):
         relations: collections.abc.Iterable[global___Relations] | None = ...,
         mime_type: builtins.str = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["last_extract", b"last_extract", "last_index", b"last_index", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "thumbnail", b"thumbnail"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["classifications", b"classifications", "entities", b"entities", "language", b"language", "last_extract", b"last_extract", "last_index", b"last_index", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "links", b"links", "mime_type", b"mime_type", "ner", b"ner", "paragraphs", b"paragraphs", "positions", b"positions", "relations", b"relations", "summary", b"summary", "thumbnail", b"thumbnail"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["last_extract", b"last_extract", "last_index", b"last_index", "last_processing_start", b"last_processing_start", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "thumbnail", b"thumbnail"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["classifications", b"classifications", "entities", b"entities", "language", b"language", "last_extract", b"last_extract", "last_index", b"last_index", "last_processing_start", b"last_processing_start", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "links", b"links", "mime_type", b"mime_type", "ner", b"ner", "paragraphs", b"paragraphs", "positions", b"positions", "relations", b"relations", "summary", b"summary", "thumbnail", b"thumbnail"]) -> None: ...
 
 global___FieldMetadata = FieldMetadata
 

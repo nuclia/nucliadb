@@ -73,6 +73,7 @@ class FieldBuilder:
             self.__extracted_metadata.metadata.metadata.last_index.FromDatetime(now)
             self.__extracted_metadata.metadata.metadata.last_understanding.FromDatetime(now)
             self.__extracted_metadata.metadata.metadata.last_extract.FromDatetime(now)
+            self.__extracted_metadata.metadata.metadata.last_processing_start.FromDatetime(now)
         return self.__extracted_metadata
 
     @property
