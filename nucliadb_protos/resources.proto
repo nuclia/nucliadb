@@ -320,6 +320,7 @@ message FieldMetadata {
     google.protobuf.Timestamp last_understanding = 6;
     google.protobuf.Timestamp last_extract = 7;
     google.protobuf.Timestamp last_summary = 8;
+    google.protobuf.Timestamp last_processing_start = 16;
     CloudFile thumbnail = 9;
     string language = 10;
     string summary = 11;
