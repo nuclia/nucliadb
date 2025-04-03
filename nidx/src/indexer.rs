@@ -42,10 +42,9 @@ use crate::errors::NidxError;
 use crate::grpc_server::GrpcServer;
 use crate::metrics::IndexKindLabels;
 use crate::metrics::OperationStatusLabels;
-use crate::metrics::indexer::INDEXING_COUNTER;
-use crate::metrics::indexer::PER_INDEX_INDEXING_TIME;
-use crate::metrics::indexer::TOTAL_INDEXING_TIME;
+use crate::metrics::indexer::*;
 use crate::segment_store::pack_and_upload;
+use crate::utilization_tracker::UtilizationTracker;
 use crate::{Settings, metadata::*};
 
 #[cfg(feature = "telemetry")]
@@ -138,7 +137,12 @@ pub async fn run_nats(settings: Settings, shutdown: CancellationToken) -> anyhow
         None => tempfile::env::temp_dir(),
     };
 
+    let utilization = UtilizationTracker::new(|busy, duration| {
+        INDEXING_BUSY.get_or_create(&busy.into()).inc_by(duration.as_secs_f64());
+    });
+
     while !shutdown.is_cancelled() {
+        utilization.idle().await;
         let sub_msg = tokio::select! {
             sub_msg = subscription.next() => sub_msg,
             _ = shutdown.cancelled() => { return Ok(()) }
@@ -164,6 +168,7 @@ pub async fn run_nats(settings: Settings, shutdown: CancellationToken) -> anyhow
             continue;
         }
 
+        utilization.busy().await;
         let span = info_span!("indexer_message", ?seq);
         let (msg, acker) = msg.split();
 
