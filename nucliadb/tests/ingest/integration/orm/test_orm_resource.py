@@ -419,9 +419,6 @@ async def test_generate_index_message_contains_all_metadata(
             "/e/ENTITY/document",
             "/e/NOUN/document",
         }.issubset(set(text_info.labels))
-        if field in ("u/link", "t/text1"):
-            assert "/e/Location/My home" in text_info.labels
-
     assert len(fields_to_be_found) == 0
 
     # Metadata

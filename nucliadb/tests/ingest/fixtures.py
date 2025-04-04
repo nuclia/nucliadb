@@ -601,7 +601,7 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox_ingest:
         basic.usermetadata.classifications.append(cl1)
 
         ufm1 = rpb.UserFieldMetadata(
-            paragraphs=[rpb.ParagraphAnnotation(classifications=[cl1], key="key1")],
+            paragraphs=[rpb.ParagraphAnnotation(classifications=[cl1], key=f"{rid}/t/text1/0-20")],
             field=rpb.FieldID(field_type=rpb.FieldType.TEXT, field="text1"),
         )
         basic.fieldmetadata.append(ufm1)

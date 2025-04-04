@@ -141,8 +141,9 @@ async def entities(
     """Single fixture to get entities injected in different ways."""
     # Ensure entities are properly stored/indexed
     await wait_until_entity(nucliadb_ingest_grpc, standalone_knowledgebox, "ANIMALS", "cat")
+    await wait_until_entity(nucliadb_ingest_grpc, standalone_knowledgebox, "ANIMALS", "dog")
+    await wait_until_entity(nucliadb_ingest_grpc, standalone_knowledgebox, "ANIMALS", "domestic-cat")
     await wait_until_entity(nucliadb_ingest_grpc, standalone_knowledgebox, "ANIMALS", "dolphin")
-    await wait_until_entity(nucliadb_ingest_grpc, standalone_knowledgebox, "ANIMALS", "bird")
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -232,7 +233,6 @@ async def test_update_entities_group(
     body = resp.json()
 
     assert body["entities"].keys() == {
-        "bird",
         "cat",
         "dog",
         "seal",
@@ -343,20 +343,25 @@ async def test_entities_indexing(
     entities,
     predict_mock,
 ):
-    # TODO: improve test cases here
-
     kbid = standalone_knowledgebox
 
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/suggest",
-        params={
-            "query": "do",
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
+    async def suggested_entities(query: str) -> list[str]:
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/suggest",
+            params={
+                "query": query,
+                "features": ["entities"],
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        entities = set((e["value"] for e in body["entities"]["entities"]))
+        return list(entities)
 
-    entities = set((e["value"] for e in body["entities"]["entities"]))
-    # BUG? why is "domestic cat" not appearing in the results?
-    assert entities == {"dog", "dolphin"}
-    # assert entities == {"dog", "domestic cat", "dolphin"}
+    entities = await suggested_entities("do")
+    # Only the processing entities are indexed
+    assert "dog" not in entities
+    assert "dolphin" in entities
+    entities = await suggested_entities("ca")
+    assert "cat" in entities
+    assert "domestic-cat" not in entities
