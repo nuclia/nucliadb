@@ -55,7 +55,6 @@ async def test_fieldmetadata_crud(
                 ],
             },
         ],
-        "selections": [],
     }
     fieldmetadata_1 = {
         "field": {"field": "textfield2", "field_type": "text"},
@@ -88,7 +87,6 @@ async def test_fieldmetadata_crud(
             }
         ],
         "question_answers": [],
-        "selections": [],
     }
 
     # Step 1
