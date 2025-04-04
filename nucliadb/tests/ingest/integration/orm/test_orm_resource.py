@@ -34,7 +34,6 @@ from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType
 from nucliadb_protos.resources_pb2 import FieldID as PBFieldID
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
-from nucliadb_protos.resources_pb2 import TokenSplit as PBTokenSplit
 from nucliadb_protos.resources_pb2 import UserFieldMetadata as PBUserFieldMetadata
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
@@ -64,7 +63,7 @@ async def test_create_resource_orm_with_basic(
     basic.usermetadata.classifications.append(cl1)
 
     ufm1 = PBUserFieldMetadata(
-        token=[PBTokenSplit(token="My home", klass="Location")],
+        paragraphs=[rpb.ParagraphAnnotation(classifications=[cl1], key="key1")],
         field=PBFieldID(field_type=FieldType.TEXT, field="title"),
     )
 
@@ -276,8 +275,6 @@ async def test_generate_broker_message(
     basic_fieldmetadata = basic.fieldmetadata
     assert len(basic_fieldmetadata) == 1
     assert basic_fieldmetadata[0].field.field == "text1"
-    assert basic_fieldmetadata[0].token[0].token == "My home"
-    assert basic_fieldmetadata[0].token[0].klass == "Location"
 
     # 1.2 USER RELATIONS
     assert len(bm.user_relations.relations) == 1
@@ -422,9 +419,6 @@ async def test_generate_index_message_contains_all_metadata(
             "/e/ENTITY/document",
             "/e/NOUN/document",
         }.issubset(set(text_info.labels))
-        if field in ("u/link", "t/text1"):
-            assert "/e/Location/My home" in text_info.labels
-
     assert len(fields_to_be_found) == 0
 
     # Metadata

@@ -54,7 +54,6 @@ from nucliadb_protos.resources_pb2 import (
     Metadata,
     PageSelections,
     Paragraph,
-    TokenSplit,
     UserFieldMetadata,
     VisualSelection,
 )
@@ -102,16 +101,6 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
     if item.fieldmetadata is not None:
         for fieldmetadata in item.fieldmetadata:
             userfieldmetadata = UserFieldMetadata()
-            for token in fieldmetadata.token:
-                userfieldmetadata.token.append(
-                    TokenSplit(
-                        token=token.token,
-                        klass=token.klass,
-                        start=token.start,
-                        end=token.end,
-                        cancelled_by_user=token.cancelled_by_user,
-                    )
-                )
             for paragraph in fieldmetadata.paragraphs:
                 validate_classifications(paragraph)
                 paragraphpb = PBParagraphAnnotation(key=paragraph.key)

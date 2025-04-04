@@ -1815,36 +1815,6 @@ class ComputedMetadata(google.protobuf.message.Message):
 global___ComputedMetadata = ComputedMetadata
 
 @typing.final
-class TokenSplit(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    TOKEN_FIELD_NUMBER: builtins.int
-    KLASS_FIELD_NUMBER: builtins.int
-    START_FIELD_NUMBER: builtins.int
-    END_FIELD_NUMBER: builtins.int
-    CANCELLED_BY_USER_FIELD_NUMBER: builtins.int
-    SPLIT_FIELD_NUMBER: builtins.int
-    token: builtins.str
-    klass: builtins.str
-    start: builtins.int
-    end: builtins.int
-    cancelled_by_user: builtins.bool
-    split: builtins.str
-    def __init__(
-        self,
-        *,
-        token: builtins.str = ...,
-        klass: builtins.str = ...,
-        start: builtins.int = ...,
-        end: builtins.int = ...,
-        cancelled_by_user: builtins.bool = ...,
-        split: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["cancelled_by_user", b"cancelled_by_user", "end", b"end", "klass", b"klass", "split", b"split", "start", b"start", "token", b"token"]) -> None: ...
-
-global___TokenSplit = TokenSplit
-
-@typing.final
 class ParagraphAnnotation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1939,13 +1909,10 @@ global___PageSelections = PageSelections
 class UserFieldMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    TOKEN_FIELD_NUMBER: builtins.int
     PARAGRAPHS_FIELD_NUMBER: builtins.int
     PAGE_SELECTIONS_FIELD_NUMBER: builtins.int
     QUESTION_ANSWERS_FIELD_NUMBER: builtins.int
     FIELD_FIELD_NUMBER: builtins.int
-    @property
-    def token(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___TokenSplit]: ...
     @property
     def paragraphs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ParagraphAnnotation]: ...
     @property
@@ -1957,14 +1924,13 @@ class UserFieldMetadata(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        token: collections.abc.Iterable[global___TokenSplit] | None = ...,
         paragraphs: collections.abc.Iterable[global___ParagraphAnnotation] | None = ...,
         page_selections: collections.abc.Iterable[global___PageSelections] | None = ...,
         question_answers: collections.abc.Iterable[global___QuestionAnswerAnnotation] | None = ...,
         field: global___FieldID | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["field", b"field"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["field", b"field", "page_selections", b"page_selections", "paragraphs", b"paragraphs", "question_answers", b"question_answers", "token", b"token"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["field", b"field", "page_selections", b"page_selections", "paragraphs", b"paragraphs", "question_answers", b"question_answers"]) -> None: ...
 
 global___UserFieldMetadata = UserFieldMetadata
 

@@ -39,7 +39,6 @@ from nucliadb_protos.resources_pb2 import (
     Paragraph,
     ParagraphAnnotation,
     Position,
-    TokenSplit,
     UserFieldMetadata,
 )
 from nucliadb_protos.utils_pb2 import Vector
@@ -56,7 +55,6 @@ class ClassificationLabels:
 
 
 class EntityLabels:
-    ANNOTATED = "PERSON/Rusty"
     DETECTED = "COUNTRY/Spain"
 
 
@@ -76,7 +74,6 @@ ALL_PARAGRAPHS = {PARAGRAPH1, PARAGRAPH2, PARAGRAPH3, PARAGRAPH4}
 
 
 FILTERS_TO_PARAGRAPHS = {
-    entity_filter(EntityLabels.ANNOTATED): {PARAGRAPH1, PARAGRAPH2},
     entity_filter(EntityLabels.DETECTED): {PARAGRAPH1, PARAGRAPH2},
     label_filter(ClassificationLabels.RESOURCE_ANNOTATED): {PARAGRAPH3, PARAGRAPH4},
     label_filter(ClassificationLabels.FIELD_DETECTED): {PARAGRAPH3, PARAGRAPH4},
@@ -95,13 +92,6 @@ def broker_message_with_entities(kbid):
     field = FieldID()
     field.field = field_id
     field.field_type = FieldType.TEXT
-
-    # Add annotated entity
-    ufm = UserFieldMetadata()
-    ufm.field.CopyFrom(field)
-    family, entity = EntityLabels.ANNOTATED.split("/")
-    ufm.token.append(TokenSplit(token=entity, klass=family, start=11, end=16, cancelled_by_user=False))
-    bm.basic.fieldmetadata.append(ufm)
 
     # Add a couple of paragraphs to a text field
     p1 = PARAGRAPH1
@@ -304,19 +294,12 @@ async def test_filtering_before_and_after_reindexing(
         [label_filter("resource/unexisting")],
         [label_filter("user-resource/unexisting")],
         # Filter with existing labels and entities
-        [entity_filter(EntityLabels.ANNOTATED)],
         [entity_filter(EntityLabels.DETECTED)],
         [label_filter(ClassificationLabels.PARAGRAPH_ANNOTATED)],
         [label_filter(ClassificationLabels.PARAGRAPH_DETECTED)],
         [label_filter(ClassificationLabels.RESOURCE_ANNOTATED)],
         [label_filter(ClassificationLabels.FIELD_DETECTED)],
         # Combine filters
-        [entity_filter(EntityLabels.ANNOTATED), entity_filter("unexisting/entity")],
-        [entity_filter(EntityLabels.ANNOTATED), entity_filter(EntityLabels.DETECTED)],
-        [
-            entity_filter(EntityLabels.ANNOTATED),
-            label_filter(ClassificationLabels.PARAGRAPH_DETECTED),
-        ],
         [
             label_filter(ClassificationLabels.PARAGRAPH_ANNOTATED),
             label_filter("user-paragraph/unexisting"),
