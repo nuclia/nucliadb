@@ -23,6 +23,7 @@ from uuid import uuid4
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.broker_message import generate_broker_message
+from nucliadb.ingest.orm.index_message import get_resource_index_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2
@@ -133,8 +134,8 @@ async def test_paragraphs_with_page(storage, txn, cache, dummy_nidx_utility, kno
     fcmw.metadata.metadata.paragraphs.append(p2)
     bm.field_metadata.append(fcmw)
     await r.apply_extracted(bm)
-    resource_brain = await r.generate_index_message()
-    for metadata in resource_brain.brain.paragraphs["t/field1"].paragraphs.values():
+    index_message = await get_resource_index_message(r, reindex=False)
+    for metadata in index_message.paragraphs["t/field1"].paragraphs.values():
         if metadata.start == 84:
             assert metadata.metadata.position.in_page is False
             assert metadata.metadata.position.page_number == 0
@@ -220,9 +221,11 @@ async def test_vector_duplicate_fields(
 
         await resource.apply_fields(bm)
         await resource.apply_extracted(bm)
+        index_message = await get_resource_index_message(resource, reindex=False)
+        await txn.commit()
 
     count = 0
-    for field_id, field_paragraphs in resource.indexer.brain.paragraphs.items():
+    for field_id, field_paragraphs in index_message.paragraphs.items():
         for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
             for vectorset_id, vectorset_sentences in paragraph.vectorsets_sentences.items():
                 for vector_id, sentence in vectorset_sentences.sentences.items():
@@ -381,8 +384,7 @@ async def test_generate_index_message_contains_all_metadata(
 
     async with maindb_driver.transaction() as txn:
         resource.txn = txn  # I don't like this but this is the API we have...
-        resource_brain = await resource.generate_index_message()
-    index_message = resource_brain.brain
+        index_message = await get_resource_index_message(resource, reindex=False)
 
     # Global resource labels
     assert set(index_message.labels) == {
@@ -463,8 +465,7 @@ async def test_generate_index_message_vectorsets(
 
     async with maindb_driver.transaction() as txn:
         resource.txn = txn  # I don't like this but this is the API we have...
-        resource_brain = await resource.generate_index_message()
-    index_message = resource_brain.brain
+        index_message = await get_resource_index_message(resource, reindex=False)
 
     # Check length of vectorsets of first sentence of first paragraph. In the fixture, we set the vector
     # to be equal to the vectorset index, repeated to its length, to be able to differentiate
@@ -494,10 +495,10 @@ async def test_generate_index_message_cancels_labels(
 
     async with maindb_driver.transaction() as txn:
         resource.txn = txn  # I don't like this but this is the API we have...
-        resource_brain = await resource.generate_index_message()
+        index_message = await get_resource_index_message(resource, reindex=False)
 
         # There is a label in the generated resource
-        assert "/l/labelset1/label1" in resource_brain.brain.texts["a/title"].labels
+        assert "/l/labelset1/label1" in index_message.texts["a/title"].labels
 
         # Cancel the label and regenerate brain
         assert resource.basic
@@ -505,7 +506,7 @@ async def test_generate_index_message_cancels_labels(
         resource.basic.usermetadata.classifications.add(
             labelset="labelset1", label="label1", cancelled_by_user=True
         )
-        resource_brain = await resource.generate_index_message()
+        index_message = await get_resource_index_message(resource, reindex=False)
 
         # Label is not generated anymore
-        assert "/l/labelset1/label1" not in resource_brain.brain.texts["a/title"].labels
+        assert "/l/labelset1/label1" not in index_message.texts["a/title"].labels
