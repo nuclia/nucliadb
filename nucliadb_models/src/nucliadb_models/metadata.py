@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import warnings
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -139,6 +140,22 @@ class ComputedMetadata(BaseModel):
 class UserMetadata(BaseModel):
     classifications: List[UserClassification] = []
     relations: List[Relation] = []
+
+
+class TokenSplit(BaseModel):
+    token: str
+    klass: str
+    start: int
+    end: int
+    cancelled_by_user: bool = False
+
+    def __init__(self, **data):
+        warnings.warn(
+            f"{self.__class__.__name__} is deprecated and will be removed in a future version.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(**data)
 
 
 class ParagraphAnnotation(BaseModel):
