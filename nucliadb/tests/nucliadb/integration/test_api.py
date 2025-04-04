@@ -356,7 +356,22 @@ async def test_extracted_shortened_metadata(
     - Create a resource with a field containing FieldMetadata with ner, positions and relations.
     - Check that new extracted data option filters them out
     """
-    br = broker_resource(standalone_knowledgebox)
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "slug": "myresource",
+            "title": "My resource",
+            "texts": {"text": {"body": "My text"}},
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    br = broker_resource(
+        standalone_knowledgebox,
+        rid=rid,
+        slug="myresource",
+    )
 
     field = rpb.FieldID(field_type=rpb.FieldType.TEXT, field="text")
     fcmw = FieldComputedMetadataWrapper()
@@ -633,13 +648,17 @@ async def test_language_metadata(
     kbid = standalone_knowledgebox
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
-        json={"title": "My resource"},
+        json={
+            "title": "My resource",
+            "texts": {"text": {"body": "My text"}},
+        },
     )
     assert resp.status_code == 201
     uuid = resp.json()["uuid"]
 
     # Detected language in processing should be stored in basic metadata
     bm = BrokerMessage()
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
     bm.kbid = kbid
     bm.uuid = uuid
     field = FieldID(field_type=FieldType.TEXT, field="text")
@@ -1661,3 +1680,16 @@ async def test_deletions_on_text_index(
     counters = await kb_counters(kbid)
     assert counters.resources == 1
     assert counters.fields == 3
+
+    # Now delete the resource
+    resp = await nucliadb_writer.delete(f"kb/{kbid}/resource/{rid}")
+    assert resp.status_code == 204, resp.text
+    await mark_dirty()
+    await wait_for_sync()
+
+    # Check that the resource is gone
+    results = await kb_search(query="My name is")
+    assert len(results.resources) == 0
+    counters = await kb_counters(kbid)
+    assert counters.resources == 0
+    assert counters.fields == 0

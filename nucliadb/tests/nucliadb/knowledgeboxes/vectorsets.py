@@ -25,6 +25,7 @@ from typing import AsyncIterable, Optional
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 
@@ -82,4 +83,7 @@ async def inject_broker_message_with_vectorset_data(
         default_vectorset_dimension=default_vector_dimension,
         vectorset_dimension=vectorset_dimension,
     )
-    await inject_message(nucliadb_ingest_grpc, bm)
+    bm_writer = get_writer_bm(bm)
+    await inject_message(nucliadb_ingest_grpc, bm_writer)
+    bm_processor = get_processor_bm(bm)
+    await inject_message(nucliadb_ingest_grpc, bm_processor)

@@ -224,6 +224,11 @@ async def test_story_7286(
             "title": "My Title",
             "summary": "My summary",
             "icon": "text/plain",
+            "texts": {
+                "text1": {
+                    "body": "This is a text",
+                }
+            },
         },
     )
     assert resp.status_code == 201
@@ -533,6 +538,7 @@ async def test_find_fields_parameter(
     rid = resp.json()["uuid"]
 
     bm = BrokerMessage()
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
     bm.kbid = standalone_knowledgebox
     bm.uuid = rid
 

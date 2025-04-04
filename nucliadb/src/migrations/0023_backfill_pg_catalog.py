@@ -29,6 +29,7 @@ from typing import cast
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
+from nucliadb.ingest.orm.index_message import get_resource_index_message
 from nucliadb.ingest.orm.processor.pgcatalog import pgcatalog_update
 from nucliadb.migrator.context import ExecutionContext
 
@@ -73,8 +74,8 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                         logger.warning(f"Could not load resource {rid} for kbid {kbid}")
                         continue
 
-                    await resource.compute_global_tags(resource.indexer)
-                    await pgcatalog_update(txn, kbid, resource)
+                    index_message = await get_resource_index_message(resource, reindex=False)
+                    await pgcatalog_update(txn, kbid, resource, index_message)
 
                 await txn.commit()
                 continue_sql = f"AND key > '/kbs/{kbid}/r/{rid}'"
