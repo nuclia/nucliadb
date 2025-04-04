@@ -33,7 +33,7 @@ from nucliadb_protos.dataset_pb2 import (
     TrainSet,
 )
 from nucliadb_protos.nodereader_pb2 import StreamRequest
-from nucliadb_protos.resources_pb2 import FieldType, PageStructure, VisualSelection
+from nucliadb_protos.resources_pb2 import FieldType, PageStructure
 
 VISUALLY_ANNOTABLE_FIELDS = {FieldType.FILE, FieldType.LINK}
 
@@ -128,24 +128,9 @@ async def generate_image_classification_payloads(
             yield ic
 
 
-async def get_page_selections(resource: Resource, field: Field) -> dict[int, list[VisualSelection]]:
-    page_selections: dict[int, list[VisualSelection]] = {}
-    basic = await resource.get_basic()
-    if basic is None or basic.fieldmetadata is None:
-        return page_selections
-
-    # We assume only one fieldmetadata per field as it's implemented in
-    # resource ingestion
-    for fieldmetadata in basic.fieldmetadata:
-        if (
-            fieldmetadata.field.field == field.id
-            and fieldmetadata.field.field_type == FIELD_TYPE_STR_TO_PB[field.type]
-        ):
-            for selection in fieldmetadata.page_selections:
-                page_selections[selection.page] = selection.visual  # type: ignore
-            break
-
-    return page_selections
+async def get_page_selections(resource: Resource, field: Field) -> dict[int, list[Any]]:
+    # NOTE: user-generated page selections were removed from the api
+    return {}
 
 
 async def get_page_structure(field: Field) -> list[tuple[str, PageStructure]]:

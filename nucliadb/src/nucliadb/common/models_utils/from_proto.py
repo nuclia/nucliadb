@@ -85,15 +85,6 @@ def user_field_metadata(message: resources_pb2.UserFieldMetadata) -> UserFieldMe
         including_default_value_fields=True,
         use_integers_for_enums=True,
     )
-    value["selections"] = [
-        MessageToDict(
-            selections,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-            use_integers_for_enums=True,
-        )
-        for selections in message.page_selections
-    ]
     value["field"]["field_type"] = field_type_name(value["field"]["field_type"]).value
     return UserFieldMetadata(**value)
 

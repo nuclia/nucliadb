@@ -1854,69 +1854,14 @@ class QuestionAnswerAnnotation(google.protobuf.message.Message):
 global___QuestionAnswerAnnotation = QuestionAnswerAnnotation
 
 @typing.final
-class VisualSelection(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    LABEL_FIELD_NUMBER: builtins.int
-    TOP_FIELD_NUMBER: builtins.int
-    LEFT_FIELD_NUMBER: builtins.int
-    RIGHT_FIELD_NUMBER: builtins.int
-    BOTTOM_FIELD_NUMBER: builtins.int
-    TOKEN_IDS_FIELD_NUMBER: builtins.int
-    label: builtins.str
-    top: builtins.float
-    left: builtins.float
-    right: builtins.float
-    bottom: builtins.float
-    @property
-    def token_ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
-        """Token IDs are the indexes in PageStructure"""
-
-    def __init__(
-        self,
-        *,
-        label: builtins.str = ...,
-        top: builtins.float = ...,
-        left: builtins.float = ...,
-        right: builtins.float = ...,
-        bottom: builtins.float = ...,
-        token_ids: collections.abc.Iterable[builtins.int] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["bottom", b"bottom", "label", b"label", "left", b"left", "right", b"right", "token_ids", b"token_ids", "top", b"top"]) -> None: ...
-
-global___VisualSelection = VisualSelection
-
-@typing.final
-class PageSelections(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    PAGE_FIELD_NUMBER: builtins.int
-    VISUAL_FIELD_NUMBER: builtins.int
-    page: builtins.int
-    @property
-    def visual(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___VisualSelection]: ...
-    def __init__(
-        self,
-        *,
-        page: builtins.int = ...,
-        visual: collections.abc.Iterable[global___VisualSelection] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["page", b"page", "visual", b"visual"]) -> None: ...
-
-global___PageSelections = PageSelections
-
-@typing.final
 class UserFieldMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     PARAGRAPHS_FIELD_NUMBER: builtins.int
-    PAGE_SELECTIONS_FIELD_NUMBER: builtins.int
     QUESTION_ANSWERS_FIELD_NUMBER: builtins.int
     FIELD_FIELD_NUMBER: builtins.int
     @property
     def paragraphs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ParagraphAnnotation]: ...
-    @property
-    def page_selections(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___PageSelections]: ...
     @property
     def question_answers(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___QuestionAnswerAnnotation]: ...
     @property
@@ -1925,12 +1870,11 @@ class UserFieldMetadata(google.protobuf.message.Message):
         self,
         *,
         paragraphs: collections.abc.Iterable[global___ParagraphAnnotation] | None = ...,
-        page_selections: collections.abc.Iterable[global___PageSelections] | None = ...,
         question_answers: collections.abc.Iterable[global___QuestionAnswerAnnotation] | None = ...,
         field: global___FieldID | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["field", b"field"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["field", b"field", "page_selections", b"page_selections", "paragraphs", b"paragraphs", "question_answers", b"question_answers"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["field", b"field", "paragraphs", b"paragraphs", "question_answers", b"question_answers"]) -> None: ...
 
 global___UserFieldMetadata = UserFieldMetadata
 
