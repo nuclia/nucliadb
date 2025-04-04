@@ -55,7 +55,6 @@ class ClassificationLabels:
 
 
 class EntityLabels:
-    ANNOTATED = "PERSON/Rusty"
     DETECTED = "COUNTRY/Spain"
 
 
@@ -75,7 +74,6 @@ ALL_PARAGRAPHS = {PARAGRAPH1, PARAGRAPH2, PARAGRAPH3, PARAGRAPH4}
 
 
 FILTERS_TO_PARAGRAPHS = {
-    entity_filter(EntityLabels.ANNOTATED): {PARAGRAPH1, PARAGRAPH2},
     entity_filter(EntityLabels.DETECTED): {PARAGRAPH1, PARAGRAPH2},
     label_filter(ClassificationLabels.RESOURCE_ANNOTATED): {PARAGRAPH3, PARAGRAPH4},
     label_filter(ClassificationLabels.FIELD_DETECTED): {PARAGRAPH3, PARAGRAPH4},
@@ -296,19 +294,12 @@ async def test_filtering_before_and_after_reindexing(
         [label_filter("resource/unexisting")],
         [label_filter("user-resource/unexisting")],
         # Filter with existing labels and entities
-        [entity_filter(EntityLabels.ANNOTATED)],
         [entity_filter(EntityLabels.DETECTED)],
         [label_filter(ClassificationLabels.PARAGRAPH_ANNOTATED)],
         [label_filter(ClassificationLabels.PARAGRAPH_DETECTED)],
         [label_filter(ClassificationLabels.RESOURCE_ANNOTATED)],
         [label_filter(ClassificationLabels.FIELD_DETECTED)],
         # Combine filters
-        [entity_filter(EntityLabels.ANNOTATED), entity_filter("unexisting/entity")],
-        [entity_filter(EntityLabels.ANNOTATED), entity_filter(EntityLabels.DETECTED)],
-        [
-            entity_filter(EntityLabels.ANNOTATED),
-            label_filter(ClassificationLabels.PARAGRAPH_DETECTED),
-        ],
         [
             label_filter(ClassificationLabels.PARAGRAPH_ANNOTATED),
             label_filter("user-paragraph/unexisting"),
