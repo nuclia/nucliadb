@@ -115,10 +115,11 @@ async def test_ingest_field_metadata_relation_extraction(
     dummy_nidx_utility, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
-    bm = BrokerMessage(
+    bm_writer = BrokerMessage(
         kbid=knowledgebox_ingest,
         uuid=rid,
         slug="slug-1",
+        source=BrokerMessage.MessageSource.WRITER,
         type=BrokerMessage.AUTOCOMMIT,
         texts={
             "title": FieldText(
@@ -127,6 +128,10 @@ async def test_ingest_field_metadata_relation_extraction(
             )
         },
     )
+    bm_processor = BrokerMessage()
+    bm_processor.CopyFrom(bm_writer)
+
+    await processor.process(message=bm_writer, seqid=0)
 
     fcmw = FieldComputedMetadataWrapper(
         field=FieldID(
@@ -152,9 +157,9 @@ async def test_ingest_field_metadata_relation_extraction(
         ]
     )
 
-    bm.field_metadata.append(fcmw)
+    bm_processor.field_metadata.append(fcmw)
 
-    await processor.process(message=bm, seqid=1)
+    await processor.process(message=bm_processor, seqid=1)
 
     storage = await get_storage(service_name=SERVICE_NAME)
 
@@ -194,8 +199,10 @@ async def test_ingest_field_metadata_relation_extraction(
         ),
     ]
 
-    for generated_relation in generated_relations:
-        assert generated_relation in [r.relation for r in pb.field_relations["t/title"].relations]
+    indexed_relations = [r.relation for r in pb.field_relations["t/title"].relations]
+    assert all(relation in indexed_relations for relation in generated_relations), (
+        f"Expected relations: {generated_relations}, but got: {indexed_relations}"
+    )
 
 
 async def test_ingest_field_relations_relation_extraction(

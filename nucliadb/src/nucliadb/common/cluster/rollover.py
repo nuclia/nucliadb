@@ -38,7 +38,7 @@ from nucliadb_telemetry import errors
 from .utils import (
     delete_resource_from_shard,
     get_resource,
-    get_resource_index_message,
+    get_rollover_resource_index_message,
     index_resource_to_shard,
 )
 
@@ -288,7 +288,7 @@ async def _index_resource_to_rollover_index(
                 f"Shard {shard_id} not found. Was a new one created during migration?"
             )
         resource = await get_resource(kbid, resource_id)
-        index_message = await get_resource_index_message(kbid, resource_id)
+        index_message = await get_rollover_resource_index_message(kbid, resource_id)
         if resource is None or index_message is None:
             # resource no longer existing, remove indexing and carry on
             async with datamanagers.with_transaction() as txn:
@@ -503,7 +503,7 @@ async def validate_indexed_data(
                 await txn.commit()
             continue
 
-        index_message = await get_resource_index_message(kbid, resource_id)
+        index_message = await get_rollover_resource_index_message(kbid, resource_id)
         if index_message is None:
             logger.error(
                 "Resource index message not found while validating, skipping",

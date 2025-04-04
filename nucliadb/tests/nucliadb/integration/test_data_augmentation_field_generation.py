@@ -26,8 +26,9 @@ import pytest
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
 
+from nucliadb.common import datamanagers
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
-from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import (
     DummyProcessingEngine,
     ProcessingEngine,
@@ -53,6 +54,7 @@ from nucliadb_utils.settings import (
 )
 from nucliadb_utils.utilities import (
     Utility,
+    get_storage,
     get_utility,
     start_partitioning_utility,
     stop_partitioning_utility,
@@ -134,7 +136,6 @@ async def test_send_to_process_generated_fields(
     bm.texts[da_field].md5 = hashlib.md5("Text author".encode()).hexdigest()
     bm.texts[da_field].generated_by.data_augmentation.SetInParent()
 
-    processor_index_resource_spy = mocker.spy(processor, "index_resource")
     await processor.process(bm, 3)
 
     assert len(processing_utility.calls) == 1
@@ -145,11 +146,13 @@ async def test_send_to_process_generated_fields(
     assert payload.textfield[da_field].body == bm.texts[da_field].body
     assert partition == 1
 
-    resource: Resource = processor_index_resource_spy.call_args.kwargs["resource"]
-    field = await resource.get_field(da_field, FieldType.TEXT)
-
-    generated_by = await field.generated_by()
-    assert generated_by.WhichOneof("author") == "data_augmentation"
+    async with datamanagers.with_ro_transaction() as txn:
+        kb = KnowledgeBox(txn, storage=await get_storage(), kbid=kbid)
+        resource = await kb.get(rid)
+        assert resource is not None
+        field = await resource.get_field(da_field, FieldType.TEXT)
+        generated_by = await field.generated_by()
+        assert generated_by.WhichOneof("author") == "data_augmentation"
 
     # Processed DA resource (from processing)
     bm = BrokerMessage()

@@ -73,6 +73,7 @@ def resources_datamanager(resource_ids):
     res = MagicMock()
 
     res.basic.modified.ToDatetime.return_value = datetime.now()
+    res.kb = MagicMock(kbid="kbid")
 
     mock.get_resource = AsyncMock()
     mock.get_resource.return_value = res
