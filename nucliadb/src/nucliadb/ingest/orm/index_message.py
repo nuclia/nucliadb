@@ -405,5 +405,8 @@ async def get_resource_index_message(
         im_builder = IndexMessageBuilder(resource)
         return await im_builder.full(reindex=reindex)
     else:
+<<<<<<< HEAD
         # TODO: remove this code when we remove the old index message generation
+=======
+>>>>>>> 113d76069 (Decouple)
         return (await resource.generate_index_message(reindex=reindex)).brain
