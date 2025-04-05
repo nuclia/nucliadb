@@ -51,3 +51,4 @@ class Features:
     SKIP_EXTERNAL_INDEX = "nucliadb_skip_external_index"
     LOG_REQUEST_PAYLOADS = "nucliadb_log_request_payloads"
     IGNORE_EXTRACTED_IN_SEARCH = "nucliadb_ignore_extracted_in_search"
+    INDEX_MESSAGE_GENERATION_V2 = "nucliadb_index_message_generation_v2"

@@ -172,7 +172,7 @@ message Resource {
     // vectorset_id -> [vector_key_prefix, ...]
     map<string, StringList> vector_prefixes_to_delete = 15;
     repeated string relation_fields_to_delete = 16;
-
+    repeated string texts_to_delete = 17;
 
     // Relations
     map<string, IndexRelations> field_relations = 10;
@@ -183,6 +183,10 @@ message Resource {
     map<string, utils.UserVectorsList> vectors_to_delete = 13 [deprecated = true];  // Vectorset prefix vector id
 
     optional utils.Security security = 14;
+
+    // Boleans to indicate if the indexing needs to be done
+    bool skip_texts = 18;
+    bool skip_paragraphs = 19;
 }
 
 message ShardMetadata {

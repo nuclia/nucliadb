@@ -17,10 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from nucliadb.ingest.orm.brain import ResourceBrain
 from nucliadb.ingest.orm.resource import (
     Resource,
     get_file_page_positions,
@@ -30,8 +31,7 @@ from nucliadb.ingest.orm.resource import (
     maybe_update_basic_thumbnail,
     update_basic_languages,
 )
-from nucliadb_protos import utils_pb2, writer_pb2
-from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
+from nucliadb_protos import utils_pb2
 from nucliadb_protos.resources_pb2 import (
     AllFieldIDs,
     Basic,
@@ -278,7 +278,6 @@ async def test_apply_extracted_vectors_cut_by_dimension(txn, storage, kb):
     STORED_VECTOR_DIMENSION = 100
     MATRYOSHKA_DIMENSION = 10
 
-    mock_field = AsyncMock()
     vectors = utils_pb2.VectorObject(
         vectors=utils_pb2.Vectors(
             vectors=[
@@ -292,33 +291,43 @@ async def test_apply_extracted_vectors_cut_by_dimension(txn, storage, kb):
             ]
         )
     )
-    mock_field.set_vectors.return_value = (vectors, False, [])
-    resource = Resource(txn, storage, kb, "matryoshka-rid")
 
-    with (
-        patch.object(resource, "get_fields", AsyncMock()),
-        patch.object(resource, "has_field", Mock(return_value=True)),
-        patch.object(resource, "get_field", AsyncMock(return_value=mock_field)),
-        patch.object(resource, "generate_field_id", Mock(return_value="field_id")),
-        patch("nucliadb.ingest.orm.resource.datamanagers") as mock_datamanagers,
-        patch.object(resource.indexer, "apply_field_vectors", AsyncMock()) as apply_field_vectors,
-    ):
-        config = VectorSetConfig()
-        config.vectorset_id = "my-vectorset"
-        config.storage_key_kind = VectorSetConfig.StorageKeyKind.LEGACY
+    brain = ResourceBrain("rid")
+    brain.apply_field_vectors(
+        "t/text",
+        vectors,
+        vectorset="my-vectorset",
+        replace_field=False,
+        vector_dimension=STORED_VECTOR_DIMENSION,
+    )
 
-        async def _iter_vectorsets(txn, kbid):
-            for vs in [config]:
-                yield (vs.vectorset_id, vs)
+    sentences = (
+        brain.brain.paragraphs["t/text"]
+        .paragraphs["rid/t/text/0-10"]
+        .vectorsets_sentences["my-vectorset"]
+        .sentences
+    )
+    assert len(sentences) == 1
+    assert sentences["rid/t/text/0/0-10"].metadata.position.start == 0
+    assert sentences["rid/t/text/0/0-10"].metadata.position.end == 10
+    assert len(sentences["rid/t/text/0/0-10"].vector) == STORED_VECTOR_DIMENSION
 
-        mock_datamanagers.vectorsets.iter = _iter_vectorsets
+    brain = ResourceBrain("rid")
+    brain.apply_field_vectors(
+        "t/text",
+        vectors,
+        vectorset="my-vectorset",
+        replace_field=False,
+        vector_dimension=MATRYOSHKA_DIMENSION,
+    )
 
-        config.vectorset_index_config.vector_dimension = STORED_VECTOR_DIMENSION
-        await resource._apply_extracted_vectors([writer_pb2.ExtractedVectorsWrapper(vectors=vectors)])
-        assert apply_field_vectors.call_count == 1
-        assert apply_field_vectors.call_args.kwargs["vector_dimension"] == STORED_VECTOR_DIMENSION
-
-        config.vectorset_index_config.vector_dimension = MATRYOSHKA_DIMENSION
-        await resource._apply_extracted_vectors([writer_pb2.ExtractedVectorsWrapper(vectors=vectors)])
-        assert apply_field_vectors.call_count == 2
-        assert apply_field_vectors.call_args.kwargs["vector_dimension"] == MATRYOSHKA_DIMENSION
+    sentences = (
+        brain.brain.paragraphs["t/text"]
+        .paragraphs["rid/t/text/0-10"]
+        .vectorsets_sentences["my-vectorset"]
+        .sentences
+    )
+    assert len(sentences) == 1
+    assert sentences["rid/t/text/0/0-10"].metadata.position.start == 0
+    assert sentences["rid/t/text/0/0-10"].metadata.position.end == 10
+    assert len(sentences["rid/t/text/0/0-10"].vector) == MATRYOSHKA_DIMENSION

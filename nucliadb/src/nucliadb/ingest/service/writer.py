@@ -34,6 +34,7 @@ from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
+from nucliadb.ingest.orm.index_message import get_resource_index_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
@@ -444,9 +445,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
                 resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
                 resobj.disable_vectors = not request.reindex_vectors
-                brain = await resobj.generate_index_message(reindex=True)
+                index_message = await get_resource_index_message(resobj, reindex=True)
                 shard = await self.proc.get_or_assign_resource_shard(txn, kbobj, request.rid)
-                index_message = brain.brain
                 external_index_manager = await get_external_index_manager(kbid=request.kbid)
                 if external_index_manager is not None:
                     await self.proc.external_index_add_resource(

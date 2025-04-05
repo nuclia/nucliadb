@@ -82,6 +82,9 @@ impl ParagraphIndexer {
         output_dir: &Path,
         resource: &nidx_protos::Resource,
     ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
+        if resource.skip_paragraphs {
+            return Ok(None);
+        }
         let field_schema = ParagraphSchema::new();
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 

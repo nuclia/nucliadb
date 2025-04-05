@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.tests.vectors import V1
 from nucliadb_models.search import SearchOptions
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -48,7 +49,10 @@ async def resource(nucliadb_ingest_grpc: WriterStub, standalone_knowledgebox):
     bm.basic.modified.FromDatetime(NOW)
     bm.origin.ClearField("created")
     bm.origin.ClearField("modified")
-    await inject_message(nucliadb_ingest_grpc, bm)
+    writer_bm = get_writer_bm(bm)
+    await inject_message(nucliadb_ingest_grpc, writer_bm)
+    processor_bm = get_processor_bm(bm)
+    await inject_message(nucliadb_ingest_grpc, processor_bm)
     return bm.uuid
 
 

@@ -36,7 +36,7 @@ from nucliadb.common.external_index_providers.base import (
     VectorsetExternalIndex,
 )
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
-from nucliadb.common.ids import FieldId, ParagraphId, VectorId
+from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb_models.search import SCORE_TYPE, TextPosition
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import utils_pb2
@@ -418,52 +418,17 @@ class PineconeIndexManager(ExternalIndexManager):
         if len(delete_tasks) > 0:
             await asyncio.gather(*delete_tasks)
 
-    def get_vectorsets_in_resource(self, index_data: Resource) -> set[str]:
-        vectorsets: set[str] = set()
-        for _, paragraph in iter_paragraphs(index_data):
-            if not paragraph.sentences and not paragraph.vectorsets_sentences:
-                continue
-            if paragraph.sentences and self.default_vectorset:
-                vectorsets.add(self.default_vectorset)
-            for vectorset_id, vectorsets_sentences in paragraph.vectorsets_sentences.items():
-                if vectorsets_sentences.sentences:
-                    vectorsets.add(vectorset_id)
-            # Once we have found at least one paragraph with vectors, we can stop iterating
-            return vectorsets
-        return vectorsets
-
     def get_index_host(self, vectorset_id: str, rollover: bool = False) -> str:
         if rollover:
             return self.rollover_indexes[vectorset_id].index_host
         else:
             return self.indexes[vectorset_id].index_host
 
-    def get_prefixes_to_delete(self, index_data: Resource) -> set[str]:
-        prefixes_to_delete = set()
-        # TODO: migrate to vector_prefixes_to_delete
-        for field_id in index_data.sentences_to_delete:
-            try:
-                delete_vid = VectorId.from_string(field_id)
-                prefixes_to_delete.add(delete_vid.field_id.full())
-            except ValueError:  # pragma: no cover
-                try:
-                    delete_field = FieldId.from_string(field_id)
-                    prefixes_to_delete.add(delete_field.full())
-                except ValueError:
-                    logger.warning(f"Invalid id to delete sentences from: {field_id}.")
-                    continue
-        for paragraph_id in index_data.paragraphs_to_delete:
-            try:
-                delete_pid = ParagraphId.from_string(paragraph_id)
-                prefixes_to_delete.add(delete_pid.field_id.full())
-            except ValueError:  # pragma: no cover
-                try:
-                    delete_field = FieldId.from_string(paragraph_id)
-                    prefixes_to_delete.add(delete_field.full())
-                except ValueError:
-                    logger.warning(f"Invalid id to delete: {paragraph_id}. ParagraphId expected.")
-                    continue
-        return prefixes_to_delete
+    def get_prefixes_to_delete(self, index_data: Resource) -> dict[str, set[str]]:
+        return {
+            vectorset_id: set(prefixes_list.items)
+            for vectorset_id, prefixes_list in index_data.vector_prefixes_to_delete.items()
+        }
 
     async def _index_resource(
         self, resource_uuid: str, index_data: Resource, to_rollover_indexes: bool = False
@@ -480,10 +445,8 @@ class PineconeIndexManager(ExternalIndexManager):
           metadata with any specific sentence metadata. This is done for each vectorset.
         - Finally, upsert the vectors to each vectorset index in parallel.
         """
-        vectorsets = self.get_vectorsets_in_resource(index_data)
-        prefixes_to_delete = self.get_prefixes_to_delete(index_data)
         delete_tasks = []
-        for vectorset in vectorsets:
+        for vectorset, prefixes_to_delete in self.get_prefixes_to_delete(index_data).items():
             index_host = self.get_index_host(vectorset_id=vectorset, rollover=to_rollover_indexes)
             delete_tasks.append(
                 asyncio.create_task(

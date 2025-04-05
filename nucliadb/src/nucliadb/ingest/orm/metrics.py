@@ -22,6 +22,6 @@ from nucliadb_telemetry import metrics
 
 processor_observer = metrics.Observer(
     "nucliadb_ingest_processor",
-    labels={"type": ""},
+    labels={"type": "", "source": ""},
     error_mappings={"kb_conflict": KnowledgeBoxConflict},
 )

@@ -31,6 +31,7 @@ from pytest_mock import MockerFixture
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.ingest.consumer import shard_creator
 from nucliadb.search.predict import SendToPredictError
 from nucliadb.tests.vectors import V1
@@ -418,7 +419,10 @@ def get_resource_with_a_sentence(standalone_knowledgebox):
 
 async def inject_resource_with_a_sentence(standalone_knowledgebox, writer):
     bm = get_resource_with_a_sentence(standalone_knowledgebox)
-    await inject_message(writer, bm)
+    writer_bm = get_writer_bm(bm)
+    await inject_message(writer, writer_bm)
+    processor_bm = get_processor_bm(bm)
+    await inject_message(writer, processor_bm)
 
 
 @pytest.mark.deploy_modes("standalone")
