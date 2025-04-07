@@ -357,7 +357,10 @@ where
         }
         INDEX_CACHE_COUNT.inc();
         INDEX_CACHE_BYTES.inc_by(v.memory_usage() as i64);
-        self.live.push(k.clone(), Arc::clone(v));
+        if let Some((_, out)) = self.live.push(k.clone(), Arc::clone(v)) {
+            INDEX_CACHE_COUNT.dec();
+            INDEX_CACHE_BYTES.dec_by(out.memory_usage() as i64);
+        }
     }
 
     fn evict(&mut self) {
