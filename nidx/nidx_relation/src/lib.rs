@@ -262,4 +262,13 @@ impl RelationSearcher {
         let response = self.graph_search(&request, PrefilterResult::All)?;
         Ok(response.nodes)
     }
+
+    pub fn space_usage(&self) -> usize {
+        let usage = self.reader.reader.searcher().space_usage();
+        if let Ok(usage) = usage {
+            usage.total().get_bytes() as usize
+        } else {
+            0
+        }
+    }
 }

@@ -162,4 +162,13 @@ impl TextSearcher {
     pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = DocumentItem> + use<>> {
         self.reader.iterator(request)
     }
+
+    pub fn space_usage(&self) -> usize {
+        let usage = self.reader.reader.searcher().space_usage();
+        if let Ok(usage) = usage {
+            usage.total().get_bytes() as usize
+        } else {
+            0
+        }
+    }
 }

@@ -454,6 +454,10 @@ impl OpenDataPoint {
         self.alive_bitset.iter()
     }
 
+    pub fn space_usage(&self) -> usize {
+        self.nodes.len() + self.index.len() + self.inverted_indexes.space_usage()
+    }
+
     pub fn search(
         &self,
         query: &[f32],

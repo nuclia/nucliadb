@@ -155,6 +155,10 @@ impl Reader {
         })
     }
 
+    pub fn space_usage(&self) -> usize {
+        self.open_data_points.iter().map(|dp| dp.space_usage()).sum()
+    }
+
     pub fn _search(
         &self,
         request: &dyn SearchRequest,
