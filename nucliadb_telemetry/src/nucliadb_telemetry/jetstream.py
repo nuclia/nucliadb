@@ -210,7 +210,7 @@ class JetStreamContextTelemetry:
         return await self.js.consumer_info(stream, consumer, timeout)
 
 
-class NatsClientTelemetry:
+class NatsClientTelemetry(Client):
     def __init__(self, nc: Client, service_name: str, tracer_provider: TracerProvider):
         self.nc = nc
         self.service_name = service_name
@@ -239,17 +239,17 @@ class NatsClientTelemetry:
     async def publish(
         self,
         subject: str,
-        body: bytes,
+        body: bytes = b"",
+        reply: str = "",
         headers: Optional[Dict[str, str]] = None,
-        **kwargs,
-    ):
+    ) -> None:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_publisher")
         headers = {} if headers is None else headers
         inject(headers)
 
         with start_span_message_publisher(tracer, subject) as span:
             try:
-                await self.nc.publish(subject, body, headers=headers, **kwargs)
+                await self.nc.publish(subject, body, reply, headers)
                 msg_sent_counter.inc({"subject": subject, "status": metrics.OK})
             except Exception as error:
                 set_span_exception(span, error)
@@ -277,8 +277,16 @@ class NatsClientTelemetry:
         return result
 
 
+def get_traced_nats_client(nc: Client, service_name: str) -> Union[Client, NatsClientTelemetry]:
+    tracer_provider = get_telemetry(service_name)
+    if tracer_provider is not None:
+        return NatsClientTelemetry(nc, service_name, tracer_provider)
+    else:
+        return nc
+
+
 def get_traced_jetstream(
-    nc: Client, service_name: str
+    nc: Union[Client, NatsClientTelemetry], service_name: str
 ) -> Union[JetStreamContext, JetStreamContextTelemetry]:
     jetstream = nc.jetstream()
     tracer_provider = get_telemetry(service_name)

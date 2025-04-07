@@ -34,9 +34,9 @@ from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
 from nats.js.manager import JetStreamManager
 
+from nucliadb_telemetry.jetstream import get_traced_jetstream
 from nucliadb_utils import logger
 from nucliadb_utils.cache.pubsub import Callback, PubSubDriver
-from nucliadb_utils.nats import get_traced_jetstream
 
 
 async def wait_for_it(future: asyncio.Future, msg):
