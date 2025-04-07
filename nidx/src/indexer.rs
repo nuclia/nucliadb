@@ -330,8 +330,7 @@ pub async fn index_resource(
     let mut indexes = Vec::new();
     for (index_id, segment_result, deletions) in results?.into_iter() {
         let mut update_index = false;
-        if segment_result.is_some() {
-            let (segment, size) = segment_result.unwrap();
+        if let Some((segment, size)) = segment_result {
             segment.mark_ready(&mut *tx, size as i64).await?;
             update_index = true;
         }
@@ -339,7 +338,7 @@ pub async fn index_resource(
             Deletion::create(&mut *tx, index_id, seq, &deletions).await?;
             update_index = true;
         }
-        if update_index && !indexes.contains(&index_id) {
+        if update_index {
             indexes.push(index_id)
         }
     }
@@ -490,6 +489,43 @@ mod tests {
         let deletions = Deletion::for_index_and_seq(&meta.pool, index.id, 10i64.into()).await?;
         assert_eq!(deletions.len(), 1);
         assert_eq!(deletions[0].keys, keys);
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_index_deletions_empty_segment(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let meta = NidxMetadata::new_with_pool(pool).await?;
+        let storage = Arc::new(object_store::memory::InMemory::new());
+
+        let kbid = Uuid::new_v4();
+        let shard = Shard::create(&meta.pool, kbid).await?;
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?;
+
+        // Index a resource with only deletions -- no new segment is created
+        let mut resource = minimal_resource(shard.id.to_string());
+        resource.texts_to_delete.push("uuid/t/title".to_string());
+        resource.vector_prefixes_to_delete.insert(
+            "multilingual".to_string(),
+            StringList {
+                items: vec!["uuid/t/title".to_string()],
+            },
+        );
+        resource.paragraphs_to_delete.push("uuid/t/title".to_string());
+        resource.relation_fields_to_delete.push("uuid/t/title".to_string());
+
+        index_resource(
+            &meta,
+            storage.clone(),
+            &tempfile::env::temp_dir(),
+            &shard.id.to_string(),
+            resource.clone(),
+            1i64.into(),
+        )
+        .await?;
+
+        let deletions = Deletion::for_index_and_seq(&meta.pool, index.id, 10i64.into()).await?;
+        assert!(!deletions.is_empty());
 
         Ok(())
     }
