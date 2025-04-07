@@ -32,6 +32,7 @@ from opentelemetry.trace import SpanKind, Tracer
 
 from nucliadb_telemetry import logger, metrics
 from nucliadb_telemetry.common import set_span_exception
+from nucliadb_telemetry.utils import get_telemetry
 
 msg_consume_time_histo = metrics.Histogram(
     # time it takes from when msg was queue to when it finished processing
@@ -274,3 +275,16 @@ class NatsClientTelemetry:
                 raise error
 
         return result
+
+
+def get_traced_jetstream(
+    nc: Client, service_name: str
+) -> Union[JetStreamContext, JetStreamContextTelemetry]:
+    jetstream = nc.jetstream()
+    tracer_provider = get_telemetry(service_name)
+
+    if tracer_provider is not None and jetstream is not None:  # pragma: no cover
+        logger.info(f"Configuring {service_name} jetstream with telemetry")
+        return JetStreamContextTelemetry(jetstream, service_name, tracer_provider)
+    else:
+        return jetstream

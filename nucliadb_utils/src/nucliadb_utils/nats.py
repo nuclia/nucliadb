@@ -34,22 +34,12 @@ from nats.js.client import JetStreamContext
 
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
-from nucliadb_telemetry.utils import get_telemetry
 
 logger = logging.getLogger(__name__)
 
-
-def get_traced_jetstream(
-    nc: NATSClient, service_name: str
-) -> Union[JetStreamContext, JetStreamContextTelemetry]:
-    jetstream = nc.jetstream()
-    tracer_provider = get_telemetry(service_name)
-
-    if tracer_provider is not None and jetstream is not None:  # pragma: no cover
-        logger.info(f"Configuring {service_name} jetstream with telemetry")
-        return JetStreamContextTelemetry(jetstream, service_name, tracer_provider)
-    else:
-        return jetstream
+# Re-export for bw/c. This function was defined here but makes more sense in the
+# telemetry library
+from nucliadb_telemetry.jetstream import get_traced_jetstream  # noqa
 
 
 class MessageProgressUpdater:
