@@ -29,21 +29,37 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.train import SERVICE_NAME, logger
 from nucliadb.train.types import T
+from nucliadb_telemetry.metrics import Gauge
 from nucliadb_utils.utilities import get_storage
+
+cached_resources = Gauge("nucliadb_train_global_cached_resources")
 
 
 class ResourceCache:
-    def __init__(self, size: int = 1024):
-        self.cache: LRU[str, ResourceORM] = LRU(size)
+    def __init__(self):
+        # this is an arbitrary number, once we have a metric in place and we
+        # analyze memory consumption, we can adjust it with more knoweldge
+        cache_size = 1024
+        self.cache: LRU[str, ResourceORM] = LRU(cache_size)
 
     def get(self, rid: str) -> Optional[ResourceORM]:
         return self.cache.get(rid)
 
     def set(self, rid: str, value: ResourceORM):
+        len_before = len(self.cache)
+
         self.cache[rid] = value
+
+        len_after = len(self.cache)
+        if len_after - len_before > 0:
+            cached_resources.inc(len_after - len_before)
 
     def contains(self, rid: str) -> bool:
         return rid in self.cache
+
+    def __del__(self):
+        cached_resources.dec(len(self.cache))
+        self.cache.clear()
 
 
 rcache: ContextVar[Optional[ResourceCache]] = ContextVar("rcache", default=None)
