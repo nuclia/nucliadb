@@ -187,6 +187,9 @@ pub mod searcher {
         ACTIVE_SHARDS: Gauge as "searcher_shards_active" ("Number of active shards in this searcher"),
         EVICTED_SHARDS: Gauge as "searcher_shards_evicted" ("Number of evicted shards (pending deletion) in this searcher"),
         DESIRED_SHARDS: Gauge as "searcher_shards_desired" ("Number of shards desired by this searcher"),
+
+        INDEX_CACHE_COUNT: Gauge as "searcher_index_cache_count" ("Number of indexes in the searcher cache"),
+        INDEX_CACHE_BYTES: Gauge as "searcher_index_cache_size_bytes" ("Total size of open indexes in the searcher cache"),
     }
 }
 

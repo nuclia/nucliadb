@@ -80,6 +80,10 @@ impl FstIndexReader {
         }
         results
     }
+
+    pub fn space_usage(&self) -> usize {
+        self.fst.as_fst().as_bytes().len()
+    }
 }
 
 #[cfg(test)]

@@ -116,6 +116,10 @@ impl VectorSearcher {
     ) -> anyhow::Result<VectorSearchResponse> {
         self.reader.search(request, prefilter)
     }
+
+    pub fn space_usage(&self) -> usize {
+        self.reader.space_usage()
+    }
 }
 
 fn open_segments(open_index: impl OpenIndexMetadata<VectorSegmentMeta>) -> VectorR<Vec<OpenDataPoint>> {
