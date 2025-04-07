@@ -124,8 +124,11 @@ async def setup_telemetry(service_name: str) -> Optional[AsyncTracerProvider]:
             from opentelemetry.instrumentation.aiohttp_client import (
                 AioHttpClientInstrumentor,
             )
+            from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 
             AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)
+            HTTPXClientInstrumentor().instrument(tracer_provider=tracer_provider)
+
         except ImportError:  # pragma: no cover
             pass
     return tracer_provider

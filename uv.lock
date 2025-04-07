@@ -2107,6 +2107,7 @@ all = [
     { name = "opentelemetry-exporter-jaeger" },
     { name = "opentelemetry-instrumentation-aiohttp-client" },
     { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-httpx" },
     { name = "opentelemetry-propagator-b3" },
     { name = "opentelemetry-proto" },
     { name = "opentelemetry-sdk" },
@@ -2119,6 +2120,7 @@ fastapi = [
     { name = "opentelemetry-exporter-jaeger" },
     { name = "opentelemetry-instrumentation-aiohttp-client" },
     { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-httpx" },
     { name = "opentelemetry-propagator-b3" },
     { name = "opentelemetry-proto" },
     { name = "opentelemetry-sdk" },
@@ -2136,6 +2138,7 @@ grpc = [
     { name = "opentelemetry-exporter-jaeger" },
     { name = "opentelemetry-instrumentation-aiohttp-client" },
     { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-httpx" },
     { name = "opentelemetry-propagator-b3" },
     { name = "opentelemetry-proto" },
     { name = "opentelemetry-sdk" },
@@ -2147,6 +2150,7 @@ nats = [
     { name = "opentelemetry-exporter-jaeger" },
     { name = "opentelemetry-instrumentation-aiohttp-client" },
     { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-httpx" },
     { name = "opentelemetry-propagator-b3" },
     { name = "opentelemetry-proto" },
     { name = "opentelemetry-sdk" },
@@ -2158,6 +2162,7 @@ otel = [
     { name = "opentelemetry-exporter-jaeger" },
     { name = "opentelemetry-instrumentation-aiohttp-client" },
     { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-httpx" },
     { name = "opentelemetry-propagator-b3" },
     { name = "opentelemetry-proto" },
     { name = "opentelemetry-sdk" },
@@ -2204,6 +2209,11 @@ requires-dist = [
     { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'grpc'", specifier = ">=0.42b0" },
     { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'nats'", specifier = ">=0.42b0" },
     { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'otel'", specifier = ">=0.42b0" },
+    { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'all'", specifier = ">=0.42b0" },
+    { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'fastapi'", specifier = ">=0.42b0" },
+    { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'grpc'", specifier = ">=0.42b0" },
+    { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'nats'", specifier = ">=0.42b0" },
+    { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'otel'", specifier = ">=0.42b0" },
     { name = "opentelemetry-propagator-b3", marker = "extra == 'all'", specifier = ">=1.21.0" },
     { name = "opentelemetry-propagator-b3", marker = "extra == 'fastapi'", specifier = ">=1.21.0" },
     { name = "opentelemetry-propagator-b3", marker = "extra == 'grpc'", specifier = ">=1.21.0" },
@@ -2516,6 +2526,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/30/92/29d3b07874a77dd578b26a3eefc8fdfb188da039b63bb573cbeb004071c3/opentelemetry_instrumentation_fastapi-0.52b0.tar.gz", hash = "sha256:89d48334db82680db4da2792d5a533a632cb1c8a20342e6263c62a9302658cb2", size = 19247 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/51/e4/cf52204413891954cd854bd4ffe19d9ef70a510affb835adef4c8d8ac45f/opentelemetry_instrumentation_fastapi-0.52b0-py3-none-any.whl", hash = "sha256:738d93e5ea819c2ce7905395c64acb2792f097697b4d4b2e35a7fee8c692241f", size = 12114 },
+]
+
+[[package]]
+name = "opentelemetry-instrumentation-httpx"
+version = "0.52b0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "opentelemetry-util-http" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6d/fc/607b483df75f5b5121de46a9b7fd06bfebdbeb0288626b9a65de6708c9f2/opentelemetry_instrumentation_httpx-0.52b0.tar.gz", hash = "sha256:171ae5f68b6fdf56a1eb9524589245c8dfdb73e2da76c10706547904da9c50d8", size = 17699 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0c/54/6c9e6ca8bff3e3fde9f7c368119b540e1c86f32f2e38c3912b4003e1c93c/opentelemetry_instrumentation_httpx-0.52b0-py3-none-any.whl", hash = "sha256:1016464d95a30581fdfcde7779182f4e72dc84c8bd16e4859e856bce1785b770", size = 14107 },
 ]
 
 [[package]]
