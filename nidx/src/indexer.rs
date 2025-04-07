@@ -492,4 +492,41 @@ mod tests {
 
         Ok(())
     }
+
+    #[sqlx::test]
+    async fn test_index_deletions_empty_segment(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let meta = NidxMetadata::new_with_pool(pool).await?;
+        let storage = Arc::new(object_store::memory::InMemory::new());
+
+        let kbid = Uuid::new_v4();
+        let shard = Shard::create(&meta.pool, kbid).await?;
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?;
+
+        // Index a resource with only deletions -- no new segment is created
+        let mut resource = minimal_resource(shard.id.to_string());
+        resource.texts_to_delete.push("uuid/t/title".to_string());
+        resource.vector_prefixes_to_delete.insert(
+            "multilingual".to_string(),
+            StringList {
+                items: vec!["uuid/t/title".to_string()],
+            },
+        );
+        resource.paragraphs_to_delete.push("uuid/t/title".to_string());
+        resource.relation_fields_to_delete.push("uuid/t/title".to_string());
+
+        index_resource(
+            &meta,
+            storage.clone(),
+            &tempfile::env::temp_dir(),
+            &shard.id.to_string(),
+            resource.clone(),
+            1i64.into(),
+        )
+        .await?;
+
+        let deletions = Deletion::for_index_and_seq(&meta.pool, index.id, 10i64.into()).await?;
+        assert!(deletions.len() > 0);
+
+        Ok(())
+    }
 }
