@@ -525,7 +525,7 @@ mod tests {
         .await?;
 
         let deletions = Deletion::for_index_and_seq(&meta.pool, index.id, 10i64.into()).await?;
-        assert!(deletions.len() > 0);
+        assert!(!deletions.is_empty());
 
         Ok(())
     }
