@@ -29,29 +29,44 @@ from nucliadb.train import SERVICE_NAME, logger
 from nucliadb.train.types import T
 from nucliadb_utils.utilities import get_storage
 
-rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar("rcache", default=None)
+
+class ResourceCache:
+    def __init__(self, size: int = 1000):
+        self.cache: dict[str, ResourceORM] = {}
+
+    def get(self, rid: str) -> Optional[ResourceORM]:
+        return self.cache.get(rid)
+
+    def set(self, rid: str, value: ResourceORM):
+        self.cache[rid] = value
+
+    def contains(self, rid: str) -> bool:
+        return rid in self.cache
 
 
-def get_resource_cache(clear: bool = False) -> dict[str, ResourceORM]:
-    value: Optional[dict[str, ResourceORM]] = rcache.get()
+rcache: ContextVar[Optional[ResourceCache]] = ContextVar("rcache", default=None)
+
+
+def get_resource_cache(clear: bool = False) -> ResourceCache:
+    value: Optional[ResourceCache] = rcache.get()
     if value is None or clear:
-        value = {}
+        value = ResourceCache()
         rcache.set(value)
     return value
 
 
 async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[ResourceORM]:
-    resouce_cache = get_resource_cache()
+    resource_cache = get_resource_cache()
     orm_resource: Optional[ResourceORM] = None
-    if uuid not in resouce_cache:
+    if not resource_cache.contains(uuid):
         storage = await get_storage(service_name=SERVICE_NAME)
         async with get_driver().transaction(read_only=True) as transaction:
             kb = KnowledgeBoxORM(transaction, storage, kbid)
             orm_resource = await kb.get(uuid)
             if orm_resource is not None:
-                resouce_cache[uuid] = orm_resource
+                resource_cache.set(uuid, orm_resource)
     else:
-        orm_resource = resouce_cache.get(uuid)
+        orm_resource = resource_cache.get(uuid)
     return orm_resource
 
 
