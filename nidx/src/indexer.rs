@@ -330,8 +330,7 @@ pub async fn index_resource(
     let mut indexes = Vec::new();
     for (index_id, segment_result, deletions) in results?.into_iter() {
         let mut update_index = false;
-        if segment_result.is_some() {
-            let (segment, size) = segment_result.unwrap();
+        if let Some((segment,size)) = segment_result {
             segment.mark_ready(&mut *tx, size as i64).await?;
             update_index = true;
         }
@@ -339,7 +338,7 @@ pub async fn index_resource(
             Deletion::create(&mut *tx, index_id, seq, &deletions).await?;
             update_index = true;
         }
-        if update_index && !indexes.contains(&index_id) {
+        if update_index {
             indexes.push(index_id)
         }
     }
