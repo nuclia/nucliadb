@@ -80,16 +80,11 @@ pub fn index_document(
         field_doc.add_facet(schema.field, facet_field);
         field_doc.add_text(schema.text, &text_info.text);
 
-        if let Some(encoded_field_id) = schema.encoded_field_id {
-            for d in encode_field_id(resource_uuid, &format!("/{field}")) {
-                field_doc.add_u64(encoded_field_id, d);
-            }
+        for d in encode_field_id(resource_uuid, &format!("/{field}")) {
+            field_doc.add_u64(schema.encoded_field_id, d);
         }
-
-        if let Some(encoded_field_id_bytes) = schema.encoded_field_id_bytes {
-            let encoded = encode_field_id_bytes(resource_uuid, field);
-            field_doc.add_bytes(encoded_field_id_bytes, encoded.as_slice());
-        }
+        let encoded = encode_field_id_bytes(resource_uuid, field);
+        field_doc.add_bytes(schema.encoded_field_id_bytes, encoded.as_slice());
 
         for label in text_info.labels.iter() {
             let facet = Facet::from(label.as_str());
