@@ -332,7 +332,6 @@ async def test_vectorset_migration(
     ev.vectors.vectors.vectors.append(vector)
     bm2.field_vectors.append(ev)
 
-    breakpoint()
     await inject_message(nucliadb_ingest_grpc, bm2)
 
     await wait_for_sync()
