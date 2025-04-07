@@ -21,6 +21,8 @@
 from contextvars import ContextVar
 from typing import Any, AsyncGenerator, AsyncIterator, Optional, Type
 
+from lru import LRU
+
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -31,8 +33,8 @@ from nucliadb_utils.utilities import get_storage
 
 
 class ResourceCache:
-    def __init__(self, size: int = 1000):
-        self.cache: dict[str, ResourceORM] = {}
+    def __init__(self, size: int = 1024):
+        self.cache: LRU[str, ResourceORM] = LRU(size)
 
     def get(self, rid: str) -> Optional[ResourceORM]:
         return self.cache.get(rid)
