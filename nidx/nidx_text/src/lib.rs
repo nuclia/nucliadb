@@ -126,7 +126,9 @@ impl TextIndexer {
     }
 
     pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
-        resource.texts_to_delete.clone()
+        vec![resource.resource.as_ref().unwrap().uuid.clone()]
+        // TODO: Uncomment in another PR
+        // resource.texts_to_delete.clone()
     }
 
     #[instrument(name = "text::merge", skip_all)]
