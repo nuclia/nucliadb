@@ -76,7 +76,11 @@ class IndexMessageBuilder:
             None,
         )
         if texts or paragraphs:
-            # We need to compute the texts when we're going to generate the paragraphs too.
+            # We need to compute the texts when we're going to generate the paragraphs too, but we may not
+            # want to index them always.
+            skip_index_texts = not texts
+            replace_texts = replace and not skip_index_texts
+
             if extracted_text is not None:
                 try:
                     field_author = await field.generated_by()
@@ -89,10 +93,15 @@ class IndexMessageBuilder:
                     field_computed_metadata,
                     basic.usermetadata,
                     field_author,
-                    replace_field=replace,
-                    skip_index=not texts,
+                    replace_field=replace_texts,
+                    skip_index=skip_index_texts,
                 )
         if paragraphs or vectors:
+            # The paragraphs are needed to generate the vectors. However, we don't need to index them
+            # in all cases.
+            skip_index_paragraphs = not paragraphs
+            replace_paragraphs = replace and not skip_index_paragraphs
+
             # We need to compute the paragraphs when we're going to generate the vectors too.
             if extracted_text is not None and field_computed_metadata is not None:
                 page_positions = (
@@ -105,8 +114,8 @@ class IndexMessageBuilder:
                     extracted_text,
                     page_positions,
                     user_field_metadata,
-                    replace_field=replace,
-                    skip_index=not paragraphs,
+                    replace_field=replace_paragraphs,
+                    skip_index=skip_index_paragraphs,
                 )
         if vectors:
             assert vectorset_configs is not None
@@ -134,7 +143,7 @@ class IndexMessageBuilder:
                 replace_field=replace,
             )
 
-    def _apply_deletions(
+    def _apply_field_deletions(
         self,
         brain: ResourceBrain,
         field_ids: list[FieldID],
@@ -154,15 +163,13 @@ class IndexMessageBuilder:
         assert all(message.source == BrokerMessage.MessageSource.WRITER for message in messages)
 
         deleted_fields = get_bm_deleted_fields(messages)
-        self._apply_deletions(self.brain, deleted_fields)
-
+        self._apply_field_deletions(self.brain, deleted_fields)
         await self._apply_resource_index_data(self.brain)
         basic = await self.get_basic()
-
         prefilter_update = needs_prefilter_update(messages)
         if prefilter_update:
-            # When some metadata at the resource level that is used for filtering is changed, we need to
-            # reindex all the fields of the resource to propagate the changes to our prefiltering index (the texts index)
+            # Changes on some metadata at the resource level that is used for filtering require that we reindex all the fields
+            # in the texts index (as it is the one used for prefiltering).
             fields_to_index = [
                 FieldID(field=field_id, field_type=field_type)
                 for field_type, field_id in await self.resource.get_fields(force=True)
@@ -195,7 +202,7 @@ class IndexMessageBuilder:
         """
         assert all(message.source == BrokerMessage.MessageSource.PROCESSOR for message in messages)
         deleted_fields = get_bm_deleted_fields(messages)
-        self._apply_deletions(self.brain, deleted_fields)
+        self._apply_field_deletions(self.brain, deleted_fields)
         await self._apply_resource_index_data(self.brain)
         basic = await self.get_basic()
         fields_to_index = get_bm_modified_fields(messages)
@@ -398,4 +405,5 @@ async def get_resource_index_message(
         im_builder = IndexMessageBuilder(resource)
         return await im_builder.full(reindex=reindex)
     else:
+        # TODO: remove this code when we remove the old index message generation
         return (await resource.generate_index_message(reindex=reindex)).brain

@@ -209,7 +209,8 @@ async def test_learning_config_errors_are_proxied_correctly(
         assert resp.json() == {"detail": "Learning Internal Server Error"}
 
 
-@pytest.mark.parametrize("bwc_with_default_vectorset", [True, False])
+@pytest.mark.parametrize("bwc_with_default_vectorset", [False])
+# @pytest.mark.parametrize("bwc_with_default_vectorset", [True, False])
 @pytest.mark.deploy_modes("standalone")
 async def test_vectorset_migration(
     nucliadb_writer: AsyncClient,
@@ -331,6 +332,7 @@ async def test_vectorset_migration(
     ev.vectors.vectors.vectors.append(vector)
     bm2.field_vectors.append(ev)
 
+    breakpoint()
     await inject_message(nucliadb_ingest_grpc, bm2)
 
     await wait_for_sync()

@@ -314,6 +314,7 @@ class Processor:
 
                 # index message
                 if resource and resource.modified:
+                    breakpoint()
                     index_message = await self.generate_index_message(resource, messages, created)
                     await pgcatalog_update(txn, kbid, resource, index_message)
                     await self.index_resource(  # noqa
