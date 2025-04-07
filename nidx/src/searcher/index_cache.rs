@@ -352,12 +352,13 @@ where
     }
 
     pub fn insert(&mut self, k: &K, v: &Arc<V>) {
-        if self.live.len() >= self.capacity.unwrap_or(NonZeroUsize::MAX).into() {
+        if self.live.len() >= self.capacity.unwrap_or(NonZeroUsize::MAX).into() && !self.live.contains(k) {
             self.evict();
         }
         INDEX_CACHE_COUNT.inc();
         INDEX_CACHE_BYTES.inc_by(v.memory_usage() as i64);
         if let Some((_, out)) = self.live.push(k.clone(), Arc::clone(v)) {
+            // The previous condition ensures this only happens if updating an existing key with a new value
             INDEX_CACHE_COUNT.dec();
             INDEX_CACHE_BYTES.dec_by(out.memory_usage() as i64);
         }
