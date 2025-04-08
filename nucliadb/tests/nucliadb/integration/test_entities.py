@@ -44,6 +44,7 @@ from nucliadb_protos.resources_pb2 import (
     RelationNode,
     Relations,
 )
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
 from tests.utils.dirty_index import wait_for_sync
@@ -91,9 +92,15 @@ async def processing_entities(nucliadb_ingest_grpc: WriterStub, standalone_knowl
         "cat": {"value": "cat"},
         "dolphin": {"value": "dolphin"},
     }
-    bm = broker_resource(standalone_knowledgebox, slug="automatic-entities")
+    bm = broker_resource(
+        standalone_knowledgebox, slug="automatic-entities", source=BrokerMessage.MessageSource.WRITER
+    )
+    await inject_message(nucliadb_ingest_grpc, bm)
+    await wait_for_sync()
+
     relations = []
 
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
     for entity in entities.values():
         node = RelationNode(
             value=entity["value"],

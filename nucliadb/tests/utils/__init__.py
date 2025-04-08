@@ -31,6 +31,7 @@ def broker_resource(
     kbid: str,
     rid: Optional[str] = None,
     slug: Optional[str] = None,
+    source: BrokerMessage.MessageSource.ValueType = BrokerMessage.MessageSource.WRITER,
 ) -> BrokerMessage:
     """
     Returns a broker resource with barebones metadata.
@@ -38,7 +39,7 @@ def broker_resource(
     rid = rid or str(uuid.uuid4()).replace("-", "")
     slug = slug or f"{rid}slug1"
 
-    bmb = BrokerMessageBuilder(kbid=kbid, rid=rid, slug=slug)
+    bmb = BrokerMessageBuilder(kbid=kbid, rid=rid, slug=slug, source=source)
     bmb.with_title("Title Resource")
     bmb.with_summary("Summary of document")
     bm = bmb.build()
