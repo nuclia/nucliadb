@@ -27,7 +27,6 @@ from unittest.mock import patch
 
 import aiohttp
 import pytest
-from grpc import aio
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
@@ -59,6 +58,7 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage, SetEntitiesRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_utils.grpc import get_traced_grpc_channel
 from nucliadb_utils.settings import (
     running_settings,
 )
@@ -66,6 +66,7 @@ from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
     get_storage,
 )
+from tests.ndbfixtures import SERVICE_NAME
 
 
 @dataclass
@@ -78,7 +79,7 @@ class TrainGrpcServer:
 
 @pytest.fixture(scope="function")
 async def component_nucliadb_train_grpc(train_grpc_server: TrainGrpcServer) -> AsyncIterator[TrainStub]:
-    channel = aio.insecure_channel(f"localhost:{train_grpc_server.port}")
+    channel = get_traced_grpc_channel(f"localhost:{train_grpc_server.port}", SERVICE_NAME)
     stub = TrainStub(channel)
     yield stub
     await channel.close(grace=None)
@@ -86,7 +87,7 @@ async def component_nucliadb_train_grpc(train_grpc_server: TrainGrpcServer) -> A
 
 @pytest.fixture(scope="function")
 async def standalone_nucliadb_train_grpc(nucliadb: Settings) -> AsyncIterator[TrainStub]:
-    channel = aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}")
+    channel = get_traced_grpc_channel(f"localhost:{nucliadb.train_grpc_port}", SERVICE_NAME)
     stub = TrainStub(channel)
     yield stub
     await channel.close(grace=None)
@@ -118,11 +119,9 @@ async def train_grpc_server(
         patch.object(train_settings, "grpc_port", free_port()) as grpc_port,
     ):
         await start_shard_manager()
-        await start_train_grpc("testing_train")
+        await start_train_grpc(SERVICE_NAME)
 
-        yield TrainGrpcServer(
-            port=grpc_port,
-        )
+        yield TrainGrpcServer(port=grpc_port)
 
         await stop_train_grpc()
         await stop_shard_manager()
