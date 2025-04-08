@@ -103,7 +103,7 @@ async def test_file_tus_upload_and_download(
             "upload-defer-length": "1",
         },
     )
-    assert resp.status_code == 201, resp.json()
+    assert resp.status_code == 201, resp.text
     # Get the URL to upload the file to
     url = resp.headers["location"]
 
@@ -243,7 +243,7 @@ async def test_file_tus_supports_empty_files(
             "upload-defer-length": "1",
         },
     )
-    assert resp.status_code == 201, resp.json()
+    assert resp.status_code == 201, resp.text
     url = resp.headers["location"]
     resp = await nucliadb_writer.patch(
         url,
@@ -267,7 +267,7 @@ async def test_file_tus_supports_empty_files(
             "upload-length": "0",
         },
     )
-    assert resp.status_code == 201, resp.json()
+    assert resp.status_code == 201, resp.text
     url = resp.headers["location"]
 
     resp = await nucliadb_writer.patch(

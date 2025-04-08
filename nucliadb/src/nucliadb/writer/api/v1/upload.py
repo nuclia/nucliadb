@@ -309,7 +309,7 @@ async def _tus_post(
     await dm.save()
 
     # Find the URL for upload, with the same parameter as this call
-    location = api.url_path_for("Upload information", upload_id=upload_id, **request.path_params)
+    location = str(request.url_for("Upload information", upload_id=upload_id, **request.path_params))
     return Response(
         status_code=201,
         headers={
