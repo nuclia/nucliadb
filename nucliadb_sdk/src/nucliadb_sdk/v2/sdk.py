@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import enum
+import importlib.metadata
 import inspect
 import io
 import warnings
@@ -119,6 +120,7 @@ OUTPUT_TYPE = TypeVar("OUTPUT_TYPE", bound=Union[BaseModel, None])
 RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes], dict[str, Any]]
 
 INPUT_TYPE = TypeVar("INPUT_TYPE", BaseModel, List[InputMessage], RawRequestContent, object, None)
+USER_AGENT = f"nucliadb-sdk/{importlib.metadata.version('nucliadb_sdk')}"
 
 
 class Region(enum.Enum):
@@ -821,7 +823,7 @@ class _NucliaDBBase:
             if api_key is not None:
                 headers["X-STF-SERVICEACCOUNT"] = f"Bearer {api_key}"
 
-        self.headers = headers
+        self.headers = {"User-Agent": USER_AGENT, **headers}
 
     def _request(
         self,

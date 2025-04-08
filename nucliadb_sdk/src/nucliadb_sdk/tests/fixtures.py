@@ -28,8 +28,8 @@ from typing import Optional
 from uuid import uuid4
 
 import docker  # type: ignore
+import httpx
 import pytest
-import requests
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
@@ -71,7 +71,7 @@ class NucliaDB(BaseImage):
 
     def check(self):
         try:
-            response = requests.get(f"http://{self.host}:{self.get_port()}")
+            response = httpx.get(f"http://{self.host}:{self.get_port()}")
             return response.status_code == 200
         except Exception:
             return False
@@ -132,13 +132,13 @@ def nucliadb(pg):
             # Wait for service ready
             for _ in range(10):
                 try:
-                    if requests.get(f"http://localhost:8080").status_code == 200:
+                    if httpx.get(f"http://localhost:8080").status_code == 200:
                         break
                 except Exception:
                     pass
                 time.sleep(1)
 
-            if requests.get(f"http://localhost:8080").status_code != 200:
+            if httpx.get(f"http://localhost:8080").status_code != 200:
                 raise Exception("No NucliaDB Running")
 
         yield NucliaFixture(
@@ -204,7 +204,7 @@ async def init_fixture(
     kb_obj = sdk.create_knowledge_box(slug=slug)
     kbid = kb_obj.uuid
 
-    import_resp = requests.get(dataset_location)
+    import_resp = httpx.get(dataset_location)
     assert import_resp.status_code == 200, (
         f"Error pulling dataset {dataset_location}:{import_resp.status_code}"
     )
