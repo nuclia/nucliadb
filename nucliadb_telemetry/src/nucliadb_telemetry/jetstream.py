@@ -210,7 +210,7 @@ class JetStreamContextTelemetry:
         return await self.js.consumer_info(stream, consumer, timeout)
 
 
-class NatsClientTelemetry(Client):
+class NatsClientTelemetry:
     def __init__(self, nc: Client, service_name: str, tracer_provider: TracerProvider):
         self.nc = nc
         self.service_name = service_name
@@ -275,6 +275,13 @@ class NatsClientTelemetry(Client):
                 raise error
 
         return result
+
+    @property
+    def is_connected(self) -> bool:
+        return self.nc.is_connected
+
+    def jetstream(self, **opts) -> nats.js.JetStreamContext:
+        return self.nc.jetstream(**opts)
 
 
 def get_traced_nats_client(nc: Client, service_name: str) -> Union[Client, NatsClientTelemetry]:
