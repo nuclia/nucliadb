@@ -26,7 +26,12 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb_telemetry.jetstream import (
+    get_traced_jetstream,
+    get_traced_nats_client,
+)
 from nucliadb_utils.tests.fixtures import get_testing_storage_backend
+from tests.ndbfixtures import SERVICE_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +104,8 @@ def nidx_storage(request):
 async def nidx(natsd, nidx_storage, pg):
     # Create needed NATS stream/consumer
     nc = await nats.connect(servers=[natsd])
-    js = nc.jetstream()
+    nc = get_traced_nats_client(nc, SERVICE_NAME)
+    js = get_traced_jetstream(nc, SERVICE_NAME)
     await js.add_stream(name="nidx", subjects=["nidx"])
     await js.add_consumer(stream="nidx", config=ConsumerConfig(name="nidx"))
     await nc.drain()
