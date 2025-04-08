@@ -72,15 +72,15 @@ async def cluster_nucliadb_search(
         patch.object(ingest_settings, "grpc_port", free_port()),
         patch.object(nucliadb_settings, "nucliadb_ingest", f"localhost:{ingest_settings.grpc_port}"),
     ):
-        app = instrument_app(
+        instrument_app(
             application,
             tracer_provider=get_telemetry(SERVICE_NAME),
             excluded_urls=["/"],
             metrics=True,
             trace_id_on_responses=True,
         )
-        async with app.router.lifespan_context(app):
-            client_factory = create_api_client_factory(app)
+        async with application.router.lifespan_context(application):
+            client_factory = create_api_client_factory(application)
             async with client_factory(roles=[NucliaDBRoles.READER]) as client:
                 yield client
 
