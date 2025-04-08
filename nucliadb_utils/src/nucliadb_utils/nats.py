@@ -33,17 +33,23 @@ from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
 
 from nucliadb_telemetry.errors import capture_exception
-from nucliadb_telemetry.jetstream import (
-    JetStreamContextTelemetry,
-    NatsClientTelemetry,
-    get_traced_nats_client,
-)
+from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
+from nucliadb_telemetry.utils import get_telemetry
 
 logger = logging.getLogger(__name__)
 
-# Re-export for bw/c. This function was defined here but makes more sense in the
-# telemetry library
-from nucliadb_telemetry.jetstream import get_traced_jetstream  # noqa
+
+def get_traced_jetstream(
+    nc: NATSClient, service_name: str
+) -> Union[JetStreamContext, JetStreamContextTelemetry]:
+    jetstream = nc.jetstream()
+    tracer_provider = get_telemetry(service_name)
+
+    if tracer_provider is not None and jetstream is not None:  # pragma: no cover
+        logger.info(f"Configuring {service_name} jetstream with telemetry")
+        return JetStreamContextTelemetry(jetstream, service_name, tracer_provider)
+    else:
+        return jetstream
 
 
 class MessageProgressUpdater:
@@ -98,7 +104,7 @@ class MessageProgressUpdater:
 
 
 class NatsConnectionManager:
-    _nc: Union[NATSClient, NatsClientTelemetry]
+    _nc: NATSClient
     _subscriptions: list[tuple[Subscription, Callable[[], Awaitable[None]]]]
     _pull_subscriptions: list[
         tuple[
@@ -160,8 +166,7 @@ class NatsConnectionManager:
             options["servers"] = self._nats_servers
 
         async with self._lock:
-            nc = await nats.connect(**options)
-            self._nc = get_traced_nats_client(nc, service_name=self._service_name)
+            self._nc = await nats.connect(**options)
 
         self._expected_subscription_task = asyncio.create_task(self._verify_expected_subscriptions())
 
@@ -302,7 +307,7 @@ class NatsConnectionManager:
         logger.info("Connection is closed on NATS")
 
     @property
-    def nc(self) -> Union[NATSClient, NatsClientTelemetry]:
+    def nc(self) -> NATSClient:
         return self._nc
 
     @cached_property

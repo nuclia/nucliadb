@@ -50,9 +50,9 @@ from nucliadb_protos.kb_usage_pb2 import (
 )
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
-from nucliadb_telemetry.jetstream import get_traced_jetstream, get_traced_nats_client
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
+from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
 
 
@@ -182,8 +182,7 @@ class StreamAuditStorage(AuditStorage):
         if len(self.nats_servers) > 0:
             options["servers"] = self.nats_servers
 
-        nc = await nats.connect(**options)
-        self.nc = get_traced_nats_client(nc, self.service)
+        self.nc = await nats.connect(**options)
 
         self.js = get_traced_jetstream(self.nc, self.service)
         self.task = asyncio.create_task(self.run())
