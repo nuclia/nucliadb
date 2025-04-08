@@ -32,7 +32,6 @@ from opentelemetry.trace import SpanKind, Tracer
 
 from nucliadb_telemetry import logger, metrics
 from nucliadb_telemetry.common import set_span_exception
-from nucliadb_telemetry.utils import get_telemetry
 
 msg_consume_time_histo = metrics.Histogram(
     # time it takes from when msg was queue to when it finished processing
@@ -210,7 +209,7 @@ class JetStreamContextTelemetry:
         return await self.js.consumer_info(stream, consumer, timeout)
 
 
-class NatsClientTelemetry(Client):
+class NatsClientTelemetry:
     def __init__(self, nc: Client, service_name: str, tracer_provider: TracerProvider):
         self.nc = nc
         self.service_name = service_name
@@ -239,17 +238,17 @@ class NatsClientTelemetry(Client):
     async def publish(
         self,
         subject: str,
-        body: bytes = b"",
-        reply: str = "",
+        body: bytes,
         headers: Optional[Dict[str, str]] = None,
-    ) -> None:
+        **kwargs,
+    ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_publisher")
         headers = {} if headers is None else headers
         inject(headers)
 
         with start_span_message_publisher(tracer, subject) as span:
             try:
-                await self.nc.publish(subject, body, reply, headers)
+                await self.nc.publish(subject, body, headers=headers, **kwargs)
                 msg_sent_counter.inc({"subject": subject, "status": metrics.OK})
             except Exception as error:
                 set_span_exception(span, error)
@@ -275,24 +274,3 @@ class NatsClientTelemetry(Client):
                 raise error
 
         return result
-
-
-def get_traced_nats_client(nc: Client, service_name: str) -> Union[Client, NatsClientTelemetry]:
-    tracer_provider = get_telemetry(service_name)
-    if tracer_provider is not None:
-        return NatsClientTelemetry(nc, service_name, tracer_provider)
-    else:
-        return nc
-
-
-def get_traced_jetstream(
-    nc: Union[Client, NatsClientTelemetry], service_name: str
-) -> Union[JetStreamContext, JetStreamContextTelemetry]:
-    jetstream = nc.jetstream()
-    tracer_provider = get_telemetry(service_name)
-
-    if tracer_provider is not None and jetstream is not None:  # pragma: no cover
-        logger.info(f"Configuring {service_name} jetstream with telemetry")
-        return JetStreamContextTelemetry(jetstream, service_name, tracer_provider)
-    else:
-        return jetstream
