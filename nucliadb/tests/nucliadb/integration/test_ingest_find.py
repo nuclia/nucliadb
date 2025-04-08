@@ -54,6 +54,7 @@ async def test_field_update_deletes_old_vectors(
     rid = resp.json()["uuid"]
 
     bm = BrokerMessage()
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
     bm.kbid = standalone_knowledgebox
     bm.uuid = rid
 
@@ -83,6 +84,7 @@ async def test_field_update_deletes_old_vectors(
 
     # Now, the field is edited to something else and there are no vectors computed
     bm = BrokerMessage()
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
     bm.kbid = standalone_knowledgebox
     bm.uuid = rid
 
