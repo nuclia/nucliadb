@@ -2067,7 +2067,6 @@ dependencies = [
     { name = "nucliadb-models" },
     { name = "orjson" },
     { name = "pydantic" },
-    { name = "requests" },
 ]
 
 [package.metadata]
@@ -2077,7 +2076,6 @@ requires-dist = [
     { name = "nucliadb-models", editable = "nucliadb_models" },
     { name = "orjson" },
     { name = "pydantic", specifier = ">=2.6" },
-    { name = "requests" },
 ]
 
 [[package]]
