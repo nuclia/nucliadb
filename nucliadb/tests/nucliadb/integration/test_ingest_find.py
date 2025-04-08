@@ -17,15 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
-from unittest import mock
-from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
-from nucliadb_models.search import SearchOptions
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
@@ -35,7 +30,6 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.exceptions import LimitsExceededError
 from tests.utils import inject_message
 
 
@@ -104,11 +98,11 @@ async def test_field_update_deletes_old_vectors(
 
     await inject_message(nucliadb_ingest_grpc, bm)
 
-    # should get no results
+    # should get no results with semantic search
     resp = await nucliadb_reader.post(
         f"/kb/{standalone_knowledgebox}/ask",
         json={
-            "query": "Hello",
+            "query": "zxcvb",
             "features": ["semantic"],
             "min_score": -1,
             "rag_strategies": [{"name": "neighbouring_paragraphs"}],
