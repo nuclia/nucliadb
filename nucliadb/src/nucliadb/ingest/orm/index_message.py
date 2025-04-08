@@ -186,7 +186,7 @@ class IndexMessageBuilder:
                 basic,
                 texts=prefilter_update or needs_texts_update(fieldid, messages),
                 paragraphs=needs_paragraphs_update(fieldid, messages),
-                relations=False,
+                relations=False,  # Relations at the field level are not modified by the writer
                 vectors=False,  # Vectors are never added by the writer
                 replace=not resource_created,
             )
