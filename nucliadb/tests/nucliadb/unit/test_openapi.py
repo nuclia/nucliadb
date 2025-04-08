@@ -22,7 +22,7 @@ from unittest.mock import Mock
 from starlette.routing import Mount
 
 from nucliadb.openapi import extract_openapi, is_versioned_route
-from nucliadb.search.app import application
+from nucliadb.search.app import create_application
 
 
 def get_route(path):
@@ -35,4 +35,5 @@ def test_is_versioned_route():
 
 
 def test_extract_openapi():
+    application = create_application()
     assert extract_openapi(application, "1", "commitid", "nucliadb_search")

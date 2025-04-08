@@ -67,21 +67,6 @@ fastapi_settings = dict(
 )
 
 
-base_app = FastAPI(title="NucliaDB Search API", **fastapi_settings)  # type: ignore
-base_app.include_router(api_v1)
-
-extend_openapi(base_app)
-
-application = VersionedFastAPI(
-    base_app,
-    version_format="{major}",
-    prefix_format=f"/{API_PREFIX}/v{{major}}",
-    default_version=(1, 0),
-    enable_latest=False,
-    kwargs=fastapi_settings,
-)
-
-
 async def homepage(request: Request) -> HTMLResponse:
     return HTMLResponse("NucliaDB Search Service")
 
@@ -97,7 +82,24 @@ async def ready(request: Request) -> JSONResponse:
     return await alive(request)
 
 
-# Use raw starlette routes to avoid unnecessary overhead
-application.add_route("/", homepage)
-application.add_route("/health/alive", alive)
-application.add_route("/health/ready", ready)
+def create_application() -> FastAPI:
+    base_app = FastAPI(title="NucliaDB Search API", **fastapi_settings)  # type: ignore
+    base_app.include_router(api_v1)
+
+    extend_openapi(base_app)
+
+    application = VersionedFastAPI(
+        base_app,
+        version_format="{major}",
+        prefix_format=f"/{API_PREFIX}/v{{major}}",
+        default_version=(1, 0),
+        enable_latest=False,
+        kwargs=fastapi_settings,
+    )
+
+    # Use raw starlette routes to avoid unnecessary overhead
+    application.add_route("/", homepage)
+    application.add_route("/health/alive", alive)
+    application.add_route("/health/ready", ready)
+
+    return application

@@ -29,7 +29,7 @@ from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.ingest.orm.processor.processor import Processor
 from nucliadb.ingest.settings import settings as ingest_settings
-from nucliadb.search.app import application
+from nucliadb.search.app import create_application
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.nodereader_pb2 import GetShardRequest
 from nucliadb_protos.noderesources_pb2 import Shard
@@ -75,6 +75,7 @@ async def cluster_nucliadb_search(
         patch.object(ingest_settings, "grpc_port", free_port()),
         patch.object(nucliadb_settings, "nucliadb_ingest", f"localhost:{ingest_settings.grpc_port}"),
     ):
+        application = create_application()
         instrument_app(
             application,
             tracer_provider=get_telemetry(SERVICE_NAME),
