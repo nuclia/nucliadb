@@ -20,6 +20,7 @@
 from datetime import datetime
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Union
+from urllib.parse import ParseResult
 
 import nats
 from nats.aio.client import Client
@@ -276,12 +277,27 @@ class NatsClientTelemetry:
 
         return result
 
+    # Other methods we use but don't need telemetry
+
     @property
     def is_connected(self) -> bool:
         return self.nc.is_connected
 
+    @property
+    def connected_url(self) -> Optional[ParseResult]:
+        return self.nc.connected_url
+
     def jetstream(self, **opts) -> nats.js.JetStreamContext:
         return self.nc.jetstream(**opts)
+
+    async def drain(self) -> None:
+        return await self.nc.drain()
+
+    async def flush(self, timeout: int = nats.aio.client.DEFAULT_FLUSH_TIMEOUT) -> None:
+        return await self.nc.flush(timeout)
+
+    async def close(self) -> None:
+        return await self.nc.close()
 
 
 def get_traced_nats_client(nc: Client, service_name: str) -> Union[Client, NatsClientTelemetry]:
