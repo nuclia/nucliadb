@@ -31,6 +31,8 @@ from nucliadb.search.app import application
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.nodereader_pb2 import GetShardRequest
 from nucliadb_protos.noderesources_pb2 import Shard
+from nucliadb_telemetry.fastapi import instrument_app
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.settings import (
     nuclia_settings,
@@ -44,6 +46,7 @@ from nucliadb_utils.utilities import (
     clear_global_cache,
 )
 from tests.ingest.fixtures import broker_resource
+from tests.ndbfixtures import SERVICE_NAME
 from tests.ndbfixtures.utils import create_api_client_factory
 
 # Main fixtures
@@ -69,8 +72,15 @@ async def cluster_nucliadb_search(
         patch.object(ingest_settings, "grpc_port", free_port()),
         patch.object(nucliadb_settings, "nucliadb_ingest", f"localhost:{ingest_settings.grpc_port}"),
     ):
-        async with application.router.lifespan_context(application):
-            client_factory = create_api_client_factory(application)
+        app = instrument_app(
+            application,
+            tracer_provider=get_telemetry(SERVICE_NAME),
+            excluded_urls=["/"],
+            metrics=True,
+            trace_id_on_responses=True,
+        )
+        async with app.router.lifespan_context(app):
+            client_factory = create_api_client_factory(app)
             async with client_factory(roles=[NucliaDBRoles.READER]) as client:
                 yield client
 

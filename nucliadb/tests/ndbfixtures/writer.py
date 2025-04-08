@@ -30,10 +30,13 @@ from nucliadb.writer import API_PREFIX, tus
 from nucliadb.writer.app import create_application
 from nucliadb.writer.settings import settings
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_telemetry.fastapi import instrument_app
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.settings import (
     nucliadb_settings,
 )
 from nucliadb_utils.storages.storage import Storage
+from tests.ndbfixtures import SERVICE_NAME
 from tests.utils.dirty_index import mark_dirty
 
 from .utils import create_api_client_factory
@@ -94,6 +97,13 @@ async def writer_api_server(
 ) -> AsyncIterator[FastAPI]:
     with patch.object(nucliadb_settings, "nucliadb_ingest", ingest_grpc_server.address):
         application = create_application()
+        instrument_app(
+            application,
+            tracer_provider=get_telemetry(SERVICE_NAME),
+            excluded_urls=["/"],
+            metrics=True,
+            trace_id_on_responses=True,
+        )
         async with application.router.lifespan_context(application):
             yield application
 

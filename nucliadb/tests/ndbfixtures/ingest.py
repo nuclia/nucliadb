@@ -24,7 +24,6 @@ from os.path import dirname
 from typing import AsyncIterator
 
 import pytest
-from grpc import aio
 
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
@@ -32,7 +31,9 @@ from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.standalone.settings import Settings
 from nucliadb_protos import writer_pb2_grpc
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_utils.grpc import get_traced_grpc_channel, get_traced_grpc_server
 from nucliadb_utils.storages.storage import Storage
+from tests.ndbfixtures import SERVICE_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ class IngestGrpcServer:
 async def component_nucliadb_ingest_grpc(
     ingest_grpc_server: IngestGrpcServer,
 ) -> AsyncIterator[WriterStub]:
-    channel = aio.insecure_channel(ingest_grpc_server.address)
+    channel = get_traced_grpc_channel(ingest_grpc_server.address, SERVICE_NAME)
     stub = WriterStub(channel)
     yield stub
     await channel.close(grace=None)
@@ -64,7 +65,7 @@ async def component_nucliadb_ingest_grpc(
 
 @pytest.fixture(scope="function")
 async def standalone_nucliadb_ingest_grpc(nucliadb: Settings) -> AsyncIterator[WriterStub]:
-    channel = aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}")
+    channel = get_traced_grpc_channel(f"localhost:{nucliadb.ingest_grpc_port}", SERVICE_NAME)
     stub = WriterStub(channel)
     yield stub
     await channel.close(grace=None)
@@ -88,7 +89,7 @@ async def ingest_grpc_server(
     """Ingest ORM gRPC server with dummy/mocked index."""
     servicer = WriterServicer()
     await servicer.initialize()
-    server = aio.server()
+    server = get_traced_grpc_server(SERVICE_NAME)
     port = server.add_insecure_port("[::]:0")
     writer_pb2_grpc.add_WriterServicer_to_server(servicer, server)
     await server.start()
