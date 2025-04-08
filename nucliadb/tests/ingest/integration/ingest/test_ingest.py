@@ -843,7 +843,7 @@ async def test_pull_consumers(nats_manager, pg_maindb_driver, local_storage):
             nats_servers=nats_manager._nats_servers,
             nats_creds=nats_manager._nats_creds,
         )
-        await transaction_util.initialize()
+        await transaction_util.initialize(service_name="nucliadb-tests")
         for i in range(10):
             bm = BrokerMessage(
                 kbid=str(uuid4()),
