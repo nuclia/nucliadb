@@ -462,6 +462,7 @@ class Processor:
                 source=source,
             )
 
+    @processor_observer.wrap({"type": "generate_index_message_v2"})
     async def generate_index_message_v2(
         self,
         resource: Resource,
@@ -471,14 +472,13 @@ class Processor:
         builder = IndexMessageBuilder(resource)
         message_source = messages_source(messages)
         if message_source == nodewriter_pb2.IndexMessageSource.WRITER:
-            with processor_observer({"type": "generate_index_message", "source": "writer"}):
-                return await builder.for_writer_bm(messages, resource_created)
+            return await builder.for_writer_bm(messages, resource_created)
         elif message_source == nodewriter_pb2.IndexMessageSource.PROCESSOR:
-            with processor_observer({"type": "generate_index_message", "source": "processor"}):
-                return await builder.for_processor_bm(messages)
+            return await builder.for_processor_bm(messages)
         else:  # pragma: no cover
             raise InvalidBrokerMessage(f"Unknown broker message source: {message_source}")
 
+    @processor_observer.wrap({"type": "generate_index_message_v1"})
     async def generate_index_message_v1(
         self,
         resource: Resource,
