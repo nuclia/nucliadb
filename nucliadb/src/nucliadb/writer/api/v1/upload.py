@@ -25,7 +25,7 @@ from hashlib import md5
 from io import BytesIO
 from typing import Annotated, Optional
 
-from fastapi import HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.requests import Request
 from fastapi.responses import Response
 from fastapi_versioning import version
@@ -307,13 +307,10 @@ async def _tus_post(
 
     await storage_manager.start(dm, path=path, kbid=kbid)
     await dm.save()
-
-    # Find the URL for upload, with the same parameter as this call
-    location = api.url_path_for("Upload information", upload_id=upload_id, **request.path_params)
     return Response(
         status_code=201,
         headers={
-            "Location": location,  # noqa
+            "Location": get_relative_location(api, request, upload_id),
             "Tus-Resumable": "1.0.0",
             "Access-Control-Expose-Headers": "Location,Tus-Resumable",
         },
@@ -990,3 +987,16 @@ def maybe_b64decode(some_string: str) -> str:
     except ValueError:
         # not b64encoded
         return some_string
+
+
+def get_relative_location(router: APIRouter, request: Request, upload_id: str) -> str:
+    """
+    Get the hostname-relative location of the tus upload
+    """
+    # Find the URL for upload, with the same parameter as this call (does not include the /api/vX part)
+    unversioned_relative_location = api.url_path_for(
+        "Upload information", upload_id=upload_id, **request.path_params
+    )
+    request_path = request.url.path
+    api_version = request_path.split("/")[0:3]
+    return "/".join(api_version) + unversioned_relative_location
