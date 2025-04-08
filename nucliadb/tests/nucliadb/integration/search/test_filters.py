@@ -24,6 +24,7 @@ from httpx import AsyncClient
 
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
+from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
 from nucliadb.tests.vectors import V1, V2, Q
 from nucliadb_models.labels import Label, LabelSetKind
@@ -277,8 +278,11 @@ async def kbid(
     standalone_knowledgebox,
 ):
     await create_test_labelsets(nucliadb_writer, standalone_knowledgebox)
-    await inject_message(nucliadb_ingest_grpc, broker_message_with_entities(standalone_knowledgebox))
-    await inject_message(nucliadb_ingest_grpc, broker_message_with_labels(standalone_knowledgebox))
+    bm_with_entities = broker_message_with_entities(standalone_knowledgebox)
+    bm_with_labels = broker_message_with_labels(standalone_knowledgebox)
+    for bm in (bm_with_entities, bm_with_labels):
+        for partial_bm in (get_writer_bm(bm), get_processor_bm(bm)):
+            await inject_message(nucliadb_ingest_grpc, partial_bm)
     return standalone_knowledgebox
 
 

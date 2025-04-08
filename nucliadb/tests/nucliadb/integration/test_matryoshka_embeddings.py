@@ -95,7 +95,9 @@ async def test_matryoshka_embeddings(
     rid = resp.json()["uuid"]
 
     # Fake processing and inject vectors
-    bmb = BrokerMessageBuilder(kbid=kbid, rid=rid)
+    bmb = BrokerMessageBuilder(
+        kbid=kbid, rid=rid, source=writer_pb2.BrokerMessage.MessageSource.PROCESSOR
+    )
     bmb.with_title(title)
 
     text_field = FieldBuilder(field_id, resources_pb2.FieldType.FILE)  # TODO: implement TEXT

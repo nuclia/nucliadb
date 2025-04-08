@@ -93,6 +93,7 @@ async def resource_with_conversation(
     extracted_split_text = {"1": "Split text 1", "2": "Split text 2"}
 
     bm = BrokerMessage()
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
     bm.uuid = rid
     bm.kbid = standalone_knowledgebox
     field = FieldID(field="faq", field_type=FieldType.CONVERSATION)

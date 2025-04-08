@@ -24,6 +24,7 @@ from typing import Optional
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_protos import (
@@ -101,23 +102,33 @@ async def test_ingest_broker_message_with_vectorsets(
         default_vectorset_dimension=default_vectorset_dimension,
         vectorset_dimension=vectorset_dimension,
     )
-    await processor.process(message=bm, seqid=1)
+    bm_writer = get_writer_bm(bm)
+    await processor.process(message=bm_writer, seqid=1)
+    bm_processor = get_processor_bm(bm)
+    await processor.process(message=bm_processor, seqid=2)
 
-    pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
-    validate_index_message(pb)
+    # Get the index message from the processor bm
+    index_message = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[-1][1][0])
+    validate_index_message(index_message)
 
     # Generate a reindex to validate storage.
     #
-    # A BrokerMessage with reindex=True will trigger a full brain generation
-    # from the stored resource
-    bm = writer_pb2.BrokerMessage(kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT)
+    # A BrokerMessage with reindex=True will trigger a texts index reindex from the stored resource.
+    # Valudate that it does not reindex the paragraphs and vectors index.
+    bm = writer_pb2.BrokerMessage(
+        kbid=kbid,
+        uuid=rid,
+        type=writer_pb2.BrokerMessage.AUTOCOMMIT,
+        source=writer_pb2.BrokerMessage.MessageSource.WRITER,
+    )
     bm.reindex = True
     bm.basic.modified.FromDatetime(datetime.now())
 
-    await processor.process(message=bm, seqid=2)
-
-    pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[1][1][0])
-    validate_index_message(pb)
+    await processor.process(message=bm, seqid=3)
+    index_message = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[-1][1][0])
+    assert len(index_message.texts) == 1
+    assert index_message.skip_texts is False
+    assert len(index_message.paragraphs) == 0
 
 
 def create_broker_message_with_vectorset(

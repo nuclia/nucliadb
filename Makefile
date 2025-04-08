@@ -72,20 +72,11 @@ install__deprecated: ## Install dependencies (on the active environment)
 	pip install -e ./nucliadb_sdk
 	pip install -e ./nucliadb_dataset
 
-build-node:
-	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node .
-
-build-node-prebuilt:
-	cargo build --release --bin node_reader --bin node_writer
-	mkdir builds || true
-	cp target/release/node_*er builds
-	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
-
 debug-test-nucliadb:
-	RUST_BACKTRACE=1 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG pytest nucliadb/tests -sxv
+	RUST_BACKTRACE=1 pytest nucliadb/tests -sxv
 
 debug-run-nucliadb:
-	RUST_BACKTRACE=1 MAX_RECEIVE_MESSAGE_LENGTH=1024 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG nucliadb --maindb=data/maindb --blob=data/blob --node=data/node --zone=europe-1 --log=DEBUG
+	RUST_BACKTRACE=1 MAX_RECEIVE_MESSAGE_LENGTH=1024 nucliadb --maindb=data/maindb --blob=data/blob --node=data/node --zone=europe-1 --log=DEBUG
 
 debug-run-nucliadb-redis:
 	nucliadb --driver=REDIS --maindb=redis://localhost:55359 --blob=data/blob --node=data/node --zone=europe-1 --log=INFO

@@ -38,6 +38,7 @@ from nucliadb.ingest.orm.exceptions import (
     ResourceNotIndexable,
     SequenceOrderViolation,
 )
+from nucliadb.ingest.orm.index_message import IndexMessageBuilder
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
@@ -312,25 +313,11 @@ class Processor:
                     await self.apply_resource(message, resource, update=(not created))
 
                 # index message
-
-                if resource:
-                    if any(needs_reindex(m) for m in messages):
-                        # when reindexing, let's just generate full new index message
-                        # TODO - This should be improved in the future as it's not optimal for very large resources:
-                        # As of now, there are some API operations that require fully reindexing all the fields of a resource.
-                        # An example of this is classification label changes - we need to reindex all the fields of a resource to
-                        # propagate the label changes to the index.
-                        resource.replace_indexer(await resource.generate_index_message(reindex=True))
-                    else:
-                        # TODO - Ideally we should only update the fields that have been changed in the current transaction.
-                        await resource.compute_global_text()
-                        await resource.compute_global_tags(resource.indexer)
-                        await resource.compute_security(resource.indexer)
-
                 if resource and resource.modified:
-                    await pgcatalog_update(txn, kbid, resource)
+                    index_message = await self.generate_index_message(resource, messages, created)
+                    await pgcatalog_update(txn, kbid, resource, index_message)
                     await self.index_resource(  # noqa
-                        resource=resource,
+                        index_message=index_message,
                         txn=txn,
                         uuid=uuid,
                         kbid=kbid,
@@ -451,7 +438,7 @@ class Processor:
     @processor_observer.wrap({"type": "index_resource"})
     async def index_resource(
         self,
-        resource: Resource,
+        index_message: PBBrainResource,
         txn: Transaction,
         uuid: str,
         kbid: str,
@@ -460,9 +447,8 @@ class Processor:
         kb: KnowledgeBox,
         source: nodewriter_pb2.IndexMessageSource.ValueType,
     ) -> None:
-        validate_indexable_resource(resource.indexer.brain)
+        validate_indexable_resource(index_message)
         shard = await self.get_or_assign_resource_shard(txn, kb, uuid)
-        index_message = resource.indexer.brain
         external_index_manager = await get_external_index_manager(kbid=kbid)
         if external_index_manager is not None:
             await self.external_index_add_resource(external_index_manager, uuid, index_message)
@@ -475,6 +461,56 @@ class Processor:
                 kb=kbid,
                 source=source,
             )
+
+    async def generate_index_message_v2(
+        self,
+        resource: Resource,
+        messages: list[writer_pb2.BrokerMessage],
+        resource_created: bool,
+    ) -> PBBrainResource:
+        builder = IndexMessageBuilder(resource)
+        message_source = messages_source(messages)
+        if message_source == nodewriter_pb2.IndexMessageSource.WRITER:
+            with processor_observer({"type": "generate_index_message", "source": "writer"}):
+                return await builder.for_writer_bm(messages, resource_created)
+        elif message_source == nodewriter_pb2.IndexMessageSource.PROCESSOR:
+            with processor_observer({"type": "generate_index_message", "source": "processor"}):
+                return await builder.for_processor_bm(messages)
+        else:  # pragma: no cover
+            raise InvalidBrokerMessage(f"Unknown broker message source: {message_source}")
+
+    async def generate_index_message_v1(
+        self,
+        resource: Resource,
+        messages: list[writer_pb2.BrokerMessage],
+    ) -> PBBrainResource:
+        if any(needs_reindex(m) for m in messages):
+            # when reindexing, let's just generate full new index message
+            # TODO - This should be improved in the future as it's not optimal for very large resources:
+            # As of now, there are some API operations that require fully reindexing all the fields of a resource.
+            # An example of this is classification label changes - we need to reindex all the fields of a resource to
+            # propagate the label changes to the index.
+            resource.replace_indexer(await resource.generate_index_message(reindex=True))
+        else:
+            # TODO - Ideally we should only update the fields that have been changed in the current transaction.
+            await resource.compute_global_text()
+            await resource.compute_global_tags(resource.indexer)
+            await resource.compute_security(resource.indexer)
+        return resource.indexer.brain
+
+    async def generate_index_message(
+        self,
+        resource: Resource,
+        messages: list[writer_pb2.BrokerMessage],
+        resource_created: bool = False,
+    ) -> PBBrainResource:
+        if has_feature(
+            const.Features.INDEX_MESSAGE_GENERATION_V2,
+            context={"kbid": resource.kb.kbid},
+        ):
+            return await self.generate_index_message_v2(resource, messages, resource_created)
+        else:
+            return await self.generate_index_message_v1(resource, messages)
 
     async def external_index_delete_resource(
         self, external_index_manager: ExternalIndexManager, resource_uuid: str
@@ -564,7 +600,10 @@ class Processor:
         resource: Resource,
         update: bool = False,
     ):
-        """Apply broker message to resource object in the database"""
+        """
+        Apply broker message to resource object in the persistence layers (maindb and storage).
+        DO NOT add any indexing logic here.
+        """
         if update:
             await self.maybe_update_resource_basic(resource, message)
 
@@ -675,30 +714,9 @@ class Processor:
         try:
             async with self.driver.transaction() as txn:
                 kb.txn = resource.txn = txn
-
-                shard_id = await datamanagers.resources.get_resource_shard_id(
-                    txn, kbid=kb.kbid, rid=resource.uuid
-                )
-                shard = None
-                if shard_id is not None:
-                    shard = await kb.get_resource_shard(shard_id)
-                if shard is None:
-                    logger.warning(
-                        "Unable to mark resource as error, shard is None. "
-                        "This should not happen so you did something special to get here."
-                    )
-                    return
-
                 resource.basic.metadata.status = resources_pb2.Metadata.Status.ERROR
                 await resource.set_basic(resource.basic)
                 await txn.commit()
-
-            resource.indexer.set_processing_status(
-                basic=resource.basic, previous_status=resource._previous_status
-            )
-            await self.index_node_shard_manager.add_resource(
-                shard, resource.indexer.brain, seqid, partition=partition, kb=kb.kbid
-            )
         except Exception:
             logger.warning("Error while marking resource as error", exc_info=True)
 
@@ -745,11 +763,7 @@ def has_vectors_operation(index_message: PBBrainResource) -> bool:
     """
     Returns True if the index message has any vectors to index or to delete.
     """
-    if (
-        len(index_message.sentences_to_delete) > 0
-        or len(index_message.paragraphs_to_delete) > 0
-        or any([len(deletions.items) for deletions in index_message.vector_prefixes_to_delete.values()])
-    ):
+    if any([len(deletions.items) for deletions in index_message.vector_prefixes_to_delete.values()]):
         return True
     for field_paragraphs in index_message.paragraphs.values():
         for paragraph in field_paragraphs.paragraphs.values():

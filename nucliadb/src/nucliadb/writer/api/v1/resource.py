@@ -616,6 +616,7 @@ def needs_resource_reindex(item: UpdateResourcePayload) -> bool:
                 or item.origin.metadata is not None
             )
         )
+        or item.security is not None
     )
 
 

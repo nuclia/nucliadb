@@ -26,11 +26,14 @@ from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_api_client
+from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
+from nucliadb.ingest.orm.processor.processor import Processor
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.search.app import application
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.nodereader_pb2 import GetShardRequest
 from nucliadb_protos.noderesources_pb2 import Shard
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.settings import (
     nuclia_settings,
@@ -116,8 +119,13 @@ async def multiple_search_resource(
     return knowledgebox_ingest
 
 
-async def inject_message(processor, knowledgebox_ingest, message, count: int = 1) -> str:
-    await processor.process(message=message, seqid=count)
+async def inject_message(
+    processor: Processor, knowledgebox_ingest: str, message: BrokerMessage, count: int = 1
+) -> str:
+    message_writer = get_writer_bm(message)
+    await processor.process(message=message_writer, seqid=count, transaction_check=False)
+    message_processor = get_processor_bm(message)
+    await processor.process(message=message_processor, seqid=count, transaction_check=False)
     await wait_for_shard(knowledgebox_ingest, count)
     return knowledgebox_ingest
 

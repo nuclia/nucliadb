@@ -756,9 +756,14 @@ class Resource(google.protobuf.message.Message):
     VECTORS_FIELD_NUMBER: builtins.int
     VECTORS_TO_DELETE_FIELD_NUMBER: builtins.int
     SECURITY_FIELD_NUMBER: builtins.int
+    SKIP_TEXTS_FIELD_NUMBER: builtins.int
+    SKIP_PARAGRAPHS_FIELD_NUMBER: builtins.int
     status: global___Resource.ResourceStatus.ValueType
     """Tantivy doc"""
     shard_id: builtins.str
+    skip_texts: builtins.bool
+    """Boleans to indicate if the indexing needs to be done"""
+    skip_paragraphs: builtins.bool
     @property
     def resource(self) -> global___ResourceID: ...
     @property
@@ -831,9 +836,11 @@ class Resource(google.protobuf.message.Message):
         vectors: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectors] | None = ...,
         vectors_to_delete: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectorsList] | None = ...,
         security: nucliadb_protos.utils_pb2.Security | None = ...,
+        skip_texts: builtins.bool = ...,
+        skip_paragraphs: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_security", b"_security", "metadata", b"metadata", "resource", b"resource", "security", b"security"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_security", b"_security", "field_relations", b"field_relations", "labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relation_fields_to_delete", b"relation_fields_to_delete", "resource", b"resource", "security", b"security", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "texts_to_delete", b"texts_to_delete", "vector_prefixes_to_delete", b"vector_prefixes_to_delete", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_security", b"_security", "field_relations", b"field_relations", "labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relation_fields_to_delete", b"relation_fields_to_delete", "resource", b"resource", "security", b"security", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "skip_paragraphs", b"skip_paragraphs", "skip_texts", b"skip_texts", "status", b"status", "texts", b"texts", "texts_to_delete", b"texts_to_delete", "vector_prefixes_to_delete", b"vector_prefixes_to_delete", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["_security", b"_security"]) -> typing.Literal["security"] | None: ...
 
 global___Resource = Resource
