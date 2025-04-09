@@ -17,13 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 import contextlib
 import logging
 from contextvars import ContextVar
 from typing import Optional
-
-from lru import LRU
 
 from nucliadb.common.cache import (
     ExtractedTextCache,
@@ -49,7 +46,6 @@ logger = logging.getLogger(__name__)
 etcache: ContextVar[Optional[ExtractedTextCache]] = ContextVar("etcache", default=None)
 
 
-RESOURCE_LOCKS: dict[str, asyncio.Lock] = LRU(1000)  # type: ignore
 RESOURCE_CACHE_OPS = metrics.Counter("nucliadb_resource_cache_ops", labels={"type": ""})
 EXTRACTED_CACHE_OPS = metrics.Counter("nucliadb_extracted_text_cache_ops", labels={"type": ""})
 
@@ -66,10 +62,7 @@ async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
         logger.warning("Resource cache not set")
         return await _orm_get_resource(kbid, uuid)
 
-    if uuid not in RESOURCE_LOCKS:
-        RESOURCE_LOCKS[uuid] = asyncio.Lock()
-
-    async with RESOURCE_LOCKS[uuid]:
+    async with resource_cache.get_lock(uuid):
         if not resource_cache.contains(uuid):
             RESOURCE_CACHE_OPS.inc({"type": "miss"})
             orm_resource = await _orm_get_resource(kbid, uuid)
