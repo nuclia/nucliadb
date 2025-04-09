@@ -1288,6 +1288,26 @@ async def test_extract_strategy_on_fields(
     processing.calls.clear()
     processing.values.clear()
 
+    # Upload a file with the kb upload endpoint, and set the extract strategy via a header
+    resp = await nucliadb_writer.post(
+        f"kb/{standalone_knowledgebox}/upload",
+        headers={"x-extract-strategy": "barbafoo"},
+        content=b"file content",
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    # Check that the extract strategy is stored
+    resp = await nucliadb_reader.get(
+        f"kb/{standalone_knowledgebox}/resource/{rid}?show=values",
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["data"]["files"].popitem()[1]["value"]["extract_strategy"] == "barbafoo"
+
+    processing.calls.clear()
+    processing.values.clear()
+
     # Upload a file with the tus upload endpoint, and set the extract strategy via a header
     def header_encode(some_string):
         return base64.b64encode(some_string.encode()).decode()
