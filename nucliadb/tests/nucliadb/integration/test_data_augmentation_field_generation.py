@@ -32,10 +32,10 @@ from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.processing import (
     DummyProcessingEngine,
     ProcessingEngine,
-    Source,
     start_processing_engine,
     stop_processing_engine,
 )
+from nucliadb.models.internal.processing import Source
 from nucliadb_protos import noderesources_pb2, resources_pb2
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,

@@ -129,16 +129,3 @@ class LabelSet(BaseModel):
 class KnowledgeBoxLabels(BaseModel):
     uuid: str
     labelsets: Dict[str, LabelSet] = {}
-
-
-class ClassificationLabel(BaseModel):
-    """
-    NOTE: This model is used to send the labels of each field in the processing requests.
-    It is a rath is not meant to be used by api users.
-    """
-
-    labelset: str
-    label: str
-
-    def __hash__(self):
-        return hash((self.labelset, self.label))

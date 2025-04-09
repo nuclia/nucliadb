@@ -28,16 +28,15 @@ from nucliadb.common.models_utils.from_proto import (
     RelationTypeMap,
 )
 from nucliadb.ingest.orm.utils import set_title
-from nucliadb.ingest.processing import PushPayload
+from nucliadb.models.internal.processing import ClassificationLabel, PushPayload, PushTextFormat, Text
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
 from nucliadb_models.file import FileField
-from nucliadb_models.labels import ClassificationLabel
 from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
     ParagraphAnnotation,
     QuestionAnswerAnnotation,
 )
-from nucliadb_models.text import TEXT_FORMAT_TO_MIMETYPE, PushTextFormat, Text
+from nucliadb_models.text import TEXT_FORMAT_TO_MIMETYPE
 from nucliadb_models.writer import (
     ComingResourcePayload,
     CreateResourcePayload,

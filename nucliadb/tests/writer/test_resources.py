@@ -25,10 +25,10 @@ import pytest
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
 
-import nucliadb_models
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.ingest.processing import PushPayload
+from nucliadb.models.internal import processing as processing_models
+from nucliadb.models.internal.processing import PushPayload
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
@@ -302,9 +302,9 @@ async def test_reprocess_resource(
 
     assert isinstance(payload.filefield.get("file1"), str)
     assert payload.filefield["file1"] == "convert_internal_filefield_to_str,0"
-    assert isinstance(payload.linkfield.get("link1"), nucliadb_models.LinkUpload)
-    assert isinstance(payload.textfield.get("text1"), nucliadb_models.Text)
-    assert isinstance(payload.conversationfield.get("conv1"), nucliadb_models.PushConversation)
+    assert isinstance(payload.linkfield.get("link1"), processing_models.LinkUpload)
+    assert isinstance(payload.textfield.get("text1"), processing_models.Text)
+    assert isinstance(payload.conversationfield.get("conv1"), processing_models.PushConversation)
     assert (
         payload.conversationfield["conv1"].messages[33].content.attachments[0]
         == "convert_internal_cf_to_str,0"

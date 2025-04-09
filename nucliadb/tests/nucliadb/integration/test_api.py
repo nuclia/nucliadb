@@ -31,9 +31,9 @@ from nucliadb.learning_proxy import (
     SemanticConfig,
     SimilarityFunction,
 )
+from nucliadb.models.internal.processing import ClassificationLabel
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models import common, metadata
-from nucliadb_models.labels import ClassificationLabel
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxSearchResults
 from nucliadb_protos import resources_pb2 as rpb

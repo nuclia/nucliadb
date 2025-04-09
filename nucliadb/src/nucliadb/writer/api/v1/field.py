@@ -27,7 +27,7 @@ from starlette.requests import Request
 import nucliadb_models as models
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.processing import PushPayload, Source
+from nucliadb.models.internal.processing import PushPayload, Source
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.constants import (
     X_FILE_PASSWORD,
