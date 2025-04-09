@@ -37,6 +37,7 @@ from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.settings import LogOutputType, LogSettings
+from nucliadb_utils.debug import profile_memory
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 
 logger = logging.getLogger(__name__)
@@ -142,7 +143,8 @@ def run():
 =================================================
 """
     )
-    server.run()
+    with profile_memory():
+        server.run()
 
 
 def get_latest_nucliadb() -> Optional[str]:

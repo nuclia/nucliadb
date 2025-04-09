@@ -21,7 +21,7 @@ import asyncio
 import logging
 from typing import Optional
 
-from nucliadb.common import locking
+from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.maindb.pg import PGDriver
@@ -174,7 +174,9 @@ async def run_rollover_in_parallel(
 
 
 async def run_rollovers(context: ExecutionContext) -> None:
-    kbs_to_rollover = await context.data_manager.get_kbs_to_rollover()
+    async with datamanagers.with_ro_transaction() as txn:
+        kbs_to_rollover = [kbid async for kbid, _ in datamanagers.kb.get_kbs(txn)]
+    #    kbs_to_rollover = await context.data_manager.get_kbs_to_rollover()
 
     if len(kbs_to_rollover) == 0:
         return

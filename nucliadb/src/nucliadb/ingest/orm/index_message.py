@@ -19,7 +19,7 @@
 #
 
 
-import asyncio
+import contextlib
 from typing import Optional
 
 from nucliadb.common import datamanagers
@@ -49,8 +49,7 @@ class IndexMessageBuilder:
         user_relations = await self.resource.get_user_relations()
         origin = await self.resource.get_origin()
         security = await self.resource.get_security()
-        await asyncio.to_thread(
-            brain.generate_resource_metadata,
+        await brain.generate_resource_metadata(
             basic,
             user_relations,
             origin,
@@ -89,8 +88,7 @@ class IndexMessageBuilder:
                     field_author = await field.generated_by()
                 except FieldAuthorNotFound:
                     field_author = None
-                await asyncio.to_thread(
-                    brain.generate_texts,
+                await brain.generate_texts(
                     self.resource.generate_field_id(fieldid),
                     extracted_text,
                     field_computed_metadata,
@@ -110,8 +108,7 @@ class IndexMessageBuilder:
                 page_positions = (
                     await get_file_page_positions(field) if isinstance(field, File) else None
                 )
-                await asyncio.to_thread(
-                    brain.generate_paragraphs,
+                await brain.generate_paragraphs(
                     self.resource.generate_field_id(fieldid),
                     field_computed_metadata,
                     extracted_text,
@@ -129,8 +126,7 @@ class IndexMessageBuilder:
                 )
                 if vo is not None:
                     dimension = vectorset_config.vectorset_index_config.vector_dimension
-                    await asyncio.to_thread(
-                        brain.generate_vectors,
+                    await brain.generate_vectors(
                         self.resource.generate_field_id(fieldid),
                         vo,
                         vectorset=vectorset_config.vectorset_id,
@@ -138,8 +134,7 @@ class IndexMessageBuilder:
                         vector_dimension=dimension,
                     )
         if relations:
-            await asyncio.to_thread(
-                brain.generate_relations,
+            await brain.generate_relations(
                 self.resource.generate_field_id(fieldid),
                 field_computed_metadata,
                 basic.usermetadata,
@@ -402,14 +397,31 @@ async def get_resource_index_message(
     """
     Get the full index message for a resource.
     """
-    if has_feature(
-        const.Features.INDEX_MESSAGE_GENERATION_V2,
-        context={
-            "kbid": resource.kb.kbid,
-        },
-    ):
-        im_builder = IndexMessageBuilder(resource)
-        return await im_builder.full(reindex=reindex)
-    else:
-        # TODO: remove this code when we remove the old index message generation
-        return (await resource.generate_index_message(reindex=reindex)).brain
+    with timeit():
+        if (
+            has_feature(
+                const.Features.INDEX_MESSAGE_GENERATION_V2,
+                context={
+                    "kbid": resource.kb.kbid,
+                },
+            )
+            and False
+        ):
+            im_builder = IndexMessageBuilder(resource)
+            return await im_builder.full(reindex=reindex)
+        else:
+            # TODO: remove this code when we remove the old index message generation
+            return (await resource.generate_index_message(reindex=reindex)).brain
+
+
+@contextlib.contextmanager
+def timeit():
+    """
+    Context manager to time the execution of a block of code.
+    """
+    import time
+
+    start = time.time()
+    yield
+    end = time.time()
+    print(f"Execution time: {end - start:.2f} seconds")
