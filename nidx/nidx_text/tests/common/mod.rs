@@ -110,7 +110,6 @@ pub fn create_resource(shard_id: String) -> Resource {
         labels: vec![],
         paragraphs: HashMap::new(),
         paragraphs_to_delete: vec![],
-        relations: vec![],
         vectors: HashMap::default(),
         vectors_to_delete: HashMap::default(),
         shard_id,

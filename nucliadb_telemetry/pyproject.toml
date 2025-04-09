@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb_telemetry"
-version = "6.3.4"
+version = "6.3.5"
 license = { text = "AGPL" }
 description = "NucliaDB Telemetry Library Python process"
 authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
@@ -45,6 +45,7 @@ otel = [
     "opentelemetry-propagator-b3>=1.21.0",
     "opentelemetry-instrumentation-fastapi>=0.42b0",
     "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
+    "opentelemetry-instrumentation-httpx>=0.42b0",
     "opentelemetry-semantic-conventions>=0.42b0",
 ]
 grpc = [
@@ -64,6 +65,7 @@ grpc = [
     "opentelemetry-propagator-b3>=1.21.0",
     "opentelemetry-instrumentation-fastapi>=0.42b0",
     "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
+    "opentelemetry-instrumentation-httpx>=0.42b0",
     "opentelemetry-semantic-conventions>=0.42b0",
 ]
 nats = [
@@ -78,6 +80,7 @@ nats = [
     "opentelemetry-propagator-b3>=1.21.0",
     "opentelemetry-instrumentation-fastapi>=0.42b0",
     "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
+    "opentelemetry-instrumentation-httpx>=0.42b0",
     "opentelemetry-semantic-conventions>=0.42b0",
 ]
 fastapi = [
@@ -91,6 +94,7 @@ fastapi = [
     "opentelemetry-propagator-b3>=1.21.0",
     "opentelemetry-instrumentation-fastapi>=0.42b0",
     "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
+    "opentelemetry-instrumentation-httpx>=0.42b0",
     "opentelemetry-semantic-conventions>=0.42b0",
 ]
 all = [
@@ -102,6 +106,7 @@ all = [
     "opentelemetry-propagator-b3>=1.21.0",
     "opentelemetry-instrumentation-fastapi>=0.42b0",
     "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
+    "opentelemetry-instrumentation-httpx>=0.42b0",
     "opentelemetry-semantic-conventions>=0.42b0",
 
     "grpcio>=1.44.0",

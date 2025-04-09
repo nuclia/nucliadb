@@ -22,7 +22,7 @@
 
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
-use nidx_protos::{Relation, RelationMetadata, RelationNode};
+use nidx_protos::{IndexRelation, Relation, RelationMetadata, RelationNode};
 use nidx_tantivy::{TantivyMeta, TantivySegmentMetadata};
 use nidx_types::{OpenIndexMetadata, Seq};
 
@@ -55,6 +55,7 @@ pub fn create_relation_node(source: String, node_type: NodeType, subtype: String
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_relation(
     source: String,
     source_node_type: NodeType,
@@ -64,14 +65,16 @@ pub fn create_relation(
     to_subtype: String,
     rel_type: RelationType,
     rel_label: String,
-) -> Relation {
-    Relation {
-        source: Some(create_relation_node(source, source_node_type, source_subtype)),
-        to: Some(create_relation_node(to, to_node_type, to_subtype)),
-        relation: rel_type.into(),
-        relation_label: rel_label,
-        metadata: Some(RelationMetadata { ..Default::default() }),
-        resource_id: None,
+) -> IndexRelation {
+    IndexRelation {
+        relation: Some(Relation {
+            source: Some(create_relation_node(source, source_node_type, source_subtype)),
+            to: Some(create_relation_node(to, to_node_type, to_subtype)),
+            relation: rel_type.into(),
+            relation_label: rel_label,
+            metadata: Some(RelationMetadata { ..Default::default() }),
+        }),
+        ..Default::default()
     }
 }
 
@@ -86,7 +89,7 @@ pub fn create_relation_with_metadata(
     rel_type: RelationType,
     rel_label: String,
     metadata: RelationMetadata,
-) -> Relation {
+) -> IndexRelation {
     let mut relation = create_relation(
         source,
         source_node_type,
@@ -97,6 +100,6 @@ pub fn create_relation_with_metadata(
         rel_type,
         rel_label,
     );
-    relation.metadata = Some(metadata);
+    relation.relation.as_mut().unwrap().metadata = Some(metadata);
     relation
 }

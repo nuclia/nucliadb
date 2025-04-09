@@ -29,6 +29,7 @@ pub mod searcher;
 mod segment_store;
 pub mod settings;
 pub mod tool;
+mod utilization_tracker;
 pub mod worker;
 
 #[cfg(feature = "telemetry")]

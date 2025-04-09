@@ -126,7 +126,7 @@ impl<'a> WriteAdaptor<'a> {
     }
 }
 
-impl<'a> std::io::Write for WriteAdaptor<'a> {
+impl std::io::Write for WriteAdaptor<'_> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let s = std::str::from_utf8(buf).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
 
@@ -134,7 +134,7 @@ impl<'a> std::io::Write for WriteAdaptor<'a> {
             .write_str(s)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
-        Ok(s.as_bytes().len())
+        Ok(s.len())
     }
 
     fn flush(&mut self) -> std::io::Result<()> {

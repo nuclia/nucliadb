@@ -284,7 +284,7 @@ impl<'a> Retriever<'a> {
     }
 }
 
-impl<'a> DataRetriever for Retriever<'a> {
+impl DataRetriever for Retriever<'_> {
     fn will_need(&self, Address(x): Address) {
         data_store::will_need(self.nodes, x, self.vector_len_bytes);
     }
@@ -452,6 +452,10 @@ impl OpenDataPoint {
 
     pub fn alive_nodes(&self) -> impl Iterator<Item = usize> + '_ {
         self.alive_bitset.iter()
+    }
+
+    pub fn space_usage(&self) -> usize {
+        self.nodes.len() + self.index.len() + self.inverted_indexes.space_usage()
     }
 
     pub fn search(

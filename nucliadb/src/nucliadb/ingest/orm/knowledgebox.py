@@ -502,17 +502,22 @@ class KnowledgeBox:
         shard_manager = get_shard_manager()
         await shard_manager.create_vectorset(self.kbid, config)
 
-    async def delete_vectorset(self, vectorset_id: str):
-        vectorset_count = await datamanagers.vectorsets.count(self.txn, kbid=self.kbid)
-        if vectorset_count == 1:
-            raise VectorSetConflict("Deletion of your last vectorset is not allowed")
+    async def vectorset_marked_for_deletion(self, vectorset_id: str) -> bool:
+        key = KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id)
+        value = await self.txn.get(key)
+        return value is not None
 
+    async def delete_vectorset(self, vectorset_id: str):
         deleted = await datamanagers.vectorsets.delete(
             self.txn, kbid=self.kbid, vectorset_id=vectorset_id
         )
         if deleted is None:
             # already deleted
             return
+
+        vectorset_count = await datamanagers.vectorsets.count(self.txn, kbid=self.kbid)
+        if vectorset_count == 0:
+            raise VectorSetConflict("Deletion of your last vectorset is not allowed")
 
         # mark vectorset for async deletion
         deletion_mark_key = KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id)

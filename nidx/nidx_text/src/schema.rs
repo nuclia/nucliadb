@@ -45,7 +45,8 @@ pub struct TextSchema {
     pub groups_public: Field,
     pub groups_with_access: Field,
 
-    pub encoded_field_id: Option<Field>,
+    pub encoded_field_id: Field,
+    pub encoded_field_id_bytes: Field,
 }
 
 pub fn timestamp_to_datetime_utc(timestamp: &nidx_protos::prost_types::Timestamp) -> DateTime {
@@ -53,7 +54,7 @@ pub fn timestamp_to_datetime_utc(timestamp: &nidx_protos::prost_types::Timestamp
 }
 
 impl TextSchema {
-    pub fn new(version: u64) -> Self {
+    pub fn new(_version: u64) -> Self {
         let mut sb = Schema::builder();
         let num_options: NumericOptions = NumericOptions::default().set_indexed().set_fast();
 
@@ -80,14 +81,12 @@ impl TextSchema {
         let groups_public = sb.add_u64_field("groups_public", num_options);
         let groups_with_access = sb.add_facet_field("groups_with_access", facet_options);
 
-        // v2: Field ID encoded as array of u64 for faster retrieval during prefilter
+        // v4: Field ID encoded as array of u64 for faster retrieval during prefilter
         // Using a bytes field is slow due to tantivy's implementation being slow with many unique values.
         // A better implementation is tracked in https://github.com/quickwit-oss/tantivy/issues/2090
-        let encoded_field_id = if version >= 2 {
-            Some(sb.add_u64_field("encoded_field_id", FAST))
-        } else {
-            None
-        };
+        let encoded_field_id = sb.add_u64_field("encoded_field_id", FAST);
+        // v4: Field ID encoded as array of u8 for faster deletions
+        let encoded_field_id_bytes = sb.add_bytes_field("encoded_field_id_bytes", INDEXED);
 
         let schema = sb.build();
 
@@ -103,6 +102,7 @@ impl TextSchema {
             groups_public,
             groups_with_access,
             encoded_field_id,
+            encoded_field_id_bytes,
         }
     }
 }
@@ -144,9 +144,28 @@ pub fn decode_field_id(data: &[u64]) -> (uuid::Uuid, String) {
     (rid, String::from_utf8(ubytes).unwrap())
 }
 
+/// Encodes a resource and field id as a series of u8
+/// This is stored in the indexed field `encoded_field_id_bytes`
+pub fn encode_field_id_bytes(rid: uuid::Uuid, fid: &str) -> Vec<u8> {
+    let mut out = Vec::with_capacity(16 + fid.len());
+    out.extend_from_slice(rid.as_bytes());
+    out.extend_from_slice(fid.as_bytes());
+    out
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{decode_field_id, encode_field_id};
+    use super::{decode_field_id, encode_field_id, encode_field_id_bytes};
+
+    /// Decodes a resource and field id from a series of u8
+    pub fn decode_field_id_bytes(data: &[u8]) -> (uuid::Uuid, String) {
+        if data.len() < 16 {
+            panic!("Data is too short to contain a valid UUID");
+        }
+        let rid = uuid::Uuid::from_slice(&data[..16]).unwrap();
+        let fid = String::from_utf8(data[16..].to_vec()).unwrap();
+        (rid, fid)
+    }
 
     #[test]
     fn test_encode_decode_field_id() {
@@ -165,6 +184,28 @@ mod tests {
             let rid = uuid::Uuid::parse_str(t.0).unwrap();
             let data = encode_field_id(rid, t.1);
             let (decoded_rid, decoded_fid) = decode_field_id(&data);
+            assert_eq!(decoded_rid.simple().to_string().as_str(), t.0);
+            assert_eq!(decoded_fid, t.1);
+        }
+    }
+
+    #[test]
+    fn test_encode_decode_field_id_bytes() {
+        // Test with different lengths to ensure it works when crossing block length
+        let testcases = [
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title1"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title12"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title123"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title1234"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title12345"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title123456"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "a/title1234567"),
+        ];
+        for t in testcases {
+            let rid = uuid::Uuid::parse_str(t.0).unwrap();
+            let data = encode_field_id_bytes(rid, t.1);
+            let (decoded_rid, decoded_fid) = decode_field_id_bytes(&data);
             assert_eq!(decoded_rid.simple().to_string().as_str(), t.0);
             assert_eq!(decoded_fid, t.1);
         }

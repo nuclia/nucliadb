@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
@@ -40,15 +40,7 @@ def driver(txn):
 
 
 @pytest.fixture()
-def sm():
-    mock = AsyncMock()
-    mock.add_resource = AsyncMock()
-    with patch("nucliadb.ingest.orm.processor.processor.get_shard_manager", return_value=mock):
-        yield mock
-
-
-@pytest.fixture()
-def processor(driver, sm):
+def processor(driver):
     yield Processor(driver, None)
 
 
@@ -79,27 +71,14 @@ async def test_commit_slug(processor: Processor, txn, resource):
     assert resource.txn is another_txn
 
 
-async def test_mark_resource_error(processor: Processor, txn, resource, kb, sm):
+async def test_mark_resource_error(processor: Processor, txn, resource, kb):
     await processor._mark_resource_error(kb, resource, partition="partition", seqid=1)
     txn.commit.assert_called_once()
     resource.set_basic.assert_awaited_once()
-    sm.add_resource.assert_awaited_once_with(
-        kb.get_resource_shard.return_value,
-        resource.indexer.brain,
-        1,
-        partition="partition",
-        kb="kbid",
-    )
 
 
 async def test_mark_resource_error_handle_error(processor: Processor, kb, resource, txn):
     resource.set_basic.side_effect = Exception("test")
-    await processor._mark_resource_error(kb, resource, partition="partition", seqid=1)
-    txn.commit.assert_not_called()
-
-
-async def test_mark_resource_error_skip_no_shard(processor: Processor, resource, driver, kb, txn):
-    kb.get_resource_shard.return_value = None
     await processor._mark_resource_error(kb, resource, partition="partition", seqid=1)
     txn.commit.assert_not_called()
 

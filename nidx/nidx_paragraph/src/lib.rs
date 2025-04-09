@@ -82,6 +82,9 @@ impl ParagraphIndexer {
         output_dir: &Path,
         resource: &nidx_protos::Resource,
     ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
+        if resource.skip_paragraphs {
+            return Ok(None);
+        }
         let field_schema = ParagraphSchema::new();
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
@@ -158,5 +161,14 @@ impl ParagraphSearcher {
 
     pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = ParagraphItem> + use<>> {
         self.reader.iterator(request)
+    }
+
+    pub fn space_usage(&self) -> usize {
+        let usage = self.reader.reader.searcher().space_usage();
+        if let Ok(usage) = usage {
+            usage.total().get_bytes() as usize
+        } else {
+            0
+        }
     }
 }

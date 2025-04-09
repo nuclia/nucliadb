@@ -306,12 +306,15 @@ mod tests {
         );
 
         let storage_source = Arc::new(object_store::memory::InMemory::new());
+        let mut resource = little_prince(kbid.to_string(), None);
+        // Add some random deletions to test the import
+        resource.paragraphs_to_delete.push("1".to_string());
         index_resource(
             &meta_source,
             storage_source.clone(),
             &tempfile::env::temp_dir(),
             &shard.id.to_string(),
-            little_prince(shard.id.to_string(), None),
+            resource.clone(),
             123i64.into(),
         )
         .await?;
@@ -323,12 +326,10 @@ mod tests {
                 .await?,
             3
         );
-        assert_eq!(
-            sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM deletions")
-                .fetch_one(&meta_source.pool)
-                .await?,
-            1
-        );
+        let deletions_count = sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM deletions")
+            .fetch_one(&meta_source.pool)
+            .await?;
+        assert!(deletions_count >= 1, "Expected at least one deletion");
 
         // Create destination DB
         let config_dest = Postgres::test_context(&TestArgs::new("test_export_and_import_dest")).await?;
@@ -346,12 +347,10 @@ mod tests {
         let shard_dest = Shard::get(&meta_dest.pool, shard.id).await?;
         assert_eq!(shard_dest.kbid, shard.kbid);
         assert_eq!(Index::for_shard(&meta_dest.pool, shard.id).await?.len(), 3);
-        assert_eq!(
-            sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM deletions")
-                .fetch_one(&meta_dest.pool)
-                .await?,
-            1
-        );
+        let after_deletions_count = sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM deletions")
+            .fetch_one(&meta_dest.pool)
+            .await?;
+        assert_eq!(after_deletions_count, deletions_count);
 
         let all_segments = Segment::in_indexes(&meta_dest.pool, &index_ids).await?;
         assert_eq!(all_segments.len(), 3);

@@ -108,7 +108,7 @@ fn segment_matches(expression: &BooleanExpression<String>, labels: &HashSet<Stri
     }
 }
 
-impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
+impl SearchRequest for (usize, &VectorSearchRequest, Formula) {
     fn with_duplicates(&self) -> bool {
         self.1.with_duplicates
     }
@@ -155,6 +155,10 @@ impl Reader {
         })
     }
 
+    pub fn space_usage(&self) -> usize {
+        self.open_data_points.iter().map(|dp| dp.space_usage()).sum()
+    }
+
     pub fn _search(
         &self,
         request: &dyn SearchRequest,
@@ -188,7 +192,7 @@ impl Reader {
             // Skip this segment if it doesn't match the segment filter
             if !segment_filter
                 .as_ref()
-                .map_or(true, |f| segment_matches(f, open_data_point.tags()))
+                .is_none_or(|f| segment_matches(f, open_data_point.tags()))
             {
                 continue;
             }

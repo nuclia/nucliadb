@@ -38,7 +38,9 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: clippy
-        run: cd nidx && cargo clippy --workspace --tests
+        run: cd nidx && cargo clippy --workspace --all-targets --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
 
   updated-protos:
     name: "Pre-checks: Protos up-to-date"
@@ -71,8 +73,7 @@ jobs:
       - build-virtual-env
     steps:
       - uses: actions/checkout@v4
-      - name: Set up PDM
-        uses: pdm-project/setup-pdm@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12.5"
       - name: Restore venv
@@ -98,11 +99,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: nidx
-      - name: Set up PDM
-        uses: pdm-project/setup-pdm@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.9.20"
-          cache: true
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
       # Needed for nidx_protos (rust)
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
@@ -115,7 +116,7 @@ jobs:
           max_attempts: 2
           retry_on: error
           timeout_minutes: 20
-          command: pdm sync -d --clean --no-editable
+          command: uv sync --no-editable --no-group nidx
       - name: Clean build
         run: find . -name build | xargs rm -r || true
       - name: Lint source code
@@ -249,11 +250,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: nidx
-      - name: Set up PDM
-        uses: pdm-project/setup-pdm@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12.5"
-          cache: true
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
       # Needed for nidx_protos (rust)
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
@@ -266,7 +267,7 @@ jobs:
           max_attempts: 2
           retry_on: error
           timeout_minutes: 20
-          command: pdm sync -d --clean --no-editable
+          command: uv sync --no-editable
       - name: Upload virtualenv to cache
         uses: actions/cache/save@v4
         with:

@@ -31,8 +31,6 @@ for users.
 
 """
 
-import asyncio
-
 import pytest
 from httpx import AsyncClient
 
@@ -41,16 +39,12 @@ from nucliadb_models.entities import (
     Entity,
     UpdateEntitiesGroupPayload,
 )
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.resources_pb2 import (
-    FieldID,
-    FieldType,
     Relation,
     RelationNode,
-    TokenSplit,
-    UserFieldMetadata,
+    Relations,
 )
-from nucliadb_protos.writer_pb2 import GetEntitiesGroupRequest, GetEntitiesGroupResponse
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
 from tests.utils.dirty_index import wait_for_sync
@@ -98,14 +92,15 @@ async def processing_entities(nucliadb_ingest_grpc: WriterStub, standalone_knowl
         "cat": {"value": "cat"},
         "dolphin": {"value": "dolphin"},
     }
-    bm = broker_resource(standalone_knowledgebox, slug="automatic-entities")
-    ufm = UserFieldMetadata(
-        field=FieldID(field_type=FieldType.GENERIC, field="title"),
-        token=[TokenSplit(token="cat", start=0, end=3, klass="ANIMALS")],
+    bm = broker_resource(
+        standalone_knowledgebox, slug="automatic-entities", source=BrokerMessage.MessageSource.WRITER
     )
-    bm.basic.fieldmetadata.append(ufm)
+    await inject_message(nucliadb_ingest_grpc, bm)
+    await wait_for_sync()
+
     relations = []
 
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
     for entity in entities.values():
         node = RelationNode(
             value=entity["value"],
@@ -120,63 +115,10 @@ async def processing_entities(nucliadb_ingest_grpc: WriterStub, standalone_knowl
                 relation_label="itself",
             )
         )
-    bm.relations.extend(relations)
+
+    bm.field_metadata[0].metadata.metadata.relations.append(Relations(relations=relations))
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
-
-
-@pytest.fixture
-async def annotated_entities(
-    nucliadb_writer: AsyncClient, text_field: tuple[str, str, str], nucliadb_ingest_grpc
-):
-    kbid, rid, field_id = text_field
-
-    resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{rid}",
-        json={
-            "fieldmetadata": [
-                {
-                    "token": [
-                        {
-                            "token": "dog",
-                            "klass": "ANIMALS",
-                            "start": 2,
-                            "end": 5,
-                            "cancelled_by_user": False,
-                        },
-                        {
-                            "token": "bird",
-                            "klass": "ANIMALS",
-                            "start": 26,
-                            "end": 30,
-                            "cancelled_by_user": False,
-                        },
-                    ],
-                    "paragraphs": [],
-                    "field": {
-                        "field_type": "text",
-                        "field": field_id,
-                    },
-                }
-            ]
-        },
-    )
-    assert resp.status_code == 200
-
-    # wait until indexed
-    bm_indexed = 0
-    retries = 0
-    while not bm_indexed:
-        response: GetEntitiesGroupResponse = await nucliadb_ingest_grpc.GetEntitiesGroup(
-            GetEntitiesGroupRequest(kb=KnowledgeBoxID(uuid=kbid), group="ANIMALS")
-        )
-        bm_indexed = "bird" in response.group.entities
-
-        assert retries < 10, "Broker message indexing took too much, might be a test error"
-
-        # small sleep to give time for indexing
-        await asyncio.sleep(0.1)
-        retries += 1
 
 
 @pytest.fixture
@@ -202,13 +144,13 @@ async def entities(
     standalone_knowledgebox: str,
     user_entities,
     processing_entities,
-    annotated_entities,
 ):
     """Single fixture to get entities injected in different ways."""
     # Ensure entities are properly stored/indexed
     await wait_until_entity(nucliadb_ingest_grpc, standalone_knowledgebox, "ANIMALS", "cat")
+    await wait_until_entity(nucliadb_ingest_grpc, standalone_knowledgebox, "ANIMALS", "dog")
+    await wait_until_entity(nucliadb_ingest_grpc, standalone_knowledgebox, "ANIMALS", "domestic-cat")
     await wait_until_entity(nucliadb_ingest_grpc, standalone_knowledgebox, "ANIMALS", "dolphin")
-    await wait_until_entity(nucliadb_ingest_grpc, standalone_knowledgebox, "ANIMALS", "bird")
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -224,7 +166,6 @@ async def test_get_entities_groups(
     body = resp.json()
 
     assert body["entities"].keys() == {
-        "bird",
         "cat",
         "dog",
         "dolphin",
@@ -299,7 +240,6 @@ async def test_update_entities_group(
     body = resp.json()
 
     assert body["entities"].keys() == {
-        "bird",
         "cat",
         "dog",
         "seal",
@@ -410,20 +350,25 @@ async def test_entities_indexing(
     entities,
     predict_mock,
 ):
-    # TODO: improve test cases here
-
     kbid = standalone_knowledgebox
 
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/suggest",
-        params={
-            "query": "do",
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
+    async def suggested_entities(query: str) -> list[str]:
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/suggest",
+            params={
+                "query": query,
+                "features": ["entities"],
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        entities = set((e["value"] for e in body["entities"]["entities"]))
+        return list(entities)
 
-    entities = set((e["value"] for e in body["entities"]["entities"]))
-    # BUG? why is "domestic cat" not appearing in the results?
-    assert entities == {"dog", "dolphin"}
-    # assert entities == {"dog", "domestic cat", "dolphin"}
+    entities = await suggested_entities("do")
+    # Only the processing entities are indexed
+    assert "dog" not in entities
+    assert "dolphin" in entities
+    entities = await suggested_entities("ca")
+    assert "cat" in entities
+    assert "domestic-cat" not in entities

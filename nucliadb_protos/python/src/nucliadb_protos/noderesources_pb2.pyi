@@ -687,6 +687,24 @@ class Resource(google.protobuf.message.Message):
         def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
 
     @typing.final
+    class FieldRelationsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___IndexRelations: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___IndexRelations | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    @typing.final
     class VectorsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -731,14 +749,21 @@ class Resource(google.protobuf.message.Message):
     PARAGRAPHS_TO_DELETE_FIELD_NUMBER: builtins.int
     SENTENCES_TO_DELETE_FIELD_NUMBER: builtins.int
     VECTOR_PREFIXES_TO_DELETE_FIELD_NUMBER: builtins.int
-    RELATIONS_FIELD_NUMBER: builtins.int
+    RELATION_FIELDS_TO_DELETE_FIELD_NUMBER: builtins.int
+    TEXTS_TO_DELETE_FIELD_NUMBER: builtins.int
+    FIELD_RELATIONS_FIELD_NUMBER: builtins.int
     SHARD_ID_FIELD_NUMBER: builtins.int
     VECTORS_FIELD_NUMBER: builtins.int
     VECTORS_TO_DELETE_FIELD_NUMBER: builtins.int
     SECURITY_FIELD_NUMBER: builtins.int
+    SKIP_TEXTS_FIELD_NUMBER: builtins.int
+    SKIP_PARAGRAPHS_FIELD_NUMBER: builtins.int
     status: global___Resource.ResourceStatus.ValueType
     """Tantivy doc"""
     shard_id: builtins.str
+    skip_texts: builtins.bool
+    """Boleans to indicate if the indexing needs to be done"""
+    skip_paragraphs: builtins.bool
     @property
     def resource(self) -> global___ResourceID: ...
     @property
@@ -775,7 +800,11 @@ class Resource(google.protobuf.message.Message):
         """vectorset_id -> [vector_key_prefix, ...]"""
 
     @property
-    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]:
+    def relation_fields_to_delete(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def texts_to_delete(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def field_relations(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___IndexRelations]:
         """Relations"""
 
     @property
@@ -800,14 +829,18 @@ class Resource(google.protobuf.message.Message):
         paragraphs_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
         sentences_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
         vector_prefixes_to_delete: collections.abc.Mapping[builtins.str, global___StringList] | None = ...,
-        relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
+        relation_fields_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
+        texts_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
+        field_relations: collections.abc.Mapping[builtins.str, global___IndexRelations] | None = ...,
         shard_id: builtins.str = ...,
         vectors: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectors] | None = ...,
         vectors_to_delete: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectorsList] | None = ...,
         security: nucliadb_protos.utils_pb2.Security | None = ...,
+        skip_texts: builtins.bool = ...,
+        skip_paragraphs: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_security", b"_security", "metadata", b"metadata", "resource", b"resource", "security", b"security"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_security", b"_security", "labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relations", b"relations", "resource", b"resource", "security", b"security", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "vector_prefixes_to_delete", b"vector_prefixes_to_delete", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_security", b"_security", "field_relations", b"field_relations", "labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relation_fields_to_delete", b"relation_fields_to_delete", "resource", b"resource", "security", b"security", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "skip_paragraphs", b"skip_paragraphs", "skip_texts", b"skip_texts", "status", b"status", "texts", b"texts", "texts_to_delete", b"texts_to_delete", "vector_prefixes_to_delete", b"vector_prefixes_to_delete", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["_security", b"_security"]) -> typing.Literal["security"] | None: ...
 
 global___Resource = Resource
@@ -915,3 +948,46 @@ class StringList(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["items", b"items"]) -> None: ...
 
 global___StringList = StringList
+
+@typing.final
+class IndexRelation(google.protobuf.message.Message):
+    """Relations as sent and retrieved from the index, with some additional metadata"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RELATION_FIELD_NUMBER: builtins.int
+    RESOURCE_FIELD_ID_FIELD_NUMBER: builtins.int
+    FACETS_FIELD_NUMBER: builtins.int
+    resource_field_id: builtins.str
+    @property
+    def relation(self) -> nucliadb_protos.utils_pb2.Relation: ...
+    @property
+    def facets(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        relation: nucliadb_protos.utils_pb2.Relation | None = ...,
+        resource_field_id: builtins.str | None = ...,
+        facets: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_resource_field_id", b"_resource_field_id", "relation", b"relation", "resource_field_id", b"resource_field_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_resource_field_id", b"_resource_field_id", "facets", b"facets", "relation", b"relation", "resource_field_id", b"resource_field_id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_resource_field_id", b"_resource_field_id"]) -> typing.Literal["resource_field_id"] | None: ...
+
+global___IndexRelation = IndexRelation
+
+@typing.final
+class IndexRelations(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RELATIONS_FIELD_NUMBER: builtins.int
+    @property
+    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___IndexRelation]: ...
+    def __init__(
+        self,
+        *,
+        relations: collections.abc.Iterable[global___IndexRelation] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["relations", b"relations"]) -> None: ...
+
+global___IndexRelations = IndexRelations

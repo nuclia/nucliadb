@@ -31,17 +31,20 @@ from nucliadb.common.external_index_providers.manager import (
     get_external_index_manager,
 )
 from nucliadb.common.nidx import get_nidx_fake_node
+from nucliadb.migrator.settings import settings
 from nucliadb_protos import writer_pb2
 from nucliadb_telemetry import errors
 
 from .utils import (
     delete_resource_from_shard,
     get_resource,
-    get_resource_index_message,
+    get_rollover_resource_index_message,
     index_resource_to_shard,
 )
 
 logger = logging.getLogger(__name__)
+
+resource_index_semaphore = asyncio.Semaphore(settings.max_concurrent_rollover_resources)
 
 
 class UnexpectedRolloverError(Exception):
@@ -234,10 +237,33 @@ async def index_to_rollover_index(
     # now index on all new shards only
     while True:
         async with datamanagers.with_transaction() as txn:
-            resource_id = await datamanagers.rollover.get_to_index(txn, kbid=kbid)
-        if resource_id is None:
+            resource_ids = await datamanagers.rollover.get_to_index(
+                txn, kbid=kbid, count=settings.max_concurrent_rollover_resources
+            )
+        if resource_ids is None:
             break
 
+        batch = [
+            _index_resource_to_rollover_index(app_context, rollover_shards, kbid, rid, external)
+            for rid in resource_ids
+        ]
+        await asyncio.gather(*batch)
+
+    async with datamanagers.with_transaction() as txn:
+        state.resources_indexed = True
+        await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
+        await datamanagers.rollover.update_kb_rollover_shards(txn, kbid=kbid, kb_shards=rollover_shards)
+        await txn.commit()
+
+
+async def _index_resource_to_rollover_index(
+    app_context: ApplicationContext,
+    rollover_shards: writer_pb2.Shards,
+    kbid: str,
+    resource_id: str,
+    external: Optional[ExternalIndexManager] = None,
+) -> None:
+    async with resource_index_semaphore:
         async with datamanagers.with_transaction() as txn:
             shard_id = await datamanagers.resources.get_resource_shard_id(
                 txn, kbid=kbid, rid=resource_id
@@ -250,7 +276,7 @@ async def index_to_rollover_index(
             async with datamanagers.with_transaction() as txn:
                 await datamanagers.rollover.remove_to_index(txn, kbid=kbid, resource=resource_id)
                 await txn.commit()
-            continue
+            return
 
         shard = _get_shard(rollover_shards, shard_id)
         if shard is None:  # pragma: no cover
@@ -262,13 +288,13 @@ async def index_to_rollover_index(
                 f"Shard {shard_id} not found. Was a new one created during migration?"
             )
         resource = await get_resource(kbid, resource_id)
-        index_message = await get_resource_index_message(kbid, resource_id)
+        index_message = await get_rollover_resource_index_message(kbid, resource_id)
         if resource is None or index_message is None:
             # resource no longer existing, remove indexing and carry on
             async with datamanagers.with_transaction() as txn:
                 await datamanagers.rollover.remove_to_index(txn, kbid=kbid, resource=resource_id)
                 await txn.commit()
-            continue
+            return
 
         if external is not None:
             await external.index_resource(resource_id, index_message, to_rollover_indexes=True)
@@ -286,12 +312,6 @@ async def index_to_rollover_index(
                 modification_time=_to_ts(resource.basic.modified.ToDatetime()),  # type: ignore
             )
             await txn.commit()
-
-    async with datamanagers.with_transaction() as txn:
-        state.resources_indexed = True
-        await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
-        await datamanagers.rollover.update_kb_rollover_shards(txn, kbid=kbid, kb_shards=rollover_shards)
-        await txn.commit()
 
 
 async def cutover_index(
@@ -483,7 +503,7 @@ async def validate_indexed_data(
                 await txn.commit()
             continue
 
-        index_message = await get_resource_index_message(kbid, resource_id)
+        index_message = await get_rollover_resource_index_message(kbid, resource_id)
         if index_message is None:
             logger.error(
                 "Resource index message not found while validating, skipping",

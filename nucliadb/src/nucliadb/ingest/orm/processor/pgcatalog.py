@@ -23,6 +23,7 @@ from typing import cast
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb_protos.noderesources_pb2 import Resource as IndexMessage
 from nucliadb_telemetry import metrics
 
 from ..resource import Resource
@@ -39,7 +40,7 @@ def pgcatalog_enabled(kbid):
 
 
 @observer.wrap({"type": "update"})
-async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource):
+async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource, index_message: IndexMessage):
     if not pgcatalog_enabled(kbid):
         return
 
@@ -69,7 +70,7 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource):
                 "title": resource.basic.title,
                 "created_at": created_at,
                 "modified_at": modified_at,
-                "labels": list(resource.indexer.brain.labels),
+                "labels": list(index_message.labels),
             },
         )
 

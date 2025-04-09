@@ -49,18 +49,18 @@ repos:
         types: ["python"]
         pass_filenames: false
 
-      - id: rustfmt_nucliadb
-        name: fmt
-        entry: cargo fmt --check
+      - id: rustfmt_nidx
+        name: Rust format check for nidx
+        entry: cargo fmt --check --all --manifest-path nidx/Cargo.toml
         language: system
-        files: (^nucliadb_vectors*/)|(^nucliadb_node*/)|(^nucliadb_paragraphs*/)|(^nucliadb_texts*/)|(^nucliadb_relations*/)
+        files: (^nidx/)
         types: ["rust"]
         pass_filenames: false
 
-      - id: clippy_nucliadb
-        name: clippy
-        entry: cargo clippy --all-features -- -D warnings
+      - id: clippy_nidx
+        name: Clippy warning check for nidx
+        entry: cargo clippy --all-features --manifest-path nidx/Cargo.toml -- -D warnings
         language: system
-        files: (^nucliadb_vectors*/)|(^nucliadb_node*/)|(^nucliadb_paragraphs*/)|(^nucliadb_texts*/)|(^nucliadb_relations*/)
+        files: (^nidx/)
         types: ["rust"]
         pass_filenames: false

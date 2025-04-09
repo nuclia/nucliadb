@@ -30,7 +30,8 @@ pub async fn update_merge_job_metric(metadb: &NidxMetadata) -> anyhow::Result<()
     let job_states = sqlx::query!(
         r#"
         SELECT
-        COUNT(*) FILTER (WHERE started_at IS NULL) AS "queued!",
+        COUNT(*) FILTER (WHERE started_at IS NULL AND enqueued_at < NOW() - INTERVAL '1 minute') AS "queued!",
+        COUNT(*) FILTER (WHERE started_at IS NULL AND enqueued_at > NOW() - INTERVAL '1 minute') AS "recently_queued!",
         COUNT(*) FILTER (WHERE started_at IS NOT NULL) AS "running!"
         FROM merge_jobs;
         "#
@@ -40,6 +41,11 @@ pub async fn update_merge_job_metric(metadb: &NidxMetadata) -> anyhow::Result<()
     metrics::scheduler::QUEUED_JOBS
         .get_or_create(&JobFamily {
             state: JobState::Queued,
+        })
+        .set(job_states.queued);
+    metrics::scheduler::QUEUED_JOBS
+        .get_or_create(&JobFamily {
+            state: JobState::RecentlyQueued,
         })
         .set(job_states.queued);
     metrics::scheduler::QUEUED_JOBS

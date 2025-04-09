@@ -21,6 +21,7 @@
 use std::{any::TypeId, path::PathBuf};
 
 use anyhow::anyhow;
+use nidx_relation::RelationConfig;
 use nidx_text::TextConfig;
 use nidx_vector::config::VectorConfig;
 use serde::{Deserialize, Serialize};
@@ -75,7 +76,7 @@ pub enum IndexConfig {
     Text(TextConfig),
     Paragraph(()),
     Vector(VectorConfig),
-    Relation(()),
+    Relation(RelationConfig),
 }
 
 impl Index {
@@ -255,6 +256,7 @@ impl Index {
         let config_type = match self.kind {
             IndexKind::Vector => TypeId::of::<VectorConfig>(),
             IndexKind::Text => TypeId::of::<TextConfig>(),
+            IndexKind::Relation => TypeId::of::<RelationConfig>(),
             _ => TypeId::of::<()>(),
         };
 
@@ -325,7 +327,7 @@ impl IndexConfig {
     }
 
     pub fn new_relation() -> Self {
-        Self::Relation(())
+        Self::Relation(RelationConfig::default())
     }
 }
 
@@ -343,12 +345,12 @@ mod tests {
     async fn test_text_config(pool: sqlx::PgPool) -> anyhow::Result<()> {
         let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
 
-        // Default version for new indexes is 2
+        // Default version for new indexes is 4
         let shard = Shard::create(&meta.pool, Uuid::new_v4()).await.unwrap();
         let index = Index::create(&meta.pool, shard.id, "multilingual", IndexConfig::new_text())
             .await
             .unwrap();
-        assert_eq!(index.config::<TextConfig>()?.version, 2);
+        assert_eq!(index.config::<TextConfig>()?.version, 4);
 
         // Default version if DB is empty is 1
         sqlx::query("UPDATE indexes SET configuration = NULL")

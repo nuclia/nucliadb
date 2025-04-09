@@ -153,6 +153,7 @@ fn blocking_suggest(
     }
 
     if let Some(entities) = rrelation {
+        let entities = entities?;
         response.entity_results = Some(RelationPrefixSearchResponse { nodes: entities });
     }
 

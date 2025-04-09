@@ -20,12 +20,14 @@
 
 use std::collections::HashMap;
 
-use nidx_protos::{GraphSearchResponse, Relation, RelationNode, relation::RelationType, relation_node::NodeType};
+use nidx_protos::{
+    GraphSearchResponse, IndexRelation, Relation, RelationNode, relation::RelationType, relation_node::NodeType,
+};
 
 /// Parse a graph search response and return a list of triplets (source,
 /// relation, target). This is a simplified view but yet useful view of the
 /// response.
-pub fn friendly_parse<'a>(relations: &'a GraphSearchResponse) -> Vec<(&'a str, &'a str, &'a str)> {
+pub fn friendly_parse(relations: &GraphSearchResponse) -> Vec<(&str, &str, &str)> {
     relations
         .graph
         .iter()
@@ -67,7 +69,7 @@ pub fn friendly_print(result: &nidx_protos::GraphSearchResponse) {
 }
 
 /// Returns a simple knowledge graph as a list of relations
-pub fn knowledge_graph_as_relations() -> Vec<Relation> {
+pub fn knowledge_graph_as_relations() -> Vec<IndexRelation> {
     let entities = HashMap::from([
         ("Anastasia", "PERSON"),
         ("Anna", "PERSON"),
@@ -78,6 +80,7 @@ pub fn knowledge_graph_as_relations() -> Vec<Relation> {
         ("Dimitri", "PERSON"),
         ("Erin", "PERSON"),
         ("Jerry", "ANIMAL"),
+        ("Mr. P", "AGENT"),
         ("Margaret", "PERSON"),
         ("Mouse", "ANIMAL"),
         ("New York", "PLACE"),
@@ -86,6 +89,19 @@ pub fn knowledge_graph_as_relations() -> Vec<Relation> {
         ("Rocket", "VEHICLE"),
         ("Tom", "ANIMAL"),
         ("UK", "PLACE"),
+    ]);
+
+    let relations = HashMap::from([
+        ("ALIAS", RelationType::Synonym),
+        ("BORN_IN", RelationType::Entity),
+        ("CHASE", RelationType::Entity),
+        ("DEVELOPED", RelationType::Entity),
+        ("FOLLOW", RelationType::Entity),
+        ("IS", RelationType::Entity),
+        ("IS_FRIEND", RelationType::Entity),
+        ("LIVE_IN", RelationType::Entity),
+        ("LOVE", RelationType::Entity),
+        ("WORK_IN", RelationType::Entity),
     ]);
 
     let graph = vec![
@@ -102,30 +118,33 @@ pub fn knowledge_graph_as_relations() -> Vec<Relation> {
         ("Jerry", "IS", "Mouse"),
         ("Margaret", "DEVELOPED", "Apollo"),
         ("Margaret", "WORK_IN", "Computer science"),
+        ("Mr. P", "ALIAS", "Peter"),
         ("Peter", "LIVE_IN", "New York"),
         ("Tom", "CHASE", "Jerry"),
         ("Tom", "IS", "Cat"),
     ];
 
-    let mut relations = vec![];
+    let mut pb_relations = vec![];
     for (source, relation, target) in graph {
-        relations.push(Relation {
-            source: Some(RelationNode {
-                value: source.to_string(),
-                ntype: NodeType::Entity as i32,
-                subtype: entities.get(source).unwrap().to_string(),
+        pb_relations.push(IndexRelation {
+            relation: Some(Relation {
+                source: Some(RelationNode {
+                    value: source.to_string(),
+                    ntype: NodeType::Entity as i32,
+                    subtype: entities.get(source).unwrap().to_string(),
+                }),
+                relation: *relations.get(relation).unwrap() as i32,
+                relation_label: relation.to_string(),
+                to: Some(RelationNode {
+                    value: target.to_string(),
+                    ntype: NodeType::Entity as i32,
+                    subtype: entities.get(target).unwrap().to_string(),
+                }),
+                metadata: None,
             }),
-            relation: RelationType::Entity.into(),
-            relation_label: relation.to_string(),
-            to: Some(RelationNode {
-                value: target.to_string(),
-                ntype: NodeType::Entity as i32,
-                subtype: entities.get(target).unwrap().to_string(),
-            }),
-            metadata: None,
-            resource_id: None,
+            ..Default::default()
         })
     }
 
-    relations
+    pb_relations
 }

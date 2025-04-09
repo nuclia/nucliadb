@@ -21,7 +21,7 @@ from enum import Enum
 
 from pydantic import BaseModel
 
-from nucliadb_models.metadata import RelationNodeType
+from nucliadb_models.metadata import RelationNodeType, RelationType
 
 
 class GraphNode(BaseModel):
@@ -42,6 +42,7 @@ class PositionedGraphNode(GraphNode):
 
 class GraphRelation(BaseModel):
     label: str
+    type: RelationType
 
 
 class GraphPath(BaseModel):

@@ -67,9 +67,10 @@ from nucliadb_protos.resources_pb2 import Extra as PBExtra
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
-from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_utils import const
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.utilities import has_feature
 
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -157,6 +158,14 @@ class Resource:
         if basic_in_payload.HasField("metadata") and basic_in_payload.metadata.useful:
             current_basic.metadata.status = basic_in_payload.metadata.status
 
+    def has_index_message_v2_feature(self) -> bool:
+        return has_feature(
+            const.Features.INDEX_MESSAGE_GENERATION_V2,
+            context={
+                "kbid": self.kb.kbid,
+            },
+        )
+
     @processor_observer.wrap({"type": "set_basic"})
     async def set_basic(
         self,
@@ -209,32 +218,34 @@ class Resource:
                 del self.basic.fieldmetadata[:]
                 self.basic.fieldmetadata.extend(updated)
 
-                # All modified field metadata should be indexed
-                # TODO: could be improved to only index the diff
-                for user_field_metadata in self.basic.fieldmetadata:
-                    field_id = self.generate_field_id(fieldmetadata.field)
-                    field_obj = await self.get_field(
-                        fieldmetadata.field.field, fieldmetadata.field.field_type
-                    )
-                    field_metadata = await field_obj.get_field_metadata()
-                    if field_metadata is not None:
-                        page_positions: Optional[FilePagePositions] = None
-                        if isinstance(field_obj, File):
-                            page_positions = await get_file_page_positions(field_obj)
-
-                        self.indexer.apply_field_metadata(
-                            field_id,
-                            field_metadata,
-                            page_positions=page_positions,
-                            extracted_text=await field_obj.get_extracted_text(),
-                            basic_user_field_metadata=user_field_metadata,
-                            replace_field=True,
+                if not self.has_index_message_v2_feature():
+                    # TODO: Remove this when we remove the old indexer is removed
+                    # All modified field metadata should be indexed
+                    # TODO: could be improved to only index the diff
+                    for user_field_metadata in self.basic.fieldmetadata:
+                        field_id = self.generate_field_id(fieldmetadata.field)
+                        field_obj = await self.get_field(
+                            fieldmetadata.field.field, fieldmetadata.field.field_type
                         )
+                        field_metadata = await field_obj.get_field_metadata()
+                        if field_metadata is not None:
+                            page_positions: Optional[FilePagePositions] = None
+                            if isinstance(field_obj, File):
+                                page_positions = await get_file_page_positions(field_obj)
+
+                            self.indexer.apply_field_metadata(
+                                field_id,
+                                field_metadata,
+                                page_positions=page_positions,
+                                extracted_text=await field_obj.get_extracted_text(),
+                                basic_user_field_metadata=user_field_metadata,
+                                replace_field=True,
+                            )
 
         # Some basic fields are computed off field metadata.
         # This means we need to recompute upon field deletions.
         if deleted_fields is not None and len(deleted_fields) > 0:
-            remove_field_classifications(self.basic, deleted_fields=deleted_fields)
+            delete_basic_computedmetadata_classifications(self.basic, deleted_fields=deleted_fields)
 
         await datamanagers.resources.set_basic(
             self.txn, kbid=self.kb.kbid, rid=self.uuid, basic=self.basic
@@ -284,24 +295,6 @@ class Resource:
         self.security = payload
 
     # Relations
-    async def get_relations(self) -> Optional[PBRelations]:
-        if self.relations is None:
-            relations = await datamanagers.resources.get_relations(
-                self.txn, kbid=self.kb.kbid, rid=self.uuid
-            )
-            self.relations = relations
-        return self.relations
-
-    async def set_relations(self, payload: list[PBRelation]):
-        relations = PBRelations()
-        for relation in payload:
-            relations.relations.append(relation)
-        await datamanagers.resources.set_relations(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid, relations=relations
-        )
-        self.modified = True
-        self.relations = relations
-
     async def get_user_relations(self) -> PBRelations:
         if self.user_relations is None:
             sf = self.storage.user_relations(self.kb.kbid, self.uuid)
@@ -319,7 +312,7 @@ class Resource:
         self.modified = True
         self.user_relations = payload
 
-    @processor_observer.wrap({"type": "generate_index_message"})
+    @processor_observer.wrap({"type": "generate_index_message_old"})
     async def generate_index_message(self, reindex: bool = False) -> ResourceBrain:
         brain = ResourceBrain(rid=self.uuid)
         basic = await self.get_basic()
@@ -451,10 +444,9 @@ class Resource:
             if field in self.all_fields_keys:
                 self.all_fields_keys.remove(field)
 
-        field_key = self.generate_field_id(FieldID(field_type=type, field=key))
-
-        metadata = await field_obj.get_field_metadata()
-        if metadata is not None:
+        # TODO: Remove this when we remove the old indexer
+        if not self.has_index_message_v2_feature():
+            field_key = self.generate_field_id(FieldID(field_type=type, field=key))
             self.indexer.delete_field(field_key=field_key)
 
         await field_obj.delete()
@@ -536,6 +528,7 @@ class Resource:
                 deleted=message.delete_fields,  # type: ignore
                 errors=message.errors,  # type: ignore
             )
+            self.modified = True
 
     @processor_observer.wrap({"type": "apply_fields_status"})
     async def apply_fields_status(self, message: BrokerMessage, updated_fields: list[FieldID]):
@@ -593,6 +586,7 @@ class Resource:
                 # status to the default value, which is PROCESSING. This covers the case of new field creation.
 
             await field_obj.set_status(status)
+            self.modified = True
 
     async def update_status(self):
         field_ids = await self.get_all_field_ids(for_update=False)
@@ -681,14 +675,11 @@ class Resource:
         for field_large_metadata in message.field_large_metadata:
             await self._apply_field_large_metadata(field_large_metadata)
 
-        for relation in message.relations:
-            self.indexer.brain.relations.append(relation)
-        await self.set_relations(message.relations)  # type: ignore
-
         # Basic proto may have been modified in some apply functions but we only
         # want to set it once
         if self.basic != previous_basic:
             await self.set_basic(self.basic)
+            self.modified = True
 
     async def _apply_extracted_text(self, extracted_text: ExtractedTextWrapper):
         field_obj = await self.get_field(
@@ -698,15 +689,18 @@ class Resource:
         self._modified_extracted_text.append(
             extracted_text.field,
         )
+        self.modified = True
 
     async def _apply_question_answers(self, question_answers: FieldQuestionAnswerWrapper):
         field = question_answers.field
         field_obj = await self.get_field(field.field, field.field_type, load=False)
         await field_obj.set_question_answers(question_answers)
+        self.modified = True
 
     async def _delete_question_answers(self, field_id: FieldID):
         field_obj = await self.get_field(field_id.field, field_id.field_type, load=False)
         await field_obj.delete_question_answers()
+        self.modified = True
 
     async def _apply_link_extracted_data(self, link_extracted_data: LinkExtractedData):
         assert self.basic is not None
@@ -722,6 +716,7 @@ class Resource:
         maybe_update_basic_icon(self.basic, "application/stf-link")
 
         maybe_update_basic_summary(self.basic, link_extracted_data.description)
+        self.modified = True
 
     async def maybe_update_resource_title_from_link(self, link_extracted_data: LinkExtractedData):
         """
@@ -736,6 +731,7 @@ class Resource:
             return
         title = link_extracted_data.title
         await self.update_resource_title(title)
+        self.modified = True
 
     async def update_resource_title(self, computed_title: str) -> None:
         assert self.basic is not None
@@ -760,6 +756,7 @@ class Resource:
         fcmw.metadata.metadata.paragraphs.append(paragraph)
 
         await field.set_field_metadata(fcmw)
+        self.modified = True
 
     async def _apply_file_extracted_data(self, file_extracted_data: FileExtractedData):
         assert self.basic is not None
@@ -772,6 +769,7 @@ class Resource:
         await field_file.set_file_extracted_data(file_extracted_data)
         maybe_update_basic_icon(self.basic, file_extracted_data.icon)
         maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail)
+        self.modified = True
 
     async def _should_update_resource_title_from_file_metadata(self) -> bool:
         """
@@ -830,38 +828,42 @@ class Resource:
             load=False,
         )
         metadata = await field_obj.set_field_metadata(field_metadata)
-        field_key = self.generate_field_id(field_metadata.field)
 
-        page_positions: Optional[FilePagePositions] = None
-        if field_metadata.field.field_type == FieldType.FILE and isinstance(field_obj, File):
-            page_positions = await get_file_page_positions(field_obj)
+        # TODO: Remove this when we remove the old indexer
+        if not self.has_index_message_v2_feature():
+            field_key = self.generate_field_id(field_metadata.field)
 
-        user_field_metadata = next(
-            (
-                fm
-                for fm in self.basic.fieldmetadata
-                if fm.field.field == field_metadata.field.field
-                and fm.field.field_type == field_metadata.field.field_type
-            ),
-            None,
-        )
+            page_positions: Optional[FilePagePositions] = None
+            if field_metadata.field.field_type == FieldType.FILE and isinstance(field_obj, File):
+                page_positions = await get_file_page_positions(field_obj)
 
-        extracted_text = await field_obj.get_extracted_text()
-        apply_field_metadata = partial(
-            self.indexer.apply_field_metadata,
-            field_key,
-            metadata,
-            page_positions=page_positions,
-            extracted_text=extracted_text,
-            basic_user_field_metadata=user_field_metadata,
-            replace_field=True,
-        )
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(_executor, apply_field_metadata)
+            user_field_metadata = next(
+                (
+                    fm
+                    for fm in self.basic.fieldmetadata
+                    if fm.field.field == field_metadata.field.field
+                    and fm.field.field_type == field_metadata.field.field_type
+                ),
+                None,
+            )
+
+            extracted_text = await field_obj.get_extracted_text()
+            apply_field_metadata = partial(
+                self.indexer.apply_field_metadata,
+                field_key,
+                metadata,
+                page_positions=page_positions,
+                extracted_text=extracted_text,
+                basic_user_field_metadata=user_field_metadata,
+                replace_field=True,
+            )
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(_executor, apply_field_metadata)
 
         maybe_update_basic_thumbnail(self.basic, field_metadata.metadata.metadata.thumbnail)
 
-        add_field_classifications(self.basic, field_metadata)
+        update_basic_computedmetadata_classifications(self.basic, field_metadata)
+        self.modified = True
 
     async def _apply_extracted_vectors(
         self,
@@ -906,11 +908,15 @@ class Resource:
             vo = await field_obj.set_vectors(
                 field_vectors, vectorset.vectorset_id, vectorset.storage_key_kind
             )
+            self.modified = True
             if vo is None:
                 raise AttributeError("Vector object not found on set_vectors")
 
-            # Prepare vectors to be indexed
+            if self.has_index_message_v2_feature():
+                continue
 
+            # TODO: Remove this when we remove the old indexer
+            # Prepare vectors to be indexed
             field_key = self.generate_field_id(field_vectors.field)
             dimension = vectorset.vectorset_index_config.vector_dimension
             if not dimension:
@@ -934,6 +940,7 @@ class Resource:
             load=False,
         )
         await field_obj.set_large_field_metadata(field_large_metadata)
+        self.modified = True
 
     def generate_field_id(self, field: FieldID) -> str:
         return f"{FIELD_TYPE_PB_TO_STR[field.field_type]}/{field.field}"
@@ -993,7 +1000,7 @@ class Resource:
         field_text = extracted_text.text
         for _, split in extracted_text.split_text.items():
             field_text += f" {split} "
-        brain.apply_field_text(fieldkey, field_text)
+        brain.apply_field_text(fieldkey, field_text, replace_field=True)
 
     def clean(self):
         self._indexer = None
@@ -1010,37 +1017,57 @@ async def get_file_page_positions(field: File) -> FilePagePositions:
     return positions
 
 
-def remove_field_classifications(basic: PBBasic, deleted_fields: list[FieldID]):
+def delete_basic_computedmetadata_classifications(basic: PBBasic, deleted_fields: list[FieldID]) -> bool:
     """
-    Clean classifications of fields that have been deleted
+    We keep a copy of field classifications computed by the processing engine at the basic object
+    so that users can easily access them without having to load the field metadata from the storage.
+
+    This funcion removes the field classifications for the fields that have been deleted.
+    Returns whether the basic was modified.
     """
-    field_classifications = [
+    if len(deleted_fields) == 0:
+        # Nothing to delete
+        return False
+    new_field_classifications = [
         fc for fc in basic.computedmetadata.field_classifications if fc.field not in deleted_fields
     ]
-    basic.computedmetadata.ClearField("field_classifications")
-    basic.computedmetadata.field_classifications.extend(field_classifications)
-
-
-def add_field_classifications(basic: PBBasic, fcmw: FieldComputedMetadataWrapper) -> bool:
-    """
-    Returns whether some new field classifications were added
-    """
-    if len(fcmw.metadata.metadata.classifications) == 0 and all(
-        len(split.classifications) == 0 for split in fcmw.metadata.split_metadata.values()
-    ):
+    if len(new_field_classifications) == len(basic.computedmetadata.field_classifications):
+        # No changes
         return False
 
-    remove_field_classifications(basic, [fcmw.field])
+    basic.computedmetadata.ClearField("field_classifications")
+    basic.computedmetadata.field_classifications.extend(new_field_classifications)
+    return True
+
+
+def update_basic_computedmetadata_classifications(
+    basic: PBBasic, fcmw: FieldComputedMetadataWrapper
+) -> bool:
+    """
+    We keep a copy of field classifications computed by the processing engine at the basic object
+    so that users can easily access them without having to load the field metadata from the storage.
+
+    This function updates the basic object with the new field computed metadata.
+    Returns whether the basic was modified.
+    """
+    some_deleted = delete_basic_computedmetadata_classifications(basic, [fcmw.field])
+
     fcfs = FieldClassifications()
     fcfs.field.CopyFrom(fcmw.field)
-    fcfs.classifications.extend(fcmw.metadata.metadata.classifications)
+
+    some_added = False
+    if len(fcmw.metadata.metadata.classifications) > 0:
+        some_added = True
+        fcfs.classifications.extend(fcmw.metadata.metadata.classifications)
 
     for split_id, split in fcmw.metadata.split_metadata.items():
         if split_id not in fcmw.metadata.deleted_splits:
-            fcfs.classifications.extend(split.classifications)
-
-    basic.computedmetadata.field_classifications.append(fcfs)
-    return True
+            if len(split.classifications) > 0:
+                some_added = True
+                fcfs.classifications.extend(split.classifications)
+    if some_added:
+        basic.computedmetadata.field_classifications.append(fcfs)
+    return some_added or some_deleted
 
 
 def maybe_update_basic_summary(basic: PBBasic, summary_text: str) -> bool:

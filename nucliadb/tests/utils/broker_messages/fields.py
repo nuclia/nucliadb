@@ -73,6 +73,7 @@ class FieldBuilder:
             self.__extracted_metadata.metadata.metadata.last_index.FromDatetime(now)
             self.__extracted_metadata.metadata.metadata.last_understanding.FromDatetime(now)
             self.__extracted_metadata.metadata.metadata.last_extract.FromDatetime(now)
+            self.__extracted_metadata.metadata.metadata.last_processing_start.FromDatetime(now)
         return self.__extracted_metadata
 
     @property
@@ -136,15 +137,6 @@ class FieldBuilder:
 
     def with_extracted_paragraph_metadata(self, paragraph: rpb.Paragraph):
         self._extracted_metadata.metadata.metadata.paragraphs.append(paragraph)
-
-    def with_user_entity(self, klass: str, name: str, *, start: int, end: int):
-        entity = rpb.TokenSplit(
-            klass=klass,
-            token=name,
-            start=start,
-            end=end,
-        )
-        self._user_metadata.token.append(entity)
 
     def with_extracted_entity(
         self,

@@ -103,6 +103,7 @@ class FieldMetadata(BaseModel):
     last_understanding: Optional[datetime] = None
     last_extract: Optional[datetime] = None
     last_summary: Optional[datetime] = None
+    last_processing_start: Optional[datetime] = None
     thumbnail: Optional[CloudLink] = None
     language: Optional[str] = None
     summary: Optional[str] = None

@@ -20,6 +20,7 @@
 import functools
 from typing import AsyncGenerator, AsyncIterator, Callable, Optional
 
+import backoff
 from google.protobuf.message import DecodeError as ProtobufDecodeError
 
 from nucliadb import learning_proxy
@@ -38,6 +39,7 @@ from nucliadb_models.configuration import SearchConfiguration
 from nucliadb_models.export_import import Status
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.const import Streams
 from nucliadb_utils.transaction import MaxTransactionSizeExceededError
 from nucliadb_utils.utilities import get_ingest
@@ -76,7 +78,6 @@ BM_FIELDS = {
         "field_vectors",
         "field_large_metadata",
         "question_answers",
-        "relations",
         "field_statuses",
     ],
     # These fields are mostly used for internal purposes and they are not part of
@@ -115,18 +116,24 @@ async def import_broker_message(
 async def restore_broker_message(
     context: ApplicationContext, kbid: str, bm: writer_pb2.BrokerMessage
 ) -> None:
-    bm.kbid = kbid
+    await send_writer_bm(context, bm)
+    await send_processor_bm(context, bm)
 
-    # First, ingest the broker message writer part synchronously
-    async def ingest_request_stream() -> AsyncIterator[writer_pb2.BrokerMessage]:
+
+@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8)
+async def send_writer_bm(context: ApplicationContext, bm: writer_pb2.BrokerMessage) -> None:
+    async def _iterator() -> AsyncIterator[writer_pb2.BrokerMessage]:
         yield get_writer_bm(bm)
 
-    response = await get_ingest().ProcessMessage(ingest_request_stream())  # type: ignore
+    ingest_grpc: WriterStub = get_ingest()
+    response: writer_pb2.OpStatusWriter = await ingest_grpc.ProcessMessage(_iterator())  # type: ignore
     assert response.status == writer_pb2.OpStatusWriter.Status.OK, "Failed to process broker message"
 
+
+async def send_processor_bm(context: ApplicationContext, bm: writer_pb2.BrokerMessage) -> None:
     # Then enqueue the processor part asynchronously
     processor_bm = get_processor_bm(bm)
-    partition = context.partitioning.generate_partition(kbid, bm.uuid)
+    partition = context.partitioning.generate_partition(bm.kbid, bm.uuid)
     await transaction_commit(context, processor_bm, partition)
 
 

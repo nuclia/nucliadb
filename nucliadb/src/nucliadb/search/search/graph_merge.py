@@ -19,7 +19,7 @@
 #
 
 
-from nucliadb.common.models_utils.from_proto import RelationNodeTypePbMap
+from nucliadb.common.models_utils.from_proto import RelationNodeTypePbMap, RelationTypePbMap
 from nucliadb_models.graph import responses as graph_responses
 from nucliadb_models.graph.responses import (
     GraphNodesSearchResponse,
@@ -45,6 +45,7 @@ def build_graph_response(results: list[nodereader_pb2.GraphSearchResponse]) -> G
                 ),
                 relation=graph_responses.GraphRelation(
                     label=relation.label,
+                    type=RelationTypePbMap[relation.relation_type],
                 ),
                 destination=graph_responses.GraphNode(
                     value=destination.value,
@@ -84,6 +85,7 @@ def build_graph_relations_response(
             relations.append(
                 graph_responses.GraphRelation(
                     label=relation.label,
+                    type=RelationTypePbMap[relation.relation_type],
                 )
             )
     response = GraphRelationsSearchResponse(relations=relations)

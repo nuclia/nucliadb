@@ -49,7 +49,6 @@ def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
                     "field": "text",
                     "field_type": "text",
                 },
-                "token": [{"token": "Ramon", "klass": "NAME", "start": 5, "end": 9}],
             }
         ],
     )

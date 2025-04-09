@@ -485,12 +485,17 @@ def _merge_relations_results(
         relations.entities[entry_point.value] = EntitySubgraph(related_to=[])
 
     for relation_response in relations_responses:
-        for relation in relation_response.subgraph.relations:
+        for index_relation in relation_response.subgraph.relations:
+            relation = index_relation.relation
             origin = relation.source
             destination = relation.to
-            relation_type = RelationTypePbMap[relation.relation]
+            relation_type = RelationTypePbMap[relation.relation]  # type: ignore
             relation_label = relation.relation_label
             metadata = relation.metadata if relation.HasField("metadata") else None
+
+            if index_relation.resource_field_id is not None:
+                resource_id = index_relation.resource_field_id.split("/")[0]
+
             # If only_with_metadata is True, we check that metadata for the relation is not None
             # If only_agentic is True, we check that metadata for the relation is not None and that it has a data_augmentation_task_id
             # TODO: This is suboptimal, we should be able to filter this in the query to the index,
@@ -513,7 +518,7 @@ def _merge_relations_results(
                         relation_label=relation_label,
                         direction=RelationDirection.OUT,
                         metadata=from_proto.relation_metadata(metadata) if metadata else None,
-                        resource_id=relation.resource_id,
+                        resource_id=resource_id,
                     )
                 )
             elif destination.value in relations.entities:
@@ -526,7 +531,7 @@ def _merge_relations_results(
                         relation_label=relation_label,
                         direction=RelationDirection.IN,
                         metadata=from_proto.relation_metadata(metadata) if metadata else None,
-                        resource_id=relation.resource_id,
+                        resource_id=resource_id,
                     )
                 )
 
@@ -621,19 +626,6 @@ async def merge_suggest_entities_results(
     for response in suggest_responses:
         response_entities = (
             RelatedEntity(family=e.subtype, value=e.value) for e in response.entity_results.nodes
-        )
-        unique_entities.update(response_entities)
-
-    return RelatedEntities(entities=list(unique_entities), total=len(unique_entities))
-
-
-def merge_relation_prefix_results(
-    responses: list[SearchResponse],
-) -> RelatedEntities:
-    unique_entities: Set[RelatedEntity] = set()
-    for response in responses:
-        response_entities = (
-            RelatedEntity(family=e.subtype, value=e.value) for e in response.relation.prefix.nodes
         )
         unique_entities.update(response_entities)
 

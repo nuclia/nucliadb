@@ -55,16 +55,6 @@ async def test_fieldmetadata_crud(
                 ],
             },
         ],
-        "selections": [],
-        "token": [
-            {
-                "token": "token1",
-                "klass": "klassA",
-                "start": 10,
-                "end": 20,
-                "cancelled_by_user": False,
-            }
-        ],
     }
     fieldmetadata_1 = {
         "field": {"field": "textfield2", "field_type": "text"},
@@ -97,23 +87,6 @@ async def test_fieldmetadata_crud(
             }
         ],
         "question_answers": [],
-        "selections": [],
-        "token": [
-            {
-                "token": "token2",
-                "klass": "klassB",
-                "start": 5,
-                "end": 12,
-                "cancelled_by_user": False,
-            },
-            {
-                "token": "token3",
-                "klass": "klassC",
-                "start": 15,
-                "end": 16,
-                "cancelled_by_user": True,
-            },
-        ],
     }
 
     # Step 1
@@ -154,7 +127,6 @@ async def test_fieldmetadata_crud(
     assert fieldmetadata[0] == fieldmetadata_0
     assert fieldmetadata[1]["field"] == fieldmetadata_1["field"]
     assert fieldmetadata[1]["paragraphs"] == fieldmetadata_1["paragraphs"]
-    assert fieldmetadata[1]["token"] == []
 
     # Step 3
 
@@ -174,4 +146,3 @@ async def test_fieldmetadata_crud(
     assert fieldmetadata[0] == fieldmetadata_2
     assert fieldmetadata[1]["field"] == fieldmetadata_1["field"]
     assert fieldmetadata[1]["paragraphs"] == fieldmetadata_1["paragraphs"]
-    assert fieldmetadata[1]["token"] == []

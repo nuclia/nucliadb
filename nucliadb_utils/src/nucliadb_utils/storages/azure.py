@@ -191,7 +191,10 @@ class AzureStorage(Storage):
         await self.object_store.finalize()
 
     async def delete_upload(self, uri: str, bucket_name: str):
-        await self.object_store.delete(bucket_name, uri)
+        try:
+            await self.object_store.delete(bucket_name, uri)
+        except ObjectNotFoundError:
+            pass
 
     async def create_bucket(self, bucket_name: str, kbid: Optional[str] = None):
         if await self.object_store.bucket_exists(bucket_name):

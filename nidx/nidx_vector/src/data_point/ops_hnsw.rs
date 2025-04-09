@@ -85,7 +85,7 @@ struct NodeFilter<'a, DR> {
     vec_counter: RepCounter<'a>,
 }
 
-impl<'a, DR: DataRetriever> NodeFilter<'a, DR> {
+impl<DR: DataRetriever> NodeFilter<'_, DR> {
     pub fn passes_formula(&self, n: Address) -> bool {
         self.filter.contains(n.0)
     }

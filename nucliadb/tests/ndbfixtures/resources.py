@@ -34,7 +34,7 @@ from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.tests.vectors import V1
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
-from nucliadb_models.metadata import RelationEntity, RelationNodeType
+from nucliadb_models.metadata import RelationEntity, RelationNodeType, RelationType
 from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
@@ -343,7 +343,7 @@ async def knowledge_graph(
     bm = BrokerMessage()
     bm.uuid = rid
     bm.kbid = standalone_knowledgebox
-    bm.relations.extend(edges)
+    bm.user_relations.relations.extend(edges)
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
 
@@ -393,10 +393,10 @@ async def kb_with_entity_graph(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     standalone_knowledgebox: str,
-    entity_graph: tuple[dict[str, RelationEntity], list[tuple[str, str, str]]],
+    entity_graph: tuple[dict[str, RelationEntity], dict[str, RelationType], list[tuple[str, str, str]]],
 ) -> AsyncIterator[str]:
     kbid = standalone_knowledgebox
-    entities, paths = entity_graph
+    entities, relations, paths = entity_graph
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
@@ -404,7 +404,7 @@ async def kb_with_entity_graph(
             "usermetadata": {
                 "relations": [
                     {
-                        "relation": "ENTITY",
+                        "relation": relations[relation].value,
                         "label": relation,
                         "from": entities[source].model_dump(),
                         "to": entities[target].model_dump(),
@@ -420,7 +420,9 @@ async def kb_with_entity_graph(
 
 
 @pytest.fixture(scope="function")
-def entity_graph() -> tuple[dict[str, RelationEntity], list[tuple[str, str, str]]]:
+def entity_graph() -> tuple[
+    dict[str, RelationEntity], dict[str, RelationType], list[tuple[str, str, str]]
+]:
     entities = {
         "Anastasia": RelationEntity(value="Anastasia", type=RelationNodeType.ENTITY, group="PERSON"),
         "Anna": RelationEntity(value="Anna", type=RelationNodeType.ENTITY, group="PERSON"),
@@ -434,6 +436,7 @@ def entity_graph() -> tuple[dict[str, RelationEntity], list[tuple[str, str, str]
         "Erin": RelationEntity(value="Erin", type=RelationNodeType.ENTITY, group="PERSON"),
         "Jerry": RelationEntity(value="Jerry", type=RelationNodeType.ENTITY, group="ANIMAL"),
         "Margaret": RelationEntity(value="Margaret", type=RelationNodeType.ENTITY, group="PERSON"),
+        "Mr. P": RelationEntity(value="Mr. P", type=RelationNodeType.ENTITY, group="AGENT"),
         "Mouse": RelationEntity(value="Mouse", type=RelationNodeType.ENTITY, group="ANIMAL"),
         "New York": RelationEntity(value="New York", type=RelationNodeType.ENTITY, group="PLACE"),
         "Olympic athlete": RelationEntity(
@@ -443,6 +446,18 @@ def entity_graph() -> tuple[dict[str, RelationEntity], list[tuple[str, str, str]
         "Rocket": RelationEntity(value="Rocket", type=RelationNodeType.ENTITY, group="VEHICLE"),
         "Tom": RelationEntity(value="Tom", type=RelationNodeType.ENTITY, group="ANIMAL"),
         "UK": RelationEntity(value="UK", type=RelationNodeType.ENTITY, group="PLACE"),
+    }
+    relations = {
+        "ALIAS": RelationType.SYNONYM,
+        "BORN_IN": RelationType.ENTITY,
+        "CHASE": RelationType.ENTITY,
+        "DEVELOPED": RelationType.ENTITY,
+        "FOLLOW": RelationType.ENTITY,
+        "IS": RelationType.ENTITY,
+        "IS_FRIEND": RelationType.ENTITY,
+        "LIVE_IN": RelationType.ENTITY,
+        "LOVE": RelationType.ENTITY,
+        "WORK_IN": RelationType.ENTITY,
     }
     graph = [
         ("Anastasia", "IS_FRIEND", "Anna"),
@@ -458,9 +473,10 @@ def entity_graph() -> tuple[dict[str, RelationEntity], list[tuple[str, str, str]
         ("Jerry", "IS", "Mouse"),
         ("Margaret", "DEVELOPED", "Apollo"),
         ("Margaret", "WORK_IN", "Computer science"),
+        ("Mr. P", "ALIAS", "Peter"),
         ("Peter", "LIVE_IN", "New York"),
         ("Tom", "CHASE", "Jerry"),
         ("Tom", "IS", "Cat"),
     ]
 
-    return (entities, graph)
+    return (entities, relations, graph)

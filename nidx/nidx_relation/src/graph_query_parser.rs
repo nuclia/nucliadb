@@ -18,13 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use anyhow::anyhow;
+use nidx_protos::graph_query::FacetFilter;
+use nidx_protos::graph_query::node::MatchLocation;
+use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator};
-use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
-use tantivy::schema::{Field, IndexRecordOption};
+use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery, TermSetQuery};
+use tantivy::schema::{Facet, Field, IndexRecordOption};
+use tantivy::tokenizer::TokenizerManager;
 
+use crate::io_maps;
 use crate::schema::Schema;
-use crate::{io_maps, schema};
 
 const DEFAULT_NODE_VALUE_FUZZY_DISTANCE: u8 = 1;
 
@@ -38,7 +42,9 @@ pub struct FuzzyTerm {
 #[derive(Clone)]
 pub enum Term {
     Exact(String),
+    ExactWord(String),
     Fuzzy(FuzzyTerm),
+    FuzzyWord(FuzzyTerm),
 }
 
 #[derive(Default, Clone)]
@@ -51,6 +57,7 @@ pub struct Node {
 #[derive(Default, Clone)]
 pub struct Relation {
     pub value: Option<String>,
+    pub relation_type: Option<RelationType>,
 }
 
 // Generic (simple) boolean expression for graph querying
@@ -106,6 +113,8 @@ pub enum GraphQuery {
     RelationQuery(RelationQuery),
     // (:A)-[:R]->(:B)
     PathQuery(PathQuery),
+
+    Facet(String),
 }
 
 #[derive(Clone, Copy)]
@@ -114,23 +123,30 @@ enum NodePosition {
     Destination,
 }
 
-pub struct BoolNodeQuery(BooleanExpression<Node>);
+#[derive(Clone)]
+enum NodeExpression {
+    Node(Node),
+    Facet(String),
+}
+
+pub struct BoolNodeQuery(BooleanExpression<NodeExpression>);
 pub struct BoolGraphQuery(BooleanExpression<GraphQuery>);
 
 #[derive(Clone, Copy)]
 struct NodeSchemaFields {
-    normalized_value: Field,
+    exact_value: Field,
+    tokenized_value: Field,
     node_type: Field,
     node_subtype: Field,
 }
 
-pub struct GraphQueryParser {
-    schema: Schema,
+pub struct GraphQueryParser<'a> {
+    schema: &'a Schema,
 }
 
-impl GraphQueryParser {
-    pub fn new() -> Self {
-        Self { schema: Schema::new() }
+impl<'a> GraphQueryParser<'a> {
+    pub fn new(schema: &'a Schema) -> Self {
+        Self { schema }
     }
 
     pub fn parse_bool(&self, query: BoolGraphQuery) -> Box<dyn Query> {
@@ -141,9 +157,10 @@ impl GraphQueryParser {
         match query {
             BooleanExpression::Literal(query) => self.parse(query),
             BooleanExpression::Not(subquery) => {
-                let mut subqueries = vec![];
-                subqueries.push((Occur::Must, Box::new(AllQuery) as Box<dyn Query>));
-                subqueries.push((Occur::MustNot, self.inner_parse_bool(*subquery)));
+                let subqueries = vec![
+                    (Occur::Must, Box::new(AllQuery) as Box<dyn Query>),
+                    (Occur::MustNot, self.inner_parse_bool(*subquery)),
+                ];
                 Box::new(BooleanQuery::new(subqueries))
             }
             BooleanExpression::Operation(operation) => {
@@ -167,9 +184,13 @@ impl GraphQueryParser {
         )
     }
 
-    fn inner_parse_bool_node(&self, query: BooleanExpression<Node>, position: NodePosition) -> Box<dyn Query> {
+    fn inner_parse_bool_node(
+        &self,
+        query: BooleanExpression<NodeExpression>,
+        position: NodePosition,
+    ) -> Box<dyn Query> {
         match query {
-            BooleanExpression::Literal(node) => match position {
+            BooleanExpression::Literal(NodeExpression::Node(node)) => match position {
                 NodePosition::Source => {
                     self.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(node))))
                 }
@@ -177,10 +198,12 @@ impl GraphQueryParser {
                     Expression::Value(node),
                 ))),
             },
+            BooleanExpression::Literal(NodeExpression::Facet(facet)) => self.parse_facet(&facet),
             BooleanExpression::Not(subquery) => {
-                let mut subqueries = vec![];
-                subqueries.push((Occur::Must, Box::new(AllQuery) as Box<dyn Query>));
-                subqueries.push((Occur::MustNot, self.inner_parse_bool_node(*subquery, position)));
+                let subqueries = vec![
+                    (Occur::Must, Box::new(AllQuery) as Box<dyn Query>),
+                    (Occur::MustNot, self.inner_parse_bool_node(*subquery, position)),
+                ];
                 Box::new(BooleanQuery::new(subqueries))
             }
             BooleanExpression::Operation(operation) => {
@@ -204,6 +227,7 @@ impl GraphQueryParser {
             GraphQuery::NodeQuery(query) => self.parse_node_query(query),
             GraphQuery::RelationQuery(query) => self.parse_relation_query(query),
             GraphQuery::PathQuery(query) => self.parse_path_query(query),
+            GraphQuery::Facet(facet) => self.parse_facet(&facet),
         }
     }
 
@@ -239,13 +263,20 @@ impl GraphQueryParser {
         self.parse_path_query(equivalent_path_query)
     }
 
+    fn parse_facet(&self, facet: &str) -> Box<dyn Query> {
+        Box::new(TermQuery::new(
+            tantivy::Term::from_facet(self.schema.facets, &Facet::from_text(facet).expect("Invalid facet")),
+            IndexRecordOption::Basic,
+        ))
+    }
+
     fn parse_path_query(&self, query: PathQuery) -> Box<dyn Query> {
         match query {
             PathQuery::DirectedPath((source_expression, relation_expression, destination_expression)) => {
                 let mut subqueries = vec![];
 
                 subqueries.extend(self.has_node_expression_as_source(&source_expression));
-                subqueries.extend(self.has_relation(&relation_expression).into_iter());
+                subqueries.extend(self.has_relation(&relation_expression));
                 subqueries.extend(self.has_node_expression_as_destination(&destination_expression));
 
                 // Due to implementation details on tantivy, a query containing only MustNot won't
@@ -272,7 +303,8 @@ impl GraphQueryParser {
         self.has_node_expression(
             expression,
             NodeSchemaFields {
-                normalized_value: self.schema.normalized_source_value,
+                exact_value: self.schema.normalized_source_value,
+                tokenized_value: self.schema.source_value,
                 node_type: self.schema.source_type,
                 node_subtype: self.schema.source_subtype,
             },
@@ -284,7 +316,8 @@ impl GraphQueryParser {
         self.has_node_expression(
             expression,
             NodeSchemaFields {
-                normalized_value: self.schema.normalized_target_value,
+                exact_value: self.schema.normalized_target_value,
+                tokenized_value: self.schema.target_value,
                 node_type: self.schema.target_type,
                 node_subtype: self.schema.target_subtype,
             },
@@ -313,16 +346,16 @@ impl GraphQueryParser {
             Expression::Not(query) => {
                 // NOT granularity is a node, so we to use a Must { MustNot { X } } instead of
                 // unnest it in multiple MustNot { x }
-                let subquery: Box<dyn Query> = Box::new(BooleanQuery::intersection(self.has_node(&query, fields)));
+                let subquery: Box<dyn Query> = Box::new(BooleanQuery::intersection(self.has_node(query, fields)));
                 queries.push((Occur::MustNot, subquery));
             }
             Expression::Or(nodes) => {
                 // OR needs careful treatment. If there's only one node query matching, we can
                 // behave as it was a Value(Node). Otherwise we need a nested query with its parts
                 let mut subqueries: Vec<_> = nodes
-                    .into_iter()
+                    .iter()
                     .flat_map(|node| {
-                        let node_queries = self.has_node(&node, fields);
+                        let node_queries = self.has_node(node, fields);
                         if node_queries.is_empty() {
                             // We don't care about nodes that match everything as they don't provide any
                             // filtering value
@@ -344,7 +377,7 @@ impl GraphQueryParser {
                         // When there's multiple nodes to match, we must do a nested query and force
                         // that any of these matches
                         let or_subqueries = subqueries.into_iter().map(|mut node_queries| {
-                            debug_assert!(node_queries.len() > 0, "already validated above");
+                            debug_assert!(!node_queries.is_empty(), "already validated above");
                             let node_query: (Occur, Box<dyn Query>) = if node_queries.len() == 1 {
                                 // To avoid a nested boolean query for a node matching only in
                                 // one field, we can directly add a subquery
@@ -370,7 +403,7 @@ impl GraphQueryParser {
         let value_query = node
             .value
             .as_ref()
-            .and_then(|value| self.has_node_value(value, fields.normalized_value));
+            .and_then(|value| self.has_node_value(value, fields.exact_value, fields.tokenized_value));
         if let Some(query) = value_query {
             subqueries.push(query);
         }
@@ -393,20 +426,32 @@ impl GraphQueryParser {
         let mut subqueries = vec![];
 
         match expression {
-            Expression::Value(Relation { value: None }) => {}
-            Expression::Value(Relation { value: Some(value) }) if value.is_empty() => {}
-            Expression::Value(Relation { value: Some(value) }) => {
-                subqueries.push((Occur::Must, self.has_relation_label(value)));
+            Expression::Value(Relation { value, relation_type }) => {
+                if let Some(value) = value {
+                    if !value.is_empty() {
+                        subqueries.push((Occur::Must, self.has_relation_label(value)));
+                    }
+                };
+
+                relation_type.map(|relation_type| {
+                    subqueries.push((Occur::Must, self.has_relation_type(relation_type)));
+                });
             }
 
-            Expression::Not(Relation { value: None }) => {}
-            Expression::Not(Relation { value: Some(value) }) if value.is_empty() => {}
-            Expression::Not(Relation { value: Some(value) }) => {
-                subqueries.push((Occur::MustNot, self.has_relation_label(value)));
+            Expression::Not(Relation { value, relation_type }) => {
+                if let Some(value) = value {
+                    if !value.is_empty() {
+                        subqueries.push((Occur::MustNot, self.has_relation_label(value)));
+                    }
+                };
+
+                relation_type.map(|relation_type| {
+                    subqueries.push((Occur::MustNot, self.has_relation_type(relation_type)));
+                });
             }
 
             Expression::Or(relations) => {
-                subqueries.extend(relations.into_iter().flat_map(|relation| {
+                subqueries.extend(relations.iter().flat_map(|relation| {
                     if let Some(label) = &relation.value {
                         if label.is_empty() {
                             None
@@ -423,47 +468,58 @@ impl GraphQueryParser {
         subqueries
     }
 
-    fn has_node_value(&self, value: &Term, field: Field) -> Option<Box<dyn Query>> {
-        match value {
-            Term::Exact(value) => {
-                if value.is_empty() {
-                    return None;
-                }
-                let normalized_value = schema::normalize(&value);
-                let query = Box::new(TermQuery::new(
-                    tantivy::Term::from_field_text(field, &normalized_value),
-                    IndexRecordOption::Basic,
-                ));
-                Some(query)
-            }
+    fn has_node_value(&self, value: &Term, exact_field: Field, tokenized_field: Field) -> Option<Box<dyn Query>> {
+        let text_value = match value {
+            Term::Exact(value) | Term::ExactWord(value) => value,
+            Term::Fuzzy(fuzzy) | Term::FuzzyWord(fuzzy) => &fuzzy.value,
+        };
+        if text_value.is_empty() {
+            return None;
+        }
+        let exact_term = tantivy::Term::from_field_text(exact_field, &self.schema.normalize(text_value));
+
+        let mut tokenizer = TokenizerManager::default().get("default").unwrap();
+        let mut token_stream = tokenizer.token_stream(text_value);
+        let mut tokenized_terms = Vec::new();
+        while let Some(token) = token_stream.next() {
+            tokenized_terms.push(tantivy::Term::from_field_text(tokenized_field, &token.text));
+        }
+
+        let query: Box<dyn Query> = match value {
+            Term::Exact(_) => Box::new(TermQuery::new(exact_term, IndexRecordOption::Basic)),
+
+            Term::ExactWord(_) => Box::new(TermSetQuery::new(tokenized_terms)),
 
             Term::Fuzzy(fuzzy) => {
-                let normalized_value = schema::normalize(&fuzzy.value);
-                match fuzzy {
-                    FuzzyTerm { value, .. } if value.is_empty() => None,
-
-                    FuzzyTerm {
-                        fuzzy_distance: distance,
-                        is_prefix: true,
-                        ..
-                    } => Some(Box::new(FuzzyTermQuery::new_prefix(
-                        tantivy::Term::from_field_text(field, &normalized_value),
-                        *distance,
-                        true,
-                    ))),
-
-                    FuzzyTerm {
-                        fuzzy_distance: distance,
-                        is_prefix: false,
-                        ..
-                    } => Some(Box::new(FuzzyTermQuery::new(
-                        tantivy::Term::from_field_text(field, &normalized_value),
-                        *distance,
-                        true,
-                    ))),
+                if fuzzy.is_prefix {
+                    Box::new(FuzzyTermQuery::new_prefix(exact_term, fuzzy.fuzzy_distance, true))
+                } else {
+                    Box::new(FuzzyTermQuery::new(exact_term, fuzzy.fuzzy_distance, true))
                 }
             }
-        }
+
+            Term::FuzzyWord(fuzzy) => {
+                let query_builder = if fuzzy.is_prefix {
+                    FuzzyTermQuery::new_prefix
+                } else {
+                    FuzzyTermQuery::new
+                };
+
+                if tokenized_terms.len() == 1 {
+                    let tokenized_term = tokenized_terms.into_iter().next().unwrap();
+                    Box::new(query_builder(tokenized_term, fuzzy.fuzzy_distance, true))
+                } else {
+                    Box::new(BooleanQuery::intersection(
+                        tokenized_terms
+                            .into_iter()
+                            .map(|term| -> Box<dyn Query> { Box::new(query_builder(term, fuzzy.fuzzy_distance, true)) })
+                            .collect(),
+                    ))
+                }
+            }
+        };
+
+        Some(query)
     }
 
     fn has_node_type(&self, node_type: NodeType, field: Field) -> Box<dyn Query> {
@@ -483,7 +539,15 @@ impl GraphQueryParser {
 
     fn has_relation_label(&self, label: &str) -> Box<dyn Query> {
         Box::new(TermQuery::new(
-            tantivy::Term::from_field_text(self.schema.label, &label),
+            tantivy::Term::from_field_text(self.schema.label, label),
+            IndexRecordOption::Basic,
+        ))
+    }
+
+    fn has_relation_type(&self, relation_type: RelationType) -> Box<dyn Query> {
+        let relation_type = io_maps::relation_type_to_u64(relation_type);
+        Box::new(TermQuery::new(
+            tantivy::Term::from_field_u64(self.schema.relationship, relation_type),
             IndexRecordOption::Basic,
         ))
     }
@@ -511,7 +575,7 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolNodeQuery {
                     if !(path.source.is_some()
                         && path.relation.is_none()
                         && path.destination.is_none()
-                        && path.undirected == true)
+                        && path.undirected)
                     {
                         // We are doing something wrong between search API and nidx
                         return Err(anyhow!(
@@ -521,14 +585,12 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolNodeQuery {
 
                     let pb_node = path.source.as_ref().unwrap();
                     let node = Node::try_from(pb_node)?;
-                    BooleanExpression::Literal(node)
+                    BooleanExpression::Literal(NodeExpression::Node(node))
                 }
-
                 nidx_protos::graph_query::path_query::Query::BoolNot(bool_not) => {
                     let subquery = BoolNodeQuery::try_from(bool_not.as_ref())?.0;
                     BooleanExpression::Not(Box::new(subquery))
                 }
-
                 nidx_protos::graph_query::path_query::Query::BoolAnd(bool_and) => {
                     BooleanExpression::Operation(BooleanOperation {
                         operator: Operator::And,
@@ -539,7 +601,6 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolNodeQuery {
                             .collect::<anyhow::Result<Vec<_>>>()?,
                     })
                 }
-
                 nidx_protos::graph_query::path_query::Query::BoolOr(bool_or) => {
                     BooleanExpression::Operation(BooleanOperation {
                         operator: Operator::Or,
@@ -550,9 +611,12 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolNodeQuery {
                             .collect::<anyhow::Result<Vec<_>>>()?,
                     })
                 }
+                nidx_protos::graph_query::path_query::Query::Facet(FacetFilter { facet }) => {
+                    BooleanExpression::Literal(NodeExpression::Facet(facet.clone()))
+                }
             },
 
-            None => BooleanExpression::Literal(Node::default()),
+            None => BooleanExpression::Literal(NodeExpression::Node(Node::default())),
         };
 
         Ok(BoolNodeQuery(bool_expr))
@@ -595,12 +659,10 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolGraphQuery {
 
                     BooleanExpression::Literal(path_query)
                 }
-
                 nidx_protos::graph_query::path_query::Query::BoolNot(bool_not) => {
                     let subquery = BoolGraphQuery::try_from(bool_not.as_ref())?.0;
                     BooleanExpression::Not(Box::new(subquery))
                 }
-
                 nidx_protos::graph_query::path_query::Query::BoolAnd(bool_and) => {
                     BooleanExpression::Operation(BooleanOperation {
                         operator: Operator::And,
@@ -611,7 +673,6 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolGraphQuery {
                             .collect::<anyhow::Result<Vec<_>>>()?,
                     })
                 }
-
                 nidx_protos::graph_query::path_query::Query::BoolOr(bool_or) => {
                     BooleanExpression::Operation(BooleanOperation {
                         operator: Operator::Or,
@@ -621,6 +682,9 @@ impl TryFrom<&nidx_protos::graph_query::PathQuery> for BoolGraphQuery {
                             .map(|o| BoolGraphQuery::try_from(o).map(|x| x.0))
                             .collect::<anyhow::Result<Vec<_>>>()?,
                     })
+                }
+                nidx_protos::graph_query::path_query::Query::Facet(FacetFilter { facet }) => {
+                    BooleanExpression::Literal(GraphQuery::Facet(facet.clone()))
                 }
             },
 
@@ -639,13 +703,56 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
     type Error = anyhow::Error;
 
     fn try_from(node_pb: &nidx_protos::graph_query::Node) -> Result<Self, Self::Error> {
-        let value = node_pb.value.clone().map(|value| match node_pb.match_kind() {
-            nidx_protos::graph_query::node::MatchKind::Exact => Term::Exact(value),
-            nidx_protos::graph_query::node::MatchKind::Fuzzy => Term::Fuzzy(FuzzyTerm {
-                value: value,
-                fuzzy_distance: DEFAULT_NODE_VALUE_FUZZY_DISTANCE,
-                is_prefix: true,
-            }),
+        let value = node_pb.value.clone().map(|value| {
+            if let Some(match_kind) = node_pb.new_match_kind {
+                match match_kind {
+                    nidx_protos::graph_query::node::NewMatchKind::Exact(exact) => match exact.kind() {
+                        MatchLocation::Full => Term::Exact(value),
+                        MatchLocation::Prefix => Term::Fuzzy(FuzzyTerm {
+                            value,
+                            fuzzy_distance: 0,
+                            is_prefix: true,
+                        }),
+                        MatchLocation::Words => Term::ExactWord(value),
+                        MatchLocation::PrefixWords => Term::FuzzyWord(FuzzyTerm {
+                            value,
+                            fuzzy_distance: 0,
+                            is_prefix: true,
+                        }),
+                    },
+                    nidx_protos::graph_query::node::NewMatchKind::Fuzzy(fuzzy) => match fuzzy.kind() {
+                        MatchLocation::Full => Term::Fuzzy(FuzzyTerm {
+                            value,
+                            fuzzy_distance: fuzzy.distance as u8,
+                            is_prefix: false,
+                        }),
+                        MatchLocation::Prefix => Term::Fuzzy(FuzzyTerm {
+                            value,
+                            fuzzy_distance: fuzzy.distance as u8,
+                            is_prefix: true,
+                        }),
+                        MatchLocation::Words => Term::FuzzyWord(FuzzyTerm {
+                            value,
+                            fuzzy_distance: fuzzy.distance as u8,
+                            is_prefix: false,
+                        }),
+                        MatchLocation::PrefixWords => Term::FuzzyWord(FuzzyTerm {
+                            value,
+                            fuzzy_distance: fuzzy.distance as u8,
+                            is_prefix: true,
+                        }),
+                    },
+                }
+            } else {
+                match node_pb.match_kind() {
+                    nidx_protos::graph_query::node::MatchKind::DeprecatedExact => Term::Exact(value),
+                    nidx_protos::graph_query::node::MatchKind::DeprecatedFuzzy => Term::Fuzzy(FuzzyTerm {
+                        value,
+                        fuzzy_distance: DEFAULT_NODE_VALUE_FUZZY_DISTANCE,
+                        is_prefix: true,
+                    }),
+                }
+            }
         });
         let node_type = node_pb.node_type.map(NodeType::try_from).transpose()?;
         let node_subtype = node_pb.node_subtype.clone();
@@ -663,7 +770,8 @@ impl TryFrom<&nidx_protos::graph_query::Relation> for Relation {
 
     fn try_from(relation_pb: &nidx_protos::graph_query::Relation) -> Result<Self, Self::Error> {
         let value = relation_pb.value.clone();
+        let relation_type = relation_pb.relation_type.map(RelationType::try_from).transpose()?;
 
-        Ok(Relation { value })
+        Ok(Relation { value, relation_type })
     }
 }

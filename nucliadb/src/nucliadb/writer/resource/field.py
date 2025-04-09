@@ -483,6 +483,9 @@ async def parse_conversation_field(
         convs.messages.append(processing_message)
         field_value.messages.append(cm)
     convs.classification_labels = classif_labels
+    if conversation_field.extract_strategy:
+        field_value.extract_strategy = conversation_field.extract_strategy
+        convs.extract_strategy = conversation_field.extract_strategy
     toprocess.conversationfield[key] = convs
     writer.conversations[key].CopyFrom(field_value)
     writer.field_statuses.append(

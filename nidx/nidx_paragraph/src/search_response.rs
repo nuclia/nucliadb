@@ -97,7 +97,7 @@ pub struct SearchFacetsResponse<'a> {
     pub facets: Vec<String>,
 }
 
-impl<'a> From<SearchFacetsResponse<'a>> for ParagraphSearchResponse {
+impl From<SearchFacetsResponse<'_>> for ParagraphSearchResponse {
     fn from(response: SearchFacetsResponse) -> Self {
         let facets = response
             .facets_count
@@ -112,7 +112,7 @@ impl<'a> From<SearchFacetsResponse<'a>> for ParagraphSearchResponse {
     }
 }
 
-impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
+impl From<SearchIntResponse<'_>> for ParagraphSearchResponse {
     fn from(response: SearchIntResponse) -> Self {
         let total = response.total as i32;
         let obtained = response.top_docs.len();
@@ -210,7 +210,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
     }
 }
 
-impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
+impl From<SearchBm25Response<'_>> for ParagraphSearchResponse {
     fn from(response: SearchBm25Response) -> Self {
         let total = response.total as i32;
         let obtained = response.top_docs.len();

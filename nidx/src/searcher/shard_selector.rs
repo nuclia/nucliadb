@@ -173,7 +173,7 @@ impl ListNodes for KubernetesCluster {
 /// Helper to sort (shard, node) pairs based on rendezvous hashing score
 #[derive(Hash)]
 struct Scored<'a>(&'a Uuid, &'a String);
-impl<'a> Scored<'a> {
+impl Scored<'_> {
     fn score(&self) -> u64 {
         let mut s = DefaultHasher::new();
         self.hash(&mut s);

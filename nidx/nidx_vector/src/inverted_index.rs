@@ -136,6 +136,10 @@ pub struct InvertedIndexes {
 }
 
 impl InvertedIndexes {
+    pub fn space_usage(&self) -> usize {
+        self.field_index.space_usage() + self.label_index.space_usage()
+    }
+
     pub fn exists(path: &Path) -> bool {
         path.join(file::INDEX_MAP).exists()
     }

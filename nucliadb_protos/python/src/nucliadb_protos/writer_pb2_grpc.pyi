@@ -90,6 +90,8 @@ from nucliadb_protos.noderesources_pb2 import (
     IndexMetadata as IndexMetadata,
     IndexParagraph as IndexParagraph,
     IndexParagraphs as IndexParagraphs,
+    IndexRelation as IndexRelation,
+    IndexRelations as IndexRelations,
     NodeMetadata as NodeMetadata,
     ParagraphMetadata as ParagraphMetadata,
     Position as Position,
@@ -156,7 +158,6 @@ from nucliadb_protos.resources_pb2 import (
     Origin as Origin,
     PageInformation as PageInformation,
     PagePositions as PagePositions,
-    PageSelections as PageSelections,
     PageStructure as PageStructure,
     PageStructurePage as PageStructurePage,
     PageStructureToken as PageStructureToken,
@@ -174,11 +175,9 @@ from nucliadb_protos.resources_pb2 import (
     RowsPreview as RowsPreview,
     Sentence as Sentence,
     TEXT as TEXT,
-    TokenSplit as TokenSplit,
     UserFieldMetadata as UserFieldMetadata,
     UserMetadata as UserMetadata,
     UserVectorsWrapper as UserVectorsWrapper,
-    VisualSelection as VisualSelection,
 )
 
 _T = typing.TypeVar("_T")

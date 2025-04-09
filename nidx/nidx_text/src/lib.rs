@@ -37,7 +37,7 @@ use prefilter::PreFilterRequest;
 use reader::TextReaderService;
 use resource_indexer::index_document;
 use schema::TextSchema;
-
+use schema::encode_field_id_bytes;
 use serde::{Deserialize, Serialize};
 use tantivy::indexer::merge_indices;
 use tantivy::schema::Field;
@@ -46,7 +46,8 @@ use tantivy::{
     directory::MmapDirectory,
     query::{Query, TermSetQuery},
 };
-use tracing::instrument;
+use tracing::*;
+use uuid::Uuid;
 
 pub use request_types::DocumentSearchRequest;
 
@@ -61,7 +62,7 @@ impl Default for TextConfig {
         Self {
             // This is the default version when creating a new index.
             // Should typically be set to the latest supported version
-            version: 2,
+            version: 4,
         }
     }
 }
@@ -74,12 +75,38 @@ fn default_version() -> u64 {
 
 pub struct TextIndexer;
 
-pub struct TextDeletionQueryBuilder(Field);
+pub struct TextDeletionQueryBuilder {
+    resource_uuid: Field,
+    encoded_field_id_bytes: Field,
+}
 impl DeletionQueryBuilder for TextDeletionQueryBuilder {
     fn query<'a>(&self, keys: impl Iterator<Item = &'a String>) -> Box<dyn Query> {
-        Box::new(TermSetQuery::new(
-            keys.map(|k| Term::from_field_bytes(self.0, k.as_bytes())),
-        ))
+        Box::new(TermSetQuery::new(keys.filter_map(|k| {
+            // Our keys can be resource ids or encoded field ids (e.g: uuid/t/text)
+            // match the corresponding tantivy field
+            let is_field = k.len() > 32;
+            if is_field {
+                let Ok(uuid) = Uuid::parse_str(&k[0..32]) else {
+                    error!(?k, "Invalid deletion key in nidx_text");
+                    return None;
+                };
+                let field_id = &k[33..];
+                Some(Term::from_field_bytes(
+                    self.encoded_field_id_bytes,
+                    &encode_field_id_bytes(uuid, field_id)[..],
+                ))
+            } else {
+                Some(Term::from_field_bytes(self.resource_uuid, k.as_bytes()))
+            }
+        })))
+    }
+}
+impl TextDeletionQueryBuilder {
+    fn new(schema: &TextSchema) -> Self {
+        TextDeletionQueryBuilder {
+            resource_uuid: schema.schema.get_field("uuid").unwrap(),
+            encoded_field_id_bytes: schema.schema.get_field("encoded_field_id_bytes").unwrap(),
+        }
     }
 }
 
@@ -91,6 +118,10 @@ impl TextIndexer {
         config: TextConfig,
         resource: &nidx_protos::Resource,
     ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
+        if resource.skip_texts {
+            return Ok(None);
+        }
+
         let field_schema = TextSchema::new(config.version);
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
@@ -99,7 +130,7 @@ impl TextIndexer {
     }
 
     pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
-        vec![resource.resource.as_ref().unwrap().uuid.clone()]
+        resource.texts_to_delete.clone()
     }
 
     #[instrument(name = "text::merge", skip_all)]
@@ -109,8 +140,9 @@ impl TextIndexer {
         config: TextConfig,
         open_index: impl OpenIndexMetadata<TantivyMeta>,
     ) -> anyhow::Result<TantivySegmentMetadata> {
-        let schema = TextSchema::new(config.version).schema;
-        let query_builder = TextDeletionQueryBuilder(schema.get_field("uuid").unwrap());
+        let text_schema = TextSchema::new(config.version);
+        let query_builder = TextDeletionQueryBuilder::new(&text_schema);
+        let schema = text_schema.clone().schema;
         let index = open_index_with_deletions(schema, open_index, query_builder)?;
 
         let output_index = merge_indices(&[index], MmapDirectory::open(work_dir)?)?;
@@ -134,8 +166,11 @@ impl TextSearcher {
     #[instrument(name = "text::open", skip_all)]
     pub fn open(config: TextConfig, open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
         let schema = TextSchema::new(config.version);
-        let index =
-            open_index_with_deletions(schema.schema.clone(), open_index, TextDeletionQueryBuilder(schema.uuid))?;
+        let index = open_index_with_deletions(
+            schema.schema.clone(),
+            open_index,
+            TextDeletionQueryBuilder::new(&schema),
+        )?;
 
         Ok(Self {
             reader: TextReaderService {
@@ -161,5 +196,14 @@ impl TextSearcher {
 
     pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = DocumentItem> + use<>> {
         self.reader.iterator(request)
+    }
+
+    pub fn space_usage(&self) -> usize {
+        let usage = self.reader.reader.searcher().space_usage();
+        if let Ok(usage) = usage {
+            usage.total().get_bytes() as usize
+        } else {
+            0
+        }
     }
 }

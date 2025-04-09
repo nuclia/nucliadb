@@ -24,8 +24,8 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.orm.resource import (
-    add_field_classifications,
-    remove_field_classifications,
+    delete_basic_computedmetadata_classifications,
+    update_basic_computedmetadata_classifications,
 )
 from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_models.common import UserClassification
@@ -281,37 +281,45 @@ async def test_classification_labels_are_shown_in_resource_basic(
     assert results.resources[rid].computedmetadata == expected_computedmetadata
 
 
-def test_remove_field_classifications():
+def test_delete_basic_computedmetadata_classifications():
     field = rpb.FieldID(field_type=rpb.FieldType.FILE, field="foo")
     basic = rpb.Basic()
-    remove_field_classifications(basic, deleted_fields=[field])
+    delete_basic_computedmetadata_classifications(basic, deleted_fields=[field])
 
     field = rpb.FieldID(field_type=rpb.FieldType.FILE, field="foo")
     basic.computedmetadata.field_classifications.append(rpb.FieldClassifications(field=field))
-    remove_field_classifications(basic, deleted_fields=[field])
+    delete_basic_computedmetadata_classifications(basic, deleted_fields=[field])
 
     assert len(basic.computedmetadata.field_classifications) == 0
 
 
-def test_add_field_classifications():
+def test_update_basic_computedmetadata_classifications():
     field = rpb.FieldID(field_type=rpb.FieldType.FILE, field="foo")
     basic = rpb.Basic()
 
+    # Empty field computed metadata adds nothing
     fcmw = rpb.FieldComputedMetadataWrapper()
     fcmw.field.CopyFrom(field)
 
-    assert add_field_classifications(basic, fcmw) is False
+    assert update_basic_computedmetadata_classifications(basic, fcmw) is False
 
     assert len(basic.computedmetadata.field_classifications) == 0
 
+    # Field computed metadata with classifications adds them to the basic computed metadata
     c1 = rpb.Classification(label="foo", labelset="bar")
     fcmw.metadata.metadata.classifications.append(c1)
 
-    assert add_field_classifications(basic, fcmw) is True
+    assert update_basic_computedmetadata_classifications(basic, fcmw) is True
 
     assert basic.computedmetadata.field_classifications[0] == rpb.FieldClassifications(
         field=field, classifications=[c1]
     )
+
+    # Empty field computed metadata clears the field classifications
+    fcmw.metadata.metadata.ClearField("classifications")
+
+    assert update_basic_computedmetadata_classifications(basic, fcmw) is True
+    assert len(basic.computedmetadata.field_classifications) == 0
 
 
 @pytest.mark.deploy_modes("standalone")

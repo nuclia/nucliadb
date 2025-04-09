@@ -275,7 +275,7 @@ class GCloudFileStorageManager(FileStorageManager):
                     data = {"text": text}
                 if resp.status not in (200, 204, 404):
                     if resp.status == 404:
-                        logger.error(
+                        logger.debug(
                             f"Attempt to delete not found gcloud: {data}, status: {resp.status}",
                             exc_info=True,
                         )

@@ -197,7 +197,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
     bm = BrokerMessage()
     bm.uuid = rid
     bm.kbid = standalone_knowledgebox
-    bm.relations.extend(edges)
+    bm.user_relations.relations.extend(edges)
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
     return rid
@@ -257,15 +257,18 @@ async def test_ask_status_code_no_retrieval_data(
     )
     assert resp.status_code == 200
     results = parse_ask_response(resp)
-    main_results = results[0]
+    assert results[0].item.type == "status"
+    assert results[0].item.status == AnswerStatusCode.NO_RETRIEVAL_DATA.prettify()
+    answer = results[1].item
+    assert answer.type == "answer"
+    assert answer.text == "Not enough data to answer this."
+    main_results = results[2]
     assert main_results.item.type == "retrieval"
     assert len(main_results.item.results.resources) == 0
-    prequeries_results = results[1]
+    prequeries_results = results[3]
     assert prequeries_results.item.type == "prequeries"
     assert len(prequeries_results.item.results) == 1
     assert len(prequeries_results.item.results.popitem()[1].resources) == 0
-    assert results[-1].item.type == "status"
-    assert results[-1].item.status == AnswerStatusCode.NO_RETRIEVAL_DATA.prettify()
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -1172,6 +1175,34 @@ async def test_ask_graph_strategy_with_user_relations(
 
 
 @pytest.mark.deploy_modes("standalone")
+async def test_ask_graph_strategy_inner_fuzzy_prefix_search(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    graph_resource,
+    dummy_predict,
+):
+    from nucliadb.search.search.graph_strategy import fuzzy_search_entities
+
+    kbid = standalone_knowledgebox
+
+    related = await fuzzy_search_entities(
+        kbid, "Which actors have been in movies directed by Christopher Nolan?"
+    )
+    assert related is not None
+    assert related.total == 1 == len(related.entities)
+    related.entities[0].value == "Christopher Nolan"
+    related.entities[0].family == "DIRECTOR"
+
+    related = await fuzzy_search_entities(kbid, "Did Leonard and Joseph perform in the same film?")
+    assert related is not None
+    assert related.total == 2 == len(related.entities)
+    assert set((r.value, r.family) for r in related.entities) == {
+        ("Leonardo DiCaprio", "ACTOR"),
+        ("Joseph Gordon-Levitt", "ACTOR"),
+    }
+
+
+@pytest.mark.deploy_modes("standalone")
 async def test_ask_rag_strategy_prequeries(
     nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
 ):
@@ -1530,3 +1561,23 @@ async def test_ask_skip_answer_generation(
     assert results[2].item.type == "debug"
     assert results[2].item.metadata["prompt_context"] is not None
     assert results[2].item.metadata["predict_request"] is not None
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_calls_predict_query_once(
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource
+):
+    predict = get_predict()
+    assert isinstance(predict, DummyPredictEngine), "dummy is expected in this test"
+    assert len(predict.calls) == 0
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={"query": "title", "reranker": "noop"},
+        headers={"X-Synchronous": "true"},
+    )
+    assert resp.status_code == 200
+
+    assert len(predict.calls) == 2
+    assert predict.calls[0][0] == "query"
+    assert predict.calls[1][0] == "chat_query_ndjson"

@@ -42,10 +42,9 @@ use crate::errors::NidxError;
 use crate::grpc_server::GrpcServer;
 use crate::metrics::IndexKindLabels;
 use crate::metrics::OperationStatusLabels;
-use crate::metrics::indexer::INDEXING_COUNTER;
-use crate::metrics::indexer::PER_INDEX_INDEXING_TIME;
-use crate::metrics::indexer::TOTAL_INDEXING_TIME;
+use crate::metrics::indexer::*;
 use crate::segment_store::pack_and_upload;
+use crate::utilization_tracker::UtilizationTracker;
 use crate::{Settings, metadata::*};
 
 #[cfg(feature = "telemetry")]
@@ -138,7 +137,12 @@ pub async fn run_nats(settings: Settings, shutdown: CancellationToken) -> anyhow
         None => tempfile::env::temp_dir(),
     };
 
+    let utilization = UtilizationTracker::new(|busy, duration| {
+        INDEXING_BUSY.get_or_create(&busy.into()).inc_by(duration.as_secs_f64());
+    });
+
     while !shutdown.is_cancelled() {
+        utilization.idle().await;
         let sub_msg = tokio::select! {
             sub_msg = subscription.next() => sub_msg,
             _ = shutdown.cancelled() => { return Ok(()) }
@@ -164,6 +168,7 @@ pub async fn run_nats(settings: Settings, shutdown: CancellationToken) -> anyhow
             continue;
         }
 
+        utilization.busy().await;
         let span = info_span!("indexer_message", ?seq);
         let (msg, acker) = msg.split();
 
@@ -259,7 +264,7 @@ pub async fn download_message(storage: Arc<DynObjectStore>, storage_key: &str) -
     Ok(resource)
 }
 
-type IndexingResult = (Segment, usize, Vec<String>);
+type IndexingResult = (IndexId, Option<(Segment, usize)>, Vec<String>);
 
 #[instrument(skip_all, fields(shard_id = shard_id))]
 pub async fn index_resource(
@@ -280,7 +285,7 @@ pub async fn index_resource(
     let num_vector_indexes = indexes.iter().filter(|i| matches!(i.kind, IndexKind::Vector)).count();
     let single_vector_index = num_vector_indexes == 1;
 
-    let mut tasks: JoinSet<anyhow::Result<Option<IndexingResult>>> = JoinSet::new();
+    let mut tasks: JoinSet<anyhow::Result<IndexingResult>> = JoinSet::new();
     for index in indexes {
         let resource = Arc::clone(&resource);
         let meta = meta.clone();
@@ -297,7 +302,7 @@ pub async fn index_resource(
                 })
                 .await??;
                 let Some(new_segment) = new_segment else {
-                    return Ok(None);
+                    return Ok((index.id, None, deletions));
                 };
 
                 // Create the segment first so we can track it if the upload gets interrupted
@@ -311,7 +316,7 @@ pub async fn index_resource(
                 .await?;
                 let size = pack_and_upload(storage.clone(), output_dir.path(), segment.id.storage_key()).await?;
 
-                Ok(Some((segment, size, deletions)))
+                Ok((index.id, Some((segment, size)), deletions))
             }
             .in_current_span(),
         );
@@ -323,13 +328,19 @@ pub async fn index_resource(
     // and the index message can be safely reprocessed
     let mut tx = meta.transaction().await?;
     let mut indexes = Vec::new();
-    for (segment, size, deletions) in results?.into_iter().flatten() {
-        // Mark the segments as visible and write the deletions at the same time
-        segment.mark_ready(&mut *tx, size as i64).await?;
-        if !deletions.is_empty() {
-            Deletion::create(&mut *tx, segment.index_id, seq, &deletions).await?;
+    for (index_id, segment_result, deletions) in results?.into_iter() {
+        let mut update_index = false;
+        if let Some((segment, size)) = segment_result {
+            segment.mark_ready(&mut *tx, size as i64).await?;
+            update_index = true;
         }
-        indexes.push(segment.index_id);
+        if !deletions.is_empty() {
+            Deletion::create(&mut *tx, index_id, seq, &deletions).await?;
+            update_index = true;
+        }
+        if update_index {
+            indexes.push(index_id)
+        }
     }
     Index::updated_many(&mut *tx, &indexes).await?;
     tx.commit().await?;
@@ -356,7 +367,7 @@ fn index_resource_to_index(
             .index_resource(output_dir, resource)?
             .map(|x| x.into()),
         IndexKind::Relation => nidx_relation::RelationIndexer
-            .index_resource(output_dir, resource)?
+            .index_resource(output_dir, &index.config()?, resource)?
             .map(|x| x.into()),
     };
 
@@ -364,7 +375,7 @@ fn index_resource_to_index(
         IndexKind::Vector => nidx_vector::VectorIndexer.deletions_for_resource(resource, &index.name),
         IndexKind::Text => nidx_text::TextIndexer.deletions_for_resource(resource),
         IndexKind::Paragraph => nidx_paragraph::ParagraphIndexer.deletions_for_resource(resource),
-        IndexKind::Relation => nidx_relation::RelationIndexer.deletions_for_resource(resource),
+        IndexKind::Relation => nidx_relation::RelationIndexer.deletions_for_resource(&index.config()?, resource),
     };
     PER_INDEX_INDEXING_TIME
         .get_or_create(&IndexKindLabels::new(index.kind))
@@ -478,6 +489,43 @@ mod tests {
         let deletions = Deletion::for_index_and_seq(&meta.pool, index.id, 10i64.into()).await?;
         assert_eq!(deletions.len(), 1);
         assert_eq!(deletions[0].keys, keys);
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_index_deletions_empty_segment(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let meta = NidxMetadata::new_with_pool(pool).await?;
+        let storage = Arc::new(object_store::memory::InMemory::new());
+
+        let kbid = Uuid::new_v4();
+        let shard = Shard::create(&meta.pool, kbid).await?;
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?;
+
+        // Index a resource with only deletions -- no new segment is created
+        let mut resource = minimal_resource(shard.id.to_string());
+        resource.texts_to_delete.push("uuid/t/title".to_string());
+        resource.vector_prefixes_to_delete.insert(
+            "multilingual".to_string(),
+            StringList {
+                items: vec!["uuid/t/title".to_string()],
+            },
+        );
+        resource.paragraphs_to_delete.push("uuid/t/title".to_string());
+        resource.relation_fields_to_delete.push("uuid/t/title".to_string());
+
+        index_resource(
+            &meta,
+            storage.clone(),
+            &tempfile::env::temp_dir(),
+            &shard.id.to_string(),
+            resource.clone(),
+            1i64.into(),
+        )
+        .await?;
+
+        let deletions = Deletion::for_index_and_seq(&meta.pool, index.id, 10i64.into()).await?;
+        assert!(!deletions.is_empty());
 
         Ok(())
     }

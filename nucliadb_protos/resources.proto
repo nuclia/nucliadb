@@ -152,6 +152,7 @@ message Message {
 
 message Conversation {
     repeated Message messages = 1;
+    string extract_strategy = 2;
 }
 
 message FieldConversation {
@@ -161,6 +162,7 @@ message FieldConversation {
     int32 size = 2;
     // Total number of messages
     int32 total = 3;
+    string extract_strategy = 4;
 }
 
 message NestedPosition {
@@ -318,6 +320,7 @@ message FieldMetadata {
     google.protobuf.Timestamp last_understanding = 6;
     google.protobuf.Timestamp last_extract = 7;
     google.protobuf.Timestamp last_summary = 8;
+    google.protobuf.Timestamp last_processing_start = 16;
     CloudFile thumbnail = 9;
     string language = 10;
     string summary = 11;
@@ -450,7 +453,6 @@ message Classification {
 
 message UserMetadata {
     repeated Classification classifications = 1;
-    repeated utils.Relation relations = 3 [deprecated=true]; // Moved to BrokerMessage (outside Basic)
 }
 
 message FieldClassifications {
@@ -461,16 +463,6 @@ message FieldClassifications {
 message ComputedMetadata {
     repeated FieldClassifications field_classifications = 1;
 }
-
-message TokenSplit {
-    string token = 1;
-    string klass = 2;
-    uint32 start = 3;
-    uint32 end = 4;
-    bool cancelled_by_user = 5;
-    string split = 6;
-}
-
 
 message ParagraphAnnotation {
     string key = 1;
@@ -483,26 +475,9 @@ message QuestionAnswerAnnotation {
 }
 
 
-message VisualSelection {
-    string label = 1;
-    float top = 2;
-    float left = 3;
-    float right = 4;
-    float bottom = 5;
-
-    // Token IDs are the indexes in PageStructure
-    repeated uint32 token_ids = 6;
-}
-
-message PageSelections {
-    uint32 page = 1;
-    repeated VisualSelection visual = 2;
-}
-
 message UserFieldMetadata {
-    repeated TokenSplit token = 1;
+    reserved 1, 4;
     repeated ParagraphAnnotation paragraphs = 2;
-    repeated PageSelections page_selections = 4;
     repeated QuestionAnswerAnnotation question_answers = 5;
     FieldID field = 3;
 }

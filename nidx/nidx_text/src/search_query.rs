@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn test_stream_filter_query_per_tag() {
-        let schema = TextSchema::new(2);
+        let schema = TextSchema::new(3);
 
         let filter = StreamFilter::default();
         let queries = create_stream_filter_queries(&schema, &filter);
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_default_stream_filter_queries_creation() {
-        let schema = TextSchema::new(2);
+        let schema = TextSchema::new(3);
         let filter = StreamFilter {
             labels: vec!["/A".to_string(), "/B".to_string()],
             ..Default::default()
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn test_and_stream_filter_queries_creation() {
-        let schema = TextSchema::new(2);
+        let schema = TextSchema::new(3);
         let filter = StreamFilter {
             labels: vec!["/A".to_string(), "/B".to_string()],
             conjunction: Conjunction::And.into(),
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_or_stream_filter_queries_creation() {
-        let schema = TextSchema::new(2);
+        let schema = TextSchema::new(3);
         let filter = StreamFilter {
             labels: vec!["/A".to_string(), "/B".to_string()],
             conjunction: Conjunction::Or.into(),
@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_not_stream_filter_queries_creation() {
-        let schema = TextSchema::new(2);
+        let schema = TextSchema::new(3);
         let filter = StreamFilter {
             labels: vec!["/A".to_string(), "/B".to_string()],
             conjunction: Conjunction::Not.into(),

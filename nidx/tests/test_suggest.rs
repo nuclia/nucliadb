@@ -218,12 +218,13 @@ async fn test_suggest_entities(pool: PgPool) -> Result<(), Box<dyn std::error::E
         &["Barcelona", "Bárcenas"],
     );
 
-    // multiple words and result ordering
+    // multiple words
     let response = suggest_entities(&mut fixture, &shard.id, "Solomon Isa").await;
     assert!(response.entity_results.is_some());
     assert_eq!(response.entity_results.as_ref().unwrap().nodes.len(), 2);
-    assert!(response.entity_results.as_ref().unwrap().nodes[0].value == *"Solomon Islands");
-    assert!(response.entity_results.as_ref().unwrap().nodes[1].value == *"Israel");
+    // Due to tantivy limitations, scoring with fuzzy doesn't work as expected
+    // and the order of results is random
+    expect_entities(&response, &["Solomon Islands", "Israel"]);
 
     // Does not find resources by UUID prefix
     let pap_uuid = &shard.resources["pap"];

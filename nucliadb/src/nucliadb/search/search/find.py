@@ -153,9 +153,10 @@ async def _index_node_retrieval(
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
 
+    ndb_time = metrics.elapsed("node_query") + metrics.elapsed("results_merge")
     if metrics.elapsed("node_query") > settings.slow_node_query_log_threshold:
         logger.warning(
-            "Slow node query",
+            "Slow nidx query",
             extra={
                 "kbid": kbid,
                 "user": x_nucliadb_user,
@@ -166,7 +167,7 @@ async def _index_node_retrieval(
                 "durations": metrics.steps(),
             },
         )
-    elif search_time > settings.slow_find_log_threshold:
+    elif ndb_time > settings.slow_find_log_threshold:
         logger.info(
             "Slow find query",
             extra={

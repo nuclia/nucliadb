@@ -110,14 +110,14 @@ async def test_broker_message_relations(
     resp = await nucliadb_reader.get(
         f"/kb/{standalone_knowledgebox}/resource/{rid}",
         params=dict(
-            show=["relations", "extracted"],
+            show=["basic", "relations", "extracted"],
             extracted=["metadata"],
         ),
     )
     assert resp.status_code == 200
     body = resp.json()
     # Resource level relations
-    assert len(body["relations"]) == 3
+    assert len(body["usermetadata"]["relations"]) == 3
 
     # Field level relations
     extracted_metadata = body["data"]["texts"]["text1"]["extracted"]["metadata"]
@@ -233,7 +233,7 @@ async def create_broker_message_with_relations():
     bm = BrokerMessage()
 
     # Add relations at the resource level
-    bm.relations.extend([r0, r1, r2])
+    bm.user_relations.relations.extend([r0, r1, r2])
 
     # Add relations at the field level
     fcmw = FieldComputedMetadataWrapper()

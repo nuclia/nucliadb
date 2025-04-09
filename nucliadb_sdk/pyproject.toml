@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb_sdk"
-version = "6.3.4"
+version = "6.3.5"
 license = { text = "AGPL" }
 description = "NucliaDB SDK"
 authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
@@ -25,7 +25,6 @@ classifiers = [
 requires-python = ">=3.9, <4"
 dependencies = [
     "httpx",
-    "requests",
     "orjson",
     "pydantic>=2.6",
     "nuclia-models>=0.24.2",

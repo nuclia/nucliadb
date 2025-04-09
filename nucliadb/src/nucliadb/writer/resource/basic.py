@@ -51,11 +51,8 @@ from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldType,
     Metadata,
-    PageSelections,
     Paragraph,
-    TokenSplit,
     UserFieldMetadata,
-    VisualSelection,
 )
 from nucliadb_protos.resources_pb2 import ParagraphAnnotation as PBParagraphAnnotation
 from nucliadb_protos.resources_pb2 import (
@@ -101,16 +98,6 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
     if item.fieldmetadata is not None:
         for fieldmetadata in item.fieldmetadata:
             userfieldmetadata = UserFieldMetadata()
-            for token in fieldmetadata.token:
-                userfieldmetadata.token.append(
-                    TokenSplit(
-                        token=token.token,
-                        klass=token.klass,
-                        start=token.start,
-                        end=token.end,
-                        cancelled_by_user=token.cancelled_by_user,
-                    )
-                )
             for paragraph in fieldmetadata.paragraphs:
                 validate_classifications(paragraph)
                 paragraphpb = PBParagraphAnnotation(key=paragraph.key)
@@ -123,24 +110,6 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
                         )
                     )
                 userfieldmetadata.paragraphs.append(paragraphpb)
-
-            for page_selections in fieldmetadata.selections:
-                page_selections_pb = PageSelections()
-                page_selections_pb.page = page_selections.page
-                page_selections_pb.visual.extend(
-                    [
-                        VisualSelection(
-                            label=visual_selection.label,
-                            top=visual_selection.top,
-                            left=visual_selection.left,
-                            right=visual_selection.right,
-                            bottom=visual_selection.bottom,
-                            token_ids=visual_selection.token_ids,
-                        )
-                        for visual_selection in page_selections.visual
-                    ]
-                )
-                userfieldmetadata.page_selections.append(page_selections_pb)
 
             for qa_annotation in fieldmetadata.question_answers:
                 qa_annotation_pb = build_question_answer_annotation_pb(qa_annotation)

@@ -36,7 +36,7 @@ use crate::search_query::{SharedTermC, search_query, streaming_query, suggest_qu
 use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse, extract_labels};
 
 const FUZZY_DISTANCE: u8 = 1;
-const NUMBER_OF_RESULTS_SUGGEST: usize = 10;
+const NUMBER_OF_RESULTS_SUGGEST: usize = 20;
 
 pub struct ParagraphReaderService {
     pub index: Index,
@@ -282,7 +282,7 @@ struct Searcher<'a> {
     text: &'a str,
     only_faceted: bool,
 }
-impl<'a> Searcher<'a> {
+impl Searcher<'_> {
     fn custom_order_collector(
         &self,
         order: OrderBy,

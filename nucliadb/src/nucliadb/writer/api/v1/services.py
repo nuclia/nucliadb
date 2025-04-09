@@ -180,9 +180,15 @@ async def set_labelset_endpoint(request: Request, kbid: str, labelset: str, item
 
     try:
         labelsets = await datamanagers.atomic.labelset.get_all(kbid=kbid)
-        labelset_titles = [ls.title.lower() for (k, ls) in labelsets.labelset.items() if k != labelset]
+        labelset_titles = {
+            ls.title.lower(): k for (k, ls) in labelsets.labelset.items() if k != labelset
+        }
         if item.title.lower() in labelset_titles:
-            raise HTTPException(status_code=422, detail="Duplicated labelset titles are not allowed")
+            conflict = labelset_titles[item.title.lower()]
+            raise HTTPException(
+                status_code=422,
+                detail=f"Duplicated labelset titles are not allowed. Labelset {conflict} has the same title",
+            )
 
         await set_labelset(kbid, labelset, item)
     except KnowledgeBoxNotFound:

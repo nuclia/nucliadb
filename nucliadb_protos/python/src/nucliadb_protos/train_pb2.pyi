@@ -105,7 +105,6 @@ from nucliadb_protos.resources_pb2 import (
     Origin as Origin,
     PageInformation as PageInformation,
     PagePositions as PagePositions,
-    PageSelections as PageSelections,
     PageStructure as PageStructure,
     PageStructurePage as PageStructurePage,
     PageStructureToken as PageStructureToken,
@@ -123,11 +122,9 @@ from nucliadb_protos.resources_pb2 import (
     RowsPreview as RowsPreview,
     Sentence as Sentence,
     TEXT as TEXT,
-    TokenSplit as TokenSplit,
     UserFieldMetadata as UserFieldMetadata,
     UserMetadata as UserMetadata,
     UserVectorsWrapper as UserVectorsWrapper,
-    VisualSelection as VisualSelection,
 )
 from nucliadb_protos.writer_pb2 import (
     Audit as Audit,

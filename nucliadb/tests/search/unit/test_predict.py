@@ -259,7 +259,7 @@ async def test_check_response_error():
     response._headers = {"Content-Type": "text/plain; charset=utf-8"}
 
     with pytest.raises(ProxiedPredictAPIError) as ex:
-        await PredictEngine().check_response(response, expected_status=200)
+        await PredictEngine().check_response("kbid", response, expected_status=200)
     assert ex.value.status == 503
     assert ex.value.detail == "some error"
 

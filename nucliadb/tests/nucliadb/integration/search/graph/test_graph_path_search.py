@@ -22,6 +22,12 @@ from httpx import AsyncClient
 
 from nucliadb_models.graph import responses as graph_responses
 from nucliadb_models.graph.responses import GraphSearchResponse
+from nucliadb_models.metadata import RelationType
+from nucliadb_protos.resources_pb2 import FieldComputedMetadataWrapper, FieldType, Relations
+from nucliadb_protos.utils_pb2 import Relation, RelationMetadata, RelationNode
+from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -44,7 +50,7 @@ async def test_graph_search__node_queries(
     )
     assert resp.status_code == 200
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
-    assert len(paths) == 16
+    assert len(paths) == 17
 
     # (:PERSON)-[]->()
     resp = await nucliadb_reader.post(
@@ -251,6 +257,24 @@ async def test_graph_search__relation_queries(
     assert ("Anna", "LIVE_IN", "New York") in paths
     assert ("Peter", "LIVE_IN", "New York") in paths
 
+    # ()-[LIVE_IN]->()
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "relation": {
+                    "type": RelationType.SYNONYM.value,
+                },
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert ("Mr. P", "ALIAS", "Peter") in paths
+
     # ()-[: LIVE_IN | BORN_IN]->()
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/graph",
@@ -298,7 +322,7 @@ async def test_graph_search__relation_queries(
     )
     assert resp.status_code == 200
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
-    assert len(paths) == 14
+    assert len(paths) == 15
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -451,6 +475,427 @@ async def test_graph_search__undirected_path_queries(
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
     assert len(paths) == 1
     assert ("Anastasia", "IS_FRIEND", "Anna") in paths
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_graph_search__security(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    kb_with_entity_graph: str,
+):
+    kbid = kb_with_entity_graph
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resources",
+    )
+    assert resp.status_code == 200
+    rid = resp.json()["resources"][0]["id"]
+
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{rid}",
+        json={
+            "security": {
+                "access_groups": ["secret"],
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Without groups, returns it
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+
+    # With the proper group, returns it
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+            "security": {"groups": ["secret"]},
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+
+    # With other groups, returns nothing
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+            "security": {"groups": ["fake"]},
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_graph_search__hidden(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
+    kb_with_entity_graph: str,
+):
+    kbid = kb_with_entity_graph
+
+    resp = await nucliadb_writer_manager.patch(
+        f"/kb/{kb_with_entity_graph}", json={"hidden_resources_enabled": True}
+    )
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resources",
+    )
+    assert resp.status_code == 200
+    rid = resp.json()["resources"][0]["id"]
+
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{rid}",
+        json={
+            "hidden": True,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # By default, does not return hidden
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+    # It returns them with show_hidden
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+            "show_hidden": True,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_graph_search__filtering(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    kb_with_entity_graph: str,
+):
+    kbid = kb_with_entity_graph
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resources",
+    )
+    assert resp.status_code == 200
+    rid = resp.json()["resources"][0]["id"]
+
+    # Filter to include the result
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+            "filter_expression": {"field": {"prop": "resource", "id": rid}},
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+
+    # Filter to exclude the result
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "path",
+                "source": {
+                    "value": "Anna",
+                },
+                "relation": {
+                    "label": "IS_FRIEND",
+                },
+                "undirected": True,
+            },
+            "top_k": 100,
+            "filter_expression": {"field": {"not": {"prop": "resource", "id": rid}}},
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_graph_search_facets(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+
+    # Create a resource with entities from different origins (user, processor, da)
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Knowledge graph",
+            "slug": "knowledge-graph",
+            "summary": "User defined knowledge graph",
+            "usermetadata": {
+                "relations": [
+                    {
+                        "relation": "ENTITY",
+                        "label": "SAME",
+                        "from": {"type": "entity", "group": "PERSON", "value": "Ursula User"},
+                        "to": {"type": "entity", "group": "PERSON", "value": "Úrsula Usuario"},
+                    }
+                ],
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    rel = Relation(
+        relation=Relation.RelationType.ENTITY,
+        source=RelationNode(
+            ntype=RelationNode.NodeType.ENTITY, subtype="PERSON", value="Peter Processor"
+        ),
+        to=RelationNode(ntype=RelationNode.NodeType.ENTITY, subtype="PERSON", value="Pedro Procesador"),
+        relation_label="SAME",
+        metadata=RelationMetadata(
+            paragraph_id="foo",
+            source_start=1,
+            source_end=2,
+            to_start=10,
+            to_end=11,
+        ),
+    )
+
+    # Broker message from processor
+    bm = BrokerMessage()
+    bm.kbid = kbid
+    bm.uuid = rid
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.field_type = FieldType.TEXT
+    fcmw.field.field = "text"
+    relations = Relations()
+    relations.relations.append(rel)
+    fcmw.metadata.metadata.relations.append(relations)
+    bm.field_metadata.append(fcmw)
+
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    # Broker message from DA
+    rel.metadata.data_augmentation_task_id = "mytask"
+    rel.source.value = "Alfred Agent"
+    rel.to.value = "Alfredo Agente"
+
+    bm = BrokerMessage()
+    bm.kbid = kbid
+    bm.uuid = rid
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.field_type = FieldType.TEXT
+    fcmw.field.field = "text2"
+    relations = Relations()
+    relations.relations.append(rel)
+    fcmw.metadata.metadata.relations.append(relations)
+    bm.field_metadata.append(fcmw)
+
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    # Everything
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "prop": "relation",
+                "label": "SAME",
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 3
+
+    # User
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "and": [
+                    {
+                        "prop": "relation",
+                        "label": "SAME",
+                    },
+                    {"prop": "generated", "by": "user"},
+                ]
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert paths == [("Ursula User", "SAME", "Úrsula Usuario")]
+
+    # Processor
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "and": [
+                    {
+                        "prop": "relation",
+                        "label": "SAME",
+                    },
+                    {"prop": "generated", "by": "processor"},
+                ]
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert paths == [("Peter Processor", "SAME", "Pedro Procesador")]
+
+    # DA
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "and": [
+                    {
+                        "prop": "relation",
+                        "label": "SAME",
+                    },
+                    {"prop": "generated", "by": "data-augmentation"},
+                ]
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert paths == [("Alfred Agent", "SAME", "Alfredo Agente")]
+
+    # DA task
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "and": [
+                    {
+                        "prop": "relation",
+                        "label": "SAME",
+                    },
+                    {"prop": "generated", "by": "data-augmentation", "da_task": "mytask"},
+                ]
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert paths == [("Alfred Agent", "SAME", "Alfredo Agente")]
+
+    # fake DA task
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={
+            "query": {
+                "and": [
+                    {
+                        "prop": "relation",
+                        "label": "SAME",
+                    },
+                    {"prop": "generated", "by": "data-augmentation", "da_task": "faketask"},
+                ]
+            },
+            "top_k": 100,
+        },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
 
 
 def simple_paths(paths: list[graph_responses.GraphPath]) -> list[tuple[str, str, str]]:

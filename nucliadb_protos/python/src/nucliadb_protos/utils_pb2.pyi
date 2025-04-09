@@ -95,10 +95,8 @@ class Relation(google.protobuf.message.Message):
     RELATION_FIELD_NUMBER: builtins.int
     RELATION_LABEL_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
-    RESOURCE_ID_FIELD_NUMBER: builtins.int
     relation: global___Relation.RelationType.ValueType
     relation_label: builtins.str
-    resource_id: builtins.str
     @property
     def source(self) -> global___RelationNode: ...
     @property
@@ -113,11 +111,9 @@ class Relation(google.protobuf.message.Message):
         relation: global___Relation.RelationType.ValueType = ...,
         relation_label: builtins.str = ...,
         metadata: global___RelationMetadata | None = ...,
-        resource_id: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_resource_id", b"_resource_id", "metadata", b"metadata", "resource_id", b"resource_id", "source", b"source", "to", b"to"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_resource_id", b"_resource_id", "metadata", b"metadata", "relation", b"relation", "relation_label", b"relation_label", "resource_id", b"resource_id", "source", b"source", "to", b"to"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["_resource_id", b"_resource_id"]) -> typing.Literal["resource_id"] | None: ...
+    def HasField(self, field_name: typing.Literal["metadata", b"metadata", "source", b"source", "to", b"to"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["metadata", b"metadata", "relation", b"relation", "relation_label", b"relation_label", "source", b"source", "to", b"to"]) -> None: ...
 
 global___Relation = Relation
 

@@ -449,7 +449,7 @@ class SearchParamDefaults:
     filters = ParamDefault(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
     )
     resource_filters = ParamDefault(
         default=[],
@@ -459,7 +459,7 @@ class SearchParamDefaults:
     faceted = ParamDefault(
         default=[],
         title="Faceted",
-        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/rag/advanced/search_filters",  # noqa: E501
+        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
         max_items=50,
     )
     autofilter = ParamDefault(
@@ -650,7 +650,7 @@ class SearchParamDefaults:
         title="Filter resource by an expression",
         description=(
             "Returns only documents that match this filter expression."
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters "
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
             "This allows building complex filtering expressions and replaces the following parameters:"
             "`fields`, `filters`, `range_*`, `resource_filters`, `keyword_filters`."
         ),
@@ -660,7 +660,7 @@ class SearchParamDefaults:
         title="Filter resource by an expression",
         description=(
             "Returns only documents that match this filter expression."
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters "
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
             "This allows building complex filtering expressions and replaces the following parameters:"
             "`filters`, `range_*`, `with_status`."
         ),
@@ -688,7 +688,7 @@ class CatalogRequest(BaseModel):
     filters: Union[list[str], list[Filter]] = Field(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
     )
     faceted: list[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
@@ -771,7 +771,7 @@ class BaseSearchRequest(AuditMetadataBase):
     filters: Union[list[str], list[Filter]] = Field(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
     )
     top_k: int = SearchParamDefaults.top_k.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
@@ -1407,7 +1407,7 @@ class AskRequest(AuditMetadataBase):
     filters: Union[list[str], list[Filter]] = Field(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
     )
     keyword_filters: Union[list[str], list[Filter]] = Field(
         default=[],
@@ -1416,7 +1416,7 @@ class AskRequest(AuditMetadataBase):
             "List of keyword filter expressions to apply to the retrieval step. "
             "The text block search will only be performed on the documents that contain the specified keywords. "
             "The filters are case-insensitive, and only alphanumeric characters and spaces are allowed. "
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters"  # noqa: E501
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters"  # noqa: E501
         ),
         examples=[
             ["NLP", "BERT"],
@@ -1734,7 +1734,7 @@ class FindRequest(BaseSearchRequest):
             "List of keyword filter expressions to apply to the retrieval step. "
             "The text block search will only be performed on the documents that contain the specified keywords. "
             "The filters are case-insensitive, and only alphanumeric characters and spaces are allowed. "
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters"  # noqa: E501
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters"  # noqa: E501
         ),
         examples=[
             ["NLP", "BERT"],

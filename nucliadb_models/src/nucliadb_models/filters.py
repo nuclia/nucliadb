@@ -342,7 +342,7 @@ ResourceFilterExpression = Annotated[
 
 class FilterExpression(BaseModel, extra="forbid"):
     """Returns only documents that match this filter expression.
-    Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters
+    Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters
 
     This allows building complex filtering expressions and replaces the following parameters:
     `fields`, `filters`, `range_*`, `resource_filters`, `keyword_filters`.
@@ -371,7 +371,7 @@ class FilterExpression(BaseModel, extra="forbid"):
 
 class CatalogFilterExpression(BaseModel, extra="forbid"):
     """Returns only documents that match this filter expression.
-    Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters
+    Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters
 
     This allows building complex filtering expressions and replaces the following parameters:
     `filters`, `range_*`, `with_status`.

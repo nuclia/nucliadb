@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import pytest
 from httpx import AsyncClient
 
 from nucliadb.common.datamanagers.cluster import KB_SHARDS
@@ -29,7 +28,7 @@ from nucliadb_protos.nodereader_pb2 import SuggestFeatures, SuggestRequest
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 
-@pytest.mark.flaky(reruns=5)
+# @pytest.mark.flaky(reruns=5)
 async def test_suggest_resource_all(
     cluster_nucliadb_search: AsyncClient, test_search_resource: str
 ) -> None:

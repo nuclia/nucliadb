@@ -69,7 +69,7 @@ async def graph_search_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> GraphSearchResponse:
-    pb_query = parse_graph_search(item)
+    pb_query = await parse_graph_search(kbid, item)
 
     results, _, _ = await node_query(kbid, Method.GRAPH, pb_query)
 
@@ -96,7 +96,7 @@ async def graph_nodes_search_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> GraphNodesSearchResponse:
-    pb_query = parse_graph_node_search(item)
+    pb_query = await parse_graph_node_search(kbid, item)
 
     results, _, _ = await node_query(kbid, Method.GRAPH, pb_query)
 
@@ -123,7 +123,7 @@ async def graph_relations_search_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> GraphRelationsSearchResponse:
-    pb_query = parse_graph_relation_search(item)
+    pb_query = await parse_graph_relation_search(kbid, item)
 
     results, _, _ = await node_query(kbid, Method.GRAPH, pb_query)
 

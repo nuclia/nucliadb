@@ -224,6 +224,11 @@ async def test_story_7286(
             "title": "My Title",
             "summary": "My summary",
             "icon": "text/plain",
+            "texts": {
+                "text1": {
+                    "body": "This is a text",
+                }
+            },
         },
     )
     assert resp.status_code == 201
@@ -533,6 +538,7 @@ async def test_find_fields_parameter(
     rid = resp.json()["uuid"]
 
     bm = BrokerMessage()
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
     bm.kbid = standalone_knowledgebox
     bm.uuid = rid
 
@@ -569,3 +575,19 @@ async def test_find_fields_parameter(
         assert resp.status_code == 200
         body = resp.json()
         assert len(body["resources"]) == expected_n_resources
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_find_query_error(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/find",
+        json={
+            "query": "# Markdown\n- **Bold**",
+        },
+    )
+    assert resp.status_code == 412

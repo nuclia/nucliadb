@@ -171,10 +171,11 @@ message Resource {
     repeated string sentences_to_delete = 8 [deprecated = true];
     // vectorset_id -> [vector_key_prefix, ...]
     map<string, StringList> vector_prefixes_to_delete = 15;
-
+    repeated string relation_fields_to_delete = 16;
+    repeated string texts_to_delete = 17;
 
     // Relations
-    repeated utils.Relation relations = 9;
+    map<string, IndexRelations> field_relations = 10;
 
     string shard_id = 11;
 
@@ -182,6 +183,10 @@ message Resource {
     map<string, utils.UserVectorsList> vectors_to_delete = 13 [deprecated = true];  // Vectorset prefix vector id
 
     optional utils.Security security = 14;
+
+    // Boleans to indicate if the indexing needs to be done
+    bool skip_texts = 18;
+    bool skip_paragraphs = 19;
 }
 
 message ShardMetadata {
@@ -205,4 +210,15 @@ message NodeMetadata {
 
 message StringList {
     repeated string items = 1;
+}
+
+// Relations as sent and retrieved from the index, with some additional metadata
+message IndexRelation {
+    utils.Relation relation = 1;
+    optional string resource_field_id = 2;
+    repeated string facets = 3;
+}
+
+message IndexRelations {
+    repeated IndexRelation relations = 1;
 }

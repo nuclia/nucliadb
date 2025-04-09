@@ -182,7 +182,7 @@ message EntitiesSubgraphRequest {
 }
 
 message EntitiesSubgraphResponse {
-    repeated utils.Relation relations = 1;
+    repeated noderesources.IndexRelation relations = 2;
 }
 
 
@@ -193,14 +193,40 @@ message GraphQuery {
         optional string node_subtype = 3;
 
         enum MatchKind {
-            EXACT = 0;
-            FUZZY = 1;
+            DEPRECATED_EXACT = 0;
+            DEPRECATED_FUZZY = 1;
         }
-        MatchKind match_kind = 4;
+        MatchKind match_kind = 4 [deprecated = true];
+
+        enum MatchLocation {
+            // Match full value. Search "Rosa Parks" to find "Rosa Parks"
+            FULL = 0;
+            // Match prefix. Search "Rosa P" or "Ros" to find "Rosa Parks"
+            PREFIX = 1;
+            // Match individual words. Search "Rosa" or "Parks" to find "Rosa Parks"
+            WORDS = 2;
+            // Match individual word by prefix. Search "Ros" or "Par" to find "Rosa Parks"
+            PREFIX_WORDS = 3;
+        }
+
+        message ExactMatch {
+            MatchLocation kind = 1;
+        }
+
+        message FuzzyMatch {
+            MatchLocation kind = 1;
+            uint32 distance = 2;
+        }
+
+        oneof new_match_kind {
+            ExactMatch exact = 5;
+            FuzzyMatch fuzzy = 6;
+        }
     }
 
     message Relation {
         optional string value = 1;
+        optional utils.Relation.RelationType relation_type = 2;
     }
 
     message Path {
@@ -214,12 +240,17 @@ message GraphQuery {
         repeated PathQuery operands = 1;
     }
 
+    message FacetFilter {
+        string facet = 1;
+    }
+
     message PathQuery {
         oneof query {
             GraphQuery.Path path = 1;
             PathQuery bool_not = 2;
             BoolQuery bool_and = 3;
             BoolQuery bool_or = 4;
+            FacetFilter facet = 5;
         }
     }
 
@@ -242,13 +273,15 @@ message GraphSearchRequest {
     QueryKind kind = 3;
 
     uint32 top_k = 4;
+
+    optional utils.Security security = 5;
+    optional FilterExpression field_filter = 6;
 }
 
 message GraphSearchResponse {
     message Relation {
         utils.Relation.RelationType relation_type = 1;
         string label = 2;
-        utils.RelationMetadata metadata = 3;
     }
 
     // To optimize proto size, paths are built using pointers to nodes and
@@ -258,6 +291,7 @@ message GraphSearchResponse {
         uint32 source = 1;
         uint32 relation = 2;
         uint32 destination = 3;
+        optional utils.RelationMetadata metadata = 4;
     }
 
     repeated utils.RelationNode nodes = 1;
@@ -272,9 +306,10 @@ message GraphSearchResponse {
 // - graph search:
 //   - given some entry vertices, get the filtered subgraph around them
 message RelationSearchRequest {
+    reserved 11;
+
     string shard_id = 1;
 
-    RelationPrefixSearchRequest prefix = 11;
     EntitiesSubgraphRequest subgraph = 12;
 }
 
@@ -329,6 +364,8 @@ enum FilterOperator {
 }
 
 message SearchRequest {
+    reserved 20;
+
     string shard = 1;
 
     // query this text in all the paragraphs
@@ -353,7 +390,6 @@ message SearchRequest {
 
     optional string advanced_query = 18;
 
-    RelationPrefixSearchRequest relation_prefix = 20;
     EntitiesSubgraphRequest relation_subgraph = 21;
 
     float min_score_semantic = 23;

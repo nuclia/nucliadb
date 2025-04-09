@@ -96,7 +96,7 @@ pub struct EdgeIter<'a> {
     crnt: usize,
     buf: &'a [u8],
 }
-impl<'a> Iterator for EdgeIter<'a> {
+impl Iterator for EdgeIter<'_> {
     type Item = (Address, Edge);
     fn next(&mut self) -> Option<Self::Item> {
         if self.buf.len() == self.crnt {

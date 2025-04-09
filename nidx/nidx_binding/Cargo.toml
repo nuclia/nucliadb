@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 anyhow = "1.0.93"
 nidx = { version = "0.1.0", path = "..", default-features = false }
 nidx_protos = { version = "0.1.0", path = "../nidx_protos" }
-pyo3 = "0.23"
+pyo3 = "0.24"
 tempfile = "3.14.0"
 tokio = "1.41.1"
 tokio-util = { version = "0.7.12", features = ["io", "io-util", "compat"] }

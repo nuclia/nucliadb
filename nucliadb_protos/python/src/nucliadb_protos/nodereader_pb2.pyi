@@ -25,6 +25,8 @@ from nucliadb_protos.noderesources_pb2 import (
     IndexMetadata as IndexMetadata,
     IndexParagraph as IndexParagraph,
     IndexParagraphs as IndexParagraphs,
+    IndexRelation as IndexRelation,
+    IndexRelations as IndexRelations,
     NodeMetadata as NodeMetadata,
     ParagraphMetadata as ParagraphMetadata,
     Position as Position,
@@ -665,11 +667,11 @@ class EntitiesSubgraphResponse(google.protobuf.message.Message):
 
     RELATIONS_FIELD_NUMBER: builtins.int
     @property
-    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
+    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.noderesources_pb2.IndexRelation]: ...
     def __init__(
         self,
         *,
-        relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
+        relations: collections.abc.Iterable[nucliadb_protos.noderesources_pb2.IndexRelation] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["relations", b"relations"]) -> None: ...
 
@@ -689,21 +691,81 @@ class GraphQuery(google.protobuf.message.Message):
 
         class _MatchKindEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GraphQuery.Node._MatchKind.ValueType], builtins.type):
             DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-            EXACT: GraphQuery.Node._MatchKind.ValueType  # 0
-            FUZZY: GraphQuery.Node._MatchKind.ValueType  # 1
+            DEPRECATED_EXACT: GraphQuery.Node._MatchKind.ValueType  # 0
+            DEPRECATED_FUZZY: GraphQuery.Node._MatchKind.ValueType  # 1
 
         class MatchKind(_MatchKind, metaclass=_MatchKindEnumTypeWrapper): ...
-        EXACT: GraphQuery.Node.MatchKind.ValueType  # 0
-        FUZZY: GraphQuery.Node.MatchKind.ValueType  # 1
+        DEPRECATED_EXACT: GraphQuery.Node.MatchKind.ValueType  # 0
+        DEPRECATED_FUZZY: GraphQuery.Node.MatchKind.ValueType  # 1
+
+        class _MatchLocation:
+            ValueType = typing.NewType("ValueType", builtins.int)
+            V: typing_extensions.TypeAlias = ValueType
+
+        class _MatchLocationEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GraphQuery.Node._MatchLocation.ValueType], builtins.type):
+            DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+            FULL: GraphQuery.Node._MatchLocation.ValueType  # 0
+            """Match full value. Search "Rosa Parks" to find "Rosa Parks" """
+            PREFIX: GraphQuery.Node._MatchLocation.ValueType  # 1
+            """Match prefix. Search "Rosa P" or "Ros" to find "Rosa Parks" """
+            WORDS: GraphQuery.Node._MatchLocation.ValueType  # 2
+            """Match individual words. Search "Rosa" or "Parks" to find "Rosa Parks" """
+            PREFIX_WORDS: GraphQuery.Node._MatchLocation.ValueType  # 3
+            """Match individual word by prefix. Search "Ros" or "Par" to find "Rosa Parks" """
+
+        class MatchLocation(_MatchLocation, metaclass=_MatchLocationEnumTypeWrapper): ...
+        FULL: GraphQuery.Node.MatchLocation.ValueType  # 0
+        """Match full value. Search "Rosa Parks" to find "Rosa Parks" """
+        PREFIX: GraphQuery.Node.MatchLocation.ValueType  # 1
+        """Match prefix. Search "Rosa P" or "Ros" to find "Rosa Parks" """
+        WORDS: GraphQuery.Node.MatchLocation.ValueType  # 2
+        """Match individual words. Search "Rosa" or "Parks" to find "Rosa Parks" """
+        PREFIX_WORDS: GraphQuery.Node.MatchLocation.ValueType  # 3
+        """Match individual word by prefix. Search "Ros" or "Par" to find "Rosa Parks" """
+
+        @typing.final
+        class ExactMatch(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            KIND_FIELD_NUMBER: builtins.int
+            kind: global___GraphQuery.Node.MatchLocation.ValueType
+            def __init__(
+                self,
+                *,
+                kind: global___GraphQuery.Node.MatchLocation.ValueType = ...,
+            ) -> None: ...
+            def ClearField(self, field_name: typing.Literal["kind", b"kind"]) -> None: ...
+
+        @typing.final
+        class FuzzyMatch(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            KIND_FIELD_NUMBER: builtins.int
+            DISTANCE_FIELD_NUMBER: builtins.int
+            kind: global___GraphQuery.Node.MatchLocation.ValueType
+            distance: builtins.int
+            def __init__(
+                self,
+                *,
+                kind: global___GraphQuery.Node.MatchLocation.ValueType = ...,
+                distance: builtins.int = ...,
+            ) -> None: ...
+            def ClearField(self, field_name: typing.Literal["distance", b"distance", "kind", b"kind"]) -> None: ...
 
         VALUE_FIELD_NUMBER: builtins.int
         NODE_TYPE_FIELD_NUMBER: builtins.int
         NODE_SUBTYPE_FIELD_NUMBER: builtins.int
         MATCH_KIND_FIELD_NUMBER: builtins.int
+        EXACT_FIELD_NUMBER: builtins.int
+        FUZZY_FIELD_NUMBER: builtins.int
         value: builtins.str
         node_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType
         node_subtype: builtins.str
         match_kind: global___GraphQuery.Node.MatchKind.ValueType
+        @property
+        def exact(self) -> global___GraphQuery.Node.ExactMatch: ...
+        @property
+        def fuzzy(self) -> global___GraphQuery.Node.FuzzyMatch: ...
         def __init__(
             self,
             *,
@@ -711,29 +773,39 @@ class GraphQuery(google.protobuf.message.Message):
             node_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType | None = ...,
             node_subtype: builtins.str | None = ...,
             match_kind: global___GraphQuery.Node.MatchKind.ValueType = ...,
+            exact: global___GraphQuery.Node.ExactMatch | None = ...,
+            fuzzy: global___GraphQuery.Node.FuzzyMatch | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "match_kind", b"match_kind", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "exact", b"exact", "fuzzy", b"fuzzy", "new_match_kind", b"new_match_kind", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "exact", b"exact", "fuzzy", b"fuzzy", "match_kind", b"match_kind", "new_match_kind", b"new_match_kind", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> None: ...
         @typing.overload
         def WhichOneof(self, oneof_group: typing.Literal["_node_subtype", b"_node_subtype"]) -> typing.Literal["node_subtype"] | None: ...
         @typing.overload
         def WhichOneof(self, oneof_group: typing.Literal["_node_type", b"_node_type"]) -> typing.Literal["node_type"] | None: ...
         @typing.overload
         def WhichOneof(self, oneof_group: typing.Literal["_value", b"_value"]) -> typing.Literal["value"] | None: ...
+        @typing.overload
+        def WhichOneof(self, oneof_group: typing.Literal["new_match_kind", b"new_match_kind"]) -> typing.Literal["exact", "fuzzy"] | None: ...
 
     @typing.final
     class Relation(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
         VALUE_FIELD_NUMBER: builtins.int
+        RELATION_TYPE_FIELD_NUMBER: builtins.int
         value: builtins.str
+        relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType
         def __init__(
             self,
             *,
             value: builtins.str | None = ...,
+            relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing.Literal["_value", b"_value", "value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["_value", b"_value", "value", b"value"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["_relation_type", b"_relation_type", "_value", b"_value", "relation_type", b"relation_type", "value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["_relation_type", b"_relation_type", "_value", b"_value", "relation_type", b"relation_type", "value", b"value"]) -> None: ...
+        @typing.overload
+        def WhichOneof(self, oneof_group: typing.Literal["_relation_type", b"_relation_type"]) -> typing.Literal["relation_type"] | None: ...
+        @typing.overload
         def WhichOneof(self, oneof_group: typing.Literal["_value", b"_value"]) -> typing.Literal["value"] | None: ...
 
     @typing.final
@@ -783,6 +855,19 @@ class GraphQuery(google.protobuf.message.Message):
         def ClearField(self, field_name: typing.Literal["operands", b"operands"]) -> None: ...
 
     @typing.final
+    class FacetFilter(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        FACET_FIELD_NUMBER: builtins.int
+        facet: builtins.str
+        def __init__(
+            self,
+            *,
+            facet: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["facet", b"facet"]) -> None: ...
+
+    @typing.final
     class PathQuery(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -790,6 +875,7 @@ class GraphQuery(google.protobuf.message.Message):
         BOOL_NOT_FIELD_NUMBER: builtins.int
         BOOL_AND_FIELD_NUMBER: builtins.int
         BOOL_OR_FIELD_NUMBER: builtins.int
+        FACET_FIELD_NUMBER: builtins.int
         @property
         def path(self) -> global___GraphQuery.Path: ...
         @property
@@ -798,6 +884,8 @@ class GraphQuery(google.protobuf.message.Message):
         def bool_and(self) -> global___GraphQuery.BoolQuery: ...
         @property
         def bool_or(self) -> global___GraphQuery.BoolQuery: ...
+        @property
+        def facet(self) -> global___GraphQuery.FacetFilter: ...
         def __init__(
             self,
             *,
@@ -805,10 +893,11 @@ class GraphQuery(google.protobuf.message.Message):
             bool_not: global___GraphQuery.PathQuery | None = ...,
             bool_and: global___GraphQuery.BoolQuery | None = ...,
             bool_or: global___GraphQuery.BoolQuery | None = ...,
+            facet: global___GraphQuery.FacetFilter | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "path", b"path", "query", b"query"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "path", b"path", "query", b"query"]) -> None: ...
-        def WhichOneof(self, oneof_group: typing.Literal["query", b"query"]) -> typing.Literal["path", "bool_not", "bool_and", "bool_or"] | None: ...
+        def HasField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "facet", b"facet", "path", b"path", "query", b"query"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "facet", b"facet", "path", b"path", "query", b"query"]) -> None: ...
+        def WhichOneof(self, oneof_group: typing.Literal["query", b"query"]) -> typing.Literal["path", "bool_not", "bool_and", "bool_or", "facet"] | None: ...
 
     PATH_FIELD_NUMBER: builtins.int
     @property
@@ -854,11 +943,17 @@ class GraphSearchRequest(google.protobuf.message.Message):
     QUERY_FIELD_NUMBER: builtins.int
     KIND_FIELD_NUMBER: builtins.int
     TOP_K_FIELD_NUMBER: builtins.int
+    SECURITY_FIELD_NUMBER: builtins.int
+    FIELD_FILTER_FIELD_NUMBER: builtins.int
     shard: builtins.str
     kind: global___GraphSearchRequest.QueryKind.ValueType
     top_k: builtins.int
     @property
     def query(self) -> global___GraphQuery: ...
+    @property
+    def security(self) -> nucliadb_protos.utils_pb2.Security: ...
+    @property
+    def field_filter(self) -> global___FilterExpression: ...
     def __init__(
         self,
         *,
@@ -866,9 +961,15 @@ class GraphSearchRequest(google.protobuf.message.Message):
         query: global___GraphQuery | None = ...,
         kind: global___GraphSearchRequest.QueryKind.ValueType = ...,
         top_k: builtins.int = ...,
+        security: nucliadb_protos.utils_pb2.Security | None = ...,
+        field_filter: global___FilterExpression | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["query", b"query"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["kind", b"kind", "query", b"query", "shard", b"shard", "top_k", b"top_k"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "_security", b"_security", "field_filter", b"field_filter", "query", b"query", "security", b"security"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "_security", b"_security", "field_filter", b"field_filter", "kind", b"kind", "query", b"query", "security", b"security", "shard", b"shard", "top_k", b"top_k"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_field_filter", b"_field_filter"]) -> typing.Literal["field_filter"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_security", b"_security"]) -> typing.Literal["security"] | None: ...
 
 global___GraphSearchRequest = GraphSearchRequest
 
@@ -882,20 +983,15 @@ class GraphSearchResponse(google.protobuf.message.Message):
 
         RELATION_TYPE_FIELD_NUMBER: builtins.int
         LABEL_FIELD_NUMBER: builtins.int
-        METADATA_FIELD_NUMBER: builtins.int
         relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType
         label: builtins.str
-        @property
-        def metadata(self) -> nucliadb_protos.utils_pb2.RelationMetadata: ...
         def __init__(
             self,
             *,
             relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType = ...,
             label: builtins.str = ...,
-            metadata: nucliadb_protos.utils_pb2.RelationMetadata | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing.Literal["metadata", b"metadata"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["label", b"label", "metadata", b"metadata", "relation_type", b"relation_type"]) -> None: ...
+        def ClearField(self, field_name: typing.Literal["label", b"label", "relation_type", b"relation_type"]) -> None: ...
 
     @typing.final
     class Path(google.protobuf.message.Message):
@@ -909,17 +1005,23 @@ class GraphSearchResponse(google.protobuf.message.Message):
         SOURCE_FIELD_NUMBER: builtins.int
         RELATION_FIELD_NUMBER: builtins.int
         DESTINATION_FIELD_NUMBER: builtins.int
+        METADATA_FIELD_NUMBER: builtins.int
         source: builtins.int
         relation: builtins.int
         destination: builtins.int
+        @property
+        def metadata(self) -> nucliadb_protos.utils_pb2.RelationMetadata: ...
         def __init__(
             self,
             *,
             source: builtins.int = ...,
             relation: builtins.int = ...,
             destination: builtins.int = ...,
+            metadata: nucliadb_protos.utils_pb2.RelationMetadata | None = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing.Literal["destination", b"destination", "relation", b"relation", "source", b"source"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["_metadata", b"_metadata", "metadata", b"metadata"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["_metadata", b"_metadata", "destination", b"destination", "metadata", b"metadata", "relation", b"relation", "source", b"source"]) -> None: ...
+        def WhichOneof(self, oneof_group: typing.Literal["_metadata", b"_metadata"]) -> typing.Literal["metadata"] | None: ...
 
     NODES_FIELD_NUMBER: builtins.int
     RELATIONS_FIELD_NUMBER: builtins.int
@@ -954,22 +1056,18 @@ class RelationSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SHARD_ID_FIELD_NUMBER: builtins.int
-    PREFIX_FIELD_NUMBER: builtins.int
     SUBGRAPH_FIELD_NUMBER: builtins.int
     shard_id: builtins.str
-    @property
-    def prefix(self) -> global___RelationPrefixSearchRequest: ...
     @property
     def subgraph(self) -> global___EntitiesSubgraphRequest: ...
     def __init__(
         self,
         *,
         shard_id: builtins.str = ...,
-        prefix: global___RelationPrefixSearchRequest | None = ...,
         subgraph: global___EntitiesSubgraphRequest | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["prefix", b"prefix", "subgraph", b"subgraph"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["prefix", b"prefix", "shard_id", b"shard_id", "subgraph", b"subgraph"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["subgraph", b"subgraph"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["shard_id", b"shard_id", "subgraph", b"subgraph"]) -> None: ...
 
 global___RelationSearchRequest = RelationSearchRequest
 
@@ -1167,7 +1265,6 @@ class SearchRequest(google.protobuf.message.Message):
     WITH_DUPLICATES_FIELD_NUMBER: builtins.int
     ONLY_FACETED_FIELD_NUMBER: builtins.int
     ADVANCED_QUERY_FIELD_NUMBER: builtins.int
-    RELATION_PREFIX_FIELD_NUMBER: builtins.int
     RELATION_SUBGRAPH_FIELD_NUMBER: builtins.int
     MIN_SCORE_SEMANTIC_FIELD_NUMBER: builtins.int
     MIN_SCORE_BM25_FIELD_NUMBER: builtins.int
@@ -1198,8 +1295,6 @@ class SearchRequest(google.protobuf.message.Message):
         """Embedded vector search."""
 
     @property
-    def relation_prefix(self) -> global___RelationPrefixSearchRequest: ...
-    @property
     def relation_subgraph(self) -> global___EntitiesSubgraphRequest: ...
     @property
     def security(self) -> nucliadb_protos.utils_pb2.Security: ...
@@ -1223,7 +1318,6 @@ class SearchRequest(google.protobuf.message.Message):
         with_duplicates: builtins.bool = ...,
         only_faceted: builtins.bool = ...,
         advanced_query: builtins.str | None = ...,
-        relation_prefix: global___RelationPrefixSearchRequest | None = ...,
         relation_subgraph: global___EntitiesSubgraphRequest | None = ...,
         min_score_semantic: builtins.float = ...,
         min_score_bm25: builtins.float = ...,
@@ -1232,8 +1326,8 @@ class SearchRequest(google.protobuf.message.Message):
         paragraph_filter: global___FilterExpression | None = ...,
         filter_operator: global___FilterOperator.ValueType = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "advanced_query", b"advanced_query", "faceted", b"faceted", "field_filter", b"field_filter", "order", b"order", "paragraph_filter", b"paragraph_filter", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "security", b"security"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "field_filter", b"field_filter", "filter_operator", b"filter_operator", "min_score_bm25", b"min_score_bm25", "min_score_semantic", b"min_score_semantic", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "paragraph_filter", b"paragraph_filter", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "result_per_page", b"result_per_page", "security", b"security", "shard", b"shard", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "advanced_query", b"advanced_query", "faceted", b"faceted", "field_filter", b"field_filter", "order", b"order", "paragraph_filter", b"paragraph_filter", "relation_subgraph", b"relation_subgraph", "security", b"security"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "field_filter", b"field_filter", "filter_operator", b"filter_operator", "min_score_bm25", b"min_score_bm25", "min_score_semantic", b"min_score_semantic", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "paragraph_filter", b"paragraph_filter", "relation_subgraph", b"relation_subgraph", "result_per_page", b"result_per_page", "security", b"security", "shard", b"shard", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_advanced_query", b"_advanced_query"]) -> typing.Literal["advanced_query"] | None: ...
     @typing.overload

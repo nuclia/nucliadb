@@ -127,6 +127,31 @@ impl OperationStatusLabels {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, EncodeLabelValue)]
+enum Utilization {
+    Free,
+    Busy,
+}
+
+#[derive(Clone, Debug, EncodeLabelSet, PartialEq, Eq, Hash)]
+pub struct UtilizationLabels {
+    status: Utilization,
+}
+
+impl From<bool> for UtilizationLabels {
+    fn from(busy: bool) -> Self {
+        if busy {
+            Self {
+                status: Utilization::Busy,
+            }
+        } else {
+            Self {
+                status: Utilization::Free,
+            }
+        }
+    }
+}
+
 pub mod common {
     metrics! {
         SPAN_DURATION: Family<Vec<(String, String)>, Histogram>{exponential_buckets(0.001, 2.0, 20)} as "span_duration_seconds" ("Duration of a tracing span"),
@@ -137,6 +162,7 @@ pub mod scheduler {
     #[derive(Clone, Debug, EncodeLabelValue, PartialEq, Eq, Hash)]
     pub enum JobState {
         Queued,
+        RecentlyQueued,
         Running,
     }
 
@@ -161,6 +187,9 @@ pub mod searcher {
         ACTIVE_SHARDS: Gauge as "searcher_shards_active" ("Number of active shards in this searcher"),
         EVICTED_SHARDS: Gauge as "searcher_shards_evicted" ("Number of evicted shards (pending deletion) in this searcher"),
         DESIRED_SHARDS: Gauge as "searcher_shards_desired" ("Number of shards desired by this searcher"),
+
+        INDEX_CACHE_COUNT: Gauge as "searcher_index_cache_count" ("Number of indexes in the searcher cache"),
+        INDEX_CACHE_BYTES: Gauge as "searcher_index_cache_size_bytes" ("Total size of open indexes in the searcher cache"),
     }
 }
 
@@ -169,6 +198,7 @@ pub mod indexer {
         INDEXING_COUNTER: Family<OperationStatusLabels, Counter> as "indexer_message_count" ("Number of indexing operations per status"),
         TOTAL_INDEXING_TIME: Histogram[exponential_buckets(0.01, 2.0, 12)] as "total_indexing_time_seconds" ("Time it took to process an entire index message"),
         PER_INDEX_INDEXING_TIME: Family<IndexKindLabels, Histogram>{exponential_buckets(0.01, 2.0, 12)} as "indexing_time_seconds" ("Time it took to index a resource to an index"),
+        INDEXING_BUSY: Family<UtilizationLabels, Counter::<f64, AtomicU64>> as "indexer_utilization_seconds" ("Time spent in free/busy status"),
     }
 }
 
@@ -176,5 +206,6 @@ pub mod worker {
     metrics! {
         MERGE_COUNTER: Family<OperationStatusLabels, Counter> as "merge_job_count" ("Number of merge jobs per status"),
         PER_INDEX_MERGE_TIME: Family<IndexKindLabels, Histogram>{exponential_buckets(1.0, 2.0, 12)} as "merge_time_seconds" ("Time it took to run a merge job"),
+        WORKER_BUSY: Family<UtilizationLabels, Counter::<f64, AtomicU64>> as "merge_worker_utilization_seconds" ("Time spent in free/busy status"),
     }
 }

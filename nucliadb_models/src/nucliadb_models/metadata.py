@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import warnings
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -148,6 +149,14 @@ class TokenSplit(BaseModel):
     end: int
     cancelled_by_user: bool = False
 
+    def __init__(self, **data):
+        warnings.warn(
+            f"{self.__class__.__name__} is deprecated and will be removed in a future version.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(**data)
+
 
 class ParagraphAnnotation(BaseModel):
     classifications: List[UserClassification] = []
@@ -172,15 +181,21 @@ class PageSelections(BaseModel):
     page: int
     visual: List[VisualSelection]
 
+    def __init__(self, **data):
+        warnings.warn(
+            f"{self.__class__.__name__} is deprecated and will be removed in a future version.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(**data)
+
 
 class UserFieldMetadata(BaseModel):
     """
     Field-level metadata set by the user via the rest api
     """
 
-    token: List[TokenSplit] = []
     paragraphs: List[ParagraphAnnotation] = []
-    selections: List[PageSelections] = []
     question_answers: List[QuestionAnswerAnnotation] = []
     field: FieldID
 

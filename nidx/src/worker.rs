@@ -39,11 +39,9 @@ use tracing::*;
 use crate::{
     NidxMetadata, Settings,
     metadata::{Deletion, Index, IndexKind, MergeJob, NewSegment, Segment},
-    metrics::{
-        IndexKindLabels, OperationStatusLabels,
-        worker::{MERGE_COUNTER, PER_INDEX_MERGE_TIME},
-    },
+    metrics::{IndexKindLabels, OperationStatusLabels, worker::*},
     segment_store::{download_segment, pack_and_upload},
+    utilization_tracker::UtilizationTracker,
 };
 
 pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
@@ -55,9 +53,14 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
         None => tempfile::env::temp_dir(),
     };
 
+    let utilization = UtilizationTracker::new(|busy, duration| {
+        WORKER_BUSY.get_or_create(&busy.into()).inc_by(duration.as_secs_f64());
+    });
+
     while !shutdown.is_cancelled() {
         let job = MergeJob::take(&meta.pool).await?;
         if let Some(job) = job {
+            utilization.busy().await;
             let span = info_span!("worker_job", ?job.id);
             info!(job.id, "Running job");
 
@@ -85,6 +88,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
             // Stop keep alives
             keepalive.abort();
         } else {
+            utilization.idle().await;
             debug!("No jobs, waiting for more");
             tokio::select! {
                 _ = tokio::time::sleep(Duration::from_secs(5)) => {},
@@ -179,7 +183,9 @@ pub async fn run_job(
                 .merge(&work_path, index2.config().unwrap(), merge_inputs)
                 .map(|x| x.into()),
             IndexKind::Paragraph => ParagraphIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
-            IndexKind::Relation => RelationIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
+            IndexKind::Relation => RelationIndexer
+                .merge(&work_path, index2.config().unwrap(), merge_inputs)
+                .map(|x| x.into()),
         })
     })
     .await??;

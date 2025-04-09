@@ -37,7 +37,7 @@ use crate::NidxMetadata;
 use crate::errors::{NidxError, NidxResult};
 use crate::metadata::{IndexId, IndexKind, Segment, SegmentId};
 use crate::metrics::IndexKindLabels;
-use crate::metrics::searcher::INDEX_LOAD_TIME;
+use crate::metrics::searcher::*;
 
 use super::sync::{Operations, ShardIndexes, SyncMetadata};
 
@@ -80,6 +80,17 @@ impl<'a> From<&'a IndexSearcher> for &'a RelationSearcher {
         match value {
             IndexSearcher::Relation(v) => v,
             _ => unreachable!(),
+        }
+    }
+}
+
+impl MemoryUsage for IndexSearcher {
+    fn memory_usage(&self) -> usize {
+        match self {
+            IndexSearcher::Paragraph(paragraph_searcher) => paragraph_searcher.space_usage(),
+            IndexSearcher::Relation(relation_searcher) => relation_searcher.space_usage(),
+            IndexSearcher::Text(text_searcher) => text_searcher.space_usage(),
+            IndexSearcher::Vector(vector_searcher) => vector_searcher.space_usage(),
         }
     }
 }
@@ -199,7 +210,7 @@ impl IndexCache {
             IndexKind::Text => IndexSearcher::Text(TextSearcher::open(meta.index.config()?, open_index)?),
             IndexKind::Paragraph => IndexSearcher::Paragraph(ParagraphSearcher::open(open_index)?),
             IndexKind::Vector => IndexSearcher::Vector(VectorSearcher::open(meta.index.config()?, open_index)?),
-            IndexKind::Relation => IndexSearcher::Relation(RelationSearcher::open(open_index)?),
+            IndexKind::Relation => IndexSearcher::Relation(RelationSearcher::open(meta.index.config()?, open_index)?),
         };
         INDEX_LOAD_TIME
             .get_or_create(&IndexKindLabels::new(meta.index.kind))
@@ -243,7 +254,11 @@ enum CachePeekResult<V> {
     NotPresent,
 }
 
-struct ResourceCache<K, V> {
+trait MemoryUsage {
+    fn memory_usage(&self) -> usize;
+}
+
+struct ResourceCache<K, V: MemoryUsage> {
     live: LruCache<K, Arc<V>>,
     eviction: HashMap<K, Weak<V>>,
     capacity: Option<NonZeroUsize>,
@@ -253,6 +268,7 @@ struct ResourceCache<K, V> {
 impl<K, V> ResourceCache<K, V>
 where
     K: Eq + Hash + Clone + std::fmt::Debug,
+    V: MemoryUsage,
 {
     #[allow(dead_code)]
     pub fn new_with_capacity(capacity: NonZeroUsize) -> Self {
@@ -321,7 +337,10 @@ where
     }
 
     pub fn remove(&mut self, k: &K) {
-        self.live.pop(k);
+        if let Some(v) = self.live.pop(k) {
+            INDEX_CACHE_COUNT.dec();
+            INDEX_CACHE_BYTES.dec_by(v.memory_usage() as i64);
+        }
     }
 
     pub fn get_cached(&mut self, id: &K) -> Option<Arc<V>> {
@@ -333,14 +352,22 @@ where
     }
 
     pub fn insert(&mut self, k: &K, v: &Arc<V>) {
-        if self.live.len() >= self.capacity.unwrap_or(NonZeroUsize::MAX).into() {
+        if self.live.len() >= self.capacity.unwrap_or(NonZeroUsize::MAX).into() && !self.live.contains(k) {
             self.evict();
         }
-        self.live.push(k.clone(), Arc::clone(v));
+        INDEX_CACHE_COUNT.inc();
+        INDEX_CACHE_BYTES.inc_by(v.memory_usage() as i64);
+        if let Some((_, out)) = self.live.push(k.clone(), Arc::clone(v)) {
+            // The previous condition ensures this only happens if updating an existing key with a new value
+            INDEX_CACHE_COUNT.dec();
+            INDEX_CACHE_BYTES.dec_by(out.memory_usage() as i64);
+        }
     }
 
     fn evict(&mut self) {
         if let Some((evicted_k, evicted_v)) = self.live.pop_lru() {
+            INDEX_CACHE_COUNT.dec();
+            INDEX_CACHE_BYTES.dec_by(evicted_v.memory_usage() as i64);
             self.eviction.insert(evicted_k, Arc::downgrade(&evicted_v));
         }
     }
@@ -358,6 +385,8 @@ mod tests {
         use anyhow::anyhow;
         use rand::Rng;
         use tokio::task::JoinSet;
+
+        use crate::searcher::index_cache::MemoryUsage;
 
         use super::super::{CacheResult, ResourceCache};
 
@@ -386,6 +415,18 @@ mod tests {
                     panic!("A resource was opened more than once simultaneously");
                 }
                 Ok(Self(k))
+            }
+        }
+
+        impl MemoryUsage for CacheItem {
+            fn memory_usage(&self) -> usize {
+                123
+            }
+        }
+
+        impl MemoryUsage for usize {
+            fn memory_usage(&self) -> usize {
+                8
             }
         }
 

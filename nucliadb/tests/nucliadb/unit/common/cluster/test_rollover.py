@@ -71,8 +71,9 @@ def resources_datamanager(resource_ids):
     mock.get_resource_shard_id.return_value = "1"
 
     res = MagicMock()
-
+    res.uuid = "uuid"
     res.basic.modified.ToDatetime.return_value = datetime.now()
+    res.kb = MagicMock(kbid="kbid")
 
     mock.get_resource = AsyncMock()
     mock.get_resource.return_value = res
@@ -84,6 +85,15 @@ def resources_datamanager(resource_ids):
 
     with patch("nucliadb.common.cluster.rollover.datamanagers.resources", mock):
         yield mock
+
+
+@pytest.fixture(scope="function")
+def get_resource_index_message():
+    with patch(
+        "nucliadb.common.cluster.utils.index_message.get_resource_index_message",
+        return_value=MagicMock(),
+    ):
+        yield
 
 
 @pytest.fixture()
@@ -194,7 +204,12 @@ async def test_create_rollover_index_does_not_recreate(
 
 
 async def test_index_to_rollover_index(
-    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
+    app_context,
+    rollover_datamanager,
+    resources_datamanager,
+    shards,
+    resource_ids,
+    get_resource_index_message,
 ):
     rollover_datamanager.get_kb_rollover_shards.return_value = shards
     rollover_datamanager.get_rollover_state.return_value = RolloverState(
@@ -263,7 +278,12 @@ async def test_cutover_index_missing(app_context, rollover_datamanager):
 
 
 async def test_validate_indexed_data(
-    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
+    app_context,
+    rollover_datamanager,
+    resources_datamanager,
+    shards,
+    resource_ids,
+    get_resource_index_message,
 ):
     rollover_datamanager.get_kb_rollover_shards.return_value = shards
     rollover_datamanager.get_rollover_state.return_value = RolloverState(

@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import re
 import string
 from datetime import datetime
 from typing import Any, Awaitable, Optional
@@ -68,6 +69,10 @@ INDEX_SORTABLE_FIELDS = [
 ]
 
 DEFAULT_GENERIC_SEMANTIC_THRESHOLD = 0.7
+
+# -* is an invalid query in tantivy and it won't return results but if you add some whitespaces
+# between - and *, it will actually trigger a tantivy bug and panic
+INVALID_QUERY = re.compile(r"- +\*")
 
 
 class QueryParser:
@@ -197,6 +202,11 @@ class QueryParser:
                 - incomplete: If the query is incomplete (missing vectors)
                 - autofilters: The autofilters that were applied
         """
+
+        # Filter some queries that panic tantivy, better than returning the 500
+        if INVALID_QUERY.search(self.query):
+            raise InvalidQueryError("query", "Invalid query syntax")
+
         request = nodereader_pb2.SearchRequest()
         request.body = self.query
         request.with_duplicates = self.with_duplicates

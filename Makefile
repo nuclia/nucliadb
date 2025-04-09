@@ -7,15 +7,6 @@ license-check:
 license-fix:
 	docker run -it --rm -v $(shell pwd):/github/workspace ghcr.io/apache/skywalking-eyes/license-eye header fix
 
-fmt-all:
-	@echo "Formatting Rust files"
-	cargo fmt
-
-fmt-check-package:
-	@echo "Formatting Rust files from specific package"
-	cargo fmt -p $(PACKAGE) --check
-
-
 protos: proto-py
 
 proto-py:
@@ -57,13 +48,9 @@ python-code-lint:
 	make -C nucliadb_dataset/ lint
 	make -C nucliadb_models/ lint
 
-
-rust-code-lint: fmt-all
-	cargo clippy --tests
-
-
-test-rust:
-	cargo test --workspace --all-features --no-fail-fast
+rust-code-lint:
+	cargo fmt --all --manifest-path nidx/Cargo.toml
+	cargo clippy --all-features --manifest-path nidx/Cargo.toml
 
 
 venv:  ## Initializes an environment
@@ -71,7 +58,7 @@ venv:  ## Initializes an environment
 	pyenv local nucliadb
 
 install:
-	pdm sync -d
+	uv sync
 
 install__deprecated: ## Install dependencies (on the active environment)
 	pip install --upgrade pip wheel
@@ -85,20 +72,11 @@ install__deprecated: ## Install dependencies (on the active environment)
 	pip install -e ./nucliadb_sdk
 	pip install -e ./nucliadb_dataset
 
-build-node:
-	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node .
-
-build-node-prebuilt:
-	cargo build --release --bin node_reader --bin node_writer
-	mkdir builds || true
-	cp target/release/node_*er builds
-	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
-
 debug-test-nucliadb:
-	RUST_BACKTRACE=1 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG pytest nucliadb/tests -sxv
+	RUST_BACKTRACE=1 pytest nucliadb/tests -sxv
 
 debug-run-nucliadb:
-	RUST_BACKTRACE=1 MAX_RECEIVE_MESSAGE_LENGTH=1024 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG nucliadb --maindb=data/maindb --blob=data/blob --node=data/node --zone=europe-1 --log=DEBUG
+	RUST_BACKTRACE=1 MAX_RECEIVE_MESSAGE_LENGTH=1024 nucliadb --maindb=data/maindb --blob=data/blob --node=data/node --zone=europe-1 --log=DEBUG
 
 debug-run-nucliadb-redis:
 	nucliadb --driver=REDIS --maindb=redis://localhost:55359 --blob=data/blob --node=data/node --zone=europe-1 --log=INFO

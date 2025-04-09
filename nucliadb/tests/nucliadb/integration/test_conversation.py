@@ -93,6 +93,7 @@ async def resource_with_conversation(
     extracted_split_text = {"1": "Split text 1", "2": "Split text 2"}
 
     bm = BrokerMessage()
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
     bm.uuid = rid
     bm.kbid = standalone_knowledgebox
     field = FieldID(field="faq", field_type=FieldType.CONVERSATION)
@@ -130,7 +131,7 @@ async def test_conversations(
     res_resp = ResponseResponse.model_validate(resp.json())
 
     assert res_resp.data.conversations["faq"] == ConversationFieldData(  # type: ignore
-        value=FieldConversation(pages=2, size=200, total=301),
+        value=FieldConversation(pages=2, size=200, total=301, extract_strategy=""),
         extracted=None,
         error=None,
     )

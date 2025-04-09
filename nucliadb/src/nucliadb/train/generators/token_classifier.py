@@ -109,33 +109,6 @@ async def get_field_text(
     ] = {}  # Dict of entity group , with entity and list of positions in field
     split_ners[MAIN] = {}
 
-    basic_data = await orm_resource.get_basic()
-    invalid_tokens_split: dict[str, list[tuple[str, str, int, int]]] = {}
-    # Check user definition of entities
-    if basic_data is not None:
-        for userfieldmetadata in basic_data.fieldmetadata:
-            if (
-                userfieldmetadata.field.field == field
-                and userfieldmetadata.field.field_type == field_type_int
-            ):
-                for token in userfieldmetadata.token:
-                    if token.klass in valid_entity_groups:
-                        if token.cancelled_by_user:
-                            if token.split in (None, ""):
-                                split = MAIN
-                            else:
-                                split = token.split
-                            invalid_tokens_split[split].append(
-                                (token.klass, token.token, token.start, token.end)
-                            )
-                        else:
-                            if token.split in (None, ""):
-                                split = MAIN
-                            else:
-                                split = token.split
-                            split_ners[split].setdefault(token.klass, {}).setdefault(token.token, [])
-                            split_ners[split][token.klass][token.token].append((token.start, token.end))
-
     field_metadata = await field_obj.get_field_metadata()
     # Check computed definition of entities
     if field_metadata is not None:
@@ -188,17 +161,6 @@ async def get_field_text(
                     split_ners.setdefault(split, {}).setdefault(entity_group, {}).setdefault(entity, [])
                     for position in positions.position:
                         split_ners[split][entity_group][entity].append((position.start, position.end))
-
-    for split, invalid_tokens in invalid_tokens_split.items():
-        for token.klass, token.token, token.start, token.end in invalid_tokens:
-            if token.klass in split_ners.get(split, {}):
-                if token.token in split_ners.get(split, {}).get(token.klass, {}):
-                    if (token.start, token.end) in split_ners[split][token.klass][token.token]:
-                        split_ners[split][token.klass][token.token].remove((token.start, token.end))
-                        if len(split_ners[split][token.klass][token.token]) == 0:
-                            del split_ners[split][token.klass][token.token]
-                        if len(split_ners[split][token.klass]) == 0:
-                            del split_ners[split][token.klass]
 
     ordered_positions: dict[str, POSITION_DICT] = {}
     for split, ners in split_ners.items():
