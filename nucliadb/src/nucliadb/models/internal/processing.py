@@ -112,6 +112,7 @@ class PushMessage(BaseModel):
 
 class PushConversation(BaseModel):
     messages: list[PushMessage] = []
+    extract_strategy: Optional[str] = None
     classification_labels: list[ClassificationLabel] = []
 
 
