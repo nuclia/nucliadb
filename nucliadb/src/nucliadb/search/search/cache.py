@@ -25,6 +25,11 @@ from typing import Optional
 
 from lru import LRU
 
+from nucliadb.common.cache import (
+    delete_resource_cache,
+    get_resource_cache,
+    set_resource_cache,
+)
 from nucliadb.common.ids import FieldId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
@@ -37,7 +42,6 @@ from nucliadb_utils.utilities import get_storage
 
 logger = logging.getLogger(__name__)
 
-rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar("rcache", default=None)
 etcache: ContextVar[Optional["ExtractedTextCache"]] = ContextVar("etcache", default=None)
 
 
@@ -62,22 +66,6 @@ def clear_extracted_text_cache() -> None:
         etcache.set(None)
 
 
-def set_resource_cache() -> None:
-    value: dict[str, ResourceORM] = {}
-    rcache.set(value)
-
-
-def get_resource_cache() -> Optional[dict[str, ResourceORM]]:
-    return rcache.get()
-
-
-def clear_resource_cache() -> None:
-    value = rcache.get()
-    if value is not None:
-        value.clear()
-        rcache.set(None)
-
-
 async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
     """
     Will try to get the resource from the cache, if it's not there it will fetch it from the ORM and cache it.
@@ -94,14 +82,14 @@ async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
         RESOURCE_LOCKS[uuid] = asyncio.Lock()
 
     async with RESOURCE_LOCKS[uuid]:
-        if uuid not in resource_cache:
+        if not resource_cache.contains(uuid):
             RESOURCE_CACHE_OPS.inc({"type": "miss"})
             orm_resource = await _orm_get_resource(kbid, uuid)
         else:
             RESOURCE_CACHE_OPS.inc({"type": "hit"})
 
         if orm_resource is not None:
-            resource_cache[uuid] = orm_resource
+            resource_cache.set(uuid, orm_resource)
         else:
             orm_resource = resource_cache.get(uuid)
 
@@ -202,5 +190,5 @@ def request_caches():
     try:
         yield
     finally:
-        clear_resource_cache()
+        delete_resource_cache()
         clear_extracted_text_cache()
