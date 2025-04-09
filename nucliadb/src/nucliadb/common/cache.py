@@ -18,26 +18,44 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
+from abc import ABC, abstractmethod
 from contextvars import ContextVar
+from functools import cached_property
 from typing import Generic, Optional, TypeVar
 
 from lru import LRU
 
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
+from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_telemetry.metrics import Gauge
 
-cached_resources = Gauge("nucliadb_global_cached_resources")
+cached_resources = Gauge("nucliadb_cached_resources")
+cached_extracted_texts = Gauge("nucliadb_cached_extracted_texts")
 
 
 T = TypeVar("T")
 
 
-class Cache(Generic[T]):
+class Cache(Generic[T], ABC):
+    """Low-level bounded cache implementation with access to per-key async locks
+    in case cache users want to lock concurrent access.
+
+    This cache is measured using a mandatory metric all subclasses must define.
+
+    """
+
     def __init__(self, cache_size: int) -> None:
-        self.cache: LRU[str, T] = LRU(cache_size)
+        self.cache: LRU[str, T] = LRU(cache_size, callback=self._evicted_callback)
+        self.locks: dict[str, asyncio.Lock] = {}
 
     def get(self, key: str) -> Optional[T]:
         return self.cache.get(key)
+
+    # Get a lock for a specific key. Locks will be evicted at the same time as
+    # key-value pairs
+    def get_lock(self, key: str) -> asyncio.Lock:
+        return self.locks.setdefault(key, asyncio.Lock())
 
     def set(self, key: str, value: T):
         len_before = len(self.cache)
@@ -46,14 +64,27 @@ class Cache(Generic[T]):
 
         len_after = len(self.cache)
         if len_after - len_before > 0:
-            cached_resources.inc(len_after - len_before)
+            self._cache_size_metric.inc(len_after - len_before)
 
     def contains(self, key: str) -> bool:
         return key in self.cache
 
-    def __del__(self):
-        cached_resources.dec(len(self.cache))
+    def clear(self):
+        self._cache_size_metric.dec(len(self.cache))
         self.cache.clear()
+        self.locks.clear()
+
+    def __del__(self):
+        # we want to clear the cache before deleting the object and set the
+        # metric appropriately
+        self.clear()
+
+    @abstractmethod
+    @cached_property
+    def _cache_size_metric(self) -> Gauge: ...
+
+    def _evicted_callback(self, key: str, value: T):
+        self.locks.pop(key, None)
 
 
 class ResourceCache(Cache[ResourceORM]):
@@ -61,6 +92,28 @@ class ResourceCache(Cache[ResourceORM]):
     # we analyze memory consumption, we can adjust it with more knoweldge
     def __init__(self, cache_size: int = 1024) -> None:
         super().__init__(cache_size)
+
+    @cached_property
+    def _cache_size_metric(self) -> Gauge:
+        return cached_resources
+
+
+class ExtractedTextCache(Cache[ExtractedText]):
+    """
+    Used to cache extracted text from a resource in memory during the process
+    of search results hydration.
+
+    This is needed to avoid fetching the same extracted text multiple times,
+    as matching text blocks are processed in parallel and the extracted text is
+    fetched for each field where the text block is found.
+    """
+
+    def __init__(self, cache_size: int = 1024):
+        super().__init__(cache_size)
+
+    @cached_property
+    def _cache_size_metric(self) -> Gauge:
+        return cached_extracted_texts
 
 
 rcache: ContextVar[Optional[ResourceCache]] = ContextVar("rcache", default=None)
