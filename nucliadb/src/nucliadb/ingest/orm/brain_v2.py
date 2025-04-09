@@ -17,7 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Optional
@@ -26,6 +28,7 @@ from nucliadb.common import ids
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.metrics import brain_observer as observer
 from nucliadb.ingest.orm.utils import compute_paragraph_key
+from nucliadb.ingest.settings import settings
 from nucliadb_models.labels import BASE_LABELS, LABEL_HIDDEN, flatten_resource_labels
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import utils_pb2
@@ -62,6 +65,19 @@ METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
     Metadata.Status.EXPIRED: ResourceProcessingStatus.EXPIRED.name,
 }
 
+_executor = ThreadPoolExecutor(
+    max_workers=settings.brain_executor_max_workers,
+)
+
+
+async def to_executor(func, *args, **kwargs):
+    """
+    It allows blocking tasks (e.g., _generate_vectors) to run without blocking the asyncio event loop.
+    It avoids the overhead of creating new threads or processes for each task by reusing threads in the pool.
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(_executor, func, *args, **kwargs)
+
 
 @dataclass
 class ParagraphClassifications:
@@ -76,7 +92,24 @@ class ResourceBrainV2:
         self.labels: dict[str, set[str]] = deepcopy(BASE_LABELS)
 
     @observer.wrap({"type": "generate_resource_metadata"})
-    def generate_resource_metadata(
+    async def generate_resource_metadata(
+        self,
+        basic: Basic,
+        user_relations: Relations,
+        origin: Optional[Origin],
+        previous_processing_status: Optional[Metadata.Status.ValueType],
+        security: Optional[utils_pb2.Security],
+    ) -> None:
+        await to_executor(
+            self._generate_resource_metadata,
+            basic,
+            user_relations,
+            origin,
+            previous_processing_status,
+            security,
+        )
+
+    def _generate_resource_metadata(
         self,
         basic: Basic,
         user_relations: Relations,
@@ -92,7 +125,28 @@ class ResourceBrainV2:
             self._set_resource_security(security)
 
     @observer.wrap({"type": "generate_texts"})
-    def generate_texts(
+    async def generate_texts(
+        self,
+        field_key: str,
+        extracted_text: ExtractedText,
+        field_computed_metadata: Optional[FieldComputedMetadata],
+        basic_user_metadata: Optional[UserMetadata],
+        field_author: Optional[FieldAuthor],
+        replace_field: bool,
+        skip_index: bool,
+    ) -> None:
+        await to_executor(
+            self._generate_texts,
+            field_key,
+            extracted_text,
+            field_computed_metadata,
+            basic_user_metadata,
+            field_author,
+            replace_field,
+            skip_index,
+        )
+
+    def _generate_texts(
         self,
         field_key: str,
         extracted_text: ExtractedText,
@@ -206,7 +260,28 @@ class ResourceBrainV2:
         self.brain.texts[field_key].labels.extend(flatten_resource_labels(labels))
 
     @observer.wrap({"type": "generate_paragraphs"})
-    def generate_paragraphs(
+    async def generate_paragraphs(
+        self,
+        field_key: str,
+        field_computed_metadata: FieldComputedMetadata,
+        extracted_text: ExtractedText,
+        page_positions: Optional[FilePagePositions],
+        user_field_metadata: Optional[UserFieldMetadata],
+        replace_field: bool,
+        skip_index: Optional[bool],
+    ) -> None:
+        await to_executor(
+            self._generate_paragraphs,
+            field_key,
+            field_computed_metadata,
+            extracted_text,
+            page_positions,
+            user_field_metadata,
+            replace_field,
+            skip_index,
+        )
+
+    def _generate_paragraphs(
         self,
         field_key: str,
         field_computed_metadata: FieldComputedMetadata,
@@ -379,7 +454,22 @@ class ResourceBrainV2:
         return pc
 
     @observer.wrap({"type": "generate_relations"})
-    def generate_relations(
+    async def generate_relations(
+        self,
+        field_key: str,
+        field_computed_metadata: Optional[FieldComputedMetadata],
+        basic_user_metadata: Optional[UserMetadata],
+        replace_field: bool,
+    ) -> None:
+        await to_executor(
+            self._generate_relations,
+            field_key,
+            field_computed_metadata,
+            basic_user_metadata,
+            replace_field,
+        )
+
+    def _generate_relations(
         self,
         field_key: str,
         field_computed_metadata: Optional[FieldComputedMetadata],
@@ -486,7 +576,7 @@ class ResourceBrainV2:
         self.brain.relation_fields_to_delete.append(field_key)
 
     @observer.wrap({"type": "generate_vectors"})
-    def generate_vectors(
+    async def generate_vectors(
         self,
         field_id: str,
         vo: utils_pb2.VectorObject,
@@ -495,6 +585,24 @@ class ResourceBrainV2:
         replace_field: bool = False,
         # cut to specific dimension if specified
         vector_dimension: Optional[int] = None,
+    ) -> None:
+        await to_executor(
+            self._generate_vectors,
+            field_id,
+            vo,
+            vectorset,
+            replace_field,
+            vector_dimension,
+        )
+
+    def _generate_vectors(
+        self,
+        field_id: str,
+        vo: utils_pb2.VectorObject,
+        vectorset: str,
+        replace_field: bool,
+        # cut to specific dimension if specified
+        vector_dimension: Optional[int],
     ):
         fid = ids.FieldId.from_string(f"{self.rid}/{field_id}")
         for subfield, vectors in vo.split_vectors.items():

@@ -85,5 +85,9 @@ class Settings(DriverSettings):
 
     max_concurrent_ingest_processing: int = 5
 
+    brain_executor_max_workers: int = Field(
+        default=10, description="Number of workers for the brain executor"
+    )
+
 
 settings = Settings()
