@@ -21,7 +21,7 @@ import asyncio
 import logging
 from typing import Optional
 
-from nucliadb.common import datamanagers, locking
+from nucliadb.common import locking
 from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.maindb.pg import PGDriver
