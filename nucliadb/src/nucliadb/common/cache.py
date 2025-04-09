@@ -30,6 +30,7 @@ from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_telemetry.metrics import Gauge
 
+# specific metrics per cache type
 cached_resources = Gauge("nucliadb_cached_resources")
 cached_extracted_texts = Gauge("nucliadb_cached_extracted_texts")
 
@@ -116,7 +117,13 @@ class ExtractedTextCache(Cache[ExtractedText]):
         return cached_extracted_texts
 
 
+# Global caches (per asyncio task)
+
 rcache: ContextVar[Optional[ResourceCache]] = ContextVar("rcache", default=None)
+etcache: ContextVar[Optional[ExtractedTextCache]] = ContextVar("etcache", default=None)
+
+
+# Cache management
 
 
 # Get or create a resource cache specific to the current asyncio task
@@ -142,4 +149,20 @@ def delete_resource_cache() -> None:
     cache = rcache.get()
     if cache is not None:
         rcache.set(None)
+        del cache
+
+
+def get_extracted_text_cache() -> Optional[ExtractedTextCache]:
+    return etcache.get()
+
+
+def set_extracted_text_cache() -> None:
+    value = ExtractedTextCache()
+    etcache.set(value)
+
+
+def delete_extracted_text_cache() -> None:
+    cache = etcache.get()
+    if cache is not None:
+        etcache.set(None)
         del cache

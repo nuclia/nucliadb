@@ -27,8 +27,11 @@ from lru import LRU
 
 from nucliadb.common.cache import (
     ExtractedTextCache,
+    delete_extracted_text_cache,
     delete_resource_cache,
+    get_extracted_text_cache,
     get_resource_cache,
+    set_extracted_text_cache,
     set_resource_cache,
 )
 from nucliadb.common.ids import FieldId
@@ -49,22 +52,6 @@ etcache: ContextVar[Optional[ExtractedTextCache]] = ContextVar("etcache", defaul
 RESOURCE_LOCKS: dict[str, asyncio.Lock] = LRU(1000)  # type: ignore
 RESOURCE_CACHE_OPS = metrics.Counter("nucliadb_resource_cache_ops", labels={"type": ""})
 EXTRACTED_CACHE_OPS = metrics.Counter("nucliadb_extracted_text_cache_ops", labels={"type": ""})
-
-
-def set_extracted_text_cache() -> None:
-    value = ExtractedTextCache()
-    etcache.set(value)
-
-
-def get_extracted_text_cache() -> Optional[ExtractedTextCache]:
-    return etcache.get()
-
-
-def clear_extracted_text_cache() -> None:
-    value = etcache.get()
-    if value is not None:
-        value.clear()
-        etcache.set(None)
 
 
 async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
@@ -164,4 +151,4 @@ def request_caches():
         yield
     finally:
         delete_resource_cache()
-        clear_extracted_text_cache()
+        delete_extracted_text_cache()
