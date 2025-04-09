@@ -128,7 +128,6 @@ class ProcessingInfo(BaseModel):
 
 
 class PushPayload(BaseModel):
-    # There are multiple options of payload
     uuid: str
     slug: Optional[str] = None
     kbid: str
