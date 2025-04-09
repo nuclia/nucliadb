@@ -174,9 +174,7 @@ async def run_rollover_in_parallel(
 
 
 async def run_rollovers(context: ExecutionContext) -> None:
-    async with datamanagers.with_ro_transaction() as txn:
-        kbs_to_rollover = [kbid async for kbid, _ in datamanagers.kb.get_kbs(txn)]
-    #    kbs_to_rollover = await context.data_manager.get_kbs_to_rollover()
+    kbs_to_rollover = await context.data_manager.get_kbs_to_rollover()
 
     if len(kbs_to_rollover) == 0:
         return
