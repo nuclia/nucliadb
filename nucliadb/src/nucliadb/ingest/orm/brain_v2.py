@@ -24,6 +24,7 @@ from typing import Optional
 
 from nucliadb.common import ids
 from nucliadb.ingest import logger
+from nucliadb.ingest.orm.metrics import brain_observer as observer
 from nucliadb.ingest.orm.utils import compute_paragraph_key
 from nucliadb_models.labels import BASE_LABELS, LABEL_HIDDEN, flatten_resource_labels
 from nucliadb_models.metadata import ResourceProcessingStatus
@@ -74,7 +75,8 @@ class ResourceBrainV2:
         self.brain: PBBrainResource = PBBrainResource(resource=ResourceID(uuid=rid))
         self.labels: dict[str, set[str]] = deepcopy(BASE_LABELS)
 
-    def generate_resource_indexing_metadata(
+    @observer.wrap({"type": "generate_resource_metadata"})
+    def generate_resource_metadata(
         self,
         basic: Basic,
         user_relations: Relations,
@@ -89,7 +91,8 @@ class ResourceBrainV2:
         if security is not None:
             self._set_resource_security(security)
 
-    def generate_texts_index_message(
+    @observer.wrap({"type": "generate_texts"})
+    def generate_texts(
         self,
         field_key: str,
         extracted_text: ExtractedText,
@@ -112,6 +115,7 @@ class ResourceBrainV2:
             basic_user_metadata,
         )
 
+    @observer.wrap({"type": "apply_field_text"})
     def apply_field_text(
         self,
         field_key: str,
@@ -131,6 +135,7 @@ class ResourceBrainV2:
             full_field_id = ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
             self.brain.texts_to_delete.append(full_field_id)
 
+    @observer.wrap({"type": "apply_field_labels"})
     def apply_field_labels(
         self,
         field_key: str,
@@ -200,7 +205,8 @@ class ResourceBrainV2:
 
         self.brain.texts[field_key].labels.extend(flatten_resource_labels(labels))
 
-    def generate_paragraphs_index_message(
+    @observer.wrap({"type": "generate_paragraphs"})
+    def generate_paragraphs(
         self,
         field_key: str,
         field_computed_metadata: FieldComputedMetadata,
@@ -228,6 +234,7 @@ class ResourceBrainV2:
             skip_paragraphs=skip_index,
         )
 
+    @observer.wrap({"type": "apply_field_paragraphs"})
     def apply_field_paragraphs(
         self,
         field_key: str,
@@ -371,7 +378,8 @@ class ResourceBrainV2:
                     pc.valid.setdefault(paragraph_key, []).append(classif_label)
         return pc
 
-    def generate_relations_index_message(
+    @observer.wrap({"type": "generate_relations"})
+    def generate_relations(
         self,
         field_key: str,
         field_computed_metadata: Optional[FieldComputedMetadata],
@@ -477,7 +485,8 @@ class ResourceBrainV2:
         self.brain.sentences_to_delete.append(full_field_id)
         self.brain.relation_fields_to_delete.append(field_key)
 
-    def generate_vectors_index_message(
+    @observer.wrap({"type": "generate_vectors"})
+    def generate_vectors(
         self,
         field_id: str,
         vo: utils_pb2.VectorObject,
@@ -547,6 +556,7 @@ class ResourceBrainV2:
             full_field_id = ids.FieldId(rid=self.rid, type=fid.type, key=fid.key).full()
             self.brain.vector_prefixes_to_delete[vectorset].items.append(full_field_id)
 
+    @observer.wrap({"type": "apply_field_vector"})
     def _apply_field_vector(
         self,
         field_id: str,
@@ -764,6 +774,7 @@ class ParagraphPages:
         self.positions = positions
         self._materialized = self._materialize_page_numbers(positions)
 
+    @observer.wrap({"type": "materialize_page_numbers"})
     def _materialize_page_numbers(self, positions: FilePagePositions) -> list[int]:
         page_numbers_by_index = []
         for page_number, (page_start, page_end) in positions.items():

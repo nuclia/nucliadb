@@ -26,6 +26,7 @@ from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.brain_v2 import ResourceBrainV2 as ResourceBrain
+from nucliadb.ingest.orm.metrics import index_message_observer as observer
 from nucliadb.ingest.orm.resource import Resource, get_file_page_positions
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.noderesources_pb2 import Resource as IndexMessage
@@ -40,6 +41,7 @@ class IndexMessageBuilder:
         self.resource = resource
         self.brain = ResourceBrain(resource.uuid)
 
+    @observer.wrap({"type": "resource_data"})
     async def _apply_resource_index_data(self, brain: ResourceBrain) -> None:
         # Set the metadata at the resource level
         basic = await self.resource.get_basic()
@@ -48,7 +50,7 @@ class IndexMessageBuilder:
         origin = await self.resource.get_origin()
         security = await self.resource.get_security()
         await asyncio.to_thread(
-            brain.generate_resource_indexing_metadata,
+            brain.generate_resource_metadata,
             basic,
             user_relations,
             origin,
@@ -56,6 +58,7 @@ class IndexMessageBuilder:
             security,
         )
 
+    @observer.wrap({"type": "field_data"})
     async def _apply_field_index_data(
         self,
         brain: ResourceBrain,
@@ -87,7 +90,7 @@ class IndexMessageBuilder:
                 except FieldAuthorNotFound:
                     field_author = None
                 await asyncio.to_thread(
-                    brain.generate_texts_index_message,
+                    brain.generate_texts,
                     self.resource.generate_field_id(fieldid),
                     extracted_text,
                     field_computed_metadata,
@@ -108,7 +111,7 @@ class IndexMessageBuilder:
                     await get_file_page_positions(field) if isinstance(field, File) else None
                 )
                 await asyncio.to_thread(
-                    brain.generate_paragraphs_index_message,
+                    brain.generate_paragraphs,
                     self.resource.generate_field_id(fieldid),
                     field_computed_metadata,
                     extracted_text,
@@ -127,7 +130,7 @@ class IndexMessageBuilder:
                 if vo is not None:
                     dimension = vectorset_config.vectorset_index_config.vector_dimension
                     await asyncio.to_thread(
-                        brain.generate_vectors_index_message,
+                        brain.generate_vectors,
                         self.resource.generate_field_id(fieldid),
                         vo,
                         vectorset=vectorset_config.vectorset_id,
@@ -136,7 +139,7 @@ class IndexMessageBuilder:
                     )
         if relations:
             await asyncio.to_thread(
-                brain.generate_relations_index_message,
+                brain.generate_relations,
                 self.resource.generate_field_id(fieldid),
                 field_computed_metadata,
                 basic.usermetadata,
@@ -151,6 +154,7 @@ class IndexMessageBuilder:
         for field_id in field_ids:
             brain.delete_field(self.resource.generate_field_id(field_id))
 
+    @observer.wrap({"type": "writer_bm"})
     async def for_writer_bm(
         self,
         messages: list[BrokerMessage],
@@ -192,6 +196,7 @@ class IndexMessageBuilder:
             )
         return self.brain.brain
 
+    @observer.wrap({"type": "processor_bm"})
     async def for_processor_bm(
         self,
         messages: list[BrokerMessage],
@@ -223,6 +228,7 @@ class IndexMessageBuilder:
             )
         return self.brain.brain
 
+    @observer.wrap({"type": "full"})
     async def full(self, reindex: bool) -> IndexMessage:
         await self._apply_resource_index_data(self.brain)
         basic = await self.get_basic()

@@ -22,6 +22,17 @@ from nucliadb_telemetry import metrics
 
 processor_observer = metrics.Observer(
     "nucliadb_ingest_processor",
-    labels={"type": "", "source": ""},
+    labels={"type": ""},
     error_mappings={"kb_conflict": KnowledgeBoxConflict},
+)
+
+
+index_message_observer = metrics.Observer(
+    "index_message_builder",
+    labels={"type": ""},
+)
+
+brain_observer = metrics.Observer(
+    "brain",
+    labels={"type": ""},
 )
