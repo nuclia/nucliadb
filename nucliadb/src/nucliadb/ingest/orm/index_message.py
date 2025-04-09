@@ -19,7 +19,6 @@
 #
 
 
-import contextlib
 from typing import Optional
 
 from nucliadb.common import datamanagers
@@ -397,31 +396,14 @@ async def get_resource_index_message(
     """
     Get the full index message for a resource.
     """
-    with timeit():
-        if (
-            has_feature(
-                const.Features.INDEX_MESSAGE_GENERATION_V2,
-                context={
-                    "kbid": resource.kb.kbid,
-                },
-            )
-            and False
-        ):
-            im_builder = IndexMessageBuilder(resource)
-            return await im_builder.full(reindex=reindex)
-        else:
-            # TODO: remove this code when we remove the old index message generation
-            return (await resource.generate_index_message(reindex=reindex)).brain
-
-
-@contextlib.contextmanager
-def timeit():
-    """
-    Context manager to time the execution of a block of code.
-    """
-    import time
-
-    start = time.time()
-    yield
-    end = time.time()
-    print(f"Execution time: {end - start:.2f} seconds")
+    if has_feature(
+        const.Features.INDEX_MESSAGE_GENERATION_V2,
+        context={
+            "kbid": resource.kb.kbid,
+        },
+    ):
+        im_builder = IndexMessageBuilder(resource)
+        return await im_builder.full(reindex=reindex)
+    else:
+        # TODO: remove this code when we remove the old index message generation
+        return (await resource.generate_index_message(reindex=reindex)).brain
