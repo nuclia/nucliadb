@@ -28,7 +28,6 @@ from nucliadb.common.cluster.manager import (
     StandaloneKBShardManager,
 )
 from nucliadb.common.cluster.settings import settings
-from nucliadb.common.context import ApplicationContext
 from nucliadb.ingest.orm import index_message
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import nodereader_pb2, writer_pb2
