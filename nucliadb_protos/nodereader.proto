@@ -292,6 +292,8 @@ message GraphSearchResponse {
         uint32 relation = 2;
         uint32 destination = 3;
         optional utils.RelationMetadata metadata = 4;
+        optional string resource_field_id = 5;
+        repeated string facets = 6;
     }
 
     repeated utils.RelationNode nodes = 1;

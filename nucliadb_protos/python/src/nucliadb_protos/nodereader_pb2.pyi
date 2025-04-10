@@ -1006,11 +1006,16 @@ class GraphSearchResponse(google.protobuf.message.Message):
         RELATION_FIELD_NUMBER: builtins.int
         DESTINATION_FIELD_NUMBER: builtins.int
         METADATA_FIELD_NUMBER: builtins.int
+        RESOURCE_FIELD_ID_FIELD_NUMBER: builtins.int
+        FACETS_FIELD_NUMBER: builtins.int
         source: builtins.int
         relation: builtins.int
         destination: builtins.int
+        resource_field_id: builtins.str
         @property
         def metadata(self) -> nucliadb_protos.utils_pb2.RelationMetadata: ...
+        @property
+        def facets(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
         def __init__(
             self,
             *,
@@ -1018,10 +1023,15 @@ class GraphSearchResponse(google.protobuf.message.Message):
             relation: builtins.int = ...,
             destination: builtins.int = ...,
             metadata: nucliadb_protos.utils_pb2.RelationMetadata | None = ...,
+            resource_field_id: builtins.str | None = ...,
+            facets: collections.abc.Iterable[builtins.str] | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing.Literal["_metadata", b"_metadata", "metadata", b"metadata"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["_metadata", b"_metadata", "destination", b"destination", "metadata", b"metadata", "relation", b"relation", "source", b"source"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["_metadata", b"_metadata", "_resource_field_id", b"_resource_field_id", "metadata", b"metadata", "resource_field_id", b"resource_field_id"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["_metadata", b"_metadata", "_resource_field_id", b"_resource_field_id", "destination", b"destination", "facets", b"facets", "metadata", b"metadata", "relation", b"relation", "resource_field_id", b"resource_field_id", "source", b"source"]) -> None: ...
+        @typing.overload
         def WhichOneof(self, oneof_group: typing.Literal["_metadata", b"_metadata"]) -> typing.Literal["metadata"] | None: ...
+        @typing.overload
+        def WhichOneof(self, oneof_group: typing.Literal["_resource_field_id", b"_resource_field_id"]) -> typing.Literal["resource_field_id"] | None: ...
 
     NODES_FIELD_NUMBER: builtins.int
     RELATIONS_FIELD_NUMBER: builtins.int
