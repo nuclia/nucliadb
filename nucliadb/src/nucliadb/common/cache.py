@@ -91,7 +91,7 @@ class Cache(Generic[T], ABC):
 class ResourceCache(Cache[ResourceORM]):
     # This cache size is an arbitrary number, once we have a metric in place and
     # we analyze memory consumption, we can adjust it with more knoweldge
-    def __init__(self, cache_size: int = 1024) -> None:
+    def __init__(self, cache_size: int = 128) -> None:
         super().__init__(cache_size)
 
     @cached_property
@@ -109,7 +109,7 @@ class ExtractedTextCache(Cache[ExtractedText]):
     fetched for each field where the text block is found.
     """
 
-    def __init__(self, cache_size: int = 1024):
+    def __init__(self, cache_size: int = 128):
         super().__init__(cache_size)
 
     @cached_property
