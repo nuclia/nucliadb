@@ -1266,6 +1266,7 @@ class SearchRequest(google.protobuf.message.Message):
     ONLY_FACETED_FIELD_NUMBER: builtins.int
     ADVANCED_QUERY_FIELD_NUMBER: builtins.int
     RELATION_SUBGRAPH_FIELD_NUMBER: builtins.int
+    GRAPH_REQUEST_FIELD_NUMBER: builtins.int
     MIN_SCORE_SEMANTIC_FIELD_NUMBER: builtins.int
     MIN_SCORE_BM25_FIELD_NUMBER: builtins.int
     SECURITY_FIELD_NUMBER: builtins.int
@@ -1297,6 +1298,8 @@ class SearchRequest(google.protobuf.message.Message):
     @property
     def relation_subgraph(self) -> global___EntitiesSubgraphRequest: ...
     @property
+    def graph_request(self) -> global___GraphSearchRequest: ...
+    @property
     def security(self) -> nucliadb_protos.utils_pb2.Security: ...
     @property
     def field_filter(self) -> global___FilterExpression: ...
@@ -1319,6 +1322,7 @@ class SearchRequest(google.protobuf.message.Message):
         only_faceted: builtins.bool = ...,
         advanced_query: builtins.str | None = ...,
         relation_subgraph: global___EntitiesSubgraphRequest | None = ...,
+        graph_request: global___GraphSearchRequest | None = ...,
         min_score_semantic: builtins.float = ...,
         min_score_bm25: builtins.float = ...,
         security: nucliadb_protos.utils_pb2.Security | None = ...,
@@ -1326,8 +1330,8 @@ class SearchRequest(google.protobuf.message.Message):
         paragraph_filter: global___FilterExpression | None = ...,
         filter_operator: global___FilterOperator.ValueType = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "advanced_query", b"advanced_query", "faceted", b"faceted", "field_filter", b"field_filter", "order", b"order", "paragraph_filter", b"paragraph_filter", "relation_subgraph", b"relation_subgraph", "security", b"security"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "field_filter", b"field_filter", "filter_operator", b"filter_operator", "min_score_bm25", b"min_score_bm25", "min_score_semantic", b"min_score_semantic", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "paragraph_filter", b"paragraph_filter", "relation_subgraph", b"relation_subgraph", "result_per_page", b"result_per_page", "security", b"security", "shard", b"shard", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "advanced_query", b"advanced_query", "faceted", b"faceted", "field_filter", b"field_filter", "graph_request", b"graph_request", "order", b"order", "paragraph_filter", b"paragraph_filter", "relation_subgraph", b"relation_subgraph", "security", b"security"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "field_filter", b"field_filter", "filter_operator", b"filter_operator", "graph_request", b"graph_request", "min_score_bm25", b"min_score_bm25", "min_score_semantic", b"min_score_semantic", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "paragraph_filter", b"paragraph_filter", "relation_subgraph", b"relation_subgraph", "result_per_page", b"result_per_page", "security", b"security", "shard", b"shard", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_advanced_query", b"_advanced_query"]) -> typing.Literal["advanced_query"] | None: ...
     @typing.overload

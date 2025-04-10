@@ -390,7 +390,8 @@ message SearchRequest {
 
     optional string advanced_query = 18;
 
-    EntitiesSubgraphRequest relation_subgraph = 21;
+    EntitiesSubgraphRequest relation_subgraph = 21 [deprecated = true];
+    GraphSearchRequest graph_request = 29;
 
     float min_score_semantic = 23;
     float min_score_bm25 = 25;
