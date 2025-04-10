@@ -122,11 +122,11 @@ def test_extracted_text_cache():
     assert len(etcache.locks) == 1
 
     etcache.set("foo", "bar")
-    assert len(etcache.values) == 1
+    assert len(etcache.cache) == 1
 
     assert etcache.get("foo") == "bar"
 
     etcache.clear()
 
-    assert len(etcache.values) == 0
+    assert len(etcache.cache) == 0
     assert len(etcache.locks) == 0
