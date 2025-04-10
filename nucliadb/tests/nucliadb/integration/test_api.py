@@ -17,7 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import base64
+import hashlib
 import json
 from typing import Optional, cast
 from unittest.mock import AsyncMock, patch
@@ -1713,3 +1715,35 @@ async def test_deletions_on_text_index(
     counters = await kb_counters(kbid)
     assert counters.resources == 0
     assert counters.fields == 0
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_md5_to_rid_collision(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+
+    async def kb_upload_file():
+        file_content = b"file content"
+        md5 = hashlib.md5(file_content).hexdigest()
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/upload",
+            content=file_content,
+            headers={
+                "x-filename": "my_file.txt",
+                "x-language": "en",
+                "x-md5": md5,
+            },
+        )
+        assert resp.status_code in (201, 409), resp.text
+        return resp.status_code
+
+    # Upload the same file 5 times concurrently
+    tasks = [kb_upload_file() for _ in range(5)]
+    results = await asyncio.gather(*tasks)
+
+    # Check that the file was uploaded only once
+    assert results.count(201) == 1
+    assert results.count(409) == 4
