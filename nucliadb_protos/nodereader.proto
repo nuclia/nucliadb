@@ -452,6 +452,7 @@ message SearchResponse {
     ParagraphSearchResponse paragraph = 2;
     VectorSearchResponse vector = 3;
     RelationSearchResponse relation = 4;
+    GraphSearchResponse graph = 5;
 }
 
 message IdCollection {

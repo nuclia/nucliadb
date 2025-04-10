@@ -212,7 +212,7 @@ impl RelationSearcher {
         self.reader.relation_search(request)
     }
 
-    #[instrument(name = "relation::graph_searcher", skip_all)]
+    #[instrument(name = "relation::graph_search", skip_all)]
     pub fn graph_search(
         &self,
         request: &GraphSearchRequest,
