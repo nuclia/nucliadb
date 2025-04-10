@@ -223,7 +223,7 @@ pub async fn graph_search(
     let results = tokio::task::spawn_blocking(move || {
         current.in_scope(|| {
             let searcher: &RelationSearcher = relation_searcher.as_ref().into();
-            searcher.graph_search(&graph_request, prefilter)
+            searcher.graph_search(&graph_request, &prefilter)
         })
     })
     .await??;

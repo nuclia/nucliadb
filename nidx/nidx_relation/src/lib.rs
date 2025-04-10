@@ -216,9 +216,9 @@ impl RelationSearcher {
     pub fn graph_search(
         &self,
         request: &GraphSearchRequest,
-        prefilter: PrefilterResult,
+        prefilter: &PrefilterResult,
     ) -> anyhow::Result<GraphSearchResponse> {
-        self.reader.graph_search(request, &prefilter)
+        self.reader.graph_search(request, prefilter)
     }
 
     #[instrument(name = "relation::suggest", skip_all)]
@@ -259,7 +259,7 @@ impl RelationSearcher {
             }),
             ..Default::default()
         };
-        let response = self.graph_search(&request, PrefilterResult::All)?;
+        let response = self.graph_search(&request, &PrefilterResult::All)?;
         Ok(response.nodes)
     }
 
