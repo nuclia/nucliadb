@@ -390,9 +390,6 @@ message SearchRequest {
 
     optional string advanced_query = 18;
 
-    EntitiesSubgraphRequest relation_subgraph = 21 [deprecated = true];
-    GraphSearchRequest graph_request = 29;
-
     float min_score_semantic = 23;
     float min_score_bm25 = 25;
 
@@ -401,7 +398,18 @@ message SearchRequest {
     optional FilterExpression field_filter = 26;
     optional FilterExpression paragraph_filter = 27;
     FilterOperator filter_operator = 28;
+
+    EntitiesSubgraphRequest relation_subgraph = 21 [deprecated = true];
+
+    // Reduced graph search for specific use case of text block search. It only
+    // supports path search (as it's the only one that can return paragraph_ids)
+    // and filters are inherited from the main request
+    message GraphSearch {
+        GraphQuery query = 1;
+    }
+    GraphSearch graph_search = 29;
 }
+
 
 enum SuggestFeatures {
     ENTITIES = 0;
