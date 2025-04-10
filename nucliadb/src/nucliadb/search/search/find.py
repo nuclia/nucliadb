@@ -144,6 +144,7 @@ async def _index_node_retrieval(
             pb_query,
             search_time,
             len(search_results.resources),
+            retrieval_rephrased_question=rephrased_query,
         )
 
     if item.debug:

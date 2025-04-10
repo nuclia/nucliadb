@@ -310,6 +310,7 @@ class AuditRequest(google.protobuf.message.Message):
     FEEDBACK_FIELD_NUMBER: builtins.int
     USER_REQUEST_FIELD_NUMBER: builtins.int
     PROCESSING_ID_FIELD_NUMBER: builtins.int
+    RETRIEVAL_REPHRASED_QUESTION_FIELD_NUMBER: builtins.int
     type: global___AuditRequest.AuditType.ValueType
     kbid: builtins.str
     userid: builtins.str
@@ -328,6 +329,7 @@ class AuditRequest(google.protobuf.message.Message):
     rephrase_time: builtins.float
     user_request: builtins.str
     processing_id: builtins.str
+    retrieval_rephrased_question: builtins.str
     @property
     def time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
@@ -373,9 +375,10 @@ class AuditRequest(google.protobuf.message.Message):
         feedback: global___FeedbackAudit | None = ...,
         user_request: builtins.str | None = ...,
         processing_id: builtins.str | None = ...,
+        retrieval_rephrased_question: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_generative_answer_first_chunk_time", b"_generative_answer_first_chunk_time", "_generative_answer_time", b"_generative_answer_time", "_processing_id", b"_processing_id", "_rephrase_time", b"_rephrase_time", "_retrieval_time", b"_retrieval_time", "_user_request", b"_user_request", "chat", b"chat", "feedback", b"feedback", "generative_answer_first_chunk_time", b"generative_answer_first_chunk_time", "generative_answer_time", b"generative_answer_time", "kb_counter", b"kb_counter", "processing_id", b"processing_id", "rephrase_time", b"rephrase_time", "retrieval_time", b"retrieval_time", "search", b"search", "time", b"time", "user_request", b"user_request"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_generative_answer_first_chunk_time", b"_generative_answer_first_chunk_time", "_generative_answer_time", b"_generative_answer_time", "_processing_id", b"_processing_id", "_rephrase_time", b"_rephrase_time", "_retrieval_time", b"_retrieval_time", "_user_request", b"_user_request", "chat", b"chat", "client_type", b"client_type", "feedback", b"feedback", "field_metadata", b"field_metadata", "fields", b"fields", "fields_audit", b"fields_audit", "generative_answer_first_chunk_time", b"generative_answer_first_chunk_time", "generative_answer_time", b"generative_answer_time", "kb_counter", b"kb_counter", "kbid", b"kbid", "origin", b"origin", "processing_id", b"processing_id", "rephrase_time", b"rephrase_time", "request_time", b"request_time", "resources", b"resources", "retrieval_time", b"retrieval_time", "rid", b"rid", "search", b"search", "success", b"success", "task", b"task", "time", b"time", "timeit", b"timeit", "trace_id", b"trace_id", "type", b"type", "user_request", b"user_request", "userid", b"userid"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_generative_answer_first_chunk_time", b"_generative_answer_first_chunk_time", "_generative_answer_time", b"_generative_answer_time", "_processing_id", b"_processing_id", "_rephrase_time", b"_rephrase_time", "_retrieval_rephrased_question", b"_retrieval_rephrased_question", "_retrieval_time", b"_retrieval_time", "_user_request", b"_user_request", "chat", b"chat", "feedback", b"feedback", "generative_answer_first_chunk_time", b"generative_answer_first_chunk_time", "generative_answer_time", b"generative_answer_time", "kb_counter", b"kb_counter", "processing_id", b"processing_id", "rephrase_time", b"rephrase_time", "retrieval_rephrased_question", b"retrieval_rephrased_question", "retrieval_time", b"retrieval_time", "search", b"search", "time", b"time", "user_request", b"user_request"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_generative_answer_first_chunk_time", b"_generative_answer_first_chunk_time", "_generative_answer_time", b"_generative_answer_time", "_processing_id", b"_processing_id", "_rephrase_time", b"_rephrase_time", "_retrieval_rephrased_question", b"_retrieval_rephrased_question", "_retrieval_time", b"_retrieval_time", "_user_request", b"_user_request", "chat", b"chat", "client_type", b"client_type", "feedback", b"feedback", "field_metadata", b"field_metadata", "fields", b"fields", "fields_audit", b"fields_audit", "generative_answer_first_chunk_time", b"generative_answer_first_chunk_time", "generative_answer_time", b"generative_answer_time", "kb_counter", b"kb_counter", "kbid", b"kbid", "origin", b"origin", "processing_id", b"processing_id", "rephrase_time", b"rephrase_time", "request_time", b"request_time", "resources", b"resources", "retrieval_rephrased_question", b"retrieval_rephrased_question", "retrieval_time", b"retrieval_time", "rid", b"rid", "search", b"search", "success", b"success", "task", b"task", "time", b"time", "timeit", b"timeit", "trace_id", b"trace_id", "type", b"type", "user_request", b"user_request", "userid", b"userid"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_generative_answer_first_chunk_time", b"_generative_answer_first_chunk_time"]) -> typing.Literal["generative_answer_first_chunk_time"] | None: ...
     @typing.overload
@@ -384,6 +387,8 @@ class AuditRequest(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing.Literal["_processing_id", b"_processing_id"]) -> typing.Literal["processing_id"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_rephrase_time", b"_rephrase_time"]) -> typing.Literal["rephrase_time"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_retrieval_rephrased_question", b"_retrieval_rephrased_question"]) -> typing.Literal["retrieval_rephrased_question"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_retrieval_time", b"_retrieval_time"]) -> typing.Literal["retrieval_time"] | None: ...
     @typing.overload

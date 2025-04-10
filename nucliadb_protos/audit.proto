@@ -118,4 +118,5 @@ message AuditRequest {
   FeedbackAudit feedback = 26;
   optional string user_request = 27;
   optional string processing_id = 28;
+  optional string retrieval_rephrased_question = 29;
 }
