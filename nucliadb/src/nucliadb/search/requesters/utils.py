@@ -209,9 +209,7 @@ def debug_nodes_info(nodes: list[tuple[AbstractIndexNode, str]]) -> list[dict[st
         info = {
             "id": node.id,
             "shard_id": shard_id,
-            "address": node.address,
+            "address": "nidx",
         }
-        if node.primary_id:
-            info["primary_id"] = node.primary_id
         details.append(info)
     return details

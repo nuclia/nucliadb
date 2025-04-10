@@ -54,7 +54,6 @@ class UnexpectedRolloverError(Exception):
 async def create_rollover_index(
     app_context: ApplicationContext,
     kbid: str,
-    drain_nodes: Optional[list[str]] = None,
     external: Optional[ExternalIndexManager] = None,
 ) -> None:
     """
@@ -63,7 +62,7 @@ async def create_rollover_index(
     it is used to store the rollover state during the rollover. However, the actual indexing will be done
     by the external index provider.
     """
-    await create_rollover_shards(app_context, kbid, drain_nodes=drain_nodes)
+    await create_rollover_shards(app_context, kbid)
     if external is not None:
         if external.supports_rollover:
             await create_rollover_external_index(kbid, external)
@@ -100,11 +99,11 @@ async def create_rollover_external_index(kbid: str, external: ExternalIndexManag
 
 
 async def create_rollover_shards(
-    app_context: ApplicationContext, kbid: str, drain_nodes: Optional[list[str]] = None
+    app_context: ApplicationContext,
+    kbid: str,
 ) -> writer_pb2.Shards:
     """
     Creates new index node shards for a rollover operation.
-    If drain_nodes is provided, no replicas will be created on those nodes.
     """
 
     logger.info("Creating rollover shards", extra={"kbid": kbid})
@@ -583,7 +582,8 @@ async def clean_rollover_status(app_context: ApplicationContext, kbid: str) -> N
 
 
 async def rollover_kb_index(
-    app_context: ApplicationContext, kbid: str, drain_nodes: Optional[list[str]] = None
+    app_context: ApplicationContext,
+    kbid: str,
 ) -> None:
     """
     Rollover a KB index is the process of creating new shard replicas for every
@@ -591,9 +591,6 @@ async def rollover_kb_index(
     the KB is configured to use them.
 
     Once all the data is in the new indexes, cut over to the replicated index delete the old one.
-
-    If drain_nodes is provided, no index node replicas will be created on those nodes. This is useful
-    for when we want to remove a set of nodes from the index node cluster.
 
     This is a very expensive operation and should be done with care.
 
@@ -612,7 +609,7 @@ async def rollover_kb_index(
     logger.info("Rolling over KB index", extra=extra)
 
     async with locking.distributed_lock(locking.KB_SHARDS_LOCK.format(kbid=kbid)):
-        await create_rollover_index(app_context, kbid, drain_nodes=drain_nodes, external=external)
+        await create_rollover_index(app_context, kbid, external=external)
         await schedule_resource_indexing(app_context, kbid)
         await index_to_rollover_index(app_context, kbid, external=external)
         await cutover_index(app_context, kbid, external=external)

@@ -24,7 +24,6 @@ from nucliadb.backups import tasks as backup_tasks
 from nucliadb.backups import utils as backup_utils
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
-from nucliadb.common.cluster.manager import get_nidx_fake_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
@@ -59,8 +58,6 @@ from nucliadb_protos.writer_pb2 import (
     IndexStatus,
     ListEntitiesGroupsRequest,
     ListEntitiesGroupsResponse,
-    ListMembersRequest,
-    ListMembersResponse,
     NewEntitiesGroupRequest,
     NewEntitiesGroupResponse,
     OpStatusWriter,
@@ -406,25 +403,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     response.msgid[partition] = seq_id
 
             return response
-
-    async def ListMembers(  # type: ignore
-        self, request: ListMembersRequest, context=None
-    ) -> ListMembersResponse:
-        response = ListMembersResponse()
-        response.members.extend(
-            [
-                writer_pb2.Member(
-                    id=n.id,
-                    listen_address=n.address,
-                    is_self=False,
-                    dummy=n.dummy,
-                    shard_count=n.shard_count,
-                    primary_id=n.primary_id or "",
-                )
-                for n in [get_nidx_fake_node()]
-            ]
-        )
-        return response
 
     async def Index(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         async with self.driver.transaction() as txn:

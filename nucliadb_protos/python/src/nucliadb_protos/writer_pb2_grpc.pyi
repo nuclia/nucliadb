@@ -250,11 +250,6 @@ class WriterStub:
         nucliadb_protos.writer_pb2.WriterStatusResponse,
     ]
 
-    ListMembers: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.ListMembersRequest,
-        nucliadb_protos.writer_pb2.ListMembersResponse,
-    ]
-
     Index: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.IndexResource,
         nucliadb_protos.writer_pb2.IndexStatus,
@@ -340,11 +335,6 @@ class WriterAsyncStub:
     Status: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.WriterStatusRequest,
         nucliadb_protos.writer_pb2.WriterStatusResponse,
-    ]
-
-    ListMembers: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.ListMembersRequest,
-        nucliadb_protos.writer_pb2.ListMembersResponse,
     ]
 
     Index: grpc.aio.UnaryUnaryMultiCallable[
@@ -457,13 +447,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.writer_pb2.WriterStatusRequest,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.writer_pb2.WriterStatusResponse, collections.abc.Awaitable[nucliadb_protos.writer_pb2.WriterStatusResponse]]: ...
-
-    @abc.abstractmethod
-    def ListMembers(
-        self,
-        request: nucliadb_protos.writer_pb2.ListMembersRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.ListMembersResponse, collections.abc.Awaitable[nucliadb_protos.writer_pb2.ListMembersResponse]]: ...
 
     @abc.abstractmethod
     def Index(

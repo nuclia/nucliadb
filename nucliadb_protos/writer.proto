@@ -348,48 +348,6 @@ message Notification {
 }
 
 
-// The member information.
-message Member {
-    enum Type {
-        IO = 0;
-        SEARCH = 1;
-        INGEST = 2;
-        TRAIN = 3;
-        UNKNOWN = 4;
-    }
-    /// Member ID.　A string of the UUID.
-    string id = 1;
-
-    /// Cluster listen address. string of IP and port number.
-    /// E.g. 127.0.0.1:5000
-    string listen_address = 2;
-
-    /// If true, it means self.
-    bool is_self = 3 [deprecated = true];
-
-    /// Io, Ingest, Search, Train.
-    Type type = 4 [deprecated = true];
-
-    /// Dummy Member
-    bool dummy = 5 [deprecated = true];
-
-    /// The load score of the member.
-    float load_score = 6 [deprecated = true];
-
-    /// The number of shards in the node.
-    uint32 shard_count = 7;
-
-    /// The id of the primary node (if it is a secondary node).
-    string primary_id = 8;
-}
-
-message ListMembersRequest {
-}
-
-message ListMembersResponse {
-  repeated Member members = 1;
-}
-
 message ShardReplica {
     noderesources.ShardCreated shard = 1;
     string node = 2;
@@ -478,8 +436,6 @@ service Writer {
     rpc DelEntities(DelEntitiesRequest) returns (OpStatusWriter) {}
 
     rpc Status(WriterStatusRequest) returns (WriterStatusResponse) {}
-
-    rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
 
     rpc Index(IndexResource) returns (IndexStatus) {}
     rpc ReIndex(IndexResource) returns (IndexStatus) {}

@@ -279,19 +279,8 @@ class FakeNode(AbstractIndexNode):
     def writer(self):
         return self.client
 
-    def is_read_replica(_):
-        return False
-
     @property
     def id(self):
-        return "nidx"
-
-    @property
-    def address(self):
-        return "nidx"
-
-    @property
-    def primary_id(self):
         return "nidx"
 
 
