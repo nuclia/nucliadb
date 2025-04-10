@@ -270,6 +270,7 @@ class Predict(google.protobuf.message.Message):
     OUTPUT_FIELD_NUMBER: builtins.int
     IMAGE_FIELD_NUMBER: builtins.int
     NUM_PREDICTS_FIELD_NUMBER: builtins.int
+    CUSTOMER_KEY_FIELD_NUMBER: builtins.int
     client: global___ClientType.ValueType
     type: global___PredictType.ValueType
     model: builtins.str
@@ -277,6 +278,7 @@ class Predict(google.protobuf.message.Message):
     output: builtins.int
     image: builtins.int
     num_predicts: builtins.int
+    customer_key: builtins.bool
     def __init__(
         self,
         *,
@@ -287,8 +289,9 @@ class Predict(google.protobuf.message.Message):
         output: builtins.int = ...,
         image: builtins.int = ...,
         num_predicts: builtins.int = ...,
+        customer_key: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["client", b"client", "image", b"image", "input", b"input", "model", b"model", "num_predicts", b"num_predicts", "output", b"output", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["client", b"client", "customer_key", b"customer_key", "image", b"image", "input", b"input", "model", b"model", "num_predicts", b"num_predicts", "output", b"output", "type", b"type"]) -> None: ...
 
 global___Predict = Predict
 
