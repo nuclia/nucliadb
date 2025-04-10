@@ -126,7 +126,10 @@ etcache: ContextVar[Optional[ExtractedTextCache]] = ContextVar("etcache", defaul
 # Cache management
 
 
-# Get or create a resource cache specific to the current asyncio task
+# Get or create a resource cache specific to the current asyncio task (and all
+# its subtasks). If you spawn subtasks that use this cache, make sure to create
+# it in the parent task, otherwise each subtask will have its own independent
+# cache instance
 def get_or_create_resource_cache(clear: bool = False) -> ResourceCache:
     cache: Optional[ResourceCache] = rcache.get()
     if cache is None or clear:
