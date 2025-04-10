@@ -19,11 +19,9 @@
 
 import contextlib
 import logging
-from contextvars import ContextVar
 from typing import Optional
 
 from nucliadb.common.cache import (
-    ExtractedTextCache,
     delete_extracted_text_cache,
     delete_resource_cache,
     get_extracted_text_cache,
@@ -42,8 +40,6 @@ from nucliadb_telemetry import metrics
 from nucliadb_utils.utilities import get_storage
 
 logger = logging.getLogger(__name__)
-
-etcache: ContextVar[Optional[ExtractedTextCache]] = ContextVar("etcache", default=None)
 
 
 RESOURCE_CACHE_OPS = metrics.Counter("nucliadb_resource_cache_ops", labels={"type": ""})
