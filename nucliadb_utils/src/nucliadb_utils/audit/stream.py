@@ -343,6 +343,7 @@ class StreamAuditStorage(AuditStorage):
         search: SearchRequest,
         timeit: float,
         resources: int,
+        retrieval_rephrased_question: Optional[str] = None,
     ):
         context = get_request_context()
         if context is None:
@@ -361,7 +362,8 @@ class StreamAuditStorage(AuditStorage):
             auditrequest.type = AuditRequest.CHAT
         else:
             auditrequest.type = AuditRequest.SEARCH
-
+        if retrieval_rephrased_question is not None:
+            auditrequest.retrieval_rephrased_question = retrieval_rephrased_question
         trace_id = get_trace_id()
         self.kb_usage_utility.send_kb_usage(
             service=Service.NUCLIA_DB,
@@ -390,6 +392,7 @@ class StreamAuditStorage(AuditStorage):
         origin: str,
         question: str,
         rephrased_question: Optional[str],
+        retrieval_rephrased_question: Optional[str],
         chat_context: List[ChatContext],
         retrieved_context: List[RetrievedContext],
         answer: Optional[str],
@@ -416,6 +419,8 @@ class StreamAuditStorage(AuditStorage):
             auditrequest.generative_answer_time = generative_answer_time
         if generative_answer_first_chunk_time is not None:
             auditrequest.generative_answer_first_chunk_time = generative_answer_first_chunk_time
+        if retrieval_rephrased_question is not None:
+            auditrequest.retrieval_rephrased_question = retrieval_rephrased_question
         auditrequest.type = AuditRequest.CHAT
         auditrequest.chat.question = question
         auditrequest.chat.chat_context.extend(chat_context)
