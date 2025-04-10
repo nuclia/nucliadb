@@ -315,6 +315,7 @@ def maybe_audit_chat(
     rephrase_time: Optional[float],
     user_query: str,
     rephrased_query: Optional[str],
+    retrieval_rephrase_query: Optional[str],
     text_answer: bytes,
     status_code: AnswerStatusCode,
     chat_history: list[ChatContextMessage],
@@ -349,6 +350,7 @@ def maybe_audit_chat(
         generative_answer_first_chunk_time=generative_answer_first_chunk_time,
         rephrase_time=rephrase_time,
         rephrased_question=rephrased_query,
+        retrieval_rephrased_question=retrieval_rephrase_query,
         chat_context=chat_history_context,
         retrieved_context=chat_retrieved_context,
         answer=audit_answer,
@@ -380,6 +382,7 @@ class ChatAuditor:
         origin: str,
         user_query: str,
         rephrased_query: Optional[str],
+        retrieval_rephrased_query: Optional[str],
         chat_history: list[ChatContextMessage],
         learning_id: Optional[str],
         query_context: PromptContext,
@@ -392,6 +395,7 @@ class ChatAuditor:
         self.origin = origin
         self.user_query = user_query
         self.rephrased_query = rephrased_query
+        self.retrieval_rephrased_query = retrieval_rephrased_query
         self.chat_history = chat_history
         self.learning_id = learning_id
         self.query_context = query_context
@@ -413,6 +417,7 @@ class ChatAuditor:
             origin=self.origin,
             user_query=self.user_query,
             rephrased_query=self.rephrased_query,
+            retrieval_rephrase_query=self.retrieval_rephrased_query,
             generative_answer_time=generative_answer_time,
             generative_answer_first_chunk_time=generative_answer_first_chunk_time,
             rephrase_time=rephrase_time,

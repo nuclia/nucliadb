@@ -70,6 +70,7 @@ class AuditStorage:
         search: SearchRequest,
         timeit: float,
         resources: int,
+        retrieval_rephrased_question: Optional[str] = None,
     ):
         raise NotImplementedError
 
@@ -81,6 +82,7 @@ class AuditStorage:
         origin: str,
         question: str,
         rephrased_question: Optional[str],
+        retrieval_rephrased_question: Optional[str],
         chat_context: List[ChatContext],
         retrieved_context: List[RetrievedContext],
         answer: Optional[str],
