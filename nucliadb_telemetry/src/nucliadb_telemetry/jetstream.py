@@ -20,6 +20,7 @@
 from datetime import datetime
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Union
+from urllib.parse import ParseResult
 
 import nats
 from nats.aio.client import Client
@@ -239,17 +240,17 @@ class NatsClientTelemetry:
     async def publish(
         self,
         subject: str,
-        body: bytes,
+        body: bytes = b"",
+        reply: str = "",
         headers: Optional[Dict[str, str]] = None,
-        **kwargs,
-    ):
+    ) -> None:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_publisher")
         headers = {} if headers is None else headers
         inject(headers)
 
         with start_span_message_publisher(tracer, subject) as span:
             try:
-                await self.nc.publish(subject, body, headers=headers, **kwargs)
+                await self.nc.publish(subject, body, reply, headers)
                 msg_sent_counter.inc({"subject": subject, "status": metrics.OK})
             except Exception as error:
                 set_span_exception(span, error)
@@ -276,9 +277,39 @@ class NatsClientTelemetry:
 
         return result
 
+    # Other methods we use but don't need telemetry
+
+    @property
+    def is_connected(self) -> bool:
+        return self.nc.is_connected
+
+    @property
+    def connected_url(self) -> Optional[ParseResult]:
+        return self.nc.connected_url
+
+    def jetstream(self, **opts) -> nats.js.JetStreamContext:
+        return self.nc.jetstream(**opts)
+
+    async def drain(self) -> None:
+        return await self.nc.drain()
+
+    async def flush(self, timeout: int = nats.aio.client.DEFAULT_FLUSH_TIMEOUT) -> None:
+        return await self.nc.flush(timeout)
+
+    async def close(self) -> None:
+        return await self.nc.close()
+
+
+def get_traced_nats_client(nc: Client, service_name: str) -> Union[Client, NatsClientTelemetry]:
+    tracer_provider = get_telemetry(service_name)
+    if tracer_provider is not None:
+        return NatsClientTelemetry(nc, service_name, tracer_provider)
+    else:
+        return nc
+
 
 def get_traced_jetstream(
-    nc: Client, service_name: str
+    nc: Union[Client, NatsClientTelemetry], service_name: str
 ) -> Union[JetStreamContext, JetStreamContextTelemetry]:
     jetstream = nc.jetstream()
     tracer_provider = get_telemetry(service_name)
