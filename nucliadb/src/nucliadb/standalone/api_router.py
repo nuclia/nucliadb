@@ -40,7 +40,7 @@ from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
-standalone_api_router = APIRouter()
+standalone_api_router = APIRouter(prefix="/api/v1")
 
 
 @standalone_api_router.get("/config-check")
