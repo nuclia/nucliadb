@@ -21,6 +21,7 @@
 import asyncio
 from abc import ABC, abstractmethod
 from contextvars import ContextVar
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Generic, Optional, TypeVar
 
@@ -28,14 +29,22 @@ from lru import LRU
 
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb_protos.utils_pb2 import ExtractedText
-from nucliadb_telemetry.metrics import Gauge
+from nucliadb_telemetry.metrics import Counter, Gauge
 
 # specific metrics per cache type
 cached_resources = Gauge("nucliadb_cached_resources")
 cached_extracted_texts = Gauge("nucliadb_cached_extracted_texts")
+resource_cache_ops = Counter("nucliadb_resource_cache_ops", labels={"type": ""})
+extracted_text_cache_ops = Counter("nucliadb_extracted_text_cache_ops", labels={"type": ""})
 
 
 T = TypeVar("T")
+
+
+@dataclass
+class CacheMetrics:
+    _cache_size: Gauge
+    ops: Counter
 
 
 class Cache(Generic[T], ABC):
@@ -49,6 +58,10 @@ class Cache(Generic[T], ABC):
     def __init__(self, cache_size: int) -> None:
         self.cache: LRU[str, T] = LRU(cache_size, callback=self._evicted_callback)
         self.locks: dict[str, asyncio.Lock] = {}
+
+    def _evicted_callback(self, key: str, value: T):
+        self.locks.pop(key, None)
+        self.metrics.ops.inc({"type": "evict"})
 
     def get(self, key: str) -> Optional[T]:
         return self.cache.get(key)
@@ -65,7 +78,7 @@ class Cache(Generic[T], ABC):
 
         len_after = len(self.cache)
         if len_after - len_before > 0:
-            self._cache_size_metric.inc(len_after - len_before)
+            self.metrics._cache_size.inc(len_after - len_before)
 
     def contains(self, key: str) -> bool:
         return key in self.cache
@@ -82,21 +95,19 @@ class Cache(Generic[T], ABC):
 
     @abstractmethod
     @cached_property
-    def _cache_size_metric(self) -> Gauge: ...
-
-    def _evicted_callback(self, key: str, value: T):
-        self.locks.pop(key, None)
+    def metrics(self) -> CacheMetrics: ...
 
 
 class ResourceCache(Cache[ResourceORM]):
+    metrics = CacheMetrics(
+        _cache_size=cached_resources,
+        ops=resource_cache_ops,
+    )
+
     # This cache size is an arbitrary number, once we have a metric in place and
     # we analyze memory consumption, we can adjust it with more knoweldge
     def __init__(self, cache_size: int = 128) -> None:
         super().__init__(cache_size)
-
-    @cached_property
-    def _cache_size_metric(self) -> Gauge:
-        return cached_resources
 
 
 class ExtractedTextCache(Cache[ExtractedText]):
@@ -109,12 +120,13 @@ class ExtractedTextCache(Cache[ExtractedText]):
     fetched for each field where the text block is found.
     """
 
+    metrics = CacheMetrics(
+        _cache_size=cached_extracted_texts,
+        ops=extracted_text_cache_ops,
+    )
+
     def __init__(self, cache_size: int = 128):
         super().__init__(cache_size)
-
-    @cached_property
-    def _cache_size_metric(self) -> Gauge:
-        return cached_extracted_texts
 
 
 # Global caches (per asyncio task)

@@ -36,14 +36,9 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search import SERVICE_NAME
 from nucliadb_protos.utils_pb2 import ExtractedText
-from nucliadb_telemetry import metrics
 from nucliadb_utils.utilities import get_storage
 
 logger = logging.getLogger(__name__)
-
-
-RESOURCE_CACHE_OPS = metrics.Counter("nucliadb_resource_cache_ops", labels={"type": ""})
-EXTRACTED_CACHE_OPS = metrics.Counter("nucliadb_extracted_text_cache_ops", labels={"type": ""})
 
 
 async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
@@ -54,16 +49,15 @@ async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
 
     resource_cache = get_resource_cache()
     if resource_cache is None:
-        RESOURCE_CACHE_OPS.inc({"type": "miss"})
         logger.warning("Resource cache not set")
         return await _orm_get_resource(kbid, uuid)
 
     async with resource_cache.get_lock(uuid):
         if not resource_cache.contains(uuid):
-            RESOURCE_CACHE_OPS.inc({"type": "miss"})
+            resource_cache.metrics.ops.inc({"type": "miss"})
             orm_resource = await _orm_get_resource(kbid, uuid)
         else:
-            RESOURCE_CACHE_OPS.inc({"type": "hit"})
+            resource_cache.metrics.ops.inc({"type": "hit"})
 
         if orm_resource is not None:
             resource_cache.set(uuid, orm_resource)
@@ -84,23 +78,22 @@ async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
     cache = get_extracted_text_cache()
     if cache is None:
         logger.warning("Extracted text cache not set")
-        EXTRACTED_CACHE_OPS.inc({"type": "miss"})
         return await field.get_extracted_text()
 
     key = f"{field.kbid}/{field.uuid}/{field.id}"
     extracted_text = cache.get(key)
     if extracted_text is not None:
-        EXTRACTED_CACHE_OPS.inc({"type": "hit"})
+        cache.metrics.ops.inc({"type": "hit"})
         return extracted_text
 
     async with cache.get_lock(key):
         # Check again in case another task already fetched it
         extracted_text = cache.get(key)
         if extracted_text is not None:
-            EXTRACTED_CACHE_OPS.inc({"type": "hit"})
+            cache.metrics.ops.inc({"type": "hit"})
             return extracted_text
 
-        EXTRACTED_CACHE_OPS.inc({"type": "miss"})
+        cache.metrics.ops.inc({"type": "miss"})
         extracted_text = await field.get_extracted_text()
         if extracted_text is not None:
             # Only cache if we actually have extracted text
