@@ -22,6 +22,7 @@ from typing import Optional, Union
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
+from pydantic import ValidationError
 from starlette.responses import StreamingResponse
 
 from nucliadb.common import datamanagers
