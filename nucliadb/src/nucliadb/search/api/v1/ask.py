@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 from typing import Optional, Union
 
 from fastapi import Header, Request, Response
@@ -86,9 +87,13 @@ async def ask_knowledgebox_endpoint(
                 status_code=400, detail="This search configuration is not valid for `ask`"
             )
 
-        item = AskRequest.model_validate(
-            search_config.config.model_dump(exclude_unset=True) | item.model_dump(exclude_unset=True)
-        )
+        try:
+            item = AskRequest.model_validate(
+                search_config.config.model_dump(exclude_unset=True) | item.model_dump(exclude_unset=True)
+            )
+        except ValidationError as e:
+            detail = json.loads(e.json())
+            return HTTPClientError(status_code=422, detail=detail)
 
     return await create_ask_response(
         kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous

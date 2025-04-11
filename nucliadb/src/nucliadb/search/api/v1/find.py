@@ -220,9 +220,13 @@ async def _find_endpoint(
                 status_code=400, detail="This search configuration is not valid for `find`"
             )
 
-        item = FindRequest.model_validate(
-            search_config.config.model_dump(exclude_unset=True) | item.model_dump(exclude_unset=True)
-        )
+        try:
+            item = FindRequest.model_validate(
+                search_config.config.model_dump(exclude_unset=True) | item.model_dump(exclude_unset=True)
+            )
+        except ValidationError as e:
+            detail = json.loads(e.json())
+            return HTTPClientError(status_code=422, detail=detail)
 
     try:
         maybe_log_request_payload(kbid, "/find", item)
