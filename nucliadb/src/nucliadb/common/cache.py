@@ -84,7 +84,7 @@ class Cache(Generic[T], ABC):
         return key in self.cache
 
     def clear(self):
-        self._cache_size_metric.dec(len(self.cache))
+        self.metrics._cache_size.dec(len(self.cache))
         self.cache.clear()
         self.locks.clear()
 
