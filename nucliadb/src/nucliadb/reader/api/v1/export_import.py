@@ -20,7 +20,6 @@
 from typing import AsyncGenerator, AsyncIterable, Union
 
 from fastapi.responses import StreamingResponse
-from fastapi_versioning import version
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
@@ -46,7 +45,6 @@ from nucliadb_utils.authentication import requires_one
     response_class=StreamingResponse,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
-@version(1)
 async def download_export_kb_endpoint(request: Request, kbid: str, export_id: str):
     context = get_app_context(request.app)
     if not await exists_kb(kbid):
@@ -105,7 +103,6 @@ async def download_export_and_delete(
     tags=["Knowledge Boxes"],
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
-@version(1)
 async def get_export_status_endpoint(
     request: Request, kbid: str, export_id: str
 ) -> Union[StatusResponse, HTTPClientError]:
@@ -124,7 +121,6 @@ async def get_export_status_endpoint(
     tags=["Knowledge Boxes"],
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
-@version(1)
 async def get_import_status_endpoint(
     request: Request, kbid: str, import_id: str
 ) -> Union[StatusResponse, HTTPClientError]:

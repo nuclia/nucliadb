@@ -22,7 +22,6 @@ from datetime import datetime
 from typing import Optional, Union
 
 from fastapi import Header, Request, Response
-from fastapi_versioning import version
 from pydantic import ValidationError
 
 from nucliadb.models.responses import HTTPClientError
@@ -58,7 +57,6 @@ from nucliadb_utils.authentication import requires
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def suggest_knowledgebox(
     request: Request,
     response: Response,

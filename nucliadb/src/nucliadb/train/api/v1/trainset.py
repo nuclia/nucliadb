@@ -21,7 +21,6 @@
 from typing import Optional
 
 from fastapi import Request
-from fastapi_versioning import version
 
 from nucliadb.train.api.utils import get_kb_partitions
 from nucliadb.train.api.v1.router import KB_PREFIX, api
@@ -38,7 +37,6 @@ from nucliadb_utils.authentication import requires_one
     response_model=TrainSetPartitions,
 )
 @requires_one([NucliaDBRoles.READER])
-@version(1)
 async def get_partitions_all(request: Request, kbid: str) -> TrainSetPartitions:
     return await get_partitions(kbid)
 
@@ -51,7 +49,6 @@ async def get_partitions_all(request: Request, kbid: str) -> TrainSetPartitions:
     response_model=TrainSetPartitions,
 )
 @requires_one([NucliaDBRoles.READER])
-@version(1)
 async def get_partitions_prefix(request: Request, kbid: str, prefix: str) -> TrainSetPartitions:
     return await get_partitions(kbid, prefix=prefix)
 

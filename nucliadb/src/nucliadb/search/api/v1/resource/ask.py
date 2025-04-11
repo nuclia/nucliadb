@@ -20,7 +20,6 @@
 from typing import Union
 
 from fastapi import Header, Request, Response
-from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
 from nucliadb.models.responses import HTTPClientError
@@ -42,7 +41,6 @@ from ..ask import create_ask_response
     response_model=SyncAskResponse,
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def resource_ask_endpoint_by_uuid(
     request: Request,
     kbid: str,
@@ -77,7 +75,6 @@ async def resource_ask_endpoint_by_uuid(
     response_model=SyncAskResponse,
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def resource_ask_endpoint_by_slug(
     request: Request,
     kbid: str,

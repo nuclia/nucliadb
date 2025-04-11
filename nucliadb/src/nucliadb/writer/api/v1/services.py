@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from fastapi import HTTPException, Response
-from fastapi_versioning import version
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
@@ -61,7 +60,6 @@ from nucliadb_utils.utilities import get_ingest
     openapi_extra={"x-operation_order": 1},
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def create_entities_group(request: Request, kbid: str, item: CreateEntitiesGroupPayload):
     ingest = get_ingest()
 
@@ -102,7 +100,6 @@ async def create_entities_group(request: Request, kbid: str, item: CreateEntitie
     openapi_extra={"x-operation_order": 2},
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def update_entities_group(
     request: Request, kbid: str, group: str, item: UpdateEntitiesGroupPayload
 ):
@@ -147,7 +144,6 @@ async def update_entities_group(
     openapi_extra={"x-operation_order": 3},
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def delete_entities(request: Request, kbid: str, group: str):
     ingest = get_ingest()
     pbrequest: DelEntitiesRequest = DelEntitiesRequest()
@@ -173,7 +169,6 @@ async def delete_entities(request: Request, kbid: str, group: str):
     openapi_extra={"x-operation_order": 1},
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def set_labelset_endpoint(request: Request, kbid: str, labelset: str, item: LabelSet):
     if item.title is None:
         item.title = labelset
@@ -229,7 +224,6 @@ async def set_labelset(kbid: str, labelset_id: str, item: LabelSet):
     openapi_extra={"x-operation_order": 3},
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def delete_labelset_endpoint(request: Request, kbid: str, labelset: str):
     try:
         await delete_labelset(kbid, labelset)
@@ -252,7 +246,6 @@ async def delete_labelset(kbid: str, labelset_id: str):
     openapi_extra={"x-operation_order": 1},
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSynonyms):
     if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -269,7 +262,6 @@ async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSyn
     openapi_extra={"x-operation_order": 3},
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def delete_custom_synonyms(request: Request, kbid: str):
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
@@ -288,7 +280,6 @@ async def delete_custom_synonyms(request: Request, kbid: str):
     tags=["Knowledge Box Services"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def create_search_configuration(
     request: Request, kbid: str, config_name: str, search_configuration: SearchConfiguration
 ):
@@ -314,7 +305,6 @@ async def create_search_configuration(
     tags=["Knowledge Box Services"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def update_search_configuration(
     request: Request, kbid: str, config_name: str, search_configuration: SearchConfiguration
 ):
@@ -340,7 +330,6 @@ async def update_search_configuration(
     tags=["Knowledge Box Services"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def delete_search_configuration(request: Request, kbid: str, config_name: str):
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):

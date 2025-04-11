@@ -22,7 +22,6 @@ from typing import Optional, Union
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
-from fastapi_versioning import version
 from google.protobuf.json_format import MessageToDict
 from starlette.requests import Request
 
@@ -66,7 +65,6 @@ from nucliadb_utils.utilities import get_ingest, get_storage
     tags=["Knowledge Box Services"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_entities(
     request: Request, kbid: str, show_entities: bool = False
 ) -> Union[KnowledgeBoxEntities, HTTPClientError]:
@@ -106,7 +104,6 @@ async def list_entities_groups(kbid: str):
     tags=["Knowledge Box Services"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
     ingest = get_ingest()
     l_request: GetEntitiesGroupRequest = GetEntitiesGroupRequest()
@@ -133,7 +130,6 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
     tags=["Knowledge Box Services"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_labelsets_endoint(request: Request, kbid: str) -> KnowledgeBoxLabels:
     try:
         return await get_labelsets(kbid)
@@ -168,7 +164,6 @@ async def get_labelsets(kbid: str) -> KnowledgeBoxLabels:
     responses={"404": {"description": "Knowledge Box or Label Set not found"}},
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_labelset_endpoint(request: Request, kbid: str, labelset: str) -> LabelSet:
     try:
         return await get_labelset(kbid, labelset)
@@ -210,7 +205,6 @@ async def get_labelset(kbid: str, labelset_id: str) -> LabelSet:
     openapi_extra={"x-operation_order": 2},
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_custom_synonyms(request: Request, kbid: str):
     if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -229,7 +223,6 @@ async def get_custom_synonyms(request: Request, kbid: str):
     responses={"404": {"description": "Knowledge Box not found"}},
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def notifications_endpoint(
     request: Request, kbid: str
 ) -> Union[StreamingResponse, HTTPClientError]:
@@ -270,7 +263,6 @@ async def exists_kb(kbid: str) -> bool:
     },
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def processing_status(
     request: Request,
     kbid: str,
@@ -326,7 +318,6 @@ async def processing_status(
     response_model_exclude_unset=True,
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_search_configuration(request: Request, kbid: str, config_name: str) -> SearchConfiguration:
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
@@ -347,7 +338,6 @@ async def get_search_configuration(request: Request, kbid: str, config_name: str
     response_model_exclude_unset=True,
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def list_search_configurations(request: Request, kbid: str) -> dict[str, SearchConfiguration]:
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):

@@ -24,7 +24,6 @@ from typing import Annotated, Optional
 from uuid import uuid4
 
 from fastapi import HTTPException, Query, Response
-from fastapi_versioning import version
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
@@ -91,7 +90,6 @@ from nucliadb_utils.utilities import (
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def create_resource(
     request: Request,
     item: CreateResourcePayload,
@@ -186,7 +184,6 @@ async def create_resource(
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def modify_resource_rslug_prefix(
     request: Request,
     kbid: str,
@@ -214,7 +211,6 @@ async def modify_resource_rslug_prefix(
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def modify_resource_rid_prefix(
     request: Request,
     kbid: str,
@@ -388,7 +384,6 @@ async def update_resource_slug(
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def reprocess_resource_rslug_prefix(
     request: Request,
     kbid: str,
@@ -407,7 +402,6 @@ async def reprocess_resource_rslug_prefix(
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def reprocess_resource_rid_prefix(
     request: Request,
     kbid: str,
@@ -479,7 +473,6 @@ async def _reprocess_resource(
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def delete_resource_rslug_prefix(
     request: Request,
     kbid: str,
@@ -496,7 +489,6 @@ async def delete_resource_rslug_prefix(
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def delete_resource_rid_prefix(
     request: Request,
     kbid: str,
@@ -536,7 +528,6 @@ async def _delete_resource(
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def reindex_resource_rslug_prefix(
     request: Request,
     kbid: str,
@@ -554,7 +545,6 @@ async def reindex_resource_rslug_prefix(
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def reindex_resource_rid_prefix(
     request: Request,
     kbid: str,
