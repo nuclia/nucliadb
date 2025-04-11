@@ -28,6 +28,7 @@ from typing import Annotated, Optional
 from fastapi import HTTPException
 from fastapi.requests import Request
 from fastapi.responses import Response
+from starlette.datastructures import URLPath
 from starlette.requests import Request as StarletteRequest
 
 from nucliadb.common import datamanagers
@@ -305,6 +306,11 @@ async def _tus_post(
 
     # Find the URL for upload, with the same parameter as this call
     location = api.url_path_for("Upload information", upload_id=upload_id, **request.path_params)
+    # Bw/c BUG - the URL sent before (when using VersionedFastAPI) was wrong and
+    # missed the `/api/v1` part. Replacing VersionedFastAPI for a router with a
+    # prefix fixes the issue, but may brake other clients relying on this, so we
+    # reintroduce the bug here until we migrate them
+    location = URLPath(location.removeprefix("/api/v1"))
     return Response(
         status_code=201,
         headers={
