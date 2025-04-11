@@ -212,7 +212,7 @@ fn convert_entities_subgraph_into_graph_search(bfs_request: &EntitiesSubgraphReq
 
     // Entry points are source or target nodes we want to search for. We want any undirected
     // path containing any entry point
-    let entry_points_queries = bfs_request
+    let entry_points_queries: Vec<PathQuery> = bfs_request
         .entry_points
         .iter()
         .map(|entry_point| PathQuery {
@@ -234,7 +234,7 @@ fn convert_entities_subgraph_into_graph_search(bfs_request: &EntitiesSubgraphReq
     //
     // The request groups values per subtype (to optimize request size) but, as we don't support
     // OR at node value level, we'll split them.
-    let deleted_nodes_queries = bfs_request
+    let deleted_nodes_queries: Vec<PathQuery> = bfs_request
         .deleted_entities
         .iter()
         .flat_map(|deleted_nodes| {
@@ -247,17 +247,15 @@ fn convert_entities_subgraph_into_graph_search(bfs_request: &EntitiesSubgraphReq
                 .node_values
                 .iter()
                 .map(|deleted_entity_value| PathQuery {
-                    query: Some(path_query::Query::BoolNot(Box::new(PathQuery {
-                        query: Some(path_query::Query::Path(graph_query::Path {
-                            source: Some(graph_query::Node {
-                                value: Some(deleted_entity_value.clone()),
-                                node_subtype: Some(subtype.clone()),
-                                ..Default::default()
-                            }),
-                            undirected: true,
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            value: Some(deleted_entity_value.clone()),
+                            node_subtype: Some(subtype.clone()),
                             ..Default::default()
-                        })),
-                    }))),
+                        }),
+                        undirected: true,
+                        ..Default::default()
+                    })),
                 })
                 .collect::<Vec<_>>();
             Some(subqueries)
@@ -267,7 +265,7 @@ fn convert_entities_subgraph_into_graph_search(bfs_request: &EntitiesSubgraphReq
 
     // Subtypes can also be marked as deleted in the db (but kept in the index). We also
     // want to exclude any triplet containg a node with such subtypes
-    let excluded_subtypes_queries: Vec<_> = bfs_request
+    let excluded_subtypes_queries: Vec<PathQuery> = bfs_request
         .deleted_groups
         .iter()
         .map(|deleted_subtype| PathQuery {
@@ -285,39 +283,33 @@ fn convert_entities_subgraph_into_graph_search(bfs_request: &EntitiesSubgraphReq
     let mut subqueries = vec![];
     if entry_points_queries.is_empty() {
         // match any entry point
-        subqueries.push(
-            PathQuery {
-                query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
-                    operands: entry_points_queries,
-                })),
-            }
-        );
+        subqueries.push(PathQuery {
+            query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
+                operands: entry_points_queries,
+            })),
+        });
     }
 
     if deleted_nodes_queries.is_empty() {
         // exclude deleted nodes
-        subqueries.push(
-            PathQuery {
-                query: Some(path_query::Query::BoolNot(Box::new(PathQuery {
-                    query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
-                        operands: deleted_nodes_queries,
-                    })),
-                }))),
-            }
-        );
+        subqueries.push(PathQuery {
+            query: Some(path_query::Query::BoolNot(Box::new(PathQuery {
+                query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
+                    operands: deleted_nodes_queries,
+                })),
+            }))),
+        });
     }
 
     if excluded_subtypes_queries.is_empty() {
         // exclude specific subtypes
-        subqueries.push(
-            PathQuery {
-                query: Some(path_query::Query::BoolNot(Box::new(PathQuery {
-                    query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
-                        operands: excluded_subtypes_queries,
-                    })),
-                }))),
-            }
-        );
+        subqueries.push(PathQuery {
+            query: Some(path_query::Query::BoolNot(Box::new(PathQuery {
+                query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
+                    operands: excluded_subtypes_queries,
+                })),
+            }))),
+        });
     }
 
     let graph_query = GraphQuery {
