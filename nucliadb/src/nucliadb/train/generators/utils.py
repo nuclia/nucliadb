@@ -18,9 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from contextvars import ContextVar
 from typing import Any, AsyncGenerator, AsyncIterator, Optional, Type
 
+from nucliadb.common.cache import get_or_create_resource_cache
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -29,29 +29,21 @@ from nucliadb.train import SERVICE_NAME, logger
 from nucliadb.train.types import T
 from nucliadb_utils.utilities import get_storage
 
-rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar("rcache", default=None)
-
-
-def get_resource_cache(clear: bool = False) -> dict[str, ResourceORM]:
-    value: Optional[dict[str, ResourceORM]] = rcache.get()
-    if value is None or clear:
-        value = {}
-        rcache.set(value)
-    return value
-
 
 async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[ResourceORM]:
-    resouce_cache = get_resource_cache()
+    resource_cache = get_or_create_resource_cache()
     orm_resource: Optional[ResourceORM] = None
-    if uuid not in resouce_cache:
+    if not resource_cache.contains(uuid):
+        resource_cache.metrics.ops.inc({"type": "miss"})
         storage = await get_storage(service_name=SERVICE_NAME)
         async with get_driver().transaction(read_only=True) as transaction:
             kb = KnowledgeBoxORM(transaction, storage, kbid)
             orm_resource = await kb.get(uuid)
             if orm_resource is not None:
-                resouce_cache[uuid] = orm_resource
+                resource_cache.set(uuid, orm_resource)
     else:
-        orm_resource = resouce_cache.get(uuid)
+        resource_cache.metrics.ops.inc({"type": "hit"})
+        orm_resource = resource_cache.get(uuid)
     return orm_resource
 
 

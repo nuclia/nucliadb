@@ -137,20 +137,31 @@ class TestGauge:
 
     def test_guage_with_labels(self):
         gauge = metrics.Gauge("my_guage2", labels={"foo": "", "bar": ""})
-        gauge.set(5, labels={"foo": "baz", "bar": "qux"})
 
+        gauge.set(5, labels={"foo": "baz", "bar": "qux"})
         assert gauge.gauge.labels(**{"foo": "baz", "bar": "qux"})._value.get() == 5.0
 
-        gauge.remove({"foo": "baz", "bar": "qux"})
+        gauge.inc(5.1, labels={"foo": "baz", "bar": "qux"})
+        assert gauge.gauge.labels(**{"foo": "baz", "bar": "qux"})._value.get() == 10.1
 
+        gauge.dec(2.6, labels={"foo": "baz", "bar": "qux"})
+        assert gauge.gauge.labels(**{"foo": "baz", "bar": "qux"})._value.get() == 7.5
+
+        gauge.remove({"foo": "baz", "bar": "qux"})
         assert gauge.gauge.labels(**{"foo": "baz", "bar": "qux"})._value.get() == 0.0
 
     def test_guage_with_env_label(self, monkeypatch):
         monkeypatch.setenv("VERSION", "1.0.0")
         gauge = metrics.Gauge("my_guage3")
-        gauge.set(5)
 
+        gauge.set(5)
         assert gauge.gauge.labels(**{"version": "1.0.0"})._value.get() == 5.0
+
+        gauge.inc(1)
+        assert gauge.gauge.labels(**{"version": "1.0.0"})._value.get() == 6.0
+
+        gauge.dec(2.5)
+        assert gauge.gauge.labels(**{"version": "1.0.0"})._value.get() == 3.5
 
 
 class TestCounter:

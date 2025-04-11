@@ -17,14 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 import contextlib
 import logging
-from contextvars import ContextVar
 from typing import Optional
 
-from lru import LRU
-
+from nucliadb.common.cache import (
+    delete_extracted_text_cache,
+    delete_resource_cache,
+    get_extracted_text_cache,
+    get_resource_cache,
+    set_extracted_text_cache,
+    set_resource_cache,
+)
 from nucliadb.common.ids import FieldId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
@@ -32,50 +36,9 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search import SERVICE_NAME
 from nucliadb_protos.utils_pb2 import ExtractedText
-from nucliadb_telemetry import metrics
 from nucliadb_utils.utilities import get_storage
 
 logger = logging.getLogger(__name__)
-
-rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar("rcache", default=None)
-etcache: ContextVar[Optional["ExtractedTextCache"]] = ContextVar("etcache", default=None)
-
-
-RESOURCE_LOCKS: dict[str, asyncio.Lock] = LRU(1000)  # type: ignore
-RESOURCE_CACHE_OPS = metrics.Counter("nucliadb_resource_cache_ops", labels={"type": ""})
-EXTRACTED_CACHE_OPS = metrics.Counter("nucliadb_extracted_text_cache_ops", labels={"type": ""})
-
-
-def set_extracted_text_cache() -> None:
-    value = ExtractedTextCache()
-    etcache.set(value)
-
-
-def get_extracted_text_cache() -> Optional["ExtractedTextCache"]:
-    return etcache.get()
-
-
-def clear_extracted_text_cache() -> None:
-    value = etcache.get()
-    if value is not None:
-        value.clear()
-        etcache.set(None)
-
-
-def set_resource_cache() -> None:
-    value: dict[str, ResourceORM] = {}
-    rcache.set(value)
-
-
-def get_resource_cache() -> Optional[dict[str, ResourceORM]]:
-    return rcache.get()
-
-
-def clear_resource_cache() -> None:
-    value = rcache.get()
-    if value is not None:
-        value.clear()
-        rcache.set(None)
 
 
 async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
@@ -86,22 +49,18 @@ async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
 
     resource_cache = get_resource_cache()
     if resource_cache is None:
-        RESOURCE_CACHE_OPS.inc({"type": "miss"})
         logger.warning("Resource cache not set")
         return await _orm_get_resource(kbid, uuid)
 
-    if uuid not in RESOURCE_LOCKS:
-        RESOURCE_LOCKS[uuid] = asyncio.Lock()
-
-    async with RESOURCE_LOCKS[uuid]:
-        if uuid not in resource_cache:
-            RESOURCE_CACHE_OPS.inc({"type": "miss"})
+    async with resource_cache.get_lock(uuid):
+        if not resource_cache.contains(uuid):
+            resource_cache.metrics.ops.inc({"type": "miss"})
             orm_resource = await _orm_get_resource(kbid, uuid)
         else:
-            RESOURCE_CACHE_OPS.inc({"type": "hit"})
+            resource_cache.metrics.ops.inc({"type": "hit"})
 
         if orm_resource is not None:
-            resource_cache[uuid] = orm_resource
+            resource_cache.set(uuid, orm_resource)
         else:
             orm_resource = resource_cache.get(uuid)
 
@@ -115,59 +74,30 @@ async def _orm_get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
         return await kb.get(uuid)
 
 
-class ExtractedTextCache:
-    """
-    Used to cache extracted text from a resource in memory during the process
-    of search results hydration.
-
-    This is needed to avoid fetching the same extracted text multiple times,
-    as matching text blocks are processed in parallel and the extracted text is
-    fetched for each field where the text block is found.
-    """
-
-    def __init__(self):
-        self.locks = {}
-        self.values = {}
-
-    def get_value(self, key: str) -> Optional[ExtractedText]:
-        return self.values.get(key)
-
-    def get_lock(self, key: str) -> asyncio.Lock:
-        return self.locks.setdefault(key, asyncio.Lock())
-
-    def set_value(self, key: str, value: ExtractedText) -> None:
-        self.values[key] = value
-
-    def clear(self):
-        self.values.clear()
-        self.locks.clear()
-
-
 async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
     cache = get_extracted_text_cache()
     if cache is None:
         logger.warning("Extracted text cache not set")
-        EXTRACTED_CACHE_OPS.inc({"type": "miss"})
         return await field.get_extracted_text()
 
     key = f"{field.kbid}/{field.uuid}/{field.id}"
-    extracted_text = cache.get_value(key)
+    extracted_text = cache.get(key)
     if extracted_text is not None:
-        EXTRACTED_CACHE_OPS.inc({"type": "hit"})
+        cache.metrics.ops.inc({"type": "hit"})
         return extracted_text
 
     async with cache.get_lock(key):
         # Check again in case another task already fetched it
-        extracted_text = cache.get_value(key)
+        extracted_text = cache.get(key)
         if extracted_text is not None:
-            EXTRACTED_CACHE_OPS.inc({"type": "hit"})
+            cache.metrics.ops.inc({"type": "hit"})
             return extracted_text
 
-        EXTRACTED_CACHE_OPS.inc({"type": "miss"})
+        cache.metrics.ops.inc({"type": "miss"})
         extracted_text = await field.get_extracted_text()
         if extracted_text is not None:
             # Only cache if we actually have extracted text
-            cache.set_value(key, extracted_text)
+            cache.set(key, extracted_text)
         return extracted_text
 
 
@@ -202,5 +132,5 @@ def request_caches():
     try:
         yield
     finally:
-        clear_resource_cache()
-        clear_extracted_text_cache()
+        delete_resource_cache()
+        delete_extracted_text_cache()
