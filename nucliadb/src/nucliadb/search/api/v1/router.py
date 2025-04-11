@@ -19,7 +19,9 @@
 #
 from fastapi.routing import APIRouter
 
-api = APIRouter(prefix="/api/v1")
+from nucliadb.search import API_PREFIX
+
+api = APIRouter(prefix=f"/{API_PREFIX}/v1")
 
 KB_PREFIX = "kb"
 KBS_PREFIX = "kbs"
