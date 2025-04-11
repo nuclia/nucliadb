@@ -19,6 +19,8 @@
 #
 from fastapi.routing import APIRouter
 
-api = APIRouter()
+from nucliadb.train import API_PREFIX
+
+api = APIRouter(prefix=f"/{API_PREFIX}/v1")
 
 KB_PREFIX = "kb"

@@ -45,7 +45,7 @@ async def txn(pubsub):
     nats_conn = mock.AsyncMock()
     with mock.patch("nucliadb_utils.transaction.nats.connect", return_value=nats_conn):
         txn = TransactionUtility(nats_servers=["foobar"])
-        await txn.initialize()
+        await txn.initialize(service_name="nucliadb-tests")
         yield txn
         await txn.finalize()
 

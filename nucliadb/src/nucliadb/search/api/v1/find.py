@@ -22,7 +22,6 @@ from typing import Optional, Union
 
 from fastapi import Body, Header, Query, Request, Response
 from fastapi.openapi.models import Example
-from fastapi_versioning import version
 from pydantic import ValidationError
 
 from nucliadb.common import datamanagers
@@ -77,7 +76,6 @@ FIND_EXAMPLES = {
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def find_knowledgebox(
     request: Request,
     response: Response,
@@ -187,7 +185,6 @@ async def find_knowledgebox(
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def find_post_knowledgebox(
     request: Request,
     response: Response,

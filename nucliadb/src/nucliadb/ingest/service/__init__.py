@@ -17,12 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
-
 from grpc import aio
 
 from nucliadb import health
-from nucliadb.ingest import logger
+from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import settings
 from nucliadb_protos import writer_pb2_grpc
@@ -30,12 +28,12 @@ from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.grpc import get_traced_grpc_server
 
 
-async def start_grpc(service_name: Optional[str] = None):
+async def start_grpc(service_name: str = SERVICE_NAME):
     aio.init_grpc_aio()  # type: ignore
 
-    await setup_telemetry(service_name or "ingest")
+    await setup_telemetry(service_name)
     server = get_traced_grpc_server(
-        service_name or "ingest",
+        service_name,
         max_receive_message=settings.max_receive_message_length,
     )
 

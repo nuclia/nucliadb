@@ -22,7 +22,6 @@ from time import time
 from typing import Optional, Union
 
 from fastapi import Request, Response
-from fastapi_versioning import version
 from pydantic import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
@@ -69,7 +68,6 @@ from nucliadb_utils.exceptions import LimitsExceededError
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def catalog_get(
     request: Request,
     response: Response,
@@ -139,7 +137,6 @@ async def catalog_get(
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def catalog_post(
     request: Request,
     kbid: str,

@@ -19,3 +19,5 @@
 #
 
 """NucliaDB fixtures."""
+
+SERVICE_NAME = "nucliadb-tests"

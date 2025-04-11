@@ -16,7 +16,18 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 
-from nucliadb_utils.fastapi import versioning  # noqa: F401
+from typing import AsyncIterator
 
-# force import, tests placeholder
+import pytest
+
+from nucliadb_telemetry.utils import setup_telemetry
+from tests.ndbfixtures import SERVICE_NAME
+
+
+@pytest.fixture(scope="function", autouse=True)
+async def telemetry() -> AsyncIterator[None]:
+    # run all tests with telemtry set up
+    await setup_telemetry(SERVICE_NAME)
+    yield

@@ -26,7 +26,6 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_v1
 from nucliadb.reader.lifecycle import lifespan
 from nucliadb_telemetry import errors
@@ -37,7 +36,6 @@ from nucliadb_telemetry.fastapi.utils import (
 from nucliadb_utils.audit.stream import AuditMiddleware
 from nucliadb_utils.authentication import NucliaCloudAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
-from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.utilities import get_audit
 
@@ -66,20 +64,11 @@ fastapi_settings = dict(
 
 
 def create_application() -> FastAPI:
-    base_app = FastAPI(title="NucliaDB Reader API", **fastapi_settings)  # type: ignore
+    application = FastAPI(title="NucliaDB Reader API", **fastapi_settings)  # type: ignore
 
-    base_app.include_router(api_v1)
+    application.include_router(api_v1)
 
-    extend_openapi(base_app)
-
-    application = VersionedFastAPI(
-        base_app,
-        version_format="{major}",
-        prefix_format=f"/{API_PREFIX}/v{{major}}",
-        default_version=(1, 0),
-        enable_latest=False,
-        kwargs=fastapi_settings,
-    )
+    extend_openapi(application)
 
     async def homepage(request: Request) -> HTMLResponse:
         return HTMLResponse("NucliaDB Reader Service")

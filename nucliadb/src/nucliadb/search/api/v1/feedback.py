@@ -19,7 +19,6 @@
 #
 
 from fastapi import Header, Request, Response
-from fastapi_versioning import version
 
 from nucliadb.common.models_utils import to_proto
 from nucliadb.models.responses import HTTPClientError
@@ -40,7 +39,6 @@ from nucliadb_utils.utilities import get_audit
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def send_feedback_endpoint(
     request: Request,
     response: Response,
