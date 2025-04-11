@@ -75,7 +75,7 @@ fn _search(
             kind: kind.into(),
             ..Default::default()
         },
-        prefilter,
+        &prefilter,
     )
 }
 

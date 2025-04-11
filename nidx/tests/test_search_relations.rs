@@ -1115,6 +1115,7 @@ async fn relation_search(
     fixture: &mut NidxFixture,
     request: RelationSearchRequest,
 ) -> anyhow::Result<RelationSearchResponse> {
+    #[allow(deprecated)]
     let request = SearchRequest {
         shard: request.shard_id,
         vectorset: "english".to_string(),

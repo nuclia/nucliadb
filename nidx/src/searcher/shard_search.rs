@@ -21,7 +21,10 @@
 use std::sync::Arc;
 
 use nidx_paragraph::ParagraphSearcher;
-use nidx_protos::{GraphSearchRequest, GraphSearchResponse, SearchRequest, SearchResponse};
+use nidx_protos::{
+    EntitiesSubgraphResponse, GraphSearchRequest, GraphSearchResponse, IndexRelation, Relation, RelationSearchResponse,
+    SearchRequest, SearchResponse,
+};
 use nidx_relation::RelationSearcher;
 use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
 use nidx_types::prefilter::PrefilterResult;
@@ -131,7 +134,7 @@ fn blocking_search(
 
     let relation_task = index_queries
         .relations_request
-        .map(|request| move || relation_searcher.unwrap().search(&request));
+        .map(|request| move || relation_searcher.unwrap().graph_search(&request, prefilter));
 
     let vector_task = index_queries.vectors_request.map(|mut request| {
         request.id = search_id.clone();
@@ -169,11 +172,44 @@ fn blocking_search(
         }
     });
 
+    let graph_response = rrelation.transpose()?;
+
+    // Bw/c: convert graph search into relation response
+    let relation_response = graph_response.clone().map(|graph_response| {
+        let relations = graph_response
+            .graph
+            .into_iter()
+            .map(|path| {
+                let source = graph_response.nodes[path.source as usize].clone();
+                let relation = graph_response.relations[path.relation as usize].clone();
+                let destination = graph_response.nodes[path.destination as usize].clone();
+
+                IndexRelation {
+                    relation: Some(Relation {
+                        source: Some(source),
+                        to: Some(destination),
+                        relation: relation.relation_type,
+                        relation_label: relation.label,
+                        metadata: path.metadata,
+                    }),
+                    resource_field_id: path.resource_field_id,
+                    facets: path.facets,
+                }
+            })
+            .collect();
+
+        RelationSearchResponse {
+            subgraph: Some(EntitiesSubgraphResponse { relations }),
+            ..Default::default()
+        }
+    });
+
     Ok(SearchResponse {
         document: rtext.transpose()?,
         paragraph: rparagraph.transpose()?,
         vector: rvector.transpose()?,
-        relation: rrelation.transpose()?,
+        relation: relation_response,
+        graph: graph_response,
     })
 }
 
@@ -223,7 +259,7 @@ pub async fn graph_search(
     let results = tokio::task::spawn_blocking(move || {
         current.in_scope(|| {
             let searcher: &RelationSearcher = relation_searcher.as_ref().into();
-            searcher.graph_search(&graph_request, prefilter)
+            searcher.graph_search(&graph_request, &prefilter)
         })
     })
     .await??;

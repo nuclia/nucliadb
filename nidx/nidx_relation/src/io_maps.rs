@@ -108,19 +108,24 @@ pub fn doc_to_relation(schema: &Schema, doc: &TantivyDocument) -> ProtosRelation
     }
 }
 
-pub fn doc_to_index_relation(schema: &Schema, doc: &TantivyDocument) -> IndexRelation {
-    let resource_field_id = doc.get_first(schema.resource_field_id).map(|v| {
+pub fn doc_to_resource_field_id(schema: &Schema, doc: &TantivyDocument) -> Option<String> {
+    doc.get_first(schema.resource_field_id).map(|v| {
         let (rid, fid) = decode_field_id(v.as_bytes().unwrap());
         format!("{}/{}", rid.simple(), fid)
-    });
-    let facets = doc
-        .get_all(schema.facets)
+    })
+}
+
+pub fn doc_to_facets(schema: &Schema, doc: &TantivyDocument) -> Vec<String> {
+    doc.get_all(schema.facets)
         .map(|f| f.as_facet().unwrap().to_path_string())
-        .collect();
+        .collect()
+}
+
+pub fn doc_to_index_relation(schema: &Schema, doc: &TantivyDocument) -> IndexRelation {
     IndexRelation {
         relation: Some(doc_to_relation(schema, doc)),
-        resource_field_id,
-        facets,
+        resource_field_id: doc_to_resource_field_id(schema, doc),
+        facets: doc_to_facets(schema, doc),
     }
 }
 
