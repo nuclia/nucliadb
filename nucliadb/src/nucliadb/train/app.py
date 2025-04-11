@@ -60,16 +60,17 @@ fastapi_settings = dict(
 )
 
 
-application = FastAPI(title="NucliaDB Train API", **fastapi_settings)  # type: ignore
+def create_application() -> FastAPI:
+    application = FastAPI(title="NucliaDB Train API", **fastapi_settings)  # type: ignore
 
-application.include_router(api)
+    application.include_router(api)
 
-extend_openapi(application)
+    extend_openapi(application)
 
+    async def homepage(request: Request) -> HTMLResponse:
+        return HTMLResponse("NucliaDB Train Service")
 
-async def homepage(request: Request) -> HTMLResponse:
-    return HTMLResponse("NucliaDB Train Service")
+    # Use raw starlette routes to avoid unnecessary overhead
+    application.add_route("/", homepage)
 
-
-# Use raw starlette routes to avoid unnecessary overhead
-application.add_route("/", homepage)
+    return application
