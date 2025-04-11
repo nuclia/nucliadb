@@ -354,7 +354,7 @@ class Processor:
                         rid=uuid,
                         source=message.source,
                     )
-                    logger.warning("This message did not modify the resource")
+                    logger.info("This message did not modify the resource")
             except (
                 asyncio.TimeoutError,
                 asyncio.CancelledError,
