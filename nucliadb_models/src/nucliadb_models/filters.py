@@ -29,7 +29,7 @@ from .common import FieldTypeName, Paragraph
 from .metadata import ResourceProcessingStatus
 from .utils import DateTime
 
-F = TypeVar("F")
+F = TypeVar("F", bound=BaseModel)
 
 
 class And(BaseModel, Generic[F], extra="forbid"):
