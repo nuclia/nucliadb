@@ -34,6 +34,7 @@ async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[Resour
     resource_cache = get_or_create_resource_cache()
     orm_resource: Optional[ResourceORM] = None
     if not resource_cache.contains(uuid):
+        resource_cache.metrics.ops.inc({"type": "miss"})
         storage = await get_storage(service_name=SERVICE_NAME)
         async with get_driver().transaction(read_only=True) as transaction:
             kb = KnowledgeBoxORM(transaction, storage, kbid)
@@ -41,6 +42,7 @@ async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[Resour
             if orm_resource is not None:
                 resource_cache.set(uuid, orm_resource)
     else:
+        resource_cache.metrics.ops.inc({"type": "hit"})
         orm_resource = resource_cache.get(uuid)
     return orm_resource
 
