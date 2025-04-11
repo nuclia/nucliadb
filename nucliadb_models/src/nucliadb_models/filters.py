@@ -35,19 +35,31 @@ F = TypeVar("F")
 class And(BaseModel, Generic[F], extra="forbid"):
     """AND of other expressions"""
 
-    operands: list[F] = pydantic.Field(alias="and")
+    operands: list[F] = pydantic.Field(alias="and", min_length=1)
+
+    @pydantic.model_serializer
+    def serialize_boolean(self) -> dict[str, Any]:
+        return {"and": [op.model_dump() for op in self.operands]}
 
 
 class Or(BaseModel, Generic[F], extra="forbid"):
     """OR of other expressions"""
 
-    operands: list[F] = pydantic.Field(alias="or")
+    operands: list[F] = pydantic.Field(alias="or", min_length=1)
+
+    @pydantic.model_serializer
+    def serialize_boolean(self) -> dict[str, Any]:
+        return {"or": [op.model_dump() for op in self.operands]}
 
 
 class Not(BaseModel, Generic[F], extra="forbid"):
     """NOT another expression"""
 
     operand: F = pydantic.Field(alias="not")
+
+    @pydantic.model_serializer
+    def serialize_boolean(self) -> dict[str, Any]:
+        return {"not": self.operand.model_dump()}
 
 
 class Resource(BaseModel, extra="forbid"):
