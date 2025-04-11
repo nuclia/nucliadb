@@ -27,7 +27,6 @@ from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
 from nucliadb.middleware import ProcessTimeHeaderMiddleware
-from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import lifespan
 from nucliadb_telemetry import errors
@@ -38,7 +37,6 @@ from nucliadb_telemetry.fastapi.utils import (
 from nucliadb_utils.audit.stream import AuditMiddleware
 from nucliadb_utils.authentication import NucliaCloudAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
-from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.utilities import get_audit
 
@@ -83,19 +81,10 @@ async def ready(request: Request) -> JSONResponse:
 
 
 def create_application() -> FastAPI:
-    base_app = FastAPI(title="NucliaDB Search API", **fastapi_settings)  # type: ignore
-    base_app.include_router(api_v1)
+    application = FastAPI(title="NucliaDB Search API", **fastapi_settings)  # type: ignore
+    application.include_router(api_v1)
 
-    extend_openapi(base_app)
-
-    application = VersionedFastAPI(
-        base_app,
-        version_format="{major}",
-        prefix_format=f"/{API_PREFIX}/v{{major}}",
-        default_version=(1, 0),
-        enable_latest=False,
-        kwargs=fastapi_settings,
-    )
+    extend_openapi(application)
 
     # Use raw starlette routes to avoid unnecessary overhead
     application.add_route("/", homepage)

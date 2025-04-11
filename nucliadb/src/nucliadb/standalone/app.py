@@ -32,7 +32,6 @@ from starlette.routing import Mount
 
 import nucliadb_admin_assets  # type: ignore
 from nucliadb.middleware import ProcessTimeHeaderMiddleware
-from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
 from nucliadb.standalone.lifecycle import lifespan
@@ -45,7 +44,6 @@ from nucliadb_telemetry.fastapi.utils import (
 )
 from nucliadb_utils.audit.stream import AuditMiddleware
 from nucliadb_utils.fastapi.openapi import extend_openapi
-from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
 from nucliadb_utils.utilities import get_audit
 
@@ -109,21 +107,12 @@ def application_factory(settings: Settings) -> FastAPI:
         },
     )
 
-    base_app = FastAPI(title="NucliaDB API", **fastapi_settings)  # type: ignore
-    base_app.include_router(api_writer_v1)
-    base_app.include_router(api_reader_v1)
-    base_app.include_router(api_search_v1)
-    base_app.include_router(api_train_v1)
-    base_app.include_router(standalone_api_router)
-
-    application = VersionedFastAPI(
-        base_app,
-        version_format="{major}",
-        prefix_format=f"/{API_PREFIX}/v{{major}}",
-        default_version=(1, 0),
-        enable_latest=False,
-        kwargs=fastapi_settings,
-    )
+    application = FastAPI(title="NucliaDB API", **fastapi_settings)  # type: ignore
+    application.include_router(api_writer_v1)
+    application.include_router(api_reader_v1)
+    application.include_router(api_search_v1)
+    application.include_router(api_train_v1)
+    application.include_router(standalone_api_router)
 
     for route in application.routes:
         if isinstance(route, Mount):
