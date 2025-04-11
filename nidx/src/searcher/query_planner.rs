@@ -282,33 +282,48 @@ fn convert_entities_subgraph_into_graph_search(bfs_request: &EntitiesSubgraphReq
         })
         .collect::<Vec<_>>();
 
+    let mut subqueries = vec![];
+    if entry_points_queries.is_empty() {
+        // match any entry point
+        subqueries.push(
+            PathQuery {
+                query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
+                    operands: entry_points_queries,
+                })),
+            }
+        );
+    }
+
+    if deleted_nodes_queries.is_empty() {
+        // exclude deleted nodes
+        subqueries.push(
+            PathQuery {
+                query: Some(path_query::Query::BoolNot(Box::new(PathQuery {
+                    query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
+                        operands: deleted_nodes_queries,
+                    })),
+                }))),
+            }
+        );
+    }
+
+    if excluded_subtypes_queries.is_empty() {
+        // exclude specific subtypes
+        subqueries.push(
+            PathQuery {
+                query: Some(path_query::Query::BoolNot(Box::new(PathQuery {
+                    query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
+                        operands: excluded_subtypes_queries,
+                    })),
+                }))),
+            }
+        );
+    }
+
     let graph_query = GraphQuery {
         path: Some(PathQuery {
             query: Some(path_query::Query::BoolAnd(graph_query::BoolQuery {
-                operands: vec![
-                    // match any entry point
-                    PathQuery {
-                        query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
-                            operands: entry_points_queries,
-                        })),
-                    },
-                    // exclude deleted nodes
-                    PathQuery {
-                        query: Some(path_query::Query::BoolNot(Box::new(PathQuery {
-                            query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
-                                operands: deleted_nodes_queries,
-                            })),
-                        }))),
-                    },
-                    // exclude specific subtypes
-                    PathQuery {
-                        query: Some(path_query::Query::BoolNot(Box::new(PathQuery {
-                            query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
-                                operands: excluded_subtypes_queries,
-                            })),
-                        }))),
-                    },
-                ],
+                operands: subqueries,
             })),
         }),
     };
