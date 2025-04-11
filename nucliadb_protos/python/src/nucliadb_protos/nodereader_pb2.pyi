@@ -1472,6 +1472,7 @@ class SearchResponse(google.protobuf.message.Message):
     PARAGRAPH_FIELD_NUMBER: builtins.int
     VECTOR_FIELD_NUMBER: builtins.int
     RELATION_FIELD_NUMBER: builtins.int
+    GRAPH_FIELD_NUMBER: builtins.int
     @property
     def document(self) -> global___DocumentSearchResponse: ...
     @property
@@ -1480,6 +1481,8 @@ class SearchResponse(google.protobuf.message.Message):
     def vector(self) -> global___VectorSearchResponse: ...
     @property
     def relation(self) -> global___RelationSearchResponse: ...
+    @property
+    def graph(self) -> global___GraphSearchResponse: ...
     def __init__(
         self,
         *,
@@ -1487,9 +1490,10 @@ class SearchResponse(google.protobuf.message.Message):
         paragraph: global___ParagraphSearchResponse | None = ...,
         vector: global___VectorSearchResponse | None = ...,
         relation: global___RelationSearchResponse | None = ...,
+        graph: global___GraphSearchResponse | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["document", b"document", "paragraph", b"paragraph", "relation", b"relation", "vector", b"vector"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["document", b"document", "paragraph", b"paragraph", "relation", b"relation", "vector", b"vector"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["document", b"document", "graph", b"graph", "paragraph", b"paragraph", "relation", b"relation", "vector", b"vector"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["document", b"document", "graph", b"graph", "paragraph", b"paragraph", "relation", b"relation", "vector", b"vector"]) -> None: ...
 
 global___SearchResponse = SearchResponse
 
