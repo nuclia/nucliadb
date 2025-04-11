@@ -20,7 +20,6 @@
 from typing import Union
 
 from fastapi import Request
-from fastapi_versioning import version
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
@@ -42,7 +41,6 @@ from nucliadb_utils.exceptions import LimitsExceededError
     response_model=SummarizedResponse,
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def summarize_endpoint(
     request: Request,
     kbid: str,

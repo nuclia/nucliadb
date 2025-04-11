@@ -19,7 +19,6 @@
 #
 
 from fastapi import HTTPException, Response
-from fastapi_versioning import version
 from starlette.requests import Request
 
 from nucliadb import learning_proxy
@@ -47,7 +46,6 @@ from nucliadb_utils.utilities import get_storage
     include_in_schema=False,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
-@version(1)
 async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> CreatedVectorSet:
     try:
         await _add_vectorset(kbid, vectorset_id)
@@ -138,7 +136,6 @@ def get_vectorset_config(
     include_in_schema=False,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
-@version(1)
 async def delete_vectorset(request: Request, kbid: str, vectorset_id: str) -> Response:
     try:
         await _delete_vectorset(kbid, vectorset_id)

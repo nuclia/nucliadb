@@ -21,7 +21,6 @@ from datetime import datetime
 from typing import AsyncGenerator
 from uuid import uuid4
 
-from fastapi_versioning import version
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
@@ -68,7 +67,6 @@ from nucliadb_utils.authentication import requires_one
     response_model=CreateExportResponse,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
-@version(1)
 async def start_kb_export_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
     if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
@@ -93,7 +91,6 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
     openapi_extra={"x-hidden-operation": True},
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
-@version(1)
 async def kb_create_and_import_endpoint(request: Request):
     context = get_app_context(request.app)
 
@@ -142,7 +139,6 @@ async def kb_create_and_import_endpoint(request: Request):
     response_model=CreateImportResponse,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
-@version(1)
 async def start_kb_import_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
     if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
