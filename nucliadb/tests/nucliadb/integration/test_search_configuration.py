@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import datetime
 from unittest.mock import patch
 
 import pytest
@@ -311,21 +312,31 @@ async def test_search_configuration_merge(
             return mock.call_args[0][1]
 
     request = await run_find(
-        {"search_configuration": "one_thing", "filter_expression": {"prop": "keyword", "word": "patata"}}
+        {
+            "search_configuration": "one_thing",
+            "filter_expression": {"field": {"prop": "keyword", "word": "patata"}},
+        }
     )
     assert request.top_k == 1
-    assert request.filter_expression == ["semantic"]
+    assert request.filter_expression.field.model_dump() == {"prop": "keyword", "word": "patata"}
 
     request = await run_find(
         {
             "search_configuration": "one_thing",
             "filter_expression": {
-                "and": [
-                    {"prop:": "keyword", "word": "patata"},
-                    {"prop:": "created", "since": "2024-01-01"},
-                ]
+                "field": {
+                    "and": [
+                        {"prop": "keyword", "word": "patata"},
+                        {"prop": "created", "since": "2024-01-01"},
+                    ]
+                }
             },
         }
     )
     assert request.top_k == 1
-    assert request.filter_expression == ["semantic"]
+    assert request.filter_expression.field.model_dump() == {
+        "and": [
+            {"prop": "keyword", "word": "patata"},
+            {"prop": "created", "since": datetime.datetime(2024, 1, 1, 0, 0), "until": None},
+        ]
+    }
