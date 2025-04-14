@@ -221,8 +221,6 @@ impl<'a> GraphQueryParser<'a> {
     }
 
     pub fn parse(&self, query: GraphQuery) -> Box<dyn Query> {
-        // REVIEW: if at some point we only want to return what the query really asks (nodes,
-        // relations or paths), we may want to return the query and some kind of response builder
         match query {
             GraphQuery::NodeQuery(query) => self.parse_node_query(query),
             GraphQuery::RelationQuery(query) => self.parse_relation_query(query),
