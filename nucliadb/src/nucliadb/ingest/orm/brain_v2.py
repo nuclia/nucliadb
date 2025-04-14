@@ -166,6 +166,13 @@ class ResourceBrainV2:
             for metadata in metadatas:
                 if metadata.mime_type != "":
                     labels["mt"].add(metadata.mime_type)
+
+                labels["l"].update(
+                    f"{classification.labelset}/{classification.label}"
+                    for classification in metadata.classifications
+                    if f"{classification.labelset}/{classification.label}" not in user_cancelled_labels
+                )
+
                 for classification in metadata.classifications:
                     label = f"{classification.labelset}/{classification.label}"
                     if label not in user_cancelled_labels:
@@ -253,8 +260,9 @@ class ResourceBrainV2:
         # Splits of the field
         for subfield, field_metadata in field_computed_metadata.split_metadata.items():
             extracted_text_str = extracted_text.split_text[subfield] if extracted_text else None
+            key_prefix = f"{self.rid}/{field_key}/{subfield}/"
             for idx, paragraph in enumerate(field_metadata.paragraphs):
-                key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
+                key = f"{key_prefix}{paragraph.start}-{paragraph.end}"
                 denied_classifications = set(user_paragraph_classifications.denied.get(key, []))
                 position = TextPosition(
                     index=idx,
@@ -307,8 +315,9 @@ class ResourceBrainV2:
 
         # Main field
         extracted_text_str = extracted_text.text if extracted_text else None
+        key_prefix = f"{self.rid}/{field_key}/"
         for idx, paragraph in enumerate(field_computed_metadata.metadata.paragraphs):
-            key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
+            key = f"{key_prefix}{paragraph.start}-{paragraph.end}"
             denied_classifications = set(user_paragraph_classifications.denied.get(key, []))
             position = TextPosition(
                 index=idx,
@@ -763,6 +772,25 @@ def is_paragraph_repeated_in_field(
         repeated_in_field = False
         unique_paragraphs.add(paragraph_text)
     return repeated_in_field
+
+
+# def is_paragraph_repeated_in_field(
+#     paragraph: Paragraph,
+#     extracted_text: Optional[str],
+#     unique_paragraphs: set[str],
+# ) -> bool:
+#     if extracted_text is None:
+#         return False
+
+#     paragraph_text = extracted_text[paragraph.start : paragraph.end]
+#     if len(paragraph_text) == 0:
+#         return False
+
+#     paragraph_hash = sha256(paragraph_text.encode()).hexdigest()
+#     if paragraph_hash in unique_paragraphs:
+#         return True
+#     unique_paragraphs.add(paragraph_hash)
+#     return False
 
 
 class ParagraphPages:

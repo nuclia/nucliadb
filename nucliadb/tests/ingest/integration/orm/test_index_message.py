@@ -24,6 +24,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
+import pytest
 from faker import Faker
 
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
@@ -124,28 +125,41 @@ async def test_for_writer_bm_with_prefilter_update(
         assert len(im.vector_prefixes_to_delete) == 0
 
 
+@pytest.fixture(scope="function")
+async def big_resource(storage, maindb_driver, knowledgebox_ingest):
+    return await create_big_resource(storage, maindb_driver, knowledgebox_ingest)
+
+
 async def test_big_resource(
-    storage, maindb_driver: Driver, dummy_nidx_utility, knowledgebox_ingest: str
+    storage, maindb_driver: Driver, dummy_nidx_utility, knowledgebox_ingest: str, big_resource
 ):
-    start = time.perf_counter()
-    big_resource = await create_big_resource(storage, maindb_driver, knowledgebox_ingest)
-    end = time.perf_counter()
-    print(f"Big resource created in {end - start:.2f}s")
+    times_new = []
+    times_old = []
 
     async with maindb_driver.transaction(read_only=True) as txn:
-        im_builder = IndexMessageBuilder(big_resource)
+        for i in range(10):
+            im_builder = IndexMessageBuilder(big_resource)
+            start_new = time.perf_counter()
+            im = await im_builder.full(reindex=True)
+            end_new = time.perf_counter()
+            times_new.append(end_new - start_new)
 
-        start_new = time.perf_counter()
-        im = await im_builder.full(reindex=True)
-        end_new = time.perf_counter()
+            # start_old = time.perf_counter()
+            # await big_resource.generate_index_message(reindex=True)
+            # end_old = time.perf_counter()
+            # times_old.append(end_old - start_old)
 
-        start_old = time.perf_counter()
-        await big_resource.generate_index_message(reindex=True)
-        end_old = time.perf_counter()
-
-        print(f"New: {end_new - start_new:.2f}s")
-        print(f"Old: {end_old - start_old:.2f}s")
-
+    print("=============================")
+    print("Times for new way")
+    print("=============================")
+    print(f"p50: {int(1000 * (sum(times_new) / len(times_new)))} ms")
+    print(f"p90: {int(1000 * (sorted(times_new)[int(len(times_new) * 0.9)]))} ms")
+    print("==============================")
+    # print("Times for old way")
+    # print("==============================")
+    # print(f"p50: {int(1000 * (sum(times_old) / len(times_old)))} ms")
+    # print(f"p90: {int(1000 * (sorted(times_old)[int(len(times_old) * 0.9)]))} ms")
+    # print("==============================")
 
 
 async def create_big_resource(storage: Storage, driver: Driver, knowledgebox_ingest: str) -> Resource:

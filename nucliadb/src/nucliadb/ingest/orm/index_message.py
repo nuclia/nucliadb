@@ -181,19 +181,25 @@ class IndexMessageBuilder:
         else:
             # Simply process the fields that are in the message
             fields_to_index = get_bm_modified_fields(messages)
+        tasks = []
         for fieldid in fields_to_index:
             if fieldid in deleted_fields:
                 continue
-            await self._apply_field_index_data(
-                self.brain,
-                fieldid,
-                basic,
-                texts=prefilter_update or needs_texts_update(fieldid, messages),
-                paragraphs=needs_paragraphs_update(fieldid, messages),
-                relations=False,  # Relations at the field level are not modified by the writer
-                vectors=False,  # Vectors are never added by the writer
-                replace=not resource_created,
+            tasks.append(
+                asyncio.create_task(
+                    self._apply_field_index_data(
+                        self.brain,
+                        fieldid,
+                        basic,
+                        texts=prefilter_update or needs_texts_update(fieldid, messages),
+                        paragraphs=needs_paragraphs_update(fieldid, messages),
+                        relations=False,  # Relations at the field level are not modified by the writer
+                        vectors=False,  # Vectors are never added by the writer
+                        replace=not resource_created,
+                    )
+                )
             )
+        await asyncio.gather(*tasks)
         return self.brain.brain
 
     @observer.wrap({"type": "processor_bm"})
@@ -237,18 +243,24 @@ class IndexMessageBuilder:
             for field_type, field_id in await self.resource.get_fields(force=True)
         ]
         vectorsets_configs = await self.get_vectorsets_configs()
+        tasks = []
         for fieldid in fields_to_index:
-            await self._apply_field_index_data(
-                self.brain,
-                fieldid,
-                basic,
-                texts=True,
-                paragraphs=True,
-                relations=True,
-                vectors=True,
-                replace=reindex,
-                vectorset_configs=vectorsets_configs,
+            tasks.append(
+                asyncio.create_task(
+                    self._apply_field_index_data(
+                        self.brain,
+                        fieldid,
+                        basic,
+                        texts=True,
+                        paragraphs=True,
+                        relations=True,
+                        vectors=True,
+                        replace=reindex,
+                        vectorset_configs=vectorsets_configs,
+                    )
+                )
             )
+        await asyncio.gather(*tasks)
         return self.brain.brain
 
     async def get_basic(self) -> Basic:
