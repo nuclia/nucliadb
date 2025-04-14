@@ -72,7 +72,9 @@ async def generate_field_streaming_payloads(
 
     for status in trainset.filter.status:
         request.filter.labels.append(f"/n/s/{status}")
+
     total = 0
+    resources = set()
 
     async for document_item in node.stream_get_fields(request):
         text_labels = []
@@ -81,6 +83,7 @@ async def generate_field_streaming_payloads(
 
         field_id = f"{document_item.uuid}{document_item.field}"
         total += 1
+        resources.add(document_item.uuid)
 
         field_parts = document_item.field.split("/")
         if len(field_parts) == 3:
@@ -116,6 +119,25 @@ async def generate_field_streaming_payloads(
         tl.labels.extend(text_labels)
 
         yield tl
+
+        if total % 1000 == 0:
+            logger.info(
+                "Field streaming in progress",
+                extra={
+                    "fields": total,
+                    "resources": len(resources),
+                    "kbid": kbid,
+                },
+            )
+
+    logger.info(
+        "Field streaming finished",
+        extra={
+            "fields": total,
+            "resources": len(resources),
+            "kbid": kbid,
+        },
+    )
 
 
 async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> Optional[ExtractedText]:
