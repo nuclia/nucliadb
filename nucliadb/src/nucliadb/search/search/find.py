@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-from dataclasses import dataclass
 from time import time
 from typing import Optional
 
@@ -243,12 +242,6 @@ async def _external_index_retrieval(
     )
 
     return retrieval_results, incomplete_results, query_parser
-
-
-@dataclass
-class ScoredParagraph:
-    id: str
-    score: float
 
 
 async def query_parser_from_find_request(
