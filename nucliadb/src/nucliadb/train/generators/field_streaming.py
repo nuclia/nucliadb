@@ -127,6 +127,7 @@ async def generate_field_streaming_payloads(
                     "fields": total,
                     "resources": len(resources),
                     "kbid": kbid,
+                    "shard_replica_id": shard_replica_id,
                 },
             )
 
@@ -136,6 +137,7 @@ async def generate_field_streaming_payloads(
             "fields": total,
             "resources": len(resources),
             "kbid": kbid,
+            "shard_replica_id": shard_replica_id,
         },
     )
 
