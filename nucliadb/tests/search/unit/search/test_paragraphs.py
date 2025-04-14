@@ -23,8 +23,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from nucliadb.common.cache import ExtractedTextCache
 from nucliadb.common.ids import ParagraphId
-from nucliadb.search.search import cache, paragraphs
+from nucliadb.search.search import paragraphs
 from nucliadb.search.search.cache import set_extracted_text_cache
 from nucliadb_protos.utils_pb2 import ExtractedText
 
@@ -114,18 +115,18 @@ async def test_get_field_extracted_text_is_not_cached_when_none(field):
 
 
 def test_extracted_text_cache():
-    etcache = cache.ExtractedTextCache()
-    assert etcache.get_value("foo") is None
+    etcache = ExtractedTextCache()
+    assert etcache.get("foo") is None
 
     assert isinstance(etcache.get_lock("foo"), asyncio.Lock)
     assert len(etcache.locks) == 1
 
-    etcache.set_value("foo", "bar")
-    assert len(etcache.values) == 1
+    etcache.set("foo", "bar")
+    assert len(etcache.cache) == 1
 
-    assert etcache.get_value("foo") == "bar"
+    assert etcache.get("foo") == "bar"
 
     etcache.clear()
 
-    assert len(etcache.values) == 0
+    assert len(etcache.cache) == 0
     assert len(etcache.locks) == 0

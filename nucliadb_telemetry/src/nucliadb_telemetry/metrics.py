@@ -193,6 +193,24 @@ class Gauge:
         else:
             self.gauge.set(value)
 
+    def inc(self, value: Union[float, int], labels: Optional[Dict[str, str]] = None):
+        merged_labels = self.labels.copy()
+        merged_labels.update(labels or {})
+
+        if len(merged_labels) > 0:
+            self.gauge.labels(**merged_labels).inc(value)
+        else:
+            self.gauge.inc(value)
+
+    def dec(self, value: Union[float, int], labels: Optional[Dict[str, str]] = None):
+        merged_labels = self.labels.copy()
+        merged_labels.update(labels or {})
+
+        if len(merged_labels) > 0:
+            self.gauge.labels(**merged_labels).dec(value)
+        else:
+            self.gauge.dec(value)
+
     def remove(self, labels: Dict[str, str]):
         self.gauge.remove(*[labels[k] for k in self.labels.keys()])
 
