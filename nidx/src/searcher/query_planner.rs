@@ -20,7 +20,12 @@
 
 use nidx_paragraph::ParagraphSearchRequest;
 use nidx_protos::filter_expression::Expr;
-use nidx_protos::{FilterExpression, FilterOperator, RelationSearchRequest, SearchRequest};
+use nidx_protos::graph_query::{self, PathQuery, path_query};
+use nidx_protos::graph_search_request::QueryKind;
+use nidx_protos::search_request::GraphSearch;
+use nidx_protos::{
+    EntitiesSubgraphRequest, FilterExpression, FilterOperator, GraphQuery, GraphSearchRequest, SearchRequest,
+};
 use nidx_text::DocumentSearchRequest;
 use nidx_text::prefilter::*;
 use nidx_types::prefilter::PrefilterResult;
@@ -37,7 +42,7 @@ pub struct IndexQueries {
     pub vectors_request: Option<VectorSearchRequest>,
     pub paragraphs_request: Option<ParagraphSearchRequest>,
     pub texts_request: Option<DocumentSearchRequest>,
-    pub relations_request: Option<RelationSearchRequest>,
+    pub relations_request: Option<GraphSearchRequest>,
 }
 
 impl IndexQueries {
@@ -65,7 +70,7 @@ pub struct QueryPlan {
 }
 
 pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPlan> {
-    let relations_request = compute_relations_request(&search_request);
+    let graph_request = compute_relations_request(&search_request)?;
     let texts_request = compute_texts_request(&search_request);
     let vectors_request = compute_vectors_request(&search_request)?;
     let paragraphs_request = compute_paragraphs_request(&search_request)?;
@@ -79,7 +84,7 @@ pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPl
             vectors_request,
             paragraphs_request,
             texts_request,
-            relations_request,
+            relations_request: graph_request,
         },
     })
 }
@@ -171,14 +176,153 @@ fn compute_vectors_request(search_request: &SearchRequest) -> anyhow::Result<Opt
     }))
 }
 
-fn compute_relations_request(search_request: &SearchRequest) -> Option<RelationSearchRequest> {
-    search_request.relation_subgraph.as_ref()?;
+#[allow(deprecated)]
+fn compute_relations_request(search_request: &SearchRequest) -> anyhow::Result<Option<GraphSearchRequest>> {
+    let graph_search = match (
+        search_request.relation_subgraph.as_ref(),
+        search_request.graph_search.as_ref(),
+    ) {
+        (None, None) => return Ok(None),
+        (Some(_), Some(_)) => {
+            return Err(anyhow::anyhow!(
+                "Entities subgraph and graph search are mutually exclusive features"
+            ));
+        }
+        (Some(bfs_request), None) => {
+            // Bw/c: we'll convert the entities subgraph request into a graph request
+            convert_entities_subgraph_into_graph_search(bfs_request)
+        }
+        (None, Some(graph_search)) => graph_search.clone(),
+    };
 
-    #[allow(deprecated)]
-    Some(RelationSearchRequest {
-        shard_id: search_request.shard.clone(),
-        subgraph: search_request.relation_subgraph.clone(),
-    })
+    Ok(Some(GraphSearchRequest {
+        query: graph_search.query,
+        top_k: std::cmp::max(search_request.result_per_page as u32, 20),
+        kind: QueryKind::Path.into(),
+        // we don't need to populate filters nor shard as they won't be used in search. Prefilter
+        // will be done with request filters and shard have been already obtained
+        ..Default::default()
+    }))
+}
+
+fn convert_entities_subgraph_into_graph_search(bfs_request: &EntitiesSubgraphRequest) -> GraphSearch {
+    if bfs_request.entry_points.is_empty() {
+        return GraphSearch { query: None };
+    }
+
+    // Entry points are source or target nodes we want to search for. We want any undirected
+    // path containing any entry point
+    let entry_points_queries: Vec<PathQuery> = bfs_request
+        .entry_points
+        .iter()
+        .map(|entry_point| PathQuery {
+            query: Some(path_query::Query::Path(graph_query::Path {
+                source: Some(graph_query::Node {
+                    value: Some(entry_point.value.clone()),
+                    node_type: Some(entry_point.ntype),
+                    node_subtype: Some(entry_point.subtype.clone()),
+                    ..Default::default()
+                }),
+                undirected: true,
+                ..Default::default()
+            })),
+        })
+        .collect();
+
+    // A query can specifiy nodes marked as deleted in the db (but not removed from the index).
+    // We want to exclude any path containing any of those nodes.
+    //
+    // The request groups values per subtype (to optimize request size) but, as we don't support
+    // OR at node value level, we'll split them.
+    let deleted_nodes_queries: Vec<PathQuery> = bfs_request
+        .deleted_entities
+        .iter()
+        .flat_map(|deleted_nodes| {
+            if deleted_nodes.node_values.is_empty() {
+                return None;
+            }
+            let subtype = &deleted_nodes.node_subtype;
+
+            let subqueries = deleted_nodes
+                .node_values
+                .iter()
+                .map(|deleted_entity_value| PathQuery {
+                    query: Some(path_query::Query::Path(graph_query::Path {
+                        source: Some(graph_query::Node {
+                            value: Some(deleted_entity_value.clone()),
+                            node_subtype: Some(subtype.clone()),
+                            ..Default::default()
+                        }),
+                        undirected: true,
+                        ..Default::default()
+                    })),
+                })
+                .collect::<Vec<_>>();
+            Some(subqueries)
+        })
+        .flatten()
+        .collect();
+
+    // Subtypes can also be marked as deleted in the db (but kept in the index). We also
+    // want to exclude any triplet containg a node with such subtypes
+    let excluded_subtypes_queries: Vec<PathQuery> = bfs_request
+        .deleted_groups
+        .iter()
+        .map(|deleted_subtype| PathQuery {
+            query: Some(path_query::Query::Path(graph_query::Path {
+                source: Some(graph_query::Node {
+                    node_subtype: Some(deleted_subtype.clone()),
+                    ..Default::default()
+                }),
+                undirected: true,
+                ..Default::default()
+            })),
+        })
+        .collect::<Vec<_>>();
+
+    let mut subqueries = vec![];
+    if !entry_points_queries.is_empty() {
+        // match any entry point
+        subqueries.push(PathQuery {
+            query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
+                operands: entry_points_queries,
+            })),
+        });
+    }
+
+    if !deleted_nodes_queries.is_empty() {
+        // exclude deleted nodes
+        subqueries.push(PathQuery {
+            query: Some(path_query::Query::BoolNot(Box::new(PathQuery {
+                query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
+                    operands: deleted_nodes_queries,
+                })),
+            }))),
+        });
+    }
+
+    if !excluded_subtypes_queries.is_empty() {
+        // exclude specific subtypes
+        subqueries.push(PathQuery {
+            query: Some(path_query::Query::BoolNot(Box::new(PathQuery {
+                query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {
+                    operands: excluded_subtypes_queries,
+                })),
+            }))),
+        });
+    }
+
+    let graph_query = GraphQuery {
+        path: Some(PathQuery {
+            query: Some(path_query::Query::BoolAnd(graph_query::BoolQuery {
+                operands: subqueries,
+            })),
+        }),
+    };
+
+    GraphSearch {
+        query: Some(graph_query),
+    }
 }
 
 pub fn filter_to_boolean_expression(filter: FilterExpression) -> anyhow::Result<BooleanExpression<String>> {

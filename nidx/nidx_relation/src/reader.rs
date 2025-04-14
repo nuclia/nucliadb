@@ -169,6 +169,8 @@ impl RelationsReaderService {
                 relation: relation_idx as u32,
                 destination: destination_idx as u32,
                 metadata: io_maps::decode_metadata(&self.schema, &doc),
+                resource_field_id: io_maps::doc_to_resource_field_id(&self.schema, &doc),
+                facets: io_maps::doc_to_facets(&self.schema, &doc),
             })
         }
 
@@ -289,6 +291,7 @@ impl RelationsReaderService {
         })
     }
 
+    // TODO: remove unused method
     fn entities_subgraph_search(
         &self,
         request: &RelationSearchRequest,
