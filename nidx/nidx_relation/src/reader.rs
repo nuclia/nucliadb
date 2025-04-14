@@ -291,6 +291,7 @@ impl RelationsReaderService {
         })
     }
 
+    // TODO: remove unused method
     fn entities_subgraph_search(
         &self,
         request: &RelationSearchRequest,
