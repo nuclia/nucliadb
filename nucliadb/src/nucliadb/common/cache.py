@@ -91,6 +91,7 @@ class Cache(Generic[T], ABC):
     def __del__(self):
         # we want to clear the cache before deleting the object and set the
         # metric appropriately
+        # XXX: apparently, this doesn't work properly. Don't rely on it
         self.clear()
 
     @abstractmethod
@@ -164,7 +165,7 @@ def delete_resource_cache() -> None:
     cache = rcache.get()
     if cache is not None:
         rcache.set(None)
-        del cache
+        cache.clear()
 
 
 def get_extracted_text_cache() -> Optional[ExtractedTextCache]:
@@ -180,4 +181,4 @@ def delete_extracted_text_cache() -> None:
     cache = etcache.get()
     if cache is not None:
         etcache.set(None)
-        del cache
+        cache.clear()
