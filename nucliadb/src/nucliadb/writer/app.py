@@ -26,6 +26,7 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import ClientDisconnect
 from starlette.responses import HTMLResponse
 
+from nucliadb.common.api import API_VERSION
 from nucliadb.writer.api.v1.router import api as api_v1
 from nucliadb.writer.lifecycle import lifespan
 from nucliadb_telemetry import errors
@@ -58,7 +59,7 @@ fastapi_settings = dict(
 def create_application() -> FastAPI:
     application = FastAPI(
         title="NucliaDB Writer API",
-        version="1.0",
+        version=API_VERSION,
         **fastapi_settings,  # type: ignore
     )
 

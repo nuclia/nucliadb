@@ -31,6 +31,7 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
 import nucliadb_admin_assets  # type: ignore
+from nucliadb.common.api import API_VERSION
 from nucliadb.middleware import ProcessTimeHeaderMiddleware
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
@@ -109,7 +110,7 @@ def application_factory(settings: Settings) -> FastAPI:
 
     application = FastAPI(
         title="NucliaDB API",
-        version="1.0",
+        version=API_VERSION,
         **fastapi_settings,  # type: ignore
     )
     application.include_router(api_writer_v1)

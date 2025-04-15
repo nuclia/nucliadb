@@ -26,6 +26,7 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
+from nucliadb.common.api import API_VERSION
 from nucliadb.middleware import ProcessTimeHeaderMiddleware
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import lifespan
@@ -83,7 +84,7 @@ async def ready(request: Request) -> JSONResponse:
 def create_application() -> FastAPI:
     application = FastAPI(
         title="NucliaDB Search API",
-        version="1.0",
+        version=API_VERSION,
         **fastapi_settings,  # type: ignore
     )
     application.include_router(api_v1)
