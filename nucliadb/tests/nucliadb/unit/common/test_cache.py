@@ -61,3 +61,14 @@ def test_cache_decorator():
         assert cache.get("c") == 3
 
     assert len(cache) == 0, "decorator should cleanup the cache"
+
+
+def test_cache_cleanup_with_errors():
+    try:
+        with dummy_cache(2) as cache:
+            cache.set("b", 2)
+            raise Exception
+    except Exception:
+        pass
+
+    assert len(cache) == 0, "decorator should cleanup the cache on error"

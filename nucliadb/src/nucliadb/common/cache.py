@@ -150,9 +150,11 @@ def _use_cache(klass: type[Cache], context_var: ContextVar, /, **kwargs):
     """
     cache = klass(**kwargs)
     token = context_var.set(cache)
-    yield cache
-    context_var.reset(token)
-    cache.clear()
+    try:
+        yield cache
+    finally:
+        context_var.reset(token)
+        cache.clear()
 
 
 @contextlib.contextmanager
