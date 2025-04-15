@@ -20,7 +20,7 @@
 
 from typing import Any, AsyncGenerator, AsyncIterator, Optional, Type
 
-from nucliadb.common.cache import get_or_create_resource_cache
+from nucliadb.common.cache import get_resource_cache
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -31,20 +31,28 @@ from nucliadb_utils.utilities import get_storage
 
 
 async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[ResourceORM]:
-    resource_cache = get_or_create_resource_cache()
+    resource_cache = get_resource_cache()
     orm_resource: Optional[ResourceORM] = None
-    if not resource_cache.contains(uuid):
+    if resource_cache is None:
+        return await _get_resource_from_db(kbid, uuid)
+        logger.warning("Resource cache is not set")
+
+    if uuid not in resource_cache:
         resource_cache.metrics.ops.inc({"type": "miss"})
-        storage = await get_storage(service_name=SERVICE_NAME)
-        async with get_driver().transaction(read_only=True) as transaction:
-            kb = KnowledgeBoxORM(transaction, storage, kbid)
-            orm_resource = await kb.get(uuid)
-            if orm_resource is not None:
-                resource_cache.set(uuid, orm_resource)
+        orm_resource = await _get_resource_from_db(kbid, uuid)
+        if orm_resource is not None:
+            resource_cache.set(uuid, orm_resource)
     else:
         resource_cache.metrics.ops.inc({"type": "hit"})
         orm_resource = resource_cache.get(uuid)
     return orm_resource
+
+
+async def _get_resource_from_db(kbid: str, uuid: str) -> Optional[ResourceORM]:
+    storage = await get_storage(service_name=SERVICE_NAME)
+    async with get_driver().transaction(read_only=True) as transaction:
+        kb = KnowledgeBoxORM(transaction, storage, kbid)
+        return await kb.get(uuid)
 
 
 async def get_paragraph(kbid: str, paragraph_id: str) -> str:

@@ -19,6 +19,7 @@
 #
 
 import asyncio
+import contextlib
 from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -80,19 +81,13 @@ class Cache(Generic[T], ABC):
         if len_after - len_before > 0:
             self.metrics._cache_size.inc(len_after - len_before)
 
-    def contains(self, key: str) -> bool:
-        return key in self.cache
+    def __contains__(self, key: str) -> bool:
+        return self.cache.__contains__(key)
 
     def clear(self):
         self.metrics._cache_size.dec(len(self.cache))
         self.cache.clear()
         self.locks.clear()
-
-    def __del__(self):
-        # we want to clear the cache before deleting the object and set the
-        # metric appropriately
-        # XXX: apparently, this doesn't work properly. Don't rely on it
-        self.clear()
 
     @abstractmethod
     @cached_property
@@ -104,11 +99,6 @@ class ResourceCache(Cache[ResourceORM]):
         _cache_size=cached_resources,
         ops=resource_cache_ops,
     )
-
-    # This cache size is an arbitrary number, once we have a metric in place and
-    # we analyze memory consumption, we can adjust it with more knoweldge
-    def __init__(self, cache_size: int = 128) -> None:
-        super().__init__(cache_size)
 
 
 class ExtractedTextCache(Cache[ExtractedText]):
@@ -126,9 +116,6 @@ class ExtractedTextCache(Cache[ExtractedText]):
         ops=extracted_text_cache_ops,
     )
 
-    def __init__(self, cache_size: int = 128):
-        super().__init__(cache_size)
-
 
 # Global caches (per asyncio task)
 
@@ -139,46 +126,44 @@ etcache: ContextVar[Optional[ExtractedTextCache]] = ContextVar("etcache", defaul
 # Cache management
 
 
-# Get or create a resource cache specific to the current asyncio task (and all
-# its subtasks). If you spawn subtasks that use this cache, make sure to create
-# it in the parent task, otherwise each subtask will have its own independent
-# cache instance
-def get_or_create_resource_cache(clear: bool = False) -> ResourceCache:
-    cache: Optional[ResourceCache] = rcache.get()
-    if cache is None or clear:
-        cache = ResourceCache()
-        rcache.set(cache)
-    return cache
-
-
 def get_resource_cache() -> Optional[ResourceCache]:
     return rcache.get()
-
-
-def set_resource_cache() -> None:
-    cache = ResourceCache()
-    rcache.set(cache)
-
-
-# Delete resource cache and all its content
-def delete_resource_cache() -> None:
-    cache = rcache.get()
-    if cache is not None:
-        rcache.set(None)
-        cache.clear()
 
 
 def get_extracted_text_cache() -> Optional[ExtractedTextCache]:
     return etcache.get()
 
 
-def set_extracted_text_cache() -> None:
-    value = ExtractedTextCache()
-    etcache.set(value)
+@contextlib.contextmanager
+def _use_cache(klass: type[Cache], context_var: ContextVar, /, **kwargs):
+    """Context manager that manages a context var cache. It's responsible of
+    cache creation and cleanup.
 
+    Note the configured cache is specific to the current asyncio task (and all
+    its subtasks). If you spawn subtasks that should share a cache, make sure
+    the parent task is the one using this decorator, otherwise, each subtask
+    will use its own independent cache instance
 
-def delete_extracted_text_cache() -> None:
-    cache = etcache.get()
-    if cache is not None:
-        etcache.set(None)
+    Do not use the cache object outside the scope of this context manager!
+    Otherwise, metrics and cleanup could get wrong.
+
+    """
+    cache = klass(**kwargs)
+    token = context_var.set(cache)
+    try:
+        yield cache
+    finally:
+        context_var.reset(token)
         cache.clear()
+
+
+@contextlib.contextmanager
+def resource_cache(size: int):
+    with _use_cache(ResourceCache, rcache, cache_size=size) as cache:
+        yield cache
+
+
+@contextlib.contextmanager
+def extracted_text_cache(size: int):
+    with _use_cache(ExtractedTextCache, etcache, cache_size=size) as cache:
+        yield cache

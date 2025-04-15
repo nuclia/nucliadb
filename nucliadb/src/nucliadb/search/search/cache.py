@@ -24,12 +24,10 @@ from typing import Optional
 import backoff
 
 from nucliadb.common.cache import (
-    delete_extracted_text_cache,
-    delete_resource_cache,
+    extracted_text_cache,
     get_extracted_text_cache,
     get_resource_cache,
-    set_extracted_text_cache,
-    set_resource_cache,
+    resource_cache,
 )
 from nucliadb.common.ids import FieldId
 from nucliadb.common.maindb.utils import get_driver
@@ -55,7 +53,7 @@ async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
         return await _orm_get_resource(kbid, uuid)
 
     async with resource_cache.get_lock(uuid):
-        if not resource_cache.contains(uuid):
+        if uuid not in resource_cache:
             resource_cache.metrics.ops.inc({"type": "miss"})
             orm_resource = await _orm_get_resource(kbid, uuid)
         else:
@@ -146,10 +144,9 @@ def request_caches():
     ...     resource = await get_resource(kbid, uuid)
     ...     extracted_text = await get_extracted_text_from_field_id(kbid, rid, field_id)
     """
-    set_resource_cache()
-    set_extracted_text_cache()
-    try:
+
+    # This cache size is an arbitrary number, once we have a metric in place and
+    # we analyze memory consumption, we can adjust it with more knoweldge
+    cache_size = 50
+    with resource_cache(cache_size), extracted_text_cache(cache_size):
         yield
-    finally:
-        delete_resource_cache()
-        delete_extracted_text_cache()

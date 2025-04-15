@@ -22,6 +22,7 @@ from typing import AsyncIterator, Optional
 
 from fastapi import HTTPException
 
+from nucliadb.common.cache import resource_cache
 from nucliadb.train.generators.field_classifier import (
     field_classification_batch_generator,
 )
@@ -85,7 +86,10 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             detail=f"Invalid train type '{TaskType.Name(trainset.type)}'",
         )
 
-    async for item in batch_generator:
-        payload = item.SerializeToString()
-        yield len(payload).to_bytes(4, byteorder="big", signed=False)
-        yield payload
+    # This cache size is an arbitrary number, once we have a metric in place and
+    # we analyze memory consumption, we can adjust it with more knoweldge
+    with resource_cache(size=20):
+        async for item in batch_generator:
+            payload = item.SerializeToString()
+            yield len(payload).to_bytes(4, byteorder="big", signed=False)
+            yield payload
