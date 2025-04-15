@@ -81,7 +81,11 @@ async def ready(request: Request) -> JSONResponse:
 
 
 def create_application() -> FastAPI:
-    application = FastAPI(title="NucliaDB Search API", **fastapi_settings)  # type: ignore
+    application = FastAPI(
+        title="NucliaDB Search API",
+        version="1.0",
+        **fastapi_settings,  # type: ignore
+    )
     application.include_router(api_v1)
 
     extend_openapi(application)

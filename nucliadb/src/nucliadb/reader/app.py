@@ -64,7 +64,11 @@ fastapi_settings = dict(
 
 
 def create_application() -> FastAPI:
-    application = FastAPI(title="NucliaDB Reader API", **fastapi_settings)  # type: ignore
+    application = FastAPI(
+        title="NucliaDB Reader API",
+        version="1.0",
+        **fastapi_settings,  # type: ignore
+    )
 
     application.include_router(api_v1)
 

@@ -107,7 +107,11 @@ def application_factory(settings: Settings) -> FastAPI:
         },
     )
 
-    application = FastAPI(title="NucliaDB API", **fastapi_settings)  # type: ignore
+    application = FastAPI(
+        title="NucliaDB API",
+        version="1.0",
+        **fastapi_settings,  # type: ignore
+    )
     application.include_router(api_writer_v1)
     application.include_router(api_reader_v1)
     application.include_router(api_search_v1)
