@@ -23,7 +23,7 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
 import pyarrow as pa  # type: ignore
 
-from nucliadb_dataset.streamer import Streamer, StreamerAlreadyRunning
+from nucliadb_dataset.streamer import Streamer
 from nucliadb_dataset.tasks import (
     ACTUAL_PARTITION,
     TASK_DEFINITIONS,
@@ -145,14 +145,6 @@ class NucliaDBDataset(NucliaDataset):
             self.reader_sdk = sdk
         else:
             self.reader_sdk = reader_sdk
-
-        self.streamer = Streamer(
-            self.trainset,
-            reader_headers=self.train_sdk.headers,
-            base_url=self.train_sdk.base_url,
-            kbid=kbid,
-        )
-
         self._set_schema(self.task_definition.schema)
         self._set_mappings(self.task_definition.mapping)
 
@@ -160,6 +152,19 @@ class NucliaDBDataset(NucliaDataset):
         for func in self.mappings:
             batch = func(batch, self.schema)
         return batch
+
+    def get_streamer_for_partition(
+        self,
+        partition_id: str,
+    ) -> Streamer:
+        streamer = Streamer(
+            self.trainset,
+            reader_headers=self.train_sdk.headers,
+            base_url=self.train_sdk.base_url,
+            kbid=self.kbid,
+        )
+        streamer.initialize(partition_id)
+        return streamer
 
     def _set_mappings(self, funcs: List[Callable[[Any, Any], Tuple[Any, Any]]]):
         self.mappings = funcs
@@ -186,8 +191,7 @@ class NucliaDBDataset(NucliaDataset):
         """
         Export an arrow partition from a live NucliaDB and store it locally
         """
-        if self.streamer.initialized:
-            raise StreamerAlreadyRunning()
+        streamer = self.get_streamer_for_partition(partition_id)
 
         if filename is None:
             filename = partition_id
@@ -200,18 +204,17 @@ class NucliaDBDataset(NucliaDataset):
         if os.path.exists(filename) and force is False:
             return filename
 
-        self.streamer.initialize(partition_id)
         filename_tmp = f"{filename}.tmp"
-        print(f"Generating partition {partition_id} from {self.streamer.base_url} at {filename}")
+        print(f"Generating partition {partition_id} from {streamer.base_url} at {filename}")
         with open(filename_tmp, "wb") as sink:
             with pa.ipc.new_stream(sink, self.schema) as writer:
-                for batch in self.streamer:
+                for batch in streamer:
                     batch = self._map(batch)
                     if batch is None:
                         break
                     writer.write_batch(batch)
         print("-" * 10)
-        self.streamer.finalize()
+        streamer.finalize()
         os.rename(filename_tmp, filename)
         return filename
 

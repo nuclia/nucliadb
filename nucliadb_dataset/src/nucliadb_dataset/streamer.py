@@ -27,10 +27,6 @@ from nucliadb_protos.dataset_pb2 import TrainSet
 SIZE_BYTES = 4
 
 
-class StreamerAlreadyRunning(Exception):
-    pass
-
-
 class Streamer:
     resp: Optional[requests.Response]
 
@@ -59,6 +55,7 @@ class Streamer:
             data=self.trainset.SerializeToString(),
             stream=True,
         )
+        self.resp.raise_for_status()
 
     def finalize(self):
         if self.resp is not None:
@@ -69,8 +66,7 @@ class Streamer:
         return self
 
     def read(self) -> Optional[bytes]:
-        if self.resp is None:
-            raise Exception("Not initialized")
+        assert self.resp is not None, "Streamer not initialized"
         try:
             header = self.resp.raw.read(4, decode_content=True)
             payload_size = int.from_bytes(header, byteorder="big", signed=False)  # noqa
