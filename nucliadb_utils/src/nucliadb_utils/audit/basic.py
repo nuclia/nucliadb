@@ -71,6 +71,7 @@ class BasicAuditStorage(AuditStorage):
         search: SearchRequest,
         timeit: float,
         resources: int,
+        retrieval_rephrased_question: Optional[str] = None,
     ):
         logger.debug(f"SEARCH {kbid} {user} {origin} ''{search}'' {timeit} {resources}")
 
@@ -82,6 +83,7 @@ class BasicAuditStorage(AuditStorage):
         origin: str,
         question: str,
         rephrased_question: Optional[str],
+        retrieval_rephrased_question: Optional[str],
         chat_context: List[ChatContext],
         retrieved_context: List[RetrievedContext],
         answer: Optional[str],
