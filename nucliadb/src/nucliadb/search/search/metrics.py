@@ -26,6 +26,7 @@ from nucliadb_telemetry import metrics
 merge_observer = metrics.Observer("merge_results", labels={"type": ""})
 node_features = metrics.Counter("nucliadb_node_features", labels={"type": ""})
 query_parse_dependency_observer = metrics.Observer("query_parse_dependency", labels={"type": ""})
+query_parser_observer = metrics.Observer("nucliadb_query_parser", labels={"type": ""})
 
 buckets = [
     0.005,
