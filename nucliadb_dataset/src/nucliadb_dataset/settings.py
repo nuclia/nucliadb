@@ -26,7 +26,6 @@ from pydantic_settings import BaseSettings
 
 from nucliadb_dataset import ExportType
 from nucliadb_dataset.tasks import Task
-from nucliadb_sdk.v2.sdk import Region
 
 
 class Settings(BaseSettings):
@@ -52,7 +51,7 @@ class RunningSettings(BaseSettings):
 
     apikey: Optional[str] = pydantic.Field(None, description="API key to upload to Nuclia Datasets™")
 
-    environment: Region = pydantic.Field(Region.ON_PREM, description="region or on-prem")
+    environment: str = pydantic.Field("on-prem", description="region or on-prem")
 
     service_token: Optional[str] = pydantic.Field(
         None, description="Service account key to access Nuclia Cloud"

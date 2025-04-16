@@ -35,7 +35,7 @@ from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.trainset import TrainSetPartitions
 from nucliadb_protos.dataset_pb2 import TrainSet
-from nucliadb_sdk.v2.sdk import NucliaDB, Region
+from nucliadb_sdk.v2.sdk import NucliaDB
 
 CHUNK_SIZE = 5 * 1024 * 1024
 
@@ -226,7 +226,7 @@ def download_all_partitions(
     labels: Optional[List[str]] = None,
 ):
     if sdk is None:
-        sdk = NucliaDB(region=Region.ON_PREM, url=nucliadb_base_url)
+        sdk = NucliaDB(region="on-prem", url=nucliadb_base_url)
 
     if kbid is None and slug is not None:
         kb: KnowledgeBoxObj = sdk.get_knowledge_box_by_slug(slug=slug)

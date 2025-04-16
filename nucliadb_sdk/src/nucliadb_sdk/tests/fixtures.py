@@ -174,13 +174,13 @@ def nucliadb(pg):
 
 @pytest.fixture(scope="session")
 def sdk(nucliadb: NucliaFixture):
-    sdk = nucliadb_sdk.NucliaDB(region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url)
+    sdk = nucliadb_sdk.NucliaDB(region="on-prem", url=nucliadb.url)
     return sdk
 
 
 @pytest.fixture(scope="function")
 def sdk_async(nucliadb: NucliaFixture):
-    sdk = nucliadb_sdk.NucliaDBAsync(region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url)
+    sdk = nucliadb_sdk.NucliaDBAsync(region="on-prem", url=nucliadb.url)
     return sdk
 
 
@@ -199,7 +199,7 @@ async def init_fixture(
     dataset_slug: str,
     dataset_location: str,
 ):
-    sdk = nucliadb_sdk.NucliaDB(region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url)
+    sdk = nucliadb_sdk.NucliaDB(region="on-prem", url=nucliadb.url)
     slug = uuid.uuid4().hex
     kb_obj = sdk.create_knowledge_box(slug=slug)
     kbid = kb_obj.uuid

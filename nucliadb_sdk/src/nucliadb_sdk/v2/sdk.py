@@ -792,19 +792,16 @@ class _NucliaDBBase:
     def __init__(
         self,
         *,
-        region: Region = Region.EUROPE1,
+        region: Union[str, Region] = "europe-1",
         api_key: Optional[str] = None,
         url: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = None,
     ):
-        try:
-            self.region: str = Region(region).value
-        except ValueError:
-            warnings.warn(
-                f"Unknown region '{region}'. Supported regions are: {[r.value for r in Region]}"
-            )
-            self.region = region  # type: ignore
+        if isinstance(region, Region):
+            warnings.warn(f"Passing Region enum is deprecated. Use the string instead: {region.value}")
+            region = str(region.value)
+        self.region: str = region
         self.api_key = api_key
         headers = headers or {}
         if self.region == Region.ON_PREM.value:
@@ -878,14 +875,14 @@ class NucliaDB(_NucliaDBBase):
     Example usage
 
     >>> from nucliadb_sdk import *
-    >>> sdk = NucliaDB(region=Region.EUROPE1, api_key="api-key")
+    >>> sdk = NucliaDB(region="europe-1", api_key="api-key")
     >>> sdk.list_resources(kbid='my-kbid')
     """
 
     def __init__(
         self,
         *,
-        region: Region = Region.EUROPE1,
+        region: Union[str, Region] = "europe-1",
         api_key: Optional[str] = None,
         url: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
@@ -918,7 +915,7 @@ class NucliaDB(_NucliaDBBase):
         If you are connecting to a NucliaDB on-prem instance, you will need to specify the URL as follows:
 
         >>> from nucliadb_sdk import NucliaDB, Region
-        >>> sdk = NucliaDB(api_key="api-key", region=Region.ON_PREM, url=\"http://localhost:8080\")
+        >>> sdk = NucliaDB(api_key="api-key", url=\"http://localhost:8080\")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
         self.session = httpx.Client(headers=self.headers, base_url=self.base_url, timeout=timeout)
@@ -1074,14 +1071,14 @@ class NucliaDBAsync(_NucliaDBBase):
     Example usage
 
     >>> from nucliadb_sdk import *
-    >>> sdk = NucliaDBAsync(region=Region.EUROPE1, api_key="api-key")
+    >>> sdk = NucliaDBAsync(region="europe-1", api_key="api-key")
     >>> await sdk.list_resources(kbid='my-kbid')
     """
 
     def __init__(
         self,
         *,
-        region: Region = Region.EUROPE1,
+        region: Union[str, Region] = "europe-1",
         api_key: Optional[str] = None,
         url: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
@@ -1104,15 +1101,15 @@ class NucliaDBAsync(_NucliaDBBase):
         When connecting to the managed NucliaDB cloud service, you can simply configure the SDK with your API key
 
         >>> from nucliadb_sdk import *
-        >>> sdk = NucliaDBAsync(api_key="api-key")
+        >>> sdk = NucliaDBAsync(api_key="api-key", region="aws-us-east-2-1")
 
         If the Knowledge Box you are interacting with is public, you don't even need the api key
 
-        >>> sdk = NucliaDBAsync()
+        >>> sdk = NucliaDBAsync(region="europe-1")
 
         If you are connecting to a NucliaDB on-prem instance, you will need to specify the URL
 
-        >>> sdk = NucliaDBAsync(api_key="api-key", region=Region.ON_PREM, url="https://mycompany.api.com/api/nucliadb")
+        >>> sdk = NucliaDBAsync(api_key="api-key", url="https://mycompany.api.com/api/nucliadb")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
         self.session = httpx.AsyncClient(headers=self.headers, base_url=self.base_url, timeout=timeout)
