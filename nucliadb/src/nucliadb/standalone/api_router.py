@@ -25,7 +25,6 @@ import pydantic
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
-from fastapi_versioning import version
 from jwcrypto import jwe, jwk  # type: ignore
 
 from nucliadb.common import datamanagers
@@ -40,11 +39,10 @@ from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
-standalone_api_router = APIRouter()
+standalone_api_router = APIRouter(prefix="/api/v1")
 
 
 @standalone_api_router.get("/config-check")
-@version(1)
 @requires(NucliaDBRoles.READER)
 async def api_config_check(request: Request):
     valid_nua_key = False
@@ -80,7 +78,6 @@ TEMP_TOKEN_EXPIRATION = 5 * 60
 
 
 @standalone_api_router.get("/temp-access-token")
-@version(1)
 @requires([NucliaDBRoles.READER, NucliaDBRoles.WRITER, NucliaDBRoles.MANAGER])
 def get_temp_access_token(request: Request):
     claims = {

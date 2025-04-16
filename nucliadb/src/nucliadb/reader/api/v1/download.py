@@ -24,7 +24,6 @@ from typing import Optional
 from fastapi import HTTPException
 from fastapi.requests import Request
 from fastapi.responses import Response
-from fastapi_versioning import version
 from starlette.datastructures import Headers
 from starlette.responses import StreamingResponse
 
@@ -53,7 +52,6 @@ class DownloadType(Enum):
     summary="Download extracted binary file (by slug)",
 )
 @requires_one([NucliaDBRoles.READER])
-@version(1)
 async def download_extract_file_rslug_prefix(
     request: Request,
     kbid: str,
@@ -72,7 +70,6 @@ async def download_extract_file_rslug_prefix(
     summary="Download extracted binary file (by id)",
 )
 @requires_one([NucliaDBRoles.READER])
-@version(1)
 async def download_extract_file_rid_prefix(
     request: Request,
     kbid: str,
@@ -112,7 +109,6 @@ async def _download_extract_file(
     summary="Download field binary field (by slug)",
 )
 @requires_one([NucliaDBRoles.READER])
-@version(1)
 async def download_field_file_rslug_prefix(
     request: Request,
     kbid: str,
@@ -130,7 +126,6 @@ async def download_field_file_rslug_prefix(
     summary="Download field binary field (by id)",
 )
 @requires_one([NucliaDBRoles.READER])
-@version(1)
 async def download_field_file_rid_prefix(
     request: Request,
     kbid: str,
@@ -165,7 +160,6 @@ async def _download_field_file(
     summary="Download conversation binary field (by slug)",
 )
 @requires_one([NucliaDBRoles.READER])
-@version(1)
 async def download_field_conversation_rslug_prefix(
     request: Request,
     kbid: str,
@@ -184,7 +178,6 @@ async def download_field_conversation_rslug_prefix(
     summary="Download conversation binary field (by id)",
 )
 @requires_one([NucliaDBRoles.READER])
-@version(1)
 async def download_field_conversation_rid_prefix(
     request: Request,
     kbid: str,

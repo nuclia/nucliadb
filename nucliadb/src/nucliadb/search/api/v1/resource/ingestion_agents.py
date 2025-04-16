@@ -20,7 +20,6 @@
 from typing import Union
 
 from fastapi import Header, Request, Response
-from fastapi_versioning import version
 
 from nucliadb.common.models_utils import from_proto
 from nucliadb.models.responses import HTTPClientError
@@ -50,7 +49,6 @@ from nucliadb_utils.authentication import requires_one
     response_model=ResourceAgentsResponse,
 )
 @requires_one([NucliaDBRoles.READER])
-@version(1)
 async def run_agents_by_uuid(
     request: Request,
     response: Response,
@@ -72,7 +70,6 @@ async def run_agents_by_uuid(
     response_model=ResourceAgentsResponse,
 )
 @requires_one([NucliaDBRoles.READER])
-@version(1)
 async def run_agents_by_slug(
     request: Request,
     response: Response,

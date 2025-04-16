@@ -21,7 +21,6 @@ import json
 from typing import Optional, Union
 
 from fastapi import Header, Request, Response
-from fastapi_versioning import version
 from pydantic import ValidationError
 from starlette.responses import StreamingResponse
 
@@ -53,7 +52,6 @@ from nucliadb_utils.authentication import NucliaUser, requires
     response_model=SyncAskResponse,
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def ask_knowledgebox_endpoint(
     request: Request,
     kbid: str,

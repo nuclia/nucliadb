@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from fastapi import HTTPException
-from fastapi_versioning import version
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
@@ -43,7 +42,6 @@ from nucliadb_utils.authentication import requires, requires_one
     include_in_schema=False,
 )
 @requires(NucliaDBRoles.MANAGER)
-@version(1)
 async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
     driver = get_driver()
     async with driver.transaction(read_only=True) as txn:
@@ -61,7 +59,6 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
     tags=["Knowledge Boxes"],
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
-@version(1)
 async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
     driver = get_driver()
     async with driver.transaction(read_only=True) as txn:
@@ -84,7 +81,6 @@ async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
     tags=["Knowledge Boxes"],
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
-@version(1)
 async def get_kb_by_slug(request: Request, slug: str) -> KnowledgeBoxObj:
     driver = get_driver()
     async with driver.transaction(read_only=True) as txn:

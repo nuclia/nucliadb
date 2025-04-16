@@ -17,24 +17,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest.mock import patch
+
+from typing import AsyncIterator
 
 import pytest
 
-from nucliadb.search.app import application
-from nucliadb.search.run import run
+from nucliadb_telemetry.utils import setup_telemetry
+from tests.ndbfixtures import SERVICE_NAME
 
 
-@pytest.fixture(scope="function")
-def run_fastapi_with_metrics():
-    with (
-        patch("nucliadb.search.run.run_fastapi_with_metrics") as mocked,
-        patch("nucliadb.search.run.instrument_app"),
-    ):
-        yield mocked
-
-
-def test_run_with_metrics(run_fastapi_with_metrics):
-    run()
-
-    run_fastapi_with_metrics.assert_called_once_with(application)
+@pytest.fixture(scope="function", autouse=True)
+async def telemetry() -> AsyncIterator[None]:
+    # run all tests with telemtry set up
+    await setup_telemetry(SERVICE_NAME)
+    yield

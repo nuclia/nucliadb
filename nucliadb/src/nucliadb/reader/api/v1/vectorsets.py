@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from fastapi_versioning import version
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
@@ -39,7 +38,6 @@ from nucliadb_utils.authentication import requires_one
     include_in_schema=False,
 )
 @requires_one([NucliaDBRoles.READER])
-@version(1)
 async def list_vectorsets(request: Request, kbid: str) -> VectorSetList:
     vectorsets = []
     async with datamanagers.with_ro_transaction() as txn:
