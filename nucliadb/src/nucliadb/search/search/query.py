@@ -32,6 +32,7 @@ from nucliadb.search.search.filters import (
 )
 from nucliadb.search.search.metrics import (
     node_features,
+    query_parser_observer,
 )
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.rank_fusion import (
@@ -194,6 +195,7 @@ class QueryParser:
         if self.with_synonyms and self.query:
             asyncio.ensure_future(self.fetcher.get_synonyms())
 
+    @query_parser_observer.wrap({"type": "QueryParser"})
     async def parse(self) -> tuple[nodereader_pb2.SearchRequest, bool, list[str], Optional[str]]:
         """
         :return: (request, incomplete, autofilters)

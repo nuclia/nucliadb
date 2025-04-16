@@ -20,6 +20,7 @@
 
 from pydantic import ValidationError
 
+from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.models import (
     NoopReranker,
@@ -35,6 +36,7 @@ from nucliadb_models.search import (
 )
 
 
+@query_parser_observer.wrap({"type": "parse_find"})
 async def parse_find(kbid: str, item: FindRequest) -> UnitRetrieval:
     parser = _FindParser(kbid, item)
     return await parser.parse()
