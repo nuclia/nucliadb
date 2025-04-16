@@ -22,7 +22,6 @@ from unittest.mock import Mock, patch
 
 import nucliadb_sdk
 from nucliadb_models.search import FindRequest, KnowledgeboxFindResults, SearchOptions
-from nucliadb_sdk import Region
 
 
 def test_find_request_serialization() -> None:
