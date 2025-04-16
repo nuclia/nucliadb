@@ -26,7 +26,7 @@ from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 
 
 def test_constructor():
-    # Using the region enum
+    # Using the region enum still works, although deprecated
     ndb = nucliadb_sdk.NucliaDB(region=nucliadb_sdk.Region.EUROPE1)
     assert ndb.base_url == "https://europe-1.nuclia.cloud/api"
 

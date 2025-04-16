@@ -22,11 +22,10 @@ from unittest.mock import Mock, patch
 
 import nucliadb_sdk
 from nucliadb_models.search import FindRequest, KnowledgeboxFindResults, SearchOptions
-from nucliadb_sdk import Region
 
 
 def test_find_request_serialization() -> None:
-    sdk = nucliadb_sdk.NucliaDB(region=Region.ON_PREM, url="http://fake:8080")
+    sdk = nucliadb_sdk.NucliaDB(region="on-prem", url="http://fake:8080")
 
     with patch.object(
         sdk,
