@@ -111,7 +111,6 @@ class QueryParser:
         generative_model: Optional[str] = None,
         rephrase: bool = False,
         rephrase_prompt: Optional[str] = None,
-        max_tokens: Optional[MaxTokens] = None,
         hidden: Optional[bool] = None,
         rank_fusion: Optional[RankFusionAlgorithm] = None,
         reranker: Optional[Reranker] = None,
@@ -136,7 +135,7 @@ class QueryParser:
         self.rephrase = rephrase
         self.rephrase_prompt = rephrase_prompt
         self.query_endpoint_used = False
-        self.max_tokens = max_tokens
+        self.max_tokens: Optional[MaxTokens] = None
         self.rank_fusion = rank_fusion
         self.reranker = reranker
         self.filter_expression = filter_expression
