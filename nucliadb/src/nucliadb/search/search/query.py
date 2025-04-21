@@ -219,7 +219,10 @@ class QueryParser:
 
             request, autofilters = convert_retrieval_to_proto(self.parsed_query.retrieval)
             incomplete = is_incomplete(self.parsed_query.retrieval)
-            rephrased_query = await self.parsed_query.fetcher.get_rephrased_query()
+            if self.has_vector_search:
+                rephrased_query = await self.parsed_query.fetcher.get_rephrased_query()
+            else:
+                rephrased_query = None
 
         else:
             # Filter some queries that panic tantivy, better than returning the 500

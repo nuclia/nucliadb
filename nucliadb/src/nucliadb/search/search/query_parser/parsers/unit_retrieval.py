@@ -24,7 +24,11 @@ from nucliadb.search.search.filters import (
 from nucliadb.search.search.metrics import (
     node_features,
 )
-from nucliadb.search.search.query import get_sort_field_proto
+from nucliadb.search.search.query import (
+    apply_entities_filter,
+    get_sort_field_proto,
+    translate_system_to_alias_label,
+)
 from nucliadb.search.search.query_parser.filter_expression import add_and_expression
 from nucliadb.search.search.query_parser.models import PredictReranker, UnitRetrieval
 from nucliadb_models.labels import LABEL_HIDDEN
@@ -116,12 +120,10 @@ def convert_retrieval_to_proto(retrieval: UnitRetrieval) -> tuple[SearchRequest,
         request.paragraph_filter.CopyFrom(retrieval.filters.paragraph_expression)
     request.filter_operator = retrieval.filters.filter_expression_operator
 
-    autofilters = []
-    if retrieval.filters.autofilter and retrieval.query.relation:
-        from nucliadb.search.search.query import apply_entities_filter, translate_system_to_alias_label
-
-        entity_filters = apply_entities_filter(request, retrieval.query.relation.detected_entities)
-        autofilters.extend([translate_system_to_alias_label(e) for e in entity_filters])
+    autofilter = []
+    if retrieval.filters.autofilter:
+        entity_filters = apply_entities_filter(request, retrieval.filters.autofilter)
+        autofilter.extend([translate_system_to_alias_label(e) for e in entity_filters])
 
     if retrieval.filters.hidden is not None:
         expr = nodereader_pb2.FilterExpression()
@@ -153,4 +155,4 @@ def convert_retrieval_to_proto(retrieval: UnitRetrieval) -> tuple[SearchRequest,
         reranker_window,
     )
 
-    return request, autofilters
+    return request, autofilter

@@ -89,26 +89,29 @@ class _FindParser:
         self.item = item
         self.fetcher = fetcher
 
+        # cached data while parsing
+        self._query: Optional[Query] = None
+        self._top_k: Optional[int] = None
+
     async def parse(self) -> UnitRetrieval:
         validate_base_request(self.item)
 
-        top_k = parse_top_k(self.item)
+        self._top_k = parse_top_k(self.item)
 
         # parse search types (features)
 
-        query = Query()
+        self._query = Query()
 
         if search_models.SearchOptions.KEYWORD in self.item.features:
-            query.keyword = await parse_keyword_query(self.item, fetcher=self.fetcher)
+            self._query.keyword = await parse_keyword_query(self.item, fetcher=self.fetcher)
 
         if search_models.SearchOptions.SEMANTIC in self.item.features:
-            query.semantic = await parse_semantic_query(self.item, fetcher=self.fetcher)
+            self._query.semantic = await parse_semantic_query(self.item, fetcher=self.fetcher)
 
         if search_models.SearchOptions.RELATIONS in self.item.features:
-            query.relation = await self.parse_relation_query()
+            self._query.relation = await self.parse_relation_query()
 
         # TODO: graph search
-        # TODO: relations
 
         filters = await self._parse_filters()
 
@@ -129,14 +132,31 @@ class _FindParser:
             rank_fusion.window = max(rank_fusion.window, reranker.window)
 
         return UnitRetrieval(
-            query=query,
-            top_k=top_k,
+            query=self._query,
+            top_k=self._top_k,
             filters=filters,
             rank_fusion=rank_fusion,
             reranker=reranker,
         )
 
     async def parse_relation_query(self) -> RelationQuery:
+        detected_entities = await self._get_detected_entities()
+
+        deleted_entity_groups = await self.fetcher.get_deleted_entity_groups()
+
+        meta_cache = await self.fetcher.get_entities_meta_cache()
+        deleted_entities = meta_cache.deleted_entities
+
+        return RelationQuery(
+            detected_entities=detected_entities,
+            deleted_entity_groups=deleted_entity_groups,
+            deleted_entities=deleted_entities,
+        )
+
+    async def _get_detected_entities(self) -> list[utils_pb2.RelationNode]:
+        """Get entities from request, either automatically detected or
+        explicitly set by the user."""
+
         if self.item.query_entities:
             detected_entities = []
             for entity in self.item.query_entities:
@@ -153,17 +173,11 @@ class _FindParser:
         meta_cache = await self.fetcher.get_entities_meta_cache()
         detected_entities = expand_entities(meta_cache, detected_entities)
 
-        deleted_entity_groups = await self.fetcher.get_deleted_entity_groups()
-
-        deleted_entities = meta_cache.deleted_entities
-
-        return RelationQuery(
-            detected_entities=detected_entities,
-            deleted_entity_groups=deleted_entity_groups,
-            deleted_entities=deleted_entities,
-        )
+        return detected_entities
 
     async def _parse_filters(self) -> Filters:
+        assert self._query is not None, "query must be parsed before filters"
+
         has_old_filters = (
             len(self.item.filters) > 0
             or len(self.item.resource_filters) > 0
@@ -205,10 +219,17 @@ class _FindParser:
             else:
                 filter_operator = nodereader_pb2.FilterOperator.AND
 
+        autofilter = None
+        if self.item.autofilter:
+            if self._query.relation is not None:
+                autofilter = self._query.relation.detected_entities
+            else:
+                autofilter = await self._get_detected_entities()
+
         hidden = await filter_hidden_resources(self.kbid, self.item.show_hidden)
 
         return Filters(
-            autofilter=self.item.autofilter,
+            autofilter=autofilter,
             facets=[],
             field_expression=field_expr,
             paragraph_expression=paragraph_expr,

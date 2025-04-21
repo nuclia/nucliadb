@@ -83,7 +83,7 @@ class Filters:
         nodereader_pb2.FilterOperator.AND
     )
 
-    autofilter: bool = False
+    autofilter: Optional[list[utils_pb2.RelationNode]] = None
     facets: list[str] = Field(default_factory=list)
     hidden: Optional[bool] = None
     security: Optional[search_models.RequestSecurity] = None
