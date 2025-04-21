@@ -57,15 +57,14 @@ class ReciprocalRankFusion(RankFusion):
 # reranking
 
 
-class Reranker(BaseModel): ...
+class NoopReranker: ...
 
 
-class NoopReranker(Reranker): ...
-
-
-class PredictReranker(Reranker):
+class PredictReranker(BaseModel):
     window: int = Field(le=200)
 
+
+Reranker = Union[NoopReranker, PredictReranker]
 
 # retrieval operation
 
