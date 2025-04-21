@@ -547,8 +547,7 @@ async def ask(
 
     # Now we build the prompt context
     with metrics.time("context_building"):
-        query_parser.max_tokens = ask_request.max_tokens  # type: ignore
-        max_tokens_context = await query_parser.get_max_tokens_context()
+        max_tokens_context = await query_parser.get_max_tokens_context(ask_request.max_tokens)  # type: ignore
         prompt_context_builder = PromptContextBuilder(
             kbid=kbid,
             ordered_paragraphs=[match.paragraph for match in retrieval_results.best_matches],
@@ -580,7 +579,7 @@ async def ask(
         citations=ask_request.citations,
         citation_threshold=ask_request.citation_threshold,
         generative_model=ask_request.generative_model,
-        max_tokens=query_parser.get_max_tokens_answer(),
+        max_tokens=query_parser.get_max_tokens_answer(ask_request.max_tokens),  # type: ignore
         query_context_images=prompt_context_images,
         json_schema=ask_request.answer_json_schema,
         rerank_context=False,

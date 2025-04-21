@@ -450,20 +450,20 @@ class QueryParser:
     async def get_visual_llm_enabled(self) -> bool:
         return (await self._get_query_information()).visual_llm
 
-    async def get_max_tokens_context(self) -> int:
+    async def get_max_tokens_context(self, max_tokens: Optional[MaxTokens]) -> int:
         model_max = (await self._get_query_information()).max_context
-        if self.max_tokens is not None and self.max_tokens.context is not None:
-            if self.max_tokens.context > model_max:
+        if max_tokens is not None and max_tokens.context is not None:
+            if max_tokens.context > model_max:
                 raise InvalidQueryError(
                     "max_tokens.context",
                     f"Max context tokens is higher than the model's limit of {model_max}",
                 )
-            return self.max_tokens.context
+            return max_tokens.context
         return model_max
 
-    def get_max_tokens_answer(self) -> Optional[int]:
-        if self.max_tokens is not None and self.max_tokens.answer is not None:
-            return self.max_tokens.answer
+    def get_max_tokens_answer(self, max_tokens: Optional[MaxTokens]) -> Optional[int]:
+        if max_tokens is not None and max_tokens.answer is not None:
+            return max_tokens.answer
         return None
 
     async def adjust_page_size(
