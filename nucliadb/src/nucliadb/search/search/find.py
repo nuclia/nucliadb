@@ -295,5 +295,6 @@ async def query_parser_from_find_request(
         hidden=hidden,
         rank_fusion=rank_fusion,
         reranker=reranker,
+        parsed_query=parsed,
     )
     return (query_parser, rank_fusion, reranker)

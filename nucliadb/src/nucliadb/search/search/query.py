@@ -35,6 +35,7 @@ from nucliadb.search.search.metrics import (
     query_parser_observer,
 )
 from nucliadb.search.search.query_parser.fetcher import Fetcher
+from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.search.rank_fusion import (
     RankFusionAlgorithm,
 )
@@ -114,6 +115,7 @@ class QueryParser:
         hidden: Optional[bool] = None,
         rank_fusion: Optional[RankFusionAlgorithm] = None,
         reranker: Optional[Reranker] = None,
+        parsed_query: Optional[ParsedQuery] = None,
     ):
         self.kbid = kbid
         self.features = features
@@ -140,15 +142,18 @@ class QueryParser:
         self.reranker = reranker
         self.filter_expression = filter_expression
         self.old_filters = old_filters
-        self.fetcher = Fetcher(
-            kbid=kbid,
-            query=query,
-            user_vector=user_vector,
-            vectorset=vectorset,
-            rephrase=rephrase,
-            rephrase_prompt=rephrase_prompt,
-            generative_model=generative_model,
-        )
+        if parsed_query is not None:
+            self.fetcher = parsed_query.fetcher
+        else:
+            self.fetcher = Fetcher(
+                kbid=kbid,
+                query=query,
+                user_vector=user_vector,
+                vectorset=vectorset,
+                rephrase=rephrase,
+                rephrase_prompt=rephrase_prompt,
+                generative_model=generative_model,
+            )
 
     @property
     def has_vector_search(self) -> bool:
