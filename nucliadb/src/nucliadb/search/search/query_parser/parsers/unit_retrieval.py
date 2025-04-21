@@ -23,6 +23,7 @@ from nucliadb.search.search.filters import (
 )
 from nucliadb.search.search.metrics import (
     node_features,
+    query_parser_observer,
 )
 from nucliadb.search.search.query import (
     apply_entities_filter,
@@ -46,6 +47,7 @@ def is_incomplete(retrieval: UnitRetrieval) -> bool:
     return incomplete
 
 
+@query_parser_observer.wrap({"type": "convert_retrieval_to_proto"})
 def convert_retrieval_to_proto(retrieval: UnitRetrieval) -> tuple[SearchRequest, list[str]]:
     request = SearchRequest()
 

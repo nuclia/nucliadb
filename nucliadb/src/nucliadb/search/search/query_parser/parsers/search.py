@@ -19,6 +19,7 @@
 #
 from typing import Optional
 
+from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query import expand_entities
 from nucliadb.search.search.query_parser.exceptions import InvalidQueryError
 from nucliadb.search.search.query_parser.fetcher import Fetcher
@@ -53,6 +54,7 @@ INDEX_SORTABLE_FIELDS = [
 ]
 
 
+@query_parser_observer.wrap({"type": "parse_search"})
 async def parse_search(
     kbid: str, item: SearchRequest, *, fetcher: Optional[Fetcher] = None
 ) -> ParsedQuery:
