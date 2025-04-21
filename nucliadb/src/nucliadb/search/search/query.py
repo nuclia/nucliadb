@@ -154,6 +154,7 @@ class QueryParser:
                 rephrase_prompt=rephrase_prompt,
                 generative_model=generative_model,
             )
+        self.parsed_query = parsed_query
 
     @property
     def has_vector_search(self) -> bool:
@@ -208,27 +209,40 @@ class QueryParser:
                 - incomplete: If the query is incomplete (missing vectors)
                 - autofilters: The autofilters that were applied
         """
+        if self.parsed_query is not None:
+            # query parsing already done, just use QueryParser as a wrapper
 
-        # Filter some queries that panic tantivy, better than returning the 500
-        if INVALID_QUERY.search(self.query):
-            raise InvalidQueryError("query", "Invalid query syntax")
+            from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
+                convert_retrieval_to_proto,
+                is_incomplete,
+            )
 
-        request = nodereader_pb2.SearchRequest()
-        request.body = self.query
-        request.with_duplicates = self.with_duplicates
+            request, autofilters = convert_retrieval_to_proto(self.parsed_query.retrieval)
+            incomplete = is_incomplete(self.parsed_query.retrieval)
+            rephrased_query = await self.parsed_query.fetcher.get_rephrased_query()
 
-        self.parse_sorting(request)
+        else:
+            # Filter some queries that panic tantivy, better than returning the 500
+            if INVALID_QUERY.search(self.query):
+                raise InvalidQueryError("query", "Invalid query syntax")
 
-        await self._schedule_dependency_tasks()
+            request = nodereader_pb2.SearchRequest()
+            request.body = self.query
+            request.with_duplicates = self.with_duplicates
 
-        await self.parse_filters(request)
-        self.parse_document_search(request)
-        self.parse_paragraph_search(request)
-        incomplete, rephrased_query = await self.parse_vector_search(request)
-        autofilters = await self.parse_relation_search(request)
-        await self.parse_synonyms(request)
-        await self.parse_min_score(request, incomplete)
-        await self.adjust_page_size(request, self.rank_fusion, self.reranker)
+            self.parse_sorting(request)
+
+            await self._schedule_dependency_tasks()
+
+            await self.parse_filters(request)
+            self.parse_document_search(request)
+            self.parse_paragraph_search(request)
+            incomplete, rephrased_query = await self.parse_vector_search(request)
+            autofilters = await self.parse_relation_search(request)
+            await self.parse_synonyms(request)
+            await self.parse_min_score(request, incomplete)
+            await self.adjust_page_size(request, self.rank_fusion, self.reranker)
+
         return request, incomplete, autofilters, rephrased_query
 
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
