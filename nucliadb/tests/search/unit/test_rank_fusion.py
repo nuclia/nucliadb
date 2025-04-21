@@ -26,6 +26,7 @@ This test suite validates different combinations of inputs
 
 import random
 from typing import Optional, Type
+from unittest.mock import patch
 
 import pytest
 
@@ -40,6 +41,14 @@ from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb.search.search.rank_fusion import LegacyRankFusion, ReciprocalRankFusion, get_rank_fusion
 from nucliadb_models.search import SCORE_TYPE, FindRequest
 from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
+
+
+@pytest.fixture(scope="function", autouse=True)
+def disable_hidden_resources_check():
+    with patch(
+        "nucliadb.search.search.query_parser.parsers.find.filter_hidden_resources", return_value=False
+    ):
+        yield
 
 
 @pytest.mark.parametrize(

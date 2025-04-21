@@ -112,7 +112,8 @@ class ReciprocalRankFusion(RankFusion):
 # reranking
 
 
-class NoopReranker: ...
+class NoopReranker(BaseModel):
+    pass
 
 
 class PredictReranker(BaseModel):
