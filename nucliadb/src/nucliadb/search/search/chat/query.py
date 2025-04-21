@@ -297,7 +297,7 @@ async def get_relations_results_from_entities(
     relations_results: list[RelationSearchResponse] = [result.relation for result in results]
     return await merge_relations_results(
         relations_results,
-        request.relation_subgraph,
+        request.relation_subgraph.entry_points,
         only_with_metadata,
         only_agentic_relations,
         only_entity_to_entity,

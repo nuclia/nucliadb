@@ -38,6 +38,7 @@ from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.query_parser.old_filters import OldFilterParams
+from nucliadb.search.search.query_parser.parsers.search import parse_search
 from nucliadb.search.search.utils import (
     filter_hidden_resources,
     min_score_from_payload,
@@ -270,6 +271,8 @@ async def search(
         if should_disable_vector_search(item):
             item.features.remove(SearchOptions.SEMANTIC)
 
+    parsed = await parse_search(kbid, item)
+
     # We need to query all nodes
     query_parser = QueryParser(
         kbid=kbid,
@@ -299,6 +302,7 @@ async def search(
         rephrase=item.rephrase,
         hidden=await filter_hidden_resources(kbid, item.show_hidden),
         rephrase_prompt=item.rephrase_prompt,
+        parsed_query=parsed,
     )
     pb_query, incomplete_results, autofilters, _ = await query_parser.parse()
 
@@ -309,14 +313,11 @@ async def search(
     # We need to merge
     search_results = await merge_results(
         results,
-        top_k=item.top_k,
+        parsed.retrieval,
         kbid=kbid,
         show=item.show,
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
-        sort=query_parser.sort,  # type: ignore
-        requested_relations=pb_query.relation_subgraph,
-        min_score=query_parser.min_score,
         highlight=item.highlight,
     )
 

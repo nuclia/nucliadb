@@ -134,7 +134,9 @@ async def build_find_response(
     )
 
     # build relations graph
-    relations = await merge_relations_results([search_response.relation], relation_subgraph_query)
+    relations = await merge_relations_results(
+        [search_response.relation], relation_subgraph_query.entry_points
+    )
 
     # compose response
     find_resources = compose_find_resources(text_blocks, resources)
