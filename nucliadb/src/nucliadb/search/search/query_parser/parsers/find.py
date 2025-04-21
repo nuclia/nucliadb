@@ -18,37 +18,100 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import Optional
+
 from pydantic import ValidationError
 
+from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
 from nucliadb.search.search.metrics import query_parser_observer
-from nucliadb.search.search.query_parser.exceptions import InternalParserError
+from nucliadb.search.search.query import expand_entities
+from nucliadb.search.search.query_parser.exceptions import InternalParserError, InvalidQueryError
+from nucliadb.search.search.query_parser.fetcher import Fetcher
+from nucliadb.search.search.query_parser.filter_expression import parse_expression
 from nucliadb.search.search.query_parser.models import (
+    Filters,
     NoopReranker,
+    ParsedQuery,
     PredictReranker,
+    Query,
     RankFusion,
     ReciprocalRankFusion,
+    RelationQuery,
     Reranker,
     UnitRetrieval,
 )
+from nucliadb.search.search.query_parser.old_filters import OldFilterParams, parse_old_filters
+from nucliadb.search.search.utils import filter_hidden_resources
 from nucliadb_models import search as search_models
+from nucliadb_models.filters import FilterExpression
 from nucliadb_models.search import (
     FindRequest,
+)
+from nucliadb_protos import nodereader_pb2, utils_pb2
+
+from .common import (
+    parse_keyword_query,
+    parse_semantic_query,
+    parse_top_k,
+    validate_base_request,
 )
 
 
 @query_parser_observer.wrap({"type": "parse_find"})
-async def parse_find(kbid: str, item: FindRequest) -> UnitRetrieval:
-    parser = _FindParser(kbid, item)
-    return await parser.parse()
+async def parse_find(
+    kbid: str,
+    item: FindRequest,
+    generative_model: Optional[str] = None,
+    *,
+    fetcher: Optional[Fetcher] = None,
+) -> ParsedQuery:
+    fetcher = fetcher or fetcher_for_find(kbid, item)
+    parser = _FindParser(kbid, item, fetcher)
+    retrieval = await parser.parse()
+    return ParsedQuery(fetcher=fetcher, retrieval=retrieval, generation=None)
+
+
+def fetcher_for_find(kbid: str, item: FindRequest) -> Fetcher:
+    return Fetcher(
+        kbid=kbid,
+        query=item.query,
+        user_vector=item.vector,
+        vectorset=item.vectorset,
+        rephrase=item.rephrase,
+        rephrase_prompt=item.rephrase_prompt,
+        generative_model=None,
+    )
 
 
 class _FindParser:
-    def __init__(self, kbid: str, item: FindRequest):
+    def __init__(self, kbid: str, item: FindRequest, fetcher: Fetcher):
         self.kbid = kbid
         self.item = item
+        self.fetcher = fetcher
 
     async def parse(self) -> UnitRetrieval:
-        top_k = self._parse_top_k()
+        validate_base_request(self.item)
+
+        top_k = parse_top_k(self.item)
+
+        # parse search types (features)
+
+        query = Query()
+
+        if search_models.SearchOptions.KEYWORD in self.item.features:
+            query.keyword = await parse_keyword_query(self.item, fetcher=self.fetcher)
+
+        if search_models.SearchOptions.SEMANTIC in self.item.features:
+            query.semantic = await parse_semantic_query(self.item, fetcher=self.fetcher)
+
+        if search_models.SearchOptions.RELATIONS in self.item.features:
+            query.relation = await self.parse_relation_query()
+
+        # TODO: graph search
+        # TODO: relations
+
+        filters = await self._parse_filters()
+
         try:
             rank_fusion = self._parse_rank_fusion()
         except ValidationError as exc:
@@ -66,20 +129,99 @@ class _FindParser:
             rank_fusion.window = max(rank_fusion.window, reranker.window)
 
         return UnitRetrieval(
+            query=query,
             top_k=top_k,
+            filters=filters,
             rank_fusion=rank_fusion,
             reranker=reranker,
         )
 
-    def _parse_top_k(self) -> int:
-        assert self.item.top_k is not None, "top_k must have an int value"
-        top_k = self.item.top_k
-        return top_k
+    async def parse_relation_query(self) -> RelationQuery:
+        if self.item.query_entities:
+            detected_entities = []
+            for entity in self.item.query_entities:
+                relation_node = utils_pb2.RelationNode()
+                relation_node.value = entity.name
+                if entity.type is not None:
+                    relation_node.ntype = RelationNodeTypeMap[entity.type]
+                if entity.subtype is not None:
+                    relation_node.subtype = entity.subtype
+                detected_entities.append(relation_node)
+        else:
+            detected_entities = await self.fetcher.get_detected_entities()
+
+        meta_cache = await self.fetcher.get_entities_meta_cache()
+        detected_entities = expand_entities(meta_cache, detected_entities)
+
+        deleted_entity_groups = await self.fetcher.get_deleted_entity_groups()
+
+        deleted_entities = meta_cache.deleted_entities
+
+        return RelationQuery(
+            detected_entities=detected_entities,
+            deleted_entity_groups=deleted_entity_groups,
+            deleted_entities=deleted_entities,
+        )
+
+    async def _parse_filters(self) -> Filters:
+        has_old_filters = (
+            len(self.item.filters) > 0
+            or len(self.item.resource_filters) > 0
+            or len(self.item.fields) > 0
+            or len(self.item.keyword_filters) > 0
+            or self.item.range_creation_start is not None
+            or self.item.range_creation_end is not None
+            or self.item.range_modification_start is not None
+            or self.item.range_modification_end is not None
+        )
+        if self.item.filter_expression is not None and has_old_filters:
+            raise InvalidQueryError("filter_expression", "Cannot mix old filters with filter_expression")
+
+        field_expr = None
+        paragraph_expr = None
+        filter_operator = nodereader_pb2.FilterOperator.AND
+
+        if has_old_filters:
+            old_filters = OldFilterParams(
+                label_filters=self.item.filters,
+                keyword_filters=self.item.keyword_filters,
+                range_creation_start=self.item.range_creation_start,
+                range_creation_end=self.item.range_creation_end,
+                range_modification_start=self.item.range_modification_start,
+                range_modification_end=self.item.range_modification_end,
+                fields=self.item.fields,
+                key_filters=self.item.resource_filters,
+            )
+            has_old_filters = False
+            field_expr, paragraph_expr = await parse_old_filters(old_filters, self.fetcher)
+
+        if self.item.filter_expression is not None:
+            if self.item.filter_expression.field:
+                field_expr = await parse_expression(self.item.filter_expression.field, self.kbid)
+            if self.item.filter_expression.paragraph:
+                paragraph_expr = await parse_expression(self.item.filter_expression.paragraph, self.kbid)
+            if self.item.filter_expression.operator == FilterExpression.Operator.OR:
+                filter_operator = nodereader_pb2.FilterOperator.OR
+            else:
+                filter_operator = nodereader_pb2.FilterOperator.AND
+
+        hidden = await filter_hidden_resources(self.kbid, self.item.show_hidden)
+
+        return Filters(
+            autofilter=self.item.autofilter,
+            facets=[],
+            field_expression=field_expr,
+            paragraph_expression=paragraph_expr,
+            filter_expression_operator=filter_operator,
+            security=self.item.security,
+            hidden=hidden,
+            with_duplicates=self.item.with_duplicates,
+        )
 
     def _parse_rank_fusion(self) -> RankFusion:
         rank_fusion: RankFusion
 
-        top_k = self._parse_top_k()
+        top_k = parse_top_k(self.item)
         window = min(top_k, 500)
 
         if isinstance(self.item.rank_fusion, search_models.RankFusionName):
@@ -104,7 +246,7 @@ class _FindParser:
     def _parse_reranker(self) -> Reranker:
         reranking: Reranker
 
-        top_k = self._parse_top_k()
+        top_k = parse_top_k(self.item)
 
         if isinstance(self.item.reranker, search_models.RerankerName):
             if self.item.reranker == search_models.RerankerName.NOOP:

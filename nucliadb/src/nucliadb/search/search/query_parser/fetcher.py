@@ -205,6 +205,15 @@ class Fetcher:
             return None
         return query_info.rephrased_query
 
+    async def get_semantic_min_score(self) -> Optional[float]:
+        query_info = await self._predict_query_endpoint()
+        if query_info is None:
+            return None
+
+        vectorset = await self.get_vectorset()
+        min_score = query_info.semantic_thresholds.get(vectorset, None)
+        return min_score
+
     # Labels
 
     async def get_classification_labels(self) -> knowledgebox_pb2.Labels:

@@ -260,8 +260,8 @@ async def query_parser_from_find_request(
 
     parsed = await parse_find(kbid, item)
 
-    rank_fusion = get_rank_fusion(parsed.rank_fusion)
-    reranker = get_reranker(parsed.reranker)
+    rank_fusion = get_rank_fusion(parsed.retrieval.rank_fusion)
+    reranker = get_reranker(parsed.retrieval.reranker)
 
     query_parser = QueryParser(
         kbid=kbid,
