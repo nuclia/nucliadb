@@ -17,12 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 from typing import Dict, Optional
 
 import requests
 
-from nucliadb_dataset import logger
 from nucliadb_protos.dataset_pb2 import TrainSet
+
+logger = logging.getLogger("nucliadb_dataset")
 
 SIZE_BYTES = 4
 

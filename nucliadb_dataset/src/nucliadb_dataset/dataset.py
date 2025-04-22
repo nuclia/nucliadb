@@ -17,13 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 import os
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
 import pyarrow as pa  # type: ignore
 
-from nucliadb_dataset import logger
 from nucliadb_dataset.streamer import Streamer
 from nucliadb_dataset.tasks import (
     ACTUAL_PARTITION,
@@ -37,6 +37,8 @@ from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.trainset import TrainSetPartitions
 from nucliadb_protos.dataset_pb2 import TrainSet
 from nucliadb_sdk.v2.sdk import NucliaDB
+
+logger = logging.getLogger("nucliadb_dataset")
 
 CHUNK_SIZE = 5 * 1024 * 1024
 

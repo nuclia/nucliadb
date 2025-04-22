@@ -17,15 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import logging
 from enum import Enum
 from typing import Dict
 
 from nucliadb_dataset.dataset import NucliaDBDataset, Task, download_all_partitions
 from nucliadb_dataset.nuclia import NucliaDriver
-
-logger = logging.getLogger("nucliadb_dataset")
-
 
 NUCLIA_GLOBAL: Dict[str, NucliaDriver] = {}
 
