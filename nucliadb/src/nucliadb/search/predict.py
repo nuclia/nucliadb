@@ -471,7 +471,9 @@ class DummyPredictEngine(PredictEngine):
 
     async def make_request(self, method: str, **request_args):
         response = Mock(status=200)
-        response.json = AsyncMock(return_value={"foo": "bar"})
+        json_data = {"foo": "bar"}
+        response.json = AsyncMock(return_value=json_data)
+        response.read = AsyncMock(return_value=json.dumps(json_data).encode("utf-8"))
         response.headers = {NUCLIA_LEARNING_ID_HEADER: DUMMY_LEARNING_ID}
         return response
 
