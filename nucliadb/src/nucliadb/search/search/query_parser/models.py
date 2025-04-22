@@ -130,10 +130,15 @@ class UnitRetrieval:
     query: Query
     top_k: int
     filters: Filters
-    # TODO: rank fusion depends on the response building, not the retrieval
+
+
+@dataclass
+class Merge:
     rank_fusion: RankFusion
-    # TODO: reranking fusion depends on the response building, not the retrieval
     reranker: Reranker
+
+
+# TODO: augmentation things: hydration...
 
 
 @dataclass
@@ -147,8 +152,8 @@ class Generation:
 class ParsedQuery:
     fetcher: Fetcher
     retrieval: UnitRetrieval
+    merge: Optional[Merge] = None
     generation: Optional[Generation] = None
-    # TODO: add merge, rank fusion, rerank...
 
 
 ### Catalog

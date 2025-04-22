@@ -755,7 +755,8 @@ async def retrieval_in_kb(
         )
 
         if graph_strategy is not None:
-            reranker = get_reranker(parsed_query.retrieval.reranker)
+            assert parsed_query.merge is not None, "find parser must return a merge spec"
+            reranker = get_reranker(parsed_query.merge.reranker)
             graph_results, graph_request = await get_graph_results(
                 kbid=kbid,
                 query=main_query,

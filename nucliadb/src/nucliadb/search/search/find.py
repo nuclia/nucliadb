@@ -91,9 +91,10 @@ async def _index_node_retrieval(
     start_time = time()
 
     with metrics.time("query_parse"):
-        parsed = await parse_find(kbid, item)
-        rank_fusion = get_rank_fusion(parsed.retrieval.rank_fusion)
-        reranker = get_reranker(parsed.retrieval.reranker)
+        parsed = await parse_find(kbid, item, generative_model=generative_model)
+        assert parsed.merge is not None, "find parser must return a merge spec"
+        rank_fusion = get_rank_fusion(parsed.merge.rank_fusion)
+        reranker = get_reranker(parsed.merge.reranker)
         pb_query, incomplete_results, autofilters, rephrased_query = await convert_retrieval_to_proto(
             parsed
         )
@@ -180,8 +181,9 @@ async def _external_index_retrieval(
     Parse the query, query the external index, and hydrate the results.
     """
     # Parse query
-    parsed = await parse_find(kbid, item)
-    reranker = get_reranker(parsed.retrieval.reranker)
+    parsed = await parse_find(kbid, item, generative_model=generative_model)
+    assert parsed.merge is not None, "find parser must return a merge spec"
+    reranker = get_reranker(parsed.merge.reranker)
     search_request, incomplete_results, _, rephrased_query = await convert_retrieval_to_proto(parsed)
 
     # Query index

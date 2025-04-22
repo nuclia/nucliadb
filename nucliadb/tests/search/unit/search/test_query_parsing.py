@@ -75,7 +75,8 @@ async def test_find_query_parsing__rank_fusion(
         reranker=search_models.RerankerName.NOOP,
     )
     parsed = await parse_find("kbid", find)
-    assert parsed.retrieval.rank_fusion == expected
+    assert parsed.merge is not None
+    assert parsed.merge.rank_fusion == expected
 
 
 # ATENTION: if you're changing this test, make sure public models, private
@@ -126,7 +127,8 @@ async def test_find_query_parsing__reranker(
         reranker=reranker,
     )
     parsed = await parse_find("kbid", find)
-    assert parsed.retrieval.reranker == expected
+    assert parsed.merge is not None
+    assert parsed.merge.reranker == expected
 
 
 # ATENTION: if you're changing this test, make sure public models, private
