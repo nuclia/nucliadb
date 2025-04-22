@@ -33,6 +33,9 @@ from nucliadb.search.search.metrics import (
 from nucliadb.search.search.query_parser.exceptions import InvalidQueryError
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
+from nucliadb_models.search import (
+    MaxTokens,
+)
 from nucliadb_protos import knowledgebox_pb2, utils_pb2
 
 
@@ -276,6 +279,39 @@ class Fetcher:
             synonyms = await get_kb_synonyms(self.kbid)
             self.cache.synonyms = synonyms
             return synonyms
+
+    # Generative
+    #
+    # XXX: this methods were in the QueryParser and only used by /ask, maybe it
+    # makes more sense to return a Generation object with all this information
+    # or another thing. Raising invalid query errors here feels kind of late
+
+    async def get_visual_llm_enabled(self) -> bool:
+        query_info = await self._predict_query_endpoint()
+        if query_info is None:
+            raise SendToPredictError("Error while using predict's query endpoint")
+
+        return query_info.visual_llm
+
+    async def get_max_context_tokens(self, max_tokens: Optional[MaxTokens]) -> int:
+        query_info = await self._predict_query_endpoint()
+        if query_info is None:
+            raise SendToPredictError("Error while using predict's query endpoint")
+
+        model_max = query_info.max_context
+        if max_tokens is not None and max_tokens.context is not None:
+            if max_tokens.context > model_max:
+                raise InvalidQueryError(
+                    "max_tokens.context",
+                    f"Max context tokens is higher than the model's limit of {model_max}",
+                )
+            return max_tokens.context
+        return model_max
+
+    def get_max_answer_tokens(self, max_tokens: Optional[MaxTokens]) -> Optional[int]:
+        if max_tokens is not None and max_tokens.answer is not None:
+            return max_tokens.answer
+        return None
 
     # Predict API
 
