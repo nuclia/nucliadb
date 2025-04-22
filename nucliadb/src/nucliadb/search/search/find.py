@@ -37,15 +37,13 @@ from nucliadb.search.search.hydrator import (
 from nucliadb.search.search.metrics import (
     RAGMetrics,
 )
-from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.search.query_parser.parsers import parse_find
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.search.rank_fusion import (
-    RankFusionAlgorithm,
     get_rank_fusion,
 )
 from nucliadb.search.search.rerankers import (
-    Reranker,
     RerankingOptions,
     get_reranker,
 )
@@ -96,11 +94,13 @@ async def _index_node_retrieval(
     audit = get_audit()
     start_time = time()
 
-    query_parser, rank_fusion, reranker, parsed = await query_parser_from_find_request(
-        kbid, item, generative_model=generative_model
-    )
     with metrics.time("query_parse"):
-        pb_query, incomplete_results, autofilters, rephrased_query = await query_parser.parse()
+        parsed = await parse_find(kbid, item, generative_model=generative_model)
+        rank_fusion = get_rank_fusion(parsed.retrieval.rank_fusion)
+        reranker = get_reranker(parsed.retrieval.reranker)
+        pb_query, incomplete_results, autofilters, rephrased_query = await convert_retrieval_to_proto(
+            parsed
+        )
 
     with metrics.time("node_query"):
         results, query_incomplete_results, queried_nodes = await node_query(
@@ -185,10 +185,9 @@ async def _external_index_retrieval(
     Parse the query, query the external index, and hydrate the results.
     """
     # Parse query
-    query_parser, _, reranker, parsed = await query_parser_from_find_request(
-        kbid, item, generative_model=generative_model
-    )
-    search_request, incomplete_results, _, rephrased_query = await query_parser.parse()
+    parsed = await parse_find(kbid, item, generative_model=generative_model)
+    reranker = get_reranker(parsed.retrieval.reranker)
+    search_request, incomplete_results, _, rephrased_query = await convert_retrieval_to_proto(parsed)
 
     # Query index
     query_results = await external_index_manager.query(search_request)  # noqa
@@ -235,27 +234,3 @@ async def _external_index_retrieval(
     )
 
     return retrieval_results, incomplete_results, parsed
-
-
-async def query_parser_from_find_request(
-    kbid: str, item: FindRequest, *, generative_model: Optional[str] = None
-) -> tuple[QueryParser, RankFusionAlgorithm, Reranker, ParsedQuery]:
-    # XXX this is becoming the new /find query parsing, this should be moved to
-    # a cleaner abstraction
-
-    parsed = await parse_find(kbid, item)
-
-    rank_fusion = get_rank_fusion(parsed.retrieval.rank_fusion)
-    reranker = get_reranker(parsed.retrieval.reranker)
-
-    query_parser = QueryParser(
-        kbid=kbid,
-        query=item.query,
-        user_vector=item.vector,
-        vectorset=item.vectorset,
-        generative_model=generative_model,
-        rephrase=item.rephrase,
-        rephrase_prompt=item.rephrase_prompt,
-        parsed_query=parsed,
-    )
-    return (query_parser, rank_fusion, reranker, parsed)

@@ -16,7 +16,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
 import heapq
 import json
 from collections import defaultdict
@@ -38,14 +37,18 @@ from nucliadb.search.search.chat.query import (
     find_request_from_ask_request,
     get_relations_results_from_entities,
 )
-from nucliadb.search.search.find import query_parser_from_find_request
 from nucliadb.search.search.find_merge import (
     compose_find_resources,
     hydrate_and_rerank,
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
 from nucliadb.search.search.metrics import RAGMetrics
-from nucliadb.search.search.rerankers import Reranker, RerankingOptions
+from nucliadb.search.search.query_parser.parsers.find import parse_reranker
+from nucliadb.search.search.rerankers import (
+    Reranker,
+    RerankingOptions,
+    get_reranker,
+)
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.internal.predict import (
@@ -419,8 +422,8 @@ async def get_graph_results(
     # Get the text blocks of the paragraphs that contain the top relations
     with metrics.time("graph_strat_build_response"):
         find_request = find_request_from_ask_request(item, query)
-        query_parser, _, reranker, _ = await query_parser_from_find_request(
-            kbid, find_request, generative_model=generative_model
+        reranker = get_reranker(
+            await parse_reranker(kbid, find_request, generative_model=generative_model)
         )
         find_results = await build_graph_response(
             kbid=kbid,

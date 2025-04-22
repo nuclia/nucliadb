@@ -36,8 +36,8 @@ from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_quer
 from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
-from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.query_parser.parsers.search import parse_search
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.search.utils import (
     min_score_from_payload,
     min_score_from_query_params,
@@ -270,21 +270,10 @@ async def search(
             item.features.remove(SearchOptions.SEMANTIC)
 
     parsed = await parse_search(kbid, item)
+    pb_query, incomplete_results, autofilters, _ = await convert_retrieval_to_proto(parsed)
 
     # We need to query all nodes
-    query_parser = QueryParser(
-        kbid=kbid,
-        query=item.query,
-        user_vector=item.vector,
-        vectorset=item.vectorset,
-        rephrase=item.rephrase,
-        rephrase_prompt=item.rephrase_prompt,
-        parsed_query=parsed,
-    )
-    pb_query, incomplete_results, autofilters, _ = await query_parser.parse()
-
     results, query_incomplete_results, queried_nodes = await node_query(kbid, Method.SEARCH, pb_query)
-
     incomplete_results = incomplete_results or query_incomplete_results
 
     # We need to merge

@@ -17,22 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 from datetime import datetime
 from typing import Any, Optional
 
 from nucliadb.common import datamanagers
-from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.search.filters import (
     translate_label,
 )
-from nucliadb.search.search.metrics import (
-    query_parser_observer,
-)
 from nucliadb.search.search.query_parser.fetcher import Fetcher
-from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb_models.filters import FilterExpression
-from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.labels import LABEL_HIDDEN
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
@@ -46,82 +39,6 @@ from nucliadb_protos.noderesources_pb2 import Resource
 from .exceptions import InvalidQueryError
 from .query_parser.filter_expression import add_and_expression, parse_expression
 from .query_parser.old_filters import OldFilterParams, parse_old_filters
-
-
-class QueryParser:
-    """
-    Queries are getting more and more complex and different phases of the query
-    depending on different data.
-
-    This class is an encapsulation of the different phases of the query and allow
-    some stateful interaction with a query and different depenedencies during
-    query parsing.
-    """
-
-    _query_information_task: Optional[asyncio.Task] = None
-
-    def __init__(
-        self,
-        *,
-        kbid: str,
-        query: str,
-        user_vector: Optional[list[float]] = None,
-        vectorset: Optional[str] = None,
-        generative_model: Optional[str] = None,
-        rephrase: bool = False,
-        rephrase_prompt: Optional[str] = None,
-        parsed_query: Optional[ParsedQuery] = None,
-    ):
-        if parsed_query is not None:
-            self.fetcher = parsed_query.fetcher
-        else:
-            self.fetcher = Fetcher(
-                kbid=kbid,
-                query=query,
-                user_vector=user_vector,
-                vectorset=vectorset,
-                rephrase=rephrase,
-                rephrase_prompt=rephrase_prompt,
-                generative_model=generative_model,
-            )
-        self.parsed_query = parsed_query
-
-    async def _get_query_information(self) -> QueryInfo:
-        # HACK: while transitioning to the new query parser, use fetcher under
-        # the hood for a smoother migration
-        query_info = await self.fetcher._predict_query_endpoint()
-        if query_info is None:
-            raise SendToPredictError("Error while using predict's query endpoint")
-        return query_info
-
-    @query_parser_observer.wrap({"type": "QueryParser"})
-    async def parse(self) -> tuple[nodereader_pb2.SearchRequest, bool, list[str], Optional[str]]:
-        """
-        :return: (request, incomplete, autofilters)
-            where:
-                - request: protobuf nodereader_pb2.SearchRequest object
-                - incomplete: If the query is incomplete (missing vectors)
-                - autofilters: The autofilters that were applied
-        """
-        # TODO: remove this assert before merging!
-        assert self.parsed_query is not None, "everyone should pass a parsed query!"
-
-        # query parsing has already been done, we just use QueryParser as a wrapper
-
-        from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
-            convert_retrieval_to_proto,
-            is_incomplete,
-        )
-
-        request, autofilters = convert_retrieval_to_proto(self.parsed_query.retrieval)
-        incomplete = is_incomplete(self.parsed_query.retrieval)
-        rephrased_query = None
-
-        has_vector_search = self.parsed_query.retrieval.query.semantic is not None
-        if has_vector_search:
-            rephrased_query = await self.parsed_query.fetcher.get_rephrased_query()
-
-        return request, incomplete, autofilters, rephrased_query
 
 
 async def paragraph_query_to_pb(

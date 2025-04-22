@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import Optional
 
 from nucliadb.search.search.filters import (
     translate_label,
@@ -30,7 +31,7 @@ from nucliadb.search.search.query import (
     get_sort_field_proto,
 )
 from nucliadb.search.search.query_parser.filter_expression import add_and_expression
-from nucliadb.search.search.query_parser.models import PredictReranker, UnitRetrieval
+from nucliadb.search.search.query_parser.models import ParsedQuery, PredictReranker, UnitRetrieval
 from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
 from nucliadb_models.search import (
     SortOrderMap,
@@ -39,32 +40,27 @@ from nucliadb_protos import nodereader_pb2, utils_pb2
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 
 
-def is_incomplete(retrieval: UnitRetrieval) -> bool:
-    if retrieval.query.semantic is None:
-        return False
-    incomplete = retrieval.query.semantic.query is None or len(retrieval.query.semantic.query) == 0
-    return incomplete
-
-
 @query_parser_observer.wrap({"type": "convert_retrieval_to_proto"})
-def convert_retrieval_to_proto(retrieval: UnitRetrieval) -> tuple[SearchRequest, list[str]]:
+async def convert_retrieval_to_proto(
+    parsed: ParsedQuery,
+) -> tuple[SearchRequest, bool, list[str], Optional[str]]:
     request = SearchRequest()
 
     ## queries
 
-    if retrieval.query.keyword and retrieval.query.fulltext:
-        assert retrieval.query.keyword == retrieval.query.fulltext, (
+    if parsed.retrieval.query.keyword and parsed.retrieval.query.fulltext:
+        assert parsed.retrieval.query.keyword == parsed.retrieval.query.fulltext, (
             "search proto doesn't support different queries for fulltext and keyword search"
         )
 
-    if retrieval.query.fulltext:
+    if parsed.retrieval.query.fulltext:
         request.document = True
         node_features.inc({"type": "documents"})
-    if retrieval.query.keyword:
+    if parsed.retrieval.query.keyword:
         request.paragraph = True
         node_features.inc({"type": "paragraphs"})
 
-    text_query = retrieval.query.keyword or retrieval.query.fulltext
+    text_query = parsed.retrieval.query.keyword or parsed.retrieval.query.fulltext
     if text_query is not None:
         request.min_score_bm25 = text_query.min_score
 
@@ -79,23 +75,25 @@ def convert_retrieval_to_proto(retrieval: UnitRetrieval) -> tuple[SearchRequest,
             request.order.sort_by = sort_field
             request.order.type = SortOrderMap[text_query.sort]  # type: ignore
 
-    if retrieval.query.semantic:
+    if parsed.retrieval.query.semantic:
         node_features.inc({"type": "vectors"})
 
-        request.min_score_semantic = retrieval.query.semantic.min_score
+        request.min_score_semantic = parsed.retrieval.query.semantic.min_score
 
-        query_vector = retrieval.query.semantic.query
+        query_vector = parsed.retrieval.query.semantic.query
         if query_vector is not None:
-            request.vectorset = retrieval.query.semantic.vectorset
+            request.vectorset = parsed.retrieval.query.semantic.vectorset
             request.vector.extend(query_vector)
 
-    if retrieval.query.relation:
+    if parsed.retrieval.query.relation:
         node_features.inc({"type": "relations"})
 
-        request.relation_subgraph.entry_points.extend(retrieval.query.relation.detected_entities)
+        request.relation_subgraph.entry_points.extend(parsed.retrieval.query.relation.detected_entities)
         request.relation_subgraph.depth = 1
-        request.relation_subgraph.deleted_groups.extend(retrieval.query.relation.deleted_entity_groups)
-        for group_id, deleted_entities in retrieval.query.relation.deleted_entities.items():
+        request.relation_subgraph.deleted_groups.extend(
+            parsed.retrieval.query.relation.deleted_entity_groups
+        )
+        for group_id, deleted_entities in parsed.retrieval.query.relation.deleted_entities.items():
             request.relation_subgraph.deleted_entities.append(
                 nodereader_pb2.EntitiesSubgraphRequest.DeletedEntities(
                     node_subtype=group_id, node_values=deleted_entities
@@ -104,31 +102,34 @@ def convert_retrieval_to_proto(retrieval: UnitRetrieval) -> tuple[SearchRequest,
 
     # filters
 
-    request.with_duplicates = retrieval.filters.with_duplicates
+    request.with_duplicates = parsed.retrieval.filters.with_duplicates
 
-    request.faceted.labels.extend([translate_label(facet) for facet in retrieval.filters.facets])
+    request.faceted.labels.extend([translate_label(facet) for facet in parsed.retrieval.filters.facets])
 
-    if retrieval.filters.security is not None and len(retrieval.filters.security.groups) > 0:
+    if (
+        parsed.retrieval.filters.security is not None
+        and len(parsed.retrieval.filters.security.groups) > 0
+    ):
         security_pb = utils_pb2.Security()
-        for group_id in retrieval.filters.security.groups:
+        for group_id in parsed.retrieval.filters.security.groups:
             if group_id not in security_pb.access_groups:
                 security_pb.access_groups.append(group_id)
         request.security.CopyFrom(security_pb)
 
-    if retrieval.filters.field_expression:
-        request.field_filter.CopyFrom(retrieval.filters.field_expression)
-    if retrieval.filters.paragraph_expression:
-        request.paragraph_filter.CopyFrom(retrieval.filters.paragraph_expression)
-    request.filter_operator = retrieval.filters.filter_expression_operator
+    if parsed.retrieval.filters.field_expression:
+        request.field_filter.CopyFrom(parsed.retrieval.filters.field_expression)
+    if parsed.retrieval.filters.paragraph_expression:
+        request.paragraph_filter.CopyFrom(parsed.retrieval.filters.paragraph_expression)
+    request.filter_operator = parsed.retrieval.filters.filter_expression_operator
 
     autofilter = []
-    if retrieval.filters.autofilter:
-        entity_filters = apply_entities_filter(request, retrieval.filters.autofilter)
+    if parsed.retrieval.filters.autofilter:
+        entity_filters = apply_entities_filter(request, parsed.retrieval.filters.autofilter)
         autofilter.extend([translate_system_to_alias_label(e) for e in entity_filters])
 
-    if retrieval.filters.hidden is not None:
+    if parsed.retrieval.filters.hidden is not None:
         expr = nodereader_pb2.FilterExpression()
-        if retrieval.filters.hidden:
+        if parsed.retrieval.filters.hidden:
             expr.facet.facet = LABEL_HIDDEN
         else:
             expr.bool_not.facet.facet = LABEL_HIDDEN
@@ -143,12 +144,12 @@ def convert_retrieval_to_proto(retrieval: UnitRetrieval) -> tuple[SearchRequest,
     # reranking can have more choices.
 
     rank_fusion_window = 0
-    if retrieval.rank_fusion is not None:
-        rank_fusion_window = retrieval.rank_fusion.window
+    if parsed.retrieval.rank_fusion is not None:
+        rank_fusion_window = parsed.retrieval.rank_fusion.window
 
     reranker_window = 0
-    if retrieval.reranker is not None and isinstance(retrieval.reranker, PredictReranker):
-        reranker_window = retrieval.reranker.window
+    if parsed.retrieval.reranker is not None and isinstance(parsed.retrieval.reranker, PredictReranker):
+        reranker_window = parsed.retrieval.reranker.window
 
     request.result_per_page = max(
         request.result_per_page,
@@ -156,4 +157,20 @@ def convert_retrieval_to_proto(retrieval: UnitRetrieval) -> tuple[SearchRequest,
         reranker_window,
     )
 
-    return request, autofilter
+    # XXX: legacy values that were returned by QueryParser but not always
+    # needed. We should find a better abstraction
+
+    incomplete = is_incomplete(parsed.retrieval)
+
+    rephrased_query = None
+    if parsed.retrieval.query.semantic:
+        rephrased_query = await parsed.fetcher.get_rephrased_query()
+
+    return request, incomplete, autofilter, rephrased_query
+
+
+def is_incomplete(retrieval: UnitRetrieval) -> bool:
+    if retrieval.query.semantic is None:
+        return False
+    incomplete = retrieval.query.semantic.query is None or len(retrieval.query.semantic.query) == 0
+    return incomplete

@@ -65,13 +65,21 @@ async def parse_find(
     *,
     fetcher: Optional[Fetcher] = None,
 ) -> ParsedQuery:
-    fetcher = fetcher or fetcher_for_find(kbid, item)
+    fetcher = fetcher or fetcher_for_find(kbid, item, generative_model)
     parser = _FindParser(kbid, item, fetcher)
     retrieval = await parser.parse()
     return ParsedQuery(fetcher=fetcher, retrieval=retrieval, generation=None)
 
 
-def fetcher_for_find(kbid: str, item: FindRequest) -> Fetcher:
+# XXX: partial parsing for graph use case, we should avoid this kind of things
+async def parse_reranker(kbid: str, item: FindRequest, generative_model: Optional[str]) -> Reranker:
+    fetcher = fetcher_for_find(kbid, item, generative_model)
+    parser = _FindParser(kbid, item, fetcher)
+    reranker = parser._parse_reranker()
+    return reranker
+
+
+def fetcher_for_find(kbid: str, item: FindRequest, generative_model: Optional[str]) -> Fetcher:
     return Fetcher(
         kbid=kbid,
         query=item.query,
@@ -79,7 +87,7 @@ def fetcher_for_find(kbid: str, item: FindRequest) -> Fetcher:
         vectorset=item.vectorset,
         rephrase=item.rephrase,
         rephrase_prompt=item.rephrase_prompt,
-        generative_model=None,
+        generative_model=generative_model,
     )
 
 
