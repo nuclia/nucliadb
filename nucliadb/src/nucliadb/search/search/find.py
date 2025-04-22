@@ -19,7 +19,6 @@
 #
 import logging
 from time import time
-from typing import Optional
 
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
@@ -65,7 +64,6 @@ async def find(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    generative_model: Optional[str] = None,
     metrics: RAGMetrics = RAGMetrics(),
 ) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     external_index_manager = await get_external_index_manager(kbid=kbid)
@@ -74,11 +72,10 @@ async def find(
             kbid,
             item,
             external_index_manager,
-            generative_model,
         )
     else:
         return await _index_node_retrieval(
-            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, generative_model, metrics
+            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, metrics
         )
 
 
@@ -88,14 +85,13 @@ async def _index_node_retrieval(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    generative_model: Optional[str] = None,
     metrics: RAGMetrics = RAGMetrics(),
 ) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     audit = get_audit()
     start_time = time()
 
     with metrics.time("query_parse"):
-        parsed = await parse_find(kbid, item, generative_model=generative_model)
+        parsed = await parse_find(kbid, item)
         rank_fusion = get_rank_fusion(parsed.retrieval.rank_fusion)
         reranker = get_reranker(parsed.retrieval.reranker)
         pb_query, incomplete_results, autofilters, rephrased_query = await convert_retrieval_to_proto(
@@ -179,13 +175,12 @@ async def _external_index_retrieval(
     kbid: str,
     item: FindRequest,
     external_index_manager: ExternalIndexManager,
-    generative_model: Optional[str] = None,
 ) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     """
     Parse the query, query the external index, and hydrate the results.
     """
     # Parse query
-    parsed = await parse_find(kbid, item, generative_model=generative_model)
+    parsed = await parse_find(kbid, item)
     reranker = get_reranker(parsed.retrieval.reranker)
     search_request, incomplete_results, _, rephrased_query = await convert_retrieval_to_proto(parsed)
 

@@ -61,17 +61,16 @@ from .common import (
 async def parse_find(
     kbid: str,
     item: FindRequest,
-    generative_model: Optional[str] = None,
     *,
     fetcher: Optional[Fetcher] = None,
 ) -> ParsedQuery:
-    fetcher = fetcher or fetcher_for_find(kbid, item, generative_model)
+    fetcher = fetcher or fetcher_for_find(kbid, item)
     parser = _FindParser(kbid, item, fetcher)
     retrieval = await parser.parse()
     return ParsedQuery(fetcher=fetcher, retrieval=retrieval, generation=None)
 
 
-def fetcher_for_find(kbid: str, item: FindRequest, generative_model: Optional[str]) -> Fetcher:
+def fetcher_for_find(kbid: str, item: FindRequest) -> Fetcher:
     return Fetcher(
         kbid=kbid,
         query=item.query,
@@ -79,7 +78,7 @@ def fetcher_for_find(kbid: str, item: FindRequest, generative_model: Optional[st
         vectorset=item.vectorset,
         rephrase=item.rephrase,
         rephrase_prompt=item.rephrase_prompt,
-        generative_model=generative_model,
+        generative_model=item.generative_model,
     )
 
 

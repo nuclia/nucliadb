@@ -1746,6 +1746,11 @@ class FindRequest(BaseSearchRequest):
     search_configuration: Optional[str] = Field(
         default=None, description="Load find parameters from this configuration"
     )
+    generative_model: Optional[str] = Field(
+        default=None,
+        title="Generative model",
+        description="The generative model used to rephrase the query. If not provided, the model configured for the Knowledge Box is used.",
+    )
 
     @field_validator("features", mode="after")
     @classmethod
