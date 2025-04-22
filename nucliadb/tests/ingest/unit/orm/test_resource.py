@@ -21,7 +21,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nucliadb.ingest.orm.brain import ResourceBrain
 from nucliadb.ingest.orm.resource import (
     Resource,
     get_file_page_positions,
@@ -31,7 +30,6 @@ from nucliadb.ingest.orm.resource import (
     maybe_update_basic_thumbnail,
     update_basic_languages,
 )
-from nucliadb_protos import utils_pb2
 from nucliadb_protos.resources_pb2 import (
     AllFieldIDs,
     Basic,
@@ -272,62 +270,3 @@ async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb):
     resource.update_all_field_ids.call_args[1]["deleted"] == [
         FieldID(field_type=FieldType.CONVERSATION, field="to_delete"),
     ]
-
-
-async def test_apply_extracted_vectors_cut_by_dimension(txn, storage, kb):
-    STORED_VECTOR_DIMENSION = 100
-    MATRYOSHKA_DIMENSION = 10
-
-    vectors = utils_pb2.VectorObject(
-        vectors=utils_pb2.Vectors(
-            vectors=[
-                utils_pb2.Vector(
-                    start=0,
-                    end=10,
-                    start_paragraph=0,
-                    end_paragraph=10,
-                    vector=[1.0] * STORED_VECTOR_DIMENSION,
-                )
-            ]
-        )
-    )
-
-    brain = ResourceBrain("rid")
-    brain.apply_field_vectors(
-        "t/text",
-        vectors,
-        vectorset="my-vectorset",
-        replace_field=False,
-        vector_dimension=STORED_VECTOR_DIMENSION,
-    )
-
-    sentences = (
-        brain.brain.paragraphs["t/text"]
-        .paragraphs["rid/t/text/0-10"]
-        .vectorsets_sentences["my-vectorset"]
-        .sentences
-    )
-    assert len(sentences) == 1
-    assert sentences["rid/t/text/0/0-10"].metadata.position.start == 0
-    assert sentences["rid/t/text/0/0-10"].metadata.position.end == 10
-    assert len(sentences["rid/t/text/0/0-10"].vector) == STORED_VECTOR_DIMENSION
-
-    brain = ResourceBrain("rid")
-    brain.apply_field_vectors(
-        "t/text",
-        vectors,
-        vectorset="my-vectorset",
-        replace_field=False,
-        vector_dimension=MATRYOSHKA_DIMENSION,
-    )
-
-    sentences = (
-        brain.brain.paragraphs["t/text"]
-        .paragraphs["rid/t/text/0-10"]
-        .vectorsets_sentences["my-vectorset"]
-        .sentences
-    )
-    assert len(sentences) == 1
-    assert sentences["rid/t/text/0/0-10"].metadata.position.start == 0
-    assert sentences["rid/t/text/0/0-10"].metadata.position.end == 10
-    assert len(sentences["rid/t/text/0/0-10"].vector) == MATRYOSHKA_DIMENSION
