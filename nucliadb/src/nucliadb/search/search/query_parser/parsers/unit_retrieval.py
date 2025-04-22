@@ -28,11 +28,10 @@ from nucliadb.search.search.metrics import (
 from nucliadb.search.search.query import (
     apply_entities_filter,
     get_sort_field_proto,
-    translate_system_to_alias_label,
 )
 from nucliadb.search.search.query_parser.filter_expression import add_and_expression
 from nucliadb.search.search.query_parser.models import PredictReranker, UnitRetrieval
-from nucliadb_models.labels import LABEL_HIDDEN
+from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
 from nucliadb_models.search import (
     SortOrderMap,
 )

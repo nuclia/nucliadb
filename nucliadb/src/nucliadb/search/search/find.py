@@ -39,7 +39,6 @@ from nucliadb.search.search.metrics import (
 )
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.query_parser.models import ParsedQuery
-from nucliadb.search.search.query_parser.old_filters import OldFilterParams
 from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb.search.search.rank_fusion import (
     RankFusionAlgorithm,
@@ -50,18 +49,12 @@ from nucliadb.search.search.rerankers import (
     RerankingOptions,
     get_reranker,
 )
-from nucliadb.search.search.utils import (
-    filter_hidden_resources,
-    min_score_from_payload,
-    should_disable_vector_search,
-)
 from nucliadb.search.settings import settings
 from nucliadb_models.search import (
     FindRequest,
     KnowledgeboxFindResults,
     MinScore,
     NucliaDBClientType,
-    SearchOptions,
 )
 from nucliadb_utils.utilities import get_audit
 
@@ -192,7 +185,7 @@ async def _external_index_retrieval(
     Parse the query, query the external index, and hydrate the results.
     """
     # Parse query
-    query_parser, _, reranker, _ = await query_parser_from_find_request(
+    query_parser, _, reranker, parsed = await query_parser_from_find_request(
         kbid, item, generative_model=generative_model
     )
     search_request, incomplete_results, _, rephrased_query = await query_parser.parse()
@@ -215,13 +208,15 @@ async def _external_index_retrieval(
             kbid=kbid,
             query=search_request.body,
         ),
-        top_k=query_parser.top_k,
+        top_k=parsed.retrieval.top_k,
     )
     find_resources = compose_find_resources(text_blocks, resources)
 
     results_min_score = MinScore(
         bm25=0,
-        semantic=query_parser.min_score.semantic,
+        semantic=parsed.retrieval.query.semantic.min_score
+        if parsed.retrieval.query.semantic is not None
+        else 0.0,
     )
     retrieval_results = KnowledgeboxFindResults(
         resources=find_resources,
@@ -245,14 +240,6 @@ async def _external_index_retrieval(
 async def query_parser_from_find_request(
     kbid: str, item: FindRequest, *, generative_model: Optional[str] = None
 ) -> tuple[QueryParser, RankFusionAlgorithm, Reranker, ParsedQuery]:
-    item.min_score = min_score_from_payload(item.min_score)
-
-    if SearchOptions.SEMANTIC in item.features:
-        if should_disable_vector_search(item):
-            item.features.remove(SearchOptions.SEMANTIC)
-
-    hidden = await filter_hidden_resources(kbid, item.show_hidden)
-
     # XXX this is becoming the new /find query parsing, this should be moved to
     # a cleaner abstraction
 
@@ -263,36 +250,12 @@ async def query_parser_from_find_request(
 
     query_parser = QueryParser(
         kbid=kbid,
-        features=item.features,
         query=item.query,
-        query_entities=item.query_entities,
-        filter_expression=item.filter_expression,
-        faceted=None,
-        sort=None,
-        top_k=item.top_k,
-        min_score=item.min_score,
-        old_filters=OldFilterParams(
-            label_filters=item.filters,
-            keyword_filters=item.keyword_filters,
-            range_creation_start=item.range_creation_start,
-            range_creation_end=item.range_creation_end,
-            range_modification_start=item.range_modification_start,
-            range_modification_end=item.range_modification_end,
-            fields=item.fields,
-            key_filters=item.resource_filters,
-        ),
         user_vector=item.vector,
         vectorset=item.vectorset,
-        with_duplicates=item.with_duplicates,
-        with_synonyms=item.with_synonyms,
-        autofilter=item.autofilter,
-        security=item.security,
         generative_model=generative_model,
         rephrase=item.rephrase,
         rephrase_prompt=item.rephrase_prompt,
-        hidden=hidden,
-        rank_fusion=rank_fusion,
-        reranker=reranker,
         parsed_query=parsed,
     )
     return (query_parser, rank_fusion, reranker, parsed)

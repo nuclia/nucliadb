@@ -18,63 +18,35 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import re
-import string
 from datetime import datetime
-from typing import Any, Awaitable, Optional
+from typing import Any, Optional
 
 from nucliadb.common import datamanagers
-from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
-from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.search.filters import (
     translate_label,
 )
 from nucliadb.search.search.metrics import (
-    node_features,
     query_parser_observer,
 )
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import ParsedQuery
-from nucliadb.search.search.rank_fusion import (
-    RankFusionAlgorithm,
-)
-from nucliadb.search.search.rerankers import (
-    Reranker,
-)
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.internal.predict import QueryInfo
-from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
+from nucliadb_models.labels import LABEL_HIDDEN
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
-    KnowledgeGraphEntity,
     MaxTokens,
-    MinScore,
-    SearchOptions,
     SortField,
-    SortOptions,
     SortOrder,
-    SortOrderMap,
     SuggestOptions,
 )
-from nucliadb_models.security import RequestSecurity
 from nucliadb_protos import nodereader_pb2, utils_pb2
 from nucliadb_protos.noderesources_pb2 import Resource
 
 from .exceptions import InvalidQueryError
 from .query_parser.filter_expression import add_and_expression, parse_expression
 from .query_parser.old_filters import OldFilterParams, parse_old_filters
-
-INDEX_SORTABLE_FIELDS = [
-    SortField.CREATED,
-    SortField.MODIFIED,
-]
-
-DEFAULT_GENERIC_SEMANTIC_THRESHOLD = 0.7
-
-# -* is an invalid query in tantivy and it won't return results but if you add some whitespaces
-# between - and *, it will actually trigger a tantivy bug and panic
-INVALID_QUERY = re.compile(r"- +\*")
 
 
 class QueryParser:
@@ -93,55 +65,14 @@ class QueryParser:
         self,
         *,
         kbid: str,
-        features: list[SearchOptions],
         query: str,
-        top_k: int,
-        min_score: MinScore,
-        old_filters: OldFilterParams,
-        filter_expression: Optional[FilterExpression] = None,
-        query_entities: Optional[list[KnowledgeGraphEntity]] = None,
-        faceted: Optional[list[str]] = None,
-        sort: Optional[SortOptions] = None,
         user_vector: Optional[list[float]] = None,
         vectorset: Optional[str] = None,
-        with_duplicates: bool = False,
-        with_status: Optional[ResourceProcessingStatus] = None,
-        with_synonyms: bool = False,
-        autofilter: bool = False,
-        security: Optional[RequestSecurity] = None,
         generative_model: Optional[str] = None,
         rephrase: bool = False,
         rephrase_prompt: Optional[str] = None,
-        hidden: Optional[bool] = None,
-        rank_fusion: Optional[RankFusionAlgorithm] = None,
-        reranker: Optional[Reranker] = None,
         parsed_query: Optional[ParsedQuery] = None,
     ):
-        self.kbid = kbid
-        self.features = features
-        self.query = query
-        self.query_entities = query_entities
-        self.hidden = hidden
-        self.faceted = faceted or []
-        self.top_k = top_k
-        self.min_score = min_score
-        self.sort = sort
-        self.user_vector = user_vector
-        self.vectorset = vectorset
-        self.with_duplicates = with_duplicates
-        self.with_status = with_status
-        self.with_synonyms = with_synonyms
-        self.autofilter = autofilter
-        self.security = security
-        self.generative_model = generative_model
-        self.rephrase = rephrase
-        self.rephrase_prompt = rephrase_prompt
-        self.query_endpoint_used = False
-        self.max_tokens: Optional[MaxTokens] = None
-        self.rank_fusion = rank_fusion
-        self.reranker = reranker
-        self.filter_expression = filter_expression
-        self.old_filters = old_filters
         if parsed_query is not None:
             self.fetcher = parsed_query.fetcher
         else:
@@ -156,49 +87,13 @@ class QueryParser:
             )
         self.parsed_query = parsed_query
 
-    @property
-    def has_vector_search(self) -> bool:
-        return SearchOptions.SEMANTIC in self.features
-
-    @property
-    def has_relations_search(self) -> bool:
-        return SearchOptions.RELATIONS in self.features
-
-    def _get_query_information(self) -> Awaitable[QueryInfo]:
-        if self._query_information_task is None:  # pragma: no cover
-            self._query_information_task = asyncio.create_task(self._query_information())
-        return self._query_information_task
-
-    async def _query_information(self) -> QueryInfo:
+    async def _get_query_information(self) -> QueryInfo:
         # HACK: while transitioning to the new query parser, use fetcher under
         # the hood for a smoother migration
         query_info = await self.fetcher._predict_query_endpoint()
         if query_info is None:
             raise SendToPredictError("Error while using predict's query endpoint")
         return query_info
-
-    async def _schedule_dependency_tasks(self) -> None:
-        """
-        This will schedule concurrent tasks for different data that needs to be pulled
-        for the sake of the query being performed
-        """
-        if len(self.old_filters.label_filters) > 0:
-            asyncio.ensure_future(self.fetcher.get_classification_labels())
-
-        if self.has_vector_search and self.user_vector is None:
-            self.query_endpoint_used = True
-            asyncio.ensure_future(self._get_query_information())
-            # XXX: should we also ensure get_vectorset and get_query_vector?
-            asyncio.ensure_future(self.fetcher.get_matryoshka_dimension())
-
-        if (self.has_relations_search or self.autofilter) and len(self.query) > 0:
-            if not self.query_endpoint_used:
-                # If we only need to detect entities, we don't need the query endpoint
-                asyncio.ensure_future(self.fetcher.get_detected_entities())
-            asyncio.ensure_future(self.fetcher.get_entities_meta_cache())
-            asyncio.ensure_future(self.fetcher.get_deleted_entity_groups())
-        if self.with_synonyms and self.query:
-            asyncio.ensure_future(self.fetcher.get_synonyms())
 
     @query_parser_observer.wrap({"type": "QueryParser"})
     async def parse(self) -> tuple[nodereader_pb2.SearchRequest, bool, list[str], Optional[str]]:
@@ -209,265 +104,25 @@ class QueryParser:
                 - incomplete: If the query is incomplete (missing vectors)
                 - autofilters: The autofilters that were applied
         """
-        if self.parsed_query is not None:
-            # query parsing already done, just use QueryParser as a wrapper
+        # TODO: remove this assert before merging!
+        assert self.parsed_query is not None, "everyone should pass a parsed query!"
 
-            from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
-                convert_retrieval_to_proto,
-                is_incomplete,
-            )
+        # query parsing has already been done, we just use QueryParser as a wrapper
 
-            request, autofilters = convert_retrieval_to_proto(self.parsed_query.retrieval)
-            incomplete = is_incomplete(self.parsed_query.retrieval)
-            if self.has_vector_search:
-                rephrased_query = await self.parsed_query.fetcher.get_rephrased_query()
-            else:
-                rephrased_query = None
+        from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
+            convert_retrieval_to_proto,
+            is_incomplete,
+        )
 
-        else:
-            # Filter some queries that panic tantivy, better than returning the 500
-            if INVALID_QUERY.search(self.query):
-                raise InvalidQueryError("query", "Invalid query syntax")
+        request, autofilters = convert_retrieval_to_proto(self.parsed_query.retrieval)
+        incomplete = is_incomplete(self.parsed_query.retrieval)
+        rephrased_query = None
 
-            request = nodereader_pb2.SearchRequest()
-            request.body = self.query
-            request.with_duplicates = self.with_duplicates
-
-            self.parse_sorting(request)
-
-            await self._schedule_dependency_tasks()
-
-            await self.parse_filters(request)
-            self.parse_document_search(request)
-            self.parse_paragraph_search(request)
-            incomplete, rephrased_query = await self.parse_vector_search(request)
-            autofilters = await self.parse_relation_search(request)
-            await self.parse_synonyms(request)
-            await self.parse_min_score(request, incomplete)
-            await self.adjust_page_size(request, self.rank_fusion, self.reranker)
+        has_vector_search = self.parsed_query.retrieval.query.semantic is not None
+        if has_vector_search:
+            rephrased_query = await self.parsed_query.fetcher.get_rephrased_query()
 
         return request, incomplete, autofilters, rephrased_query
-
-    async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
-        request.faceted.labels.extend([translate_label(facet) for facet in self.faceted])
-
-        if self.security is not None and len(self.security.groups) > 0:
-            security_pb = utils_pb2.Security()
-            for group_id in self.security.groups:
-                if group_id not in security_pb.access_groups:
-                    security_pb.access_groups.append(group_id)
-            request.security.CopyFrom(security_pb)
-
-        has_old_filters = False
-        if self.old_filters:
-            field_expr, paragraph_expr = await parse_old_filters(self.old_filters, self.fetcher)
-            if field_expr is not None:
-                request.field_filter.CopyFrom(field_expr)
-                has_old_filters = True
-            if paragraph_expr is not None:
-                request.paragraph_filter.CopyFrom(paragraph_expr)
-                has_old_filters = True
-
-        if self.filter_expression and has_old_filters:
-            raise InvalidQueryError("filter_expression", "Cannot mix old filters with filter_expression")
-
-        if self.filter_expression:
-            if self.filter_expression.field:
-                expr = await parse_expression(self.filter_expression.field, self.kbid)
-                if expr:
-                    request.field_filter.CopyFrom(expr)
-
-            if self.filter_expression.paragraph:
-                expr = await parse_expression(self.filter_expression.paragraph, self.kbid)
-                if expr:
-                    request.paragraph_filter.CopyFrom(expr)
-
-            if self.filter_expression.operator == FilterExpression.Operator.OR:
-                request.filter_operator = nodereader_pb2.FilterOperator.OR
-            else:
-                request.filter_operator = nodereader_pb2.FilterOperator.AND
-
-        if self.hidden is not None:
-            expr = nodereader_pb2.FilterExpression()
-            if self.hidden:
-                expr.facet.facet = LABEL_HIDDEN
-            else:
-                expr.bool_not.facet.facet = LABEL_HIDDEN
-
-            add_and_expression(request.field_filter, expr)
-
-    def parse_sorting(self, request: nodereader_pb2.SearchRequest) -> None:
-        if len(self.query) == 0:
-            if self.sort is None:
-                self.sort = SortOptions(
-                    field=SortField.CREATED,
-                    order=SortOrder.DESC,
-                    limit=None,
-                )
-            elif self.sort.field not in INDEX_SORTABLE_FIELDS:
-                raise InvalidQueryError(
-                    "sort_field",
-                    f"Empty query can only be sorted by '{SortField.CREATED}' or"
-                    f" '{SortField.MODIFIED}' and sort limit won't be applied",
-                )
-        else:
-            if self.sort is None:
-                self.sort = SortOptions(
-                    field=SortField.SCORE,
-                    order=SortOrder.DESC,
-                    limit=None,
-                )
-            elif self.sort.field not in INDEX_SORTABLE_FIELDS and self.sort.limit is None:
-                raise InvalidQueryError(
-                    "sort_field",
-                    f"Sort by '{self.sort.field}' requires setting a sort limit",
-                )
-
-        # We need to ask for all and cut later
-        request.page_number = 0
-        if self.sort and self.sort.limit is not None:
-            # As the index can't sort, we have to do it when merging. To
-            # have consistent results, we must limit them
-            request.result_per_page = self.sort.limit
-        else:
-            request.result_per_page = self.top_k
-
-        sort_field = get_sort_field_proto(self.sort.field) if self.sort else None
-        if sort_field is not None:
-            request.order.sort_by = sort_field
-            request.order.type = SortOrderMap[self.sort.order]  # type: ignore
-
-    async def parse_min_score(self, request: nodereader_pb2.SearchRequest, incomplete: bool) -> None:
-        semantic_min_score = DEFAULT_GENERIC_SEMANTIC_THRESHOLD
-        if self.min_score.semantic is not None:
-            semantic_min_score = self.min_score.semantic
-        elif self.has_vector_search and not incomplete:
-            query_information = await self._get_query_information()
-            vectorset = await self.fetcher.get_vectorset()
-            semantic_threshold = query_information.semantic_thresholds.get(vectorset, None)
-            if semantic_threshold is not None:
-                semantic_min_score = semantic_threshold
-            else:
-                logger.warning(
-                    "Semantic threshold not found in query information, using default",
-                    extra={"kbid": self.kbid},
-                )
-        self.min_score.semantic = semantic_min_score
-        request.min_score_semantic = self.min_score.semantic
-        request.min_score_bm25 = self.min_score.bm25
-
-    def parse_document_search(self, request: nodereader_pb2.SearchRequest) -> None:
-        if SearchOptions.FULLTEXT in self.features:
-            request.document = True
-            node_features.inc({"type": "documents"})
-
-    def parse_paragraph_search(self, request: nodereader_pb2.SearchRequest) -> None:
-        if SearchOptions.KEYWORD in self.features:
-            request.paragraph = True
-            node_features.inc({"type": "paragraphs"})
-
-    async def parse_vector_search(
-        self, request: nodereader_pb2.SearchRequest
-    ) -> tuple[bool, Optional[str]]:
-        if not self.has_vector_search:
-            return False, None
-
-        node_features.inc({"type": "vectors"})
-
-        vectorset = await self.fetcher.get_vectorset()
-        query_vector = await self.fetcher.get_query_vector()
-        rephrased_query = await self.fetcher.get_rephrased_query()
-        incomplete = query_vector is None
-
-        request.vectorset = vectorset
-        if query_vector is not None:
-            request.vector.extend(query_vector)
-
-        return incomplete, rephrased_query
-
-    async def parse_relation_search(self, request: nodereader_pb2.SearchRequest) -> list[str]:
-        autofilters = []
-        # BUG: autofiler should autofilter, not enable relation search
-        if self.has_relations_search or self.autofilter:
-            if self.query_entities:
-                detected_entities = []
-                for entity in self.query_entities:
-                    relation_node = utils_pb2.RelationNode()
-                    relation_node.value = entity.name
-                    if entity.type is not None:
-                        relation_node.ntype = RelationNodeTypeMap[entity.type]
-                    if entity.subtype is not None:
-                        relation_node.subtype = entity.subtype
-                    detected_entities.append(relation_node)
-            else:
-                detected_entities = await self.fetcher.get_detected_entities()
-            meta_cache = await self.fetcher.get_entities_meta_cache()
-            detected_entities = expand_entities(meta_cache, detected_entities)
-            if self.has_relations_search:
-                request.relation_subgraph.entry_points.extend(detected_entities)
-                request.relation_subgraph.depth = 1
-                request.relation_subgraph.deleted_groups.extend(
-                    await self.fetcher.get_deleted_entity_groups()
-                )
-                for group_id, deleted_entities in meta_cache.deleted_entities.items():
-                    request.relation_subgraph.deleted_entities.append(
-                        nodereader_pb2.EntitiesSubgraphRequest.DeletedEntities(
-                            node_subtype=group_id, node_values=deleted_entities
-                        )
-                    )
-                node_features.inc({"type": "relations"})
-            if self.autofilter:
-                entity_filters = apply_entities_filter(request, detected_entities)
-                autofilters.extend([translate_system_to_alias_label(e) for e in entity_filters])
-        return autofilters
-
-    async def parse_synonyms(self, request: nodereader_pb2.SearchRequest) -> None:
-        """
-        Replace the terms in the query with an expression that will make it match with the configured synonyms.
-        We're using the Tantivy's query language here: https://docs.rs/tantivy/latest/tantivy/query/struct.QueryParser.html
-
-        Example:
-        - Synonyms: Foo -> Bar, Baz
-        - Query: "What is Foo?"
-        - Advanced Query: "What is (Foo OR Bar OR Baz)?"
-        """
-        if not self.with_synonyms or not self.query:
-            # Nothing to do
-            return
-
-        if self.has_vector_search or self.has_relations_search:
-            raise InvalidQueryError(
-                "synonyms",
-                "Search with custom synonyms is only supported on paragraph and document search",
-            )
-
-        synonyms = await self.fetcher.get_synonyms()
-        if synonyms is None:
-            # No synonyms found
-            return
-
-        # Calculate term variants: 'term' -> '(term OR synonym1 OR synonym2)'
-        variants: dict[str, str] = {}
-        for term, term_synonyms in synonyms.terms.items():
-            if len(term_synonyms.synonyms) > 0:
-                variants[term] = "({})".format(" OR ".join([term] + list(term_synonyms.synonyms)))
-
-        # Split the query into terms
-        query_terms = self.query.split()
-
-        # Remove punctuation from the query terms
-        clean_query_terms = [term.strip(string.punctuation) for term in query_terms]
-
-        # Replace the original terms with the variants if the cleaned term is in the variants
-        term_with_synonyms_found = False
-        for index, clean_term in enumerate(clean_query_terms):
-            if clean_term in variants:
-                term_with_synonyms_found = True
-                query_terms[index] = query_terms[index].replace(clean_term, variants[clean_term])
-
-        if term_with_synonyms_found:
-            request.advanced_query = " ".join(query_terms)
-            request.ClearField("body")
 
     async def get_visual_llm_enabled(self) -> bool:
         return (await self._get_query_information()).visual_llm
@@ -487,32 +142,6 @@ class QueryParser:
         if max_tokens is not None and max_tokens.answer is not None:
             return max_tokens.answer
         return None
-
-    async def adjust_page_size(
-        self,
-        request: nodereader_pb2.SearchRequest,
-        rank_fusion: Optional[RankFusionAlgorithm],
-        reranker: Optional[Reranker],
-    ):
-        """Adjust requested page size depending on rank fusion and reranking algorithms.
-
-        Some rerankers want more results than the requested by the user so
-        reranking can have more choices.
-
-        """
-        rank_fusion_window = 0
-        if rank_fusion is not None:
-            rank_fusion_window = rank_fusion.window
-
-        reranker_window = 0
-        if reranker is not None:
-            reranker_window = reranker.window or 0
-
-        request.result_per_page = max(
-            request.result_per_page,
-            rank_fusion_window,
-            reranker_window,
-        )
 
 
 async def paragraph_query_to_pb(

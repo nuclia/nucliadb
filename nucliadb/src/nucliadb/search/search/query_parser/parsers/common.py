@@ -155,6 +155,9 @@ async def query_with_synonyms(
     - Query: "What is Foo?"
     - Advanced Query: "What is (Foo OR Bar OR Baz)?"
     """
+    if not query:
+        return None
+
     synonyms = await fetcher.get_synonyms()
     if synonyms is None:
         # No synonyms found

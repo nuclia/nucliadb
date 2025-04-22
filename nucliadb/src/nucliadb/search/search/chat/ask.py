@@ -62,7 +62,6 @@ from nucliadb.search.search.exceptions import (
 from nucliadb.search.search.graph_strategy import get_graph_results
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
-from nucliadb.search.search.query_parser.old_filters import OldFilterParams
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     AnswerAskResponseItem,
@@ -83,7 +82,6 @@ from nucliadb_models.search import (
     JSONAskResponseItem,
     KnowledgeboxFindResults,
     MetadataAskResponseItem,
-    MinScore,
     NucliaDBClientType,
     PrequeriesAskResponseItem,
     PreQueriesStrategy,
@@ -806,15 +804,7 @@ async def retrieval_in_resource(
             prequeries=None,
             query_parser=QueryParser(
                 kbid=kbid,
-                features=[],
                 query="",
-                filter_expression=ask_request.filter_expression,
-                old_filters=OldFilterParams(
-                    label_filters=ask_request.filters,
-                    keyword_filters=ask_request.keyword_filters,
-                ),
-                top_k=0,
-                min_score=MinScore(),
             ),
             main_query_weight=1.0,
         )
