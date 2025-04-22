@@ -419,7 +419,7 @@ async def get_graph_results(
     # Get the text blocks of the paragraphs that contain the top relations
     with metrics.time("graph_strat_build_response"):
         find_request = find_request_from_ask_request(item, query)
-        query_parser, rank_fusion, reranker = await query_parser_from_find_request(
+        query_parser, _, reranker, _ = await query_parser_from_find_request(
             kbid, find_request, generative_model=generative_model
         )
         find_results = await build_graph_response(

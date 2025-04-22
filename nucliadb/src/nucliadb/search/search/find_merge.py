@@ -32,6 +32,7 @@ from nucliadb.search.search.hydrator import (
     text_block_to_find_paragraph,
 )
 from nucliadb.search.search.merge import merge_relations_results
+from nucliadb.search.search.query_parser.models import UnitRetrieval
 from nucliadb.search.search.rank_fusion import RankFusionAlgorithm
 from nucliadb.search.search.rerankers import (
     RerankableItem,
@@ -51,7 +52,6 @@ from nucliadb_models.search import (
 )
 from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
-    EntitiesSubgraphRequest,
     ParagraphResult,
     ParagraphSearchResponse,
     RelationSearchResponse,
@@ -72,13 +72,10 @@ FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
 async def build_find_response(
     search_responses: list[SearchResponse],
     *,
+    retrieval: UnitRetrieval,
     kbid: str,
     query: str,
     rephrased_query: Optional[str],
-    relation_subgraph_query: EntitiesSubgraphRequest,
-    top_k: int,
-    min_score_bm25: float,
-    min_score_semantic: float,
     rank_fusion_algorithm: RankFusionAlgorithm,
     reranker: Reranker,
     show: list[ResourceProperties] = [],
@@ -86,6 +83,15 @@ async def build_find_response(
     field_type_filter: list[FieldTypeName] = [],
     highlight: bool = False,
 ) -> KnowledgeboxFindResults:
+    # XXX: we shouldn't need a min score that we haven't used. Previous
+    # implementations got this value from the proto request (i.e., default to 0)
+    min_score_bm25 = 0.0
+    if retrieval.query.keyword is not None:
+        min_score_bm25 = retrieval.query.keyword.min_score
+    min_score_semantic = 0.0
+    if retrieval.query.semantic is not None:
+        min_score_semantic = retrieval.query.semantic.min_score
+
     # merge
     search_response = merge_shard_responses(search_responses)
 
@@ -112,7 +118,7 @@ async def build_find_response(
         assert reranker.window is not None, "Reranker definition must enforce this condition"
         text_blocks_page, next_page = cut_page(merged_text_blocks, reranker.window)
     else:
-        text_blocks_page, next_page = cut_page(merged_text_blocks, top_k)
+        text_blocks_page, next_page = cut_page(merged_text_blocks, retrieval.top_k)
 
     # hydrate and rerank
     resource_hydration_options = ResourceHydrationOptions(
@@ -130,13 +136,14 @@ async def build_find_response(
         text_block_hydration_options=text_block_hydration_options,
         reranker=reranker,
         reranking_options=reranking_options,
-        top_k=top_k,
+        top_k=retrieval.top_k,
     )
 
     # build relations graph
-    relations = await merge_relations_results(
-        [search_response.relation], relation_subgraph_query.entry_points
-    )
+    entry_points = []
+    if retrieval.query.relation is not None:
+        entry_points = retrieval.query.relation.detected_entities
+    relations = await merge_relations_results([search_response.relation], entry_points)
 
     # compose response
     find_resources = compose_find_resources(text_blocks, resources)
@@ -152,7 +159,7 @@ async def build_find_response(
         relations=relations,
         total=total_paragraphs,
         page_number=0,  # Bw/c with pagination
-        page_size=top_k,
+        page_size=retrieval.top_k,
         next_page=next_page,
         min_score=MinScore(bm25=_round(min_score_bm25), semantic=_round(min_score_semantic)),
     )

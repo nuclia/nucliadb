@@ -38,6 +38,7 @@ from nucliadb.search.search.metrics import (
     RAGMetrics,
 )
 from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.search.query_parser.old_filters import OldFilterParams
 from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb.search.search.rank_fusion import (
@@ -102,7 +103,7 @@ async def _index_node_retrieval(
     audit = get_audit()
     start_time = time()
 
-    query_parser, rank_fusion, reranker = await query_parser_from_find_request(
+    query_parser, rank_fusion, reranker, parsed = await query_parser_from_find_request(
         kbid, item, generative_model=generative_model
     )
     with metrics.time("query_parse"):
@@ -118,13 +119,10 @@ async def _index_node_retrieval(
     with metrics.time("results_merge"):
         search_results = await build_find_response(
             results,
+            retrieval=parsed.retrieval,
             kbid=kbid,
             query=pb_query.body,
             rephrased_query=rephrased_query,
-            relation_subgraph_query=pb_query.relation_subgraph,
-            min_score_bm25=pb_query.min_score_bm25,
-            min_score_semantic=pb_query.min_score_semantic,
-            top_k=item.top_k,
             show=item.show,
             extracted=item.extracted,
             field_type_filter=item.field_type_filter,
@@ -194,7 +192,7 @@ async def _external_index_retrieval(
     Parse the query, query the external index, and hydrate the results.
     """
     # Parse query
-    query_parser, _, reranker = await query_parser_from_find_request(
+    query_parser, _, reranker, _ = await query_parser_from_find_request(
         kbid, item, generative_model=generative_model
     )
     search_request, incomplete_results, _, rephrased_query = await query_parser.parse()
@@ -246,7 +244,7 @@ async def _external_index_retrieval(
 
 async def query_parser_from_find_request(
     kbid: str, item: FindRequest, *, generative_model: Optional[str] = None
-) -> tuple[QueryParser, RankFusionAlgorithm, Reranker]:
+) -> tuple[QueryParser, RankFusionAlgorithm, Reranker, ParsedQuery]:
     item.min_score = min_score_from_payload(item.min_score)
 
     if SearchOptions.SEMANTIC in item.features:
@@ -297,4 +295,4 @@ async def query_parser_from_find_request(
         reranker=reranker,
         parsed_query=parsed,
     )
-    return (query_parser, rank_fusion, reranker)
+    return (query_parser, rank_fusion, reranker, parsed)
