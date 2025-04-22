@@ -25,7 +25,6 @@ import pytest
 
 from nucliadb.search.search.find_merge import build_find_response
 from nucliadb.search.search.query_parser.models import (
-    Filters,
     KeywordQuery,
     Query,
     SemanticQuery,
@@ -170,7 +169,6 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
                     ),
                 ),
                 top_k=20,
-                filters=Filters(),
             ),
             kbid="kbid",
             query=query,

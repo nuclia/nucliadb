@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal, Optional, Union
 
@@ -129,7 +129,7 @@ Reranker = Union[NoopReranker, PredictReranker]
 class UnitRetrieval:
     query: Query
     top_k: int
-    filters: Filters
+    filters: Filters = field(default_factory=Filters)
 
 
 @dataclass
