@@ -36,7 +36,6 @@ from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.labels import LABEL_HIDDEN
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
-    MaxTokens,
     SortField,
     SortOrder,
     SuggestOptions,
@@ -123,25 +122,6 @@ class QueryParser:
             rephrased_query = await self.parsed_query.fetcher.get_rephrased_query()
 
         return request, incomplete, autofilters, rephrased_query
-
-    async def get_visual_llm_enabled(self) -> bool:
-        return (await self._get_query_information()).visual_llm
-
-    async def get_max_tokens_context(self, max_tokens: Optional[MaxTokens]) -> int:
-        model_max = (await self._get_query_information()).max_context
-        if max_tokens is not None and max_tokens.context is not None:
-            if max_tokens.context > model_max:
-                raise InvalidQueryError(
-                    "max_tokens.context",
-                    f"Max context tokens is higher than the model's limit of {model_max}",
-                )
-            return max_tokens.context
-        return model_max
-
-    def get_max_tokens_answer(self, max_tokens: Optional[MaxTokens]) -> Optional[int]:
-        if max_tokens is not None and max_tokens.answer is not None:
-            return max_tokens.answer
-        return None
 
 
 async def paragraph_query_to_pb(
