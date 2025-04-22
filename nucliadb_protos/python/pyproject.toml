@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb_protos"
-version = "6.3.6"
+version = "6.3.7"
 license = { text = "AGPL" }
 description = "Protobuf definitions for nucliadb"
 authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
