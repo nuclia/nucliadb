@@ -74,7 +74,7 @@ class NucliaDataset(object):
         for index, partition in enumerate(partitions):
             logger.info(f"Reading partition {partition} {index}/{len(partitions)}")
             filename = self.read_partition(partition, ACTUAL_PARTITION, force)
-            logger.info("done")
+            logger.info(f"Done reading partition {partition}")
             yield partition, filename
 
     def read_all_partitions(self, force=False, path: Optional[str] = None) -> List[str]:
@@ -84,7 +84,7 @@ class NucliaDataset(object):
             logger.info(f"Reading partition {partition} {index}/{len(partitions)}")
             filename = self.read_partition(partition, force=force, path=path)
             result.append(filename)
-            logger.info("done")
+            logger.info(f"Done reading partition {partition}")
         return result
 
     def get_partitions(self):
