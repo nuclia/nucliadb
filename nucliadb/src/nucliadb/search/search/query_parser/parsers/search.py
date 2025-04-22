@@ -216,7 +216,6 @@ class _SearchParser:
                 range_modification_end=self.item.range_modification_end,
                 fields=self.item.fields,
             )
-            has_old_filters = False
             field_expr, paragraph_expr = await parse_old_filters(old_filters, self.fetcher)
 
         if self.item.filter_expression is not None:

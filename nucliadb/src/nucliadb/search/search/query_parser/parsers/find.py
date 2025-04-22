@@ -206,7 +206,6 @@ class _FindParser:
                 fields=self.item.fields,
                 key_filters=self.item.resource_filters,
             )
-            has_old_filters = False
             field_expr, paragraph_expr = await parse_old_filters(old_filters, self.fetcher)
 
         if self.item.filter_expression is not None:
