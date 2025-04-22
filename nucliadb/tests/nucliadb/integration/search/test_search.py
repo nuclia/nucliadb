@@ -1053,9 +1053,7 @@ async def test_search_min_score(
     standalone_knowledgebox,
 ):
     # When not specifying the min score on the request, it should default to 0.7
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/search", json={"query": "dummy", "features": ["semantic"]}
-    )
+    resp = await nucliadb_reader.post(f"/kb/{standalone_knowledgebox}/search", json={"query": "dummy"})
     assert resp.status_code == 200
     assert resp.json()["sentences"]["min_score"] == 0.7
 
