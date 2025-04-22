@@ -58,6 +58,18 @@ venv:  ## Initializes an environment
 install:
 	uv sync
 
+install__deprecated: ## Install dependencies (on the active environment)
+	pip install --upgrade pip wheel
+	pip install "Cython==0.29.24" "grpcio-tools>=1.44.0,<1.63.0"
+	pip install -r test-requirements.txt
+	pip install -e ./nucliadb_protos/python
+	pip install -e ./nucliadb_telemetry
+	pip install -e ./nucliadb_utils
+	pip install -e ./nucliadb_models
+	pip install -e ./nucliadb
+	pip install -e ./nucliadb_sdk
+	pip install -e ./nucliadb_dataset
+
 debug-test-nucliadb:
 	RUST_BACKTRACE=1 pytest nucliadb/tests -sxv
 
