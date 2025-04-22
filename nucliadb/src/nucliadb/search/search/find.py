@@ -38,7 +38,7 @@ from nucliadb.search.search.metrics import (
 )
 from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.search.query_parser.parsers import parse_find
-from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import legacy_convert_retrieval_to_proto
 from nucliadb.search.search.rank_fusion import (
     get_rank_fusion,
 )
@@ -95,9 +95,12 @@ async def _index_node_retrieval(
         assert parsed.merge is not None, "find parser must return a merge spec"
         rank_fusion = get_rank_fusion(parsed.merge.rank_fusion)
         reranker = get_reranker(parsed.merge.reranker)
-        pb_query, incomplete_results, autofilters, rephrased_query = await convert_retrieval_to_proto(
-            parsed
-        )
+        (
+            pb_query,
+            incomplete_results,
+            autofilters,
+            rephrased_query,
+        ) = await legacy_convert_retrieval_to_proto(parsed)
 
     with metrics.time("node_query"):
         results, query_incomplete_results, queried_nodes = await node_query(
@@ -184,7 +187,9 @@ async def _external_index_retrieval(
     parsed = await parse_find(kbid, item, generative_model=generative_model)
     assert parsed.merge is not None, "find parser must return a merge spec"
     reranker = get_reranker(parsed.merge.reranker)
-    search_request, incomplete_results, _, rephrased_query = await convert_retrieval_to_proto(parsed)
+    search_request, incomplete_results, _, rephrased_query = await legacy_convert_retrieval_to_proto(
+        parsed
+    )
 
     # Query index
     query_results = await external_index_manager.query(search_request)  # noqa

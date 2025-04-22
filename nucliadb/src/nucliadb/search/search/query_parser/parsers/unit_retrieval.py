@@ -45,7 +45,7 @@ from nucliadb_protos.nodereader_pb2 import SearchRequest
 
 
 @query_parser_observer.wrap({"type": "convert_retrieval_to_proto"})
-async def convert_retrieval_to_proto(
+async def legacy_convert_retrieval_to_proto(
     parsed: ParsedQuery,
 ) -> tuple[SearchRequest, bool, list[str], Optional[str]]:
     converter = _Converter(parsed.retrieval)
