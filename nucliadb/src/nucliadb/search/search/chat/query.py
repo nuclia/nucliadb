@@ -108,7 +108,6 @@ async def get_find_results(
                     x_ndb_client=ndb_client,
                     x_nucliadb_user=user,
                     x_forwarded_for=origin,
-                    generative_model=item.generative_model,
                     metrics=metrics,
                 )
                 prefilter_matching_resources = {
@@ -210,6 +209,7 @@ def find_request_from_ask_request(item: AskRequest, query: str) -> FindRequest:
     # We don't support pagination, we always get the top_k results.
     find_request.top_k = item.top_k
     find_request.show_hidden = item.show_hidden
+    find_request.generative_model = item.generative_model
 
     # this executes the model validators, that can tweak some fields
     return FindRequest.model_validate(find_request)
@@ -232,7 +232,6 @@ async def run_main_query(
         ndb_client,
         user,
         origin,
-        generative_model=item.generative_model,
         metrics=metrics,
     )
     if incomplete:
@@ -469,7 +468,6 @@ async def run_prequeries(
                 x_ndb_client,
                 x_nucliadb_user,
                 x_forwarded_for,
-                generative_model=generative_model,
                 metrics=metrics,
             )
             return prequery, find_results

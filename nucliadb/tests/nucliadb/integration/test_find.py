@@ -23,7 +23,9 @@ from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
+from pytest_mock import MockerFixture
 
+from nucliadb.search.predict import DummyPredictEngine
 from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
 from nucliadb_models.search import SearchOptions
 from nucliadb_protos.resources_pb2 import (
@@ -591,3 +593,28 @@ async def test_find_query_error(
         },
     )
     assert resp.status_code == 412
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_find_with_generative_model(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    dummy_predict: DummyPredictEngine,
+    standalone_knowledgebox: str,
+    mocker: MockerFixture,
+):
+    kbid = standalone_knowledgebox
+
+    spy = mocker.spy(dummy_predict, "query")
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "whatever",
+            "generative_model": "everest",
+        },
+    )
+    assert resp.status_code == 200
+
+    spy.assert_called_once_with(kbid, "whatever", None, "everest", False, None)
