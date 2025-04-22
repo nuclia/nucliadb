@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb_protos"
-version = "6.3.5"
+version = "6.3.7"
 license = { text = "AGPL" }
 description = "Protobuf definitions for nucliadb"
 authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
@@ -20,9 +20,9 @@ classifiers = [
 ]
 requires-python = ">=3.9, <4"
 dependencies = [
-    "protobuf >= 5",
+    "protobuf >= 4.22.3",
     "mypy-protobuf >= 3.4.0",
-    "types-protobuf >5",
+    "types-protobuf >= 4.24",
 ]
 
 [project.urls]

@@ -57,6 +57,10 @@ spec:
       - name: nidx-indexer
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         command: ["nidx", "indexer"]
+        {{- with .Values.envFrom }}
+        envFrom:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         env:
           {{- include "toEnv" .Values.env | nindent 10 }}
           - name: WORK_PATH

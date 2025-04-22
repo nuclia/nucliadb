@@ -36,10 +36,9 @@ from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_quer
 from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
-from nucliadb.search.search.query import QueryParser
-from nucliadb.search.search.query_parser.old_filters import OldFilterParams
+from nucliadb.search.search.query_parser.parsers.search import parse_search
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.search.utils import (
-    filter_hidden_resources,
     min_score_from_payload,
     min_score_from_query_params,
     should_disable_vector_search,
@@ -270,53 +269,21 @@ async def search(
         if should_disable_vector_search(item):
             item.features.remove(SearchOptions.SEMANTIC)
 
+    parsed = await parse_search(kbid, item)
+    pb_query, incomplete_results, autofilters, _ = await convert_retrieval_to_proto(parsed)
+
     # We need to query all nodes
-    query_parser = QueryParser(
-        kbid=kbid,
-        features=item.features,
-        query=item.query,
-        filter_expression=item.filter_expression,
-        faceted=item.faceted,
-        sort=item.sort,
-        top_k=item.top_k,
-        min_score=item.min_score,
-        old_filters=OldFilterParams(
-            label_filters=item.filters,
-            keyword_filters=[],
-            range_creation_start=item.range_creation_start,
-            range_creation_end=item.range_creation_end,
-            range_modification_start=item.range_modification_start,
-            range_modification_end=item.range_modification_end,
-            fields=item.fields,
-        ),
-        user_vector=item.vector,
-        vectorset=item.vectorset,
-        with_duplicates=item.with_duplicates,
-        with_status=with_status,
-        with_synonyms=item.with_synonyms,
-        autofilter=item.autofilter,
-        security=item.security,
-        rephrase=item.rephrase,
-        hidden=await filter_hidden_resources(kbid, item.show_hidden),
-        rephrase_prompt=item.rephrase_prompt,
-    )
-    pb_query, incomplete_results, autofilters, _ = await query_parser.parse()
-
     results, query_incomplete_results, queried_nodes = await node_query(kbid, Method.SEARCH, pb_query)
-
     incomplete_results = incomplete_results or query_incomplete_results
 
     # We need to merge
     search_results = await merge_results(
         results,
-        top_k=item.top_k,
+        parsed.retrieval,
         kbid=kbid,
         show=item.show,
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
-        sort=query_parser.sort,  # type: ignore
-        requested_relations=pb_query.relation_subgraph,
-        min_score=query_parser.min_score,
         highlight=item.highlight,
     )
 
