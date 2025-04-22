@@ -20,8 +20,8 @@
 from typing import Dict, Optional
 
 import requests
-from urllib3.exceptions import ProtocolError
 
+from nucliadb_dataset import logger
 from nucliadb_protos.dataset_pb2 import TrainSet
 
 SIZE_BYTES = 4
@@ -54,6 +54,7 @@ class Streamer:
             f"{self.base_url}/v1/kb/{self.kbid}/trainset/{partition_id}",
             data=self.trainset.SerializeToString(),
             stream=True,
+            timeout=None,
         )
         self.resp.raise_for_status()
 
@@ -67,16 +68,16 @@ class Streamer:
 
     def read(self) -> Optional[bytes]:
         assert self.resp is not None, "Streamer not initialized"
-        try:
-            header = self.resp.raw.read(4, decode_content=True)
-            payload_size = int.from_bytes(header, byteorder="big", signed=False)  # noqa
-            data = self.resp.raw.read(payload_size)
-        except ProtocolError:
-            data = None
+        header = self.resp.raw.read(4, decode_content=True)
+        if header == b"":
+            return None
+        payload_size = int.from_bytes(header, byteorder="big", signed=False)  # noqa
+        data = self.resp.raw.read(payload_size)
         return data
 
     def __next__(self) -> Optional[bytes]:
         payload = self.read()
         if payload in [None, b""]:
+            logger.info("Streamer finished reading")
             raise StopIteration
         return payload
