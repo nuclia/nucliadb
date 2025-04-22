@@ -281,10 +281,6 @@ class Fetcher:
             return synonyms
 
     # Generative
-    #
-    # XXX: this methods were in the QueryParser and only used by /ask, maybe it
-    # makes more sense to return a Generation object with all this information
-    # or another thing. Raising invalid query errors here feels kind of late
 
     async def get_visual_llm_enabled(self) -> bool:
         query_info = await self._predict_query_endpoint()

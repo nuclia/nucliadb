@@ -60,7 +60,7 @@ class RelationQuery:
     detected_entities: list[utils_pb2.RelationNode]
     # list[subtype]
     deleted_entity_groups: list[str]
-    # subtype: list[entity]
+    # subtype -> list[entity]
     deleted_entities: dict[str, list[str]]
 
 

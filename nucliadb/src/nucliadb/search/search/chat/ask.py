@@ -63,6 +63,9 @@ from nucliadb.search.search.graph_strategy import get_graph_results
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
+from nucliadb.search.search.rerankers import (
+    get_reranker,
+)
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     AnswerAskResponseItem,
@@ -752,6 +755,7 @@ async def retrieval_in_kb(
         )
 
         if graph_strategy is not None:
+            reranker = get_reranker(parsed_query.retrieval.reranker)
             graph_results, graph_request = await get_graph_results(
                 kbid=kbid,
                 query=main_query,
@@ -761,6 +765,7 @@ async def retrieval_in_kb(
                 origin=origin,
                 graph_strategy=graph_strategy,
                 metrics=metrics,
+                text_block_reranker=reranker,
             )
 
             if prequeries_results is None:
