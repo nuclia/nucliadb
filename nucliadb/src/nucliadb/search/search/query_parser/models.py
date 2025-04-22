@@ -148,9 +148,7 @@ class ParsedQuery:
     fetcher: Fetcher
     retrieval: UnitRetrieval
     generation: Optional[Generation] = None
-
     # TODO: add merge, rank fusion, rerank...
-    # merge: Optional[Merge]
 
 
 ### Catalog
