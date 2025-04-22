@@ -109,7 +109,7 @@ class _FindParser:
             self._query.semantic = await parse_semantic_query(self.item, fetcher=self.fetcher)
 
         if search_models.SearchOptions.RELATIONS in self.item.features:
-            self._query.relation = await self.parse_relation_query()
+            self._query.relation = await self._parse_relation_query()
 
         # TODO: graph search
 
@@ -139,7 +139,7 @@ class _FindParser:
             reranker=reranker,
         )
 
-    async def parse_relation_query(self) -> RelationQuery:
+    async def _parse_relation_query(self) -> RelationQuery:
         detected_entities = await self._get_detected_entities()
 
         deleted_entity_groups = await self.fetcher.get_deleted_entity_groups()

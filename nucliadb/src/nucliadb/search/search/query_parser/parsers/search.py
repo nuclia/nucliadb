@@ -96,20 +96,20 @@ class _SearchParser:
         self._query = Query()
 
         if search_models.SearchOptions.KEYWORD in self.item.features:
-            keyword = await self.parse_text_query()
+            keyword = await self._parse_text_query()
             self._query.keyword = keyword
 
         if search_models.SearchOptions.FULLTEXT in self.item.features:
             # copy from keyword, as everything is the same and we can't search
             # anything different right now
-            keyword = self._query.keyword or (await self.parse_text_query())
+            keyword = self._query.keyword or (await self._parse_text_query())
             self._query.fulltext = keyword
 
         if search_models.SearchOptions.SEMANTIC in self.item.features:
             self._query.semantic = await parse_semantic_query(self.item, fetcher=self.fetcher)
 
         if search_models.SearchOptions.RELATIONS in self.item.features:
-            self._query.relation = await self.parse_relation_query()
+            self._query.relation = await self._parse_relation_query()
 
         filters = await self._parse_filters()
 
@@ -122,11 +122,11 @@ class _SearchParser:
             reranker=NoopReranker(),
         )
 
-    async def parse_text_query(self) -> _TextQuery:
+    async def _parse_text_query(self) -> _TextQuery:
         assert self._top_k is not None, "top_k must be parsed before text query"
 
         keyword = await parse_keyword_query(self.item, fetcher=self.fetcher)
-        sort, order_by, limit = self.parse_sorting()
+        sort, order_by, limit = self._parse_sorting()
         keyword.sort = sort
         keyword.order_by = order_by
         if limit is not None:
@@ -134,7 +134,7 @@ class _SearchParser:
             self._top_k = max(self._top_k, limit)
         return keyword
 
-    async def parse_relation_query(self) -> RelationQuery:
+    async def _parse_relation_query(self) -> RelationQuery:
         detected_entities = await self._get_detected_entities()
         deleted_entity_groups = await self.fetcher.get_deleted_entity_groups()
         meta_cache = await self.fetcher.get_entities_meta_cache()
@@ -151,7 +151,7 @@ class _SearchParser:
         detected_entities = expand_entities(meta_cache, detected_entities)
         return detected_entities
 
-    def parse_sorting(self) -> tuple[search_models.SortOrder, search_models.SortField, Optional[int]]:
+    def _parse_sorting(self) -> tuple[search_models.SortOrder, search_models.SortField, Optional[int]]:
         sort = self.item.sort
         if len(self.item.query) == 0:
             if sort is None:
