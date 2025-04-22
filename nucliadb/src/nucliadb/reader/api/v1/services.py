@@ -152,7 +152,7 @@ async def get_labelsets(kbid: str) -> KnowledgeBoxLabels:
             **MessageToDict(
                 labelset_data,
                 preserving_proto_field_name=True,
-                including_default_value_fields=True,
+                always_print_fields_with_no_presence=True,
             )
         )
         response.labelsets[labelset] = labelset_response
@@ -195,7 +195,7 @@ async def get_labelset(kbid: str, labelset_id: str) -> LabelSet:
         **MessageToDict(
             labelset,
             preserving_proto_field_name=True,
-            including_default_value_fields=True,
+            always_print_fields_with_no_presence=True,
         )
     )
     return response

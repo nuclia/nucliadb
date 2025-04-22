@@ -49,13 +49,13 @@ otel = [
     "opentelemetry-semantic-conventions>=0.42b0",
 ]
 grpc = [
-    "grpcio>=1.44.0",
-    "grpcio-health-checking>=1.44.0",
-    "grpcio-channelz>=1.44.0",
-    "grpcio-status>=1.44.0",
-    "grpcio-tools>=1.44.0",
-    "grpcio-testing>=1.44.0",
-    "grpcio-reflection>=1.44.0",
+    "grpcio>=1.71.0",
+    "grpcio-health-checking>=1.71.0",
+    "grpcio-channelz>=1.71.0",
+    "grpcio-status>=1.71.0",
+    "grpcio-tools>=1.71.0",
+    "grpcio-testing>=1.71.0",
+    "grpcio-reflection>=1.71.0",
 
     # Include OpenTelemetry deps
     "opentelemetry-sdk>=1.21.0",
@@ -109,13 +109,13 @@ all = [
     "opentelemetry-instrumentation-httpx>=0.42b0",
     "opentelemetry-semantic-conventions>=0.42b0",
 
-    "grpcio>=1.44.0",
-    "grpcio-health-checking>=1.44.0",
-    "grpcio-channelz>=1.44.0",
-    "grpcio-status>=1.44.0",
-    "grpcio-tools>=1.44.0",
-    "grpcio-testing>=1.44.0",
-    "grpcio-reflection>=1.44.0",
+    "grpcio>=1.71.0",
+    "grpcio-health-checking>=1.71.0",
+    "grpcio-channelz>=1.71.0",
+    "grpcio-status>=1.71.0",
+    "grpcio-tools>=1.71.0",
+    "grpcio-testing>=1.71.0",
+    "grpcio-reflection>=1.71.0",
 
     "nats-py[nkeys]>=2.5.0",
     "PyNaCl",

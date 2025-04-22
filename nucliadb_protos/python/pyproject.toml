@@ -20,9 +20,9 @@ classifiers = [
 ]
 requires-python = ">=3.9, <4"
 dependencies = [
-    "protobuf >= 4.22.3, < 5",
+    "protobuf >= 5",
     "mypy-protobuf >= 3.4.0",
-    "types-protobuf >= 4.24, < 5",
+    "types-protobuf >5",
 ]
 
 [project.urls]
