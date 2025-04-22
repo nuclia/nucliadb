@@ -8,6 +8,7 @@ containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
 image: IMAGE_TO_REPLACE
 
 env: {}
+envFrom: {}
 indexer: {}
 scheduler: {}
 worker: {}

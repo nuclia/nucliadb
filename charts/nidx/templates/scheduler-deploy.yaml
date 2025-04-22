@@ -61,6 +61,10 @@ spec:
       - name: nidx-scheduler
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         command: ["nidx", "scheduler"]
+        {{- with .Values.envFrom }}
+        envFrom:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         env:
           {{- include "toEnv" .Values.env | nindent 10 }}
           - name: CONTROL_SOCKET
