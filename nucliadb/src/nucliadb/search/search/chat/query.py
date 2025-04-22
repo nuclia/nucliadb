@@ -29,7 +29,7 @@ from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import RAGMetrics
-from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import filters
@@ -93,7 +93,7 @@ async def get_find_results(
     origin: str,
     metrics: RAGMetrics = RAGMetrics(),
     prequeries_strategy: Optional[PreQueriesStrategy] = None,
-) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], QueryParser]:
+) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], ParsedQuery]:
     prequeries_results = None
     prefilter_queries_results = None
     queries_results = None
@@ -223,10 +223,10 @@ async def run_main_query(
     user: str,
     origin: str,
     metrics: RAGMetrics = RAGMetrics(),
-) -> tuple[KnowledgeboxFindResults, QueryParser]:
+) -> tuple[KnowledgeboxFindResults, ParsedQuery]:
     find_request = find_request_from_ask_request(item, query)
 
-    find_results, incomplete, query_parser = await find(
+    find_results, incomplete, parsed_query = await find(
         kbid,
         find_request,
         ndb_client,
@@ -237,7 +237,7 @@ async def run_main_query(
     )
     if incomplete:
         raise IncompleteFindResultsError()
-    return find_results, query_parser
+    return find_results, parsed_query
 
 
 async def get_relations_results(

@@ -69,7 +69,7 @@ async def find(
     x_forwarded_for: str,
     generative_model: Optional[str] = None,
     metrics: RAGMetrics = RAGMetrics(),
-) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
+) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     external_index_manager = await get_external_index_manager(kbid=kbid)
     if external_index_manager is not None:
         return await _external_index_retrieval(
@@ -92,7 +92,7 @@ async def _index_node_retrieval(
     x_forwarded_for: str,
     generative_model: Optional[str] = None,
     metrics: RAGMetrics = RAGMetrics(),
-) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
+) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     audit = get_audit()
     start_time = time()
 
@@ -172,7 +172,7 @@ async def _index_node_retrieval(
             },
         )
 
-    return search_results, incomplete_results, query_parser
+    return search_results, incomplete_results, parsed
 
 
 async def _external_index_retrieval(
@@ -180,7 +180,7 @@ async def _external_index_retrieval(
     item: FindRequest,
     external_index_manager: ExternalIndexManager,
     generative_model: Optional[str] = None,
-) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
+) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     """
     Parse the query, query the external index, and hydrate the results.
     """
@@ -234,7 +234,7 @@ async def _external_index_retrieval(
         nodes=None,
     )
 
-    return retrieval_results, incomplete_results, query_parser
+    return retrieval_results, incomplete_results, parsed
 
 
 async def query_parser_from_find_request(
