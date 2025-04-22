@@ -304,6 +304,37 @@ def _test_predict_proxy_chat(kbid: str):
     print(f"Answer: {answer}")
     assert "Messi" in answer
 
+    # Test application/x-ndjson content type
+    resp = requests.post(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/chat"),
+        headers={
+            "content-type": "application/x-ndjson",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+        json={
+            "question": "Who is the best football player?",
+            "query_context": ["Many football players have existed. Messi is by far the greatest."],
+            "user_id": "someone@company.uk",
+        },
+    )
+    raise_for_status(resp)
+    lines = [line for line in resp.iter_lines()]
+
+    # Check that the answer is in the response
+    text_answer = ""
+    for line in lines:
+        if line["type"] == "text":
+            text_answer += line["text"]
+    print(f"Answer: {text_answer}")
+    assert "Messi" in text_answer, f"Expected answer not found: {'\n'.join(lines)}"
+
+    # Check that the tokens are reported
+    meta = next((line for line in lines if line["type"] == "meta"), None)
+    assert meta is not None, f"Meta line not found: {'\n'.join(lines)}"
+    assert meta["input_tokens"] >= 0
+    assert meta["output_tokens"] >= 0
+
 
 def _test_predict_proxy_tokens(kbid: str):
     resp = requests.get(
