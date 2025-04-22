@@ -66,6 +66,7 @@ impl MergeScheduler {
                                 -- Biggest seq excluding the N most recent
                                 SELECT MIN(seq) FROM (
                                     SELECT seq FROM deletions WHERE index_id = indexes.id ORDER BY seq DESC LIMIT $2)
+                                    AS new_deletions
                                 ),
                             0
                         ) AS seq
