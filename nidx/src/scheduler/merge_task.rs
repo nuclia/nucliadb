@@ -56,44 +56,47 @@ impl MergeScheduler {
         // TODO: Remove vector index split by metadata when removing tags
         let indexes = sqlx::query!(
             r#"
-            -- Only gather deletion information for indexes with many deletions since it's expensive and often not needed
-            WITH indexes_with_many_deletions AS (
-                SELECT index_id FROM deletions GROUP BY index_id HAVING COUNT(*) > $2
-
-            -- Deletions that apply to each segment (so we know which segments we need to merge to allow purging deletions)
-            ), deletions_per_segment AS (
+                -- For each index, gather the seq number before which we want to force deletion of segments
+                -- e.g: gather the seq of the 100th newest deletion, and force merge all segments older than that
+                WITH index_deletion_window AS (
+                    SELECT
+                        id,
+                        COALESCE(
+                            (
+                                -- Biggest seq excluding the N most recent
+                                SELECT MIN(seq) FROM (
+                                    SELECT seq FROM deletions WHERE index_id = indexes.id ORDER BY seq DESC LIMIT $2)
+                                ),
+                            0
+                        ) AS seq
+                    FROM indexes
+                    JOIN deletions ON index_id = indexes.id
+                    GROUP BY indexes.id
+                    HAVING COUNT(*) > $2
+                )
+                -- For each index, a list of mergeable segments with amount of records and deletions
                 SELECT
-                    segments.id,
-                    (
-                        SELECT COUNT(*)
-                        FROM deletions
-                        WHERE deletions.index_id = segments.index_id
-                        AND deletions.seq > segments.seq
-                    ) AS deletions
+                    indexes.id AS "id: IndexId",
+                    indexes.kind AS "kind: IndexKind",
+                    array_agg(
+                        -- segment_id, records, force_merge (has more than N deletions)
+                        (segments.id, records, segments.seq < COALESCE(index_deletion_window.seq, 0))
+                        ORDER BY records DESC
+                    ) AS "segments!: Vec<(SegmentId, i64, bool)>"
                 FROM segments
-                NATURAL JOIN indexes_with_many_deletions
-                GROUP BY segments.id
-            )
-
-            -- For each index, a list of mergeable segments with amount of records and deletions
-            SELECT
-                indexes.id AS "id: IndexId",
-                indexes.kind AS "kind: IndexKind",
-                array_agg(
-                    (segments.id, records, COALESCE(deletions, 0) > $2)
-                    ORDER BY records DESC
-                ) AS "segments!: Vec<(SegmentId, i64, bool)>"
-            FROM segments
-            JOIN indexes ON segments.index_id = indexes.id
-            LEFT JOIN deletions_per_segment ON segments.id = deletions_per_segment.id
-            WHERE
-                delete_at IS NULL AND merge_job_id IS NULL
-                AND seq <= $1
-            GROUP BY
-                indexes.id,
-                indexes.kind,
-                -- Only merge vector segments with same tags
-                CASE WHEN kind = 'vector' THEN index_metadata::text ELSE NULL END
+                JOIN indexes ON segments.index_id = indexes.id
+                LEFT JOIN index_deletion_window ON segments.index_id = index_deletion_window.id
+                WHERE
+                    delete_at IS NULL AND merge_job_id IS NULL
+                    AND segments.seq <= $1
+                GROUP BY
+                    indexes.id,
+                    indexes.kind,
+                    -- Only merge vector segments with same tags
+                    CASE WHEN kind = 'vector' THEN index_metadata::text ELSE NULL END,
+                    index_deletion_window.id
+                -- Only return indexes with more than one segment or with many deletions
+                HAVING COUNT(segments) > 1 OR index_deletion_window.id IS NOT NULL
             "#,
             i64::from(last_indexed_seq),
             self.settings.max_deletions as i64
