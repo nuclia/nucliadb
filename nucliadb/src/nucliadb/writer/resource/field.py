@@ -130,7 +130,7 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
             parsed_link = MessageToDict(
                 field_pb,
                 preserving_proto_field_name=True,
-                always_print_fields_with_no_presence=True,
+                including_default_value_fields=True,
             )
             parsed_link["link"] = parsed_link.pop("uri", None)
             toprocess.linkfield[field_id] = processing_models.LinkUpload(**parsed_link)
@@ -140,7 +140,7 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
             parsed_text = MessageToDict(
                 field_pb,
                 preserving_proto_field_name=True,
-                always_print_fields_with_no_presence=True,
+                including_default_value_fields=True,
             )
             parsed_text["format"] = processing_models.PushTextFormat[parsed_text["format"]]
             toprocess.textfield[field_id] = processing_models.Text(**parsed_text)
@@ -161,7 +161,7 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
                     parsed_message = MessageToDict(
                         message,
                         preserving_proto_field_name=True,
-                        always_print_fields_with_no_presence=True,
+                        including_default_value_fields=True,
                     )
                     parsed_message["content"]["attachments"] = [
                         await processing.convert_internal_cf_to_str(cf, storage)

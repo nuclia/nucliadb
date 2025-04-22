@@ -82,7 +82,7 @@ def user_field_metadata(message: resources_pb2.UserFieldMetadata) -> UserFieldMe
     value = MessageToDict(
         message,
         preserving_proto_field_name=True,
-        always_print_fields_with_no_presence=True,
+        including_default_value_fields=True,
         use_integers_for_enums=True,
     )
     value["field"]["field_type"] = field_type_name(value["field"]["field_type"]).value
@@ -110,7 +110,7 @@ def user_metadata(message: resources_pb2.UserMetadata) -> UserMetadata:
     value = MessageToDict(
         message,
         preserving_proto_field_name=True,
-        always_print_fields_with_no_presence=True,
+        including_default_value_fields=True,
     )
     return UserMetadata(**value)
 
@@ -174,7 +174,7 @@ def relation_metadata(message: utils_pb2.RelationMetadata) -> RelationMetadata:
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
 
@@ -188,7 +188,7 @@ def origin(message: resources_pb2.Origin) -> Origin:
     data = MessageToDict(
         message,
         preserving_proto_field_name=True,
-        always_print_fields_with_no_presence=True,
+        including_default_value_fields=True,
     )
     # old field was "colaborators" and we want to keep pb field name
     # to avoid migration
@@ -201,7 +201,7 @@ def extra(message: resources_pb2.Extra) -> Extra:
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=False,
+            including_default_value_fields=False,
         )
     )
 
@@ -211,7 +211,7 @@ def metadata(message: resources_pb2.Metadata) -> Metadata:
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
 
@@ -222,7 +222,7 @@ def field_question_answers(
     value = MessageToDict(
         message,
         preserving_proto_field_name=True,
-        always_print_fields_with_no_presence=True,
+        including_default_value_fields=True,
     )
     return FieldQuestionAnswers(**value)
 
@@ -231,7 +231,7 @@ def question_answers(message: resources_pb2.QuestionAnswers) -> QuestionAnswers:
     value = MessageToDict(
         message,
         preserving_proto_field_name=True,
-        always_print_fields_with_no_presence=True,
+        including_default_value_fields=True,
     )
     return QuestionAnswers(**value)
 
@@ -241,7 +241,7 @@ def extracted_text(message: resources_pb2.ExtractedText) -> ExtractedText:
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
 
@@ -251,7 +251,7 @@ def vector_object(message: resources_pb2.VectorObject) -> VectorObject:
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
 
@@ -263,7 +263,7 @@ def large_computed_metadata(
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
 
@@ -273,7 +273,7 @@ def link_extracted_data(message: resources_pb2.LinkExtractedData) -> LinkExtract
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
 
@@ -283,7 +283,7 @@ def file_extracted_data(message: resources_pb2.FileExtractedData) -> FileExtract
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
 
@@ -311,7 +311,7 @@ def field_computed_metadata(
     value = MessageToDict(
         message,
         preserving_proto_field_name=True,
-        always_print_fields_with_no_presence=True,
+        including_default_value_fields=True,
     )
     value["metadata"] = metadata
     value["split_metadata"] = split_metadata
@@ -341,7 +341,7 @@ def field_metadata(
     value = MessageToDict(
         message,
         preserving_proto_field_name=True,
-        always_print_fields_with_no_presence=True,
+        including_default_value_fields=True,
     )
     value["relations"] = [
         convert_pb_relation_to_api(rel) for relations in message.relations for rel in relations.relations
@@ -353,7 +353,7 @@ def conversation(message: resources_pb2.Conversation) -> Conversation:
     as_dict = MessageToDict(
         message,
         preserving_proto_field_name=True,
-        always_print_fields_with_no_presence=True,
+        including_default_value_fields=True,
     )
     for conv_message in as_dict.get("messages", []):
         for attachment_field in conv_message.get("content", {}).get("attachments_fields", []):
@@ -366,7 +366,7 @@ def field_conversation(message: resources_pb2.FieldConversation) -> FieldConvers
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
 
@@ -376,7 +376,7 @@ def entity(message: knowledgebox_pb2.Entity) -> Entity:
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
 
@@ -387,7 +387,7 @@ def entities_group(
     entities_group = MessageToDict(
         message,
         preserving_proto_field_name=True,
-        always_print_fields_with_no_presence=True,
+        including_default_value_fields=True,
     )
     entities_group["entities"] = {}
 
@@ -405,7 +405,7 @@ def entities_group_summary(
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
 
@@ -415,7 +415,7 @@ def field_file(message: resources_pb2.FieldFile) -> FieldFile:
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
     instance.external = (  # type: ignore
@@ -429,7 +429,7 @@ def field_link(message: resources_pb2.FieldLink) -> FieldLink:
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
 
@@ -439,7 +439,7 @@ def field_text(message: resources_pb2.FieldText) -> FieldText:
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
 
@@ -448,7 +448,7 @@ def knowledgebox_config(message: knowledgebox_pb2.KnowledgeBoxConfig) -> Knowled
     as_dict = MessageToDict(
         message,
         preserving_proto_field_name=True,
-        always_print_fields_with_no_presence=True,
+        including_default_value_fields=True,
     )
     # Calculate external index provider metadata
     # that is shown on read requests
@@ -473,6 +473,6 @@ def kb_shards(message: writer_pb2.Shards) -> KnowledgeboxShards:
         **MessageToDict(
             message,
             preserving_proto_field_name=True,
-            always_print_fields_with_no_presence=True,
+            including_default_value_fields=True,
         )
     )
