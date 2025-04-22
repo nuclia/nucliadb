@@ -129,17 +129,60 @@ class _Converter:
 
         node_features.inc({"type": "relations"})
 
-        self.req.relation_subgraph.entry_points.extend(self.retrieval.query.relation.detected_entities)
-        self.req.relation_subgraph.depth = 1
-        self.req.relation_subgraph.deleted_groups.extend(
-            self.retrieval.query.relation.deleted_entity_groups
-        )
-        for group_id, deleted_entities in self.retrieval.query.relation.deleted_entities.items():
-            self.req.relation_subgraph.deleted_entities.append(
-                nodereader_pb2.EntitiesSubgraphRequest.DeletedEntities(
-                    node_subtype=group_id, node_values=deleted_entities
-                )
-            )
+        entry_points_queries = []
+        for entry_point in self.retrieval.query.relation.detected_entities:
+            q = nodereader_pb2.GraphQuery.PathQuery()
+            if entry_point.value:
+                q.path.source.value = entry_point.value
+            q.path.source.node_type = entry_point.ntype
+            if entry_point.subtype:
+                q.path.source.node_subtype = entry_point.subtype
+            q.path.undirected = True
+            entry_points_queries.append(q)
+
+        deleted_nodes_queries = []
+        for subtype, deleted_entities in self.retrieval.query.relation.deleted_entities.items():
+            if len(deleted_entities) == 0:
+                continue
+            for deleted_entity_value in deleted_entities:
+                q = nodereader_pb2.GraphQuery.PathQuery()
+                q.path.source.value = deleted_entity_value
+                q.path.source.node_subtype = subtype
+                q.path.undirected = True
+                deleted_nodes_queries.append(q)
+
+        excluded_subtypes_queries = []
+        for deleted_subtype in self.retrieval.query.relation.deleted_entity_groups:
+            q = nodereader_pb2.GraphQuery.PathQuery()
+            q.path.source.node_subtype = deleted_subtype
+            q.path.undirected = True
+            excluded_subtypes_queries.append(q)
+
+        subqueries = []
+
+        if len(entry_points_queries) > 0:
+            q = nodereader_pb2.GraphQuery.PathQuery()
+            q.bool_or.operands.extend(entry_points_queries)
+            subqueries.append(q)
+
+        if len(deleted_nodes_queries) > 0:
+            q = nodereader_pb2.GraphQuery.PathQuery()
+            q.bool_not.bool_or.operands.extend(deleted_nodes_queries)
+            subqueries.append(q)
+
+        if len(excluded_subtypes_queries) > 0:
+            q = nodereader_pb2.GraphQuery.PathQuery()
+            q.bool_not.bool_or.operands.extend(excluded_subtypes_queries)
+            subqueries.append(q)
+
+        if len(subqueries) == 0:
+            # don't set anything, no graph query
+            pass
+        elif len(subqueries) == 1:
+            q = subqueries[0]
+            self.req.graph_search.query.path.CopyFrom(q)
+        else:
+            self.req.graph_search.query.path.bool_and.operands.extend(subqueries)
 
     def _apply_filters(self):
         self.req.with_duplicates = self.retrieval.filters.with_duplicates
