@@ -65,7 +65,12 @@ async def predict_proxy_endpoint(
         payload = None
     try:
         return await predict_proxy(
-            kbid, endpoint, request.method, params=request.query_params, json=payload
+            kbid,
+            endpoint,
+            request.method,
+            params=request.query_params,
+            json=payload,
+            headers=dict(request.headers),
         )
     except KnowledgeBoxNotFound:
         return HTTPClientError(status_code=404, detail="Knowledge box not found")

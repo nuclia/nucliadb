@@ -48,6 +48,7 @@ async def predict_proxy(
     method: str,
     params: QueryParams,
     json: Optional[Any] = None,
+    headers: dict[str, str] = {},
 ) -> Union[JSONResponse, StreamingResponse]:
     if not await exists_kb(kbid=kbid):
         raise datamanagers.exceptions.KnowledgeBoxNotFound()
@@ -55,7 +56,7 @@ async def predict_proxy(
     predict: PredictEngine = get_predict()
 
     # Add KB configuration headers
-    headers = predict.get_predict_headers(kbid)
+    predict_headers = predict.get_predict_headers(kbid)
 
     # Proxy the request to predict API
     predict_response = await predict.make_request(
@@ -63,7 +64,7 @@ async def predict_proxy(
         url=predict.get_predict_url(endpoint, kbid),
         json=json,
         params=params,
-        headers=headers,
+        headers={**headers, **predict_headers},
     )
 
     # Proxy the response back to the client
