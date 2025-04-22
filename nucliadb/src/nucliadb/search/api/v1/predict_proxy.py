@@ -21,7 +21,7 @@ import json
 from typing import Union
 
 from fastapi import Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from fastapi_versioning import version
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
@@ -58,7 +58,7 @@ async def predict_proxy_endpoint(
     request: Request,
     kbid: str,
     endpoint: PredictProxiedEndpoints,
-) -> Union[JSONResponse, StreamingResponse, HTTPClientError]:
+) -> Union[Response, StreamingResponse, HTTPClientError]:
     try:
         payload = await request.json()
     except json.JSONDecodeError:

@@ -21,7 +21,7 @@ from enum import Enum
 from typing import Any, Optional, Union
 
 from fastapi.datastructures import QueryParams
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
 from nucliadb.common import datamanagers
 from nucliadb.search.predict import PredictEngine
@@ -49,7 +49,7 @@ async def predict_proxy(
     params: QueryParams,
     json: Optional[Any] = None,
     headers: dict[str, str] = {},
-) -> Union[JSONResponse, StreamingResponse]:
+) -> Union[Response, StreamingResponse]:
     if not await exists_kb(kbid=kbid):
         raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
@@ -69,17 +69,19 @@ async def predict_proxy(
 
     # Proxy the response back to the client
     status_code = predict_response.status
-    response: Union[JSONResponse, StreamingResponse]
+    media_type = predict_response.headers.get("Content-Type")
+    response: Union[Response, StreamingResponse]
     if predict_response.headers.get("Transfer-Encoding") == "chunked":
         response = StreamingResponse(
             content=predict_response.content.iter_any(),
             status_code=status_code,
-            media_type=predict_response.headers.get("Content-Type"),
+            media_type=media_type,
         )
     else:
-        response = JSONResponse(
-            content=await predict_response.json(),
+        response = Response(
+            content=await predict_response.read(),
             status_code=status_code,
+            media_type=media_type,
         )
     nuclia_learning_id = predict_response.headers.get("NUCLIA-LEARNING-ID")
     if nuclia_learning_id:

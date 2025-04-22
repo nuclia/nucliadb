@@ -304,11 +304,12 @@ def _test_predict_proxy_chat(kbid: str):
     print(f"Answer: {answer}")
     assert "Messi" in answer
 
-    # Test application/x-ndjson content type
+    # Test accepting application/x-ndjson content type
     resp = requests.post(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/chat"),
         headers={
-            "content-type": "application/x-ndjson",
+            "Content-type": "application/json",
+            "Accept": "application/x-ndjson",
             "X-NUCLIADB-ROLES": "READER",
             "x-ndb-client": "web",
         },

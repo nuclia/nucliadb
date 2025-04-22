@@ -262,7 +262,7 @@ class PredictEngine:
         jitter=backoff.random_jitter,
         max_tries=MAX_TRIES,
     )
-    async def make_request(self, method: str, **request_args):
+    async def make_request(self, method: str, **request_args) -> aiohttp.ClientResponse:
         func = getattr(self.session, method.lower())
         return await func(**request_args)
 
@@ -311,8 +311,8 @@ class PredictEngine:
             timeout=None,
         )
         await self.check_response(kbid, resp, expected_status=200)
-        ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER)
-        model = resp.headers.get(NUCLIA_LEARNING_MODEL_HEADER)
+        ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER) or "unknown"
+        model = resp.headers.get(NUCLIA_LEARNING_MODEL_HEADER) or "unknown"
         return ident, model, get_chat_ndjson_generator(resp)
 
     @predict_observer.wrap({"type": "query"})
