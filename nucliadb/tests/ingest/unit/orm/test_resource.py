@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nucliadb.ingest.orm.brain_v2 import ResourceBrainV2 as ResourceBrain
+from nucliadb.ingest.orm.brain import ResourceBrain
 from nucliadb.ingest.orm.resource import (
     Resource,
     get_file_page_positions,
