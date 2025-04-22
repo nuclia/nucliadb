@@ -4,7 +4,7 @@ build-backend = "pdm.backend"
 
 [project]
 name = "nidx_protos"
-version = "6.3.5"
+version = "6.3.6"
 license = { text = "AGPL" }
 description = "Protobuf definitions for nucliadb/nidx"
 authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
