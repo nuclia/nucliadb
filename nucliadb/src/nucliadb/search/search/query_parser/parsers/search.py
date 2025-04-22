@@ -17,61 +17,54 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
 from typing import Optional
 
-from pydantic import ValidationError
-
-from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
 from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query import expand_entities
-from nucliadb.search.search.query_parser.exceptions import InternalParserError, InvalidQueryError
+from nucliadb.search.search.query_parser.exceptions import InvalidQueryError
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.filter_expression import parse_expression
 from nucliadb.search.search.query_parser.models import (
     Filters,
     NoopReranker,
     ParsedQuery,
-    PredictReranker,
     Query,
     RankFusion,
-    ReciprocalRankFusion,
     RelationQuery,
-    Reranker,
     UnitRetrieval,
+    _TextQuery,
 )
 from nucliadb.search.search.query_parser.old_filters import OldFilterParams, parse_old_filters
 from nucliadb.search.search.utils import filter_hidden_resources
 from nucliadb_models import search as search_models
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.search import (
-    FindRequest,
+    SearchRequest,
+    SortField,
+    SortOptions,
+    SortOrder,
 )
 from nucliadb_protos import nodereader_pb2, utils_pb2
 
-from .common import (
-    parse_keyword_query,
-    parse_semantic_query,
-    parse_top_k,
-    validate_base_request,
-)
+from .common import parse_keyword_query, parse_semantic_query, parse_top_k, validate_base_request
+
+INDEX_SORTABLE_FIELDS = [
+    SortField.CREATED,
+    SortField.MODIFIED,
+]
 
 
-@query_parser_observer.wrap({"type": "parse_find"})
-async def parse_find(
-    kbid: str,
-    item: FindRequest,
-    generative_model: Optional[str] = None,
-    *,
-    fetcher: Optional[Fetcher] = None,
+@query_parser_observer.wrap({"type": "parse_search"})
+async def parse_search(
+    kbid: str, item: SearchRequest, *, fetcher: Optional[Fetcher] = None
 ) -> ParsedQuery:
-    fetcher = fetcher or fetcher_for_find(kbid, item, generative_model)
-    parser = _FindParser(kbid, item, fetcher)
+    fetcher = fetcher or fetcher_for_search(kbid, item)
+    parser = _SearchParser(kbid, item, fetcher)
     retrieval = await parser.parse()
     return ParsedQuery(fetcher=fetcher, retrieval=retrieval, generation=None)
 
 
-def fetcher_for_find(kbid: str, item: FindRequest, generative_model: Optional[str]) -> Fetcher:
+def fetcher_for_search(kbid: str, item: SearchRequest) -> Fetcher:
     return Fetcher(
         kbid=kbid,
         query=item.query,
@@ -79,12 +72,12 @@ def fetcher_for_find(kbid: str, item: FindRequest, generative_model: Optional[st
         vectorset=item.vectorset,
         rephrase=item.rephrase,
         rephrase_prompt=item.rephrase_prompt,
-        generative_model=generative_model,
+        generative_model=None,
     )
 
 
-class _FindParser:
-    def __init__(self, kbid: str, item: FindRequest, fetcher: Fetcher):
+class _SearchParser:
+    def __init__(self, kbid: str, item: SearchRequest, fetcher: Fetcher):
         self.kbid = kbid
         self.item = item
         self.fetcher = fetcher
@@ -103,7 +96,14 @@ class _FindParser:
         self._query = Query()
 
         if search_models.SearchOptions.KEYWORD in self.item.features:
-            self._query.keyword = await parse_keyword_query(self.item, fetcher=self.fetcher)
+            keyword = await self._parse_text_query()
+            self._query.keyword = keyword
+
+        if search_models.SearchOptions.FULLTEXT in self.item.features:
+            # copy from keyword, as everything is the same and we can't search
+            # anything different right now
+            keyword = self._query.keyword or (await self._parse_text_query())
+            self._query.fulltext = keyword
 
         if search_models.SearchOptions.SEMANTIC in self.item.features:
             self._query.semantic = await parse_semantic_query(self.item, fetcher=self.fetcher)
@@ -111,42 +111,34 @@ class _FindParser:
         if search_models.SearchOptions.RELATIONS in self.item.features:
             self._query.relation = await self._parse_relation_query()
 
-        # TODO: graph search
-
         filters = await self._parse_filters()
-
-        try:
-            rank_fusion = self._parse_rank_fusion()
-        except ValidationError as exc:
-            raise InternalParserError(f"Parsing error in rank fusion: {str(exc)}") from exc
-        try:
-            reranker = self._parse_reranker()
-        except ValidationError as exc:
-            raise InternalParserError(f"Parsing error in reranker: {str(exc)}") from exc
-
-        # Adjust retrieval windows. Our current implementation assume:
-        # `top_k <= reranker.window <= rank_fusion.window`
-        # and as rank fusion is done before reranking, we must ensure rank
-        # fusion window is at least, the reranker window
-        if isinstance(reranker, PredictReranker):
-            rank_fusion.window = max(rank_fusion.window, reranker.window)
 
         return UnitRetrieval(
             query=self._query,
             top_k=self._top_k,
             filters=filters,
-            rank_fusion=rank_fusion,
-            reranker=reranker,
+            # TODO: this should be in a post retrieval step
+            rank_fusion=RankFusion(window=self._top_k),
+            reranker=NoopReranker(),
         )
+
+    async def _parse_text_query(self) -> _TextQuery:
+        assert self._top_k is not None, "top_k must be parsed before text query"
+
+        keyword = await parse_keyword_query(self.item, fetcher=self.fetcher)
+        sort, order_by, limit = self._parse_sorting()
+        keyword.sort = sort
+        keyword.order_by = order_by
+        if limit is not None:
+            # sort limit can extend top_k
+            self._top_k = max(self._top_k, limit)
+        return keyword
 
     async def _parse_relation_query(self) -> RelationQuery:
         detected_entities = await self._get_detected_entities()
-
         deleted_entity_groups = await self.fetcher.get_deleted_entity_groups()
-
         meta_cache = await self.fetcher.get_entities_meta_cache()
         deleted_entities = meta_cache.deleted_entities
-
         return RelationQuery(
             detected_entities=detected_entities,
             deleted_entity_groups=deleted_entity_groups,
@@ -154,35 +146,54 @@ class _FindParser:
         )
 
     async def _get_detected_entities(self) -> list[utils_pb2.RelationNode]:
-        """Get entities from request, either automatically detected or
-        explicitly set by the user."""
-
-        if self.item.query_entities:
-            detected_entities = []
-            for entity in self.item.query_entities:
-                relation_node = utils_pb2.RelationNode()
-                relation_node.value = entity.name
-                if entity.type is not None:
-                    relation_node.ntype = RelationNodeTypeMap[entity.type]
-                if entity.subtype is not None:
-                    relation_node.subtype = entity.subtype
-                detected_entities.append(relation_node)
-        else:
-            detected_entities = await self.fetcher.get_detected_entities()
-
+        detected_entities = await self.fetcher.get_detected_entities()
         meta_cache = await self.fetcher.get_entities_meta_cache()
         detected_entities = expand_entities(meta_cache, detected_entities)
-
         return detected_entities
+
+    def _parse_sorting(self) -> tuple[search_models.SortOrder, search_models.SortField, Optional[int]]:
+        sort = self.item.sort
+        if len(self.item.query) == 0:
+            if sort is None:
+                sort = SortOptions(
+                    field=SortField.CREATED,
+                    order=SortOrder.DESC,
+                    limit=None,
+                )
+            elif sort.field not in INDEX_SORTABLE_FIELDS:
+                raise InvalidQueryError(
+                    "sort_field",
+                    f"Empty query can only be sorted by '{SortField.CREATED}' or"
+                    f" '{SortField.MODIFIED}' and sort limit won't be applied",
+                )
+        else:
+            if sort is None:
+                sort = SortOptions(
+                    field=SortField.SCORE,
+                    order=SortOrder.DESC,
+                    limit=None,
+                )
+            elif sort.field not in INDEX_SORTABLE_FIELDS and sort.limit is None:
+                raise InvalidQueryError(
+                    "sort_field",
+                    f"Sort by '{sort.field}' requires setting a sort limit",
+                )
+
+        # We need to ask for all and cut later
+        top_k = None
+        if sort and sort.limit is not None:
+            # As the index can't sort, we have to do it when merging. To
+            # have consistent results, we must limit them
+            top_k = sort.limit
+
+        return (sort.order, sort.field, top_k)
 
     async def _parse_filters(self) -> Filters:
         assert self._query is not None, "query must be parsed before filters"
 
         has_old_filters = (
             len(self.item.filters) > 0
-            or len(self.item.resource_filters) > 0
             or len(self.item.fields) > 0
-            or len(self.item.keyword_filters) > 0
             or self.item.range_creation_start is not None
             or self.item.range_creation_end is not None
             or self.item.range_modification_start is not None
@@ -198,13 +209,12 @@ class _FindParser:
         if has_old_filters:
             old_filters = OldFilterParams(
                 label_filters=self.item.filters,
-                keyword_filters=self.item.keyword_filters,
+                keyword_filters=[],
                 range_creation_start=self.item.range_creation_start,
                 range_creation_end=self.item.range_creation_end,
                 range_modification_start=self.item.range_modification_start,
                 range_modification_end=self.item.range_modification_end,
                 fields=self.item.fields,
-                key_filters=self.item.resource_filters,
             )
             field_expr, paragraph_expr = await parse_old_filters(old_filters, self.fetcher)
 
@@ -229,7 +239,7 @@ class _FindParser:
 
         return Filters(
             autofilter=autofilter,
-            facets=[],
+            facets=self.item.faceted,
             field_expression=field_expr,
             paragraph_expression=paragraph_expr,
             filter_expression_operator=filter_operator,
@@ -237,54 +247,3 @@ class _FindParser:
             hidden=hidden,
             with_duplicates=self.item.with_duplicates,
         )
-
-    def _parse_rank_fusion(self) -> RankFusion:
-        rank_fusion: RankFusion
-
-        top_k = parse_top_k(self.item)
-        window = min(top_k, 500)
-
-        if isinstance(self.item.rank_fusion, search_models.RankFusionName):
-            if self.item.rank_fusion == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
-                rank_fusion = ReciprocalRankFusion(window=window)
-            else:
-                raise InternalParserError(f"Unknown rank fusion algorithm: {self.item.rank_fusion}")
-
-        elif isinstance(self.item.rank_fusion, search_models.ReciprocalRankFusion):
-            user_window = self.item.rank_fusion.window
-            rank_fusion = ReciprocalRankFusion(
-                k=self.item.rank_fusion.k,
-                boosting=self.item.rank_fusion.boosting,
-                window=min(max(user_window or 0, top_k), 500),
-            )
-
-        else:
-            raise InternalParserError(f"Unknown rank fusion {self.item.rank_fusion}")
-
-        return rank_fusion
-
-    def _parse_reranker(self) -> Reranker:
-        reranking: Reranker
-
-        top_k = parse_top_k(self.item)
-
-        if isinstance(self.item.reranker, search_models.RerankerName):
-            if self.item.reranker == search_models.RerankerName.NOOP:
-                reranking = NoopReranker()
-
-            elif self.item.reranker == search_models.RerankerName.PREDICT_RERANKER:
-                # for predict rearnker, by default, we want a x2 factor with a
-                # top of 200 results
-                reranking = PredictReranker(window=min(top_k * 2, 200))
-
-            else:
-                raise InternalParserError(f"Unknown reranker algorithm: {self.item.reranker}")
-
-        elif isinstance(self.item.reranker, search_models.PredictReranker):
-            user_window = self.item.reranker.window
-            reranking = PredictReranker(window=min(max(user_window or 0, top_k), 200))
-
-        else:
-            raise InternalParserError(f"Unknown reranker {self.item.reranker}")
-
-        return reranking

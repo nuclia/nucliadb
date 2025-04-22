@@ -61,8 +61,11 @@ from nucliadb.search.search.exceptions import (
 )
 from nucliadb.search.search.graph_strategy import get_graph_results
 from nucliadb.search.search.metrics import RAGMetrics
-from nucliadb.search.search.query import QueryParser
-from nucliadb.search.search.query_parser.old_filters import OldFilterParams
+from nucliadb.search.search.query_parser.fetcher import Fetcher
+from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
+from nucliadb.search.search.rerankers import (
+    get_reranker,
+)
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     AnswerAskResponseItem,
@@ -83,7 +86,6 @@ from nucliadb_models.search import (
     JSONAskResponseItem,
     KnowledgeboxFindResults,
     MetadataAskResponseItem,
-    MinScore,
     NucliaDBClientType,
     PrequeriesAskResponseItem,
     PreQueriesStrategy,
@@ -116,7 +118,7 @@ class RetrievalMatch:
 @dataclasses.dataclass
 class RetrievalResults:
     main_query: KnowledgeboxFindResults
-    query_parser: QueryParser
+    fetcher: Fetcher
     main_query_weight: float
     prequeries: Optional[list[PreQueryResult]] = None
     best_matches: list[RetrievalMatch] = dataclasses.field(default_factory=list)
@@ -543,12 +545,12 @@ async def ask(
             prequeries_results=err.prequeries,
         )
 
-    query_parser = retrieval_results.query_parser
+    # parse ask request generation parameters reusing the same fetcher as
+    # retrieval, to avoid multiple round trips to Predict API
+    generation = await parse_ask(kbid, ask_request, fetcher=retrieval_results.fetcher)
 
     # Now we build the prompt context
     with metrics.time("context_building"):
-        query_parser.max_tokens = ask_request.max_tokens  # type: ignore
-        max_tokens_context = await query_parser.get_max_tokens_context()
         prompt_context_builder = PromptContextBuilder(
             kbid=kbid,
             ordered_paragraphs=[match.paragraph for match in retrieval_results.best_matches],
@@ -557,8 +559,8 @@ async def ask(
             user_image_context=ask_request.extra_context_images,
             strategies=ask_request.rag_strategies,
             image_strategies=ask_request.rag_images_strategies,
-            max_context_characters=tokens_to_chars(max_tokens_context),
-            visual_llm=await query_parser.get_visual_llm_enabled(),
+            max_context_characters=tokens_to_chars(generation.max_context_tokens),
+            visual_llm=generation.use_visual_llm,
         )
         (
             prompt_context,
@@ -580,7 +582,7 @@ async def ask(
         citations=ask_request.citations,
         citation_threshold=ask_request.citation_threshold,
         generative_model=ask_request.generative_model,
-        max_tokens=query_parser.get_max_tokens_answer(),
+        max_tokens=generation.max_answer_tokens,
         query_context_images=prompt_context_images,
         json_schema=ask_request.answer_json_schema,
         rerank_context=False,
@@ -741,7 +743,7 @@ async def retrieval_in_kb(
     prequeries = parse_prequeries(ask_request)
     graph_strategy = parse_graph_strategy(ask_request)
     with metrics.time("retrieval"):
-        main_results, prequeries_results, query_parser = await get_find_results(
+        main_results, prequeries_results, parsed_query = await get_find_results(
             kbid=kbid,
             query=main_query,
             item=ask_request,
@@ -753,6 +755,7 @@ async def retrieval_in_kb(
         )
 
         if graph_strategy is not None:
+            reranker = get_reranker(parsed_query.retrieval.reranker)
             graph_results, graph_request = await get_graph_results(
                 kbid=kbid,
                 query=main_query,
@@ -762,6 +765,7 @@ async def retrieval_in_kb(
                 origin=origin,
                 graph_strategy=graph_strategy,
                 metrics=metrics,
+                text_block_reranker=reranker,
             )
 
             if prequeries_results is None:
@@ -784,7 +788,7 @@ async def retrieval_in_kb(
     return RetrievalResults(
         main_query=main_results,
         prequeries=prequeries_results,
-        query_parser=query_parser,
+        fetcher=parsed_query.fetcher,
         main_query_weight=main_query_weight,
         best_matches=best_matches,
     )
@@ -805,18 +809,7 @@ async def retrieval_in_resource(
         return RetrievalResults(
             main_query=KnowledgeboxFindResults(resources={}, min_score=None),
             prequeries=None,
-            query_parser=QueryParser(
-                kbid=kbid,
-                features=[],
-                query="",
-                filter_expression=ask_request.filter_expression,
-                old_filters=OldFilterParams(
-                    label_filters=ask_request.filters,
-                    keyword_filters=ask_request.keyword_filters,
-                ),
-                top_k=0,
-                min_score=MinScore(),
-            ),
+            fetcher=fetcher_for_ask(kbid, ask_request),
             main_query_weight=1.0,
         )
 
@@ -836,7 +829,7 @@ async def retrieval_in_resource(
             add_resource_filter(prequery.request, [resource])
 
     with metrics.time("retrieval"):
-        main_results, prequeries_results, query_parser = await get_find_results(
+        main_results, prequeries_results, parsed_query = await get_find_results(
             kbid=kbid,
             query=main_query,
             item=ask_request,
@@ -859,7 +852,7 @@ async def retrieval_in_resource(
     return RetrievalResults(
         main_query=main_results,
         prequeries=prequeries_results,
-        query_parser=query_parser,
+        fetcher=parsed_query.fetcher,
         main_query_weight=main_query_weight,
         best_matches=best_matches,
     )

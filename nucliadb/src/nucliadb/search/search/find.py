@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-from dataclasses import dataclass
 from time import time
 from typing import Optional
 
@@ -38,22 +37,15 @@ from nucliadb.search.search.hydrator import (
 from nucliadb.search.search.metrics import (
     RAGMetrics,
 )
-from nucliadb.search.search.query import QueryParser
-from nucliadb.search.search.query_parser.old_filters import OldFilterParams
+from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.search.query_parser.parsers import parse_find
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.search.rank_fusion import (
-    RankFusionAlgorithm,
     get_rank_fusion,
 )
 from nucliadb.search.search.rerankers import (
-    Reranker,
     RerankingOptions,
     get_reranker,
-)
-from nucliadb.search.search.utils import (
-    filter_hidden_resources,
-    min_score_from_payload,
-    should_disable_vector_search,
 )
 from nucliadb.search.settings import settings
 from nucliadb_models.search import (
@@ -61,7 +53,6 @@ from nucliadb_models.search import (
     KnowledgeboxFindResults,
     MinScore,
     NucliaDBClientType,
-    SearchOptions,
 )
 from nucliadb_utils.utilities import get_audit
 
@@ -76,7 +67,7 @@ async def find(
     x_forwarded_for: str,
     generative_model: Optional[str] = None,
     metrics: RAGMetrics = RAGMetrics(),
-) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
+) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     external_index_manager = await get_external_index_manager(kbid=kbid)
     if external_index_manager is not None:
         return await _external_index_retrieval(
@@ -99,15 +90,17 @@ async def _index_node_retrieval(
     x_forwarded_for: str,
     generative_model: Optional[str] = None,
     metrics: RAGMetrics = RAGMetrics(),
-) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
+) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     audit = get_audit()
     start_time = time()
 
-    query_parser, rank_fusion, reranker = await query_parser_from_find_request(
-        kbid, item, generative_model=generative_model
-    )
     with metrics.time("query_parse"):
-        pb_query, incomplete_results, autofilters, rephrased_query = await query_parser.parse()
+        parsed = await parse_find(kbid, item, generative_model=generative_model)
+        rank_fusion = get_rank_fusion(parsed.retrieval.rank_fusion)
+        reranker = get_reranker(parsed.retrieval.reranker)
+        pb_query, incomplete_results, autofilters, rephrased_query = await convert_retrieval_to_proto(
+            parsed
+        )
 
     with metrics.time("node_query"):
         results, query_incomplete_results, queried_nodes = await node_query(
@@ -119,13 +112,10 @@ async def _index_node_retrieval(
     with metrics.time("results_merge"):
         search_results = await build_find_response(
             results,
+            retrieval=parsed.retrieval,
             kbid=kbid,
             query=pb_query.body,
             rephrased_query=rephrased_query,
-            relation_subgraph_query=pb_query.relation_subgraph,
-            min_score_bm25=pb_query.min_score_bm25,
-            min_score_semantic=pb_query.min_score_semantic,
-            top_k=item.top_k,
             show=item.show,
             extracted=item.extracted,
             field_type_filter=item.field_type_filter,
@@ -182,7 +172,7 @@ async def _index_node_retrieval(
             },
         )
 
-    return search_results, incomplete_results, query_parser
+    return search_results, incomplete_results, parsed
 
 
 async def _external_index_retrieval(
@@ -190,15 +180,14 @@ async def _external_index_retrieval(
     item: FindRequest,
     external_index_manager: ExternalIndexManager,
     generative_model: Optional[str] = None,
-) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
+) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     """
     Parse the query, query the external index, and hydrate the results.
     """
     # Parse query
-    query_parser, _, reranker = await query_parser_from_find_request(
-        kbid, item, generative_model=generative_model
-    )
-    search_request, incomplete_results, _, rephrased_query = await query_parser.parse()
+    parsed = await parse_find(kbid, item, generative_model=generative_model)
+    reranker = get_reranker(parsed.retrieval.reranker)
+    search_request, incomplete_results, _, rephrased_query = await convert_retrieval_to_proto(parsed)
 
     # Query index
     query_results = await external_index_manager.query(search_request)  # noqa
@@ -218,13 +207,15 @@ async def _external_index_retrieval(
             kbid=kbid,
             query=search_request.body,
         ),
-        top_k=query_parser.top_k,
+        top_k=parsed.retrieval.top_k,
     )
     find_resources = compose_find_resources(text_blocks, resources)
 
     results_min_score = MinScore(
         bm25=0,
-        semantic=query_parser.min_score.semantic,
+        semantic=parsed.retrieval.query.semantic.min_score
+        if parsed.retrieval.query.semantic is not None
+        else 0.0,
     )
     retrieval_results = KnowledgeboxFindResults(
         resources=find_resources,
@@ -242,65 +233,4 @@ async def _external_index_retrieval(
         nodes=None,
     )
 
-    return retrieval_results, incomplete_results, query_parser
-
-
-@dataclass
-class ScoredParagraph:
-    id: str
-    score: float
-
-
-async def query_parser_from_find_request(
-    kbid: str, item: FindRequest, *, generative_model: Optional[str] = None
-) -> tuple[QueryParser, RankFusionAlgorithm, Reranker]:
-    item.min_score = min_score_from_payload(item.min_score)
-
-    if SearchOptions.SEMANTIC in item.features:
-        if should_disable_vector_search(item):
-            item.features.remove(SearchOptions.SEMANTIC)
-
-    hidden = await filter_hidden_resources(kbid, item.show_hidden)
-
-    # XXX this is becoming the new /find query parsing, this should be moved to
-    # a cleaner abstraction
-
-    parsed = await parse_find(kbid, item)
-
-    rank_fusion = get_rank_fusion(parsed.rank_fusion)
-    reranker = get_reranker(parsed.reranker)
-
-    query_parser = QueryParser(
-        kbid=kbid,
-        features=item.features,
-        query=item.query,
-        query_entities=item.query_entities,
-        filter_expression=item.filter_expression,
-        faceted=None,
-        sort=None,
-        top_k=item.top_k,
-        min_score=item.min_score,
-        old_filters=OldFilterParams(
-            label_filters=item.filters,
-            keyword_filters=item.keyword_filters,
-            range_creation_start=item.range_creation_start,
-            range_creation_end=item.range_creation_end,
-            range_modification_start=item.range_modification_start,
-            range_modification_end=item.range_modification_end,
-            fields=item.fields,
-            key_filters=item.resource_filters,
-        ),
-        user_vector=item.vector,
-        vectorset=item.vectorset,
-        with_duplicates=item.with_duplicates,
-        with_synonyms=item.with_synonyms,
-        autofilter=item.autofilter,
-        security=item.security,
-        generative_model=generative_model,
-        rephrase=item.rephrase,
-        rephrase_prompt=item.rephrase_prompt,
-        hidden=hidden,
-        rank_fusion=rank_fusion,
-        reranker=reranker,
-    )
-    return (query_parser, rank_fusion, reranker)
+    return retrieval_results, incomplete_results, parsed

@@ -22,10 +22,12 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.search.requesters.utils import Method, node_query
-from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.query_parser.parsers.search import parse_search
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb_models.search import (
     MinScore,
     SearchOptions,
+    SearchRequest,
     SortField,
     SortOptions,
     SortOrder,
@@ -38,21 +40,24 @@ async def test_vector_result_metadata(
 ) -> None:
     kbid = test_search_resource
 
-    pb_query, _, _ = await QueryParser(
-        kbid=kbid,
-        query="own text",
-        features=[SearchOptions.SEMANTIC],
-        label_filters=[],  # type: ignore
-        keyword_filters=[],  # type: ignore
-        faceted=[],
-        top_k=20,
-        min_score=MinScore(bm25=0, semantic=-1),
-        sort=SortOptions(
-            field=SortField.SCORE,
-            order=SortOrder.DESC,
-            limit=1000,
+    parsed = await parse_search(
+        kbid,
+        SearchRequest(
+            query="own text",
+            features=[SearchOptions.SEMANTIC],
+            label_filters=[],  # type: ignore
+            keyword_filters=[],  # type: ignore
+            faceted=[],
+            top_k=20,
+            min_score=MinScore(bm25=0, semantic=-1),
+            sort=SortOptions(
+                field=SortField.SCORE,
+                order=SortOrder.DESC,
+                limit=1000,
+            ),
         ),
-    ).parse()
+    )
+    pb_query, _, _, _ = await convert_retrieval_to_proto(parsed)
 
     results, _, _ = await node_query(kbid, Method.SEARCH, pb_query)
     assert len(results[0].vector.documents) > 0

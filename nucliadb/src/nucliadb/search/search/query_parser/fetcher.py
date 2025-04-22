@@ -33,6 +33,9 @@ from nucliadb.search.search.metrics import (
 from nucliadb.search.search.query_parser.exceptions import InvalidQueryError
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
+from nucliadb_models.search import (
+    MaxTokens,
+)
 from nucliadb_protos import knowledgebox_pb2, utils_pb2
 
 
@@ -205,6 +208,15 @@ class Fetcher:
             return None
         return query_info.rephrased_query
 
+    async def get_semantic_min_score(self) -> Optional[float]:
+        query_info = await self._predict_query_endpoint()
+        if query_info is None:
+            return None
+
+        vectorset = await self.get_vectorset()
+        min_score = query_info.semantic_thresholds.get(vectorset, None)
+        return min_score
+
     # Labels
 
     async def get_classification_labels(self) -> knowledgebox_pb2.Labels:
@@ -267,6 +279,35 @@ class Fetcher:
             synonyms = await get_kb_synonyms(self.kbid)
             self.cache.synonyms = synonyms
             return synonyms
+
+    # Generative
+
+    async def get_visual_llm_enabled(self) -> bool:
+        query_info = await self._predict_query_endpoint()
+        if query_info is None:
+            raise SendToPredictError("Error while using predict's query endpoint")
+
+        return query_info.visual_llm
+
+    async def get_max_context_tokens(self, max_tokens: Optional[MaxTokens]) -> int:
+        query_info = await self._predict_query_endpoint()
+        if query_info is None:
+            raise SendToPredictError("Error while using predict's query endpoint")
+
+        model_max = query_info.max_context
+        if max_tokens is not None and max_tokens.context is not None:
+            if max_tokens.context > model_max:
+                raise InvalidQueryError(
+                    "max_tokens.context",
+                    f"Max context tokens is higher than the model's limit of {model_max}",
+                )
+            return max_tokens.context
+        return model_max
+
+    def get_max_answer_tokens(self, max_tokens: Optional[MaxTokens]) -> Optional[int]:
+        if max_tokens is not None and max_tokens.answer is not None:
+            return max_tokens.answer
+        return None
 
     # Predict API
 

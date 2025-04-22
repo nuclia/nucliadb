@@ -218,7 +218,7 @@ async def test_list_all_resources_by_creation_and_modification_dates_with_empty_
             resources.update(body["resources"])
             fulltext.extend(body["fulltext"]["results"])
 
-            next_page = body["fulltext"]["next_page"] or body["paragraphs"]["next_page"]
+            next_page = body["fulltext"]["next_page"]
             page_number += 1
 
         assert len(fulltext) == 10

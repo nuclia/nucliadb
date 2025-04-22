@@ -16,24 +16,22 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 import unittest
 from typing import Optional
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.query import (
-    QueryParser,
     apply_entities_filter,
     check_supported_filters,
 )
-from nucliadb.search.search.query_parser.old_filters import OldFilterParams
+from nucliadb.search.search.query_parser.fetcher import Fetcher
+from nucliadb.search.search.query_parser.parsers.common import parse_semantic_query, query_with_synonyms
 from nucliadb.tests.vectors import Q
-from nucliadb_models.search import MinScore, SearchOptions
+from nucliadb_models.search import BaseSearchRequest, SearchOptions
 from nucliadb_protos.knowledgebox_pb2 import Synonyms
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.utils_pb2 import RelationNode
@@ -73,56 +71,48 @@ class TestApplySynonymsToRequest:
         yield get_kb_synonyms
 
     @pytest.fixture
-    def query_parser(self, get_synonyms):
-        qp = QueryParser(
-            kbid="kbid",
-            features=[],
+    def fetcher(self, get_synonyms: AsyncMock):
+        fetcher = Fetcher(
+            "kbid",
             query="query",
-            old_filters=OldFilterParams(label_filters=[], keyword_filters=[]),
-            faceted=[],
-            top_k=10,
-            min_score=MinScore(semantic=0.5),
-            with_synonyms=True,
+            user_vector=None,
+            vectorset=None,
+            rephrase=False,
+            rephrase_prompt=None,
+            generative_model=None,
         )
         with patch("nucliadb.search.search.query_parser.fetcher.get_kb_synonyms", get_synonyms):
-            yield qp
+            yield fetcher
 
-    async def test_not_applies_if_empty_body(self, query_parser: QueryParser, get_synonyms):
-        query_parser.query = ""
-        search_request = Mock()
-        await query_parser.parse_synonyms(search_request)
+    async def test_not_applies_if_empty_body(self, fetcher: Fetcher, get_synonyms: AsyncMock):
+        synonyms_query = await query_with_synonyms(query="", fetcher=fetcher)
 
+        assert synonyms_query is None
         get_synonyms.assert_not_awaited()
-        search_request.ClearField.assert_not_called()
 
     async def test_not_applies_if_synonyms_object_not_found(
-        self, query_parser: QueryParser, get_synonyms
+        self, fetcher: Fetcher, get_synonyms: AsyncMock
     ):
-        query_parser.query = "planet"
         get_synonyms.return_value = None
-        request = Mock()
 
-        await query_parser.parse_synonyms(Mock())
+        synonyms_query = await query_with_synonyms(query="planet", fetcher=fetcher)
 
-        request.ClearField.assert_not_called()
+        assert synonyms_query is None
         get_synonyms.assert_awaited_once_with("kbid")
 
     async def test_not_applies_if_synonyms_not_found_for_query(
-        self, query_parser: QueryParser, get_synonyms
+        self, fetcher: Fetcher, get_synonyms: AsyncMock
     ):
-        query_parser.query = "foobar"
-        request = Mock()
+        synonyms_query = await query_with_synonyms(query="foobar", fetcher=fetcher)
 
-        await query_parser.parse_synonyms(request)
-
-        request.ClearField.assert_not_called()
+        assert synonyms_query is None
+        get_synonyms.assert_awaited_once_with("kbid")
 
         # Append planetary at the end of the query to test that partial terms are not replaced
-        query_parser.query = "which is this planet? planetary"
-        await query_parser.parse_synonyms(request)
-
-        request.ClearField.assert_called_once_with("body")
-        assert request.advanced_query == "which is this (planet OR earth OR globe)? planetary"
+        synonyms_query = await query_with_synonyms(
+            query="which is this planet? planetary", fetcher=fetcher
+        )
+        assert synonyms_query == "which is this (planet OR earth OR globe)? planetary"
 
 
 def test_check_supported_filters():
@@ -155,15 +145,15 @@ class TestVectorSetAndMatryoshkaParsing:
         expected_vectorset: Optional[str],
         expected_dimension: Optional[int],
     ):
-        parser = QueryParser(
-            kbid="kbid",
-            features=[SearchOptions.SEMANTIC],
+        fetcher = Fetcher(
+            "kbid",
+            query="query",
             vectorset=vectorset,
             # irrelevant mandatory args
-            query="my query",
-            old_filters=OldFilterParams(label_filters=[], keyword_filters=[]),
-            top_k=20,
-            min_score=MinScore(bm25=0, semantic=0),
+            user_vector=None,
+            rephrase=False,
+            rephrase_prompt=None,
+            generative_model=None,
         )
 
         with (
@@ -178,8 +168,13 @@ class TestVectorSetAndMatryoshkaParsing:
             patch("nucliadb.common.datamanagers.utils.get_driver"),
             patch("nucliadb.common.datamanagers.vectorsets.get_kv_pb"),
         ):
-            request, incomplete, _, _ = await parser.parse()
-            assert not incomplete
-
-            assert request.vectorset == expected_vectorset
-            assert len(request.vector) == expected_dimension
+            semantic_query = await parse_semantic_query(
+                BaseSearchRequest(
+                    features=[SearchOptions.SEMANTIC],
+                    vectorset=vectorset,
+                ),
+                fetcher=fetcher,
+            )
+            assert semantic_query.vectorset == expected_vectorset
+            assert semantic_query.query is not None
+            assert len(semantic_query.query) == expected_dimension

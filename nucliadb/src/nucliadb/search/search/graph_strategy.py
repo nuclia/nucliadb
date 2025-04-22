@@ -16,7 +16,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
 import heapq
 import json
 from collections import defaultdict
@@ -38,14 +37,16 @@ from nucliadb.search.search.chat.query import (
     find_request_from_ask_request,
     get_relations_results_from_entities,
 )
-from nucliadb.search.search.find import query_parser_from_find_request
 from nucliadb.search.search.find_merge import (
     compose_find_resources,
     hydrate_and_rerank,
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
 from nucliadb.search.search.metrics import RAGMetrics
-from nucliadb.search.search.rerankers import Reranker, RerankingOptions
+from nucliadb.search.search.rerankers import (
+    Reranker,
+    RerankingOptions,
+)
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.internal.predict import (
@@ -303,6 +304,7 @@ async def get_graph_results(
     user: str,
     origin: str,
     graph_strategy: GraphStrategy,
+    text_block_reranker: Reranker,
     generative_model: Optional[str] = None,
     metrics: RAGMetrics = RAGMetrics(),
     shards: Optional[list[str]] = None,
@@ -419,19 +421,16 @@ async def get_graph_results(
     # Get the text blocks of the paragraphs that contain the top relations
     with metrics.time("graph_strat_build_response"):
         find_request = find_request_from_ask_request(item, query)
-        query_parser, rank_fusion, reranker = await query_parser_from_find_request(
-            kbid, find_request, generative_model=generative_model
-        )
         find_results = await build_graph_response(
             kbid=kbid,
             query=query,
             final_relations=relations,
             scores=scores,
             top_k=graph_strategy.top_k,
-            reranker=reranker,
-            show=find_request.show,
-            extracted=find_request.extracted,
-            field_type_filter=find_request.field_type_filter,
+            reranker=text_block_reranker,
+            show=item.show,
+            extracted=item.extracted,
+            field_type_filter=item.field_type_filter,
             relation_text_as_paragraphs=graph_strategy.relation_text_as_paragraphs,
         )
     return find_results, find_request
