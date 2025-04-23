@@ -273,10 +273,11 @@ async def get_relations_results_from_entities(
     only_entity_to_entity: bool = False,
     deleted_entities: set[str] = set(),
 ) -> Relations:
+    entry_points = list(entities)
     retrieval = UnitRetrieval(
         query=Query(
             relation=RelationQuery(
-                detected_entities=list(entities),
+                detected_entities=list(entry_points),
                 deleted_entities={"": list(deleted_entities)},
                 deleted_entity_groups=[],
             )
@@ -301,7 +302,7 @@ async def get_relations_results_from_entities(
     relations_results: list[RelationSearchResponse] = [result.relation for result in results]
     return await merge_relations_results(
         relations_results,
-        request.relation_subgraph.entry_points,
+        entry_points,
         only_with_metadata,
         only_agentic_relations,
         only_entity_to_entity,

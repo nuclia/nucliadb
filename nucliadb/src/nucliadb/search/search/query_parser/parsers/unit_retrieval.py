@@ -154,18 +154,27 @@ class _Converter:
         subqueries = []
 
         if len(entry_points_queries) > 0:
-            q = nodereader_pb2.GraphQuery.PathQuery()
-            q.bool_or.operands.extend(entry_points_queries)
+            if len(entry_points_queries) == 1:
+                q = entry_points_queries[0]
+            else:
+                q = nodereader_pb2.GraphQuery.PathQuery()
+                q.bool_or.operands.extend(entry_points_queries)
             subqueries.append(q)
 
         if len(deleted_nodes_queries) > 0:
             q = nodereader_pb2.GraphQuery.PathQuery()
-            q.bool_not.bool_or.operands.extend(deleted_nodes_queries)
+            if len(deleted_nodes_queries) == 1:
+                q.bool_not.CopyFrom(deleted_nodes_queries[0])
+            else:
+                q.bool_not.bool_or.operands.extend(deleted_nodes_queries)
             subqueries.append(q)
 
         if len(excluded_subtypes_queries) > 0:
             q = nodereader_pb2.GraphQuery.PathQuery()
-            q.bool_not.bool_or.operands.extend(excluded_subtypes_queries)
+            if len(excluded_subtypes_queries) == 1:
+                q.bool_not.CopyFrom(excluded_subtypes_queries[0])
+            else:
+                q.bool_not.bool_or.operands.extend(excluded_subtypes_queries)
             subqueries.append(q)
 
         if len(subqueries) == 0:
