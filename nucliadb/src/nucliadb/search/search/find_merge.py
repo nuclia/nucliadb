@@ -52,9 +52,9 @@ from nucliadb_models.search import (
 )
 from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
+    GraphSearchResponse,
     ParagraphResult,
     ParagraphSearchResponse,
-    RelationSearchResponse,
     SearchResponse,
     VectorSearchResponse,
 )
@@ -143,7 +143,7 @@ async def build_find_response(
     entry_points = []
     if retrieval.query.relation is not None:
         entry_points = retrieval.query.relation.entry_points
-    relations = await merge_relations_results([search_response.relation], entry_points)
+    relations = await merge_relations_results([search_response.graph], entry_points)
 
     # compose response
     find_resources = compose_find_resources(text_blocks, resources)
@@ -178,16 +178,16 @@ def merge_shard_responses(
     """
     paragraphs = []
     vectors = []
-    relations = []
+    graphs = []
     for response in responses:
         paragraphs.append(response.paragraph)
         vectors.append(response.vector)
-        relations.append(response.relation)
+        graphs.append(response.graph)
 
     merged = SearchResponse(
         paragraph=merge_shards_keyword_responses(paragraphs),
         vector=merge_shards_semantic_responses(vectors),
-        relation=merge_shards_relation_responses(relations),
+        graph=merge_shards_graph_responses(graphs),
     )
     return merged
 
@@ -230,13 +230,27 @@ def merge_shards_semantic_responses(
     return merged
 
 
-def merge_shards_relation_responses(
-    relation_responses: list[RelationSearchResponse],
-) -> RelationSearchResponse:
-    merged = RelationSearchResponse()
-    for response in relation_responses:
-        merged.prefix.nodes.extend(response.prefix.nodes)
-        merged.subgraph.relations.extend(response.subgraph.relations)
+def merge_shards_graph_responses(
+    graph_responses: list[GraphSearchResponse],
+):
+    merged = GraphSearchResponse()
+
+    for response in graph_responses:
+        nodes_offset = len(merged.nodes)
+        relations_offset = len(merged.relations)
+
+        # paths contain indexes to nodes and relations, we must offset them
+        # while merging responses to maintain valid data
+        for path in response.graph:
+            merged_path = GraphSearchResponse.Path()
+            merged_path.CopyFrom(path)
+            merged_path.source += nodes_offset
+            merged_path.relation += relations_offset
+            merged_path.destination += nodes_offset
+            merged.graph.append(merged_path)
+
+        merged.nodes.extend(response.nodes)
+        merged.relations.extend(response.relations)
 
     return merged
 

@@ -65,9 +65,9 @@ from nucliadb_protos.nodereader_pb2 import (
     DocumentResult,
     DocumentScored,
     DocumentSearchResponse,
+    GraphSearchResponse,
     ParagraphResult,
     ParagraphSearchResponse,
-    RelationSearchResponse,
     SearchResponse,
     SuggestResponse,
     VectorSearchResponse,
@@ -438,7 +438,7 @@ async def merge_paragraph_results(
 
 @merge_observer.wrap({"type": "merge_relations"})
 async def merge_relations_results(
-    relations_responses: list[RelationSearchResponse],
+    graph_responses: list[GraphSearchResponse],
     query_entry_points: Iterable[RelationNode],
     only_with_metadata: bool = False,
     only_agentic: bool = False,
@@ -448,7 +448,7 @@ async def merge_relations_results(
     return await loop.run_in_executor(
         None,
         _merge_relations_results,
-        relations_responses,
+        graph_responses,
         query_entry_points,
         only_with_metadata,
         only_agentic,
@@ -457,7 +457,7 @@ async def merge_relations_results(
 
 
 def _merge_relations_results(
-    relations_responses: list[RelationSearchResponse],
+    graph_responses: list[GraphSearchResponse],
     query_entry_points: Iterable[RelationNode],
     only_with_metadata: bool,
     only_agentic: bool,
@@ -480,17 +480,16 @@ def _merge_relations_results(
     for entry_point in query_entry_points:
         relations.entities[entry_point.value] = EntitySubgraph(related_to=[])
 
-    for relation_response in relations_responses:
-        for index_relation in relation_response.subgraph.relations:
-            relation = index_relation.relation
-            origin = relation.source
-            destination = relation.to
-            relation_type = RelationTypePbMap[relation.relation]  # type: ignore
-            relation_label = relation.relation_label
-            metadata = relation.metadata if relation.HasField("metadata") else None
-
-            if index_relation.resource_field_id is not None:
-                resource_id = index_relation.resource_field_id.split("/")[0]
+    for graph_response in graph_responses:
+        for path in graph_response.graph:
+            relation = graph_response.relations[path.relation]
+            origin = graph_response.nodes[path.source]
+            destination = graph_response.nodes[path.destination]
+            relation_type = RelationTypePbMap[relation.relation_type]
+            relation_label = relation.label
+            metadata = path.metadata if path.HasField("metadata") else None
+            if path.resource_field_id is not None:
+                resource_id = path.resource_field_id.split("/")[0]
 
             # If only_with_metadata is True, we check that metadata for the relation is not None
             # If only_agentic is True, we check that metadata for the relation is not None and that it has a data_augmentation_task_id
@@ -547,13 +546,13 @@ async def merge_results(
     paragraphs = []
     documents = []
     vectors = []
-    relations = []
+    graphs = []
 
     for response in search_responses:
         paragraphs.append(response.paragraph)
         documents.append(response.document)
         vectors.append(response.vector)
-        relations.append(response.relation)
+        graphs.append(response.graph)
 
     api_results = KnowledgeboxSearchResults()
 
@@ -595,7 +594,7 @@ async def merge_results(
 
     if retrieval.query.relation is not None:
         api_results.relations = await merge_relations_results(
-            relations, retrieval.query.relation.entry_points
+            graphs, retrieval.query.relation.entry_points
         )
 
     api_results.resources = await fetch_resources(resources, kbid, show, field_type_filter, extracted)

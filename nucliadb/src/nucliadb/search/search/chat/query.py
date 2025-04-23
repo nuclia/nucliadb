@@ -53,7 +53,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_protos import audit_pb2
 from nucliadb_protos.nodereader_pb2 import (
-    RelationSearchResponse,
+    GraphSearchResponse,
     SearchResponse,
 )
 from nucliadb_protos.utils_pb2 import RelationNode
@@ -299,7 +299,7 @@ async def get_relations_results_from_entities(
         request,
         timeout=timeout,
     )
-    relations_results: list[RelationSearchResponse] = [result.relation for result in results]
+    relations_results: list[GraphSearchResponse] = [result.graph for result in results]
     return await merge_relations_results(
         relations_results,
         entry_points,

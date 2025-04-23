@@ -123,7 +123,7 @@ class _Converter:
         node_features.inc({"type": "relations"})
 
         entry_points_queries = []
-        for entry_point in self.retrieval.query.relation.detected_entities:
+        for entry_point in self.retrieval.query.relation.entry_points:
             q = nodereader_pb2.GraphQuery.PathQuery()
             if entry_point.value:
                 q.path.source.value = entry_point.value
