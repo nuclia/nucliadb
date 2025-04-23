@@ -220,7 +220,7 @@ class _Converter:
         Some rerankers want more results than the requested by the user so
         reranking can have more choices.
         """
-        top_k = self.retrieval_top_k
+        top_k = self.retrieval.top_k
 
         rank_fusion_window = 0
         if self.retrieval.rank_fusion is not None:
