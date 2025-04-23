@@ -24,13 +24,16 @@ from fastapi import FastAPI
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import inject_app_context
-from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 from nucliadb.train import SERVICE_NAME
 from nucliadb.train.utils import (
-    start_shard_manager,
+    start_shard_manager as start_train_shard_manager,
+)
+from nucliadb.train.utils import (
     start_train_grpc,
-    stop_shard_manager,
     stop_train_grpc,
+)
+from nucliadb.train.utils import (
+    stop_shard_manager as stop_train_shard_manager,
 )
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 
@@ -38,8 +41,7 @@ from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await setup_telemetry(SERVICE_NAME)
-    await start_nidx_utility()
-    await start_shard_manager()
+    await start_train_shard_manager()
     await start_train_grpc(SERVICE_NAME)
     try:
         context = ApplicationContext(
@@ -52,6 +54,5 @@ async def lifespan(app: FastAPI):
             yield
     finally:
         await stop_train_grpc()
-        await stop_shard_manager()
-        await stop_nidx_utility()
+        await stop_train_shard_manager()
         await clean_telemetry(SERVICE_NAME)
