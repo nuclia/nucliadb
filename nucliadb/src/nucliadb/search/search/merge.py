@@ -20,7 +20,7 @@
 import asyncio
 import datetime
 import math
-from typing import Any, Optional, Set, Union
+from typing import Any, Iterable, Optional, Set, Union
 
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.models_utils import from_proto
@@ -33,6 +33,7 @@ from nucliadb.search.search.fetch import (
     get_labels_resource,
     get_seconds_paragraph,
 )
+from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import RelationType
@@ -43,7 +44,6 @@ from nucliadb_models.search import (
     EntityType,
     KnowledgeboxSearchResults,
     KnowledgeboxSuggestResults,
-    MinScore,
     Paragraph,
     Paragraphs,
     RelatedEntities,
@@ -65,7 +65,6 @@ from nucliadb_protos.nodereader_pb2 import (
     DocumentResult,
     DocumentScored,
     DocumentSearchResponse,
-    EntitiesSubgraphRequest,
     ParagraphResult,
     ParagraphSearchResponse,
     RelationSearchResponse,
@@ -129,21 +128,17 @@ async def get_sort_value(
 
 
 async def merge_documents_results(
-    document_responses: list[DocumentSearchResponse],
-    resources: list[str],
-    top_k: int,
     kbid: str,
-    sort: SortOptions,
-    min_score: float,
-) -> Resources:
+    responses: list[DocumentSearchResponse],
+    *,
+    query: FulltextQuery,
+    top_k: int,
+) -> tuple[Resources, list[str]]:
     raw_resource_list: list[tuple[DocumentResult, SortValue]] = []
     facets: dict[str, Any] = {}
-    query = None
     total = 0
     next_page = False
-    for document_response in document_responses:
-        if query is None:
-            query = document_response.query
+    for document_response in responses:
         if document_response.facets:
             for key, value in document_response.facets.items():
                 key = translate_system_to_alias_label(key)
@@ -155,7 +150,7 @@ async def merge_documents_results(
         if document_response.next_page:
             next_page = True
         for result in document_response.results:
-            sort_value = await get_sort_value(result, sort.field, kbid)
+            sort_value = await get_sort_value(result, query.order_by, kbid)
             if sort_value is not None:
                 raw_resource_list.append((result, sort_value))
         total += document_response.total
@@ -163,8 +158,9 @@ async def merge_documents_results(
     # We need to cut first and then sort, otherwise the page will be wrong if the order is DESC
     raw_resource_list, has_more = cut_page(raw_resource_list, top_k)
     next_page = next_page or has_more
-    raw_resource_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
+    raw_resource_list.sort(key=lambda x: x[1], reverse=(query.sort == SortOrder.DESC))
 
+    result_resource_ids = []
     result_resource_list: list[ResourceResult] = []
     for result, _ in raw_resource_list:
         labels = await get_labels_resource(result, kbid)
@@ -179,26 +175,26 @@ async def merge_documents_results(
                 labels=labels,
             )
         )
-        if result.uuid not in resources:
-            resources.append(result.uuid)
+        if result.uuid not in result_resource_ids:
+            result_resource_ids.append(result.uuid)
 
     return Resources(
         facets=facets,
         results=result_resource_list,
-        query=query,
+        query=query.query,
         total=total,
         page_number=0,  # Bw/c with pagination
         page_size=top_k,
         next_page=next_page,
-        min_score=min_score,
-    )
+        min_score=query.min_score,
+    ), result_resource_ids
 
 
 async def merge_suggest_paragraph_results(
     suggest_responses: list[SuggestResponse],
     kbid: str,
     highlight: bool,
-):
+) -> Paragraphs:
     raw_paragraph_list: list[ParagraphResult] = []
     query = None
     ematches = None
@@ -266,7 +262,7 @@ async def merge_vectors_results(
     kbid: str,
     top_k: int,
     min_score: Optional[float] = None,
-):
+) -> Sentences:
     facets: dict[str, Any] = {}
     raw_vectors_list: list[DocumentScored] = []
 
@@ -339,14 +335,13 @@ async def merge_vectors_results(
 
 
 async def merge_paragraph_results(
-    paragraph_responses: list[ParagraphSearchResponse],
-    resources: list[str],
     kbid: str,
+    paragraph_responses: list[ParagraphSearchResponse],
     top_k: int,
     highlight: bool,
     sort: SortOptions,
     min_score: float,
-) -> Paragraphs:
+) -> tuple[Paragraphs, list[str]]:
     raw_paragraph_list: list[tuple[ParagraphResult, SortValue]] = []
     facets: dict[str, Any] = {}
     query = None
@@ -379,6 +374,7 @@ async def merge_paragraph_results(
     raw_paragraph_list, has_more = cut_page(raw_paragraph_list, top_k)
     next_page = next_page or has_more
 
+    result_resource_ids = []
     result_paragraph_list: list[Paragraph] = []
     for result, _ in raw_paragraph_list:
         _, field_type, field = result.field.split("/")
@@ -426,8 +422,8 @@ async def merge_paragraph_results(
                 new_paragraph.end_seconds = seconds_positions[1]
 
         result_paragraph_list.append(new_paragraph)
-        if new_paragraph.rid not in resources:
-            resources.append(new_paragraph.rid)
+        if new_paragraph.rid not in result_resource_ids:
+            result_resource_ids.append(new_paragraph.rid)
     return Paragraphs(
         results=result_paragraph_list,
         facets=facets,
@@ -437,13 +433,13 @@ async def merge_paragraph_results(
         page_size=top_k,
         next_page=next_page,
         min_score=min_score,
-    )
+    ), result_resource_ids
 
 
 @merge_observer.wrap({"type": "merge_relations"})
 async def merge_relations_results(
     relations_responses: list[RelationSearchResponse],
-    query: EntitiesSubgraphRequest,
+    query_entry_points: Iterable[RelationNode],
     only_with_metadata: bool = False,
     only_agentic: bool = False,
     only_entity_to_entity: bool = False,
@@ -453,7 +449,7 @@ async def merge_relations_results(
         None,
         _merge_relations_results,
         relations_responses,
-        query,
+        query_entry_points,
         only_with_metadata,
         only_agentic,
         only_entity_to_entity,
@@ -462,26 +458,26 @@ async def merge_relations_results(
 
 def _merge_relations_results(
     relations_responses: list[RelationSearchResponse],
-    query: EntitiesSubgraphRequest,
+    query_entry_points: Iterable[RelationNode],
     only_with_metadata: bool,
     only_agentic: bool,
     only_entity_to_entity: bool,
 ) -> Relations:
-    """
-    Merge relation search responses into a single Relations object while applying filters.
+    """Merge relation search responses into a single Relations object while applying filters.
 
-    Args:
-        relations_responses: List of relation search responses
-        query: EntitiesSubgraphRequest object
-        only_with_metadata: If True, only include relations with metadata. This metadata includes paragraph_id and entity positions among other things.
-        only_agentic: If True, only include relations extracted by a Graph Extraction Agent.
+    - When `only_with_metadata` is enabled, only include paths with metadata
+      (this can include paragraph_id and entity positions among other things)
 
-    Returns:
-        Relations
+    - When `only_agentic` is enabled, ony include relations extracted by a Graph
+      Extraction Agent
+
+    - When `only_entity_to_entity` is enabled, only include relations between
+    nodes with type ENTITY
+
     """
     relations = Relations(entities={})
 
-    for entry_point in query.entry_points:
+    for entry_point in query_entry_points:
         relations.entities[entry_point.value] = EntitySubgraph(related_to=[])
 
     for relation_response in relations_responses:
@@ -541,14 +537,11 @@ def _merge_relations_results(
 @merge_observer.wrap({"type": "merge"})
 async def merge_results(
     search_responses: list[SearchResponse],
-    top_k: int,
+    retrieval: UnitRetrieval,
     kbid: str,
     show: list[ResourceProperties],
     field_type_filter: list[FieldTypeName],
     extracted: list[ExtractedDataTypeName],
-    sort: SortOptions,
-    requested_relations: EntitiesSubgraphRequest,
-    min_score: MinScore,
     highlight: bool = False,
 ) -> KnowledgeboxSearchResults:
     paragraphs = []
@@ -565,25 +558,45 @@ async def merge_results(
     api_results = KnowledgeboxSearchResults()
 
     resources: list[str] = list()
-    api_results.fulltext = await merge_documents_results(
-        documents, resources, top_k, kbid, sort, min_score=min_score.bm25
-    )
 
-    api_results.paragraphs = await merge_paragraph_results(
-        paragraphs,
-        resources,
-        kbid,
-        top_k,
-        highlight,
-        sort,
-        min_score=min_score.bm25,
-    )
+    if retrieval.query.fulltext is not None:
+        api_results.fulltext, matched_resources = await merge_documents_results(
+            kbid,
+            documents,
+            query=retrieval.query.fulltext,
+            top_k=retrieval.top_k,
+        )
+        resources.extend(matched_resources)
 
-    api_results.sentences = await merge_vectors_results(
-        vectors, resources, kbid, top_k, min_score=min_score.semantic
-    )
+    if retrieval.query.keyword is not None:
+        sort = SortOptions(
+            field=retrieval.query.keyword.order_by,
+            order=retrieval.query.keyword.sort,
+            limit=None,  # unused
+        )
+        api_results.paragraphs, matched_resources = await merge_paragraph_results(
+            kbid,
+            paragraphs,
+            retrieval.top_k,
+            highlight,
+            sort,
+            min_score=retrieval.query.keyword.min_score,
+        )
+        resources.extend(matched_resources)
 
-    api_results.relations = await merge_relations_results(relations, requested_relations)
+    if retrieval.query.semantic is not None:
+        api_results.sentences = await merge_vectors_results(
+            vectors,
+            resources,
+            kbid,
+            retrieval.top_k,
+            min_score=retrieval.query.semantic.min_score,
+        )
+
+    if retrieval.query.relation is not None:
+        api_results.relations = await merge_relations_results(
+            relations, retrieval.query.relation.detected_entities
+        )
 
     api_results.resources = await fetch_resources(resources, kbid, show, field_type_filter, extracted)
     return api_results
@@ -602,11 +615,9 @@ async def merge_paragraphs_results(
 
     api_results = ResourceSearchResults()
 
-    resources: list[str] = list()
-    api_results.paragraphs = await merge_paragraph_results(
-        paragraphs,
-        resources,
+    api_results.paragraphs, _ = await merge_paragraph_results(
         kbid,
+        paragraphs,
         top_k,
         highlight=highlight_split,
         sort=SortOptions(

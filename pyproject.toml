@@ -1,7 +1,7 @@
 [project]
 name = "nucliadb_workspace"
 requires-python = ">=3.9.2"
-version = "6.3.5"
+version = "6.3.7"
 dependencies = ["nucliadb"]
 
 [tool.uv.workspace]
@@ -56,6 +56,9 @@ dev = [
     "requests",
     "requests-mock>=1.12.1",
     "types-PyYAML>=6.0.12.20240808",
+
+    # Pin grpio-tools so `make protos` compile with the version we want
+    "grpcio-tools<1.72.0",
 ]
 nidx = [
   "nidx-binding"

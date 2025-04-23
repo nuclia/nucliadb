@@ -24,6 +24,14 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from nucliadb.search.search.find_merge import build_find_response
+from nucliadb.search.search.query_parser import models as parser_models
+from nucliadb.search.search.query_parser.models import (
+    Filters,
+    KeywordQuery,
+    Query,
+    SemanticQuery,
+    UnitRetrieval,
+)
 from nucliadb.search.search.rank_fusion import LegacyRankFusion
 from nucliadb.search.search.rerankers import PredictReranker
 from nucliadb_models.internal.predict import (
@@ -149,13 +157,27 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
     ):
         find_response = await build_find_response(
             search_responses,
+            retrieval=UnitRetrieval(
+                query=Query(
+                    keyword=KeywordQuery(
+                        query=query,
+                        is_synonyms_query=False,
+                        min_score=0.2,
+                    ),
+                    semantic=SemanticQuery(
+                        query=[1, 2, 3],  # unused
+                        vectorset="my-model",  # unused
+                        min_score=0.4,
+                    ),
+                ),
+                top_k=20,
+                filters=Filters(),
+                rank_fusion=parser_models.RankFusion(window=20),
+                reranker=parser_models.PredictReranker(window=20),
+            ),
             kbid="kbid",
             query=query,
             rephrased_query=None,
-            relation_subgraph_query=nodereader_pb2.EntitiesSubgraphRequest(),
-            top_k=20,
-            min_score_bm25=0.2,
-            min_score_semantic=0.4,
             show=[ResourceProperties.BASIC],
             field_type_filter=[],
             extracted=[],

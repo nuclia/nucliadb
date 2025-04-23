@@ -19,6 +19,7 @@
 
 
 from typing import Union
+from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
@@ -29,12 +30,20 @@ from nucliadb_models import search as search_models
 from nucliadb_models.search import FindRequest
 
 
+@pytest.fixture(scope="function", autouse=True)
+def disable_hidden_resources_check():
+    with patch(
+        "nucliadb.search.search.query_parser.parsers.find.filter_hidden_resources", return_value=False
+    ):
+        yield
+
+
 async def test_find_query_parsing__top_k():
     find = FindRequest(
         top_k=20,
     )
     parsed = await parse_find("kbid", find)
-    assert parsed.top_k == find.top_k
+    assert parsed.retrieval.top_k == find.top_k
 
 
 @pytest.mark.parametrize(
@@ -66,7 +75,7 @@ async def test_find_query_parsing__rank_fusion(
         reranker=search_models.RerankerName.NOOP,
     )
     parsed = await parse_find("kbid", find)
-    assert parsed.rank_fusion == expected
+    assert parsed.retrieval.rank_fusion == expected
 
 
 # ATENTION: if you're changing this test, make sure public models, private
@@ -98,7 +107,7 @@ async def test_find_query_parsing__rank_fusion_limits():
     parsed = await parse_find(
         "kbid", FindRequest(rank_fusion=search_models.ReciprocalRankFusion.model_construct(window=501))
     )
-    assert parsed.rank_fusion.window == 500
+    assert parsed.retrieval.rank_fusion.window == 500
 
 
 @pytest.mark.parametrize(
@@ -117,7 +126,7 @@ async def test_find_query_parsing__reranker(
         reranker=reranker,
     )
     parsed = await parse_find("kbid", find)
-    assert parsed.reranker == expected
+    assert parsed.retrieval.reranker == expected
 
 
 # ATENTION: if you're changing this test, make sure public models, private
@@ -140,4 +149,4 @@ async def test_find_query_parsing__reranker_limits():
     parsed = await parse_find(
         "kbid", FindRequest(reranker=search_models.PredictReranker.model_construct(window=201))
     )
-    assert parsed.reranker.window == 200
+    assert parsed.retrieval.reranker.window == 200

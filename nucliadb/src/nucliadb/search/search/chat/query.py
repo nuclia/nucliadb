@@ -29,7 +29,7 @@ from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import RAGMetrics
-from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import filters
@@ -93,7 +93,7 @@ async def get_find_results(
     origin: str,
     metrics: RAGMetrics = RAGMetrics(),
     prequeries_strategy: Optional[PreQueriesStrategy] = None,
-) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], QueryParser]:
+) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], ParsedQuery]:
     prequeries_results = None
     prefilter_queries_results = None
     queries_results = None
@@ -108,7 +108,6 @@ async def get_find_results(
                     x_ndb_client=ndb_client,
                     x_nucliadb_user=user,
                     x_forwarded_for=origin,
-                    generative_model=item.generative_model,
                     metrics=metrics,
                 )
                 prefilter_matching_resources = {
@@ -210,6 +209,7 @@ def find_request_from_ask_request(item: AskRequest, query: str) -> FindRequest:
     # We don't support pagination, we always get the top_k results.
     find_request.top_k = item.top_k
     find_request.show_hidden = item.show_hidden
+    find_request.generative_model = item.generative_model
 
     # this executes the model validators, that can tweak some fields
     return FindRequest.model_validate(find_request)
@@ -223,21 +223,20 @@ async def run_main_query(
     user: str,
     origin: str,
     metrics: RAGMetrics = RAGMetrics(),
-) -> tuple[KnowledgeboxFindResults, QueryParser]:
+) -> tuple[KnowledgeboxFindResults, ParsedQuery]:
     find_request = find_request_from_ask_request(item, query)
 
-    find_results, incomplete, query_parser = await find(
+    find_results, incomplete, parsed_query = await find(
         kbid,
         find_request,
         ndb_client,
         user,
         origin,
-        generative_model=item.generative_model,
         metrics=metrics,
     )
     if incomplete:
         raise IncompleteFindResultsError()
-    return find_results, query_parser
+    return find_results, parsed_query
 
 
 async def get_relations_results(
@@ -297,7 +296,7 @@ async def get_relations_results_from_entities(
     relations_results: list[RelationSearchResponse] = [result.relation for result in results]
     return await merge_relations_results(
         relations_results,
-        request.relation_subgraph,
+        request.relation_subgraph.entry_points,
         only_with_metadata,
         only_agentic_relations,
         only_entity_to_entity,
@@ -469,7 +468,6 @@ async def run_prequeries(
                 x_ndb_client,
                 x_nucliadb_user,
                 x_forwarded_for,
-                generative_model=generative_model,
                 metrics=metrics,
             )
             return prequery, find_results

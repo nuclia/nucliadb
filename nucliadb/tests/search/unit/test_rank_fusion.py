@@ -26,6 +26,7 @@ This test suite validates different combinations of inputs
 
 import random
 from typing import Optional, Type
+from unittest.mock import patch
 
 import pytest
 
@@ -42,6 +43,14 @@ from nucliadb_models.search import SCORE_TYPE, FindRequest
 from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 
 
+@pytest.fixture(scope="function", autouse=True)
+def disable_hidden_resources_check():
+    with patch(
+        "nucliadb.search.search.query_parser.parsers.find.filter_hidden_resources", return_value=False
+    ):
+        yield
+
+
 @pytest.mark.parametrize(
     "rank_fusion,expected_type",
     [
@@ -51,7 +60,7 @@ from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 )
 async def test_get_rank_fusion(rank_fusion, expected_type: Type):
     item = FindRequest(rank_fusion=rank_fusion)
-    algorithm = get_rank_fusion((await parse_find("kbid", item)).rank_fusion)
+    algorithm = get_rank_fusion((await parse_find("kbid", item)).retrieval.rank_fusion)
     assert isinstance(algorithm, expected_type)
 
 

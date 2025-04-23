@@ -1,10 +1,10 @@
 [build-system]
-requires = ["pdm-backend", "grpcio-tools>=1.44.0,<1.63.0"]
+requires = ["pdm-backend", "grpcio-tools>=1.71.0,<1.72.0"]
 build-backend = "pdm.backend"
 
 [project]
 name = "nidx_protos"
-version = "6.3.5"
+version = "6.3.7"
 license = { text = "AGPL" }
 description = "Protobuf definitions for nucliadb/nidx"
 authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]

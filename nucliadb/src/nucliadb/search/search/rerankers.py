@@ -178,8 +178,10 @@ def get_reranker(reranker: parser_models.Reranker) -> Reranker:
     elif isinstance(reranker, parser_models.PredictReranker):
         algorithm = PredictReranker(reranker.window)
 
-    else:
-        raise ValueError(f"Unknown reranker requested: {reranker}")
+    else:  # pragma: nocover
+        # This is a trick so mypy generates an error if this branch can be reached,
+        # that is, if we are missing some ifs
+        _a: int = "a"
 
     return algorithm
 

@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 import os
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
@@ -36,6 +37,8 @@ from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.trainset import TrainSetPartitions
 from nucliadb_protos.dataset_pb2 import TrainSet
 from nucliadb_sdk.v2.sdk import NucliaDB
+
+logger = logging.getLogger("nucliadb_dataset")
 
 CHUNK_SIZE = 5 * 1024 * 1024
 
@@ -71,19 +74,19 @@ class NucliaDataset(object):
     def iter_all_partitions(self, force=False) -> Iterator[Tuple[str, str]]:
         partitions = self.get_partitions()
         for index, partition in enumerate(partitions):
-            print(f"Reading partition {partition} {index}/{len(partitions)}")
+            logger.info(f"Reading partition {partition} {index}/{len(partitions)}")
             filename = self.read_partition(partition, ACTUAL_PARTITION, force)
-            print("done")
+            logger.info(f"Done reading partition {partition}")
             yield partition, filename
 
     def read_all_partitions(self, force=False, path: Optional[str] = None) -> List[str]:
         partitions = self.get_partitions()
         result = []
         for index, partition in enumerate(partitions):
-            print(f"Reading partition {partition} {index}/{len(partitions)}")
+            logger.info(f"Reading partition {partition} {index}/{len(partitions)}")
             filename = self.read_partition(partition, force=force, path=path)
             result.append(filename)
-            print("done")
+            logger.info(f"Done reading partition {partition}")
         return result
 
     def get_partitions(self):
@@ -205,7 +208,7 @@ class NucliaDBDataset(NucliaDataset):
             return filename
 
         filename_tmp = f"{filename}.tmp"
-        print(f"Generating partition {partition_id} from {streamer.base_url} at {filename}")
+        logger.info(f"Generating partition {partition_id} from {streamer.base_url} at {filename}")
         with open(filename_tmp, "wb") as sink:
             with pa.ipc.new_stream(sink, self.schema) as writer:
                 for batch in streamer:
@@ -213,7 +216,7 @@ class NucliaDBDataset(NucliaDataset):
                     if batch is None:
                         break
                     writer.write_batch(batch)
-        print("-" * 10)
+        logger.info("Finalizing partition")
         streamer.finalize()
         os.rename(filename_tmp, filename)
         return filename
