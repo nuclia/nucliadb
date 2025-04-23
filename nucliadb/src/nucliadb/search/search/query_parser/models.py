@@ -125,8 +125,8 @@ class UnitRetrieval(BaseModel):
     query: Query
     top_k: int
     filters: Filters = Field(default_factory=Filters)
-    rank_fusion: Optional[RankFusion]
-    reranker: Optional[Reranker]
+    rank_fusion: Optional[RankFusion] = None
+    reranker: Optional[Reranker] = None
 
 
 # TODO: augmentation things: hydration...
