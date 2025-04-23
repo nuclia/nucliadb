@@ -42,12 +42,12 @@ async def lifespan(app: FastAPI):
     await start_shard_manager()
     await start_train_grpc(SERVICE_NAME)
     await start_audit_utility(SERVICE_NAME)
-
-    async with inject_app_context(app):
-        yield
-
-    await stop_audit_utility()
-    await stop_train_grpc()
-    await stop_shard_manager()
-    await stop_nidx_utility()
-    await clean_telemetry(SERVICE_NAME)
+    try:
+        async with inject_app_context(app):
+            yield
+    finally:
+        await stop_audit_utility()
+        await stop_train_grpc()
+        await stop_shard_manager()
+        await stop_nidx_utility()
+        await clean_telemetry(SERVICE_NAME)

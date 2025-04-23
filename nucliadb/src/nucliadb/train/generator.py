@@ -45,6 +45,7 @@ from nucliadb.train.generators.sentence_classifier import (
 from nucliadb.train.generators.token_classifier import (
     token_classification_batch_generator,
 )
+from nucliadb.train.settings import settings
 from nucliadb.train.types import TrainBatch
 from nucliadb.train.utils import get_shard_manager
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
@@ -88,7 +89,7 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
 
     # This cache size is an arbitrary number, once we have a metric in place and
     # we analyze memory consumption, we can adjust it with more knoweldge
-    with resource_cache(size=20):
+    with resource_cache(size=settings.resource_cache_size):
         async for item in batch_generator:
             payload = item.SerializeToString()
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
