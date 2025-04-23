@@ -595,7 +595,7 @@ async def merge_results(
 
     if retrieval.query.relation is not None:
         api_results.relations = await merge_relations_results(
-            relations, retrieval.query.relation.detected_entities
+            relations, retrieval.query.relation.entry_points
         )
 
     api_results.resources = await fetch_resources(resources, kbid, show, field_type_filter, extracted)

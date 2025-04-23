@@ -53,7 +53,7 @@ class SemanticQuery(BaseModel):
 class RelationQuery(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    detected_entities: list[utils_pb2.RelationNode]
+    entry_points: list[utils_pb2.RelationNode]
     # list[subtype]
     deleted_entity_groups: list[str]
     # subtype -> list[entity]

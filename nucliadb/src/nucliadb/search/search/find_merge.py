@@ -142,7 +142,7 @@ async def build_find_response(
     # build relations graph
     entry_points = []
     if retrieval.query.relation is not None:
-        entry_points = retrieval.query.relation.detected_entities
+        entry_points = retrieval.query.relation.entry_points
     relations = await merge_relations_results([search_response.relation], entry_points)
 
     # compose response

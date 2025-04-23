@@ -138,7 +138,7 @@ class _SearchParser:
         meta_cache = await self.fetcher.get_entities_meta_cache()
         deleted_entities = meta_cache.deleted_entities
         return RelationQuery(
-            detected_entities=detected_entities,
+            entry_points=detected_entities,
             deleted_entity_groups=deleted_entity_groups,
             deleted_entities=deleted_entities,
         )
@@ -229,7 +229,7 @@ class _SearchParser:
         autofilter = None
         if self.item.autofilter:
             if self._query.relation is not None:
-                autofilter = self._query.relation.detected_entities
+                autofilter = self._query.relation.entry_points
             else:
                 autofilter = await self._get_detected_entities()
 

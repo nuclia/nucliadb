@@ -277,7 +277,7 @@ async def get_relations_results_from_entities(
     retrieval = UnitRetrieval(
         query=Query(
             relation=RelationQuery(
-                detected_entities=list(entry_points),
+                entry_points=list(entry_points),
                 deleted_entities={"": list(deleted_entities)},
                 deleted_entity_groups=[],
             )
