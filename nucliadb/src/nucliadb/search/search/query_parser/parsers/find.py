@@ -30,7 +30,6 @@ from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.filter_expression import parse_expression
 from nucliadb.search.search.query_parser.models import (
     Filters,
-    Merge,
     NoopReranker,
     ParsedQuery,
     PredictReranker,
@@ -67,8 +66,8 @@ async def parse_find(
 ) -> ParsedQuery:
     fetcher = fetcher or fetcher_for_find(kbid, item)
     parser = _FindParser(kbid, item, fetcher)
-    retrieval, merge = await parser.parse()
-    return ParsedQuery(fetcher=fetcher, retrieval=retrieval, merge=merge, generation=None)
+    retrieval = await parser.parse()
+    return ParsedQuery(fetcher=fetcher, retrieval=retrieval, generation=None)
 
 
 def fetcher_for_find(kbid: str, item: FindRequest) -> Fetcher:
@@ -93,7 +92,7 @@ class _FindParser:
         self._query: Optional[Query] = None
         self._top_k: Optional[int] = None
 
-    async def parse(self) -> tuple[UnitRetrieval, Merge]:
+    async def parse(self) -> UnitRetrieval:
         validate_base_request(self.item)
 
         self._top_k = parse_top_k(self.item)
@@ -135,12 +134,10 @@ class _FindParser:
             query=self._query,
             top_k=self._top_k,
             filters=filters,
-        )
-        merge = Merge(
             rank_fusion=rank_fusion,
             reranker=reranker,
         )
-        return retrieval, merge
+        return retrieval
 
     async def _parse_relation_query(self) -> RelationQuery:
         detected_entities = await self._get_detected_entities()

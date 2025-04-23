@@ -282,8 +282,10 @@ async def get_relations_results_from_entities(
             )
         ),
         top_k=50,
+        rank_fusion=None,
+        reranker=None,
     )
-    request = convert_retrieval_to_proto(retrieval, merge=None)
+    request = convert_retrieval_to_proto(retrieval)
 
     results: list[SearchResponse]
     (

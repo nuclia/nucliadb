@@ -169,6 +169,8 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
                     ),
                 ),
                 top_k=20,
+                rank_fusion=None,  # unused
+                reranker=None,  # unused
             ),
             kbid="kbid",
             query=query,

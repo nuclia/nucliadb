@@ -23,7 +23,7 @@ from nucliadb.search.search.filters import translate_label
 from nucliadb.search.search.metrics import node_features, query_parser_observer
 from nucliadb.search.search.query import apply_entities_filter, get_sort_field_proto
 from nucliadb.search.search.query_parser.filter_expression import add_and_expression
-from nucliadb.search.search.query_parser.models import Merge, ParsedQuery, PredictReranker, UnitRetrieval
+from nucliadb.search.search.query_parser.models import ParsedQuery, PredictReranker, UnitRetrieval
 from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
 from nucliadb_models.search import SortOrderMap
 from nucliadb_protos import nodereader_pb2, utils_pb2
@@ -34,7 +34,7 @@ from nucliadb_protos.nodereader_pb2 import SearchRequest
 async def legacy_convert_retrieval_to_proto(
     parsed: ParsedQuery,
 ) -> tuple[SearchRequest, bool, list[str], Optional[str]]:
-    converter = _Converter(parsed.retrieval, parsed.merge)
+    converter = _Converter(parsed.retrieval)
     request = converter.into_search_request()
 
     # XXX: legacy values that were returned by QueryParser but not always
@@ -51,17 +51,16 @@ async def legacy_convert_retrieval_to_proto(
 
 
 @query_parser_observer.wrap({"type": "convert_retrieval_to_proto"})
-def convert_retrieval_to_proto(retrieval: UnitRetrieval, merge: Optional[Merge]) -> SearchRequest:
-    converter = _Converter(retrieval, merge)
+def convert_retrieval_to_proto(retrieval: UnitRetrieval) -> SearchRequest:
+    converter = _Converter(retrieval)
     request = converter.into_search_request()
     return request
 
 
 class _Converter:
-    def __init__(self, retrieval: UnitRetrieval, merge: Optional[Merge]):
+    def __init__(self, retrieval: UnitRetrieval):
         self.req = nodereader_pb2.SearchRequest()
         self.retrieval = retrieval
-        self.merge = merge
 
         self._autofilter: list[str] = []
 
@@ -221,22 +220,21 @@ class _Converter:
         Some rerankers want more results than the requested by the user so
         reranking can have more choices.
         """
-        if self.merge is None:
-            self.req.result_per_page = self.retrieval.top_k
-        else:
-            rank_fusion_window = 0
-            if self.merge.rank_fusion is not None:
-                rank_fusion_window = self.merge.rank_fusion.window
+        top_k = self.retrieval_top_k
 
-            reranker_window = 0
-            if self.merge.reranker is not None and isinstance(self.merge.reranker, PredictReranker):
-                reranker_window = self.merge.reranker.window
+        rank_fusion_window = 0
+        if self.retrieval.rank_fusion is not None:
+            rank_fusion_window = self.retrieval.rank_fusion.window
 
-            self.req.result_per_page = max(
-                self.retrieval.top_k,
-                rank_fusion_window,
-                reranker_window,
-            )
+        reranker_window = 0
+        if self.retrieval.reranker is not None and isinstance(self.retrieval.reranker, PredictReranker):
+            reranker_window = self.retrieval.reranker.window
+
+        self.req.result_per_page = max(
+            top_k,
+            rank_fusion_window,
+            reranker_window,
+        )
 
 
 def is_incomplete(retrieval: UnitRetrieval) -> bool:

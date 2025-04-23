@@ -115,6 +115,8 @@ class _SearchParser:
             query=self._query,
             top_k=self._top_k,
             filters=filters,
+            rank_fusion=None,
+            reranker=None,
         )
         return retrieval
 
