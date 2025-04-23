@@ -22,6 +22,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import inject_app_context
 from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 from nucliadb.train import SERVICE_NAME
@@ -41,7 +42,13 @@ async def lifespan(app: FastAPI):
     await start_shard_manager()
     await start_train_grpc(SERVICE_NAME)
     try:
-        async with inject_app_context(app):
+        context = ApplicationContext(
+            service_name="train",
+            partitioning=False,
+            nats_manager=False,
+            transaction=False,
+        )
+        async with inject_app_context(app, context):
             yield
     finally:
         await stop_train_grpc()
