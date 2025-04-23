@@ -31,8 +31,8 @@ from nucliadb.common.context import ApplicationContext
 async def app_context(natsd, storage, nucliadb):
     ctx = ApplicationContext()
     await ctx.initialize()
-    ctx.nats_manager = AsyncMock()
-    ctx.nats_manager.js.consumer_info = AsyncMock(return_value=MagicMock(num_pending=1))
+    ctx._nats_manager = AsyncMock()
+    ctx._nats_manager.js.consumer_info = AsyncMock(return_value=MagicMock(num_pending=1))
     yield ctx
     await ctx.finalize()
 
