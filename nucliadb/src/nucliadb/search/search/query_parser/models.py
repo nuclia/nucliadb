@@ -17,14 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, Optional, Union
 
-from pydantic import (
-    BaseModel,
-    Field,
-)
+from pydantic import BaseModel, ConfigDict, Field
 
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb_models import search as search_models
@@ -35,8 +32,7 @@ from nucliadb_protos import nodereader_pb2, utils_pb2
 # query
 
 
-@dataclass
-class _TextQuery:
+class _TextQuery(BaseModel):
     query: str
     is_synonyms_query: bool
     min_score: float
@@ -48,15 +44,15 @@ FulltextQuery = _TextQuery
 KeywordQuery = _TextQuery
 
 
-@dataclass
-class SemanticQuery:
+class SemanticQuery(BaseModel):
     query: Optional[list[float]]
     vectorset: str
     min_score: float
 
 
-@dataclass
-class RelationQuery:
+class RelationQuery(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     detected_entities: list[utils_pb2.RelationNode]
     # list[subtype]
     deleted_entity_groups: list[str]
@@ -64,8 +60,7 @@ class RelationQuery:
     deleted_entities: dict[str, list[str]]
 
 
-@dataclass
-class Query:
+class Query(BaseModel):
     fulltext: Optional[FulltextQuery] = None
     keyword: Optional[KeywordQuery] = None
     semantic: Optional[SemanticQuery] = None
@@ -75,8 +70,9 @@ class Query:
 # filters
 
 
-@dataclass
-class Filters:
+class Filters(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     field_expression: Optional[nodereader_pb2.FilterExpression] = None
     paragraph_expression: Optional[nodereader_pb2.FilterExpression] = None
     filter_expression_operator: nodereader_pb2.FilterOperator.ValueType = (
@@ -125,34 +121,28 @@ Reranker = Union[NoopReranker, PredictReranker]
 # retrieval and generation operations
 
 
-@dataclass
-class UnitRetrieval:
+class UnitRetrieval(BaseModel):
     query: Query
     top_k: int
-    filters: Filters = field(default_factory=Filters)
-
-
-@dataclass
-class Merge:
-    rank_fusion: RankFusion
-    reranker: Reranker
+    filters: Filters = Field(default_factory=Filters)
+    rank_fusion: Optional[RankFusion]
+    reranker: Optional[Reranker]
 
 
 # TODO: augmentation things: hydration...
 
 
-@dataclass
-class Generation:
+class Generation(BaseModel):
     use_visual_llm: bool
     max_context_tokens: int
     max_answer_tokens: Optional[int]
 
 
-@dataclass
-class ParsedQuery:
+class ParsedQuery(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     fetcher: Fetcher
     retrieval: UnitRetrieval
-    merge: Optional[Merge] = None
     generation: Optional[Generation] = None
 
 
