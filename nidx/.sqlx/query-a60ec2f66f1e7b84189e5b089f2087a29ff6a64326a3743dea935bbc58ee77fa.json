@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                -- For each index, gather the seq number before which we want to force deletion of segments\n                -- e.g: gather the seq of the 100th newest deletion, and force merge all segments older than that\n                WITH index_deletion_window AS (\n                    SELECT\n                        id,\n                        COALESCE(\n                            (\n                                -- Biggest seq excluding the N most recent\n                                SELECT MIN(seq) FROM (\n                                    SELECT seq FROM deletions WHERE index_id = indexes.id ORDER BY seq DESC LIMIT $2)\n                                    AS new_deletions\n                                ),\n                            0\n                        ) AS seq\n                    FROM indexes\n                    JOIN deletions ON index_id = indexes.id\n                    GROUP BY indexes.id\n                    HAVING COUNT(*) > $2\n                )\n                -- For each index, a list of mergeable segments with amount of records and deletions\n                SELECT\n                    indexes.id AS \"id: IndexId\",\n                    indexes.kind AS \"kind: IndexKind\",\n                    array_agg(\n                        -- segment_id, records, force_merge (has more than N deletions)\n                        (segments.id, records, segments.seq < COALESCE(index_deletion_window.seq, 0))\n                        ORDER BY records DESC\n                    ) AS \"segments!: Vec<(SegmentId, i64, bool)>\"\n                FROM segments\n                JOIN indexes ON segments.index_id = indexes.id\n                LEFT JOIN index_deletion_window ON segments.index_id = index_deletion_window.id\n                WHERE\n                    delete_at IS NULL AND merge_job_id IS NULL\n                    AND segments.seq <= $1\n                GROUP BY\n                    indexes.id,\n                    indexes.kind,\n                    -- Only merge vector segments with same tags\n                    CASE WHEN kind = 'vector' THEN index_metadata::text ELSE NULL END,\n                    index_deletion_window.id\n                -- Only return indexes with more than one segment or with many deletions\n                HAVING COUNT(segments) > 1 OR index_deletion_window.id IS NOT NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: IndexId",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "kind: IndexKind",
+        "type_info": {
+          "Custom": {
+            "name": "index_kind",
+            "kind": {
+              "Enum": [
+                "text",
+                "paragraph",
+                "vector",
+                "relation"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "segments!: Vec<(SegmentId, i64, bool)>",
+        "type_info": "RecordArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "a60ec2f66f1e7b84189e5b089f2087a29ff6a64326a3743dea935bbc58ee77fa"
+}
