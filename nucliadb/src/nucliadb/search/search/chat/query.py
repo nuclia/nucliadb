@@ -29,7 +29,8 @@ from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import RAGMetrics
-from nucliadb.search.search.query_parser.models import ParsedQuery
+from nucliadb.search.search.query_parser.models import ParsedQuery, Query, RelationQuery, UnitRetrieval
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import filters
@@ -52,9 +53,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_protos import audit_pb2
 from nucliadb_protos.nodereader_pb2 import (
-    EntitiesSubgraphRequest,
     RelationSearchResponse,
-    SearchRequest,
     SearchResponse,
 )
 from nucliadb_protos.utils_pb2 import RelationNode
@@ -274,13 +273,17 @@ async def get_relations_results_from_entities(
     only_entity_to_entity: bool = False,
     deleted_entities: set[str] = set(),
 ) -> Relations:
-    request = SearchRequest()
-    request.relation_subgraph.entry_points.extend(entities)
-    request.relation_subgraph.depth = 1
-
-    deleted = EntitiesSubgraphRequest.DeletedEntities()
-    deleted.node_values.extend(deleted_entities)
-    request.relation_subgraph.deleted_entities.append(deleted)
+    retrieval = UnitRetrieval(
+        query=Query(
+            relation=RelationQuery(
+                detected_entities=list(entities),
+                deleted_entities={"": list(deleted_entities)},
+                deleted_entity_groups=[],
+            )
+        ),
+        top_k=50,
+    )
+    request = convert_retrieval_to_proto(retrieval, merge=None)
 
     results: list[SearchResponse]
     (
