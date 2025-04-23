@@ -438,6 +438,8 @@ async def test_search_relations(
     predict_mock = Mock()
     set_utility(Utility.PREDICT, predict_mock)
 
+    # Search related to "Becquer" or "Newton"
+
     predict_mock.detect_entities = AsyncMock(
         return_value=[relation_nodes["Becquer"], relation_nodes["Newton"]]
     )
@@ -506,7 +508,14 @@ async def test_search_relations(
                     "relation_label": "study",
                     "direction": "out",
                     "entity_subtype": "science",
-                    "metadata": None,
+                    "metadata": {
+                        "paragraph_id": "myresource/0/myresource/100-200",
+                        "source_start": 1,
+                        "source_end": 10,
+                        "to_start": 11,
+                        "to_end": 20,
+                        "data_augmentation_task_id": "mytask",
+                    },
                     "resource_id": rid,
                 },
             ]
@@ -519,6 +528,8 @@ async def test_search_relations(
 
         for expected_relation in expected[entity]["related_to"]:
             assert expected_relation in entities[entity]["related_to"]
+
+    # Search related to "Animal"
 
     predict_mock.detect_entities = AsyncMock(return_value=[relation_nodes["Animal"]])
 
@@ -565,6 +576,27 @@ async def test_search_relations(
 
         for expected_relation in expected[entity]["related_to"]:
             assert expected_relation in entities[entity]["related_to"]
+
+    # Search related to "M&M" (doesn't exist)
+    predict_mock.detect_entities = AsyncMock(
+        return_value=[
+            RelationNode(value="M&M", ntype=RelationNode.NodeType.ENTITY, subtype="sweets"),
+        ]
+    )
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/search",
+        params={
+            "features": "relations",
+            "query": "Do you like M&M?",
+        },
+    )
+    assert resp.status_code == 200
+
+    entities = resp.json()["relations"]["entities"]
+    assert len(entities) == 1
+    assert "M&M" in entities
+    assert len(entities["M&M"]["related_to"]) == 0
 
 
 @pytest.mark.deploy_modes("standalone")
