@@ -139,52 +139,9 @@ message VectorSearchResponse {
     int32 result_per_page = 5;
 }
 
-message RelationNodeFilter {
-    utils.RelationNode.NodeType node_type = 1;
-    optional string node_subtype = 2;
-}
-
-message RelationEdgeFilter {
-    // Will filter the search to edges of type ntype.
-    utils.Relation.RelationType relation_type = 1;
-    optional string relation_subtype = 2;
-    repeated string relation_value = 3;
-}
-
-message RelationPrefixSearchRequest {
-    oneof search {
-        // Search for a single prefix
-        string prefix = 1;
-        // Search for entities appearing on a query
-        string query = 3;
-    }
-
-    repeated RelationNodeFilter node_filters = 2;
-}
-
 message RelationPrefixSearchResponse {
     repeated utils.RelationNode nodes = 1;
 }
-
-
-message EntitiesSubgraphRequest {
-    // List of vertices where search will trigger
-    repeated utils.RelationNode entry_points = 1;
-
-    optional int32 depth = 3;
-
-    message DeletedEntities {
-        string node_subtype = 1;
-        repeated string node_values = 2;
-    }
-    repeated DeletedEntities deleted_entities = 4;
-    repeated string deleted_groups = 5;
-}
-
-message EntitiesSubgraphResponse {
-    repeated noderesources.IndexRelation relations = 2;
-}
-
 
 message GraphQuery {
     message Node {
@@ -301,25 +258,6 @@ message GraphSearchResponse {
     repeated Path graph = 3;
 }
 
-// Query relation index to obtain different information about the
-// knowledge graph. It can be queried using the following strategies:
-//
-// - prefix search over vertex (node) names
-// - graph search:
-//   - given some entry vertices, get the filtered subgraph around them
-message RelationSearchRequest {
-    reserved 11;
-
-    string shard_id = 1;
-
-    EntitiesSubgraphRequest subgraph = 12;
-}
-
-message RelationSearchResponse {
-    RelationPrefixSearchResponse prefix = 11;
-    EntitiesSubgraphResponse subgraph = 12;
-}
-
 message FilterExpression {
     message FilterExpressionList {
         repeated FilterExpression operands = 1;
@@ -366,7 +304,7 @@ enum FilterOperator {
 }
 
 message SearchRequest {
-    reserved 20;
+    reserved 20, 21;
 
     string shard = 1;
 
@@ -400,8 +338,6 @@ message SearchRequest {
     optional FilterExpression field_filter = 26;
     optional FilterExpression paragraph_filter = 27;
     FilterOperator filter_operator = 28;
-
-    EntitiesSubgraphRequest relation_subgraph = 21 [deprecated = true];
 
     // Reduced graph search for specific use case of text block search. It only
     // supports path search (as it's the only one that can return paragraph_ids)
@@ -448,10 +384,10 @@ message SuggestResponse {
 }
 
 message SearchResponse {
+    reserved 4;
     DocumentSearchResponse document = 1;
     ParagraphSearchResponse paragraph = 2;
     VectorSearchResponse vector = 3;
-    RelationSearchResponse relation = 4;
     GraphSearchResponse graph = 5;
 }
 
