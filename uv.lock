@@ -2085,8 +2085,8 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "mypy-protobuf", specifier = ">=3.4.0" },
-    { name = "protobuf", specifier = ">=5" },
-    { name = "types-protobuf", specifier = ">5" },
+    { name = "protobuf", specifier = ">=4.22.3" },
+    { name = "types-protobuf", specifier = ">=4.24" },
 ]
 
 [[package]]
