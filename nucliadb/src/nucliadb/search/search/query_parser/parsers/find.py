@@ -20,6 +20,7 @@
 
 from typing import Optional
 
+from nidx_protos import nodereader_pb2
 from pydantic import ValidationError
 
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
@@ -47,13 +48,14 @@ from nucliadb_models.filters import FilterExpression
 from nucliadb_models.search import (
     FindRequest,
 )
-from nucliadb_protos import nodereader_pb2, utils_pb2
+from nucliadb_protos import utils_pb2
 
 from .common import (
     parse_keyword_query,
     parse_semantic_query,
     parse_top_k,
-    validate_base_request,
+    should_disable_vector_search,
+    validate_query_syntax,
 )
 
 
@@ -93,7 +95,7 @@ class _FindParser:
         self._top_k: Optional[int] = None
 
     async def parse(self) -> UnitRetrieval:
-        validate_base_request(self.item)
+        self._validate_request()
 
         self._top_k = parse_top_k(self.item)
 
@@ -101,13 +103,13 @@ class _FindParser:
 
         self._query = Query()
 
-        if search_models.SearchOptions.KEYWORD in self.item.features:
+        if search_models.FindOptions.KEYWORD in self.item.features:
             self._query.keyword = await parse_keyword_query(self.item, fetcher=self.fetcher)
 
-        if search_models.SearchOptions.SEMANTIC in self.item.features:
+        if search_models.FindOptions.SEMANTIC in self.item.features:
             self._query.semantic = await parse_semantic_query(self.item, fetcher=self.fetcher)
 
-        if search_models.SearchOptions.RELATIONS in self.item.features:
+        if search_models.FindOptions.RELATIONS in self.item.features:
             self._query.relation = await self._parse_relation_query()
 
         # TODO: graph search
@@ -130,13 +132,35 @@ class _FindParser:
         if isinstance(reranker, PredictReranker):
             rank_fusion.window = max(rank_fusion.window, reranker.window)
 
-        return UnitRetrieval(
+        retrieval = UnitRetrieval(
             query=self._query,
             top_k=self._top_k,
             filters=filters,
             rank_fusion=rank_fusion,
             reranker=reranker,
         )
+        return retrieval
+
+    def _validate_request(self):
+        validate_query_syntax(self.item.query)
+
+        # synonyms are not compatible with vector/graph search
+        if (
+            self.item.with_synonyms
+            and self.item.query
+            and (
+                search_models.FindOptions.SEMANTIC in self.item.features
+                or search_models.FindOptions.RELATIONS in self.item.features
+            )
+        ):
+            raise InvalidQueryError(
+                "synonyms",
+                "Search with custom synonyms is only supported on paragraph and document search",
+            )
+
+        if search_models.FindOptions.SEMANTIC in self.item.features:
+            if should_disable_vector_search(self.item):
+                self.item.features.remove(search_models.FindOptions.SEMANTIC)
 
     async def _parse_relation_query(self) -> RelationQuery:
         detected_entities = await self._get_detected_entities()
@@ -147,7 +171,7 @@ class _FindParser:
         deleted_entities = meta_cache.deleted_entities
 
         return RelationQuery(
-            detected_entities=detected_entities,
+            entry_points=detected_entities,
             deleted_entity_groups=deleted_entity_groups,
             deleted_entities=deleted_entities,
         )
@@ -220,7 +244,7 @@ class _FindParser:
         autofilter = None
         if self.item.autofilter:
             if self._query.relation is not None:
-                autofilter = self._query.relation.detected_entities
+                autofilter = self._query.relation.entry_points
             else:
                 autofilter = await self._get_detected_entities()
 

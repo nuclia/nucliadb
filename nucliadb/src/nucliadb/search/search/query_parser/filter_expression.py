@@ -20,6 +20,8 @@
 
 from typing import Union
 
+from nidx_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
+
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR
 from nucliadb.search.search.exceptions import InvalidQueryError
@@ -48,7 +50,6 @@ from nucliadb_models.filters import (
     ResourceMimetype,
     Status,
 )
-from nucliadb_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
 
 # Filters that end up as a facet
 FacetFilter = Union[

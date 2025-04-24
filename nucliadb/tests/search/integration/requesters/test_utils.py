@@ -23,7 +23,7 @@ from httpx import AsyncClient
 
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.query_parser.parsers.search import parse_search
-from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import legacy_convert_retrieval_to_proto
 from nucliadb_models.search import (
     MinScore,
     SearchOptions,
@@ -57,7 +57,7 @@ async def test_vector_result_metadata(
             ),
         ),
     )
-    pb_query, _, _, _ = await convert_retrieval_to_proto(parsed)
+    pb_query, _, _, _ = await legacy_convert_retrieval_to_proto(parsed)
 
     results, _, _ = await node_query(kbid, Method.SEARCH, pb_query)
     assert len(results[0].vector.documents) > 0

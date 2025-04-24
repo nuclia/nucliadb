@@ -79,9 +79,8 @@ async def is_rollover_shard(txn: Transaction, *, kbid: str, shard_id: str) -> bo
         return False
 
     for shard_obj in shards.shards:
-        for replica_obj in shard_obj.replicas:
-            if shard_id == replica_obj.shard.id:
-                return True
+        if shard_id == shard_obj.nidx_shard_id:
+            return True
     return False
 
 

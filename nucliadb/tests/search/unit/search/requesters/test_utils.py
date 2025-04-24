@@ -23,10 +23,11 @@ import pytest
 from fastapi import HTTPException
 from grpc import StatusCode
 from grpc.aio import AioRpcError
+from nidx_protos import nodereader_pb2
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.search.requesters import utils
-from nucliadb_protos import nodereader_pb2, writer_pb2
+from nucliadb_protos import writer_pb2
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 
@@ -39,9 +40,6 @@ def shard_manager():
         return_value=[
             writer_pb2.ShardObject(
                 shard="shard-id",
-                replicas=[
-                    writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="shard-id"), node="node-0")
-                ],
             )
         ]
     )

@@ -24,6 +24,7 @@ from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
+from nidx_protos import noderesources_pb2
 from pytest_mock import MockerFixture
 
 from nucliadb.common import datamanagers
@@ -36,7 +37,7 @@ from nucliadb.ingest.processing import (
     stop_processing_engine,
 )
 from nucliadb.models.internal.processing import Source
-from nucliadb_protos import noderesources_pb2, resources_pb2
+from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     FieldID,

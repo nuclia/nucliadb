@@ -16,27 +16,24 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 
-import json
-from unittest.mock import Mock, patch
+from nidx_protos import nodewriter_pb2 as Nidx
 
-import nucliadb_sdk
-from nucliadb_models.search import FindOptions, FindRequest, KnowledgeboxFindResults
+from nucliadb_protos import knowledgebox_pb2 as Nucliadb
 
 
-def test_find_request_serialization() -> None:
-    sdk = nucliadb_sdk.NucliaDB(region="on-prem", url="http://fake:8080")
+def nucliadb_vector_type_to_nidx(nucliadb: Nucliadb.VectorType.ValueType) -> Nidx.VectorType.ValueType:
+    if nucliadb == Nucliadb.DENSE_F32:
+        return Nidx.DENSE_F32
+    else:  # pragma: nocover
+        raise Exception("Unknown vector type")
 
-    with patch.object(
-        sdk,
-        "_request",
-        return_value=Mock(content=KnowledgeboxFindResults(resources={}).model_dump_json()),
-    ) as spy:
-        req = FindRequest(query="love", features=[FindOptions.RELATIONS])
 
-        sdk.find(kbid="kbid", content=req)
-
-        sent = json.loads(spy.call_args.kwargs["content"])
-
-        assert sent == {"query": "love", "features": [FindOptions.RELATIONS.value]}
-        assert sent == req.model_dump(exclude_unset=True)
+def nucliadb_index_config_to_nidx(nucliadb: Nucliadb.VectorIndexConfig) -> Nidx.VectorIndexConfig:
+    return Nidx.VectorIndexConfig(
+        normalize_vectors=nucliadb.normalize_vectors,
+        similarity=nucliadb.similarity,
+        vector_dimension=nucliadb.vector_dimension,
+        vector_type=nucliadb_vector_type_to_nidx(nucliadb.vector_type),
+    )

@@ -19,70 +19,10 @@
 #
 import unittest
 
-import pytest
-
 from nucliadb.search.search.utils import (
-    has_user_vectors,
-    is_empty_query,
-    is_exact_match_only_query,
     maybe_log_request_payload,
-    should_disable_vector_search,
 )
 from nucliadb_models.search import SearchRequest
-
-
-@pytest.mark.parametrize(
-    "item,empty",
-    [
-        (SearchRequest(query=""), True),
-        (SearchRequest(query="foo"), False),
-    ],
-)
-def test_is_empty_query(item, empty):
-    assert is_empty_query(item) is empty
-
-
-@pytest.mark.parametrize(
-    "query,exact_match",
-    [
-        ("some", False),
-        ("some query terms", False),
-        ('"something"', True),
-        ('   "something"', True),
-        ('"something"   ', True),
-        ('"something exact"', True),
-        ('"something exact" and something else', False),
-    ],
-)
-def test_is_exact_match_only_query(query, exact_match):
-    item = SearchRequest(query=query)
-    assert is_exact_match_only_query(item) is exact_match
-
-
-@pytest.mark.parametrize(
-    "item,has_vectors",
-    [
-        (SearchRequest(query=""), False),
-        (SearchRequest(vector=[]), False),
-        (SearchRequest(vector=[1.0]), True),
-    ],
-)
-def test_has_user_vectors(item, has_vectors):
-    assert has_user_vectors(item) is has_vectors
-
-
-@pytest.mark.parametrize(
-    "item,disable_vectors",
-    [
-        (SearchRequest(query=""), True),
-        (SearchRequest(query='"exact match"'), True),
-        (SearchRequest(query="foo"), False),
-        (SearchRequest(query="", vector=[1.0, 2.0]), False),
-        (SearchRequest(query='"exact match"', vector=[1.0, 2.0]), False),
-    ],
-)
-def test_should_disable_vectors(item, disable_vectors):
-    assert should_disable_vector_search(item) is disable_vectors
 
 
 def test_maybe_log_request_payload():

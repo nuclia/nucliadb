@@ -20,9 +20,9 @@
 from typing import List, Optional
 
 from google.protobuf.timestamp_pb2 import Timestamp
+from nidx_protos.nodereader_pb2 import SearchRequest
 
 from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, ChatContext, RetrievedContext
-from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import logger

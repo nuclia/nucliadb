@@ -26,6 +26,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
+from nidx_protos import nodewriter_pb2
+from nidx_protos.noderesources_pb2 import EmptyQuery, ShardId
 
 import nucliadb.common.nidx
 from nucliadb.common import datamanagers
@@ -45,8 +47,7 @@ from nucliadb.purge import (
     purge_kb_storage,
 )
 from nucliadb.purge.orphan_shards import detect_orphan_shards, purge_orphan_shards
-from nucliadb_protos import nodewriter_pb2, utils_pb2, writer_pb2
-from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
+from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
 from tests.utils.dirty_index import wait_for_sync
 

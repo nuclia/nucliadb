@@ -20,11 +20,11 @@
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
+from nidx_protos import noderesources_pb2
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.ingest.orm.exceptions import ResourceNotIndexable
 from nucliadb.ingest.orm.processor import Processor, validate_indexable_resource
-from nucliadb_protos import noderesources_pb2
 
 
 @pytest.fixture()

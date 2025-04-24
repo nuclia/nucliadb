@@ -34,8 +34,7 @@ use nidx_protos::graph_query::node::NewMatchKind;
 use nidx_protos::graph_query::path_query;
 use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::{
-    GraphSearchRequest, GraphSearchResponse, RelationNode, RelationSearchRequest, RelationSearchResponse,
-    relation_node::NodeType, resource::ResourceStatus,
+    GraphSearchRequest, GraphSearchResponse, RelationNode, relation_node::NodeType, resource::ResourceStatus,
 };
 use nidx_tantivy::{
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
@@ -208,11 +207,6 @@ impl RelationSearcher {
     }
 
     #[instrument(name = "relation::search", skip_all)]
-    pub fn search(&self, request: &RelationSearchRequest) -> anyhow::Result<RelationSearchResponse> {
-        self.reader.relation_search(request)
-    }
-
-    #[instrument(name = "relation::graph_search", skip_all)]
     pub fn graph_search(
         &self,
         request: &GraphSearchRequest,

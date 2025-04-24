@@ -22,11 +22,10 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from nidx_protos import nodereader_pb2, noderesources_pb2
 
 from nucliadb.search.search.find_merge import build_find_response
-from nucliadb.search.search.query_parser import models as parser_models
 from nucliadb.search.search.query_parser.models import (
-    Filters,
     KeywordQuery,
     Query,
     SemanticQuery,
@@ -40,7 +39,6 @@ from nucliadb_models.internal.predict import (
 )
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import SCORE_TYPE, ResourceProperties
-from nucliadb_protos import nodereader_pb2, noderesources_pb2
 
 
 async def test_find_post_index_search(expected_find_response: dict[str, Any], predict_mock):
@@ -171,9 +169,6 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
                     ),
                 ),
                 top_k=20,
-                filters=Filters(),
-                rank_fusion=parser_models.RankFusion(window=20),
-                reranker=parser_models.PredictReranker(window=20),
             ),
             kbid="kbid",
             query=query,

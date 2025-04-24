@@ -31,7 +31,6 @@ future multiple writable shards will be possible.
 
 import logging
 
-from nucliadb.common import datamanagers
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -41,18 +40,22 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    async with context.kv_driver.transaction() as txn:
-        shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=True)
-        if shards is None:
-            logger.error("KB without shards", extra={"kbid": kbid})
-            return
+    pass
 
-        for shard_object in shards.shards:
-            shard_object.read_only = True
-        shards.shards[shards.actual].read_only = False
+    # No longer relevant with nidx
 
-        # just ensure we're writing it correctly
-        assert [shard_object.read_only for shard_object in shards.shards].count(False) == 1
+    # async with context.kv_driver.transaction() as txn:
+    #     shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=True)
+    #     if shards is None:
+    #         logger.error("KB without shards", extra={"kbid": kbid})
+    #         return
 
-        await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=shards)
-        await txn.commit()
+    #     for shard_object in shards.shards:
+    #         shard_object.read_only = True
+    #     shards.shards[shards.actual].read_only = False
+
+    #     # just ensure we're writing it correctly
+    #     assert [shard_object.read_only for shard_object in shards.shards].count(False) == 1
+
+    #     await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=shards)
+    #     await txn.commit()

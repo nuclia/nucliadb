@@ -21,6 +21,7 @@ import json
 from collections import defaultdict
 from typing import Any, Collection, Iterable, Optional, Union
 
+from nidx_protos import nodereader_pb2
 from nuclia_models.predict.generative_responses import (
     JSONGenerativeResponse,
     MetaGenerativeResponse,
@@ -73,7 +74,6 @@ from nucliadb_models.search import (
     TextPosition,
     UserPrompt,
 )
-from nucliadb_protos import nodereader_pb2
 from nucliadb_protos.utils_pb2 import RelationNode
 
 SCHEMA = {

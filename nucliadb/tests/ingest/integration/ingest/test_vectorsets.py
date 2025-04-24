@@ -22,6 +22,8 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
+from nidx_protos import noderesources_pb2
+
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
@@ -29,8 +31,6 @@ from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_protos import (
     knowledgebox_pb2,
-    noderesources_pb2,
-    nodewriter_pb2,
     resources_pb2,
     utils_pb2,
     writer_pb2,
@@ -66,7 +66,7 @@ async def test_ingest_broker_message_with_vectorsets(
             kbid=kbid,
             config=knowledgebox_pb2.VectorSetConfig(
                 vectorset_id=vectorset_id,
-                vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
+                vectorset_index_config=knowledgebox_pb2.VectorIndexConfig(
                     vector_dimension=vectorset_dimension
                 ),
                 storage_key_kind=knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX,

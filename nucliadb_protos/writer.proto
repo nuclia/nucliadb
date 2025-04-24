@@ -4,7 +4,6 @@ package fdbwriter;
 
 import "google/protobuf/timestamp.proto";
 
-import public "nucliadb_protos/noderesources.proto";
 import public "nucliadb_protos/resources.proto";
 import public "nucliadb_protos/knowledgebox.proto";
 import public "nucliadb_protos/audit.proto";
@@ -348,14 +347,10 @@ message Notification {
 }
 
 
-message ShardReplica {
-    noderesources.ShardCreated shard = 1;
-    string node = 2;
-}
-
 message ShardObject {
+    reserved 2;
+
     string shard = 1;
-    repeated ShardReplica replicas = 3;
     google.protobuf.Timestamp timestamp = 4 [deprecated = true];
     bool read_only = 5;
     string nidx_shard_id = 6;

@@ -37,11 +37,9 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query_parser.parsers.search import parse_search
-from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import legacy_convert_retrieval_to_proto
 from nucliadb.search.search.utils import (
-    min_score_from_payload,
     min_score_from_query_params,
-    should_disable_vector_search,
 )
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.filters import FilterExpression
@@ -263,14 +261,8 @@ async def search(
     audit = get_audit()
     start_time = time()
 
-    item.min_score = min_score_from_payload(item.min_score)
-
-    if SearchOptions.SEMANTIC in item.features:
-        if should_disable_vector_search(item):
-            item.features.remove(SearchOptions.SEMANTIC)
-
     parsed = await parse_search(kbid, item)
-    pb_query, incomplete_results, autofilters, _ = await convert_retrieval_to_proto(parsed)
+    pb_query, incomplete_results, autofilters, _ = await legacy_convert_retrieval_to_proto(parsed)
 
     # We need to query all nodes
     results, query_incomplete_results, queried_nodes = await node_query(kbid, Method.SEARCH, pb_query)

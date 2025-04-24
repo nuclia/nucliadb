@@ -20,6 +20,11 @@
 import asyncio
 from typing import Iterable, Optional, Union
 
+from nidx_protos.nodereader_pb2 import (
+    GraphSearchResponse,
+    SearchResponse,
+)
+
 from nucliadb.common.models_utils import to_proto
 from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode
@@ -29,7 +34,8 @@ from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import RAGMetrics
-from nucliadb.search.search.query_parser.models import ParsedQuery
+from nucliadb.search.search.query_parser.models import ParsedQuery, Query, RelationQuery, UnitRetrieval
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import filters
@@ -37,6 +43,7 @@ from nucliadb_models.search import (
     AskRequest,
     ChatContextMessage,
     ChatOptions,
+    FindOptions,
     FindRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
@@ -47,16 +54,9 @@ from nucliadb_models.search import (
     PromptContextOrder,
     Relations,
     RephraseModel,
-    SearchOptions,
     parse_rephrase_prompt,
 )
 from nucliadb_protos import audit_pb2
-from nucliadb_protos.nodereader_pb2 import (
-    EntitiesSubgraphRequest,
-    RelationSearchResponse,
-    SearchRequest,
-    SearchResponse,
-)
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.utilities import get_audit
@@ -181,11 +181,11 @@ def find_request_from_ask_request(item: AskRequest, query: str) -> FindRequest:
     find_request.resource_filters = item.resource_filters
     find_request.features = []
     if ChatOptions.SEMANTIC in item.features:
-        find_request.features.append(SearchOptions.SEMANTIC)
+        find_request.features.append(FindOptions.SEMANTIC)
     if ChatOptions.KEYWORD in item.features:
-        find_request.features.append(SearchOptions.KEYWORD)
+        find_request.features.append(FindOptions.KEYWORD)
     if ChatOptions.RELATIONS in item.features:
-        find_request.features.append(SearchOptions.RELATIONS)
+        find_request.features.append(FindOptions.RELATIONS)
     find_request.query = query
     find_request.fields = item.fields
     find_request.filters = item.filters
@@ -274,13 +274,18 @@ async def get_relations_results_from_entities(
     only_entity_to_entity: bool = False,
     deleted_entities: set[str] = set(),
 ) -> Relations:
-    request = SearchRequest()
-    request.relation_subgraph.entry_points.extend(entities)
-    request.relation_subgraph.depth = 1
-
-    deleted = EntitiesSubgraphRequest.DeletedEntities()
-    deleted.node_values.extend(deleted_entities)
-    request.relation_subgraph.deleted_entities.append(deleted)
+    entry_points = list(entities)
+    retrieval = UnitRetrieval(
+        query=Query(
+            relation=RelationQuery(
+                entry_points=entry_points,
+                deleted_entities={"": list(deleted_entities)},
+                deleted_entity_groups=[],
+            )
+        ),
+        top_k=50,
+    )
+    request = convert_retrieval_to_proto(retrieval)
 
     results: list[SearchResponse]
     (
@@ -293,10 +298,10 @@ async def get_relations_results_from_entities(
         request,
         timeout=timeout,
     )
-    relations_results: list[RelationSearchResponse] = [result.relation for result in results]
+    relations_results: list[GraphSearchResponse] = [result.graph for result in results]
     return await merge_relations_results(
         relations_results,
-        request.relation_subgraph.entry_points,
+        entry_points,
         only_with_metadata,
         only_agentic_relations,
         only_entity_to_entity,

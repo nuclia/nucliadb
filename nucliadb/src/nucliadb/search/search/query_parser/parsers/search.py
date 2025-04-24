@@ -19,6 +19,8 @@
 #
 from typing import Optional
 
+from nidx_protos import nodereader_pb2
+
 from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query import expand_entities
 from nucliadb.search.search.query_parser.exceptions import InvalidQueryError
@@ -26,10 +28,8 @@ from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.filter_expression import parse_expression
 from nucliadb.search.search.query_parser.models import (
     Filters,
-    NoopReranker,
     ParsedQuery,
     Query,
-    RankFusion,
     RelationQuery,
     UnitRetrieval,
     _TextQuery,
@@ -44,9 +44,15 @@ from nucliadb_models.search import (
     SortOptions,
     SortOrder,
 )
-from nucliadb_protos import nodereader_pb2, utils_pb2
+from nucliadb_protos import utils_pb2
 
-from .common import parse_keyword_query, parse_semantic_query, parse_top_k, validate_base_request
+from .common import (
+    parse_keyword_query,
+    parse_semantic_query,
+    parse_top_k,
+    should_disable_vector_search,
+    validate_query_syntax,
+)
 
 INDEX_SORTABLE_FIELDS = [
     SortField.CREATED,
@@ -87,7 +93,7 @@ class _SearchParser:
         self._top_k: Optional[int] = None
 
     async def parse(self) -> UnitRetrieval:
-        validate_base_request(self.item)
+        self._validate_request()
 
         self._top_k = parse_top_k(self.item)
 
@@ -113,14 +119,33 @@ class _SearchParser:
 
         filters = await self._parse_filters()
 
-        return UnitRetrieval(
+        retrieval = UnitRetrieval(
             query=self._query,
             top_k=self._top_k,
             filters=filters,
-            # TODO: this should be in a post retrieval step
-            rank_fusion=RankFusion(window=self._top_k),
-            reranker=NoopReranker(),
         )
+        return retrieval
+
+    def _validate_request(self):
+        validate_query_syntax(self.item.query)
+
+        # synonyms are not compatible with vector/graph search
+        if (
+            self.item.with_synonyms
+            and self.item.query
+            and (
+                search_models.SearchOptions.SEMANTIC in self.item.features
+                or search_models.SearchOptions.RELATIONS in self.item.features
+            )
+        ):
+            raise InvalidQueryError(
+                "synonyms",
+                "Search with custom synonyms is only supported on paragraph and document search",
+            )
+
+        if search_models.SearchOptions.SEMANTIC in self.item.features:
+            if should_disable_vector_search(self.item):
+                self.item.features.remove(search_models.SearchOptions.SEMANTIC)
 
     async def _parse_text_query(self) -> _TextQuery:
         assert self._top_k is not None, "top_k must be parsed before text query"
@@ -140,7 +165,7 @@ class _SearchParser:
         meta_cache = await self.fetcher.get_entities_meta_cache()
         deleted_entities = meta_cache.deleted_entities
         return RelationQuery(
-            detected_entities=detected_entities,
+            entry_points=detected_entities,
             deleted_entity_groups=deleted_entity_groups,
             deleted_entities=deleted_entities,
         )
@@ -231,7 +256,7 @@ class _SearchParser:
         autofilter = None
         if self.item.autofilter:
             if self._query.relation is not None:
-                autofilter = self._query.relation.detected_entities
+                autofilter = self._query.relation.entry_points
             else:
                 autofilter = await self._get_detected_entities()
 

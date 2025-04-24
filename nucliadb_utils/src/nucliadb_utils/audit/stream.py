@@ -28,14 +28,23 @@ import backoff
 import mmh3
 import nats
 from fastapi import Request
+from google.protobuf.json_format import MessageToDict
 from google.protobuf.timestamp_pb2 import Timestamp
+from nidx_protos.nodereader_pb2 import SearchRequest
 from opentelemetry.trace import format_trace_id, get_current_span
 from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
-from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, ChatContext, ClientType, RetrievedContext
+from nucliadb_protos.audit_pb2 import (
+    AuditField,
+    AuditRequest,
+    AuditSearchRequest,
+    ChatContext,
+    ClientType,
+    RetrievedContext,
+)
 from nucliadb_protos.kb_usage_pb2 import (
     ActivityLogMatch,
     ActivityLogMatchType,
@@ -48,7 +57,6 @@ from nucliadb_protos.kb_usage_pb2 import (
 from nucliadb_protos.kb_usage_pb2 import (
     ClientType as ClientTypeKbUsage,
 )
-from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
@@ -75,6 +83,23 @@ def get_trace_id() -> Optional[str]:
 
 def get_request_context() -> Optional[RequestContext]:
     return request_context_var.get()
+
+
+def fill_audit_search_request(audit: AuditSearchRequest, request: SearchRequest):
+    audit.body = request.body
+    audit.min_score_bm25 = request.min_score_bm25
+    audit.min_score_semantic = request.min_score_semantic
+    audit.result_per_page = request.result_per_page
+    audit.security.CopyFrom(request.security)
+    audit.vector.extend(request.vector)
+    audit.vectorset = request.vectorset
+    audit.filter = json.dumps(
+        {
+            "field": MessageToDict(request.field_filter),
+            "paragraph": MessageToDict(request.paragraph_filter),
+            "operator": request.filter_operator,
+        }
+    )
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
@@ -355,15 +380,17 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.client_type = client_type  # type: ignore
         auditrequest.userid = user
         auditrequest.kbid = kbid
-        auditrequest.search.CopyFrom(search)
         auditrequest.retrieval_time = timeit
         auditrequest.resources = resources
         if "/ask" in context.path:
             auditrequest.type = AuditRequest.CHAT
         else:
             auditrequest.type = AuditRequest.SEARCH
+
+        fill_audit_search_request(auditrequest.search, search)
         if retrieval_rephrased_question is not None:
             auditrequest.retrieval_rephrased_question = retrieval_rephrased_question
+
         trace_id = get_trace_id()
         self.kb_usage_utility.send_kb_usage(
             service=Service.NUCLIA_DB,
@@ -419,8 +446,10 @@ class StreamAuditStorage(AuditStorage):
             auditrequest.generative_answer_time = generative_answer_time
         if generative_answer_first_chunk_time is not None:
             auditrequest.generative_answer_first_chunk_time = generative_answer_first_chunk_time
+
         if retrieval_rephrased_question is not None:
             auditrequest.retrieval_rephrased_question = retrieval_rephrased_question
+
         auditrequest.type = AuditRequest.CHAT
         auditrequest.chat.question = question
         auditrequest.chat.chat_context.extend(chat_context)

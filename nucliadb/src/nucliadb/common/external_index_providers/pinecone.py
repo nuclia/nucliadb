@@ -25,6 +25,8 @@ from uuid import uuid4
 
 import backoff
 from cachetools import TTLCache
+from nidx_protos.nodereader_pb2 import FilterExpression, SearchRequest
+from nidx_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSentence
 from pydantic import BaseModel
 
 from nucliadb.common.counters import IndexCounts
@@ -40,8 +42,6 @@ from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb_models.search import SCORE_TYPE, TextPosition
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import utils_pb2
-from nucliadb_protos.nodereader_pb2 import FilterExpression, SearchRequest
-from nucliadb_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSentence
 from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils.aiopynecone.client import DataPlane, FilterOperator, LogicalOperator
 from nucliadb_utils.aiopynecone.exceptions import (

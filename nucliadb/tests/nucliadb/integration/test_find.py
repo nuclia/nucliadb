@@ -27,7 +27,7 @@ from pytest_mock import MockerFixture
 
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
-from nucliadb_models.search import SearchOptions
+from nucliadb_models.search import FindOptions
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
@@ -110,25 +110,6 @@ async def test_find_with_label_changes(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == 1
-
-
-@pytest.mark.deploy_modes("standalone")
-async def test_find_does_not_support_fulltext_search(
-    nucliadb_reader: AsyncClient,
-    standalone_knowledgebox,
-):
-    resp = await nucliadb_reader.get(
-        f"/kb/{standalone_knowledgebox}/find?query=title&features=fulltext&features=keyword",
-    )
-    assert resp.status_code == 422
-    assert "fulltext search not supported" in resp.json()["detail"][0]["msg"]
-
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/find",
-        json={"query": "title", "features": [SearchOptions.FULLTEXT, SearchOptions.KEYWORD]},
-    )
-    assert resp.status_code == 422
-    assert "fulltext search not supported" in resp.json()["detail"][0]["msg"]
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -263,7 +244,7 @@ async def test_story_7286(
             f"/kb/{standalone_knowledgebox}/find",
             json={
                 "query": "title",
-                "features": [SearchOptions.KEYWORD, SearchOptions.SEMANTIC, SearchOptions.RELATIONS],
+                "features": [FindOptions.KEYWORD, FindOptions.SEMANTIC, FindOptions.RELATIONS],
                 "shards": [],
                 "highlight": True,
                 "autofilter": False,

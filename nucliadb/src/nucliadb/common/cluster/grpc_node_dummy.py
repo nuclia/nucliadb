@@ -19,19 +19,20 @@
 #
 from typing import Any
 
-from nucliadb_protos.nodereader_pb2 import (
+from nidx_protos.nodereader_pb2 import (
     EdgeList,
     RelationEdge,
 )
-from nucliadb_protos.noderesources_pb2 import (
+from nidx_protos.noderesources_pb2 import (
     EmptyResponse,
     ShardCreated,
     ShardId,
     ShardIds,
     VectorSetList,
 )
-from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
-from nucliadb_protos.nodewriter_pb2 import OpStatus
+from nidx_protos.noderesources_pb2 import Shard as NodeResourcesShard
+from nidx_protos.nodewriter_pb2 import OpStatus
+
 from nucliadb_protos.utils_pb2 import Relation
 
 

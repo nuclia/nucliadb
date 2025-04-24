@@ -22,10 +22,10 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from nidx_protos import nodereader_pb2
 
 from nucliadb.common.cluster.settings import settings
 from nucliadb.ingest.consumer import shard_creator
-from nucliadb_protos import nodereader_pb2
 from nucliadb_protos.writer_pb2 import Notification, ShardObject, Shards
 
 

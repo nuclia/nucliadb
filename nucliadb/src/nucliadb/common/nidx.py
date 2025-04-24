@@ -22,14 +22,14 @@ import os
 from typing import Optional
 
 from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxIndexerStub, NidxSearcherStub
+from nidx_protos.nodewriter_pb2 import (
+    IndexMessage,
+)
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.settings import settings
 from nucliadb.ingest.settings import DriverConfig
 from nucliadb.ingest.settings import settings as ingest_settings
-from nucliadb_protos.nodewriter_pb2 import (
-    IndexMessage,
-)
 from nucliadb_utils import logger
 from nucliadb_utils.grpc import get_traced_grpc_channel
 from nucliadb_utils.nats import NatsConnectionManager

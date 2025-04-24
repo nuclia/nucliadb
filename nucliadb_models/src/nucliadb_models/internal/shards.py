@@ -64,7 +64,6 @@ class ShardReplica(BaseModel):
 class ShardObject(BaseModel):
     shard: str
     nidx_shard_id: Optional[str]
-    replicas: List[ShardReplica]
 
 
 class KnowledgeboxShards(BaseModel):

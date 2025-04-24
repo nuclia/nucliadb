@@ -3,7 +3,6 @@ syntax = "proto3";
 package audit;
 
 import "google/protobuf/timestamp.proto";
-import "nucliadb_protos/nodereader.proto";
 import "nucliadb_protos/resources.proto";
 
 message AuditField {
@@ -46,11 +45,11 @@ message RetrievedContext {
 }
 
 message ChatAudit {
+  reserved 4;
+
   string question = 1;
   optional string answer = 2;
   optional string rephrased_question = 3;
-  // Conversation from chats
-  repeated ChatContext context = 4 [deprecated = true];
   // context retrieved on the current ask
   repeated ChatContext chat_context = 6;
   repeated RetrievedContext retrieved_context = 8;
@@ -97,7 +96,7 @@ message AuditRequest {
 
   repeated string fields = 6;
 
-  nodereader.SearchRequest search = 7;
+  AuditSearchRequest search = 7;
   float timeit = 8 [deprecated = true];
   string origin = 9;
   string rid = 10;
@@ -119,4 +118,22 @@ message AuditRequest {
   optional string user_request = 27;
   optional string processing_id = 28;
   optional string retrieval_rephrased_question = 29;
+}
+
+
+// This message is a subset of the nidx SearchRequest with what we want to audit
+message AuditSearchRequest {
+    reserved 1, 5, 6, 7, 12, 13, 14, 16, 18, 20, 21, 26, 27, 28, 29;
+
+    string body = 3;
+    int32 result_per_page = 8;
+    repeated float vector = 10; // Embedded vector search.
+    string vectorset = 15;
+
+    float min_score_semantic = 23;
+    float min_score_bm25 = 25;
+
+    optional utils.Security security = 24;
+
+    optional string filter = 30;
 }

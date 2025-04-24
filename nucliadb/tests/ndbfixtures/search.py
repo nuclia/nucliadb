@@ -21,6 +21,8 @@ import asyncio
 from unittest.mock import patch
 
 import pytest
+from nidx_protos.nodereader_pb2 import GetShardRequest
+from nidx_protos.noderesources_pb2 import Shard
 
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
@@ -31,8 +33,6 @@ from nucliadb.ingest.orm.processor.processor import Processor
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.search.app import application
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_protos.nodereader_pb2 import GetShardRequest
-from nucliadb_protos.noderesources_pb2 import Shard
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.settings import (

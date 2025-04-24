@@ -28,7 +28,7 @@ from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
 from nucliadb.tests.vectors import V1, V2, Q
 from nucliadb_models.labels import Label, LabelSetKind
-from nucliadb_models.search import MinScore, RerankerName, SearchOptions
+from nucliadb_models.search import FindOptions, MinScore, RerankerName
 from nucliadb_protos.resources_pb2 import (
     Classification,
     ExtractedTextWrapper,
@@ -374,7 +374,7 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
         ):
             request = dict(
                 query="",
-                features=[SearchOptions.KEYWORD, SearchOptions.SEMANTIC],
+                features=[FindOptions.KEYWORD, FindOptions.SEMANTIC],
                 vector=Q,
                 min_score=MinScore(semantic=-1).model_dump(),
                 reranker=RerankerName.NOOP,
@@ -416,7 +416,7 @@ async def test_filtering_field_and_paragraph(app_context, nucliadb_reader: Async
             f"/kb/{kbid}/find",
             json=dict(
                 query="",
-                features=[SearchOptions.KEYWORD, SearchOptions.SEMANTIC],
+                features=[FindOptions.KEYWORD, FindOptions.SEMANTIC],
                 vector=Q,
                 min_score=MinScore(semantic=-1).model_dump(),
                 reranker=RerankerName.NOOP,

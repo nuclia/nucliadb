@@ -21,6 +21,7 @@
 from typing import AsyncGenerator
 
 from fastapi import HTTPException
+from nidx_protos.nodereader_pb2 import StreamRequest
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
@@ -32,7 +33,6 @@ from nucliadb_protos.dataset_pb2 import (
     SentenceClassificationBatch,
     TrainSet,
 )
-from nucliadb_protos.nodereader_pb2 import StreamRequest
 
 
 def sentence_classification_batch_generator(

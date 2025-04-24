@@ -10,7 +10,7 @@ license-fix:
 protos: proto-py
 
 proto-py:
-	uv sync --reinstall-package nucliadb_protos
+	uv sync --reinstall-package nucliadb_protos --reinstall-package nidx_protos
 
 proto-clean-py:
 	rm -rf nucliadb_protos/nucliadb_protos/*_pb2.py
