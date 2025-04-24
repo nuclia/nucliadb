@@ -103,7 +103,7 @@ class SearchOptions(str, Enum):
     SEMANTIC = "semantic"
 
 
-class FindOptions(Enum):
+class FindOptions(str, Enum):
     RELATIONS = "relations"
     KEYWORD = "keyword"
     SEMANTIC = "semantic"
