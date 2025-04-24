@@ -20,7 +20,6 @@
 
 from typing import AsyncGenerator
 
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.train.generators.utils import batchify
 from nucliadb_protos.dataset_pb2 import (
     ImageClassification,
@@ -32,10 +31,9 @@ from nucliadb_protos.dataset_pb2 import (
 def image_classification_batch_generator(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[ImageClassificationBatch, None]:
-    generator = generate_image_classification_payloads(kbid, trainset, node, shard_replica_id)
+    generator = generate_image_classification_payloads(kbid, trainset, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, ImageClassificationBatch)
     return batch_generator
 
@@ -43,7 +41,6 @@ def image_classification_batch_generator(
 async def generate_image_classification_payloads(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[ImageClassification, None]:
     # NOTE: image classifications are no longer supported, as the page selection annotations were removed

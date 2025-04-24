@@ -32,7 +32,6 @@ from nidx_protos.nodereader_pb2 import (
 )
 from nidx_protos.noderesources_pb2 import Shard
 
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.nidx import get_nidx_api_client, get_nidx_searcher_client
 
 
@@ -64,7 +63,7 @@ async def get_shard(shard_id: str) -> Shard:
 @backoff.on_exception(
     backoff.expo, Exception, jitter=None, factor=0.1, max_tries=3, giveup=should_giveup
 )
-async def suggest_shard(node: AbstractIndexNode, shard: str, query: SuggestRequest) -> SuggestResponse:
+async def suggest_shard(shard: str, query: SuggestRequest) -> SuggestResponse:
     req = SuggestRequest()
     req.CopyFrom(query)
     req.shard = shard

@@ -30,8 +30,8 @@ from nidx_protos import nodereader_pb2
 from pytest_mock import MockerFixture
 
 from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb.search.requesters import utils
@@ -74,7 +74,7 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
 
     shards = await manager.KBShardManager().get_shards_by_kbid(kbid)
     logic_shard = shards[0]
-    node, shard_id = manager.choose_node(logic_shard)
+    shard_id = logic_shard.nidx_shard_id
     await wait_for_sync()
 
     test_cases = [
@@ -89,7 +89,7 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
             vectorset=vectorset,
             result_per_page=5,
         )
-        results = await node.reader.Search(query_pb)  # type: ignore
+        results = await get_nidx_searcher_client().Search(query_pb)  # type: ignore
         assert len(results.vector.documents) == 5
 
     # Test that querying with the wrong dimension raises an exception
@@ -106,7 +106,7 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
             result_per_page=5,
         )
         with pytest.raises(Exception) as exc:
-            results = await node.reader.Search(query_pb)  # type: ignore
+            results = await get_nidx_searcher_client().Search(query_pb)  # type: ignore
         assert "inconsistent dimensions" in str(exc).lower()
 
 
@@ -242,21 +242,20 @@ async def test_querying_kb_with_vectorsets(
     """
     query: tuple[Any, Optional[nodereader_pb2.SearchResponse], Optional[Exception]] = (None, None, None)
 
-    async def query_shard_wrapper(
-        node: AbstractIndexNode, shard: str, pb_query: nodereader_pb2.SearchRequest
-    ):
+    async def query_shard_wrapper(shard: str, pb_query: nodereader_pb2.SearchRequest):
         nonlocal query
 
         from nucliadb.search.search.shards import query_shard
 
         # this avoids problems with spying an object twice
-        if not hasattr(node.reader.Search, "spy_return"):
-            spy = mocker.spy(node.reader, "Search")
+        nidx = get_nidx_searcher_client()
+        if not hasattr(nidx.Search, "spy_return"):
+            spy = mocker.spy(nidx, "Search")
         else:
-            spy = node.reader.Search  # type: ignore
+            spy = nidx.Search
 
         try:
-            result = await query_shard(node, shard, pb_query)
+            result = await query_shard(shard, pb_query)
         except Exception as exc:
             query = (spy, None, exc)
             raise
