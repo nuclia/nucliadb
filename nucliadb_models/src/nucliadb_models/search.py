@@ -104,9 +104,10 @@ class SearchOptions(str, Enum):
 
 
 class FindOptions(str, Enum):
-    RELATIONS = "relations"
     KEYWORD = "keyword"
     SEMANTIC = "semantic"
+    RELATIONS = "relations"
+    GRAPH = "graph"
 
 
 class ChatOptions(str, Enum):
@@ -1768,6 +1769,13 @@ class FindRequest(BaseSearchRequest):
             if isinstance(rank_fusion, str) and rank_fusion == "legacy":
                 values["rank_fusion"] = RankFusionName.RECIPROCAL_RANK_FUSION
         return values
+
+    @field_validator("features")
+    @classmethod
+    def incompatible_features(cls, features: list[FindOptions]):
+        if FindOptions.RELATIONS in features and FindOptions.GRAPH in features:
+            raise ValueError("Relations and graph are incompatible features, please, use only one")
+        return features
 
 
 class SCORE_TYPE(str, Enum):
