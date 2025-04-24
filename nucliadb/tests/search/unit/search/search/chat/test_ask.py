@@ -24,12 +24,12 @@ from nucliadb_models.search import (
     AskRequest,
     ChatOptions,
     FindField,
+    FindOptions,
     FindParagraph,
     FindRequest,
     FindResource,
     KnowledgeboxFindResults,
     PreQuery,
-    SearchOptions,
 )
 
 
@@ -67,7 +67,7 @@ def test_calculate_prequeries_for_json_schema():
     assert prequeries.main_query_weight == 1.0
     for preq in prequeries.queries:
         assert preq.weight == 1.0
-        assert preq.request.features == [SearchOptions.KEYWORD]
+        assert preq.request.features == [FindOptions.KEYWORD]
         assert preq.request.rephrase is False
         assert preq.request.highlight is False
         # Only the top-10 results are requested for each query

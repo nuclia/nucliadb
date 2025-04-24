@@ -28,7 +28,6 @@ from nucliadb.search.search.query_parser.models import (
     KeywordQuery,
     SemanticQuery,
 )
-from nucliadb.search.search.utils import should_disable_vector_search
 from nucliadb_models import search as search_models
 
 DEFAULT_GENERIC_SEMANTIC_THRESHOLD = 0.7
@@ -38,28 +37,40 @@ DEFAULT_GENERIC_SEMANTIC_THRESHOLD = 0.7
 INVALID_QUERY = re.compile(r"- +\*")
 
 
-def validate_base_request(item: search_models.BaseSearchRequest):
+def validate_query_syntax(query: str):
     # Filter some queries that panic tantivy, better than returning the 500
-    if INVALID_QUERY.search(item.query):
+    if INVALID_QUERY.search(query):
         raise InvalidQueryError("query", "Invalid query syntax")
 
-    # synonyms are not compatible with vector/graph search
-    if (
-        item.with_synonyms
-        and item.query
-        and (
-            search_models.SearchOptions.SEMANTIC in item.features
-            or search_models.SearchOptions.RELATIONS in item.features
-        )
-    ):
-        raise InvalidQueryError(
-            "synonyms",
-            "Search with custom synonyms is only supported on paragraph and document search",
-        )
 
-    if search_models.SearchOptions.SEMANTIC in item.features:
-        if should_disable_vector_search(item):
-            item.features.remove(search_models.SearchOptions.SEMANTIC)
+def is_empty_query(request: search_models.BaseSearchRequest) -> bool:
+    return len(request.query) == 0
+
+
+def has_user_vectors(request: search_models.BaseSearchRequest) -> bool:
+    return request.vector is not None and len(request.vector) > 0
+
+
+def is_exact_match_only_query(request: search_models.BaseSearchRequest) -> bool:
+    """
+    '"something"' -> True
+    'foo "something" else' -> False
+    """
+    query = request.query.strip()
+    return len(query) > 0 and query.startswith('"') and query.endswith('"')
+
+
+def should_disable_vector_search(request: search_models.BaseSearchRequest) -> bool:
+    if has_user_vectors(request):
+        return False
+
+    if is_exact_match_only_query(request):
+        return True
+
+    if is_empty_query(request):
+        return True
+
+    return False
 
 
 def parse_top_k(item: search_models.BaseSearchRequest) -> int:
@@ -92,7 +103,7 @@ async def parse_keyword_query(
 
 
 async def parse_semantic_query(
-    item: search_models.BaseSearchRequest,
+    item: Union[search_models.SearchRequest, search_models.FindRequest],
     *,
     fetcher: Fetcher,
 ) -> SemanticQuery:

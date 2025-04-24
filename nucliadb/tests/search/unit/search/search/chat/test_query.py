@@ -28,10 +28,10 @@ from nucliadb.search.search.chat.query import (
 from nucliadb_models.search import (
     AskRequest,
     ChatOptions,
+    FindOptions,
     KnowledgeboxFindResults,
     MinScore,
     NucliaDBClientType,
-    SearchOptions,
 )
 
 
@@ -47,29 +47,29 @@ def predict():
     [
         (
             None,  # default value will be used
-            [SearchOptions.SEMANTIC, SearchOptions.KEYWORD],
+            [FindOptions.SEMANTIC, FindOptions.KEYWORD],
         ),
         (
             [ChatOptions.KEYWORD, ChatOptions.SEMANTIC, ChatOptions.RELATIONS],
-            [SearchOptions.KEYWORD, SearchOptions.SEMANTIC, SearchOptions.RELATIONS],
+            [FindOptions.KEYWORD, FindOptions.SEMANTIC, FindOptions.RELATIONS],
         ),
         (
             [ChatOptions.KEYWORD, ChatOptions.SEMANTIC],
             [
-                SearchOptions.KEYWORD,
-                SearchOptions.SEMANTIC,
+                FindOptions.KEYWORD,
+                FindOptions.SEMANTIC,
             ],
         ),
         (
             [ChatOptions.SEMANTIC],
             [
-                SearchOptions.SEMANTIC,
+                FindOptions.SEMANTIC,
             ],
         ),
         (
             [ChatOptions.KEYWORD],
             [
-                SearchOptions.KEYWORD,
+                FindOptions.KEYWORD,
             ],
         ),
     ],

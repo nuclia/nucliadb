@@ -35,7 +35,7 @@ from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.ingest.consumer import shard_creator
 from nucliadb.search.predict import SendToPredictError
 from nucliadb.tests.vectors import V1
-from nucliadb_models.search import SearchOptions
+from nucliadb_models.search import FindOptions
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.audit_pb2 import AuditRequest, ClientType
 from nucliadb_protos.utils_pb2 import RelationNode
@@ -930,7 +930,7 @@ async def test_search_endpoints_handle_predict_errors(
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/{endpoint}",
             json={
-                "features": [SearchOptions.SEMANTIC],
+                "features": [FindOptions.SEMANTIC],
                 "query": "something",
             },
         )

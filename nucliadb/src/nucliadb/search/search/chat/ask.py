@@ -80,6 +80,7 @@ from nucliadb_models.search import (
     CitationsAskResponseItem,
     DebugAskResponseItem,
     ErrorAskResponseItem,
+    FindOptions,
     FindParagraph,
     FindRequest,
     GraphStrategy,
@@ -97,7 +98,6 @@ from nucliadb_models.search import (
     Relations,
     RelationsAskResponseItem,
     RetrievalAskResponseItem,
-    SearchOptions,
     StatusAskResponseItem,
     SyncAskMetadata,
     SyncAskResponse,
@@ -955,9 +955,9 @@ def calculate_prequeries_for_json_schema(
     json_schema = ask_request.answer_json_schema or {}
     features = []
     if ChatOptions.SEMANTIC in ask_request.features:
-        features.append(SearchOptions.SEMANTIC)
+        features.append(FindOptions.SEMANTIC)
     if ChatOptions.KEYWORD in ask_request.features:
-        features.append(SearchOptions.KEYWORD)
+        features.append(FindOptions.KEYWORD)
 
     properties = json_schema.get("parameters", {}).get("properties", {})
     if len(properties) == 0:  # pragma: no cover

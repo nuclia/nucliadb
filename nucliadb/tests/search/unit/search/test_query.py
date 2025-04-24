@@ -31,7 +31,7 @@ from nucliadb.search.search.query import (
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.parsers.common import parse_semantic_query, query_with_synonyms
 from nucliadb.tests.vectors import Q
-from nucliadb_models.search import BaseSearchRequest, SearchOptions
+from nucliadb_models.search import FindOptions, FindRequest
 from nucliadb_protos.knowledgebox_pb2 import Synonyms
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.utils_pb2 import RelationNode
@@ -169,8 +169,8 @@ class TestVectorSetAndMatryoshkaParsing:
             patch("nucliadb.common.datamanagers.vectorsets.get_kv_pb"),
         ):
             semantic_query = await parse_semantic_query(
-                BaseSearchRequest(
-                    features=[SearchOptions.SEMANTIC],
+                FindRequest(
+                    features=[FindOptions.SEMANTIC],
                     vectorset=vectorset,
                 ),
                 fetcher=fetcher,

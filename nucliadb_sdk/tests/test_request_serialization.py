@@ -21,7 +21,7 @@ import json
 from unittest.mock import Mock, patch
 
 import nucliadb_sdk
-from nucliadb_models.search import FindRequest, KnowledgeboxFindResults, SearchOptions
+from nucliadb_models.search import FindOptions, FindRequest, KnowledgeboxFindResults
 
 
 def test_find_request_serialization() -> None:
@@ -32,11 +32,11 @@ def test_find_request_serialization() -> None:
         "_request",
         return_value=Mock(content=KnowledgeboxFindResults(resources={}).model_dump_json()),
     ) as spy:
-        req = FindRequest(query="love", features=[SearchOptions.RELATIONS])
+        req = FindRequest(query="love", features=[FindOptions.RELATIONS])
 
         sdk.find(kbid="kbid", content=req)
 
         sent = json.loads(spy.call_args.kwargs["content"])
 
-        assert sent == {"query": "love", "features": [SearchOptions.RELATIONS.value]}
+        assert sent == {"query": "love", "features": [FindOptions.RELATIONS.value]}
         assert sent == req.model_dump(exclude_unset=True)

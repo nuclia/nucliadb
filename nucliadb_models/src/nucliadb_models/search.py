@@ -103,6 +103,12 @@ class SearchOptions(str, Enum):
     SEMANTIC = "semantic"
 
 
+class FindOptions(Enum):
+    RELATIONS = "relations"
+    KEYWORD = "keyword"
+    SEMANTIC = "semantic"
+
+
 class ChatOptions(str, Enum):
     KEYWORD = "keyword"
     RELATIONS = "relations"
@@ -789,13 +795,6 @@ class BaseSearchRequest(AuditMetadataBase):
     range_modification_end: Optional[DateTime] = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
-    features: list[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
-        default=[
-            SearchOptions.KEYWORD,
-            SearchOptions.FULLTEXT,
-            SearchOptions.SEMANTIC,
-        ]
-    )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
@@ -853,6 +852,13 @@ Please return ONLY the question without any explanation. Just the rephrased ques
 
 
 class SearchRequest(BaseSearchRequest):
+    features: list[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
+        default=[
+            SearchOptions.KEYWORD,
+            SearchOptions.FULLTEXT,
+            SearchOptions.SEMANTIC,
+        ]
+    )
     faceted: list[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
 
@@ -1718,10 +1724,10 @@ class FindRequest(BaseSearchRequest):
     query_entities: SkipJsonSchema[Optional[list[KnowledgeGraphEntity]]] = Field(
         default=None, title="Query entities", description="Entities to use in a knowledge graph search"
     )
-    features: list[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
+    features: list[FindOptions] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
-            SearchOptions.KEYWORD,
-            SearchOptions.SEMANTIC,
+            FindOptions.KEYWORD,
+            FindOptions.SEMANTIC,
         ]
     )
     rank_fusion: Union[RankFusionName, RankFusion] = SearchParamDefaults.rank_fusion.to_pydantic_field()
@@ -1751,14 +1757,6 @@ class FindRequest(BaseSearchRequest):
         title="Generative model",
         description="The generative model used to rephrase the query. If not provided, the model configured for the Knowledge Box is used.",
     )
-
-    @field_validator("features", mode="after")
-    @classmethod
-    def fulltext_not_supported(cls, v):
-        # features are already normalized in the BaseSearchRequest model
-        if SearchOptions.FULLTEXT in v or SearchOptions.FULLTEXT == v:
-            raise ValueError("fulltext search not supported")
-        return v
 
     @model_validator(mode="before")
     @classmethod
