@@ -32,6 +32,7 @@ from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FieldId
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
+from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.generic import VALID_GENERIC_FIELDS, Generic
 from nucliadb.ingest.fields.link import Link
@@ -974,8 +975,10 @@ class Resource:
                 ):
                     valid_user_field_metadata = user_field_metadata
                     break
-
-            generated_by = await fieldobj.generated_by()
+            try:
+                generated_by = await fieldobj.generated_by()
+            except FieldAuthorNotFound:
+                generated_by = None
             brain.apply_field_labels(
                 fieldkey,
                 extracted_metadata,
