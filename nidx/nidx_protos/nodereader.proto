@@ -447,27 +447,3 @@ message ShardFileChunk {
     bytes data = 1;
     int32 index = 2;
 }
-
-// Implemented at nucliadb_object_storage
-
-service NodeReader {
-    rpc GetShard(GetShardRequest) returns (noderesources.Shard) {}
-
-    rpc DocumentIds(noderesources.ShardId) returns (IdCollection) {}
-    rpc ParagraphIds(noderesources.ShardId) returns (IdCollection) {}
-    rpc VectorIds(noderesources.VectorSetID) returns (IdCollection) {}
-    rpc RelationIds(noderesources.ShardId) returns (IdCollection) {}
-
-    rpc RelationEdges(noderesources.ShardId) returns (EdgeList) {}
-
-    rpc Search(SearchRequest) returns (SearchResponse) {}
-    rpc Suggest(SuggestRequest) returns (SuggestResponse) {}
-
-    // Streams
-    rpc Paragraphs(StreamRequest) returns (stream ParagraphItem) {}
-    rpc Documents(StreamRequest) returns (stream DocumentItem) {}
-
-    // Shard Download
-    rpc GetShardFiles(GetShardFilesRequest) returns (ShardFileList) {};
-    rpc DownloadShardFile(DownloadShardFileRequest) returns (stream ShardFileChunk) {};
-}

@@ -26,6 +26,7 @@ from nucliadb.common.cluster.base import AbstractIndexNode
 # XXX: this keys shouldn't be exposed outside datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.driver import Driver, Transaction
+from nucliadb.common.nidx import get_nidx_fake_node
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.train.resource import (
@@ -61,8 +62,7 @@ class TrainShardManager(manager.KBShardManager):
         except StopIteration:
             raise KeyError("Shard not found")
 
-        node_obj, shard_id = manager.choose_node(shard_object)
-        return node_obj, shard_id
+        return get_nidx_fake_node(), shard_object.nidx_shard_id
 
     async def get_kb_obj(self, txn: Transaction, kbid: str) -> Optional[KnowledgeBox]:
         if kbid is None:

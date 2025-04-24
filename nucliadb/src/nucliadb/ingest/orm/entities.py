@@ -30,7 +30,6 @@ from nidx_protos.nodereader_pb2 import (
 )
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import (
     AlreadyExists,
     EntitiesGroupNotFound,
@@ -203,7 +202,7 @@ class EntitiesManager:
     async def get_indexed_entities_group(self, group: str) -> Optional[EntitiesGroup]:
         shard_manager = get_shard_manager()
 
-        async def do_entities_search(node: AbstractIndexNode, shard_id: str) -> GraphSearchResponse:
+        async def do_entities_search(shard_id: str) -> GraphSearchResponse:
             request = GraphSearchRequest()
             # XXX: this is a wild guess. Are those enough or too many?
             request.top_k = 500
@@ -211,7 +210,7 @@ class EntitiesManager:
             request.query.path.path.source.node_type = RelationNode.NodeType.ENTITY
             request.query.path.path.source.node_subtype = group
             request.query.path.path.undirected = True
-            response = await graph_search_shard(node, shard_id, request)
+            response = await graph_search_shard(shard_id, request)
             return response
 
         results = await shard_manager.apply_for_all_shards(
@@ -293,7 +292,7 @@ class EntitiesManager:
     ) -> set[str]:
         shard_manager = get_shard_manager()
 
-        async def query_indexed_entities_group_names(node: AbstractIndexNode, shard_id: str) -> set[str]:
+        async def query_indexed_entities_group_names(shard_id: str) -> set[str]:
             """Search all relation types"""
             request = SearchRequest(
                 shard=shard_id,
@@ -303,7 +302,7 @@ class EntitiesManager:
                 paragraph=False,
                 faceted=Faceted(labels=["/e"]),
             )
-            response: SearchResponse = await query_shard(node, shard_id, request)
+            response: SearchResponse = await query_shard(shard_id, request)
             try:
                 facetresults = response.document.facets["/e"].facetresults
             except KeyError:

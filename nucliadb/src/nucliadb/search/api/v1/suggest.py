@@ -160,7 +160,7 @@ async def suggest(
             range_modification_end,
             hidden,
         )
-        results, incomplete_results, queried_nodes = await node_query(kbid, Method.SUGGEST, pb_query)
+        results, incomplete_results, queried_shards = await node_query(kbid, Method.SUGGEST, pb_query)
 
         # We need to merge
         search_results = await merge_suggest_results(
@@ -171,7 +171,6 @@ async def suggest(
 
         response.status_code = 206 if incomplete_results else 200
 
-        queried_shards = [shard_id for _, shard_id in queried_nodes]
         if debug and queried_shards:
             search_results.shards = queried_shards
 

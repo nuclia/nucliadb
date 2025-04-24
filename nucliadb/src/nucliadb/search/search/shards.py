@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 
 import backoff
 from grpc import StatusCode
@@ -34,15 +33,7 @@ from nidx_protos.nodereader_pb2 import (
 from nidx_protos.noderesources_pb2 import Shard
 
 from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb_telemetry import metrics
-
-node_observer = metrics.Observer(
-    "node_client",
-    labels={"type": "", "node_id": ""},
-    error_mappings={
-        "timeout": asyncio.CancelledError,
-    },
-)
+from nucliadb.common.nidx import get_nidx_api_client, get_nidx_searcher_client
 
 
 def should_giveup(e: Exception):
@@ -54,22 +45,20 @@ def should_giveup(e: Exception):
 @backoff.on_exception(
     backoff.expo, Exception, jitter=None, factor=0.1, max_tries=3, giveup=should_giveup
 )
-async def query_shard(node: AbstractIndexNode, shard: str, query: SearchRequest) -> SearchResponse:
+async def query_shard(shard: str, query: SearchRequest) -> SearchResponse:
     req = SearchRequest()
     req.CopyFrom(query)
     req.shard = shard
-    with node_observer({"type": "search", "node_id": node.id}):
-        return await node.reader.Search(req)  # type: ignore
+    return await get_nidx_searcher_client().Search(req)
 
 
 @backoff.on_exception(
     backoff.expo, Exception, jitter=None, factor=0.1, max_tries=3, giveup=should_giveup
 )
-async def get_shard(node: AbstractIndexNode, shard_id: str) -> Shard:
+async def get_shard(shard_id: str) -> Shard:
     req = GetShardRequest()
     req.shard_id.id = shard_id
-    with node_observer({"type": "get_shard", "node_id": node.id}):
-        return await node.reader.GetShard(req)  # type: ignore
+    return await get_nidx_api_client().GetShard(req)
 
 
 @backoff.on_exception(
@@ -79,18 +68,14 @@ async def suggest_shard(node: AbstractIndexNode, shard: str, query: SuggestReque
     req = SuggestRequest()
     req.CopyFrom(query)
     req.shard = shard
-    with node_observer({"type": "suggest", "node_id": node.id}):
-        return await node.reader.Suggest(req)  # type: ignore
+    return await get_nidx_searcher_client().Suggest(req)
 
 
 @backoff.on_exception(
     backoff.expo, Exception, jitter=None, factor=0.1, max_tries=3, giveup=should_giveup
 )
-async def graph_search_shard(
-    node: AbstractIndexNode, shard: str, query: GraphSearchRequest
-) -> GraphSearchResponse:
+async def graph_search_shard(shard: str, query: GraphSearchRequest) -> GraphSearchResponse:
     req = GraphSearchRequest()
     req.CopyFrom(query)
     req.shard = shard
-    with node_observer({"type": "graph_search", "node_id": node.id}):
-        return await node.reader.GraphSearch(req)  # type: ignore
+    return await get_nidx_searcher_client().GraphSearch(req)

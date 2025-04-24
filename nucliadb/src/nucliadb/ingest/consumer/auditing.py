@@ -27,9 +27,9 @@ from nidx_protos import nodereader_pb2, noderesources_pb2
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
-from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.constants import AVG_PARAGRAPH_SIZE_BYTES
+from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb_protos import audit_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
@@ -114,10 +114,10 @@ class IndexAuditHandler:
         total_paragraphs = 0
 
         for shard_obj in shard_groups:
-            # TODO: Uses node for auditing, don't want to suddenly change metrics
-            node, shard_id = choose_node(shard_obj)
-            shard: nodereader_pb2.Shard = await node.reader.GetShard(
-                nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
+            shard: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
+                nodereader_pb2.GetShardRequest(
+                    shard_id=noderesources_pb2.ShardId(id=shard_obj.nidx_shard_id)
+                )
             )
 
             total_fields += shard.fields

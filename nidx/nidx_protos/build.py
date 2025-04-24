@@ -32,8 +32,8 @@ def pdm_build_initialize(context):
     # Compile protos
     for proto, has_grpc in [
         ("nidx_protos/nidx.proto", True),
-        ("nidx_protos/nodereader.proto", True),
-        ("nidx_protos/nodewriter.proto", True),
+        ("nidx_protos/nodereader.proto", False),
+        ("nidx_protos/nodewriter.proto", False),
         ("nidx_protos/noderesources.proto", False),
     ]:
         command = [

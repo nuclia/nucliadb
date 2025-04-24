@@ -17,18 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 from typing import AsyncIterator
 
 from nidx_protos import nodereader_pb2, noderesources_pb2
-from nidx_protos.nodereader_pb2_grpc import NodeReaderStub
 from nidx_protos.nodewriter_pb2 import (
     NewShardRequest,
-    NewVectorSetRequest,
-    OpStatus,
     VectorIndexConfig,
 )
-from nidx_protos.nodewriter_pb2_grpc import NodeWriterStub
 
 from nucliadb_protos import utils_pb2
 
@@ -48,16 +44,6 @@ class AbstractIndexNode(metaclass=ABCMeta):
 
     def __repr__(self):
         return self.__str__()
-
-    @property
-    @abstractmethod
-    def reader(self) -> NodeReaderStub:  # pragma: no cover
-        pass
-
-    @property
-    @abstractmethod
-    def writer(self) -> NodeWriterStub:  # pragma: no cover
-        pass
 
     async def stream_get_fields(
         self, stream_request: nodereader_pb2.StreamRequest
@@ -91,56 +77,4 @@ class AbstractIndexNode(metaclass=ABCMeta):
         )
 
         resp = await self.writer.NewShard(req)  # type: ignore
-        return resp
-
-    async def new_shard_with_vectorsets(
-        self,
-        kbid: str,
-        vectorsets_configs: dict[str, VectorIndexConfig],
-    ) -> noderesources_pb2.ShardCreated:
-        req = NewShardRequest(
-            kbid=kbid,
-            release_channel=utils_pb2.ReleaseChannel.STABLE,
-            vectorsets_configs=vectorsets_configs,
-        )
-
-        resp = await self.writer.NewShard(req)  # type: ignore
-        return resp
-
-    async def list_shards(self) -> list[str]:
-        shards = await self.writer.ListShards(noderesources_pb2.EmptyQuery())  # type: ignore
-        return [shard.id for shard in shards.ids]
-
-    async def delete_shard(self, id: str) -> str:
-        req = noderesources_pb2.ShardId(id=id)
-        resp: noderesources_pb2.ShardId = await self.writer.DeleteShard(req)  # type: ignore
-        return resp.id
-
-    async def add_vectorset(
-        self,
-        shard_id: str,
-        vectorset: str,
-        config: VectorIndexConfig,
-    ) -> OpStatus:
-        req = NewVectorSetRequest(
-            id=noderesources_pb2.VectorSetID(
-                shard=noderesources_pb2.ShardId(id=shard_id), vectorset=vectorset
-            ),
-            config=config,
-        )
-
-        resp = await self.writer.AddVectorSet(req)  # type: ignore
-        return resp
-
-    async def list_vectorsets(self, shard_id: str) -> list[str]:
-        req = noderesources_pb2.ShardId()
-        req.id = shard_id
-        resp = await self.writer.ListVectorSets(req)  # type: ignore
-        return [v for v in resp.vectorsets]
-
-    async def remove_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
-        req = noderesources_pb2.VectorSetID()
-        req.shard.id = shard_id
-        req.vectorset = vectorset
-        resp = await self.writer.RemoveVectorSet(req)  # type: ignore
         return resp

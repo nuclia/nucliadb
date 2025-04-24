@@ -90,21 +90,3 @@ message MergeResponse {
     uint32 merged_segments = 2;
     uint32 remaining_segments = 3;
 }
-
-service NodeWriter {
-    rpc NewShard(NewShardRequest) returns (noderesources.ShardCreated) {}
-    rpc DeleteShard(noderesources.ShardId) returns (noderesources.ShardId) {}
-    rpc ListShards(noderesources.EmptyQuery) returns (noderesources.ShardIds) {}
-    rpc GC(noderesources.ShardId) returns (GarbageCollectorResponse) {}
-    rpc Merge(noderesources.ShardId) returns (MergeResponse) {}
-
-    rpc SetResource(noderesources.Resource) returns (OpStatus) {}
-    rpc SetResourceFromStorage(IndexMessage) returns (OpStatus) {}
-    rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}
-
-    rpc AddVectorSet(NewVectorSetRequest) returns (OpStatus) {}  // New
-    rpc RemoveVectorSet(noderesources.VectorSetID) returns (OpStatus) {}
-    rpc ListVectorSets(noderesources.ShardId) returns (noderesources.VectorSetList) {}
-
-    rpc GetMetadata(noderesources.EmptyQuery) returns (noderesources.NodeMetadata) {}
-}
