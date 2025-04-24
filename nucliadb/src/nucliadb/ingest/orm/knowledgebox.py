@@ -24,6 +24,7 @@ from uuid import uuid4
 
 from grpc import StatusCode
 from grpc.aio import AioRpcError
+from nidx_protos import noderesources_pb2
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardNotFound
@@ -49,7 +50,7 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
-from nucliadb_protos import knowledgebox_pb2, noderesources_pb2, nodewriter_pb2, writer_pb2
+from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
     ExternalIndexProviderType,
@@ -165,10 +166,10 @@ class KnowledgeBox:
 
                     vectorset_config = knowledgebox_pb2.VectorSetConfig(
                         vectorset_id=vectorset_id,
-                        vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
+                        vectorset_index_config=knowledgebox_pb2.VectorIndexConfig(
                             similarity=semantic_model.similarity_function,
                             # XXX: hardcoded value
-                            vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+                            vector_type=knowledgebox_pb2.VectorType.DENSE_F32,
                             normalize_vectors=len(semantic_model.matryoshka_dimensions) > 0,
                             vector_dimension=dimension,
                         ),

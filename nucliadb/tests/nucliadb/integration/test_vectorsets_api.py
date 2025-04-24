@@ -22,6 +22,7 @@ from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
+from nidx_protos.nodewriter_pb2 import VectorType
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.rollover import rollover_kb_index
@@ -36,7 +37,6 @@ from nucliadb.learning_proxy import (
 from nucliadb.purge import purge_kb_vectorsets
 from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxSearchResults
 from nucliadb_protos import utils_pb2
-from nucliadb_protos.nodewriter_pb2 import VectorType
 from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType, Paragraph
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,

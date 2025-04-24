@@ -33,18 +33,10 @@ def shards():
         shards=[
             writer_pb2.ShardObject(
                 shard="1",
-                replicas=[
-                    writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="1")),
-                    writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="2")),
-                ],
                 read_only=True,
             ),
             writer_pb2.ShardObject(
                 shard="2",
-                replicas=[
-                    writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="3")),
-                    writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="4")),
-                ],
                 read_only=False,
             ),
         ],

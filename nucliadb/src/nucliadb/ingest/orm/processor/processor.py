@@ -24,6 +24,8 @@ from typing import Optional
 import aiohttp.client_exceptions
 import nats.errors
 import nats.js.errors
+from nidx_protos import noderesources_pb2, nodewriter_pb2
+from nidx_protos.noderesources_pb2 import Resource as PBBrainResource
 
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.settings import settings as cluster_settings
@@ -50,12 +52,9 @@ from nucliadb.ingest.orm.processor.data_augmentation import (
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import (
     knowledgebox_pb2,
-    noderesources_pb2,
-    nodewriter_pb2,
     resources_pb2,
     writer_pb2,
 )
-from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver

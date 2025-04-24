@@ -19,6 +19,8 @@
 #
 
 
+from nidx_protos import nodereader_pb2
+
 from nucliadb.common.models_utils.from_proto import RelationNodeTypePbMap, RelationTypePbMap
 from nucliadb_models.graph import responses as graph_responses
 from nucliadb_models.graph.responses import (
@@ -26,7 +28,6 @@ from nucliadb_models.graph.responses import (
     GraphRelationsSearchResponse,
     GraphSearchResponse,
 )
-from nucliadb_protos import nodereader_pb2
 
 
 def build_graph_response(results: list[nodereader_pb2.GraphSearchResponse]) -> GraphSearchResponse:

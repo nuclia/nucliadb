@@ -20,11 +20,12 @@
 import asyncio
 import logging
 
+from nidx_protos import nodereader_pb2, noderesources_pb2
+
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
-from nucliadb_protos import nodereader_pb2, noderesources_pb2
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry

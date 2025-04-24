@@ -21,6 +21,7 @@ import logging
 from typing import TYPE_CHECKING, Optional, Union
 
 import backoff
+from nidx_protos import nodereader_pb2
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.manager import (
@@ -30,7 +31,7 @@ from nucliadb.common.cluster.manager import (
 from nucliadb.common.cluster.settings import settings
 from nucliadb.ingest.orm import index_message
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb_protos import nodereader_pb2, writer_pb2
+from nucliadb_protos import writer_pb2
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 if TYPE_CHECKING:  # pragma: no cover

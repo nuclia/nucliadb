@@ -22,9 +22,7 @@ import asyncio
 import backoff
 from grpc import StatusCode
 from grpc.aio import AioRpcError
-
-from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb_protos.nodereader_pb2 import (
+from nidx_protos.nodereader_pb2 import (
     GetShardRequest,
     GraphSearchRequest,
     GraphSearchResponse,
@@ -33,7 +31,9 @@ from nucliadb_protos.nodereader_pb2 import (
     SuggestRequest,
     SuggestResponse,
 )
-from nucliadb_protos.noderesources_pb2 import Shard
+from nidx_protos.noderesources_pb2 import Shard
+
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb_telemetry import metrics
 
 node_observer = metrics.Observer(

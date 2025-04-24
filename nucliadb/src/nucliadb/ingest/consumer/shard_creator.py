@@ -22,11 +22,13 @@ import logging
 import uuid
 from functools import partial
 
+from nidx_protos import nodereader_pb2, noderesources_pb2
+
 from nucliadb.common import locking
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver
-from nucliadb_protos import nodereader_pb2, noderesources_pb2, writer_pb2
+from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.storages.storage import Storage

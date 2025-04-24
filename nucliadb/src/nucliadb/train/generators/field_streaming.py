@@ -20,6 +20,8 @@
 
 from typing import AsyncGenerator, Optional
 
+from nidx_protos.nodereader_pb2 import StreamRequest
+
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.train import logger
@@ -29,7 +31,6 @@ from nucliadb_protos.dataset_pb2 import (
     FieldStreamingBatch,
     TrainSet,
 )
-from nucliadb_protos.nodereader_pb2 import StreamRequest
 from nucliadb_protos.resources_pb2 import Basic, FieldComputedMetadata
 from nucliadb_protos.utils_pb2 import ExtractedText
 

@@ -18,10 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from nidx_protos import noderesources_pb2
+
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.index_message import IndexMessageBuilder
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb_protos import noderesources_pb2
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from tests.ingest.fixtures import create_resource
 

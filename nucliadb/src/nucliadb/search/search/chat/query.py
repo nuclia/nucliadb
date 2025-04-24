@@ -20,6 +20,11 @@
 import asyncio
 from typing import Iterable, Optional, Union
 
+from nidx_protos.nodereader_pb2 import (
+    GraphSearchResponse,
+    SearchResponse,
+)
+
 from nucliadb.common.models_utils import to_proto
 from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode
@@ -52,10 +57,6 @@ from nucliadb_models.search import (
     parse_rephrase_prompt,
 )
 from nucliadb_protos import audit_pb2
-from nucliadb_protos.nodereader_pb2 import (
-    GraphSearchResponse,
-    SearchResponse,
-)
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.utilities import get_audit

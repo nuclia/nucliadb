@@ -21,6 +21,8 @@ import asyncio
 from contextvars import ContextVar
 from typing import Optional
 
+from nidx_protos.nodereader_pb2 import DocumentResult, ParagraphResult
+
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
@@ -30,7 +32,6 @@ from nucliadb.search.search import cache
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import ResourceProperties
-from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
 from nucliadb_protos.resources_pb2 import Paragraph
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature

@@ -21,9 +21,9 @@ import asyncio
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from nidx_protos.nodereader_pb2 import SearchRequest
 
 from nucliadb.search.search.shards import node_observer, query_shard
-from nucliadb_protos.nodereader_pb2 import SearchRequest
 
 
 async def test_node_observer_records_timeout_errors():

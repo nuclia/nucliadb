@@ -30,6 +30,7 @@ import nats
 from fastapi import Request
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.timestamp_pb2 import Timestamp
+from nidx_protos.nodereader_pb2 import SearchRequest
 from opentelemetry.trace import format_trace_id, get_current_span
 from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -56,7 +57,6 @@ from nucliadb_protos.kb_usage_pb2 import (
 from nucliadb_protos.kb_usage_pb2 import (
     ClientType as ClientTypeKbUsage,
 )
-from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage

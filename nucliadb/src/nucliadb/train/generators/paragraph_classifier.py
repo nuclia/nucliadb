@@ -21,6 +21,7 @@
 from typing import AsyncGenerator
 
 from fastapi import HTTPException
+from nidx_protos.nodereader_pb2 import StreamRequest
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.train.generators.utils import batchify, get_paragraph
@@ -30,7 +31,6 @@ from nucliadb_protos.dataset_pb2 import (
     TextLabel,
     TrainSet,
 )
-from nucliadb_protos.nodereader_pb2 import StreamRequest
 
 
 def paragraph_classification_batch_generator(

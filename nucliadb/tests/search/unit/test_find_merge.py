@@ -20,6 +20,8 @@
 
 import random
 
+from nidx_protos.nodereader_pb2 import DocumentScored, ParagraphResult
+
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.find_merge import (
     keyword_result_to_text_block_match,
@@ -27,7 +29,6 @@ from nucliadb.search.search.find_merge import (
 )
 from nucliadb.search.search.rank_fusion import LegacyRankFusion
 from nucliadb_models.search import SCORE_TYPE
-from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 
 
 def get_paragraph_result(score):

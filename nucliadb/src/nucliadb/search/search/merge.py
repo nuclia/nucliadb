@@ -22,6 +22,18 @@ import datetime
 import math
 from typing import Any, Iterable, Optional, Set, Union
 
+from nidx_protos.nodereader_pb2 import (
+    DocumentResult,
+    DocumentScored,
+    DocumentSearchResponse,
+    GraphSearchResponse,
+    ParagraphResult,
+    ParagraphSearchResponse,
+    SearchResponse,
+    SuggestResponse,
+    VectorSearchResponse,
+)
+
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.common.models_utils.from_proto import RelationTypePbMap
@@ -60,17 +72,6 @@ from nucliadb_models.search import (
     SortOptions,
     SortOrder,
     TextPosition,
-)
-from nucliadb_protos.nodereader_pb2 import (
-    DocumentResult,
-    DocumentScored,
-    DocumentSearchResponse,
-    GraphSearchResponse,
-    ParagraphResult,
-    ParagraphSearchResponse,
-    SearchResponse,
-    SuggestResponse,
-    VectorSearchResponse,
 )
 from nucliadb_protos.utils_pb2 import RelationNode
 

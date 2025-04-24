@@ -22,10 +22,10 @@ from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from nidx_protos.noderesources_pb2 import Resource as BrainResource
+from nidx_protos.noderesources_pb2 import ResourceID
+from nidx_protos.nodewriter_pb2 import IndexMessage
 
-from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
-from nucliadb_protos.noderesources_pb2 import ResourceID
-from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages.local import LocalStorageField
 from nucliadb_utils.storages.storage import (

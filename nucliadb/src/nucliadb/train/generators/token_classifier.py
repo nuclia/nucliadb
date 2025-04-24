@@ -21,6 +21,8 @@
 from collections import OrderedDict
 from typing import AsyncGenerator, cast
 
+from nidx_protos.nodereader_pb2 import StreamFilter, StreamRequest
+
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.train import logger
@@ -30,7 +32,6 @@ from nucliadb_protos.dataset_pb2 import (
     TokensClassification,
     TrainSet,
 )
-from nucliadb_protos.nodereader_pb2 import StreamFilter, StreamRequest
 
 NERS_DICT = dict[str, dict[str, list[tuple[int, int]]]]
 POSITION_DICT = OrderedDict[tuple[int, int], tuple[str, str]]

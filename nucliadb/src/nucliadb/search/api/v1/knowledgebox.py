@@ -24,6 +24,7 @@ from fastapi import HTTPException, Request
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError
+from nidx_protos.noderesources_pb2 import Shard
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
@@ -44,7 +45,6 @@ from nucliadb_models.search import (
     KnowledgeboxCounters,
     SearchParamDefaults,
 )
-from nucliadb_protos.noderesources_pb2 import Shard
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards
 from nucliadb_telemetry import errors

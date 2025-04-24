@@ -22,6 +22,9 @@ import logging
 import uuid
 from typing import Any, Awaitable, Callable, Optional
 
+from nidx_protos import noderesources_pb2, nodewriter_pb2
+from nidx_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, NewShardRequest, TypeMessage
+
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import (
@@ -31,13 +34,8 @@ from nucliadb.common.cluster.exceptions import (
 )
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.nidx import get_nidx, get_nidx_api_client, get_nidx_fake_node
-from nucliadb_protos import (
-    knowledgebox_pb2,
-    noderesources_pb2,
-    nodewriter_pb2,
-    writer_pb2,
-)
-from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, NewShardRequest, TypeMessage
+from nucliadb.common.vector_index_config import nucliadb_index_config_to_nidx
+from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils.utilities import get_storage
 
@@ -123,7 +121,7 @@ class KBShardManager:
             raise ShardsNotFound(msg)
 
         vectorsets = {
-            vectorset_id: vectorset_config.vectorset_index_config
+            vectorset_id: nucliadb_index_config_to_nidx(vectorset_config.vectorset_index_config)
             async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid)
         }
 
@@ -256,7 +254,7 @@ class KBShardManager:
 
         async def _create_vectorset(node: AbstractIndexNode, shard_id: str):
             vectorset_id = config.vectorset_id
-            index_config = config.vectorset_index_config
+            index_config = nucliadb_index_config_to_nidx(config.vectorset_index_config)
             result = await node.add_vectorset(shard_id, vectorset_id, index_config)
             if result.status != result.Status.OK:
                 raise NodeError(

@@ -25,7 +25,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
-from async_lru import alru_cache
 from cachetools import TTLCache
 from fastapi import HTTPException, Request
 
@@ -440,29 +439,6 @@ def estimate_try_after(rate: float, pending: int, max_wait: int) -> datetime:
     """
     delta_seconds = min(pending / rate, max_wait)
     return datetime.utcnow() + timedelta(seconds=delta_seconds)
-
-
-@alru_cache(maxsize=1024, ttl=60 * 15)
-async def get_nodes_for_kb_active_shards(context: ApplicationContext, kbid: str) -> list[str]:
-    with back_pressure_observer({"type": "get_kb_active_shard"}):
-        active_shard = await get_kb_active_shard(context, kbid)
-    if active_shard is None:
-        # KB doesn't exist or has been deleted
-        logger.debug("No active shard found for KB", extra={"kbid": kbid})
-        return []
-    return [replica.node for replica in active_shard.replicas]
-
-
-@alru_cache(maxsize=1024, ttl=60 * 60)
-async def get_nodes_for_resource_shard(
-    context: ApplicationContext, kbid: str, resource_uuid: str
-) -> list[str]:
-    with back_pressure_observer({"type": "get_resource_shard"}):
-        resource_shard = await get_resource_shard(context, kbid, resource_uuid)
-    if resource_shard is None:
-        # Resource doesn't exist or KB has been deleted
-        return []
-    return [replica.node for replica in resource_shard.replicas]
 
 
 async def get_nats_consumer_pending_messages(

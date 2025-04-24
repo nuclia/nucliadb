@@ -20,6 +20,8 @@
 
 from typing import AsyncGenerator
 
+from nidx_protos.nodereader_pb2 import StreamRequest
+
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.train import logger
@@ -30,7 +32,6 @@ from nucliadb_protos.dataset_pb2 import (
     TextLabel,
     TrainSet,
 )
-from nucliadb_protos.nodereader_pb2 import StreamRequest
 
 
 def field_classification_batch_generator(

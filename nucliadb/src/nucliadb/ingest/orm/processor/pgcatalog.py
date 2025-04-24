@@ -20,10 +20,11 @@
 
 from typing import cast
 
+from nidx_protos.noderesources_pb2 import Resource as IndexMessage
+
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb_protos.noderesources_pb2 import Resource as IndexMessage
 from nucliadb_telemetry import metrics
 
 from ..resource import Resource

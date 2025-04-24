@@ -30,13 +30,10 @@ def pdm_build_initialize(context):
 
     # Compile protos
     for proto, has_grpc in [
-        ("nucliadb_protos/noderesources.proto", False),
         ("nucliadb_protos/utils.proto", False),
         ("nucliadb_protos/resources.proto", False),
         ("nucliadb_protos/knowledgebox.proto", False),
         ("nucliadb_protos/audit.proto", False),
-        ("nucliadb_protos/nodewriter.proto", True),
-        ("nucliadb_protos/nodereader.proto", True),
         ("nucliadb_protos/backups.proto", True),
         ("nucliadb_protos/writer.proto", True),
         ("nucliadb_protos/train.proto", True),

@@ -29,6 +29,7 @@ from typing import Optional, Type
 from unittest.mock import patch
 
 import pytest
+from nidx_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 
 import nucliadb_models.search as search_models
 from nucliadb.common.external_index_providers.base import TextBlockMatch
@@ -40,7 +41,6 @@ from nucliadb.search.search.find_merge import (
 from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb.search.search.rank_fusion import LegacyRankFusion, ReciprocalRankFusion, get_rank_fusion
 from nucliadb_models.search import SCORE_TYPE, FindRequest
-from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 
 
 @pytest.fixture(scope="function", autouse=True)

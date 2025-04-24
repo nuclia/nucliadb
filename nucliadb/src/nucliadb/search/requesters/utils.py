@@ -26,6 +26,14 @@ from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError
+from nidx_protos.nodereader_pb2 import (
+    GraphSearchRequest,
+    GraphSearchResponse,
+    SearchRequest,
+    SearchResponse,
+    SuggestRequest,
+    SuggestResponse,
+)
 
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.cluster.base import AbstractIndexNode
@@ -38,14 +46,6 @@ from nucliadb.search.search.shards import (
     suggest_shard,
 )
 from nucliadb.search.settings import settings
-from nucliadb_protos.nodereader_pb2 import (
-    GraphSearchRequest,
-    GraphSearchResponse,
-    SearchRequest,
-    SearchResponse,
-    SuggestRequest,
-    SuggestResponse,
-)
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_telemetry import errors
 
