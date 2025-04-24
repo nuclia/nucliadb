@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package nodewriter;
 
-import public "nucliadb_protos/noderesources.proto";
+import public "noderesources.proto";
 
 
 message OpStatus {

@@ -3,7 +3,6 @@ syntax = "proto3";
 package knowledgebox;
 
 import public "nucliadb_protos/utils.proto";
-import public "nucliadb_protos/nodewriter.proto";
 
 
 enum KnowledgeBoxResponseStatus {
@@ -202,12 +201,22 @@ message VectorSets {
     map<string, VectorSet> vectorsets = 1;
 }
 
+enum VectorType {
+    DENSE_F32 = 0;
+}
+
+message VectorIndexConfig {
+    utils.VectorSimilarity similarity = 1;
+    bool normalize_vectors = 2;
+    VectorType vector_type = 3;
+    optional uint32 vector_dimension = 4;
+}
 
 // Configuration values for a vectorset
 message VectorSetConfig {
     string vectorset_id = 1;
 
-    nodewriter.VectorIndexConfig vectorset_index_config = 2;
+    VectorIndexConfig vectorset_index_config = 2;
 
     // list of possible subdivisions of the matryoshka embeddings (if the model
     // supports it)

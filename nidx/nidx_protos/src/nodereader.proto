@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package nodereader;
 
-import public "nucliadb_protos/noderesources.proto";
+import public "noderesources.proto";
 import "google/protobuf/timestamp.proto";
 import public "nucliadb_protos/utils.proto";
 

@@ -35,8 +35,11 @@ def pdm_build_initialize(context):
     well_known_path = resources.files("grpc_tools") / "_proto"
 
     # Compile protos
-    for proto in [
-        "src/nidx.proto",
+    for proto, has_grpc in [
+        ("src/nidx.proto", True),
+        ("src/nodereader.proto", True),
+        ("src/nodewriter.proto", True),
+        ("src/noderesources.proto", False),
     ]:
         command = [
             "grpc_tools.protoc",
@@ -44,10 +47,13 @@ def pdm_build_initialize(context):
             "--proto_path=../../",
             f"--proto_path={well_known_path}",
             f"--python_out={python_dir}",
-            f"--pyi_out={python_dir}",
-            f"--grpc_python_out={python_dir}",
+            f"--mypy_out={python_dir}",
             proto,
         ]
+        if has_grpc:
+            command.append(f"--grpc_python_out={python_dir}")
+            command.append(f"--mypy_grpc_out={python_dir}")
+
         if protoc.main(command) != 0:
             raise Exception("error: {} failed".format(command))
 

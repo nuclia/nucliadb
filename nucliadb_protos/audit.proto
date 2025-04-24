@@ -3,7 +3,6 @@ syntax = "proto3";
 package audit;
 
 import "google/protobuf/timestamp.proto";
-import "nucliadb_protos/nodereader.proto";
 import "nucliadb_protos/resources.proto";
 
 message AuditField {
