@@ -47,7 +47,6 @@ def pdm_build_initialize(context):
         ]
         if has_grpc:
             command.append(f"--grpc_python_out={build_dir}")
-            command.append(f"--mypy_grpc_out={build_dir}")
 
         if protoc.main(command) != 0:
             raise Exception("error: {} failed".format(command))
