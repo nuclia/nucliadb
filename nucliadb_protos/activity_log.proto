@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package audit;
+
+import "google/protobuf/timestamp.proto";
+import "nucliadb_protos/nodereader.proto";
+import "nucliadb_protos/resources.proto";
+
+message SearchRequest {
+    string body = 3;
+    string vectorset = 15;
+}
+
+enum ClientType {
+  API = 0;
+  WEB = 1;
+  WIDGET = 2;
+  DESKTOP = 3;
+  DASHBOARD = 4;
+  CHROME_EXTENSION = 5;
+}
+
+message ChatContext {
+  string author = 1;
+  string text = 2;
+}
+
+message RetrievedContext {
+  string text_block_id = 1;
+  string text = 2;
+
+}
+
+message ChatAudit {
+  string question = 1;
+  optional string answer = 2;
+  optional string rephrased_question = 3;
+  // Conversation from chats
+  repeated ChatContext context = 4 [deprecated = true]; // deprecated?
+  // context retrieved on the current ask
+  repeated ChatContext chat_context = 6;
+  repeated RetrievedContext retrieved_context = 8;
+  optional string learning_id = 5;
+  int32 status_code = 9;
+  optional string model = 10;
+}
+
+enum TaskType {
+  CHAT = 0;
+}
+
+message FeedbackAudit {
+  string learning_id = 1;
+  bool good = 2;
+  TaskType task = 3;
+  optional string feedback = 4;
+  optional string text_block_id = 5;
+}
+
+
+message AuditRequest {
+  enum AuditType {
+    VISITED = 0;
+    MODIFIED = 1;
+    DELETED = 2;
+    NEW = 3;
+    STARTED = 4;
+    STOPPED = 5;
+    SEARCH = 6;
+    PROCESSED = 7;
+    CHAT = 11;
+    FEEDBACK = 12;
+  }
+
+  AuditType type = 1;
+  string kbid = 2;
+  string userid = 4;
+
+  google.protobuf.Timestamp time = 5;
+
+  nodereader.SearchRequest search = 7;
+
+  string origin = 9;
+  string rid = 10;
+  string task = 11;
+  int32 resources = 12;
+  ClientType client_type = 16;
+  string trace_id = 17;
+  ChatAudit chat = 19;
+  bool success = 20;
+  float request_time = 21;
+  optional float retrieval_time = 22;
+  optional float generative_answer_time = 23;
+  optional float generative_answer_first_chunk_time = 24;
+  optional float rephrase_time = 25;
+  FeedbackAudit feedback = 26;
+  optional string user_request = 27;
+  optional string processing_id = 28;
+}
