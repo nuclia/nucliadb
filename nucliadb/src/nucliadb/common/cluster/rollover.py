@@ -138,7 +138,6 @@ async def create_rollover_shards(
     created_shards = []
     try:
         for shard in kb_shards.shards:
-            shard.ClearField("replicas")
             vectorsets = {
                 vectorset_id: nucliadb_index_config_to_nidx(vectorset_config.vectorset_index_config)
                 async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid)
