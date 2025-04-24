@@ -21,6 +21,7 @@ from typing import Optional
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from nidx_protos.nodereader_pb2 import SearchRequest
 
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.search.exceptions import InvalidQueryError
@@ -33,7 +34,6 @@ from nucliadb.search.search.query_parser.parsers.common import parse_semantic_qu
 from nucliadb.tests.vectors import Q
 from nucliadb_models.search import BaseSearchRequest, SearchOptions
 from nucliadb_protos.knowledgebox_pb2 import Synonyms
-from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.utils_pb2 import RelationNode
 
 

@@ -35,13 +35,12 @@ learning_proxy handles which API is used (internal or external)
 
 import logging
 
+from nidx_protos import nodewriter_pb2
+
 from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
 from nucliadb.migrator.context import ExecutionContext
-from nucliadb_protos import (
-    knowledgebox_pb2,
-    nodewriter_pb2,
-)
+from nucliadb_protos import knowledgebox_pb2
 
 logger = logging.getLogger(__name__)
 

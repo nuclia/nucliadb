@@ -22,6 +22,8 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
+from nidx_protos import noderesources_pb2, nodewriter_pb2
+
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
@@ -29,8 +31,6 @@ from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_protos import (
     knowledgebox_pb2,
-    noderesources_pb2,
-    nodewriter_pb2,
     resources_pb2,
     utils_pb2,
     writer_pb2,

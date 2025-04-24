@@ -22,6 +22,8 @@ from __future__ import annotations
 import asyncio
 from typing import AsyncGenerator, Callable, Tuple, cast
 
+from nidx_protos.noderesources_pb2 import EmptyQuery, NodeMetadata
+
 from nucliadb import logger
 from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
@@ -29,7 +31,6 @@ from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.migrator.datamanager import MigrationsDataManager
-from nucliadb_protos.noderesources_pb2 import EmptyQuery, NodeMetadata
 from nucliadb_telemetry import metrics
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry

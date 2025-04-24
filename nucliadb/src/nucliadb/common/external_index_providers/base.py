@@ -22,6 +22,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Iterator, Optional
 
+from nidx_protos.nodereader_pb2 import SearchRequest
+from nidx_protos.noderesources_pb2 import Resource
 from pydantic import BaseModel
 
 from nucliadb.common.counters import IndexCounts
@@ -33,8 +35,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
     StoredExternalIndexProviderMetadata,
 )
-from nucliadb_protos.nodereader_pb2 import SearchRequest
-from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_telemetry.metrics import Observer
 

@@ -22,6 +22,10 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from nidx_protos import nodereader_pb2
+from nidx_protos.nodereader_pb2 import FilterExpression
+from nidx_protos.noderesources_pb2 import IndexParagraph, IndexParagraphs
+from nidx_protos.noderesources_pb2 import Resource as PBResourceBrain
 
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.external_index_providers.pinecone import (
@@ -32,11 +36,7 @@ from nucliadb.common.external_index_providers.pinecone import (
     convert_to_pinecone_filter,
 )
 from nucliadb.common.ids import ParagraphId
-from nucliadb_protos import nodereader_pb2
 from nucliadb_protos.knowledgebox_pb2 import PineconeIndexMetadata
-from nucliadb_protos.nodereader_pb2 import FilterExpression
-from nucliadb_protos.noderesources_pb2 import IndexParagraph, IndexParagraphs
-from nucliadb_protos.noderesources_pb2 import Resource as PBResourceBrain
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_utils.aiopynecone.models import MAX_INDEX_NAME_LENGTH, QueryResponse, Vector, VectorMatch
 

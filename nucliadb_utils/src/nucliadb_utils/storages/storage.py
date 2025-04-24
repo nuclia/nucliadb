@@ -36,8 +36,9 @@ from typing import (
     cast,
 )
 
-from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
-from nucliadb_protos.nodewriter_pb2 import IndexMessage
+from nidx_protos.noderesources_pb2 import Resource as BrainResource
+from nidx_protos.nodewriter_pb2 import IndexMessage
+
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import logger

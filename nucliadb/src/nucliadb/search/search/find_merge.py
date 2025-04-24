@@ -20,6 +20,15 @@
 import asyncio
 from typing import Iterable, Optional, Union
 
+from nidx_protos.nodereader_pb2 import (
+    DocumentScored,
+    GraphSearchResponse,
+    ParagraphResult,
+    ParagraphSearchResponse,
+    SearchResponse,
+    VectorSearchResponse,
+)
+
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search import SERVICE_NAME, logger
@@ -49,14 +58,6 @@ from nucliadb_models.search import (
     MinScore,
     ResourceProperties,
     TextPosition,
-)
-from nucliadb_protos.nodereader_pb2 import (
-    DocumentScored,
-    GraphSearchResponse,
-    ParagraphResult,
-    ParagraphSearchResponse,
-    SearchResponse,
-    VectorSearchResponse,
 )
 from nucliadb_telemetry import metrics
 

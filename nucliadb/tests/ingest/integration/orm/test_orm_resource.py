@@ -21,6 +21,8 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
+from nidx_protos.noderesources_pb2 import Resource
+
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.index_message import get_resource_index_message
@@ -28,7 +30,6 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
-from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Classification as PBClassification
 from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType

@@ -20,6 +20,9 @@
 from datetime import datetime
 from typing import Any, Optional
 
+from nidx_protos import nodereader_pb2
+from nidx_protos.noderesources_pb2 import Resource
+
 from nucliadb.common import datamanagers
 from nucliadb.search.search.filters import (
     translate_label,
@@ -33,8 +36,7 @@ from nucliadb_models.search import (
     SortOrder,
     SuggestOptions,
 )
-from nucliadb_protos import nodereader_pb2, utils_pb2
-from nucliadb_protos.noderesources_pb2 import Resource
+from nucliadb_protos import utils_pb2
 
 from .exceptions import InvalidQueryError
 from .query_parser.filter_expression import add_and_expression, parse_expression

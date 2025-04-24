@@ -22,15 +22,15 @@ import os
 
 import pytest
 from httpx import AsyncClient
+from nidx_protos.nodereader_pb2 import (
+    SearchRequest,
+)
 
 from nucliadb.common.datamanagers.cluster import KB_SHARDS
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_fake_node
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.tests.vectors import Q
-from nucliadb_protos.nodereader_pb2 import (
-    SearchRequest,
-)
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"

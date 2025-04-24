@@ -26,6 +26,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
+from nidx_protos import nodereader_pb2
 from pytest_mock import MockerFixture
 
 from nucliadb.common.cluster import manager
@@ -38,7 +39,6 @@ from nucliadb_models.internal.predict import (
     QueryInfo,
 )
 from nucliadb_protos import (
-    nodereader_pb2,
     resources_pb2,
     utils_pb2,
     writer_pb2,

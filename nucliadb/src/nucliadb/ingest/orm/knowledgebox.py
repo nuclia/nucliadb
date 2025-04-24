@@ -24,6 +24,7 @@ from uuid import uuid4
 
 from grpc import StatusCode
 from grpc.aio import AioRpcError
+from nidx_protos import noderesources_pb2, nodewriter_pb2
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardNotFound
@@ -49,7 +50,7 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
-from nucliadb_protos import knowledgebox_pb2, noderesources_pb2, nodewriter_pb2, writer_pb2
+from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
     ExternalIndexProviderType,

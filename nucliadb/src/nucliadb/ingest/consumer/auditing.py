@@ -23,12 +23,14 @@ import logging
 import uuid
 from functools import partial
 
+from nidx_protos import nodereader_pb2, noderesources_pb2
+
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.constants import AVG_PARAGRAPH_SIZE_BYTES
-from nucliadb_protos import audit_pb2, nodereader_pb2, noderesources_pb2, writer_pb2
+from nucliadb_protos import audit_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.pubsub import PubSubDriver

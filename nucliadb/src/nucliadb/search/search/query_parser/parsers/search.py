@@ -19,6 +19,8 @@
 #
 from typing import Optional
 
+from nidx_protos import nodereader_pb2
+
 from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query import expand_entities
 from nucliadb.search.search.query_parser.exceptions import InvalidQueryError
@@ -42,7 +44,7 @@ from nucliadb_models.search import (
     SortOptions,
     SortOrder,
 )
-from nucliadb_protos import nodereader_pb2, utils_pb2
+from nucliadb_protos import utils_pb2
 
 from .common import parse_keyword_query, parse_semantic_query, parse_top_k, validate_base_request
 

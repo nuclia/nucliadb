@@ -22,21 +22,22 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Optional
 
+from nidx_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
+from nidx_protos.noderesources_pb2 import (
+    IndexRelation,
+    ParagraphMetadata,
+    Representation,
+    ResourceID,
+)
+from nidx_protos.noderesources_pb2 import Position as TextPosition
+from nidx_protos.noderesources_pb2 import Resource as PBBrainResource
+
 from nucliadb.common import ids
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.utils import compute_paragraph_key
 from nucliadb_models.labels import BASE_LABELS, LABEL_HIDDEN, flatten_resource_labels
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import utils_pb2
-from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
-from nucliadb_protos.noderesources_pb2 import (
-    IndexRelation,
-    ParagraphMetadata,
-    Representation,
-    ResourceID,
-)
-from nucliadb_protos.noderesources_pb2 import Position as TextPosition
-from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.resources_pb2 import (
     Basic,
     ExtractedText,

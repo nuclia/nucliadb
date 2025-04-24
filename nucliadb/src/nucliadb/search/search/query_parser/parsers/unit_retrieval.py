@@ -19,6 +19,9 @@
 #
 from typing import Optional
 
+from nidx_protos import nodereader_pb2
+from nidx_protos.nodereader_pb2 import SearchRequest
+
 from nucliadb.search.search.filters import translate_label
 from nucliadb.search.search.metrics import node_features, query_parser_observer
 from nucliadb.search.search.query import apply_entities_filter, get_sort_field_proto
@@ -26,8 +29,7 @@ from nucliadb.search.search.query_parser.filter_expression import add_and_expres
 from nucliadb.search.search.query_parser.models import ParsedQuery, PredictReranker, UnitRetrieval
 from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
 from nucliadb_models.search import SortOrderMap
-from nucliadb_protos import nodereader_pb2, utils_pb2
-from nucliadb_protos.nodereader_pb2 import SearchRequest
+from nucliadb_protos import utils_pb2
 
 
 @query_parser_observer.wrap({"type": "convert_retrieval_to_proto"})

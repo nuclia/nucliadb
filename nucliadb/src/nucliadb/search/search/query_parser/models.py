@@ -21,11 +21,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, Optional, Union
 
+from nidx_protos import nodereader_pb2
 from pydantic import BaseModel, ConfigDict, Field
 
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb_models import search as search_models
-from nucliadb_protos import nodereader_pb2, utils_pb2
+from nucliadb_protos import utils_pb2
 
 ### Retrieval
 

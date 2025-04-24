@@ -20,6 +20,7 @@
 
 from typing import Optional
 
+from nidx_protos import nodereader_pb2
 from pydantic import ValidationError
 
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
@@ -47,7 +48,7 @@ from nucliadb_models.filters import FilterExpression
 from nucliadb_models.search import (
     FindRequest,
 )
-from nucliadb_protos import nodereader_pb2, utils_pb2
+from nucliadb_protos import utils_pb2
 
 from .common import (
     parse_keyword_query,

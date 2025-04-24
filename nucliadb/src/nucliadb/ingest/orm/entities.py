@@ -21,6 +21,14 @@
 import asyncio
 from typing import AsyncGenerator, Optional
 
+from nidx_protos.nodereader_pb2 import (
+    Faceted,
+    GraphSearchRequest,
+    GraphSearchResponse,
+    SearchRequest,
+    SearchResponse,
+)
+
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import (
@@ -42,13 +50,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroup,
     EntitiesGroupSummary,
     Entity,
-)
-from nucliadb_protos.nodereader_pb2 import (
-    Faceted,
-    GraphSearchRequest,
-    GraphSearchResponse,
-    SearchRequest,
-    SearchResponse,
 )
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse

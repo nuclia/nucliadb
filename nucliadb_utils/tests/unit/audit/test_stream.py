@@ -23,9 +23,9 @@ from functools import partial
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from nidx_protos.nodereader_pb2 import SearchRequest
 
 from nucliadb_protos.audit_pb2 import AuditRequest, ChatContext, RetrievedContext
-from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_utils.audit.stream import StreamAuditStorage
 
 
