@@ -141,9 +141,7 @@ class FieldBuilder:
         if split is None:
             self._extracted_vectors(vectorset).vectors.vectors.vectors.extend(vectors)
         else:
-            self._extracted_vectors(vectorset).vectors.split_vectors[split].vectors.extend(
-                vectors
-            )
+            self._extracted_vectors(vectorset).vectors.split_vectors[split].vectors.extend(vectors)
 
     def with_extracted_paragraph_metadata(self, paragraph: rpb.Paragraph, split: Optional[str] = None):
         if split is None:

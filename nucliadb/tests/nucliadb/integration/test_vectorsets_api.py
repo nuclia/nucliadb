@@ -531,9 +531,10 @@ async def test_vectorset_migration_split_field(
                         start=0,
                         end=len(text),
                     )
-                ]
+                ],
             ),
-        split=split)
+            split=split,
+        )
         vectors = [
             utils_pb2.Vector(
                 start=0,
@@ -562,7 +563,11 @@ async def test_vectorset_migration_split_field(
 
     # Now add a new vectorset
     resp = await add_vectorset(
-        nucliadb_writer, kbid, new_vectorset_id, similarity=SimilarityFunction.COSINE, vector_dimension=1024
+        nucliadb_writer,
+        kbid,
+        new_vectorset_id,
+        similarity=SimilarityFunction.COSINE,
+        vector_dimension=1024,
     )
     assert resp.status_code == 201
 
