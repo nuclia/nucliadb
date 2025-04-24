@@ -24,13 +24,7 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=../../nucliadb_protos");
     println!("cargo:rerun-if-changed=src");
     tonic_build::configure().emit_rerun_if_changed(false).compile_protos(
-        &[
-            "src/nidx.proto",
-            "../../nucliadb_protos/nodereader.proto",
-            "../../nucliadb_protos/noderesources.proto",
-            "../../nucliadb_protos/nodewriter.proto",
-            "../../nucliadb_protos/kb_usage.proto",
-        ],
+        &["src/nidx.proto", "../../nucliadb_protos/kb_usage.proto"],
         &["../../", "src"],
     )?;
     Ok(())
