@@ -35,7 +35,14 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
-from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, ChatContext, ClientType, RetrievedContext
+from nucliadb_protos.audit_pb2 import (
+    AuditField,
+    AuditRequest,
+    AuditSearchRequest,
+    ChatContext,
+    ClientType,
+    RetrievedContext,
+)
 from nucliadb_protos.kb_usage_pb2 import (
     ActivityLogMatch,
     ActivityLogMatchType,
@@ -75,6 +82,16 @@ def get_trace_id() -> Optional[str]:
 
 def get_request_context() -> Optional[RequestContext]:
     return request_context_var.get()
+
+
+def fill_audit_search_request(audit: AuditSearchRequest, request: SearchRequest):
+    audit.body = request.body
+    audit.min_score_bm25 = request.min_score_bm25
+    audit.min_score_semantic = request.min_score_semantic
+    audit.result_per_page = request.result_per_page
+    audit.security.CopyFrom(request.security)
+    audit.vector.extend(request.vector)
+    audit.vectorset = request.vectorset
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
@@ -355,15 +372,17 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.client_type = client_type  # type: ignore
         auditrequest.userid = user
         auditrequest.kbid = kbid
-        auditrequest.search.CopyFrom(search)
         auditrequest.retrieval_time = timeit
         auditrequest.resources = resources
         if "/ask" in context.path:
             auditrequest.type = AuditRequest.CHAT
         else:
             auditrequest.type = AuditRequest.SEARCH
+
+        fill_audit_search_request(auditrequest.search, search)
         if retrieval_rephrased_question is not None:
             auditrequest.retrieval_rephrased_question = retrieval_rephrased_question
+
         trace_id = get_trace_id()
         self.kb_usage_utility.send_kb_usage(
             service=Service.NUCLIA_DB,
@@ -419,8 +438,10 @@ class StreamAuditStorage(AuditStorage):
             auditrequest.generative_answer_time = generative_answer_time
         if generative_answer_first_chunk_time is not None:
             auditrequest.generative_answer_first_chunk_time = generative_answer_first_chunk_time
+
         if retrieval_rephrased_question is not None:
             auditrequest.retrieval_rephrased_question = retrieval_rephrased_question
+
         auditrequest.type = AuditRequest.CHAT
         auditrequest.chat.question = question
         auditrequest.chat.chat_context.extend(chat_context)
