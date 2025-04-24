@@ -69,7 +69,7 @@ jobs:
       # Install all packages we are going to release
       - name: Install all packages
         run: |
-          pip install -e ./nucliadb_protos/python/
+          pip install -e ./nucliadb_protos/
           pip install -e ./nidx/nidx_protos/
           pip install -e ./nucliadb_telemetry/
           pip install -e ./nucliadb_utils/
@@ -79,7 +79,7 @@ jobs:
           pip install -e ./nucliadb/
 
       - name: Build wheels
-        run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nidx/nidx_protos/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_telemetry ./nucliadb_dataset/ ./nucliadb/
+        run: pip wheel --no-deps -w dist ./nucliadb_protos/ ./nidx/nidx_protos/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_telemetry ./nucliadb_dataset/ ./nucliadb/
 
       - name: Upload to pypi
         run: twine upload --verbose dist/*

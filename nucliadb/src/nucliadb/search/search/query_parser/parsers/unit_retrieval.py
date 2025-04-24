@@ -70,7 +70,7 @@ class _Converter:
         """Generate a SearchRequest proto from a retrieval operation."""
         self._apply_text_queries()
         self._apply_semantic_query()
-        self._apply_graph_query()
+        self._apply_relation_query()
         self._apply_filters()
         self._apply_top_k()
         return self.req
@@ -118,12 +118,18 @@ class _Converter:
             self.req.vectorset = self.retrieval.query.semantic.vectorset
             self.req.vector.extend(query_vector)
 
-    def _apply_graph_query(self):
+    def _apply_relation_query(self):
+        """Relation queries are the legacy way to query the knowledge graph.
+        Given a set of entry points and some subtypes and entities to exclude
+        from search, it'd find the distance 1 neighbours (BFS)."""
+
         if self.retrieval.query.relation is None:
             return
 
         node_features.inc({"type": "relations"})
 
+        # Entry points are source or target nodes we want to search for. We want
+        # any undirected path containing any entry point
         entry_points_queries = []
         for entry_point in self.retrieval.query.relation.entry_points:
             q = nodereader_pb2.GraphQuery.PathQuery()
@@ -135,6 +141,12 @@ class _Converter:
             q.path.undirected = True
             entry_points_queries.append(q)
 
+        # A query can specifiy nodes marked as deleted in the db (but not
+        # removed from the index). We want to exclude any path containing any of
+        # those nodes.
+        #
+        # The request groups values per subtype (to optimize request size) but,
+        # as we don't support OR at node value level, we'll split them.
         deleted_nodes_queries = []
         for subtype, deleted_entities in self.retrieval.query.relation.deleted_entities.items():
             if len(deleted_entities) == 0:
@@ -146,6 +158,9 @@ class _Converter:
                 q.path.undirected = True
                 deleted_nodes_queries.append(q)
 
+        # Subtypes can also be marked as deleted in the db (but kept in the
+        # index). We also want to exclude any triplet containg a node with such
+        # subtypes
         excluded_subtypes_queries = []
         for deleted_subtype in self.retrieval.query.relation.deleted_entity_groups:
             q = nodereader_pb2.GraphQuery.PathQuery()

@@ -55,6 +55,10 @@ def add_context(new_data: Dict[str, str]):
     context_data.set(data)  # always set the context
 
 
+def clear_context():
+    context_data.set({})
+
+
 def get_context() -> Dict[str, str]:
     return context_data.get() or {}
 

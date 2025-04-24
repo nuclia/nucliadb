@@ -37,7 +37,7 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb_models.metadata import RelationEntity, RelationNodeType, RelationType
 from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
-from nucliadb_protos.utils_pb2 import Relation, RelationNode
+from nucliadb_protos.utils_pb2 import Relation, RelationMetadata, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.storages.storage import Storage
@@ -259,6 +259,14 @@ async def knowledge_graph(
             source=nodes["Newton"],
             to=nodes["Physics"],
             relation_label="study",
+            metadata=RelationMetadata(
+                paragraph_id="myresource/0/myresource/100-200",
+                source_start=1,
+                source_end=10,
+                to_start=11,
+                to_end=20,
+                data_augmentation_task_id="mytask",
+            ),
         ),
         Relation(
             relation=Relation.RelationType.ENTITY,
