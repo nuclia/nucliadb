@@ -28,6 +28,7 @@ import backoff
 import mmh3
 import nats
 from fastapi import Request
+from google.protobuf.json_format import MessageToDict
 from google.protobuf.timestamp_pb2 import Timestamp
 from opentelemetry.trace import format_trace_id, get_current_span
 from starlette.background import BackgroundTask
@@ -92,6 +93,13 @@ def fill_audit_search_request(audit: AuditSearchRequest, request: SearchRequest)
     audit.security.CopyFrom(request.security)
     audit.vector.extend(request.vector)
     audit.vectorset = request.vectorset
+    audit.filter = json.dumps(
+        {
+            "field": MessageToDict(request.field_filter),
+            "paragraph": MessageToDict(request.paragraph_filter),
+            "operator": request.filter_operator,
+        }
+    )
 
 
 class AuditMiddleware(BaseHTTPMiddleware):

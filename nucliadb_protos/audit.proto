@@ -135,4 +135,6 @@ message AuditSearchRequest {
     float min_score_bm25 = 25;
 
     optional utils.Security security = 24;
+
+    optional string filter = 30;
 }
