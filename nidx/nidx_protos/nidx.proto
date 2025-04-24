@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package nidx;
 
-import "nodereader.proto";
-import "nodewriter.proto";
+import "nidx_protos/nodereader.proto";
+import "nidx_protos/nodewriter.proto";
 
 service NidxApi {
   rpc GetShard(nodereader.GetShardRequest) returns (noderesources.Shard) {}

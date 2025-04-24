@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package nodewriter;
 
-import public "noderesources.proto";
+import public "nidx_protos/noderesources.proto";
 
 
 message OpStatus {
