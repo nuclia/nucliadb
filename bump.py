@@ -43,7 +43,7 @@ def run(args):
         "nucliadb/pyproject.toml",
         "nucliadb_dataset/pyproject.toml",
         "nucliadb_models/pyproject.toml",
-        "nucliadb_protos/python/pyproject.toml",
+        "nucliadb_protos/pyproject.toml",
         "nucliadb_sdk/pyproject.toml",
         "nucliadb_telemetry/pyproject.toml",
         "nucliadb_utils/pyproject.toml",

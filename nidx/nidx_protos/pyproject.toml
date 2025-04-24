@@ -1,5 +1,10 @@
 [build-system]
-requires = ["pdm-backend", "grpcio-tools>=1.71.0,<1.72.0"]
+requires = [
+    "pdm-backend",
+    # Pin grpio-tools so `make protos` compile with the version we want
+    # To use grpc stubs, you need a newer dependency than what was used to build this module
+    "grpcio-tools>=1.71.0,<1.72.0"
+]
 build-backend = "pdm.backend"
 
 [project]
@@ -26,7 +31,3 @@ Repository = "https://github.com/nuclia/nucliadb"
 
 [tool.pdm.build]
 custom-hook = "build.py"
-
-[tool.pdm.version]
-source = "call"
-getter = "build:get_version"

@@ -10,7 +10,7 @@ members = [
     "nidx/nidx_protos",
     "nucliadb_dataset",
     "nucliadb_models",
-    "nucliadb_protos/python",
+    "nucliadb_protos",
     "nucliadb_sdk",
     "nucliadb_telemetry",
     "nucliadb_utils",
@@ -56,9 +56,6 @@ dev = [
     "requests",
     "requests-mock>=1.12.1",
     "types-PyYAML>=6.0.12.20240808",
-
-    # Pin grpio-tools so `make protos` compile with the version we want
-    "grpcio-tools<1.72.0",
 ]
 nidx = [
   "nidx-binding"

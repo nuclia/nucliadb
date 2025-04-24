@@ -42,30 +42,6 @@ jobs:
         env:
           RUSTFLAGS: "-Dwarnings"
 
-  updated-protos:
-    name: "Pre-checks: Protos up-to-date"
-    runs-on: ubuntu-24.04
-    permissions: write-all
-    needs:
-      - build-virtual-env
-    steps:
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12.5"
-      - name: Restore venv
-        uses: actions/cache/restore@v4
-        with:
-          path: .venv
-          key: venv-${{ github.sha }}
-          fail-on-cache-miss: true
-      - name: Compile protos
-        run: source .venv/bin/activate && make protos
-      - name: Fail if something changed
-        run: git status && [[ -z "$(git status -s)" ]]
-
   pre-checks-python:
     name: "Pre-checks: Python lint"
     runs-on: ubuntu-24.04
@@ -460,7 +436,6 @@ jobs:
     needs:
       - nidx-format-rust
       - nidx-clippy-rust
-      - updated-protos
       - pre-checks-python
       - check-licenses
       - check-migrations
