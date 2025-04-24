@@ -22,6 +22,7 @@ import hashlib
 from typing import Optional
 
 from nucliadb.ingest.fields.base import Field
+from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb_protos.resources_pb2 import FieldAuthor, FieldText
 
 
@@ -32,7 +33,8 @@ class Text(Field[FieldText]):
 
     async def generated_by(self) -> FieldAuthor:
         value = await self.get_value()
-        assert value is not None, "Can't know who generated the field if it has no value!"
+        if value is None:
+            raise FieldAuthorNotFound("Field has no value, can't know who generated it")
         return value.generated_by
 
     async def set_value(self, payload: FieldText):
