@@ -33,8 +33,6 @@ from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 
-SHARD_COUNT = metrics.Gauge("nucliadb_node_shard_count", labels={"node": ""})
-
 MIGRATION_COUNT = metrics.Gauge("nucliadb_migration", labels={"type": "", "version": ""})
 
 PENDING_RESOURCE_COUNT = metrics.Gauge("nucliadb_pending_resources_count")
