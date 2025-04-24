@@ -160,6 +160,8 @@ class IngestConsumer:
                 logger.warning("Could not delete blob reference", exc_info=True)
 
     async def subscription_worker(self, msg: Msg):
+        context.clear_context()
+
         kbid: Optional[str] = None
         subject = msg.subject
         reply = msg.reply
@@ -182,7 +184,6 @@ class IngestConsumer:
             MessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66),
             self.lock,
         ):
-            logger.info(f"Message processing: subject:{subject}, seqid: {seqid}, reply: {reply}")
             try:
                 pb = await self.get_broker_message(msg)
                 if pb.source == pb.MessageSource.PROCESSOR:
@@ -194,10 +195,8 @@ class IngestConsumer:
                 else:
                     audit_time = ""
 
-                logger.debug(
-                    f"Received from {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} partition {self.partition} at {time}"  # noqa
-                )
                 context.add_context({"kbid": pb.kbid, "rid": pb.uuid})
+                logger.info(f"Message processing: subject:{subject}, seqid: {seqid}, reply: {reply}")
                 kbid = pb.kbid
                 try:
                     source = "writer" if pb.source == pb.MessageSource.WRITER else "processor"

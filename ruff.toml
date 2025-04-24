@@ -3,7 +3,6 @@ line-length = 105
 
 exclude = [
     "*.pyi",
-    "nucliadb_protos/python/*",
     "src/nucliadb_telemetry/tests/grpc/*",
     "src/nucliadb_utils/nuclia_usage/protos/*"
 ]
