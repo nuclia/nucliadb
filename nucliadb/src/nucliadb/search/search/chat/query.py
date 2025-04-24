@@ -38,6 +38,7 @@ from nucliadb_models.search import (
     AskRequest,
     ChatContextMessage,
     ChatOptions,
+    FindOptions,
     FindRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
@@ -48,7 +49,6 @@ from nucliadb_models.search import (
     PromptContextOrder,
     Relations,
     RephraseModel,
-    SearchOptions,
     parse_rephrase_prompt,
 )
 from nucliadb_protos import audit_pb2
@@ -180,11 +180,11 @@ def find_request_from_ask_request(item: AskRequest, query: str) -> FindRequest:
     find_request.resource_filters = item.resource_filters
     find_request.features = []
     if ChatOptions.SEMANTIC in item.features:
-        find_request.features.append(SearchOptions.SEMANTIC)
+        find_request.features.append(FindOptions.SEMANTIC)
     if ChatOptions.KEYWORD in item.features:
-        find_request.features.append(SearchOptions.KEYWORD)
+        find_request.features.append(FindOptions.KEYWORD)
     if ChatOptions.RELATIONS in item.features:
-        find_request.features.append(SearchOptions.RELATIONS)
+        find_request.features.append(FindOptions.RELATIONS)
     find_request.query = query
     find_request.fields = item.fields
     find_request.filters = item.filters

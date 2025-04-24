@@ -23,7 +23,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
-from nucliadb_models.search import SearchOptions
+from nucliadb_models.search import FindOptions
 from nucliadb_protos.resources_pb2 import (
     FieldType,
     Paragraph,
@@ -111,7 +111,7 @@ async def test_paragraph_index_deletions(
         f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "Original",
-            "features": [SearchOptions.KEYWORD],
+            "features": [FindOptions.KEYWORD],
             "min_score": {"bm25": 0.0},
         },
         timeout=None,
@@ -136,7 +136,7 @@ async def test_paragraph_index_deletions(
         f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "Original",
-            "features": [SearchOptions.KEYWORD],
+            "features": [FindOptions.KEYWORD],
             "min_score": {"bm25": 0.0},
         },
         timeout=None,
@@ -150,7 +150,7 @@ async def test_paragraph_index_deletions(
         f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "Extracted",
-            "features": [SearchOptions.KEYWORD],
+            "features": [FindOptions.KEYWORD],
         },
         timeout=None,
     )
@@ -196,7 +196,7 @@ async def test_paragraph_index_deletions(
         f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "Extracted",
-            "features": [SearchOptions.KEYWORD],
+            "features": [FindOptions.KEYWORD],
             "min_score": {"bm25": 0.0},
         },
         timeout=None,
@@ -213,7 +213,7 @@ async def test_paragraph_index_deletions(
         f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "Modified",
-            "features": [SearchOptions.KEYWORD],
+            "features": [FindOptions.KEYWORD],
         },
         timeout=None,
     )

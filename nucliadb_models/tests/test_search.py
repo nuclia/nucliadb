@@ -65,6 +65,12 @@ def test_find_request_fulltext_feature_not_allowed():
         search.FindRequest(features=[search.SearchOptions.FULLTEXT])
 
 
+def test_find_supports_search_options():
+    search.FindRequest(features=[search.SearchOptions.KEYWORD])
+    search.FindRequest(features=[search.SearchOptions.SEMANTIC])
+    search.FindRequest(features=[search.SearchOptions.RELATIONS])
+
+
 # Rank fusion
 
 

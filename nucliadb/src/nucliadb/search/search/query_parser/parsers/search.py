@@ -44,7 +44,13 @@ from nucliadb_models.search import (
 )
 from nucliadb_protos import nodereader_pb2, utils_pb2
 
-from .common import parse_keyword_query, parse_semantic_query, parse_top_k, validate_base_request
+from .common import (
+    parse_keyword_query,
+    parse_semantic_query,
+    parse_top_k,
+    should_disable_vector_search,
+    validate_query_syntax,
+)
 
 INDEX_SORTABLE_FIELDS = [
     SortField.CREATED,
@@ -85,7 +91,7 @@ class _SearchParser:
         self._top_k: Optional[int] = None
 
     async def parse(self) -> UnitRetrieval:
-        validate_base_request(self.item)
+        self._validate_request()
 
         self._top_k = parse_top_k(self.item)
 
@@ -117,6 +123,27 @@ class _SearchParser:
             filters=filters,
         )
         return retrieval
+
+    def _validate_request(self):
+        validate_query_syntax(self.item.query)
+
+        # synonyms are not compatible with vector/graph search
+        if (
+            self.item.with_synonyms
+            and self.item.query
+            and (
+                search_models.SearchOptions.SEMANTIC in self.item.features
+                or search_models.SearchOptions.RELATIONS in self.item.features
+            )
+        ):
+            raise InvalidQueryError(
+                "synonyms",
+                "Search with custom synonyms is only supported on paragraph and document search",
+            )
+
+        if search_models.SearchOptions.SEMANTIC in self.item.features:
+            if should_disable_vector_search(self.item):
+                self.item.features.remove(search_models.SearchOptions.SEMANTIC)
 
     async def _parse_text_query(self) -> _TextQuery:
         assert self._top_k is not None, "top_k must be parsed before text query"

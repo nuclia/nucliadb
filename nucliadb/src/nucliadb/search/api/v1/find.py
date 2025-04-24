@@ -40,6 +40,7 @@ from nucliadb_models.configuration import FindConfig
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
+    FindOptions,
     FindRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
@@ -47,7 +48,6 @@ from nucliadb_models.search import (
     Reranker,
     RerankerName,
     ResourceProperties,
-    SearchOptions,
     SearchParamDefaults,
 )
 from nucliadb_models.security import RequestSecurity
@@ -61,7 +61,7 @@ FIND_EXAMPLES = {
         description="Perform a hybrid search that will return text and semantic results matching the query",
         value={
             "query": "How can I be an effective product manager?",
-            "features": [SearchOptions.KEYWORD, SearchOptions.SEMANTIC],
+            "features": [FindOptions.KEYWORD, FindOptions.SEMANTIC],
         },
     )
 }
@@ -110,11 +110,11 @@ async def find_knowledgebox(
     range_modification_end: Optional[DateTime] = fastapi_query(
         SearchParamDefaults.range_modification_end
     ),
-    features: list[SearchOptions] = fastapi_query(
+    features: list[FindOptions] = fastapi_query(
         SearchParamDefaults.search_features,
         default=[
-            SearchOptions.KEYWORD,
-            SearchOptions.SEMANTIC,
+            FindOptions.KEYWORD,
+            FindOptions.SEMANTIC,
         ],
     ),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
