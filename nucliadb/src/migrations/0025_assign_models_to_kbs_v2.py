@@ -35,8 +35,6 @@ learning_proxy handles which API is used (internal or external)
 
 import logging
 
-from nidx_protos import nodewriter_pb2
-
 from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
 from nucliadb.migrator.context import ExecutionContext
@@ -96,10 +94,10 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
 
     default_vectorset = knowledgebox_pb2.VectorSetConfig(
         vectorset_id=vectorset_id,
-        vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
+        vectorset_index_config=knowledgebox_pb2.VectorIndexConfig(
             vector_dimension=maindb_vector_dimension,
             similarity=maindb_similarity,
-            vector_type=nodewriter_pb2.VectorType.DENSE_F32,  # we only support this for now
+            vector_type=knowledgebox_pb2.VectorType.DENSE_F32,  # we only support this for now
             normalize_vectors=maindb_normalize_vectors,
         ),
         matryoshka_dimensions=maindb_matryoshka_dimensions,

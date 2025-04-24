@@ -31,6 +31,7 @@ from nucliadb.common.external_index_providers.manager import (
     get_external_index_manager,
 )
 from nucliadb.common.nidx import get_nidx_fake_node
+from nucliadb.common.vector_index_config import nucliadb_index_config_to_nidx
 from nucliadb.migrator.settings import settings
 from nucliadb_protos import writer_pb2
 from nucliadb_telemetry import errors
@@ -139,7 +140,7 @@ async def create_rollover_shards(
         for shard in kb_shards.shards:
             shard.ClearField("replicas")
             vectorsets = {
-                vectorset_id: vectorset_config.vectorset_index_config
+                vectorset_id: nucliadb_index_config_to_nidx(vectorset_config.vectorset_index_config)
                 async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid)
             }
 
