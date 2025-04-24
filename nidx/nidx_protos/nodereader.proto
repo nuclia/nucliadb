@@ -366,11 +366,6 @@ message SuggestRequest {
 }
 
 
-message RelatedEntities {
-    repeated string entities = 1;
-    uint32 total = 2;
-}
-
 message SuggestResponse {
     int32 total = 1;
     repeated ParagraphResult results = 2;
@@ -389,19 +384,6 @@ message SearchResponse {
     ParagraphSearchResponse paragraph = 2;
     VectorSearchResponse vector = 3;
     GraphSearchResponse graph = 5;
-}
-
-message IdCollection {
-    repeated string ids = 1;
-}
-
-message RelationEdge {
-    utils.Relation.RelationType edge_type = 1;
-    string property = 2;
-}
-
-message EdgeList {
-    repeated RelationEdge list = 1;
 }
 
 message GetShardRequest {
@@ -423,27 +405,4 @@ message DocumentItem {
 message StreamRequest {
     noderesources.ShardId shard_id = 3;
     StreamFilter filter = 4;
-}
-
-message GetShardFilesRequest {
-    string shard_id = 1;
-}
-
-message ShardFileList {
-  repeated ShardFile files = 2;
-}
-
-message ShardFile {
-    string relative_path = 1;
-    uint64 size = 2;
-}
-
-message DownloadShardFileRequest {
-    string shard_id = 1;
-    string relative_path = 2;
-}
-
-message ShardFileChunk {
-    bytes data = 1;
-    int32 index = 2;
 }

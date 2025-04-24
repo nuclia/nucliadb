@@ -204,11 +204,6 @@ impl NidxApi for ApiServer {
             vectorsets,
         }))
     }
-
-    async fn get_metadata(&self, _request: Request<EmptyQuery>) -> Result<Response<NodeMetadata>> {
-        // TODO
-        Ok(Response::new(NodeMetadata::default()))
-    }
 }
 
 struct ChannelWriter(Sender<anyhow::Result<Bytes>>);

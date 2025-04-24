@@ -45,14 +45,6 @@ message IndexMessage {
     IndexMessageSource source = 10;
 }
 
-message GarbageCollectorResponse {
-    enum Status {
-        OK = 0;
-        TRY_LATER = 1;
-    }
-    Status status = 1;
-}
-
 enum VectorType {
     DENSE_F32 = 0;
 }
@@ -80,13 +72,4 @@ message NewVectorSetRequest {
     utils.VectorSimilarity similarity = 2 [deprecated = true];
     bool normalize_vectors = 3 [deprecated = true];
     VectorIndexConfig config = 4;
-}
-
-message MergeResponse {
-    enum MergeStatus {
-        OK = 0;
-    }
-    MergeStatus status = 1;
-    uint32 merged_segments = 2;
-    uint32 remaining_segments = 3;
 }

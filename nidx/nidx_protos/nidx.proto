@@ -15,8 +15,6 @@ service NidxApi {
   rpc AddVectorSet(nodewriter.NewVectorSetRequest) returns (nodewriter.OpStatus) {}
   rpc RemoveVectorSet(noderesources.VectorSetID) returns (nodewriter.OpStatus) {}
   rpc ListVectorSets(noderesources.ShardId) returns (noderesources.VectorSetList) {}
-
-  rpc GetMetadata(noderesources.EmptyQuery) returns (noderesources.NodeMetadata) {}
 }
 
 service NidxSearcher {

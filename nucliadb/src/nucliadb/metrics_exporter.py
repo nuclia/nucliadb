@@ -22,14 +22,11 @@ from __future__ import annotations
 import asyncio
 from typing import AsyncGenerator, Callable, Tuple, cast
 
-from nidx_protos.noderesources_pb2 import EmptyQuery, NodeMetadata
-
 from nucliadb import logger
 from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.migrator.datamanager import MigrationsDataManager
 from nucliadb_telemetry import metrics
 from nucliadb_telemetry.logs import setup_logging
@@ -41,19 +38,6 @@ SHARD_COUNT = metrics.Gauge("nucliadb_node_shard_count", labels={"node": ""})
 MIGRATION_COUNT = metrics.Gauge("nucliadb_migration", labels={"type": "", "version": ""})
 
 PENDING_RESOURCE_COUNT = metrics.Gauge("nucliadb_pending_resources_count")
-
-
-async def update_node_metrics(context: ApplicationContext):
-    """
-    Report the number of shards in each node.
-    """
-    # Clear previoulsy set values so that we report only the current state
-    SHARD_COUNT.gauge.clear()
-
-    nidx_api = get_nidx_api_client()
-    metadata: NodeMetadata = await nidx_api.GetMetadata(EmptyQuery())
-
-    SHARD_COUNT.set(metadata.shard_count, labels={"node": "nidx"})
 
 
 async def iter_kbids(context: ApplicationContext) -> AsyncGenerator[str, None]:
@@ -127,7 +111,6 @@ async def run_exporter(context: ApplicationContext):
     # Schedule exporter tasks
     tasks = []
     for export_task, interval in [
-        (update_node_metrics, 10),
         (update_migration_metrics, 60 * 3),
         (update_resource_metrics, 60 * 5),
     ]:

@@ -67,9 +67,7 @@ message Shard {
     uint64 size_bytes = 6;
 }
 
-message EmptyResponse {}
 message EmptyQuery {}
-
 
 message Position {
     uint64 index = 1;
@@ -192,20 +190,6 @@ message Resource {
 message ShardMetadata {
     string kbid = 1;
     utils.ReleaseChannel release_channel = 2;
-}
-
-message NodeMetadata {
-    message ShardMetadata {
-        string kbid = 1;
-        float load_score = 2 [deprecated = true];
-    }
-    float load_score = 1 [deprecated = true];
-    uint64 shard_count = 2;
-    map<string, ShardMetadata> shards = 3 [deprecated = true];
-    string node_id = 4;
-    optional string primary_node_id = 5;
-    uint64 available_disk = 6;
-    uint64 total_disk = 7;
 }
 
 message StringList {
