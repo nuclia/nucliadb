@@ -40,9 +40,6 @@ def shard_manager():
         return_value=[
             writer_pb2.ShardObject(
                 shard="shard-id",
-                replicas=[
-                    writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="shard-id"), node="node-0")
-                ],
             )
         ]
     )
