@@ -254,7 +254,7 @@ async fn test_date_range_search(pool: PgPool) -> Result<(), Box<dyn std::error::
     assert_eq!(result.document, None);
     assert_eq!(result.paragraph, None);
     assert_eq!(result.vector, None);
-    assert_eq!(result.relation, None);
+    assert_eq!(result.graph, None);
 
     // Multiple timestamps are parsed as AND conditions
     let mut request_second_batch = request.clone();
@@ -283,7 +283,7 @@ async fn test_date_range_search(pool: PgPool) -> Result<(), Box<dyn std::error::
     assert_eq!(result.document, None);
     assert_eq!(result.paragraph, None);
     assert_eq!(result.vector, None);
-    assert_eq!(result.relation, None);
+    assert_eq!(result.graph, None);
 
     Ok(())
 }

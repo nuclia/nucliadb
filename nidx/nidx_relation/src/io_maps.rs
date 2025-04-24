@@ -18,10 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use nidx_protos::prost::*;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
-use nidx_protos::{IndexRelation, prost::*};
-use nidx_protos::{Relation as ProtosRelation, RelationMetadata, RelationNode};
+use nidx_protos::{RelationMetadata, RelationNode};
 use tantivy::TantivyDocument;
 use tantivy::schema::Value;
 
@@ -98,16 +98,6 @@ pub fn target_to_relation_node(schema: &Schema, doc: &TantivyDocument) -> Relati
     }
 }
 
-pub fn doc_to_relation(schema: &Schema, doc: &TantivyDocument) -> ProtosRelation {
-    ProtosRelation {
-        metadata: decode_metadata(schema, doc),
-        relation: u64_to_relation_type::<i32>(schema.relationship(doc)),
-        relation_label: schema.relationship_label(doc).to_string(),
-        source: Some(source_to_relation_node(schema, doc)),
-        to: Some(target_to_relation_node(schema, doc)),
-    }
-}
-
 pub fn doc_to_resource_field_id(schema: &Schema, doc: &TantivyDocument) -> Option<String> {
     doc.get_first(schema.resource_field_id).map(|v| {
         let (rid, fid) = decode_field_id(v.as_bytes().unwrap());
@@ -119,14 +109,6 @@ pub fn doc_to_facets(schema: &Schema, doc: &TantivyDocument) -> Vec<String> {
     doc.get_all(schema.facets)
         .map(|f| f.as_facet().unwrap().to_path_string())
         .collect()
-}
-
-pub fn doc_to_index_relation(schema: &Schema, doc: &TantivyDocument) -> IndexRelation {
-    IndexRelation {
-        relation: Some(doc_to_relation(schema, doc)),
-        resource_field_id: doc_to_resource_field_id(schema, doc),
-        facets: doc_to_facets(schema, doc),
-    }
 }
 
 pub fn doc_to_graph_relation(schema: &Schema, doc: &TantivyDocument) -> nidx_protos::graph_search_response::Relation {

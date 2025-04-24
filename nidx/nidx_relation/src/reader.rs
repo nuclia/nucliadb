@@ -21,29 +21,22 @@ use std::fmt::Debug;
 use std::path::Path;
 
 use nidx_protos::graph_search_request::QueryKind;
-use nidx_protos::{
-    EntitiesSubgraphResponse, GraphSearchRequest, GraphSearchResponse, RelationNode, RelationSearchRequest,
-    RelationSearchResponse,
-};
+use nidx_protos::{GraphSearchRequest, GraphSearchResponse, RelationNode};
 use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::TopDocs;
-use tantivy::query::{BooleanQuery, EmptyQuery, Occur, Query, TermSetQuery};
+use tantivy::query::{BooleanQuery, EmptyQuery, Query, TermSetQuery};
 use tantivy::schema::Field;
 use tantivy::{Index, IndexReader};
 use uuid::Uuid;
 
 use crate::graph_collector::{Selector, TopUniqueCollector};
-use crate::graph_query_parser::{
-    BoolGraphQuery, BoolNodeQuery, Expression, GraphQuery, GraphQueryParser, Node, NodeQuery,
-};
+use crate::graph_query_parser::{BoolGraphQuery, BoolNodeQuery, GraphQueryParser};
 use crate::schema::{Schema, decode_node, decode_relation, encode_field_id};
 use crate::top_unique_n::TopUniqueN;
 use crate::{RelationConfig, io_maps};
 
 pub const FUZZY_DISTANCE: u8 = 1;
 pub const NUMBER_OF_RESULTS_SUGGEST: usize = 20;
-// Hard limit until we have pagination in place
-const MAX_NUM_RELATIONS_RESULTS: usize = 500;
 
 pub struct RelationsReaderService {
     pub index: Index,
@@ -102,13 +95,6 @@ impl<'a, I: Iterator<Item = &'a FieldId>> Iterator for AddMetadataFieldIterator<
 }
 
 impl RelationsReaderService {
-    pub fn relation_search(&self, request: &RelationSearchRequest) -> anyhow::Result<RelationSearchResponse> {
-        Ok(RelationSearchResponse {
-            subgraph: self.entities_subgraph_search(request)?,
-            prefix: None,
-        })
-    }
-
     pub fn graph_search(
         &self,
         request: &GraphSearchRequest,
@@ -289,100 +275,6 @@ impl RelationsReaderService {
             reader,
             schema: field_schema,
         })
-    }
-
-    // TODO: remove unused method
-    fn entities_subgraph_search(
-        &self,
-        request: &RelationSearchRequest,
-    ) -> anyhow::Result<Option<EntitiesSubgraphResponse>> {
-        let Some(bfs_request) = request.subgraph.as_ref() else {
-            return Ok(None);
-        };
-
-        if bfs_request.depth() != 1 {
-            return Err(anyhow::anyhow!("Depth must be 1 right now"));
-        }
-
-        if bfs_request.entry_points.is_empty() {
-            return Ok(Some(EntitiesSubgraphResponse::default()));
-        }
-
-        let query_parser = GraphQueryParser::new(&self.schema);
-        let mut statements = vec![];
-
-        // Entry points are source or target nodes we want to search for. We want any undirected
-        // path containing any entry point
-        for entry_point in bfs_request.entry_points.iter() {
-            statements.push((
-                Occur::Should,
-                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::Node(Expression::Value(Node {
-                    value: Some(entry_point.value.clone().into()),
-                    node_type: Some(entry_point.ntype()),
-                    node_subtype: Some(entry_point.subtype.clone()),
-                })))),
-            ));
-        }
-
-        // A query can specifiy nodes marked as deleted in the db (but not removed from the index).
-        // We want to exclude any path containing any of those nodes.
-        //
-        // The request groups values per subtype (to optimize request size) but, as we don't support
-        // OR at node value level, we'll split them.
-        for deleted_nodes in bfs_request.deleted_entities.iter() {
-            if deleted_nodes.node_values.is_empty() {
-                continue;
-            }
-            statements.push((
-                Occur::MustNot,
-                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::Node(Expression::Or(
-                    deleted_nodes
-                        .node_values
-                        .iter()
-                        .map(|deleted_entity_value| Node {
-                            value: Some(deleted_entity_value.clone().into()),
-                            node_subtype: Some(deleted_nodes.node_subtype.clone()),
-                            ..Default::default()
-                        })
-                        .collect(),
-                )))),
-            ));
-        }
-
-        // Subtypes can also be marked as deleted in the db (but kept in the index). We also want to
-        // exclude any triplet containg a node with such subtypes
-        let excluded_subtypes: Vec<_> = bfs_request
-            .deleted_groups
-            .iter()
-            .map(|deleted_subtype| Node {
-                node_subtype: Some(deleted_subtype.clone()),
-                ..Default::default()
-            })
-            .collect();
-
-        if !excluded_subtypes.is_empty() {
-            statements.push((
-                Occur::MustNot,
-                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::Node(Expression::Or(
-                    excluded_subtypes,
-                )))),
-            ))
-        }
-
-        let query: Box<dyn Query> = Box::new(BooleanQuery::new(statements));
-        let searcher = self.reader.searcher();
-
-        let topdocs = TopDocs::with_limit(MAX_NUM_RELATIONS_RESULTS);
-        let matching_docs = searcher.search(&query, &topdocs)?;
-        let mut response = EntitiesSubgraphResponse::default();
-
-        for (_, doc_addr) in matching_docs {
-            let source = searcher.doc(doc_addr)?;
-            let index_relation = io_maps::doc_to_index_relation(&self.schema, &source);
-            response.relations.push(index_relation);
-        }
-
-        Ok(Some(response))
     }
 }
 
