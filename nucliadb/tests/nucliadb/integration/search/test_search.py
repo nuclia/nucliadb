@@ -825,10 +825,10 @@ async def test_search_user_relations(
 
     assert spy.call_count == 1
     request = spy.call_args.args[2]
-    assert len(request.relation_subgraph.entry_points) == 2
-    assert request.relation_subgraph.entry_points[0].value == "Newton"
-    assert request.relation_subgraph.entry_points[1].value == "Becquer"
-    assert request.relation_subgraph.entry_points[1].subtype == "person"
+    assert len(request.graph_search.query.path.bool_or.operands) == 2
+    assert request.graph_search.query.path.bool_or.operands[0].path.source.value == "Newton"
+    assert request.graph_search.query.path.bool_or.operands[1].path.source.value == "Becquer"
+    assert request.graph_search.query.path.bool_or.operands[1].path.source.node_subtype == "person"
 
 
 async def get_audit_messages(sub):

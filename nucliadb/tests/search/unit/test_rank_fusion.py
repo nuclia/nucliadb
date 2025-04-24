@@ -60,7 +60,9 @@ def disable_hidden_resources_check():
 )
 async def test_get_rank_fusion(rank_fusion, expected_type: Type):
     item = FindRequest(rank_fusion=rank_fusion)
-    algorithm = get_rank_fusion((await parse_find("kbid", item)).retrieval.rank_fusion)
+    parsed = await parse_find("kbid", item)
+    assert parsed.retrieval.rank_fusion is not None
+    algorithm = get_rank_fusion(parsed.retrieval.rank_fusion)
     assert isinstance(algorithm, expected_type)
 
 

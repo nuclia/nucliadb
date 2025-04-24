@@ -26,10 +26,8 @@ from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.filter_expression import parse_expression
 from nucliadb.search.search.query_parser.models import (
     Filters,
-    NoopReranker,
     ParsedQuery,
     Query,
-    RankFusion,
     RelationQuery,
     UnitRetrieval,
     _TextQuery,
@@ -113,14 +111,14 @@ class _SearchParser:
 
         filters = await self._parse_filters()
 
-        return UnitRetrieval(
+        retrieval = UnitRetrieval(
             query=self._query,
             top_k=self._top_k,
             filters=filters,
-            # TODO: this should be in a post retrieval step
-            rank_fusion=RankFusion(window=self._top_k),
-            reranker=NoopReranker(),
+            rank_fusion=None,
+            reranker=None,
         )
+        return retrieval
 
     async def _parse_text_query(self) -> _TextQuery:
         assert self._top_k is not None, "top_k must be parsed before text query"
@@ -140,7 +138,7 @@ class _SearchParser:
         meta_cache = await self.fetcher.get_entities_meta_cache()
         deleted_entities = meta_cache.deleted_entities
         return RelationQuery(
-            detected_entities=detected_entities,
+            entry_points=detected_entities,
             deleted_entity_groups=deleted_entity_groups,
             deleted_entities=deleted_entities,
         )
@@ -231,7 +229,7 @@ class _SearchParser:
         autofilter = None
         if self.item.autofilter:
             if self._query.relation is not None:
-                autofilter = self._query.relation.detected_entities
+                autofilter = self._query.relation.entry_points
             else:
                 autofilter = await self._get_detected_entities()
 

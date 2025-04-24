@@ -130,13 +130,14 @@ class _FindParser:
         if isinstance(reranker, PredictReranker):
             rank_fusion.window = max(rank_fusion.window, reranker.window)
 
-        return UnitRetrieval(
+        retrieval = UnitRetrieval(
             query=self._query,
             top_k=self._top_k,
             filters=filters,
             rank_fusion=rank_fusion,
             reranker=reranker,
         )
+        return retrieval
 
     async def _parse_relation_query(self) -> RelationQuery:
         detected_entities = await self._get_detected_entities()
@@ -147,7 +148,7 @@ class _FindParser:
         deleted_entities = meta_cache.deleted_entities
 
         return RelationQuery(
-            detected_entities=detected_entities,
+            entry_points=detected_entities,
             deleted_entity_groups=deleted_entity_groups,
             deleted_entities=deleted_entities,
         )
@@ -220,7 +221,7 @@ class _FindParser:
         autofilter = None
         if self.item.autofilter:
             if self._query.relation is not None:
-                autofilter = self._query.relation.detected_entities
+                autofilter = self._query.relation.entry_points
             else:
                 autofilter = await self._get_detected_entities()
 
