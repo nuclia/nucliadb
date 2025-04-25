@@ -45,26 +45,12 @@ async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
     """
     Will try to get the resource from the cache, if it's not there it will fetch it from the ORM and cache it.
     """
-    orm_resource: Optional[ResourceORM] = None
-
     resource_cache = get_resource_cache()
     if resource_cache is None:
         logger.warning("Resource cache not set")
         return await _orm_get_resource(kbid, uuid)
 
-    async with resource_cache.get_lock(uuid):
-        if uuid not in resource_cache:
-            resource_cache.metrics.ops.inc({"type": "miss"})
-            orm_resource = await _orm_get_resource(kbid, uuid)
-        else:
-            resource_cache.metrics.ops.inc({"type": "hit"})
-
-        if orm_resource is not None:
-            resource_cache.set(uuid, orm_resource)
-        else:
-            orm_resource = resource_cache.get(uuid)
-
-    return orm_resource
+    return await resource_cache.get((kbid, uuid))
 
 
 async def _orm_get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
@@ -75,30 +61,17 @@ async def _orm_get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
 
 
 async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
+    if field.extracted_text is not None:
+        return field.extracted_text
+
     cache = get_extracted_text_cache()
     if cache is None:
         logger.warning("Extracted text cache not set")
         return await field.get_extracted_text()
 
-    key = f"{field.kbid}/{field.uuid}/{field.id}"
-    extracted_text = cache.get(key)
-    if extracted_text is not None:
-        cache.metrics.ops.inc({"type": "hit"})
-        return extracted_text
-
-    async with cache.get_lock(key):
-        # Check again in case another task already fetched it
-        extracted_text = cache.get(key)
-        if extracted_text is not None:
-            cache.metrics.ops.inc({"type": "hit"})
-            return extracted_text
-
-        cache.metrics.ops.inc({"type": "miss"})
-        extracted_text = await field_get_extracted_text(field)
-        if extracted_text is not None:
-            # Only cache if we actually have extracted text
-            cache.set(key, extracted_text)
-        return extracted_text
+    extracted_text = await cache.get((field.kbid, FieldId(field.uuid, field.type, field.id)))
+    field.extracted_text = extracted_text
+    return extracted_text
 
 
 @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)

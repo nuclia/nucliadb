@@ -18,19 +18,27 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import asyncio
 import contextlib
+import logging
 from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Generic, Optional, TypeVar
 
-from lru import LRU
+import backoff
+from async_lru import _LRUCacheWrapper, alru_cache
 
+from nucliadb.common.ids import FieldId
+from nucliadb.common.maindb.utils import get_driver
+from nucliadb.ingest.fields.base import FieldTypes
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_telemetry.metrics import Counter, Gauge
+from nucliadb_utils.utilities import get_storage
+
+logger = logging.getLogger(__name__)
 
 # specific metrics per cache type
 cached_resources = Gauge("nucliadb_cached_resources")
@@ -39,6 +47,7 @@ resource_cache_ops = Counter("nucliadb_resource_cache_ops", labels={"type": ""})
 extracted_text_cache_ops = Counter("nucliadb_extracted_text_cache_ops", labels={"type": ""})
 
 
+K = TypeVar("K")
 T = TypeVar("T")
 
 
@@ -48,7 +57,7 @@ class CacheMetrics:
     ops: Counter
 
 
-class Cache(Generic[T], ABC):
+class Cache(Generic[K, T], ABC):
     """Low-level bounded cache implementation with access to per-key async locks
     in case cache users want to lock concurrent access.
 
@@ -56,52 +65,40 @@ class Cache(Generic[T], ABC):
 
     """
 
-    def __init__(self, cache_size: int) -> None:
-        self.cache: LRU[str, T] = LRU(cache_size, callback=self._evicted_callback)
-        self.locks: dict[str, asyncio.Lock] = {}
+    cache: _LRUCacheWrapper[Optional[T]]
 
-    def _evicted_callback(self, key: str, value: T):
-        self.locks.pop(key, None)
-        self.metrics.ops.inc({"type": "evict"})
+    async def get(self, key: K) -> Optional[T]:
+        return await self.cache(key)
 
-    def get(self, key: str) -> Optional[T]:
-        return self.cache.get(key)
-
-    # Get a lock for a specific key. Locks will be evicted at the same time as
-    # key-value pairs
-    def get_lock(self, key: str) -> asyncio.Lock:
-        return self.locks.setdefault(key, asyncio.Lock())
-
-    def set(self, key: str, value: T):
-        len_before = len(self.cache)
-
-        self.cache[key] = value
-
-        len_after = len(self.cache)
-        if len_after - len_before > 0:
-            self.metrics._cache_size.inc(len_after - len_before)
-
-    def __contains__(self, key: str) -> bool:
-        return self.cache.__contains__(key)
-
-    def clear(self):
-        self.metrics._cache_size.dec(len(self.cache))
-        self.cache.clear()
-        self.locks.clear()
+    def finalize(self):
+        info = self.cache.cache_info()
+        self.metrics.ops.inc({"type": "miss"}, value=info.misses)
+        self.metrics.ops.inc({"type": "hit"}, value=info.hits)
 
     @abstractmethod
     @cached_property
     def metrics(self) -> CacheMetrics: ...
 
 
-class ResourceCache(Cache[ResourceORM]):
+class ResourceCache(Cache[tuple[str, str], ResourceORM]):
+    def __init__(self, cache_size: int) -> None:
+        @alru_cache(maxsize=cache_size)
+        async def _get_resource(kbid_rid: tuple[str, str]) -> Optional[ResourceORM]:
+            kbid, uuid = kbid_rid
+            storage = await get_storage()
+            async with get_driver().transaction(read_only=True) as txn:
+                kb = KnowledgeBoxORM(txn, storage, kbid)
+                return await kb.get(uuid)
+
+        self.cache = _get_resource
+
     metrics = CacheMetrics(
         _cache_size=cached_resources,
         ops=resource_cache_ops,
     )
 
 
-class ExtractedTextCache(Cache[ExtractedText]):
+class ExtractedTextCache(Cache[tuple[str, FieldId], ExtractedText]):
     """
     Used to cache extracted text from a resource in memory during the process
     of search results hydration.
@@ -110,6 +107,31 @@ class ExtractedTextCache(Cache[ExtractedText]):
     as matching text blocks are processed in parallel and the extracted text is
     fetched for each field where the text block is found.
     """
+
+    def __init__(self, cache_size: int) -> None:
+        @alru_cache(maxsize=cache_size)
+        @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
+        async def _get_extracted_text(full_field_id: tuple[str, FieldId]) -> Optional[ExtractedText]:
+            (kbid, field_id) = full_field_id
+            storage = await get_storage()
+            try:
+                sf = storage.file_extracted(
+                    kbid, field_id.rid, field_id.type, field_id.key, FieldTypes.FIELD_TEXT.value
+                )
+                return await storage.download_pb(sf, ExtractedText)
+            except Exception:
+                logger.warning(
+                    "Error getting extracted text for field. Retrying",
+                    exc_info=True,
+                    extra={
+                        "kbid": kbid,
+                        "resource_id": field_id.rid,
+                        "field": f"{field_id.type}/{field_id.key}",
+                    },
+                )
+                raise
+
+        self.cache = _get_extracted_text
 
     metrics = CacheMetrics(
         _cache_size=cached_extracted_texts,
@@ -154,7 +176,7 @@ def _use_cache(klass: type[Cache], context_var: ContextVar, /, **kwargs):
         yield cache
     finally:
         context_var.reset(token)
-        cache.clear()
+        cache.finalize()
 
 
 @contextlib.contextmanager
