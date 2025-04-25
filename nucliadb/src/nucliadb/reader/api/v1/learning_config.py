@@ -20,7 +20,6 @@
 from typing import Dict
 
 from fastapi import Request
-from fastapi_versioning import version
 from nuclia_models.config.proto import ExtractConfig
 
 from nucliadb.learning_proxy import learning_config_proxy
@@ -40,7 +39,6 @@ from nucliadb_utils.settings import is_onprem_nucliadb
     tags=["Models"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def download_model(
     request: Request,
     kbid: str,
@@ -59,7 +57,6 @@ async def download_model(
     tags=["Models"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_configuration(
     request: Request,
     kbid: str,
@@ -81,7 +78,6 @@ async def get_configuration(
     tags=["Models"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_models(
     request: Request,
     kbid: str,
@@ -98,7 +94,6 @@ async def get_models(
     tags=["Models"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_model(
     request: Request,
     kbid: str,
@@ -121,7 +116,6 @@ async def get_model(
     tags=["Models"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_schema_for_configuration_updates(
     request: Request,
     kbid: str,
@@ -139,7 +133,6 @@ async def get_schema_for_configuration_updates(
     include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_schema_for_configuration_creation(
     request: Request,
 ):
@@ -157,7 +150,6 @@ async def get_schema_for_configuration_creation(
     tags=["Extract Strategies"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_extract_strategies(
     request: Request,
     kbid: str,
@@ -174,7 +166,6 @@ async def get_extract_strategies(
     tags=["Extract Strategies"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_extract_strategy_from_id(
     request: Request,
     kbid: str,

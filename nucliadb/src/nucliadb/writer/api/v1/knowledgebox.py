@@ -21,7 +21,6 @@ import asyncio
 from functools import partial
 
 from fastapi import HTTPException
-from fastapi_versioning import version
 from starlette.requests import Request
 
 from nucliadb import learning_proxy
@@ -59,7 +58,6 @@ from nucliadb_utils.authentication import requires
     openapi_extra={"x-hidden-operation": True},
 )
 @requires(NucliaDBRoles.MANAGER)
-@version(1)
 async def create_kb_endpoint(request: Request, item: KnowledgeBoxConfig) -> KnowledgeBoxObj:
     try:
         kbid, slug = await create_kb(item)
@@ -163,7 +161,6 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
     openapi_extra={"x-hidden-operation": True},
 )
 @requires(NucliaDBRoles.MANAGER)
-@version(1)
 async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> KnowledgeBoxObjID:
     driver = get_driver()
     config = None
@@ -208,7 +205,6 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> Kn
     openapi_extra={"x-hidden-operation": True},
 )
 @requires(NucliaDBRoles.MANAGER)
-@version(1)
 async def delete_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
     driver = get_driver()
     try:

@@ -21,7 +21,6 @@ from inspect import iscoroutinefunction
 from typing import TYPE_CHECKING, Annotated, Callable, Optional, Type, Union
 
 from fastapi import HTTPException, Response
-from fastapi_versioning import version
 from starlette.requests import Request
 
 import nucliadb_models as models
@@ -295,7 +294,6 @@ FIELD_PARSERS_MAP: dict[Type, Callable] = {
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def add_resource_field_text_rslug_prefix(
     request: Request,
     kbid: str,
@@ -314,7 +312,6 @@ async def add_resource_field_text_rslug_prefix(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def add_resource_field_text_rid_prefix(
     request: Request,
     kbid: str,
@@ -333,7 +330,6 @@ async def add_resource_field_text_rid_prefix(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def add_resource_field_link_rslug_prefix(
     request: Request,
     kbid: str,
@@ -352,7 +348,6 @@ async def add_resource_field_link_rslug_prefix(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def add_resource_field_link_rid_prefix(
     request: Request,
     kbid: str,
@@ -371,7 +366,6 @@ async def add_resource_field_link_rid_prefix(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def add_resource_field_conversation_rslug_prefix(
     request: Request,
     kbid: str,
@@ -390,7 +384,6 @@ async def add_resource_field_conversation_rslug_prefix(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def add_resource_field_conversation_rid_prefix(
     request: Request,
     kbid: str,
@@ -409,7 +402,6 @@ async def add_resource_field_conversation_rid_prefix(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def add_resource_field_file_rslug_prefix(
     request: Request,
     kbid: str,
@@ -431,7 +423,6 @@ async def add_resource_field_file_rslug_prefix(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def add_resource_field_file_rid_prefix(
     request: Request,
     kbid: str,
@@ -453,7 +444,6 @@ async def add_resource_field_file_rid_prefix(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def append_messages_to_conversation_field_rslug_prefix(
     request: Request,
     kbid: str,
@@ -474,7 +464,6 @@ async def append_messages_to_conversation_field_rslug_prefix(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def append_messages_to_conversation_field_rid_prefix(
     request: Request,
     kbid: str,
@@ -495,7 +484,6 @@ async def append_messages_to_conversation_field_rid_prefix(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def delete_resource_field_rslug_prefix(
     request: Request,
     kbid: str,
@@ -514,7 +502,6 @@ async def delete_resource_field_rslug_prefix(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def delete_resource_field_rid_prefix(
     request: Request,
     kbid: str,
@@ -533,7 +520,6 @@ async def delete_resource_field_rid_prefix(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def reprocess_file_field(
     request: Request,
     kbid: str,

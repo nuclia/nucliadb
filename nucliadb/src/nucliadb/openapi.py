@@ -23,21 +23,17 @@ import datetime
 import json
 
 from fastapi.openapi.utils import get_openapi
-from starlette.routing import Mount
+from starlette.routing import Route
 
 from nucliadb.reader import API_PREFIX
 
 
-def is_versioned_route(route):
-    return isinstance(route, Mount) and route.path.startswith(f"/{API_PREFIX}/v")
+def is_versioned_route(route: Route) -> bool:
+    return route.path.startswith(f"/{API_PREFIX}/v")
 
 
-def extract_openapi(application, version, commit_id, app_name):
-    app = [
-        route.app
-        for route in application.routes
-        if is_versioned_route(route) and route.app.version == version
-    ][0]
+def extract_openapi(app, version, commit_id, app_name):
+    versioned_routes = [route for route in app.routes if is_versioned_route(route)]
     document = get_openapi(
         title=app.title,
         version=app.version,
@@ -46,7 +42,7 @@ def extract_openapi(application, version, commit_id, app_name):
         terms_of_service=app.terms_of_service,
         contact=app.contact,
         license_info=app.license_info,
-        routes=app.routes,
+        routes=versioned_routes,
         tags=app.openapi_tags,
         servers=app.servers,
     )

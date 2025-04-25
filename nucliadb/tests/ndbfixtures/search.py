@@ -31,9 +31,11 @@ from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.ingest.orm.processor.processor import Processor
 from nucliadb.ingest.settings import settings as ingest_settings
-from nucliadb.search.app import application
+from nucliadb.search.app import create_application
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_telemetry.fastapi import instrument_app
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.settings import (
     nuclia_settings,
@@ -47,6 +49,7 @@ from nucliadb_utils.utilities import (
     clear_global_cache,
 )
 from tests.ingest.fixtures import broker_resource
+from tests.ndbfixtures import SERVICE_NAME
 from tests.ndbfixtures.utils import create_api_client_factory
 
 # Main fixtures
@@ -72,6 +75,14 @@ async def cluster_nucliadb_search(
         patch.object(ingest_settings, "grpc_port", free_port()),
         patch.object(nucliadb_settings, "nucliadb_ingest", f"localhost:{ingest_settings.grpc_port}"),
     ):
+        application = create_application()
+        instrument_app(
+            application,
+            tracer_provider=get_telemetry(SERVICE_NAME),
+            excluded_urls=["/"],
+            metrics=True,
+            trace_id_on_responses=True,
+        )
         async with application.router.lifespan_context(application):
             client_factory = create_api_client_factory(application)
             async with client_factory(roles=[NucliaDBRoles.READER]) as client:

@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from fastapi import Header, Request, Response
-from fastapi_versioning import version
 
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.requesters.utils import Method, node_query
@@ -59,7 +58,6 @@ from nucliadb_utils.authentication import requires
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def graph_search_knowledgebox(
     request: Request,
     response: Response,
@@ -86,7 +84,6 @@ async def graph_search_knowledgebox(
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def graph_nodes_search_knowledgebox(
     request: Request,
     response: Response,
@@ -113,7 +110,6 @@ async def graph_nodes_search_knowledgebox(
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def graph_relations_search_knowledgebox(
     request: Request,
     response: Response,

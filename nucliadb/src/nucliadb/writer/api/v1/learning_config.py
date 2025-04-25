@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from fastapi import Request
-from fastapi_versioning import version
 from nuclia_models.config.proto import ExtractConfig
 
 from nucliadb.learning_proxy import learning_config_proxy
@@ -36,7 +35,6 @@ from nucliadb_utils.authentication import requires
     tags=["Knowledge Boxes"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def set_configuration(
     request: Request,
     kbid: str,
@@ -53,7 +51,6 @@ async def set_configuration(
     tags=["Knowledge Boxes"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def patch_configuration(
     request: Request,
     kbid: str,
@@ -70,7 +67,6 @@ async def patch_configuration(
     tags=["Extract Strategies"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def add_strategy(
     request: Request,
     kbid: str,
@@ -88,7 +84,6 @@ async def add_strategy(
     tags=["Extract Strategies"],
 )
 @requires(NucliaDBRoles.WRITER)
-@version(1)
 async def delete_strategy(
     request: Request,
     kbid: str,

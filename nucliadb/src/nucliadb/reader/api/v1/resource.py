@@ -20,7 +20,6 @@
 from typing import Optional, Union
 
 from fastapi import Header, HTTPException, Query, Request, Response
-from fastapi_versioning import version
 
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.utils import get_driver
@@ -65,7 +64,6 @@ from nucliadb_utils.utilities import get_audit, get_storage
     tags=["Resources"],
 )
 @requires_one([NucliaDBRoles.READER])
-@version(1)
 async def list_resources(
     request: Request,
     response: Response,
@@ -142,7 +140,6 @@ async def list_resources(
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_resource_by_uuid(
     request: Request,
     kbid: str,
@@ -180,7 +177,6 @@ async def get_resource_by_uuid(
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_resource_by_slug(
     request: Request,
     kbid: str,
@@ -251,7 +247,6 @@ async def _get_resource(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_resource_field_rslug_prefix(
     request: Request,
     kbid: str,
@@ -291,7 +286,6 @@ async def get_resource_field_rslug_prefix(
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def get_resource_field_rid_prefix(
     request: Request,
     kbid: str,

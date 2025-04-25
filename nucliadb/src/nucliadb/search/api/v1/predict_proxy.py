@@ -22,7 +22,6 @@ from typing import Union
 
 from fastapi import Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from fastapi_versioning import version
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
@@ -53,7 +52,6 @@ DESCRIPTION = "Convenience endpoint that proxies requests to the Predict API. It
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
-@version(1)
 async def predict_proxy_endpoint(
     request: Request,
     kbid: str,

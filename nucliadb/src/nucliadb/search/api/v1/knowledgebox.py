@@ -21,7 +21,6 @@ import asyncio
 from typing import Optional
 
 from fastapi import HTTPException, Request
-from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError
 from nidx_protos.noderesources_pb2 import Shard
@@ -61,7 +60,6 @@ MAX_PARAGRAPHS_FOR_SMALL_KB = 250_000
     tags=["Knowledge Boxes"],
 )
 @requires(NucliaDBRoles.MANAGER)
-@version(1)
 async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards:
     shard_manager = get_shard_manager()
     try:
@@ -83,7 +81,6 @@ async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards
     response_model_exclude_unset=True,
 )
 @requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
-@version(1)
 async def knowledgebox_counters(
     request: Request,
     kbid: str,

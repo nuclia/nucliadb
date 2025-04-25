@@ -29,9 +29,10 @@ from nucliadb.common.maindb.exceptions import UnsetUtility
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.settings import DriverSettings
 from nucliadb.standalone.config import config_nucliadb
-from nucliadb.standalone.run import run_async_nucliadb
+from nucliadb.standalone.run import get_server
 from nucliadb.standalone.settings import Settings
 from nucliadb.tests.config import reset_config
+from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.settings import (
     LogFormatType,
@@ -39,8 +40,10 @@ from nucliadb_telemetry.settings import (
     LogOutputType,
     LogSettings,
 )
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.tests import free_port
+from tests.ndbfixtures import SERVICE_NAME
 
 from .maindb import cleanup_maindb
 
@@ -88,7 +91,16 @@ async def nucliadb(
                 log_level=LogLevel.WARNING,
             )
         )
-        server = await run_async_nucliadb(settings)
+
+        application, server = get_server(settings)
+        instrument_app(
+            application,
+            tracer_provider=get_telemetry(SERVICE_NAME),
+            excluded_urls=["/"],
+            metrics=True,
+            trace_id_on_responses=True,
+        )
+        await server.startup()
         assert server.started, "Nucliadb server did not start correctly"
 
         yield settings

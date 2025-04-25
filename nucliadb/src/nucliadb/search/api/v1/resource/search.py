@@ -21,7 +21,6 @@ import json
 from typing import Optional, Union, cast
 
 from fastapi import Header, Request, Response
-from fastapi_versioning import version
 from pydantic import ValidationError
 
 from nucliadb.models.responses import HTTPClientError
@@ -55,7 +54,6 @@ from nucliadb_utils.authentication import requires_one
     response_model=ResourceSearchResults,
 )
 @requires_one([NucliaDBRoles.READER])
-@version(1)
 async def resource_search(
     request: Request,
     response: Response,

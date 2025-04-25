@@ -25,7 +25,7 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.train import API_PREFIX
+from nucliadb.common.api import API_VERSION
 from nucliadb.train.api.v1.router import api
 from nucliadb.train.lifecycle import lifespan
 from nucliadb_telemetry import errors
@@ -35,7 +35,6 @@ from nucliadb_telemetry.fastapi.utils import (
 )
 from nucliadb_utils.authentication import NucliaCloudAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
-from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import running_settings
 
 middleware = []
@@ -59,25 +58,21 @@ fastapi_settings = dict(
 )
 
 
-base_app = FastAPI(title="NucliaDB Train API", **fastapi_settings)  # type: ignore
+def create_application() -> FastAPI:
+    application = FastAPI(
+        title="NucliaDB Train API",
+        version=API_VERSION,
+        **fastapi_settings,  # type: ignore
+    )
 
-base_app.include_router(api)
+    application.include_router(api)
 
-extend_openapi(base_app)
+    extend_openapi(application)
 
-application = VersionedFastAPI(
-    base_app,
-    version_format="{major}",
-    prefix_format=f"/{API_PREFIX}/v{{major}}",
-    default_version=(1, 0),
-    enable_latest=False,
-    kwargs=fastapi_settings,
-)
+    async def homepage(request: Request) -> HTMLResponse:
+        return HTMLResponse("NucliaDB Train Service")
 
+    # Use raw starlette routes to avoid unnecessary overhead
+    application.add_route("/", homepage)
 
-async def homepage(request: Request) -> HTMLResponse:
-    return HTMLResponse("NucliaDB Train Service")
-
-
-# Use raw starlette routes to avoid unnecessary overhead
-application.add_route("/", homepage)
+    return application
