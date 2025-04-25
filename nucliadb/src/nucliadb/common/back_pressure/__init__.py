@@ -20,6 +20,7 @@
 
 import asyncio
 import contextlib
+import logging
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -29,15 +30,16 @@ from cachetools import TTLCache
 from fastapi import HTTPException
 
 from nucliadb.common import datamanagers
+from nucliadb.common.back_pressure.settings import settings
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
-from nucliadb.writer import logger
-from nucliadb.writer.settings import back_pressure_settings as settings
 from nucliadb_protos.writer_pb2 import ShardObject
 from nucliadb_telemetry import metrics
 from nucliadb_utils import const
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import is_onprem_nucliadb
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["maybe_back_pressure"]
 
@@ -59,6 +61,9 @@ class BackPressureData:
 class BackPressureException(Exception):
     def __init__(self, data: BackPressureData):
         self.data = data
+
+    def __str__(self):
+        return f"Back pressure applied for {self.data.type}. Try again after {self.data.try_after}"
 
 
 def is_back_pressure_enabled() -> bool:
