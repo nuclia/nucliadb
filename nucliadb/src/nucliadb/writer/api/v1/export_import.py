@@ -148,7 +148,7 @@ async def start_kb_import_endpoint(request: Request, kbid: str):
     if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
-    await maybe_back_pressure(request, kbid)
+    await maybe_back_pressure(kbid)
 
     stream = stream_compatible_with_kb(kbid, request.stream())
     try:

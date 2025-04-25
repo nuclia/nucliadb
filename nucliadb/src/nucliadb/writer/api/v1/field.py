@@ -96,7 +96,7 @@ async def add_field_to_resource(
     **parser_kwargs,
 ):
     await validate_rid_exists_or_raise_error(kbid, rid)
-    await maybe_back_pressure(request, kbid, resource_uuid=rid)
+    await maybe_back_pressure(kbid, resource_uuid=rid)
 
     partitioning = get_partitioning()
     partition = partitioning.generate_partition(kbid, rid)
@@ -542,7 +542,7 @@ async def reprocess_file_field(
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
     x_file_password: Annotated[Optional[str], X_FILE_PASSWORD] = None,
 ) -> ResourceUpdated:
-    await maybe_back_pressure(request, kbid, resource_uuid=rid)
+    await maybe_back_pressure(kbid, resource_uuid=rid)
 
     processing = get_processing()
     partitioning = get_partitioning()

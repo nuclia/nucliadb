@@ -26,11 +26,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from cachetools import TTLCache
-from fastapi import HTTPException, Request
+from fastapi import HTTPException
 
 from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
-from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb.writer import logger
 from nucliadb.writer.settings import back_pressure_settings as settings
@@ -158,12 +157,19 @@ class Materializer:
         nats_manager: NatsConnectionManager,
         indexing_check_interval: int = 30,
         ingest_check_interval: int = 30,
+        processing: bool = True,
+        indexing: bool = True,
+        ingest: bool = True,
     ):
         self.nats_manager = nats_manager
         self.processing_http_client = ProcessingHTTPClient()
 
         self.indexing_check_interval = indexing_check_interval
         self.ingest_check_interval = ingest_check_interval
+
+        self.check_processing = processing
+        self.check_indexing = indexing
+        self.check_ingest = ingest
 
         self.ingest_pending: int = 0
         self.indexing_pending: int = 0
@@ -175,8 +181,10 @@ class Materializer:
         self.processing_pending_locks: dict[str, asyncio.Lock] = {}
 
     async def start(self):
-        self._tasks.append(asyncio.create_task(self._get_indexing_pending_task()))
-        self._tasks.append(asyncio.create_task(self._get_ingest_pending_task()))
+        if self.check_indexing:
+            self._tasks.append(asyncio.create_task(self._get_indexing_pending_task()))
+        if self.check_ingest:
+            self._tasks.append(asyncio.create_task(self._get_ingest_pending_task()))
         self._running = True
 
     async def stop(self):
@@ -324,28 +332,27 @@ def get_materializer() -> Materializer:
     return MATERIALIZER
 
 
-async def maybe_back_pressure(request: Request, kbid: str, resource_uuid: Optional[str] = None) -> None:
+async def maybe_back_pressure(kbid: str, resource_uuid: Optional[str] = None) -> None:
     """
     This function does system checks to see if we need to put back pressure on writes.
     In that case, a HTTP 429 will be raised with the estimated time to try again.
     """
     if not is_back_pressure_enabled() or is_onprem_nucliadb():
         return
-    await back_pressure_checks(request, kbid, resource_uuid)
+    await back_pressure_checks(kbid, resource_uuid)
 
 
-async def back_pressure_checks(request: Request, kbid: str, resource_uuid: Optional[str] = None):
+async def back_pressure_checks(kbid: str, resource_uuid: Optional[str] = None):
     """
     Will raise a 429 if back pressure is needed:
     - If the processing engine is behind.
     - If ingest processed consumer is behind.
     - If the indexing on nodes affected by the request (kbid, and resource_uuid) is behind.
     """
-    context = get_app_context(request.app)
     materializer = get_materializer()
     with cached_back_pressure(kbid, resource_uuid):
         check_ingest_behind(materializer.get_ingest_pending())
-        await check_indexing_behind(context, kbid, resource_uuid, materializer.get_indexing_pending())
+        await check_indexing_behind(kbid, resource_uuid, materializer.get_indexing_pending())
         await check_processing_behind(materializer, kbid)
 
 
@@ -379,7 +386,6 @@ async def check_processing_behind(materializer: Materializer, kbid: str):
 
 
 async def check_indexing_behind(
-    context: ApplicationContext,
     kbid: str,
     resource_uuid: Optional[str],
     pending: int,
