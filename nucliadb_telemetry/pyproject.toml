@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb_telemetry"
-version = "6.3.7"
+version = "6.4.0"
 license = { text = "AGPL" }
 description = "NucliaDB Telemetry Library Python process"
 authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
