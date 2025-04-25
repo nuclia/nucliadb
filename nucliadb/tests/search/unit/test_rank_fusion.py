@@ -29,18 +29,21 @@ from typing import Optional, Type
 from unittest.mock import patch
 
 import pytest
-from nidx_protos.nodereader_pb2 import DocumentScored, ParagraphResult
+from nidx_protos.nodereader_pb2 import DocumentScored, GraphSearchResponse, ParagraphResult
 
 import nucliadb_models.search as search_models
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search.search.find_merge import (
+    FAKE_GRAPH_SCORE,
+    graph_results_to_text_block_matches,
     keyword_result_to_text_block_match,
     semantic_result_to_text_block_match,
 )
 from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb.search.search.rank_fusion import LegacyRankFusion, ReciprocalRankFusion, get_rank_fusion
 from nucliadb_models.search import SCORE_TYPE, FindRequest
+from nucliadb_protos.utils_pb2 import RelationMetadata
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -104,6 +107,22 @@ def gen_semantic_result(
     result.metadata.position.start = vector_id.vector_start
     result.metadata.position.end = vector_id.vector_end
     return semantic_result_to_text_block_match(result)
+
+
+def gen_graph_result(rid: Optional[str] = None, force_id: Optional[str] = None) -> TextBlockMatch:
+    assert (rid is None and force_id is not None) or (rid is not None and force_id is None)
+    if force_id is None:
+        start = random.randint(0, 100)
+        end = random.randint(start, start + 100)
+        paragraph_id = ParagraphId.from_string(f"{rid}/f/my-file/{start}-{end}")
+    else:
+        paragraph_id = ParagraphId.from_string(force_id)
+
+    return graph_results_to_text_block_matches(
+        GraphSearchResponse(
+            graph=[GraphSearchResponse.Path(metadata=RelationMetadata(paragraph_id=paragraph_id.full()))]
+        )
+    )[0]
 
 
 @pytest.mark.parametrize(
@@ -221,7 +240,7 @@ def test_legacy_rank_fusion_algorithm(
 ):
     """Basic test to validate how our own rank fusion algorithm works"""
     rank_fusion = LegacyRankFusion(window=20)
-    merged = rank_fusion.fuse(keyword=keyword, semantic=semantic)
+    merged = rank_fusion.fuse(keyword=keyword, semantic=semantic, graph=[])
     results = [(item.paragraph_id.rid, round(item.score, 1), item.score_type) for item in merged]
     assert results == expected
 
@@ -235,9 +254,9 @@ def rrf_score(rank: int) -> float:
 
 
 @pytest.mark.parametrize(
-    "keyword,semantic,expected",
+    "keyword,semantic,graph,expected",
     [
-        # mix of keyword and semantic results
+        # mix of keyword, semantic and graph results
         (
             [
                 gen_keyword_result(0.1, rid="k-1"),
@@ -251,22 +270,29 @@ def rrf_score(rank: int) -> float:
                 gen_semantic_result(0.4, rid="s-4"),
             ],
             [
+                gen_graph_result(rid="g-1"),
+                gen_graph_result(rid="g-2"),
+            ],
+            [
                 ("k-2", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
                 ("s-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("g-1", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.RELATION_RELEVANCE),
                 ("k-3", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
                 ("s-4", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("g-2", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.RELATION_RELEVANCE),
                 ("k-1", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
                 ("s-2", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
                 ("s-1", round(1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
             ],
         ),
-        # only keyword results
+        # only keyword results (we maintain original scores)
         (
             [
                 gen_keyword_result(1, rid="k-1"),
                 gen_keyword_result(3, rid="k-2"),
                 gen_keyword_result(4, rid="k-3"),
             ],
+            [],
             [],
             [
                 ("k-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
@@ -283,11 +309,25 @@ def rrf_score(rank: int) -> float:
                 gen_semantic_result(0.6, rid="s-3"),
                 gen_semantic_result(0.4, rid="s-4"),
             ],
+            [],
             [
                 ("s-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
                 ("s-4", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
                 ("s-2", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
                 ("s-1", round(1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+            ],
+        ),
+        # only graph results
+        (
+            [],
+            [],
+            [
+                gen_graph_result(rid="g-1"),
+                gen_graph_result(rid="g-2"),
+            ],
+            [
+                ("g-1", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.RELATION_RELEVANCE),
+                ("g-2", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.RELATION_RELEVANCE),
             ],
         ),
         # all keyword scores greater than semantic
@@ -304,6 +344,7 @@ def rrf_score(rank: int) -> float:
                 gen_semantic_result(0.4, rid="s-4"),
                 gen_semantic_result(0.1, rid="s-5"),
             ],
+            [],
             [
                 ("k-2", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
                 ("s-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
@@ -329,6 +370,7 @@ def rrf_score(rank: int) -> float:
                 gen_semantic_result(3, rid="s-2"),
                 gen_semantic_result(6, rid="s-3"),
             ],
+            [],
             [
                 ("k-4", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
                 ("s-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
@@ -353,6 +395,7 @@ def rrf_score(rank: int) -> float:
                 gen_semantic_result(6, force_id="r-4/f/my/0/0-10"),
                 gen_semantic_result(6, force_id="r-5/f/my/0/0-10"),
             ],
+            [],
             [
                 ("r-4", round(1 / (1 + RRF_TEST_K) + 1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BOTH),
                 ("r-2", round(1 / (0 + RRF_TEST_K) + 0, 6), SCORE_TYPE.BM25),
@@ -366,16 +409,17 @@ def rrf_score(rank: int) -> float:
 def test_reciprocal_rank_fusion_algorithm(
     keyword: list[TextBlockMatch],
     semantic: list[TextBlockMatch],
+    graph: list[TextBlockMatch],
     expected: list[tuple[str, float, SCORE_TYPE]],
 ):
     rrf = ReciprocalRankFusion(k=RRF_TEST_K, window=20)
-    merged = rrf.fuse(keyword, semantic)
+    merged = rrf.fuse(keyword, semantic, graph)
     results = [(item.paragraph_id.rid, round(item.score, 6), item.score_type) for item in merged]
     assert results == expected
 
 
 @pytest.mark.parametrize(
-    "keyword,semantic,expected",
+    "keyword,semantic,graph,expected",
     [
         # only keyword results
         (
@@ -384,6 +428,7 @@ def test_reciprocal_rank_fusion_algorithm(
                 gen_keyword_result(3, rid="k-2"),
                 gen_keyword_result(4, rid="k-3"),
             ],
+            [],
             [],
             [
                 ("k-3", round(1 / (0 + RRF_TEST_K) * 2, 6), SCORE_TYPE.BM25),
@@ -399,6 +444,7 @@ def test_reciprocal_rank_fusion_algorithm(
                 gen_semantic_result(0.3, rid="s-2"),
                 gen_semantic_result(0.6, rid="s-3"),
             ],
+            [],
             [
                 ("s-3", round(1 / (0 + RRF_TEST_K) * 0.5, 6), SCORE_TYPE.VECTOR),
                 ("s-2", round(1 / (1 + RRF_TEST_K) * 0.5, 6), SCORE_TYPE.VECTOR),
@@ -419,6 +465,19 @@ def test_reciprocal_rank_fusion_algorithm(
                 gen_semantic_result(6, force_id="r-5/f/my/0/0-10"),
             ],
             [
+                gen_graph_result(force_id="r-1/f/my/0-10"),
+                gen_graph_result(force_id="r-6/f/my/0-10"),
+            ],
+            [
+                (
+                    "r-1",
+                    round(
+                        (1 / (2 + RRF_TEST_K) * 2)
+                        + (1 / (3 + RRF_TEST_K) * 0.5 + (1 / (0 + RRF_TEST_K) * FAKE_GRAPH_SCORE)),
+                        6,
+                    ),
+                    SCORE_TYPE.BOTH,
+                ),
                 ("r-2", round((1 / (0 + RRF_TEST_K) * 2) + 0, 6), SCORE_TYPE.BM25),
                 (
                     "r-4",
@@ -426,9 +485,9 @@ def test_reciprocal_rank_fusion_algorithm(
                     SCORE_TYPE.BOTH,
                 ),
                 (
-                    "r-1",
-                    round((1 / (2 + RRF_TEST_K) * 2) + (1 / (3 + RRF_TEST_K) * 0.5), 6),
-                    SCORE_TYPE.BOTH,
+                    "r-6",
+                    round(0 + (1 / (1 + RRF_TEST_K) * FAKE_GRAPH_SCORE), 6),
+                    SCORE_TYPE.RELATION_RELEVANCE,
                 ),
                 ("r-5", round(0 + (1 / (1 + RRF_TEST_K) * 0.5), 6), SCORE_TYPE.VECTOR),
                 ("r-3", round(0 + (1 / (2 + RRF_TEST_K) * 0.5), 6), SCORE_TYPE.VECTOR),
@@ -439,9 +498,10 @@ def test_reciprocal_rank_fusion_algorithm(
 def test_reciprocal_rank_fusion_boosting(
     keyword: list[TextBlockMatch],
     semantic: list[TextBlockMatch],
+    graph: list[TextBlockMatch],
     expected: list[tuple[str, float]],
 ):
     rrf = ReciprocalRankFusion(k=RRF_TEST_K, window=20, keyword_weight=2, semantic_weight=0.5)
-    merged = rrf.fuse(keyword, semantic)
+    merged = rrf.fuse(keyword, semantic, graph)
     results = [(item.paragraph_id.rid, round(item.score, 6), item.score_type) for item in merged]
     assert results == expected

@@ -573,4 +573,4 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
     bm.user_relations.relations.extend(edges)
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
-    return rid
+    yield rid

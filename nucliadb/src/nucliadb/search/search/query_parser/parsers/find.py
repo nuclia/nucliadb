@@ -31,6 +31,7 @@ from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.filter_expression import parse_expression
 from nucliadb.search.search.query_parser.models import (
     Filters,
+    GraphQuery,
     NoopReranker,
     ParsedQuery,
     PredictReranker,
@@ -112,7 +113,8 @@ class _FindParser:
         if search_models.FindOptions.RELATIONS in self.item.features:
             self._query.relation = await self._parse_relation_query()
 
-        # TODO: graph search
+        if search_models.FindOptions.GRAPH in self.item.features:
+            self._query.graph = await self._parse_graph_query()
 
         filters = await self._parse_filters()
 
@@ -151,6 +153,7 @@ class _FindParser:
             and (
                 search_models.FindOptions.SEMANTIC in self.item.features
                 or search_models.FindOptions.RELATIONS in self.item.features
+                or search_models.FindOptions.GRAPH in self.item.features
             )
         ):
             raise InvalidQueryError(
@@ -161,6 +164,9 @@ class _FindParser:
         if search_models.FindOptions.SEMANTIC in self.item.features:
             if should_disable_vector_search(self.item):
                 self.item.features.remove(search_models.FindOptions.SEMANTIC)
+
+        if self.item.graph_query and search_models.FindOptions.GRAPH not in self.item.features:
+            raise InvalidQueryError("graph_query", "Using a graph query requires enabling graph feature")
 
     async def _parse_relation_query(self) -> RelationQuery:
         detected_entities = await self._get_detected_entities()
@@ -175,6 +181,13 @@ class _FindParser:
             deleted_entity_groups=deleted_entity_groups,
             deleted_entities=deleted_entities,
         )
+
+    async def _parse_graph_query(self) -> GraphQuery:
+        if self.item.graph_query is None:
+            raise InvalidQueryError(
+                "graph_query", "Graph query must be provided when using graph search"
+            )
+        return GraphQuery(query=self.item.graph_query)
 
     async def _get_detected_entities(self) -> list[utils_pb2.RelationNode]:
         """Get entities from request, either automatically detected or

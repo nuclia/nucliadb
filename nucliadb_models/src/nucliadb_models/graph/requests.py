@@ -25,7 +25,6 @@ from typing_extensions import Self
 
 from nucliadb_models.filters import And, FieldFilterExpression, Not, Or, filter_discriminator
 from nucliadb_models.metadata import RelationNodeType, RelationType
-from nucliadb_models.search import SearchParamDefaults
 from nucliadb_models.security import RequestSecurity
 
 ## Models for graph nodes and relations
@@ -161,8 +160,16 @@ class GraphSearchRequest(BaseGraphSearchRequest):
             "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
         ),
     )
-    security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
-    show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
+    security: Optional[RequestSecurity] = Field(
+        default=None,
+        title="Security",
+        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",  # noqa: E501
+    )
+    show_hidden: bool = Field(
+        default=False,
+        title="Show hidden resources",
+        description="If set to false (default), excludes hidden resources from search",
+    )
 
 
 # Nodes search
@@ -189,8 +196,16 @@ class GraphNodesSearchRequest(BaseGraphSearchRequest):
             "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
         ),
     )
-    security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
-    show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
+    security: Optional[RequestSecurity] = Field(
+        default=None,
+        title="Security",
+        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",  # noqa: E501
+    )
+    show_hidden: bool = Field(
+        default=False,
+        title="Show hidden resources",
+        description="If set to false (default), excludes hidden resources from search",
+    )
 
 
 # Relations search
@@ -217,8 +232,16 @@ class GraphRelationsSearchRequest(BaseGraphSearchRequest):
             "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
         ),
     )
-    security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
-    show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
+    security: Optional[RequestSecurity] = Field(
+        default=None,
+        title="Security",
+        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",  # noqa: E501
+    )
+    show_hidden: bool = Field(
+        default=False,
+        title="Show hidden resources",
+        description="If set to false (default), excludes hidden resources from search",
+    )
 
 
 # We need this to avoid issues with pydantic and generic types defined in another module

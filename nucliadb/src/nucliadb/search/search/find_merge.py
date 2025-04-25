@@ -68,6 +68,9 @@ FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
     buckets=[1, 5, 10, 20, 30, 40, 50, 60, 80, 100, 200],
 )
 
+# Constant score given to all graph results until we implement graph scoring
+FAKE_GRAPH_SCORE = 1.0
+
 
 @merge_observer.wrap({"type": "find_merge"})
 async def build_find_response(
@@ -103,14 +106,17 @@ async def build_find_response(
             search_response.vector.documents,
         )
     )
+    graph_results = graph_results_to_text_block_matches(search_response.graph)
 
     merged_text_blocks: list[TextBlockMatch]
-    if len(keyword_results) == 0:
-        merged_text_blocks = semantic_results
-    elif len(semantic_results) == 0:
+    if len(keyword_results) > 0 and len(semantic_results) == 0 and len(graph_results) == 0:
         merged_text_blocks = keyword_results
+    elif len(keyword_results) == 0 and len(semantic_results) > 0 and len(graph_results) == 0:
+        merged_text_blocks = semantic_results
+    elif len(keyword_results) == 0 and len(semantic_results) == 0 and len(graph_results) > 0:
+        merged_text_blocks = graph_results
     else:
-        merged_text_blocks = rank_fusion_algorithm.fuse(keyword_results, semantic_results)
+        merged_text_blocks = rank_fusion_algorithm.fuse(keyword_results, semantic_results, graph_results)
 
     # cut
     # we assume pagination + predict reranker is forbidden and has been already
@@ -334,6 +340,43 @@ def semantic_results_to_text_block_matches(items: Iterable[DocumentScored]) -> l
             continue
         text_blocks.append(text_block)
     return text_blocks
+
+
+def graph_results_to_text_block_matches(item: GraphSearchResponse) -> list[TextBlockMatch]:
+    matches = []
+    for path in item.graph:
+        metadata = path.metadata
+
+        if not metadata.paragraph_id:
+            continue
+
+        paragraph_id = ParagraphId.from_string(metadata.paragraph_id)
+        matches.append(
+            TextBlockMatch(
+                paragraph_id=paragraph_id,
+                score=FAKE_GRAPH_SCORE,
+                score_type=SCORE_TYPE.RELATION_RELEVANCE,
+                order=0,  # NOTE: this will be filled later
+                text="",  # NOTE: this will be filled later too
+                position=TextPosition(
+                    page_number=0,
+                    index=0,
+                    start=paragraph_id.paragraph_start,
+                    end=paragraph_id.paragraph_end,
+                    start_seconds=[],
+                    end_seconds=[],
+                ),
+                # XXX: we should split labels
+                field_labels=[],
+                paragraph_labels=[],
+                fuzzy_search=False,  # TODO: this depends on the query, should we populate it?
+                is_a_table=False,
+                representation_file="",
+                page_with_visual=False,
+            )
+        )
+
+    return matches
 
 
 @merge_observer.wrap({"type": "hydrate_and_rerank"})

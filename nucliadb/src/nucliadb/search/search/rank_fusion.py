@@ -62,21 +62,28 @@ class RankFusionAlgorithm(ABC):
         return self._window
 
     def fuse(
-        self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
+        self,
+        keyword: Iterable[TextBlockMatch],
+        semantic: Iterable[TextBlockMatch],
+        graph: Iterable[TextBlockMatch],
     ) -> list[TextBlockMatch]:
         """Fuse keyword and semantic results and return a list with the merged
         results.
 
         """
-        merged = self._fuse(keyword, semantic)
+        merged = self._fuse(keyword, semantic, graph)
         return merged
 
     @abstractmethod
     def _fuse(
-        self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
+        self,
+        keyword: Iterable[TextBlockMatch],
+        semantic: Iterable[TextBlockMatch],
+        graph: Iterable[TextBlockMatch],
     ) -> list[TextBlockMatch]: ...
 
 
+# DEPRECATED: only used in tests!
 class LegacyRankFusion(RankFusionAlgorithm):
     """Legacy algorithm that given results from keyword and semantic search,
     mixes them in the following way:
@@ -88,7 +95,10 @@ class LegacyRankFusion(RankFusionAlgorithm):
 
     @rank_fusion_observer.wrap({"type": "legacy"})
     def _fuse(
-        self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
+        self,
+        keyword: Iterable[TextBlockMatch],
+        semantic: Iterable[TextBlockMatch],
+        graph: Iterable[TextBlockMatch],
     ) -> list[TextBlockMatch]:
         merged: list[TextBlockMatch] = []
 
@@ -132,6 +142,7 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         window: int,
         keyword_weight: float = 1.0,
         semantic_weight: float = 1.0,
+        graph_weight: float = 1.0,
     ):
         super().__init__(window)
         # Constant used in RRF, studies agree on 60 as a good default value
@@ -141,10 +152,14 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         self._k = k
         self._keyword_boost = keyword_weight
         self._semantic_boost = semantic_weight
+        self._graph_boost = graph_weight
 
     @rank_fusion_observer.wrap({"type": "reciprocal_rank_fusion"})
     def _fuse(
-        self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
+        self,
+        keyword: Iterable[TextBlockMatch],
+        semantic: Iterable[TextBlockMatch],
+        graph: Iterable[TextBlockMatch],
     ) -> list[TextBlockMatch]:
         scores: dict[ParagraphId, tuple[float, SCORE_TYPE]] = {}
         match_positions: dict[ParagraphId, list[tuple[int, int]]] = {}
@@ -152,10 +167,12 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         # sort results by it's score before merging them
         keyword = [k for k in sorted(keyword, key=lambda r: r.score, reverse=True)]
         semantic = [s for s in sorted(semantic, key=lambda r: r.score, reverse=True)]
+        graph = [g for g in graph]
 
         rankings = [
             (keyword, self._keyword_boost),
             (semantic, self._semantic_boost),
+            (graph, self._graph_boost),
         ]
         for r, (ranking, boost) in enumerate(rankings):
             for i, result in enumerate(ranking):
@@ -195,6 +212,7 @@ def get_rank_fusion(rank_fusion: parser_models.RankFusion) -> RankFusionAlgorith
             window=window,
             keyword_weight=rank_fusion.boosting.keyword,
             semantic_weight=rank_fusion.boosting.semantic,
+            graph_weight=rank_fusion.boosting.graph,
         )
 
     else:
