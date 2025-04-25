@@ -82,6 +82,7 @@ def test_merge_paragraphs_vectors():
         LegacyRankFusion(window=20).fuse(
             keyword=[*shard1_paragraphs, *shard2_paragraphs],
             semantic=filter(lambda x: x.score >= min_score_semantic, [*shard1_vectors, *shard2_vectors]),
+            graph=[],
         ),
         20,
     )
