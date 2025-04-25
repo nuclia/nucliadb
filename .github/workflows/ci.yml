@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12.5"
+          python-version: "3.13"
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
@@ -147,7 +147,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12.5"
+          python-version: "3.13"
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
@@ -228,7 +228,7 @@ jobs:
           workspaces: nidx
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12.5"
+          python-version: "3.13"
       - name: Install uv
         uses: astral-sh/setup-uv@v5
       # Needed for nidx_protos (rust)
@@ -262,7 +262,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12.5"
+          python-version: "3.13"
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
@@ -320,7 +320,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12.5"
+          python-version: "3.13"
 
       - name: Restore venv
         uses: actions/cache/restore@v4
@@ -367,7 +367,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12.5"
+          python-version: "3.13"
 
       - name: Restore venv
         uses: actions/cache/restore@v4
@@ -409,7 +409,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12.5"
+          python-version: "3.13"
 
       - name: Restore venv
         uses: actions/cache/restore@v4
