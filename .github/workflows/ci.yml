@@ -182,13 +182,13 @@ jobs:
         uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install cargo-llvm-cov
-        run: cargo install cargo-llvm-cov
+      - name: Install cargo-llvm-cov and nextest
+        run: cargo install cargo-llvm-cov cargo-nextest
       - name: test
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost/postgres
           SQLX_OFFLINE: true
-        run: cd nidx && cargo llvm-cov --codecov --output-path codecov.json test --workspace --all-features
+        run: cd nidx && cargo llvm-cov --codecov --output-path codecov.json nextest --workspace --all-features
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
