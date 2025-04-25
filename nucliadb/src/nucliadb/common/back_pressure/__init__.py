@@ -364,7 +364,7 @@ async def back_pressure_checks(kbid: str, resource_uuid: Optional[str] = None):
         ) from exc
 
 
-def check_processing_behind(kb_pending: int):  # materializer: BackPressureMaterializer, kbid: str):
+def check_processing_behind(kb_pending: int):
     """
     This function checks if the processing engine is behind and may raise a 429
     if it is further behind than the configured threshold.
