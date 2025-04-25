@@ -20,10 +20,10 @@
 
 import pytest
 from httpx import AsyncClient
+from nidx_protos.nodereader_pb2 import SearchRequest
 from pytest_mock import MockerFixture
 
 from nucliadb.search.search import find
-from nucliadb_protos.nodereader_pb2 import SearchRequest
 
 
 @pytest.mark.deploy_modes("standalone")
