@@ -22,7 +22,7 @@ import asyncio
 import contextlib
 import threading
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from cachetools import TTLCache
@@ -83,7 +83,7 @@ class BackPressureCache:
             data = self._cache.get(key, None)
             if data is None:
                 return None
-            if datetime.utcnow() >= data.try_after:
+            if datetime.now(timezone.utc) >= data.try_after:
                 # The key has expired, so remove it from the cache
                 self._cache.pop(key, None)
                 return None
@@ -438,7 +438,7 @@ def estimate_try_after(rate: float, pending: int, max_wait: int) -> datetime:
     This function estimates the time to try again based on the rate and the number of pending messages.
     """
     delta_seconds = min(pending / rate, max_wait)
-    return datetime.utcnow() + timedelta(seconds=delta_seconds)
+    return datetime.now(timezone.utc) + timedelta(seconds=delta_seconds)
 
 
 async def get_nats_consumer_pending_messages(

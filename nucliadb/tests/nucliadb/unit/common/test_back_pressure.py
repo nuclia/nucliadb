@@ -25,7 +25,7 @@ from unittest import mock
 import pytest
 from fastapi import HTTPException
 
-from nucliadb.writer.back_pressure import (
+from nucliadb.common.back_pressure import (
     BackPressureCache,
     BackPressureData,
     BackPressureException,
@@ -38,7 +38,7 @@ from nucliadb.writer.back_pressure import (
     maybe_back_pressure,
     start_materializer,
 )
-from nucliadb.writer.back_pressure import _cache as back_pressure_cache
+from nucliadb.common.back_pressure import _cache as back_pressure_cache
 
 MODULE = "nucliadb.writer.back_pressure"
 
@@ -285,7 +285,7 @@ async def test_start_materializer():
     assert mat.running
 
     # Make sure the singleton is set
-    from nucliadb.writer.back_pressure import MATERIALIZER
+    from nucliadb.common.back_pressure import MATERIALIZER
 
     assert MATERIALIZER is mat
 

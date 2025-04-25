@@ -57,6 +57,7 @@ class PullWorker:
         local_subscriber: bool = False,
         pull_time_empty_backoff: float = 5.0,
         pull_api_timeout: int = 60,
+        #        back_pressure: Optional[IngestBackPressure] = None,
     ):
         self.partition = partition
         self.pull_time_error_backoff = pull_time_error_backoff

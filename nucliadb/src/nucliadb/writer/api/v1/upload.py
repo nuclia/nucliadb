@@ -32,6 +32,7 @@ from fastapi_versioning import version
 from starlette.requests import Request as StarletteRequest
 
 from nucliadb.common import datamanagers
+from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.models.internal.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
@@ -43,7 +44,6 @@ from nucliadb.writer.api.v1.resource import (
     validate_rid_exists_or_raise_error,
 )
 from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_manager
-from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import parse_basic_creation, parse_user_classifications
 from nucliadb.writer.resource.field import (
