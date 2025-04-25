@@ -97,54 +97,26 @@ _cache = BackPressureCache()
 
 
 @contextlib.contextmanager
-def cached_back_pressure(kbid: str, resource_uuid: Optional[str] = None):
+def cached_back_pressure(cache_key: str):
     """
     Context manager that handles the caching of the try again in time so that
     we don't recompute try again times if we have already applied back pressure.
     """
-
-    cache_key = "-".join([kbid, resource_uuid or ""])
-
     data: Optional[BackPressureData] = _cache.get(cache_key)
     if data is not None:
-        try_after = data.try_after
         back_pressure_type = data.type
         RATE_LIMITED_REQUESTS_COUNTER.inc({"type": back_pressure_type, "cached": "true"})
-        logger.info(
-            "Back pressure applied from cache",
-            extra={
-                "type": back_pressure_type,
-                "try_after": try_after,
-                "kbid": kbid,
-                "resource_uuid": resource_uuid,
-            },
-        )
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "message": f"Too many messages pending to ingest. Retry after {try_after}",
-                "try_after": try_after.timestamp(),
-                "back_pressure_type": back_pressure_type,
-            },
-        )
+        raise BackPressureException(data)
     try:
         yield
     except BackPressureException as exc:
-        try_after = exc.data.try_after
         back_pressure_type = exc.data.type
         RATE_LIMITED_REQUESTS_COUNTER.inc({"type": back_pressure_type, "cached": "false"})
         _cache.set(cache_key, exc.data)
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "message": f"Too many messages pending to ingest. Retry after {try_after}",
-                "try_after": try_after.timestamp(),
-                "back_pressure_type": back_pressure_type,
-            },
-        )
+        raise exc
 
 
-class Materializer:
+class BackPressureMaterializer:
     """
     Singleton class that will run in the background gathering the different
     stats to apply back pressure and materializing it in memory. This allows us
@@ -157,7 +129,6 @@ class Materializer:
         nats_manager: NatsConnectionManager,
         indexing_check_interval: int = 30,
         ingest_check_interval: int = 30,
-        processing: bool = True,
         indexing: bool = True,
         ingest: bool = True,
     ):
@@ -167,9 +138,8 @@ class Materializer:
         self.indexing_check_interval = indexing_check_interval
         self.ingest_check_interval = ingest_check_interval
 
-        self.check_processing = processing
-        self.check_indexing = indexing
-        self.check_ingest = ingest
+        self.should_check_indexing = indexing
+        self.should_check_ingest = ingest
 
         self.ingest_pending: int = 0
         self.indexing_pending: int = 0
@@ -181,9 +151,9 @@ class Materializer:
         self.processing_pending_locks: dict[str, asyncio.Lock] = {}
 
     async def start(self):
-        if self.check_indexing:
+        if self.should_check_indexing:
             self._tasks.append(asyncio.create_task(self._get_indexing_pending_task()))
-        if self.check_ingest:
+        if self.should_check_ingest:
             self._tasks.append(asyncio.create_task(self._get_ingest_pending_task()))
         self._running = True
 
@@ -239,9 +209,13 @@ class Materializer:
         return response.incomplete
 
     def get_indexing_pending(self) -> int:
+        if not self.should_check_indexing:
+            raise ValueError("Indexing pending is not being tracked")
         return self.indexing_pending
 
     def get_ingest_pending(self) -> int:
+        if not self.should_check_ingest:
+            raise ValueError("Ingest pending is not being tracked")
         return self.ingest_pending
 
     async def _get_indexing_pending_task(self):
@@ -282,15 +256,25 @@ class Materializer:
         except asyncio.CancelledError:
             pass
 
+    def check_indexing(self):
+        check_indexing_behind(self.get_indexing_pending())
 
-MATERIALIZER: Optional[Materializer] = None
+    def check_ingest(self):
+        check_ingest_behind(self.get_ingest_pending())
+
+    async def check_processing(self, kbid: str):
+        kb_pending = await self.get_processing_pending(kbid)
+        check_processing_behind(kb_pending)
+
+
+MATERIALIZER: Optional[BackPressureMaterializer] = None
 materializer_lock = threading.Lock()
 
 
 async def start_materializer(context: ApplicationContext):
     global MATERIALIZER
     if MATERIALIZER is not None:
-        logger.info("Materializer already started")
+        logger.warning("BackPressureMaterializer already started")
         return
     with materializer_lock:
         if MATERIALIZER is not None:
@@ -303,7 +287,7 @@ async def start_materializer(context: ApplicationContext):
                 "Could not initialize materializer. Nats manager not found or not initialized yet"
             )
             return
-        materializer = Materializer(
+        materializer = BackPressureMaterializer(
             nats_manager,
             indexing_check_interval=settings.indexing_check_interval,
             ingest_check_interval=settings.ingest_check_interval,
@@ -315,7 +299,7 @@ async def start_materializer(context: ApplicationContext):
 async def stop_materializer():
     global MATERIALIZER
     if MATERIALIZER is None or not MATERIALIZER.running:
-        logger.info("Materializer already stopped")
+        logger.warning("BackPressureMaterializer already stopped")
         return
     with materializer_lock:
         if MATERIALIZER is None:
@@ -325,10 +309,10 @@ async def stop_materializer():
         MATERIALIZER = None
 
 
-def get_materializer() -> Materializer:
+def get_materializer() -> BackPressureMaterializer:
     global MATERIALIZER
     if MATERIALIZER is None:
-        raise RuntimeError("Materializer not initialized")
+        raise RuntimeError("BackPressureMaterializer not initialized")
     return MATERIALIZER
 
 
@@ -350,13 +334,32 @@ async def back_pressure_checks(kbid: str, resource_uuid: Optional[str] = None):
     - If the indexing on nodes affected by the request (kbid, and resource_uuid) is behind.
     """
     materializer = get_materializer()
-    with cached_back_pressure(kbid, resource_uuid):
-        check_ingest_behind(materializer.get_ingest_pending())
-        await check_indexing_behind(kbid, resource_uuid, materializer.get_indexing_pending())
-        await check_processing_behind(materializer, kbid)
+    try:
+        with cached_back_pressure(f"{kbid}-{resource_uuid}"):
+            materializer.check_indexing()
+            materializer.check_ingest()
+            await materializer.check_processing(kbid)
+    except BackPressureException as exc:
+        logger.info(
+            "Back pressure applied",
+            extra={
+                "kbid": kbid,
+                "resource_uuid": resource_uuid,
+                "try_after": exc.data.try_after,
+                "back_pressure_type": exc.data.type,
+            },
+        )
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": f"Too many messages pending to ingest. Retry after {exc.data.try_after}",
+                "try_after": exc.data.try_after.timestamp(),
+                "back_pressure_type": exc.data.type,
+            },
+        ) from exc
 
 
-async def check_processing_behind(materializer: Materializer, kbid: str):
+def check_processing_behind(kb_pending: int):  # materializer: BackPressureMaterializer, kbid: str):
     """
     This function checks if the processing engine is behind and may raise a 429
     if it is further behind than the configured threshold.
@@ -366,7 +369,6 @@ async def check_processing_behind(materializer: Materializer, kbid: str):
         # Processing back pressure is disabled
         return
 
-    kb_pending = await materializer.get_processing_pending(kbid)
     if kb_pending > max_pending:
         try_after = estimate_try_after(
             rate=settings.processing_rate,
@@ -374,27 +376,10 @@ async def check_processing_behind(materializer: Materializer, kbid: str):
             max_wait=settings.max_wait_time,
         )
         data = BackPressureData(type="processing", try_after=try_after)
-        logger.info(
-            "Processing back pressure applied",
-            extra={
-                "kbid": kbid,
-                "try_after": try_after,
-                "pending": kb_pending,
-            },
-        )
         raise BackPressureException(data)
 
 
-async def check_indexing_behind(
-    kbid: str,
-    resource_uuid: Optional[str],
-    pending: int,
-):
-    """
-    If a resource uuid is provided, it will check the nodes that have the replicas
-    of the resource's shard, otherwise it will check the nodes of all active shards
-    for the KnowledgeBox.
-    """
+def check_indexing_behind(pending: int):
     max_pending = settings.max_indexing_pending
     if max_pending <= 0:
         # Indexing back pressure is disabled
@@ -407,15 +392,6 @@ async def check_indexing_behind(
             max_wait=settings.max_wait_time,
         )
         data = BackPressureData(type="indexing", try_after=try_after)
-        logger.info(
-            "Indexing back pressure applied",
-            extra={
-                "kbid": kbid,
-                "resource_uuid": resource_uuid,
-                "try_after": try_after,
-                "pending": pending,
-            },
-        )
         raise BackPressureException(data)
 
 
@@ -432,10 +408,6 @@ def check_ingest_behind(ingest_pending: int):
             max_wait=settings.max_wait_time,
         )
         data = BackPressureData(type="ingest", try_after=try_after)
-        logger.info(
-            "Ingest back pressure applied",
-            extra={"try_after": try_after, "pending": ingest_pending},
-        )
         raise BackPressureException(data)
 
 

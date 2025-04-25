@@ -19,11 +19,17 @@
 #
 import asyncio
 import base64
+from datetime import datetime, timezone
 from typing import Optional
 
 from aiohttp.client_exceptions import ClientConnectorError
 
 from nucliadb.common import datamanagers
+from nucliadb.common.back_pressure import (
+    BackPressureException,
+    BackPressureMaterializer,
+    cached_back_pressure,
+)
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient, get_nua_api_id
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import logger, logger_activity
@@ -57,14 +63,14 @@ class PullWorker:
         local_subscriber: bool = False,
         pull_time_empty_backoff: float = 5.0,
         pull_api_timeout: int = 60,
-        #        back_pressure: Optional[IngestBackPressure] = None,
+        back_pressure: Optional[BackPressureMaterializer] = None,
     ):
         self.partition = partition
         self.pull_time_error_backoff = pull_time_error_backoff
         self.pull_time_empty_backoff = pull_time_empty_backoff
         self.pull_api_timeout = pull_api_timeout
         self.local_subscriber = local_subscriber
-
+        self.back_pressure = back_pressure
         self.processor = Processor(driver, storage, pubsub, partition)
 
     def __str__(self) -> str:
@@ -113,11 +119,30 @@ class PullWorker:
                 transaction_check=False,
             )
 
+    async def back_pressure_check(self) -> None:
+        if self.back_pressure is None:
+            return
+        while True:
+            try:
+                with cached_back_pressure(cache_key="ingest-pull-worker"):
+                    self.back_pressure.check_indexing()
+                    self.back_pressure.check_ingest()
+                break
+            except BackPressureException as exc:
+                sleep_time = (datetime.now(timezone.utc) - exc.data.try_after).total_seconds()
+                logger.warning(f"Back pressure active! Sleeping for {sleep_time} seconds", exc_info=True)
+                await asyncio.sleep(sleep_time)
+            except Exception as e:
+                errors.capture_exception(e)
+                logger.exception("Error while checking back pressure. Moving on")
+                break
+
     async def loop(self):
         """
         Run this forever
         """
         while True:
+            await self.back_pressure_check()
             try:
                 await self._loop()
             except ReallyStopPulling:

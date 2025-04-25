@@ -29,7 +29,7 @@ from nucliadb.common.back_pressure import (
     BackPressureCache,
     BackPressureData,
     BackPressureException,
-    Materializer,
+    BackPressureMaterializer,
     cached_back_pressure,
     check_ingest_behind,
     check_processing_behind,
@@ -231,7 +231,7 @@ def processing_client():
 
 
 async def test_materializer(nats_conn, js, processing_client):
-    materializer = Materializer(
+    materializer = BackPressureMaterializer(
         nats_conn,
         indexing_check_interval=0.5,
         ingest_check_interval=0.5,
@@ -279,7 +279,7 @@ async def test_start_materializer():
 
     await start_materializer(context)
     mat = get_materializer()
-    assert isinstance(mat, Materializer)
+    assert isinstance(mat, BackPressureMaterializer)
     assert mat.nats_manager == nats_mgr
 
     assert mat.running
