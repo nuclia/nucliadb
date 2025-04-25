@@ -2297,7 +2297,6 @@ dependencies = [
 
 [package.optional-dependencies]
 cache = [
-    { name = "lru-dict" },
     { name = "orjson" },
     { name = "redis" },
 ]
@@ -2330,7 +2329,6 @@ requires-dist = [
     { name = "google-api-python-client", marker = "extra == 'storages'", specifier = ">=2.37.0" },
     { name = "google-auth", marker = "extra == 'storages'", specifier = ">=2.4.1" },
     { name = "httpx", specifier = ">=0.27.0" },
-    { name = "lru-dict", marker = "extra == 'cache'", specifier = ">=1.1.7" },
     { name = "mmh3", specifier = ">=3.0.0" },
     { name = "mrflagly", specifier = ">=0.2.9" },
     { name = "nats-py", extras = ["nkeys"], specifier = ">=2.6.0" },
