@@ -61,17 +61,12 @@ class BackPressureMaterializer:
         nats_manager: NatsConnectionManager,
         indexing_check_interval: int = 30,
         ingest_check_interval: int = 30,
-        indexing: bool = True,
-        ingest: bool = True,
     ):
         self.nats_manager = nats_manager
         self.processing_http_client = ProcessingHTTPClient()
 
         self.indexing_check_interval = indexing_check_interval
         self.ingest_check_interval = ingest_check_interval
-
-        self.should_check_indexing = indexing
-        self.should_check_ingest = ingest
 
         self.ingest_pending: int = 0
         self.indexing_pending: int = 0
@@ -83,10 +78,8 @@ class BackPressureMaterializer:
         self.processing_pending_locks: dict[str, asyncio.Lock] = {}
 
     async def start(self):
-        if self.should_check_indexing:
-            self._tasks.append(asyncio.create_task(self._get_indexing_pending_task()))
-        if self.should_check_ingest:
-            self._tasks.append(asyncio.create_task(self._get_ingest_pending_task()))
+        self._tasks.append(asyncio.create_task(self._get_indexing_pending_task()))
+        self._tasks.append(asyncio.create_task(self._get_ingest_pending_task()))
         self._running = True
 
     async def stop(self):
@@ -119,7 +112,7 @@ class BackPressureMaterializer:
             try:
                 with back_pressure_observer({"type": "get_processing_pending"}):
                     pending = await self._get_processing_pending(kbid)
-            except Exception:
+            except Exception:  # pragma: no cover
                 # Do not cache if there was an error
                 logger.exception(
                     "Error getting pending messages to process. Back pressure on proccessing for KB can't be applied.",
@@ -141,13 +134,9 @@ class BackPressureMaterializer:
         return response.incomplete
 
     def get_indexing_pending(self) -> int:
-        if not self.should_check_indexing:
-            raise ValueError("Indexing pending is not being tracked")
         return self.indexing_pending
 
     def get_ingest_pending(self) -> int:
-        if not self.should_check_ingest:
-            raise ValueError("Ingest pending is not being tracked")
         return self.ingest_pending
 
     async def _get_indexing_pending_task(self):
@@ -160,7 +149,7 @@ class BackPressureMaterializer:
                             stream="nidx",
                             consumer="nidx",
                         )
-                except Exception:
+                except Exception:  # pragma: no cover
                     logger.exception(
                         "Error getting pending messages to index",
                         exc_info=True,
@@ -179,7 +168,7 @@ class BackPressureMaterializer:
                             stream=const.Streams.INGEST_PROCESSED.name,
                             consumer=const.Streams.INGEST_PROCESSED.group,
                         )
-                except Exception:
+                except Exception:  # pragma: no cover
                     logger.exception(
                         "Error getting pending messages to ingest",
                         exc_info=True,

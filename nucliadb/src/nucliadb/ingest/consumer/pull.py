@@ -28,7 +28,6 @@ from nucliadb.common import datamanagers
 from nucliadb.common.back_pressure import (
     BackPressureException,
     BackPressureMaterializer,
-    cached_back_pressure,
 )
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient, get_nua_api_id
 from nucliadb.common.maindb.driver import Driver
@@ -124,9 +123,8 @@ class PullWorker:
             return
         while True:
             try:
-                with cached_back_pressure(cache_key="ingest-pull-worker"):
-                    self.back_pressure.check_indexing()
-                    self.back_pressure.check_ingest()
+                self.back_pressure.check_indexing()
+                self.back_pressure.check_ingest()
                 break
             except BackPressureException as exc:
                 sleep_time = (datetime.now(timezone.utc) - exc.data.try_after).total_seconds()

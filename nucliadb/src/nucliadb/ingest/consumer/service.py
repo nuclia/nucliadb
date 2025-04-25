@@ -67,8 +67,6 @@ async def start_back_pressure() -> BackPressureMaterializer:
         nats_manager,
         indexing_check_interval=back_pressure_settings.indexing_check_interval,
         ingest_check_interval=back_pressure_settings.ingest_check_interval,
-        indexing=True,
-        ingest=True,
     )
     await back_pressure.start()
     return back_pressure
