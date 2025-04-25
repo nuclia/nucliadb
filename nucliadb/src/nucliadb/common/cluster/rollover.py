@@ -23,6 +23,10 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+from nidx_protos.nodewriter_pb2 import (
+    NewShardRequest,
+)
+
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers.rollover import RolloverState, RolloverStateNotFoundError
@@ -30,10 +34,10 @@ from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import (
     get_external_index_manager,
 )
-from nucliadb.common.nidx import get_nidx_fake_node
+from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.common.vector_index_config import nucliadb_index_config_to_nidx
 from nucliadb.migrator.settings import settings
-from nucliadb_protos import writer_pb2
+from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_telemetry import errors
 
 from .utils import (
@@ -109,7 +113,6 @@ async def create_rollover_shards(
 
     logger.info("Creating rollover shards", extra={"kbid": kbid})
     sm = app_context.shard_manager
-    nidx_node = get_nidx_fake_node()
 
     async with datamanagers.with_ro_transaction() as txn:
         try:
@@ -143,10 +146,14 @@ async def create_rollover_shards(
                 async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid)
             }
 
-            nidx_shard = await nidx_node.new_shard_with_vectorsets(
-                kbid,
+            req = NewShardRequest(
+                kbid=kbid,
+                release_channel=utils_pb2.ReleaseChannel.STABLE,
                 vectorsets_configs=vectorsets,
             )
+
+            nidx_shard = await get_nidx_api_client().NewShard(req)
+
             shard.nidx_shard_id = nidx_shard.id
             created_shards.append(shard)
 

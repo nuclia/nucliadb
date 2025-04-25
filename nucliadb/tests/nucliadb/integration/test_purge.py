@@ -31,7 +31,6 @@ from nidx_protos.noderesources_pb2 import EmptyQuery, ShardId
 
 import nucliadb.common.nidx
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster import manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.common.nidx import get_nidx_api_client
@@ -197,17 +196,18 @@ async def test_purge_orphan_shard_detection(
     kbid = resp.json().get("uuid")
 
     # Orphan shard
-    node = manager.get_nidx_fake_node()
-    orphan_shard = await node.new_shard_with_vectorsets(
-        kbid=str(uuid.uuid4()),
-        vectorsets_configs={
-            "some": nodewriter_pb2.VectorIndexConfig(
-                similarity=utils_pb2.VectorSimilarity.COSINE,
-                normalize_vectors=False,
-                vector_type=nodewriter_pb2.VectorType.DENSE_F32,
-                vector_dimension=128,
-            )
-        },
+    orphan_shard = await get_nidx_api_client().NewShard(
+        nodewriter_pb2.NewShardRequest(
+            kbid=str(uuid.uuid4()),
+            vectorsets_configs={
+                "some": nodewriter_pb2.VectorIndexConfig(
+                    similarity=utils_pb2.VectorSimilarity.COSINE,
+                    normalize_vectors=False,
+                    vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+                    vector_dimension=128,
+                )
+            },
+        )
     )
     orphan_shard_id = orphan_shard.id
 

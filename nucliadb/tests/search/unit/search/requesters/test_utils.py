@@ -23,9 +23,7 @@ import pytest
 from fastapi import HTTPException
 from grpc import StatusCode
 from grpc.aio import AioRpcError
-from nidx_protos import nodereader_pb2
 
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.search.requesters import utils
 from nucliadb_protos import writer_pb2
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
@@ -52,16 +50,6 @@ def shard_manager():
         clean_utility(Utility.SHARD_MANAGER)
     else:
         set_utility(Utility.SHARD_MANAGER, original)
-
-
-@pytest.fixture()
-def faulty_search_methods():
-    def fake_search(node: AbstractIndexNode, shard: str, query: nodereader_pb2.SearchRequest):
-        return nodereader_pb2.SearchResponse()
-
-    faulty_methods = {utils.Method.SEARCH: AsyncMock(side_effect=fake_search)}
-    with patch.dict(utils.METHODS, faulty_methods, clear=True):
-        yield faulty_methods
 
 
 @pytest.fixture()

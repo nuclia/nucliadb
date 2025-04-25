@@ -23,9 +23,9 @@ import logging
 from nidx_protos import nodereader_pb2, noderesources_pb2
 
 from nucliadb.common import datamanagers, locking
-from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
+from nucliadb.common.nidx import get_nidx_api_client, get_nidx_searcher_client
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
@@ -51,9 +51,10 @@ async def get_shards_paragraphs(kbid: str) -> list[tuple[str, int]]:
     results = {}
     for shard_meta in kb_shards.shards:
         # Rebalance using node as source of truth. But it will rebalance nidx
-        node, shard_id = choose_node(shard_meta)
-        shard_data: nodereader_pb2.Shard = await node.reader.GetShard(
-            nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
+        shard_data: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
+            nodereader_pb2.GetShardRequest(
+                shard_id=noderesources_pb2.ShardId(id=shard_meta.nidx_shard_id)
+            )  # type: ignore
         )
         results[shard_meta.shard] = shard_data.paragraphs
 
@@ -101,16 +102,15 @@ async def move_set_of_kb_resources(
     from_shard = [s for s in kb_shards.shards if s.shard == from_shard_id][0]
     to_shard = [s for s in kb_shards.shards if s.shard == to_shard_id][0]
 
-    from_node, from_shard_replica_id = choose_node(from_shard)
     request = nodereader_pb2.SearchRequest(
-        shard=from_shard_replica_id,
+        shard=from_shard.nidx_shard_id,
         paragraph=False,
         document=True,
         result_per_page=count,
     )
     request.field_filter.field.field_type = "a"
     request.field_filter.field.field_id = "title"
-    search_response: nodereader_pb2.SearchResponse = await from_node.reader.Search(request)  # type: ignore
+    search_response: nodereader_pb2.SearchResponse = await get_nidx_searcher_client().Search(request)
 
     for result in search_response.document.results:
         resource_id = result.uuid

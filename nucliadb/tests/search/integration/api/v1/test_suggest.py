@@ -19,11 +19,12 @@
 #
 
 from httpx import AsyncClient
-from nidx_protos.nodereader_pb2 import SuggestFeatures, SuggestRequest
+from nidx_protos.nodereader_pb2 import GetShardRequest, SuggestFeatures, SuggestRequest
+from nidx_protos.noderesources_pb2 import ShardId
 
 from nucliadb.common.datamanagers.cluster import KB_SHARDS
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.nidx import get_nidx_fake_node
+from nucliadb.common.nidx import get_nidx_api_client, get_nidx_searcher_client
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
@@ -46,7 +47,6 @@ async def test_suggest_resource_all(
     driver = get_driver()
     async with driver.transaction(read_only=True) as txn:
         key = KB_SHARDS.format(kbid=kbid)
-        node_obj = get_nidx_fake_node()
         async for key in txn.keys(key):
             value = await txn.get(key)
             assert value is not None
@@ -54,7 +54,7 @@ async def test_suggest_resource_all(
             shards.ParseFromString(value)
 
             shard_id = shards.shards[0].nidx_shard_id
-            shard = await node_obj.get_shard(shard_id)
+            shard = await get_nidx_api_client().GetShard(GetShardRequest(shard_id=ShardId(id=shard_id)))
             assert shard.shard_id == shard_id
             assert shard.fields == 3
             assert shard.paragraphs == 2
@@ -65,5 +65,5 @@ async def test_suggest_resource_all(
             )
             prequest.shard = shard_id
             prequest.body = "Ramon"
-            suggest = await node_obj.reader.Suggest(prequest)  # type: ignore
+            suggest = await get_nidx_searcher_client().Suggest(prequest)  # type: ignore
             assert suggest.total == 1, f"Request:\n{prequest}\nResponse:\n{suggest}"

@@ -21,7 +21,6 @@ from typing import AsyncIterator, Optional
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.base import AbstractIndexNode
 
 # XXX: this keys shouldn't be exposed outside datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
@@ -54,15 +53,14 @@ class TrainShardManager(manager.KBShardManager):
         self.driver = driver
         self.storage = storage
 
-    async def get_reader(self, kbid: str, shard: str) -> tuple[AbstractIndexNode, str]:
+    async def get_shard_id(self, kbid: str, shard: str) -> str:
         shards = await self.get_shards_by_kbid_inner(kbid)
         try:
             shard_object: ShardObject = next(filter(lambda x: x.shard == shard, shards.shards))
         except StopIteration:
             raise KeyError("Shard not found")
 
-        node_obj, shard_id = manager.choose_node(shard_object)
-        return node_obj, shard_id
+        return shard_object.nidx_shard_id
 
     async def get_kb_obj(self, txn: Transaction, kbid: str) -> Optional[KnowledgeBox]:
         if kbid is None:

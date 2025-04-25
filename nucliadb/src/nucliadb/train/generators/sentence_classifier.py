@@ -23,8 +23,8 @@ from typing import AsyncGenerator
 from fastapi import HTTPException
 from nidx_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
+from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_protos.dataset_pb2 import (
@@ -38,7 +38,6 @@ from nucliadb_protos.dataset_pb2 import (
 def sentence_classification_batch_generator(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[SentenceClassificationBatch, None]:
     if len(trainset.filter.labels) == 0:
@@ -47,7 +46,7 @@ def sentence_classification_batch_generator(
             detail="Sentence Classification should be at least of 1 labelset",
         )
 
-    generator = generate_sentence_classification_payloads(kbid, trainset, node, shard_replica_id)
+    generator = generate_sentence_classification_payloads(kbid, trainset, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, SentenceClassificationBatch)
     return batch_generator
 
@@ -55,7 +54,6 @@ def sentence_classification_batch_generator(
 async def generate_sentence_classification_payloads(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[MultipleTextSameLabels, None]:
     labelsets = []
@@ -67,7 +65,7 @@ async def generate_sentence_classification_payloads(
         labelsets.append(labelset)
         request.filter.labels.append(labelset)
 
-    async for paragraph_item in node.stream_get_paragraphs(request):
+    async for paragraph_item in get_nidx_searcher_client().Paragraphs(request):
         text_labels: list[str] = []
         for label in paragraph_item.labels:
             for labelset in labelsets:

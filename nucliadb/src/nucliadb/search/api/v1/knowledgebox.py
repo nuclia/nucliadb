@@ -28,7 +28,6 @@ from nidx_protos.noderesources_pb2 import Shard
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
-from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.constants import AVG_PARAGRAPH_SIZE_BYTES
 from nucliadb.common.counters import IndexCounts
@@ -164,19 +163,12 @@ async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
     ops = []
     queried_shards = []
     for shard_object in shard_groups:
-        try:
-            node, shard_id = choose_node(shard_object)
-        except KeyError:
-            raise HTTPException(
-                status_code=500,
-                detail="Couldn't retrieve counters right now, node not found",
-            )
-        else:
-            if shard_id is not None:
-                # At least one node is alive for this shard group
-                # let's add it ot the query list if has a valid value
-                ops.append(get_shard(node, shard_id))
-                queried_shards.append(shard_id)
+        shard_id = shard_object.nidx_shard_id
+        if shard_id is not None:
+            # At least one node is alive for this shard group
+            # let's add it ot the query list if has a valid value
+            ops.append(get_shard(shard_id))
+            queried_shards.append(shard_id)
 
     if not ops:
         logger.info(f"No node found for any of this resources shards {kbid}")

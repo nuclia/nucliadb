@@ -26,7 +26,6 @@ from nidx_protos.nodewriter_pb2 import (
     IndexMessage,
 )
 
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.settings import settings
 from nucliadb.ingest.settings import DriverConfig
 from nucliadb.ingest.settings import settings as ingest_settings
@@ -244,46 +243,3 @@ def get_nidx_searcher_client() -> "NidxSearcherStub":
         return nidx.searcher_client
     else:
         raise Exception("nidx not initialized")
-
-
-# TODO: Remove the index node abstraction
-class NodeNidxAdapter:
-    def __init__(self, api_client, searcher_client):
-        # API methods
-        self.GetShard = api_client.GetShard
-        self.NewShard = api_client.NewShard
-        self.DeleteShard = api_client.DeleteShard
-        self.ListShards = api_client.ListShards
-        self.AddVectorSet = api_client.AddVectorSet
-        self.RemoveVectorSet = api_client.RemoveVectorSet
-        self.ListVectorSets = api_client.ListVectorSets
-        self.GetMetadata = api_client.GetMetadata
-
-        # Searcher methods
-        self.Search = searcher_client.Search
-        self.Suggest = searcher_client.Suggest
-        self.GraphSearch = searcher_client.GraphSearch
-        self.Paragraphs = searcher_client.Paragraphs
-        self.Documents = searcher_client.Documents
-
-
-class FakeNode(AbstractIndexNode):
-    def __init__(self, api_client, searcher_client):
-        self.client = NodeNidxAdapter(api_client, searcher_client)
-
-    @property
-    def reader(self):
-        return self.client
-
-    @property
-    def writer(self):
-        return self.client
-
-    @property
-    def id(self):
-        return "nidx"
-
-
-def get_nidx_fake_node() -> FakeNode:
-    nidx = get_nidx()
-    return FakeNode(nidx.api_client, nidx.searcher_client)

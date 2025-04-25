@@ -25,9 +25,9 @@ from functools import partial
 from nidx_protos import nodereader_pb2, noderesources_pb2
 
 from nucliadb.common import locking
-from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -105,8 +105,9 @@ class ShardCreatorHandler:
         async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
             # remember, a lock will do at least 1+ reads and 1 write.
             # with heavy writes, this adds some simple k/v pressure
-            node, shard_id = choose_node(current_shard)
-            shard: nodereader_pb2.Shard = await node.reader.GetShard(
-                nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
+            shard: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
+                nodereader_pb2.GetShardRequest(
+                    shard_id=noderesources_pb2.ShardId(id=current_shard.nidx_shard_id)
+                )  # type: ignore
             )
             await self.shard_manager.maybe_create_new_shard(kbid, shard.paragraphs)
