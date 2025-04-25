@@ -129,14 +129,25 @@ class FieldBuilder:
         classifications = labels_to_classifications(labelset, labels)
         self._extracted_metadata.metadata.metadata.classifications.extend(classifications)
 
-    def with_extracted_text(self, text: str):
-        self._extracted_text.body.text = text
+    def with_extracted_text(self, text: str, split: Optional[str] = None):
+        if split is None:
+            self._extracted_text.body.text = text
+        else:
+            self._extracted_text.body.split_text[split] = text
 
-    def with_extracted_vectors(self, vectors: list[utils_pb2.Vector], vectorset: str):
-        self._extracted_vectors(vectorset).vectors.vectors.vectors.extend(vectors)
+    def with_extracted_vectors(
+        self, vectors: list[utils_pb2.Vector], vectorset: str, split: Optional[str] = None
+    ):
+        if split is None:
+            self._extracted_vectors(vectorset).vectors.vectors.vectors.extend(vectors)
+        else:
+            self._extracted_vectors(vectorset).vectors.split_vectors[split].vectors.extend(vectors)
 
-    def with_extracted_paragraph_metadata(self, paragraph: rpb.Paragraph):
-        self._extracted_metadata.metadata.metadata.paragraphs.append(paragraph)
+    def with_extracted_paragraph_metadata(self, paragraph: rpb.Paragraph, split: Optional[str] = None):
+        if split is None:
+            self._extracted_metadata.metadata.metadata.paragraphs.append(paragraph)
+        else:
+            self._extracted_metadata.metadata.split_metadata[split].paragraphs.append(paragraph)
 
     def with_extracted_entity(
         self,
