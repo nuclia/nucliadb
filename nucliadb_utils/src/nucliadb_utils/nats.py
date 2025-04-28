@@ -34,6 +34,7 @@ from nats.js.client import JetStreamContext
 
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
+from nucliadb_telemetry.metrics import Counter
 from nucliadb_telemetry.utils import get_telemetry
 
 logger = logging.getLogger(__name__)
@@ -119,6 +120,7 @@ class NatsConnectionManager:
         service_name: str,
         nats_servers: list[str],
         nats_creds: Optional[str] = None,
+        pull_utilization_metrics: Optional[Counter] = None,
     ):
         self._service_name = service_name
         self._nats_servers = nats_servers
@@ -132,6 +134,7 @@ class NatsConnectionManager:
         self._reconnect_task: Optional[asyncio.Task] = None
         self._expected_subscriptions: set[str] = set()
         self._initialized = False
+        self.pull_utilization_metrics = pull_utilization_metrics
 
     def healthy(self) -> bool:
         if not self._healthy:
@@ -364,15 +367,29 @@ class NatsConnectionManager:
                 if cancelled.is_set():
                     break
                 try:
+                    if self.pull_utilization_metrics:
+                        start_wait = time.monotonic()
+
                     messages = await psub.fetch(batch=1)
+
+                    if self.pull_utilization_metrics:
+                        received = time.monotonic()
+                        self.pull_utilization_metrics.inc({"status": "waiting"}, received - start_wait)
+
                     for message in messages:
                         await cb(message)
+
+                    if self.pull_utilization_metrics:
+                        processed = time.monotonic()
+                        self.pull_utilization_metrics.inc({"status": "processing"}, processed - received)
                 except asyncio.CancelledError:
                     # Handle task cancellation
                     logger.info("Pull subscription consume task cancelled", extra={"subject": subject})
                     break
                 except TimeoutError:
-                    pass
+                    if self.pull_utilization_metrics:
+                        received = time.monotonic()
+                        self.pull_utilization_metrics.inc({"status": "waiting"}, received - start_wait)
                 except Exception:
                     logger.exception("Error in pull_subscribe task", extra={"subject": subject})
 
