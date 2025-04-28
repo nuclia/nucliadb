@@ -175,12 +175,12 @@ def rrf_score(rank: int) -> float:
             [],
             [],
             [
-                ("k-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("k-2", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("k-1", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("k-3", 4.0, SCORE_TYPE.BM25),
+                ("k-2", 3.0, SCORE_TYPE.BM25),
+                ("k-1", 1.0, SCORE_TYPE.BM25),
             ],
         ),
-        # only semantic results
+        # only semantic results (we maintain original scores)
         (
             [],
             [
@@ -191,13 +191,13 @@ def rrf_score(rank: int) -> float:
             ],
             [],
             [
-                ("s-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("s-4", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("s-2", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("s-1", round(1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("s-3", 0.6, SCORE_TYPE.VECTOR),
+                ("s-4", 0.4, SCORE_TYPE.VECTOR),
+                ("s-2", 0.3, SCORE_TYPE.VECTOR),
+                ("s-1", 0.2, SCORE_TYPE.VECTOR),
             ],
         ),
-        # only graph results
+        # only graph results (we maintain original scores)
         (
             [],
             [],
@@ -206,8 +206,8 @@ def rrf_score(rank: int) -> float:
                 gen_graph_result(rid="g-2"),
             ],
             [
-                ("g-1", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.RELATION_RELEVANCE),
-                ("g-2", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.RELATION_RELEVANCE),
+                ("g-1", FAKE_GRAPH_SCORE, SCORE_TYPE.RELATION_RELEVANCE),
+                ("g-2", FAKE_GRAPH_SCORE, SCORE_TYPE.RELATION_RELEVANCE),
             ],
         ),
         # all keyword scores greater than semantic
@@ -301,7 +301,7 @@ def test_reciprocal_rank_fusion_algorithm(
 @pytest.mark.parametrize(
     "keyword,semantic,graph,expected",
     [
-        # only keyword results
+        # only keyword results (we maintain original scores)
         (
             [
                 gen_keyword_result(1, rid="k-1"),
@@ -311,9 +311,9 @@ def test_reciprocal_rank_fusion_algorithm(
             [],
             [],
             [
-                ("k-3", round(1 / (0 + RRF_TEST_K) * 2, 6), SCORE_TYPE.BM25),
-                ("k-2", round(1 / (1 + RRF_TEST_K) * 2, 6), SCORE_TYPE.BM25),
-                ("k-1", round(1 / (2 + RRF_TEST_K) * 2, 6), SCORE_TYPE.BM25),
+                ("k-3", 4.0, SCORE_TYPE.BM25),
+                ("k-2", 3.0, SCORE_TYPE.BM25),
+                ("k-1", 1.0, SCORE_TYPE.BM25),
             ],
         ),
         # only semantic results
@@ -326,9 +326,9 @@ def test_reciprocal_rank_fusion_algorithm(
             ],
             [],
             [
-                ("s-3", round(1 / (0 + RRF_TEST_K) * 0.5, 6), SCORE_TYPE.VECTOR),
-                ("s-2", round(1 / (1 + RRF_TEST_K) * 0.5, 6), SCORE_TYPE.VECTOR),
-                ("s-1", round(1 / (2 + RRF_TEST_K) * 0.5, 6), SCORE_TYPE.VECTOR),
+                ("s-3", 0.6, SCORE_TYPE.VECTOR),
+                ("s-2", 0.3, SCORE_TYPE.VECTOR),
+                ("s-1", 0.2, SCORE_TYPE.VECTOR),
             ],
         ),
         # multi-match

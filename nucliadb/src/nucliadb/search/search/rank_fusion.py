@@ -72,6 +72,11 @@ class RankFusionAlgorithm(ABC):
         If only one retriever is provided, rank fusion will be skipped.
 
         """
+        # sort results by it's score before merging them
+        keyword = [k for k in sorted(keyword, key=lambda r: r.score, reverse=True)]
+        semantic = [s for s in sorted(semantic, key=lambda r: r.score, reverse=True)]
+        graph = [g for g in graph]
+
         retrievals_with_results = [x for x in (keyword, semantic, graph) if len(x) > 0]
         if len(retrievals_with_results) == 1:
             return retrievals_with_results[0]
@@ -85,7 +90,10 @@ class RankFusionAlgorithm(ABC):
         keyword: list[TextBlockMatch],
         semantic: list[TextBlockMatch],
         graph: list[TextBlockMatch],
-    ) -> list[TextBlockMatch]: ...
+    ) -> list[TextBlockMatch]:
+        """Rank fusion implementation. All arguments are assumed to be ordered
+        by decreasing score."""
+        ...
 
 
 class ReciprocalRankFusion(RankFusionAlgorithm):
@@ -134,11 +142,6 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
     ) -> list[TextBlockMatch]:
         scores: dict[ParagraphId, tuple[float, SCORE_TYPE]] = {}
         match_positions: dict[ParagraphId, list[tuple[int, int]]] = {}
-
-        # sort results by it's score before merging them
-        keyword = [k for k in sorted(keyword, key=lambda r: r.score, reverse=True)]
-        semantic = [s for s in sorted(semantic, key=lambda r: r.score, reverse=True)]
-        graph = [g for g in graph]
 
         rankings = [
             (keyword, self._keyword_boost),
