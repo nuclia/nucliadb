@@ -27,6 +27,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import featureflagging
 from nucliadb_utils.aiopynecone.client import PineconeSession
 from nucliadb_utils.audit.audit import AuditStorage
@@ -57,6 +58,10 @@ if TYPE_CHECKING:  # pragma: no cover
     from nucliadb_utils.transaction import TransactionUtility
 
 logger = logging.getLogger(__name__)
+
+pull_subscriber_utilization = Counter(
+    "nucliadb_pull_subscriber_utilization_seconds", labels={"status": ""}
+)
 
 
 class Utility(str, Enum):
@@ -359,6 +364,7 @@ async def start_nats_manager(
         service_name=service_name,
         nats_servers=nats_servers,
         nats_creds=nats_creds,
+        pull_utilization_metrics=pull_subscriber_utilization,
     )
     await nats_manager.initialize()
     set_utility(Utility.NATS_MANAGER, nats_manager)

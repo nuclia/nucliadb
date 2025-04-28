@@ -37,6 +37,7 @@ from nucliadb.ingest.orm.exceptions import DeadletteredError, SequenceOrderViola
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from nucliadb_telemetry import context, errors, metrics
+from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import MessageProgressUpdater, NatsConnectionManager

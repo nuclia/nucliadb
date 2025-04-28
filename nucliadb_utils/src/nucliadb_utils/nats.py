@@ -39,10 +39,6 @@ from nucliadb_telemetry.utils import get_telemetry
 
 logger = logging.getLogger(__name__)
 
-pull_subscriber_utilization = Counter(
-    "nucliadb_pull_subscriber_utilization_seconds", labels={"status": ""}
-)
-
 
 def get_traced_jetstream(
     nc: NATSClient, service_name: str
@@ -124,6 +120,7 @@ class NatsConnectionManager:
         service_name: str,
         nats_servers: list[str],
         nats_creds: Optional[str] = None,
+        pull_utilization_metrics: Optional[Counter] = None,
     ):
         self._service_name = service_name
         self._nats_servers = nats_servers
@@ -137,6 +134,7 @@ class NatsConnectionManager:
         self._reconnect_task: Optional[asyncio.Task] = None
         self._expected_subscriptions: set[str] = set()
         self._initialized = False
+        self.pull_utilization_metrics = pull_utilization_metrics
 
     def healthy(self) -> bool:
         if not self._healthy:
@@ -374,13 +372,13 @@ class NatsConnectionManager:
                     messages = await psub.fetch(batch=1)
 
                     received = time.monotonic()
-                    pull_subscriber_utilization.inc({"status": "waiting"}, received - start_wait)
+                    self.pull_utilization_metrics.inc({"status": "waiting"}, received - start_wait)
 
                     for message in messages:
                         await cb(message)
 
                     processed = time.monotonic()
-                    pull_subscriber_utilization.inc({"status": "processing"}, processed - received)
+                    self.pull_utilization_metrics.inc({"status": "processing"}, processed - received)
                 except asyncio.CancelledError:
                     # Handle task cancellation
                     logger.info("Pull subscription consume task cancelled", extra={"subject": subject})
