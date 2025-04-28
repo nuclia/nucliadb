@@ -41,7 +41,7 @@ from nucliadb.search.search.find_merge import (
     semantic_result_to_text_block_match,
 )
 from nucliadb.search.search.query_parser.parsers import parse_find
-from nucliadb.search.search.rank_fusion import LegacyRankFusion, ReciprocalRankFusion, get_rank_fusion
+from nucliadb.search.search.rank_fusion import ReciprocalRankFusion, get_rank_fusion
 from nucliadb_models.search import SCORE_TYPE, FindRequest
 from nucliadb_protos.utils_pb2 import RelationMetadata
 
@@ -123,126 +123,6 @@ def gen_graph_result(rid: Optional[str] = None, force_id: Optional[str] = None) 
             graph=[GraphSearchResponse.Path(metadata=RelationMetadata(paragraph_id=paragraph_id.full()))]
         )
     )[0]
-
-
-@pytest.mark.parametrize(
-    "keyword,semantic,expected",
-    [
-        # mix of keyword and semantic results
-        (
-            [
-                gen_keyword_result(0.1, rid="k-1"),
-                gen_keyword_result(0.5, rid="k-2"),
-                gen_keyword_result(0.3, rid="k-3"),
-            ],
-            [
-                gen_semantic_result(0.2, rid="s-1"),
-                gen_semantic_result(0.3, rid="s-2"),
-                gen_semantic_result(0.6, rid="s-3"),
-                gen_semantic_result(0.4, rid="s-4"),
-            ],
-            [
-                ("k-2", 0.5, SCORE_TYPE.BM25),
-                ("s-3", 0.6, SCORE_TYPE.VECTOR),
-                ("k-3", 0.3, SCORE_TYPE.BM25),
-                ("k-1", 0.1, SCORE_TYPE.BM25),
-                ("s-4", 0.4, SCORE_TYPE.VECTOR),
-                ("s-2", 0.3, SCORE_TYPE.VECTOR),
-                ("s-1", 0.2, SCORE_TYPE.VECTOR),
-            ],
-        ),
-        # only keyword results
-        (
-            [
-                gen_keyword_result(1, rid="k-1"),
-                gen_keyword_result(3, rid="k-2"),
-                gen_keyword_result(4, rid="k-3"),
-            ],
-            [],
-            [
-                ("k-3", 4, SCORE_TYPE.BM25),
-                ("k-2", 3, SCORE_TYPE.BM25),
-                ("k-1", 1, SCORE_TYPE.BM25),
-            ],
-        ),
-        # only semantic results
-        (
-            [],
-            [
-                gen_semantic_result(0.2, rid="s-1"),
-                gen_semantic_result(0.3, rid="s-2"),
-                gen_semantic_result(0.6, rid="s-3"),
-                gen_semantic_result(0.4, rid="s-4"),
-            ],
-            [
-                ("s-3", 0.6, SCORE_TYPE.VECTOR),
-                ("s-4", 0.4, SCORE_TYPE.VECTOR),
-                ("s-2", 0.3, SCORE_TYPE.VECTOR),
-                ("s-1", 0.2, SCORE_TYPE.VECTOR),
-            ],
-        ),
-        # all keyword scores greater than semantic
-        (
-            [
-                gen_keyword_result(1, rid="k-1"),
-                gen_keyword_result(5, rid="k-2"),
-                gen_keyword_result(3, rid="k-3"),
-            ],
-            [
-                gen_semantic_result(0.2, rid="s-1"),
-                gen_semantic_result(0.3, rid="s-2"),
-                gen_semantic_result(0.6, rid="s-3"),
-                gen_semantic_result(0.4, rid="s-4"),
-                gen_semantic_result(0.1, rid="s-5"),
-            ],
-            [
-                ("k-2", 5, SCORE_TYPE.BM25),
-                ("s-3", 0.6, SCORE_TYPE.VECTOR),
-                ("k-3", 3, SCORE_TYPE.BM25),
-                ("k-1", 1, SCORE_TYPE.BM25),
-                ("s-4", 0.4, SCORE_TYPE.VECTOR),
-                ("s-2", 0.3, SCORE_TYPE.VECTOR),
-                ("s-1", 0.2, SCORE_TYPE.VECTOR),
-                ("s-5", 0.1, SCORE_TYPE.VECTOR),
-            ],
-        ),
-        # all keyword scores smaller than semantic
-        (
-            [
-                gen_keyword_result(0.1, rid="k-1"),
-                gen_keyword_result(0.5, rid="k-2"),
-                gen_keyword_result(0.3, rid="k-3"),
-                gen_keyword_result(0.6, rid="k-4"),
-                gen_keyword_result(0.6, rid="k-5"),
-            ],
-            [
-                gen_semantic_result(2, rid="s-1"),
-                gen_semantic_result(3, rid="s-2"),
-                gen_semantic_result(6, rid="s-3"),
-            ],
-            [
-                ("k-4", 0.6, SCORE_TYPE.BM25),
-                ("s-3", 6.0, SCORE_TYPE.VECTOR),
-                ("k-5", 0.6, SCORE_TYPE.BM25),
-                ("k-2", 0.5, SCORE_TYPE.BM25),
-                ("s-2", 3.0, SCORE_TYPE.VECTOR),
-                ("k-3", 0.3, SCORE_TYPE.BM25),
-                ("k-1", 0.1, SCORE_TYPE.BM25),
-                ("s-1", 2.0, SCORE_TYPE.VECTOR),
-            ],
-        ),
-    ],
-)
-def test_legacy_rank_fusion_algorithm(
-    keyword: list[TextBlockMatch],
-    semantic: list[TextBlockMatch],
-    expected: list[tuple[str, float, SCORE_TYPE]],
-):
-    """Basic test to validate how our own rank fusion algorithm works"""
-    rank_fusion = LegacyRankFusion(window=20)
-    merged = rank_fusion.fuse(keyword=keyword, semantic=semantic, graph=[])
-    results = [(item.paragraph_id.rid, round(item.score, 1), item.score_type) for item in merged]
-    assert results == expected
 
 
 RRF_TEST_K = 2

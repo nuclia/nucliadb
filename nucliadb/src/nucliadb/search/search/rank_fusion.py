@@ -83,40 +83,6 @@ class RankFusionAlgorithm(ABC):
     ) -> list[TextBlockMatch]: ...
 
 
-# DEPRECATED: only used in tests!
-class LegacyRankFusion(RankFusionAlgorithm):
-    """Legacy algorithm that given results from keyword and semantic search,
-    mixes them in the following way:
-    - 1st result from keyword search
-    - 2nd result from semantic search
-    - 2 keyword results and 1 semantic (and repeat)
-
-    """
-
-    @rank_fusion_observer.wrap({"type": "legacy"})
-    def _fuse(
-        self,
-        keyword: Iterable[TextBlockMatch],
-        semantic: Iterable[TextBlockMatch],
-        graph: Iterable[TextBlockMatch],
-    ) -> list[TextBlockMatch]:
-        merged: list[TextBlockMatch] = []
-
-        # sort results by it's score before merging them
-        keyword = [k for k in sorted(keyword, key=lambda r: r.score, reverse=True)]
-        semantic = [s for s in sorted(semantic, key=lambda r: r.score, reverse=True)]
-
-        for k in keyword:
-            merged.append(k)
-
-        nextpos = 1
-        for s in semantic:
-            merged.insert(nextpos, s)
-            nextpos += 3
-
-        return merged
-
-
 class ReciprocalRankFusion(RankFusionAlgorithm):
     """Rank-based rank fusion algorithm. Discounts the weight of documents
     occurring deep in retrieved lists using a reciprocal distribution. It can be
