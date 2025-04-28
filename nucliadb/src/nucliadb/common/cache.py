@@ -24,11 +24,11 @@ from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, TypeVar
+from typing import Generic, Optional, TypeVar
 
 import backoff
 from async_lru import _LRUCacheWrapper, alru_cache
-from typing_extensions import Generic, TypeVarTuple, Unpack
+from typing_extensions import ParamSpec
 
 from nucliadb.common.ids import FieldId
 from nucliadb.common.maindb.utils import get_driver
@@ -48,7 +48,7 @@ resource_cache_ops = Counter("nucliadb_resource_cache_ops", labels={"type": ""})
 extracted_text_cache_ops = Counter("nucliadb_extracted_text_cache_ops", labels={"type": ""})
 
 
-K = TypeVarTuple("K")
+K = ParamSpec("K")
 T = TypeVar("T")
 
 
@@ -58,7 +58,7 @@ class CacheMetrics:
     ops: Counter
 
 
-class Cache(Generic[*K, T], ABC):
+class Cache(Generic[K, T], ABC):
     """Low-level bounded cache implementation with access to per-key async locks
     in case cache users want to lock concurrent access.
 
@@ -68,7 +68,7 @@ class Cache(Generic[*K, T], ABC):
 
     cache: _LRUCacheWrapper[Optional[T]]
 
-    async def get(self, *args: Unpack[K]) -> Optional[T]:
+    async def get(self, *args: K.args, **kwargs: K.kwargs) -> Optional[T]:
         result = await self.cache(*args)
         # Do not cache None
         if result is None:
@@ -85,7 +85,7 @@ class Cache(Generic[*K, T], ABC):
     def metrics(self) -> CacheMetrics: ...
 
 
-class ResourceCache(Cache[str, str, ResourceORM]):
+class ResourceCache(Cache[[str, str], ResourceORM]):
     def __init__(self, cache_size: int) -> None:
         @alru_cache(maxsize=cache_size)
         async def _get_resource(kbid: str, rid: str) -> Optional[ResourceORM]:
@@ -102,7 +102,7 @@ class ResourceCache(Cache[str, str, ResourceORM]):
     )
 
 
-class ExtractedTextCache(Cache[str, FieldId, ExtractedText]):
+class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
     """
     Used to cache extracted text from a resource in memory during the process
     of search results hydration.
