@@ -73,7 +73,7 @@ class RankFusionAlgorithm(ABC):
 
         """
         retrievals_with_results = [x for x in (keyword, semantic, graph) if len(x) > 0]
-        if len(retrievals_with_results) == 0:
+        if len(retrievals_with_results) == 1:
             return retrievals_with_results[0]
         else:
             merged = self._fuse(keyword, semantic, graph)
