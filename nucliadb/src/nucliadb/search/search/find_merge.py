@@ -108,15 +108,7 @@ async def build_find_response(
     )
     graph_results = graph_results_to_text_block_matches(search_response.graph)
 
-    merged_text_blocks: list[TextBlockMatch]
-    if len(keyword_results) > 0 and len(semantic_results) == 0 and len(graph_results) == 0:
-        merged_text_blocks = keyword_results
-    elif len(keyword_results) == 0 and len(semantic_results) > 0 and len(graph_results) == 0:
-        merged_text_blocks = semantic_results
-    elif len(keyword_results) == 0 and len(semantic_results) == 0 and len(graph_results) > 0:
-        merged_text_blocks = graph_results
-    else:
-        merged_text_blocks = rank_fusion_algorithm.fuse(keyword_results, semantic_results, graph_results)
+    merged_text_blocks = rank_fusion_algorithm.fuse(keyword_results, semantic_results, graph_results)
 
     # cut
     # we assume pagination + predict reranker is forbidden and has been already

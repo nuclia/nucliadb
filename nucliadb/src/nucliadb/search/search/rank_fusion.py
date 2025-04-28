@@ -19,7 +19,6 @@
 #
 import logging
 from abc import ABC, abstractmethod
-from typing import Iterable
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
@@ -63,23 +62,29 @@ class RankFusionAlgorithm(ABC):
 
     def fuse(
         self,
-        keyword: Iterable[TextBlockMatch],
-        semantic: Iterable[TextBlockMatch],
-        graph: Iterable[TextBlockMatch],
+        keyword: list[TextBlockMatch],
+        semantic: list[TextBlockMatch],
+        graph: list[TextBlockMatch],
     ) -> list[TextBlockMatch]:
         """Fuse keyword and semantic results and return a list with the merged
         results.
 
+        If only one retriever is provided, rank fusion will be skipped.
+
         """
-        merged = self._fuse(keyword, semantic, graph)
+        retrievals_with_results = [x for x in (keyword, semantic, graph) if len(x) > 0]
+        if len(retrievals_with_results) == 0:
+            return retrievals_with_results[0]
+        else:
+            merged = self._fuse(keyword, semantic, graph)
         return merged
 
     @abstractmethod
     def _fuse(
         self,
-        keyword: Iterable[TextBlockMatch],
-        semantic: Iterable[TextBlockMatch],
-        graph: Iterable[TextBlockMatch],
+        keyword: list[TextBlockMatch],
+        semantic: list[TextBlockMatch],
+        graph: list[TextBlockMatch],
     ) -> list[TextBlockMatch]: ...
 
 
@@ -123,9 +128,9 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
     @rank_fusion_observer.wrap({"type": "reciprocal_rank_fusion"})
     def _fuse(
         self,
-        keyword: Iterable[TextBlockMatch],
-        semantic: Iterable[TextBlockMatch],
-        graph: Iterable[TextBlockMatch],
+        keyword: list[TextBlockMatch],
+        semantic: list[TextBlockMatch],
+        graph: list[TextBlockMatch],
     ) -> list[TextBlockMatch]:
         scores: dict[ParagraphId, tuple[float, SCORE_TYPE]] = {}
         match_positions: dict[ParagraphId, list[tuple[int, int]]] = {}
