@@ -387,7 +387,9 @@ class NatsConnectionManager:
                     logger.info("Pull subscription consume task cancelled", extra={"subject": subject})
                     break
                 except TimeoutError:
-                    pass
+                    if self.pull_utilization_metrics:
+                        received = time.monotonic()
+                        self.pull_utilization_metrics.inc({"status": "waiting"}, received - start_wait)
                 except Exception:
                     logger.exception("Error in pull_subscribe task", extra={"subject": subject})
 
