@@ -34,9 +34,14 @@ from nats.js.client import JetStreamContext
 
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
+from nucliadb_telemetry.metrics import Counter
 from nucliadb_telemetry.utils import get_telemetry
 
 logger = logging.getLogger(__name__)
+
+pull_subscriber_utilization = Counter(
+    "nucliadb_pull_subscriber_utilization_seconds", labels={"status": ""}
+)
 
 
 def get_traced_jetstream(
@@ -364,9 +369,18 @@ class NatsConnectionManager:
                 if cancelled.is_set():
                     break
                 try:
+                    start_wait = time.monotonic()
+
                     messages = await psub.fetch(batch=1)
+
+                    received = time.monotonic()
+                    pull_subscriber_utilization.inc({"status": "waiting"}, received - start_wait)
+
                     for message in messages:
                         await cb(message)
+
+                    processed = time.monotonic()
+                    pull_subscriber_utilization.inc({"status": "processing"}, processed - received)
                 except asyncio.CancelledError:
                     # Handle task cancellation
                     logger.info("Pull subscription consume task cancelled", extra={"subject": subject})
