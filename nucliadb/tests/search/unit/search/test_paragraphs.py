@@ -23,7 +23,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nucliadb.common.cache import ExtractedTextCache
 from nucliadb.common.ids import ParagraphId
 from nucliadb.search.search import paragraphs
 from nucliadb.search.search.cache import extracted_text_cache
@@ -41,6 +40,7 @@ def extracted_text():
 @pytest.fixture()
 def field(extracted_text):
     mock = MagicMock()
+    mock.extracted_text = None
     mock.get_extracted_text = AsyncMock(return_value=extracted_text)
     yield mock
 
@@ -85,48 +85,38 @@ class TestGetParagraphText:
         orm_resource.get_field.assert_called_once_with("text", 4, load=False)
 
 
+@pytest.fixture(scope="function")
+async def fake_download_pb():
+    with patch(f"nucliadb.common.cache.get_storage") as get_storage_mock:
+        fake_download = AsyncMock()
+        fake_download.download_pb = AsyncMock(side_effect=fake_get_extracted_text_from_gcloud)
+        get_storage_mock.return_value = fake_download
+        yield fake_download.download_pb
+
+
 async def fake_get_extracted_text_from_gcloud(*args, **kwargs):
     await asyncio.sleep(random.uniform(0, 1))
     return ExtractedText(text=b"Hello World!")
 
 
-async def test_get_field_extracted_text_is_cached(field):
+async def test_get_field_extracted_text_is_cached(field, fake_download_pb):
     field.kbid = "kbid"
     field.uuid = "rid"
     field.id = "fid"
-    # Simulate a slow response from GCloud
-    field.get_extracted_text = AsyncMock(side_effect=fake_get_extracted_text_from_gcloud)
 
     # Run 10 times in parallel to check that the cache is working
     with extracted_text_cache(10):
         futures = [paragraphs.cache.get_field_extracted_text(field) for _ in range(10)]
         await asyncio.gather(*futures)
 
-        field.get_extracted_text.assert_awaited_once()
+        fake_download_pb.assert_awaited_once()
 
 
-async def test_get_field_extracted_text_is_not_cached_when_none(field):
-    field.get_extracted_text = AsyncMock(return_value=None)
+async def test_get_field_extracted_text_is_not_cached_when_none(field, fake_download_pb):
+    fake_download_pb.side_effect = lambda _a, _b: None
 
-    await paragraphs.cache.get_field_extracted_text(field)
-    await paragraphs.cache.get_field_extracted_text(field)
+    with extracted_text_cache(10):
+        await paragraphs.cache.get_field_extracted_text(field)
+        await paragraphs.cache.get_field_extracted_text(field)
 
-    assert field.get_extracted_text.await_count == 2
-
-
-def test_extracted_text_cache():
-    etcache = ExtractedTextCache(cache_size=10)
-    assert etcache.get("foo") is None
-
-    assert isinstance(etcache.get_lock("foo"), asyncio.Lock)
-    assert len(etcache.locks) == 1
-
-    etcache.set("foo", "bar")
-    assert len(etcache.cache) == 1
-
-    assert etcache.get("foo") == "bar"
-
-    etcache.clear()
-
-    assert len(etcache.cache) == 0
-    assert len(etcache.locks) == 0
+    assert fake_download_pb.await_count == 2

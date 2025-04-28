@@ -69,7 +69,11 @@ class Cache(Generic[*K, T], ABC):
     cache: _LRUCacheWrapper[Optional[T]]
 
     async def get(self, *args: Unpack[K]) -> Optional[T]:
-        return await self.cache(args)
+        result = await self.cache(*args)
+        # Do not cache None
+        if result is None:
+            self.cache.cache_invalidate(*args)
+        return result
 
     def finalize(self):
         info = self.cache.cache_info()
