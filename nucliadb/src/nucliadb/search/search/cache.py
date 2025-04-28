@@ -50,7 +50,7 @@ async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
         logger.warning("Resource cache not set")
         return await _orm_get_resource(kbid, uuid)
 
-    return await resource_cache.get((kbid, uuid))
+    return await resource_cache.get(kbid, uuid)
 
 
 async def _orm_get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
@@ -69,7 +69,7 @@ async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
         logger.warning("Extracted text cache not set")
         return await field.get_extracted_text()
 
-    extracted_text = await cache.get((field.kbid, FieldId(field.uuid, field.type, field.id)))
+    extracted_text = await cache.get(field.kbid, FieldId(field.uuid, field.type, field.id))
     field.extracted_text = extracted_text
     return extracted_text
 

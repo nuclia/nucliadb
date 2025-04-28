@@ -36,7 +36,7 @@ async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[Resour
         return await _get_resource_from_db(kbid, uuid)
         logger.warning("Resource cache is not set")
 
-    return await resource_cache.get((kbid, uuid))
+    return await resource_cache.get(kbid, uuid)
 
 
 async def _get_resource_from_db(kbid: str, uuid: str) -> Optional[ResourceORM]:

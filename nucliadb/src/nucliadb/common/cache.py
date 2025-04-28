@@ -24,10 +24,11 @@ from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Generic, Optional, TypeVar
+from typing import Optional, TypeVar
 
 import backoff
 from async_lru import _LRUCacheWrapper, alru_cache
+from typing_extensions import Generic, TypeVarTuple, Unpack
 
 from nucliadb.common.ids import FieldId
 from nucliadb.common.maindb.utils import get_driver
@@ -47,7 +48,7 @@ resource_cache_ops = Counter("nucliadb_resource_cache_ops", labels={"type": ""})
 extracted_text_cache_ops = Counter("nucliadb_extracted_text_cache_ops", labels={"type": ""})
 
 
-K = TypeVar("K")
+K = TypeVarTuple("K")
 T = TypeVar("T")
 
 
@@ -57,7 +58,7 @@ class CacheMetrics:
     ops: Counter
 
 
-class Cache(Generic[K, T], ABC):
+class Cache(Generic[*K, T], ABC):
     """Low-level bounded cache implementation with access to per-key async locks
     in case cache users want to lock concurrent access.
 
@@ -67,8 +68,8 @@ class Cache(Generic[K, T], ABC):
 
     cache: _LRUCacheWrapper[Optional[T]]
 
-    async def get(self, key: K) -> Optional[T]:
-        return await self.cache(key)
+    async def get(self, *args: Unpack[K]) -> Optional[T]:
+        return await self.cache(args)
 
     def finalize(self):
         info = self.cache.cache_info()
@@ -80,15 +81,14 @@ class Cache(Generic[K, T], ABC):
     def metrics(self) -> CacheMetrics: ...
 
 
-class ResourceCache(Cache[tuple[str, str], ResourceORM]):
+class ResourceCache(Cache[str, str, ResourceORM]):
     def __init__(self, cache_size: int) -> None:
         @alru_cache(maxsize=cache_size)
-        async def _get_resource(kbid_rid: tuple[str, str]) -> Optional[ResourceORM]:
-            kbid, uuid = kbid_rid
+        async def _get_resource(kbid: str, rid: str) -> Optional[ResourceORM]:
             storage = await get_storage()
             async with get_driver().transaction(read_only=True) as txn:
                 kb = KnowledgeBoxORM(txn, storage, kbid)
-                return await kb.get(uuid)
+                return await kb.get(rid)
 
         self.cache = _get_resource
 
@@ -98,7 +98,7 @@ class ResourceCache(Cache[tuple[str, str], ResourceORM]):
     )
 
 
-class ExtractedTextCache(Cache[tuple[str, FieldId], ExtractedText]):
+class ExtractedTextCache(Cache[str, FieldId, ExtractedText]):
     """
     Used to cache extracted text from a resource in memory during the process
     of search results hydration.
@@ -111,8 +111,7 @@ class ExtractedTextCache(Cache[tuple[str, FieldId], ExtractedText]):
     def __init__(self, cache_size: int) -> None:
         @alru_cache(maxsize=cache_size)
         @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
-        async def _get_extracted_text(full_field_id: tuple[str, FieldId]) -> Optional[ExtractedText]:
-            (kbid, field_id) = full_field_id
+        async def _get_extracted_text(kbid: str, field_id: FieldId) -> Optional[ExtractedText]:
             storage = await get_storage()
             try:
                 sf = storage.file_extracted(
