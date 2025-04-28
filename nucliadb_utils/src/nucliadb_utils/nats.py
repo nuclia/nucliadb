@@ -367,18 +367,21 @@ class NatsConnectionManager:
                 if cancelled.is_set():
                     break
                 try:
-                    start_wait = time.monotonic()
+                    if self.pull_utilization_metrics:
+                        start_wait = time.monotonic()
 
                     messages = await psub.fetch(batch=1)
 
-                    received = time.monotonic()
-                    self.pull_utilization_metrics.inc({"status": "waiting"}, received - start_wait)
+                    if self.pull_utilization_metrics:
+                        received = time.monotonic()
+                        self.pull_utilization_metrics.inc({"status": "waiting"}, received - start_wait)
 
                     for message in messages:
                         await cb(message)
 
-                    processed = time.monotonic()
-                    self.pull_utilization_metrics.inc({"status": "processing"}, processed - received)
+                    if self.pull_utilization_metrics:
+                        processed = time.monotonic()
+                        self.pull_utilization_metrics.inc({"status": "processing"}, processed - received)
                 except asyncio.CancelledError:
                     # Handle task cancellation
                     logger.info("Pull subscription consume task cancelled", extra={"subject": subject})
