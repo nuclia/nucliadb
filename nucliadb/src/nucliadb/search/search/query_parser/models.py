@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb_models import search as search_models
+from nucliadb_models.graph.requests import GraphPathQuery
 from nucliadb_protos import utils_pb2
 
 ### Retrieval
@@ -61,11 +62,16 @@ class RelationQuery(BaseModel):
     deleted_entities: dict[str, list[str]]
 
 
+class GraphQuery(BaseModel):
+    query: GraphPathQuery
+
+
 class Query(BaseModel):
     fulltext: Optional[FulltextQuery] = None
     keyword: Optional[KeywordQuery] = None
     semantic: Optional[SemanticQuery] = None
     relation: Optional[RelationQuery] = None
+    graph: Optional[GraphQuery] = None
 
 
 # filters
@@ -180,3 +186,7 @@ class CatalogQuery(BaseModel):
 # Right now, we don't need a more generic model for graph queries, we can
 # directly use the protobuffer directly
 GraphRetrieval = nodereader_pb2.GraphSearchRequest
+
+
+# We need this to avoid issues with pydantic and generic types defined in another module
+GraphQuery.model_rebuild()

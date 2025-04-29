@@ -159,6 +159,7 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
                     source=relation_node_from,
                     to=relation_node_to,
                     relation_label=relation.label or "",
+                    # XXX: we are not propagating metadata, is this intended?
                 )
             )
 
