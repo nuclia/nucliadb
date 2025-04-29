@@ -41,7 +41,10 @@ from nucliadb.search.search.find_merge import (
     semantic_result_to_text_block_match,
 )
 from nucliadb.search.search.query_parser.parsers import parse_find
-from nucliadb.search.search.rank_fusion import ReciprocalRankFusion, get_rank_fusion
+from nucliadb.search.search.rank_fusion import (
+    ReciprocalRankFusion,
+    get_rank_fusion,
+)
 from nucliadb_models.search import SCORE_TYPE, FindRequest
 from nucliadb_protos.utils_pb2 import RelationMetadata
 
@@ -293,7 +296,7 @@ def test_reciprocal_rank_fusion_algorithm(
     expected: list[tuple[str, float, SCORE_TYPE]],
 ):
     rrf = ReciprocalRankFusion(k=RRF_TEST_K, window=20)
-    merged = rrf.fuse(keyword, semantic, graph)
+    merged = rrf.fuse({"keyword": keyword, "semantic": semantic, "graph": graph})
     results = [(item.paragraph_id.rid, round(item.score, 6), item.score_type) for item in merged]
     assert results == expected
 
@@ -381,7 +384,15 @@ def test_reciprocal_rank_fusion_boosting(
     graph: list[TextBlockMatch],
     expected: list[tuple[str, float]],
 ):
-    rrf = ReciprocalRankFusion(k=RRF_TEST_K, window=20, keyword_weight=2, semantic_weight=0.5)
-    merged = rrf.fuse(keyword, semantic, graph)
+    rrf = ReciprocalRankFusion(
+        k=RRF_TEST_K,
+        window=20,
+        weights={
+            "keyword": 2,
+            "semantic": 0.5,
+        },
+        default_weight=1.0,
+    )
+    merged = rrf.fuse({"keyword": keyword, "semantic": semantic, "graph": graph})
     results = [(item.paragraph_id.rid, round(item.score, 6), item.score_type) for item in merged]
     assert results == expected

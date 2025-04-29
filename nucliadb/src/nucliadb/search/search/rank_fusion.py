@@ -19,6 +19,8 @@
 #
 import logging
 from abc import ABC, abstractmethod
+from enum import Enum, auto
+from typing import Optional
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
@@ -46,6 +48,12 @@ rank_fusion_observer = Observer(
 )
 
 
+class IndexSource(str, Enum):
+    KEYWORD = auto()
+    SEMANTIC = auto()
+    GRAPH = auto()
+
+
 class RankFusionAlgorithm(ABC):
     def __init__(self, window: int):
         self._window = window
@@ -60,37 +68,28 @@ class RankFusionAlgorithm(ABC):
         """
         return self._window
 
-    def fuse(
-        self,
-        keyword: list[TextBlockMatch],
-        semantic: list[TextBlockMatch],
-        graph: list[TextBlockMatch],
-    ) -> list[TextBlockMatch]:
-        """Fuse keyword and semantic results and return a list with the merged
+    def fuse(self, sources: dict[str, list[TextBlockMatch]]) -> list[TextBlockMatch]:
+        """Fuse elements from multiple sources and return a list of merged
         results.
 
-        If only one retriever is provided, rank fusion will be skipped.
+        If only one source is provided, rank fusion will be skipped.
 
         """
-        # sort results by it's score before merging them
-        keyword = [k for k in sorted(keyword, key=lambda r: r.score, reverse=True)]
-        semantic = [s for s in sorted(semantic, key=lambda r: r.score, reverse=True)]
-        graph = [g for g in graph]
+        # sort results by it's score before fusing them
+        sources = {
+            retriever: sorted(values, key=lambda r: r.score, reverse=True)
+            for retriever, values in sources.items()
+        }
 
-        retrievals_with_results = [x for x in (keyword, semantic, graph) if len(x) > 0]
-        if len(retrievals_with_results) == 1:
-            return retrievals_with_results[0]
+        sources_with_results = [x for x in sources.values() if len(x) > 0]
+        if len(sources_with_results) == 1:
+            return sources_with_results[0]
         else:
-            merged = self._fuse(keyword, semantic, graph)
-        return merged
+            merged = self._fuse(sources)
+            return merged
 
     @abstractmethod
-    def _fuse(
-        self,
-        keyword: list[TextBlockMatch],
-        semantic: list[TextBlockMatch],
-        graph: list[TextBlockMatch],
-    ) -> list[TextBlockMatch]:
+    def _fuse(self, sources: dict[str, list[TextBlockMatch]]) -> list[TextBlockMatch]:
         """Rank fusion implementation. All arguments are assumed to be ordered
         by decreasing score."""
         ...
@@ -119,9 +118,8 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         k: float = 60.0,
         *,
         window: int,
-        keyword_weight: float = 1.0,
-        semantic_weight: float = 1.0,
-        graph_weight: float = 1.0,
+        weights: Optional[dict[str, float]] = None,
+        default_weight: float = 1.0,
     ):
         super().__init__(window)
         # Constant used in RRF, studies agree on 60 as a good default value
@@ -129,24 +127,20 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         # difference among the best results and a smaller score difference among
         # bad results
         self._k = k
-        self._keyword_boost = keyword_weight
-        self._semantic_boost = semantic_weight
-        self._graph_boost = graph_weight
+        self._weights = weights or {}
+        self._default_weight = default_weight
 
     @rank_fusion_observer.wrap({"type": "reciprocal_rank_fusion"})
     def _fuse(
         self,
-        keyword: list[TextBlockMatch],
-        semantic: list[TextBlockMatch],
-        graph: list[TextBlockMatch],
+        sources: dict[str, list[TextBlockMatch]],
     ) -> list[TextBlockMatch]:
         scores: dict[ParagraphId, tuple[float, SCORE_TYPE]] = {}
         match_positions: dict[ParagraphId, list[tuple[int, int]]] = {}
 
         rankings = [
-            (keyword, self._keyword_boost),
-            (semantic, self._semantic_boost),
-            (graph, self._graph_boost),
+            (values, self._weights.get(source, self._default_weight))
+            for source, values in sources.items()
         ]
         for r, (ranking, boost) in enumerate(rankings):
             for i, result in enumerate(ranking):
@@ -184,9 +178,11 @@ def get_rank_fusion(rank_fusion: parser_models.RankFusion) -> RankFusionAlgorith
         algorithm = ReciprocalRankFusion(
             k=rank_fusion.k,
             window=window,
-            keyword_weight=rank_fusion.boosting.keyword,
-            semantic_weight=rank_fusion.boosting.semantic,
-            graph_weight=rank_fusion.boosting.graph,
+            weights={
+                IndexSource.KEYWORD: rank_fusion.boosting.keyword,
+                IndexSource.SEMANTIC: rank_fusion.boosting.semantic,
+                IndexSource.GRAPH: rank_fusion.boosting.graph,
+            },
         )
 
     else:
