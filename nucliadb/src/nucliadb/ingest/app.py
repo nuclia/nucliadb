@@ -61,7 +61,7 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
 
     start_partitioning_utility()
 
-    await start_nidx_utility()
+    await start_nidx_utility(SERVICE_NAME)
 
     await start_audit_utility(SERVICE_NAME)
 

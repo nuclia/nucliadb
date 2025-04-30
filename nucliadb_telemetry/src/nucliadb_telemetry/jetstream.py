@@ -152,8 +152,8 @@ class JetStreamContextTelemetry:
     ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_publisher")
         headers = {} if headers is None else headers
-        inject(headers)
         with start_span_message_publisher(tracer, subject) as span:
+            inject(headers)
             try:
                 result = await self.js.publish(subject, body, headers=headers, **kwargs)
                 msg_sent_counter.inc({"subject": subject, "status": metrics.OK})
@@ -261,9 +261,9 @@ class NatsClientTelemetry:
     ) -> None:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_publisher")
         headers = {} if headers is None else headers
-        inject(headers)
 
         with start_span_message_publisher(tracer, subject) as span:
+            inject(headers)
             try:
                 await self.nc.publish(subject, body, reply, headers)
                 msg_sent_counter.inc({"subject": subject, "status": metrics.OK})
@@ -281,9 +281,9 @@ class NatsClientTelemetry:
         headers: Optional[Dict[str, Any]] = None,
     ) -> Msg:
         headers = {} if headers is None else headers
-        inject(headers)
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_request")
         with start_span_message_publisher(tracer, subject) as span:
+            inject(headers)
             try:
                 result = await self.nc.request(subject, payload, timeout, old_style, headers)
             except Exception as error:

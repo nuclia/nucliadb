@@ -100,7 +100,7 @@ class ApplicationContext:
         if self.enabled_transaction:
             self._transaction = await start_transaction_utility(self.service_name)
         if self.enabled_nidx:
-            self._nidx = await start_nidx_utility()
+            self._nidx = await start_nidx_utility(self.service_name)
 
     @property
     def kv_driver(self) -> Driver:
