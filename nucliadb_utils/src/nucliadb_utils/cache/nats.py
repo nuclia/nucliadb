@@ -23,7 +23,7 @@ import functools
 import os
 import uuid
 from inspect import iscoroutinefunction
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import nats
 import nats.errors
@@ -34,10 +34,14 @@ from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
 from nats.js.manager import JetStreamManager
 
-from nucliadb_telemetry.jetstream import get_traced_nats_client
+from nucliadb_telemetry.jetstream import (
+    JetStreamContextTelemetry,
+    NatsClientTelemetry,
+    get_traced_jetstream,
+    get_traced_nats_client,
+)
 from nucliadb_utils import logger
 from nucliadb_utils.cache.pubsub import Callback, PubSubDriver
-from nucliadb_utils.nats import get_traced_jetstream
 
 
 async def wait_for_it(future: asyncio.Future, msg):
@@ -47,7 +51,7 @@ async def wait_for_it(future: asyncio.Future, msg):
 # Configuration Utility
 
 
-class NatsPubsub(PubSubDriver):
+class NatsPubsub(PubSubDriver[Msg]):
     _jetstream = None
     _jsm = None
     _subscriptions: Dict[str, Subscription]
@@ -69,11 +73,11 @@ class NatsPubsub(PubSubDriver):
         self._uuid = os.environ.get("HOSTNAME", uuid.uuid4().hex)
         self.initialized = False
         self.lock = asyncio.Lock()
-        self.nc = None
+        self.nc: Union[Client, NatsClientTelemetry, None] = None
         self.user_credentials_file = user_credentials_file
 
     @property
-    def jetstream(self) -> JetStreamContext:
+    def jetstream(self) -> Union[JetStreamContext, JetStreamContextTelemetry]:
         if self.nc is None:
             raise AttributeError("NC not initialized")
         if self._jetstream is None:
@@ -201,7 +205,7 @@ class NatsPubsub(PubSubDriver):
         else:
             raise ErrConnectionClosed("Could not publish")
 
-    def parse(self, data: Msg):
+    def parse(self, data: Msg) -> bytes:
         return data.data
 
 

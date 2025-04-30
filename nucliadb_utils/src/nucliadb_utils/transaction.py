@@ -143,8 +143,8 @@ class TransactionUtility:
     ) -> Optional[Event]:
         action_type = self._get_notification_action_type()
 
-        def received(waiting_for: WaitFor, event: Event, raw_data: bytes):
-            data = self.pubsub.parse(raw_data)
+        def received(waiting_for: WaitFor, event: Event, msg: Any):
+            data = self.pubsub.parse(msg)
             pb = Notification()
             pb.ParseFromString(data)
             if pb.uuid == waiting_for.uuid and pb.action == action_type:

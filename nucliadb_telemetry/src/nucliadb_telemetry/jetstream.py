@@ -110,7 +110,13 @@ class JetStreamContextTelemetry:
     async def add_stream(self, name: str, subjects: List[str]):
         return await self.js.add_stream(name=name, subjects=subjects)
 
-    async def subscribe(self, cb, **kwargs):
+    async def subscribe(
+        self,
+        subject: str,
+        queue: Optional[str],
+        cb: Optional[Callable[[Msg], Awaitable[None]]],
+        **kwargs,
+    ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_subscriber")
 
         async def wrapper(origin_cb, tracer, msg: Msg):
@@ -137,7 +143,7 @@ class JetStreamContextTelemetry:
                     )
 
         wrapped_cb = partial(wrapper, cb, tracer)
-        return await self.js.subscribe(cb=wrapped_cb, **kwargs)
+        return await self.js.subscribe(subject, queue=queue, cb=wrapped_cb, **kwargs)
 
     async def publish(
         self,
@@ -296,6 +302,9 @@ class NatsClientTelemetry:
 
     def jetstream(self, **opts) -> nats.js.JetStreamContext:
         return self.nc.jetstream(**opts)
+
+    def jsm(self, **opts) -> nats.js.JetStreamManager:
+        return self.nc.jsm(**opts)
 
     async def drain(self) -> None:
         return await self.nc.drain()

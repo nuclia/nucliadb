@@ -17,12 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Awaitable, Callable, Optional, Union
+from typing import Awaitable, Callable, Generic, Optional, TypeVar
 
-Callback = Union[Callable, Awaitable]
+T = TypeVar("T")
+
+Callback = Callable[[T], Awaitable[None]]
 
 
-class PubSubDriver:
+class PubSubDriver(Generic[T]):
     initialized: bool = False
     async_callback: bool = False
 
@@ -47,5 +49,5 @@ class PubSubDriver:
     ):
         raise NotImplementedError()
 
-    def parse(self, data: Any):
+    def parse(self, data: T) -> bytes:
         raise NotImplementedError()
