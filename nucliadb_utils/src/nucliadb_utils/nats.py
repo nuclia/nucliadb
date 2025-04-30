@@ -348,6 +348,7 @@ class NatsConnectionManager:
         durable: Optional[str] = None,
         config: Optional[nats.js.api.ConsumerConfig] = None,
     ) -> JetStreamContext.PullSubscription:
+        wrapped_cb: Callable[[Msg], Awaitable[None]]
         if isinstance(self.js, JetStreamContextTelemetry):
             wrapped_cb = partial(self.js.trace_pull_subscriber_message, cb)
         else:

@@ -72,7 +72,7 @@ def start_span_message_receiver(tracer: Tracer, msg: Msg):
     }
 
     # add some attributes from the metadata
-    ctx = extract(msg.headers)
+    ctx = extract(msg.headers or {})
 
     span = tracer.start_as_current_span(
         name=f"Received from {msg.subject}",
@@ -99,12 +99,6 @@ def start_span_message_publisher(tracer: Tracer, subject: str):
 
 
 async def _traced_callback(origin_cb: Callable[[Msg], Awaitable[None]], tracer: Tracer, msg: Msg):
-    # Execute the callback without tracing
-    if msg.headers is None:
-        logger.debug("Message received without headers, skipping span")
-        await origin_cb(msg)
-        return
-
     with start_span_message_receiver(tracer, msg) as span:
         try:
             await origin_cb(msg)
