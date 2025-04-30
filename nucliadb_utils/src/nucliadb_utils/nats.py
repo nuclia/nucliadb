@@ -21,7 +21,7 @@ import asyncio
 import logging
 import sys
 import time
-from functools import cached_property
+from functools import cached_property, partial
 from typing import Any, Awaitable, Callable, Optional, Union
 
 import nats
@@ -348,13 +348,18 @@ class NatsConnectionManager:
         durable: Optional[str] = None,
         config: Optional[nats.js.api.ConsumerConfig] = None,
     ) -> JetStreamContext.PullSubscription:
+        wrapped_cb: Callable[[Msg], Awaitable[None]]
+        if isinstance(self.js, JetStreamContextTelemetry):
+            wrapped_cb = partial(self.js.trace_pull_subscriber_message, cb)
+        else:
+            wrapped_cb = cb
+
         psub = await self.js.pull_subscribe(
             subject,
-            durable=durable,  # type: ignore
+            durable=durable,
             stream=stream,
-            config=config,  # type: ignore
+            config=config,
         )
-
         cancelled = asyncio.Event()
 
         async def consume(psub: JetStreamContext.PullSubscription, subject: str):
@@ -372,7 +377,7 @@ class NatsConnectionManager:
                         self.pull_utilization_metrics.inc({"status": "waiting"}, received - start_wait)
 
                     for message in messages:
-                        await cb(message)
+                        await wrapped_cb(message)
 
                     if self.pull_utilization_metrics:
                         processed = time.monotonic()

@@ -72,7 +72,7 @@ def start_span_message_receiver(tracer: Tracer, msg: Msg):
     }
 
     # add some attributes from the metadata
-    ctx = extract(msg.headers)
+    ctx = extract(msg.headers or {})
 
     span = tracer.start_as_current_span(
         name=f"Received from {msg.subject}",
@@ -98,6 +98,24 @@ def start_span_message_publisher(tracer: Tracer, subject: str):
     return span
 
 
+async def _traced_callback(origin_cb: Callable[[Msg], Awaitable[None]], tracer: Tracer, msg: Msg):
+    with start_span_message_receiver(tracer, msg) as span:
+        try:
+            await origin_cb(msg)
+        except Exception as error:
+            set_span_exception(span, error)
+            raise error
+        finally:
+            msg_consume_time_histo.observe(
+                (datetime.now() - msg.metadata.timestamp).total_seconds(),
+                {
+                    "stream": msg.metadata.stream,
+                    "consumer": msg.metadata.consumer or "",
+                    "acked": "yes" if msg._ackd else "no",
+                },
+            )
+
+
 class JetStreamContextTelemetry:
     def __init__(self, js: JetStreamContext, service_name: str, tracer_provider: TracerProvider):
         self.js = js
@@ -118,31 +136,11 @@ class JetStreamContextTelemetry:
         **kwargs,
     ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_subscriber")
-
-        async def wrapper(origin_cb, tracer, msg: Msg):
-            # Execute the callback without tracing
-            if msg.headers is None:
-                logger.debug("Message received without headers, skipping span")
-                await origin_cb(msg)
-                return
-
-            with start_span_message_receiver(tracer, msg) as span:
-                try:
-                    await origin_cb(msg)
-                except Exception as error:
-                    set_span_exception(span, error)
-                    raise error
-                finally:
-                    msg_consume_time_histo.observe(
-                        (datetime.now() - msg.metadata.timestamp).total_seconds(),
-                        {
-                            "stream": msg.metadata.stream,
-                            "consumer": msg.metadata.consumer or "",
-                            "acked": "yes" if msg._ackd else "no",  # type: ignore
-                        },
-                    )
-
-        wrapped_cb = partial(wrapper, cb, tracer)
+        wrapped_cb: Optional[Callable[[Msg], Awaitable[None]]]
+        if cb is not None:
+            wrapped_cb = partial(_traced_callback, cb, tracer)
+        else:
+            wrapped_cb = cb
         return await self.js.subscribe(subject, queue=queue, cb=wrapped_cb, **kwargs)
 
     async def publish(
@@ -165,6 +163,10 @@ class JetStreamContextTelemetry:
                 raise error
 
         return result
+
+    async def trace_pull_subscriber_message(self, cb: Callable[[Msg], Awaitable[None]], msg: Msg):
+        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_pull_subscriber")
+        await _traced_callback(cb, tracer, msg)
 
     # Just for convenience, to wrap all we use in the context of
     # telemetry-instrumented stuff using the JetStreamContextTelemetry class
