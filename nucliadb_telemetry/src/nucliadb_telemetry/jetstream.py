@@ -19,12 +19,13 @@
 
 from datetime import datetime
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
 from urllib.parse import ParseResult
 
 import nats
 from nats.aio.client import Client
 from nats.aio.msg import Msg
+from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
 from opentelemetry.propagate import extract, inject
 from opentelemetry.sdk.trace import TracerProvider
@@ -109,7 +110,13 @@ class JetStreamContextTelemetry:
     async def add_stream(self, name: str, subjects: List[str]):
         return await self.js.add_stream(name=name, subjects=subjects)
 
-    async def subscribe(self, cb, **kwargs):
+    async def subscribe(
+        self,
+        subject: str,
+        queue: Optional[str] = None,
+        cb: Optional[Callable[[Msg], Awaitable[None]]] = None,
+        **kwargs,
+    ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_subscriber")
 
         async def wrapper(origin_cb, tracer, msg: Msg):
@@ -136,7 +143,7 @@ class JetStreamContextTelemetry:
                     )
 
         wrapped_cb = partial(wrapper, cb, tracer)
-        return await self.js.subscribe(cb=wrapped_cb, **kwargs)
+        return await self.js.subscribe(subject, queue=queue, cb=wrapped_cb, **kwargs)
 
     async def publish(
         self,
@@ -217,7 +224,13 @@ class NatsClientTelemetry:
         self.service_name = service_name
         self.tracer_provider = tracer_provider
 
-    async def subscribe(self, cb, **kwargs):
+    async def subscribe(
+        self,
+        subject: str,
+        queue: str = "",
+        cb: Optional[Callable[[Msg], Awaitable[None]]] = None,
+        **kwargs,
+    ) -> Subscription:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_subscriber")
 
         async def wrapper(origin_cb, tracer, msg: Msg):
@@ -235,7 +248,7 @@ class NatsClientTelemetry:
                     raise error
 
         wrapped_cb = partial(wrapper, cb, tracer)
-        return await self.nc.subscribe(cb=wrapped_cb, **kwargs)
+        return await self.nc.subscribe(subject, queue=queue, cb=wrapped_cb, **kwargs)
 
     async def publish(
         self,
@@ -289,6 +302,9 @@ class NatsClientTelemetry:
 
     def jetstream(self, **opts) -> nats.js.JetStreamContext:
         return self.nc.jetstream(**opts)
+
+    def jsm(self, **opts) -> nats.js.JetStreamManager:
+        return self.nc.jsm(**opts)
 
     async def drain(self) -> None:
         return await self.nc.drain()

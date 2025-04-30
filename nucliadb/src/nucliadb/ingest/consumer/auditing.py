@@ -22,6 +22,7 @@ import asyncio
 import logging
 import uuid
 from functools import partial
+from typing import Any
 
 from nidx_protos import nodereader_pb2, noderesources_pb2
 
@@ -85,8 +86,8 @@ class IndexAuditHandler:
         await self.pubsub.unsubscribe(self.subscription_id)
         await self.task_handler.finalize()
 
-    async def handle_message(self, raw_data: bytes) -> None:
-        data = self.pubsub.parse(raw_data)
+    async def handle_message(self, msg: Any) -> None:
+        data = self.pubsub.parse(msg)
         notification = writer_pb2.Notification()
         notification.ParseFromString(data)
 
@@ -169,8 +170,8 @@ class ResourceWritesAuditHandler:
     async def finalize(self) -> None:
         await self.pubsub.unsubscribe(self.subscription_id)
 
-    async def handle_message(self, raw_data) -> None:
-        data = self.pubsub.parse(raw_data)
+    async def handle_message(self, msg: Any) -> None:
+        data = self.pubsub.parse(msg)
         notification = writer_pb2.Notification()
         notification.ParseFromString(data)
 

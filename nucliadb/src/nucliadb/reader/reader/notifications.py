@@ -24,6 +24,7 @@ from collections.abc import AsyncGenerator
 from typing import Optional
 
 import async_timeout
+from nats.aio.msg import Msg
 
 from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
@@ -91,8 +92,8 @@ async def kb_notifications(kbid: str) -> AsyncGenerator[writer_pb2.Notification,
 
     subscription_key = const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid)
 
-    def subscription_handler(raw_data: bytes):
-        data = pubsub.parse(raw_data)
+    def subscription_handler(msg: Msg):
+        data = pubsub.parse(msg)
         notification = writer_pb2.Notification()
         notification.ParseFromString(data)
         try:
