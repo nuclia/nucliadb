@@ -21,7 +21,7 @@ import asyncio
 import logging
 import sys
 import time
-from functools import cached_property
+from functools import cached_property, partial
 from typing import Any, Awaitable, Callable, Optional, Union
 
 import nats
@@ -343,11 +343,16 @@ class NatsConnectionManager:
         *,
         subject: str,
         stream: str,
-        cb: Callable[[Msg], Awaitable[None]],
+        origin_cb: Callable[[Msg], Awaitable[None]],
         subscription_lost_cb: Callable[[], Awaitable[None]],
         durable: Optional[str] = None,
         config: Optional[nats.js.api.ConsumerConfig] = None,
     ) -> JetStreamContext.PullSubscription:
+        if isinstance(self._nc, JetStreamContextTelemetry):
+            cb = partial(self._nc.trace_pull_subscriber_message, origin_cb)
+        else:
+            cb = origin_cb
+
         psub = await self.js.pull_subscribe(
             subject,
             durable=durable,  # type: ignore
