@@ -20,9 +20,9 @@
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import Optional
+from typing import Optional, TypeVar
 
-from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.external_index_providers.base import ScoredTextBlock
 from nucliadb.common.ids import ParagraphId
 from nucliadb.search.search.query_parser import models as parser_models
 from nucliadb_models.search import SCORE_TYPE
@@ -47,6 +47,8 @@ rank_fusion_observer = Observer(
     ],
 )
 
+ScoredItem = TypeVar("ScoredItem", bound=ScoredTextBlock)
+
 
 class IndexSource(str, Enum):
     KEYWORD = auto()
@@ -68,7 +70,7 @@ class RankFusionAlgorithm(ABC):
         """
         return self._window
 
-    def fuse(self, sources: dict[str, list[TextBlockMatch]]) -> list[TextBlockMatch]:
+    def fuse(self, sources: dict[str, list[ScoredItem]]) -> list[ScoredItem]:
         """Fuse elements from multiple sources and return a list of merged
         results.
 
@@ -87,7 +89,7 @@ class RankFusionAlgorithm(ABC):
         return merged
 
     @abstractmethod
-    def _fuse(self, sources: dict[str, list[TextBlockMatch]]) -> list[TextBlockMatch]:
+    def _fuse(self, sources: dict[str, list[ScoredItem]]) -> list[ScoredItem]:
         """Rank fusion implementation.
 
         Each concrete subclass must provide an implementation that merges
@@ -140,8 +142,8 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
     @rank_fusion_observer.wrap({"type": "reciprocal_rank_fusion"})
     def _fuse(
         self,
-        sources: dict[str, list[TextBlockMatch]],
-    ) -> list[TextBlockMatch]:
+        sources: dict[str, list[ScoredItem]],
+    ) -> list[ScoredItem]:
         # accumulated scores per paragraph
         scores: dict[ParagraphId, tuple[float, SCORE_TYPE]] = {}
         # pointers from paragraph to the original source
@@ -213,7 +215,7 @@ class WeigthedCombSum(RankFusionAlgorithm):
         self._default_weight = default_weight
 
     @rank_fusion_observer.wrap({"type": "weighted_comb_sum"})
-    def _fuse(self, sources: dict[str, list[TextBlockMatch]]) -> list[TextBlockMatch]:
+    def _fuse(self, sources: dict[str, list[ScoredItem]]) -> list[ScoredItem]:
         # accumulated scores per paragraph
         scores: dict[ParagraphId, tuple[float, SCORE_TYPE]] = {}
         # pointers from paragraph to the original source
