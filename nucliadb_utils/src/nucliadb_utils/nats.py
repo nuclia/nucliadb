@@ -360,7 +360,6 @@ class NatsConnectionManager:
             stream=stream,
             config=config,
         )
-        print(f"Subscribe to {subject}")
         cancelled = asyncio.Event()
 
         async def consume(psub: JetStreamContext.PullSubscription, subject: str):
