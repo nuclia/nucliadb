@@ -343,23 +343,23 @@ class NatsConnectionManager:
         *,
         subject: str,
         stream: str,
-        origin_cb: Callable[[Msg], Awaitable[None]],
+        cb: Callable[[Msg], Awaitable[None]],
         subscription_lost_cb: Callable[[], Awaitable[None]],
         durable: Optional[str] = None,
         config: Optional[nats.js.api.ConsumerConfig] = None,
     ) -> JetStreamContext.PullSubscription:
-        if isinstance(self._nc, JetStreamContextTelemetry):
-            cb = partial(self._nc.trace_pull_subscriber_message, origin_cb)
+        if isinstance(self.js, JetStreamContextTelemetry):
+            wrapped_cb = partial(self.js.trace_pull_subscriber_message, cb)
         else:
-            cb = origin_cb
+            wrapped_cb = cb
 
         psub = await self.js.pull_subscribe(
             subject,
-            durable=durable,  # type: ignore
+            durable=durable,
             stream=stream,
-            config=config,  # type: ignore
+            config=config,
         )
-
+        print(f"Subscribe to {subject}")
         cancelled = asyncio.Event()
 
         async def consume(psub: JetStreamContext.PullSubscription, subject: str):
@@ -377,7 +377,7 @@ class NatsConnectionManager:
                         self.pull_utilization_metrics.inc({"status": "waiting"}, received - start_wait)
 
                     for message in messages:
-                        await cb(message)
+                        await wrapped_cb(message)
 
                     if self.pull_utilization_metrics:
                         processed = time.monotonic()
