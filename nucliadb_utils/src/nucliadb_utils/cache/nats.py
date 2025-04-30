@@ -34,6 +34,7 @@ from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
 from nats.js.manager import JetStreamManager
 
+from nucliadb_telemetry.jetstream import get_traced_nats_client
 from nucliadb_utils import logger
 from nucliadb_utils.cache.pubsub import Callback, PubSubDriver
 from nucliadb_utils.nats import get_traced_jetstream
@@ -91,7 +92,7 @@ class NatsPubsub(PubSubDriver):
         # No asyncio loop to run
 
         async with self.lock:
-            self.nc = Client()
+            nc = Client()
             options = {
                 "servers": self._hosts,
                 "disconnected_cb": self.disconnected_cb,
@@ -104,11 +105,12 @@ class NatsPubsub(PubSubDriver):
             if self.user_credentials_file is not None:
                 options["user_credentials"] = self.user_credentials_file
             try:
-                await self.nc.connect(**options)
+                await nc.connect(**options)
             except ErrNoServers:
                 logger.exception("No servers found")
                 raise
 
+            self.nc = get_traced_nats_client(nc, "nucliadb_pubsub")
             logger.info("Connected to nats")
 
         self.initialized = True
