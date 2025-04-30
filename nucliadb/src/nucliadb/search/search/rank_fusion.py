@@ -171,6 +171,74 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         return merged
 
 
+class WeigthedCombSum(RankFusionAlgorithm):
+    """Score-based rank fusion algorithm. Multiply each score by a list-specific
+    weight (boost). Then adds the retrieval score of documents contained in more
+    than one list and sort by score.
+
+    wCombSUM = Σ(r ∈ R) (w(r) · S(r, d))
+
+    where:
+    - d is a document
+    - R is the set of retrievers
+    - w(r) weight (boost) for retriever r
+    - S(r, d) is the score of document d given by retriever r
+
+    wCombSUM boosts matches from multiple retrievers and deduplicate them. As a
+    score ranking algorithm, comparison of different scores may lead to bad
+    results.
+
+    """
+
+    def __init__(
+        self,
+        *,
+        window: int,
+        weights: Optional[dict[str, float]] = None,
+        default_weight: float = 1.0,
+    ):
+        super().__init__(window)
+        self._weights = weights or {}
+        self._default_weight = default_weight
+
+    @rank_fusion_observer.wrap({"type": "weighted_comb_sum"})
+    def _fuse(self, sources: dict[str, list[TextBlockMatch]]) -> list[TextBlockMatch]:
+        # accumulated scores per paragraph
+        scores: dict[ParagraphId, tuple[float, SCORE_TYPE]] = {}
+        # pointers from paragraph to the original source
+        match_positions: dict[ParagraphId, list[tuple[int, int]]] = {}
+
+        rankings = [
+            (values, self._weights.get(source, self._default_weight))
+            for source, values in sources.items()
+        ]
+        for i, (ranking, weight) in enumerate(rankings):
+            for j, item in enumerate(ranking):
+                id = item.paragraph_id
+                score, score_type = scores.setdefault(id, (0, item.score_type))
+                score += item.score * weight
+                if {score_type, item.score_type} == {SCORE_TYPE.BM25, SCORE_TYPE.VECTOR}:
+                    score_type = SCORE_TYPE.BOTH
+                scores[id] = (score, score_type)
+
+                position = (i, j)
+                match_positions.setdefault(item.paragraph_id, []).append(position)
+
+        merged = []
+        for paragraph_id, positions in match_positions.items():
+            # we are getting only one position, effectively deduplicating
+            # multiple matches for the same text block
+            i, j = match_positions[paragraph_id][0]
+            score, score_type = scores[paragraph_id]
+            item = rankings[i][0][j]
+            item.score = score
+            item.score_type = score_type
+            merged.append(item)
+
+        merged.sort(key=lambda x: x.score, reverse=True)
+        return merged
+
+
 def get_rank_fusion(rank_fusion: parser_models.RankFusion) -> RankFusionAlgorithm:
     """Given a rank fusion API type, return the appropiate rank fusion algorithm instance"""
     algorithm: RankFusionAlgorithm

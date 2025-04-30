@@ -43,6 +43,7 @@ from nucliadb.search.search.find_merge import (
 from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb.search.search.rank_fusion import (
     ReciprocalRankFusion,
+    WeigthedCombSum,
     get_rank_fusion,
 )
 from nucliadb_models.search import SCORE_TYPE, FindRequest
@@ -356,7 +357,8 @@ def test_reciprocal_rank_fusion_algorithm(
                     "r-1",
                     round(
                         (1 / (2 + RRF_TEST_K) * 2)
-                        + (1 / (3 + RRF_TEST_K) * 0.5 + (1 / (0 + RRF_TEST_K) * FAKE_GRAPH_SCORE)),
+                        + (1 / (3 + RRF_TEST_K) * 0.5)
+                        + (1 / (0 + RRF_TEST_K) * 1.0),
                         6,
                     ),
                     SCORE_TYPE.BOTH,
@@ -367,11 +369,7 @@ def test_reciprocal_rank_fusion_algorithm(
                     round((1 / (1 + RRF_TEST_K) * 2) + (1 / (0 + RRF_TEST_K) * 0.5), 6),
                     SCORE_TYPE.BOTH,
                 ),
-                (
-                    "r-6",
-                    round(0 + (1 / (1 + RRF_TEST_K) * FAKE_GRAPH_SCORE), 6),
-                    SCORE_TYPE.RELATION_RELEVANCE,
-                ),
+                ("r-6", round(0 + (1 / (1 + RRF_TEST_K) * 1.0), 6), SCORE_TYPE.RELATION_RELEVANCE),
                 ("r-5", round(0 + (1 / (1 + RRF_TEST_K) * 0.5), 6), SCORE_TYPE.VECTOR),
                 ("r-3", round(0 + (1 / (2 + RRF_TEST_K) * 0.5), 6), SCORE_TYPE.VECTOR),
             ],
@@ -394,5 +392,55 @@ def test_reciprocal_rank_fusion_boosting(
         default_weight=1.0,
     )
     merged = rrf.fuse({"keyword": keyword, "semantic": semantic, "graph": graph})
+    results = [(item.paragraph_id.rid, round(item.score, 6), item.score_type) for item in merged]
+    assert results == expected
+
+
+@pytest.mark.parametrize(
+    "keyword,semantic,graph,expected",
+    [
+        # multi-match
+        (
+            [
+                gen_keyword_result(0.1, force_id="r-1/f/my/0-10"),
+                gen_keyword_result(0.5, force_id="r-2/f/my/0-10"),
+                gen_keyword_result(0.3, force_id="r-4/f/my/0-10"),
+            ],
+            [
+                gen_semantic_result(2, force_id="r-1/f/my/0/0-10"),
+                gen_semantic_result(3, force_id="r-3/f/my/0/0-10"),
+                gen_semantic_result(6, force_id="r-4/f/my/0/0-10"),
+                gen_semantic_result(6, force_id="r-5/f/my/0/0-10"),
+            ],
+            [
+                gen_graph_result(force_id="r-1/f/my/0-10"),
+                gen_graph_result(force_id="r-6/f/my/0-10"),
+            ],
+            [
+                ("r-4", round(0.3 * 2.0 + 6 * 0.5, 6), SCORE_TYPE.BOTH),
+                ("r-5", round(6 * 0.5, 6), SCORE_TYPE.VECTOR),
+                ("r-1", round(0.1 * 2.0 + 2 * 0.5 + FAKE_GRAPH_SCORE * 1.5, 6), SCORE_TYPE.BOTH),
+                ("r-3", round(3 * 0.5, 6), SCORE_TYPE.VECTOR),
+                ("r-6", round(FAKE_GRAPH_SCORE * 1.5, 6), SCORE_TYPE.RELATION_RELEVANCE),
+                ("r-2", round(0.5 * 2.0, 6), SCORE_TYPE.BM25),
+            ],
+        ),
+    ],
+)
+def test_weighted_comb_sum_rank_fusion(
+    keyword: list[TextBlockMatch],
+    semantic: list[TextBlockMatch],
+    graph: list[TextBlockMatch],
+    expected: list[tuple[str, float]],
+):
+    wcombsum = WeigthedCombSum(
+        window=20,
+        weights={
+            "keyword": 2,
+            "semantic": 0.5,
+        },
+        default_weight=1.5,
+    )
+    merged = wcombsum.fuse({"keyword": keyword, "semantic": semantic, "graph": graph})
     results = [(item.paragraph_id.rid, round(item.score, 6), item.score_type) for item in merged]
     assert results == expected
