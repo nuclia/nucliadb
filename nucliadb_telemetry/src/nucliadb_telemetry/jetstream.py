@@ -113,8 +113,8 @@ class JetStreamContextTelemetry:
     async def subscribe(
         self,
         subject: str,
-        queue: Optional[str],
-        cb: Optional[Callable[[Msg], Awaitable[None]]],
+        queue: Optional[str] = None,
+        cb: Optional[Callable[[Msg], Awaitable[None]]] = None,
         **kwargs,
     ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_subscriber")
