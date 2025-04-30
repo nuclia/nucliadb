@@ -35,10 +35,14 @@ from nucliadb_protos.writer_pb2 import (
     Notification,
     OpStatusWriter,
 )
-from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
+from nucliadb_telemetry.jetstream import (
+    JetStreamContextTelemetry,
+    NatsClientTelemetry,
+    get_traced_jetstream,
+    get_traced_nats_client,
+)
 from nucliadb_utils import const, logger
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.utilities import get_pubsub
 
 
@@ -95,7 +99,7 @@ class LocalTransactionUtility:
 
 
 class TransactionUtility:
-    nc: Client
+    nc: Union[Client, NatsClientTelemetry]
     js: Union[JetStreamContext, JetStreamContextTelemetry]
     pubsub: PubSubDriver
 
@@ -177,7 +181,8 @@ class TransactionUtility:
         if len(self.nats_servers) > 0:
             options["servers"] = self.nats_servers
 
-        self.nc = await nats.connect(**options)
+        nc = await nats.connect(**options)
+        self.nc = get_traced_nats_client(nc, service_name or "nucliadb")
         self.js = get_traced_jetstream(self.nc, service_name or "nucliadb")
 
     async def finalize(self):
