@@ -75,30 +75,37 @@ class RankFusionAlgorithm(ABC):
         If only one source is provided, rank fusion will be skipped.
 
         """
-        # sort results by it's score before fusing them
-        sources = {
-            retriever: sorted(values, key=lambda r: r.score, reverse=True)
-            for retriever, values in sources.items()
-        }
-
         sources_with_results = [x for x in sources.values() if len(x) > 0]
         if len(sources_with_results) == 1:
-            return sources_with_results[0]
+            # skip rank fusion, we only have a source
+            merged = sources_with_results[0]
         else:
             merged = self._fuse(sources)
-            return merged
+
+        # sort and return the unordered results from the implementation
+        merged.sort(key=lambda r: r.score, reverse=True)
+        return merged
 
     @abstractmethod
     def _fuse(self, sources: dict[str, list[TextBlockMatch]]) -> list[TextBlockMatch]:
-        """Rank fusion implementation. All arguments are assumed to be ordered
-        by decreasing score."""
+        """Rank fusion implementation.
+
+        Each concrete subclass must provide an implementation that merges
+        `sources`, a group of unordered matches, into a list of unordered
+        results with the new rank fusion score.
+
+        Results can be deduplicated or changed by the rank fusion algorithm.
+
+        """
         ...
 
 
 class ReciprocalRankFusion(RankFusionAlgorithm):
     """Rank-based rank fusion algorithm. Discounts the weight of documents
-    occurring deep in retrieved lists using a reciprocal distribution. It can be
-    parametrized with weights to boost retrievers.
+    occurring deep in retrieved lists using a reciprocal distribution.
+
+    This implementation can be further parametrized with a weight (boost) per
+    retriever that will be applied to all documents ranked by it.
 
     RRF = Σ(r ∈ R) (1 / (k + r(d)) · w(r))
 
@@ -140,6 +147,11 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         # pointers from paragraph to the original source
         match_positions: dict[ParagraphId, list[tuple[int, int]]] = {}
 
+        # sort results by it's score before fusing them, as we need the rank
+        sources = {
+            retriever: sorted(values, key=lambda r: r.score, reverse=True)
+            for retriever, values in sources.items()
+        }
         rankings = [
             (values, self._weights.get(source, self._default_weight))
             for source, values in sources.items()
@@ -167,7 +179,6 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
             item.score_type = score_type
             merged.append(item)
 
-        merged.sort(key=lambda x: x.score, reverse=True)
         return merged
 
 
@@ -235,7 +246,6 @@ class WeigthedCombSum(RankFusionAlgorithm):
             item.score_type = score_type
             merged.append(item)
 
-        merged.sort(key=lambda x: x.score, reverse=True)
         return merged
 
 
