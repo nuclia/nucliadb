@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
 
     await setup_driver()
     await setup_cluster()
-    await start_nidx_utility()
+    await start_nidx_utility(SERVICE_NAME)
 
     await start_audit_utility(SERVICE_NAME)
 
