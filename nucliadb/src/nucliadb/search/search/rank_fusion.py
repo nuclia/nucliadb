@@ -135,35 +135,37 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         self,
         sources: dict[str, list[TextBlockMatch]],
     ) -> list[TextBlockMatch]:
+        # accumulated scores per paragraph
         scores: dict[ParagraphId, tuple[float, SCORE_TYPE]] = {}
+        # pointers from paragraph to the original source
         match_positions: dict[ParagraphId, list[tuple[int, int]]] = {}
 
         rankings = [
             (values, self._weights.get(source, self._default_weight))
             for source, values in sources.items()
         ]
-        for r, (ranking, boost) in enumerate(rankings):
-            for i, result in enumerate(ranking):
-                id = result.paragraph_id
-                score, score_type = scores.setdefault(id, (0, result.score_type))
-                score += 1 / (self._k + i) * boost
-                if {score_type, result.score_type} == {SCORE_TYPE.BM25, SCORE_TYPE.VECTOR}:
+        for i, (ranking, weight) in enumerate(rankings):
+            for rank, item in enumerate(ranking):
+                id = item.paragraph_id
+                score, score_type = scores.setdefault(id, (0, item.score_type))
+                score += 1 / (self._k + rank) * weight
+                if {score_type, item.score_type} == {SCORE_TYPE.BM25, SCORE_TYPE.VECTOR}:
                     score_type = SCORE_TYPE.BOTH
                 scores[id] = (score, score_type)
 
-                position = (r, i)
-                match_positions.setdefault(result.paragraph_id, []).append(position)
+                position = (i, rank)
+                match_positions.setdefault(item.paragraph_id, []).append(position)
 
         merged = []
         for paragraph_id, positions in match_positions.items():
             # we are getting only one position, effectively deduplicating
             # multiple matches for the same text block
-            r, i = match_positions[paragraph_id][0]
+            i, j = match_positions[paragraph_id][0]
             score, score_type = scores[paragraph_id]
-            result = rankings[r][0][i]
-            result.score = score
-            result.score_type = score_type
-            merged.append(result)
+            item = rankings[i][0][j]
+            item.score = score
+            item.score_type = score_type
+            merged.append(item)
 
         merged.sort(key=lambda x: x.score, reverse=True)
         return merged
