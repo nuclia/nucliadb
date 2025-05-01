@@ -33,6 +33,8 @@ from nuclia_models.predict.generative_responses import (
 from pydantic_core import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.external_index_providers.base import ScoredTextBlock
+from nucliadb.common.ids import ParagraphId
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger, predict
 from nucliadb.search.predict import (
@@ -63,6 +65,7 @@ from nucliadb.search.search.graph_strategy import get_graph_results
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
+from nucliadb.search.search.rank_fusion import WeightedCombSum
 from nucliadb.search.search.rerankers import (
     get_reranker,
 )
@@ -861,6 +864,10 @@ async def retrieval_in_resource(
     )
 
 
+class _FindParagraph(ScoredTextBlock):
+    original: FindParagraph
+
+
 def compute_best_matches(
     main_results: KnowledgeboxFindResults,
     prequeries_results: Optional[list[PreQueryResult]] = None,
@@ -878,42 +885,49 @@ def compute_best_matches(
     `main_query_weight` is the weight given to the paragraphs matching the main query when calculating the final score.
     """
 
-    def iter_paragraphs(results: KnowledgeboxFindResults):
+    def extract_paragraphs(results: KnowledgeboxFindResults) -> list[_FindParagraph]:
+        paragraphs = []
         for resource in results.resources.values():
             for field in resource.fields.values():
                 for paragraph in field.paragraphs.values():
-                    yield paragraph
+                    paragraphs.append(
+                        _FindParagraph(
+                            paragraph_id=ParagraphId.from_string(paragraph.id),
+                            score=paragraph.score,
+                            score_type=paragraph.score_type,
+                            original=paragraph,
+                        )
+                    )
+        return paragraphs
 
-    total_weights = main_query_weight + sum(prequery.weight for prequery, _ in prequeries_results or [])
-    paragraph_id_to_match: dict[str, RetrievalMatch] = {}
-    for paragraph in iter_paragraphs(main_results):
-        normalized_weight = main_query_weight / total_weights
-        rmatch = RetrievalMatch(
-            paragraph=paragraph,
-            weighted_score=paragraph.score * normalized_weight,
+    weights = {
+        "main": main_query_weight,
+    }
+    total_weight = main_query_weight
+    find_results = {
+        "main": extract_paragraphs(main_results),
+    }
+    total_elements = len(find_results["main"])
+    for i, (prequery, prequery_results) in enumerate(prequeries_results or []):
+        weights[f"prequery-{i}"] = prequery.weight
+        total_weight += prequery.weight
+        prequery_paragraphs = extract_paragraphs(prequery_results)
+        find_results[f"prequery-{i}"] = prequery_paragraphs
+        total_elements += len(prequery_paragraphs)
+
+    normalized_weights = {key: value / total_weight for key, value in weights.items()}
+
+    # window does nothing here
+    rank_fusion = WeightedCombSum(window=0, weights=normalized_weights)
+
+    merged = []
+    for item in rank_fusion.fuse(find_results):
+        match = RetrievalMatch(
+            paragraph=item.original,
+            weighted_score=item.score,
         )
-        paragraph_id_to_match[paragraph.id] = rmatch
-
-    for prequery, prequery_results in prequeries_results or []:
-        for paragraph in iter_paragraphs(prequery_results):
-            normalized_weight = prequery.weight / total_weights
-            weighted_score = paragraph.score * normalized_weight
-            if paragraph.id in paragraph_id_to_match:
-                rmatch = paragraph_id_to_match[paragraph.id]
-                # If a paragraph is matched in various prequeries, the final score is the
-                # sum of the weighted scores
-                rmatch.weighted_score += weighted_score
-            else:
-                paragraph_id_to_match[paragraph.id] = RetrievalMatch(
-                    paragraph=paragraph,
-                    weighted_score=weighted_score,
-                )
-
-    return sorted(
-        paragraph_id_to_match.values(),
-        key=lambda match: match.weighted_score,
-        reverse=True,
-    )
+        merged.append(match)
+    return merged
 
 
 def calculate_prequeries_for_json_schema(
