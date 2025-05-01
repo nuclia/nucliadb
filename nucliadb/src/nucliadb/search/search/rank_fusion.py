@@ -184,7 +184,7 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         return merged
 
 
-class WeigthedCombSum(RankFusionAlgorithm):
+class WeightedCombSum(RankFusionAlgorithm):
     """Score-based rank fusion algorithm. Multiply each score by a list-specific
     weight (boost). Then adds the retrieval score of documents contained in more
     than one list and sort by score.

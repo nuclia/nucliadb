@@ -43,7 +43,7 @@ from nucliadb.search.search.find_merge import (
 from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb.search.search.rank_fusion import (
     ReciprocalRankFusion,
-    WeigthedCombSum,
+    WeightedCombSum,
     get_rank_fusion,
 )
 from nucliadb_models.search import SCORE_TYPE, FindRequest
@@ -433,7 +433,7 @@ def test_weighted_comb_sum_rank_fusion(
     graph: list[TextBlockMatch],
     expected: list[tuple[str, float]],
 ):
-    wcombsum = WeigthedCombSum(
+    wcombsum = WeightedCombSum(
         window=20,
         weights={
             "keyword": 2,
