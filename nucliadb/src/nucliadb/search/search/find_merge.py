@@ -32,7 +32,6 @@ from nidx_protos.nodereader_pb2 import (
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search import SERVICE_NAME, logger
-from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
@@ -41,6 +40,7 @@ from nucliadb.search.search.hydrator import (
     text_block_to_find_paragraph,
 )
 from nucliadb.search.search.merge import merge_relations_results
+from nucliadb.search.search.plan.cut import cut_page
 from nucliadb.search.search.query_parser.models import UnitRetrieval
 from nucliadb.search.search.rank_fusion import IndexSource, RankFusionAlgorithm
 from nucliadb.search.search.rerankers import (

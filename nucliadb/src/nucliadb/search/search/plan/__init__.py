@@ -17,14 +17,3 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-from typing import TypeVar
-
-T = TypeVar("T")
-
-
-def cut_page(items: list[T], top_k: int) -> tuple[list[T], bool]:
-    """Return a slice of `items` representing the specified page and a boolean
-    indicating whether there is a next page or not"""
-    next_page = len(items) > top_k
-    return items[:top_k], next_page
