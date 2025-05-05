@@ -70,7 +70,7 @@ def ask_mock():
         (
             IncompleteFindResultsError(),
             HTTPClientError(
-                status_code=529,
+                status_code=530,
                 detail="Temporary error on information retrieval. Please try again.",
             ),
         ),

@@ -649,9 +649,11 @@ def handled_ask_exceptions(func):
                 detail=err.detail,
             )
         except IncompleteFindResultsError:
+            msg = "Temporary error on information retrieval. Please try again."
+            logger.error(msg)
             return HTTPClientError(
-                status_code=529,
-                detail="Temporary error on information retrieval. Please try again.",
+                status_code=530,
+                detail=msg,
             )
         except predict.RephraseMissingContextError:
             return HTTPClientError(
@@ -659,9 +661,11 @@ def handled_ask_exceptions(func):
                 detail="Unable to rephrase the query with the provided context.",
             )
         except predict.RephraseError as err:
+            msg = f"Temporary error while rephrasing the query. Please try again later. Error: {err}"
+            logger.info(msg)
             return HTTPClientError(
                 status_code=529,
-                detail=f"Temporary error while rephrasing the query. Please try again later. Error: {err}",
+                detail=msg,
             )
         except InvalidQueryError as exc:
             return HTTPClientError(status_code=412, detail=str(exc))
