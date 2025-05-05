@@ -102,3 +102,25 @@ def test_legacy_rank_fusion_fix():
 
     req = search.FindRequest.model_validate({"rank_fusion": "legacy"})
     assert req.rank_fusion == "rrf"
+
+
+# /ask
+
+
+def test_ask_rename_context_to_chat_history():
+    payload = [search.ChatContextMessage(author=search.Author.USER, text="my context")]
+
+    req = search.AskRequest(query="")
+    assert req.context is None
+    assert req.chat_history is None
+
+    req = search.AskRequest(query="", context=payload)
+    assert req.context is None
+    assert req.chat_history == payload
+
+    req = search.AskRequest(query="", chat_history=payload)
+    assert req.context is None
+    assert req.chat_history == payload
+
+    with pytest.raises(ValidationError):
+        search.AskRequest(query="", context=payload, chat_history=payload)
