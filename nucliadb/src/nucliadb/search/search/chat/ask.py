@@ -907,13 +907,10 @@ def compute_best_matches(
     find_results = {
         "main": extract_paragraphs(main_results),
     }
-    total_elements = len(find_results["main"])
     for i, (prequery, prequery_results) in enumerate(prequeries_results or []):
         weights[f"prequery-{i}"] = prequery.weight
         total_weight += prequery.weight
-        prequery_paragraphs = extract_paragraphs(prequery_results)
-        find_results[f"prequery-{i}"] = prequery_paragraphs
-        total_elements += len(prequery_paragraphs)
+        find_results[f"prequery-{i}"] = extract_paragraphs(prequery_results)
 
     normalized_weights = {key: value / total_weight for key, value in weights.items()}
 
