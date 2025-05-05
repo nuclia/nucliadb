@@ -479,7 +479,7 @@ async def ask(
     resource: Optional[str] = None,
 ) -> AskResult:
     metrics = RAGMetrics()
-    chat_history = ask_request.context or []
+    chat_history = ask_request.chat_history or []
     user_context = ask_request.extra_context or []
     user_query = ask_request.query
 
