@@ -19,33 +19,34 @@
 #
 import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 import pytest
-from fastapi import HTTPException
 
-from nucliadb.common.back_pressure import (
+from nucliadb.common.back_pressure.cache import (
     BackPressureCache,
     BackPressureData,
-    BackPressureException,
-    Materializer,
     cached_back_pressure,
-    check_ingest_behind,
-    check_processing_behind,
-    estimate_try_after,
+)
+from nucliadb.common.back_pressure.cache import _cache as back_pressure_cache
+from nucliadb.common.back_pressure.materializer import (
+    BackPressureMaterializer,
     get_materializer,
     maybe_back_pressure,
     start_materializer,
 )
-from nucliadb.common.back_pressure.cache import _cache as back_pressure_cache
+from nucliadb.common.back_pressure.utils import (
+    BackPressureException,
+    estimate_try_after,
+)
 
-MODULE = "nucliadb.writer.back_pressure"
+MODULE = "nucliadb.common.back_pressure"
 
 
 @pytest.fixture(scope="function", autouse=True)
 def is_back_pressure_enabled():
-    with mock.patch(f"{MODULE}.is_back_pressure_enabled", return_value=True) as mock_:
+    with mock.patch(f"{MODULE}.materializer.is_back_pressure_enabled", return_value=True) as mock_:
         yield mock_
 
 
@@ -58,7 +59,7 @@ def is_back_pressure_enabled():
     ],
 )
 def test_estimate_try_after(rate, pending, max_wait, delta):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     try_after = estimate_try_after(rate, pending, max_wait)
     assert int(try_after.timestamp()) == int(now.timestamp() + delta)
 
@@ -70,7 +71,7 @@ def test_back_pressure_cache():
     assert cache.get(key) is None
 
     # Set a value and get it
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     try_after = now + timedelta(seconds=0.5)
     data = BackPressureData(try_after=try_after, type="indexing")
 
@@ -85,7 +86,7 @@ def test_back_pressure_cache():
 
 async def test_maybe_back_pressure_skip_conditions_onprem(is_back_pressure_enabled, onprem_nucliadb):
     # onprem should never run back pressure even if enabled
-    with mock.patch(f"{MODULE}.back_pressure_checks") as back_pressure_checks_mock:
+    with mock.patch(f"{MODULE}.materializer.back_pressure_checks") as back_pressure_checks_mock:
         is_back_pressure_enabled.return_value = True
         await maybe_back_pressure(mock.Mock(), "kbid")
         back_pressure_checks_mock.assert_not_called()
@@ -93,7 +94,7 @@ async def test_maybe_back_pressure_skip_conditions_onprem(is_back_pressure_enabl
 
 async def test_maybe_back_pressure_skip_conditions_hosted(is_back_pressure_enabled, hosted_nucliadb):
     # Back pressure should only run for hosted deployments, when enabled
-    with mock.patch(f"{MODULE}.back_pressure_checks") as back_pressure_checks_mock:
+    with mock.patch(f"{MODULE}.materializer.back_pressure_checks") as back_pressure_checks_mock:
         is_back_pressure_enabled.return_value = False
         await maybe_back_pressure(mock.Mock(), "kbid")
         back_pressure_checks_mock.assert_not_called()
@@ -124,7 +125,7 @@ def settings():
         ingest_rate=2,
         max_wait_time=60,
     )
-    with mock.patch(f"{MODULE}.settings", settings):
+    with mock.patch(f"{MODULE}.materializer.settings", settings):
         yield settings
 
 
@@ -134,52 +135,56 @@ def cache():
     yield back_pressure_cache
 
 
-async def test_check_processing_behind(materializer, settings, cache):
+async def test_check_processing_behind(settings, cache, nats_conn):
     settings.max_processing_pending = 5
 
+    materializer = BackPressureMaterializer(nats_conn)
+    materializer.get_processing_pending = mock.AsyncMock(return_value=1)
+
     # Check that it runs and does not raise an exception if the pending is low
-    materializer.get_processing_pending.return_value = 1
-    await check_processing_behind(materializer, "kbid")
+    await materializer.check_processing("kbid")
     materializer.get_processing_pending.assert_awaited_once_with("kbid")
 
     # Check that it raises an exception if the pending is too high
     materializer.get_processing_pending.reset_mock()
     materializer.get_processing_pending.return_value = 10
     with pytest.raises(BackPressureException):
-        await check_processing_behind(materializer, "kbid")
+        await materializer.check_processing("kbid")
     materializer.get_processing_pending.assert_awaited_once_with("kbid")
 
 
-async def test_check_processing_behind_does_not_run_if_configured_max_is_zero(
-    materializer, settings, cache
-):
+async def test_check_processing_behind_does_not_run_if_configured_max_is_zero(settings, cache):
     settings.max_processing_pending = 0
-    materializer.get_processing_pending.return_value = 100
+    materializer = BackPressureMaterializer(mock.Mock())
+    materializer.get_processing_pending = mock.AsyncMock(return_value=100)
 
-    await check_processing_behind(materializer, "kbid")
+    await materializer.check_processing("kbid")
 
     materializer.get_processing_pending.assert_not_called()
 
 
-def test_check_ingest_behind(settings, cache):
+async def test_check_ingest_behind(settings, cache):
+    materializer = BackPressureMaterializer(mock.Mock())
     settings.max_ingest_pending = 5
-
-    check_ingest_behind(2)
+    materializer.ingest_pending = 2
+    materializer.check_ingest()
 
     with pytest.raises(BackPressureException):
-        check_ingest_behind(10)
+        materializer.ingest_pending = 10
+        materializer.check_ingest()
 
 
-def test_check_ingest_behind_does_not_raise_if_configured_max_is_zero(settings):
+async def test_check_ingest_behind_does_not_raise_if_configured_max_is_zero(settings):
     settings.max_ingest_pending = 0
-
-    check_ingest_behind(1000)
+    materializer = BackPressureMaterializer(mock.Mock())
+    materializer.ingest_pending = 1000
+    materializer.check_ingest()
 
 
 def test_cached_back_pressure_context_manager(cache):
     func = mock.Mock()
 
-    with cached_back_pressure("foo", "bar"):
+    with cached_back_pressure("foo-bar"):
         func()
 
     func.assert_called_once()
@@ -188,22 +193,20 @@ def test_cached_back_pressure_context_manager(cache):
     func.side_effect = Exception("Boom")
 
     with pytest.raises(Exception):
-        with cached_back_pressure("foo", "bar"):
+        with cached_back_pressure("foo-bar"):
             func()
 
     func.reset_mock()
 
-    data = BackPressureData(try_after=datetime.now() + timedelta(seconds=10), type="indexing")
+    data = BackPressureData(
+        try_after=datetime.now(timezone.utc) + timedelta(seconds=10), type="indexing"
+    )
     func.side_effect = BackPressureException(data)
 
-    with pytest.raises(HTTPException) as exc:
-        with cached_back_pressure("foo", "bar"):
+    with pytest.raises(BackPressureException) as exc:
+        with cached_back_pressure("foo-bar"):
             func()
-
-    assert exc.value.status_code == 429
-    assert exc.value.detail["message"].startswith("Too many messages pending to ingest. Retry after")
-    assert exc.value.detail["try_after"]
-    assert exc.value.detail["back_pressure_type"] == "indexing"
+    assert exc.value.data == data
 
 
 @pytest.fixture(scope="function")
@@ -231,7 +234,7 @@ def processing_client():
 
 
 async def test_materializer(nats_conn, js, processing_client):
-    materializer = Materializer(
+    materializer = BackPressureMaterializer(
         nats_conn,
         indexing_check_interval=0.5,
         ingest_check_interval=0.5,
@@ -279,13 +282,13 @@ async def test_start_materializer():
 
     await start_materializer(context)
     mat = get_materializer()
-    assert isinstance(mat, Materializer)
+    assert isinstance(mat, BackPressureMaterializer)
     assert mat.nats_manager == nats_mgr
 
     assert mat.running
 
     # Make sure the singleton is set
-    from nucliadb.common.back_pressure import MATERIALIZER
+    from nucliadb.common.back_pressure.materializer import MATERIALIZER
 
     assert MATERIALIZER is mat
 

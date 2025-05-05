@@ -25,6 +25,7 @@ from fastapi_versioning import version
 from starlette.requests import Request
 
 import nucliadb_models as models
+from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.models.internal.processing import PushPayload, Source
@@ -40,7 +41,6 @@ from nucliadb.writer.api.v1.resource import (
     validate_rid_exists_or_raise_error,
 )
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
-from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.field import (
     ResourceClassifications,
