@@ -609,6 +609,12 @@ class SearchParamDefaults:
     chat_context = ParamDefault(
         default=None,
         title="Chat history",
+        description="DEPRECATED! Please, use `chat_history` instead.",
+        deprecated=True,
+    )
+    chat_history = ParamDefault(
+        default=None,
+        title="Chat history",
         description="Use to rephrase the new LLM query by taking into account the chat conversation history",  # noqa: E501
     )
     chat_features = ParamDefault(
@@ -1454,6 +1460,9 @@ class AskRequest(AuditMetadataBase):
     field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
     extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
     context: Optional[list[ChatContextMessage]] = SearchParamDefaults.chat_context.to_pydantic_field()
+    chat_history: Optional[list[ChatContextMessage]] = (
+        SearchParamDefaults.chat_history.to_pydantic_field()
+    )
     extra_context: Optional[list[str]] = Field(
         default=None,
         title="Extra query context",
@@ -1640,6 +1649,16 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
             if isinstance(rank_fusion, str) and rank_fusion == "legacy":
                 values["rank_fusion"] = RankFusionName.RECIPROCAL_RANK_FUSION
         return values
+
+    @model_validator(mode="after")
+    def rename_context_to_chat_history(self) -> Self:
+        """Bw/c rename from `context` to `chat_history`"""
+        if self.context is not None and self.chat_history is not None:
+            raise ValueError("`context` and `chat_history` are the same, please, use the latter")
+        elif self.context is not None:
+            self.chat_history = self.context
+            self.context = None
+        return self
 
 
 # Alias (for backwards compatiblity with testbed)

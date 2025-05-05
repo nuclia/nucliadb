@@ -66,12 +66,12 @@ async def test_ask(
     resp = await nucliadb_reader.post(f"/kb/{standalone_knowledgebox}/ask", json={"query": "query"})
     assert resp.status_code == 200
 
-    context = [{"author": "USER", "text": "query"}]
+    chat_history = [{"author": "USER", "text": "query"}]
     resp = await nucliadb_reader.post(
         f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "query",
-            "context": context,
+            "chat_history": chat_history,
         },
     )
     assert resp.status_code == 200
