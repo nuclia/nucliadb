@@ -38,7 +38,7 @@ from nucliadb.common.back_pressure import (
     maybe_back_pressure,
     start_materializer,
 )
-from nucliadb.common.back_pressure import _cache as back_pressure_cache
+from nucliadb.common.back_pressure.cache import _cache as back_pressure_cache
 
 MODULE = "nucliadb.writer.back_pressure"
 
