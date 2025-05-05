@@ -28,6 +28,7 @@ from fastapi_versioning import version
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
+from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
@@ -45,7 +46,6 @@ from nucliadb.writer.api.v1.router import (
     api,
 )
 from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_manager
-from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
     parse_basic_creation,
@@ -106,7 +106,7 @@ async def create_resource(
             detail="Cannot hide a resource: the KB does not have hidden resources enabled",
         )
 
-    await maybe_back_pressure(request, kbid)
+    await maybe_back_pressure(kbid)
 
     partitioning = get_partitioning()
 
@@ -243,7 +243,7 @@ async def modify_resource_endpoint(
 ):
     await validate_rid_exists_or_raise_error(kbid, rid)
 
-    await maybe_back_pressure(request, kbid, resource_uuid=rid)
+    await maybe_back_pressure(kbid, resource_uuid=rid)
 
     if item.slug is None:
         return await modify_resource(
@@ -424,7 +424,7 @@ async def _reprocess_resource(
     x_nucliadb_user: str,
 ):
     await validate_rid_exists_or_raise_error(kbid, rid)
-    await maybe_back_pressure(request, kbid, resource_uuid=rid)
+    await maybe_back_pressure(kbid, resource_uuid=rid)
 
     partitioning = get_partitioning()
 
@@ -571,7 +571,7 @@ async def _reindex_resource(
     reindex_vectors: bool,
 ):
     await validate_rid_exists_or_raise_error(kbid, rid)
-    await maybe_back_pressure(request, kbid, resource_uuid=rid)
+    await maybe_back_pressure(kbid, resource_uuid=rid)
 
     ingest = get_ingest()
     index_req = IndexResource()
