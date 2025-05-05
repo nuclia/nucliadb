@@ -93,7 +93,7 @@ async def test_ask_handles_incomplete_find_results(
     find_incomplete_results,
 ):
     resp = await nucliadb_reader.post(f"/kb/{standalone_knowledgebox}/ask", json={"query": "query"})
-    assert resp.status_code == 529
+    assert resp.status_code == 530
     assert resp.json() == {"detail": "Temporary error on information retrieval. Please try again."}
 
 
