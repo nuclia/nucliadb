@@ -90,7 +90,6 @@ async def start_pull_workers(
     if is_back_pressure_enabled():
         back_pressure = await start_back_pressure()
         finalizers.append(partial(stop_back_pressure, back_pressure))
-
     tasks = []
     for partition in settings.partitions:
         worker = PullWorker(
