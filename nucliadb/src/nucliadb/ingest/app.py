@@ -103,7 +103,7 @@ async def initialize_pull_workers() -> list[Callable[[], Awaitable[None]]]:
     finalizers = await initialize_grpc()
     pull_workers = await consumer_service.start_pull_workers(SERVICE_NAME)
 
-    return [pull_workers] + finalizers
+    return pull_workers + finalizers
 
 
 async def main_consumer():  # pragma: no cover
@@ -117,7 +117,7 @@ async def main_consumer():  # pragma: no cover
     ingest_consumers = await consumer_service.start_ingest_consumers(SERVICE_NAME)
 
     await run_until_exit(
-        [grpc_health_finalizer, pull_workers, ingest_consumers, metrics_server.shutdown] + finalizers
+        [grpc_health_finalizer, ingest_consumers, metrics_server.shutdown] + pull_workers + finalizers
     )
 
 
