@@ -649,7 +649,7 @@ def handled_ask_exceptions(func):
                 detail=err.detail,
             )
         except IncompleteFindResultsError:
-            msg = "Temporary error while retrieving the results. Please try again later."
+            msg = "Temporary error on information retrieval. Please try again."
             logger.error(msg)
             return HTTPClientError(
                 status_code=530,
