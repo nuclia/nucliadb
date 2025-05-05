@@ -16,10 +16,13 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
+from nucliadb.common.back_pressure.materializer import BackPressureMaterializer
+from nucliadb.common.back_pressure.utils import BackPressureData, BackPressureException
 from nucliadb.ingest.consumer.pull import PullWorker
 
 
@@ -42,8 +45,7 @@ class TestPullWorker:
         conn.jetstream.return_value = AsyncMock()
         conn.drain = AsyncMock()
         conn.close = AsyncMock()
-        with patch("nucliadb.ingest.consumer.pull.nats.connect", return_value=conn):
-            yield conn
+        yield conn
 
     @pytest.fixture()
     def worker(self, processor):
@@ -52,9 +54,52 @@ class TestPullWorker:
             partition="1",
             storage=AsyncMock(),
             pull_time_error_backoff=100,
-            zone="zone",
-            nuclia_processing_cluster_url="nuclia_processing_cluster_url",
-            nuclia_public_url="nuclia_public_url",
-            audit=None,
-            onprem=False,
         )
+
+    @pytest.fixture()
+    async def back_pressure(self, nats_manager):
+        materializer = BackPressureMaterializer(nats_manager)
+        materializer.check_indexing = Mock(return_value=None)
+        materializer.check_ingest = Mock(return_value=None)
+        yield materializer
+
+    async def test_back_pressure_check(
+        self,
+        worker: PullWorker,
+        back_pressure,
+        processor: AsyncMock,
+        nats_conn: MagicMock,
+    ):
+        # If the worker does not have the back pressure, it should not be called
+        worker.back_pressure = None
+
+        await worker.back_pressure_check()
+
+        back_pressure.check_ingest.assert_not_called()
+        back_pressure.check_indexing.assert_not_called()
+
+        # Check that the back pressure check is called when the worker has it
+        worker.back_pressure = back_pressure
+
+        await worker.back_pressure_check()
+
+        back_pressure.check_ingest.assert_called_once()
+        back_pressure.check_indexing.assert_called_once()
+
+        # Check that it is retried when the back pressure exception is raised
+        back_pressure.check_ingest.reset_mock()
+        back_pressure.check_indexing.reset_mock()
+        bpdata = BackPressureData(type="ingest", try_after=datetime.now(timezone.utc))
+        back_pressure.check_ingest.side_effect = [BackPressureException(bpdata), None]
+
+        await worker.back_pressure_check()
+
+        assert back_pressure.check_ingest.call_count == 2
+
+        # Other exceptions are not retried
+        back_pressure.check_ingest.reset_mock()
+        back_pressure.check_ingest.side_effect = [ValueError("test"), None]
+
+        await worker.back_pressure_check()
+
+        assert back_pressure.check_ingest.call_count == 1
