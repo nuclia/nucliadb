@@ -22,6 +22,7 @@ import base64
 import time
 import uuid
 from dataclasses import dataclass
+from typing import AsyncIterator, Optional
 from unittest.mock import patch
 
 import pytest
@@ -29,6 +30,8 @@ from fastapi import FastAPI
 from uvicorn.config import Config  # type: ignore
 from uvicorn.server import Server  # type: ignore
 
+from nucliadb.common.back_pressure.materializer import BackPressureMaterializer
+from nucliadb.common.back_pressure.settings import BackPressureSettings
 from nucliadb.ingest.consumer.pull import PullWorker
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
@@ -87,13 +90,52 @@ async def pull_processor_api():
 
 
 @pytest.fixture()
-async def pull_worker(maindb_driver, pull_processor_api: PullProcessorAPI):
+async def pull_worker(
+    maindb_driver,
+    pull_processor_api: PullProcessorAPI,
+):
     worker = PullWorker(
         driver=maindb_driver,
         partition="1",
         storage=None,  # type: ignore
         pull_time_error_backoff=5,
         pull_time_empty_backoff=0.1,
+    )
+
+    task = asyncio.create_task(worker.loop())
+    yield worker
+    task.cancel()
+
+
+@pytest.fixture(scope="function")
+async def back_pressure(
+    nats_manager: NatsConnectionManager,
+) -> AsyncIterator[Optional[BackPressureMaterializer]]:
+    settings = BackPressureSettings()
+    settings.enabled = False
+    back_pressure = BackPressureMaterializer(
+        nats_manager,
+        indexing_check_interval=settings.indexing_check_interval,
+        ingest_check_interval=settings.ingest_check_interval,
+    )
+    await back_pressure.start()
+    yield back_pressure
+    await back_pressure.stop()
+
+
+@pytest.fixture()
+async def pull_worker_with_back_pressure(
+    maindb_driver,
+    pull_processor_api: PullProcessorAPI,
+    back_pressure: BackPressureMaterializer,
+):
+    worker = PullWorker(
+        driver=maindb_driver,
+        partition="1",
+        storage=None,  # type: ignore
+        pull_time_error_backoff=5,
+        pull_time_empty_backoff=0.1,
+        back_pressure=back_pressure,
     )
 
     task = asyncio.create_task(worker.loop())
@@ -117,6 +159,37 @@ async def test_pull_full_integration(
     ingest_consumers,
     ingest_processed_consumer,
     pull_worker: PullWorker,
+    pull_processor_api: PullProcessorAPI,
+    knowledgebox_ingest: str,
+    nats_manager: NatsConnectionManager,
+):
+    # make sure stream is empty
+    consumer_info1 = await nats_manager.js.consumer_info(
+        const.Streams.INGEST.name, const.Streams.INGEST.group.format(partition="1")
+    )
+    consumer_info2 = await nats_manager.js.consumer_info(
+        const.Streams.INGEST_PROCESSED.name, const.Streams.INGEST_PROCESSED.group
+    )
+    assert consumer_info1.delivered.stream_seq == 0
+    assert consumer_info2.delivered.stream_seq == 0
+
+    # add message that should go to first consumer
+    pull_processor_api.messages.append(create_broker_message(knowledgebox_ingest))
+    await wait_for_messages(pull_processor_api.messages)
+
+    consumer_info1 = await nats_manager.js.consumer_info(
+        const.Streams.INGEST.name, const.Streams.INGEST_PROCESSED.group
+    )
+
+    assert consumer_info1.delivered.stream_seq == 1
+
+
+async def test_pull_full_integration_with_back_pressure(
+    shard_manager,
+    dummy_nidx_utility,
+    ingest_consumers,
+    ingest_processed_consumer,
+    pull_worker_with_back_pressure: PullWorker,
     pull_processor_api: PullProcessorAPI,
     knowledgebox_ingest: str,
     nats_manager: NatsConnectionManager,
