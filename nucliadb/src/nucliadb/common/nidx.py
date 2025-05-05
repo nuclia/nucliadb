@@ -19,7 +19,7 @@
 #
 
 import os
-from typing import Optional
+from typing import Optional, Union
 
 from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxIndexerStub, NidxSearcherStub
 from nidx_protos.nodewriter_pb2 import (
@@ -89,10 +89,11 @@ def _storage_config(prefix: str, bucket: Optional[str]) -> dict[str, str]:
 class NidxBindingUtility(NidxUtility):
     """Implements Nidx utility using the binding"""
 
-    def __init__(self):
+    def __init__(self, service_name: str):
         if ingest_settings.driver != DriverConfig.PG:
             raise ValueError("nidx_binding requires DRIVER=pg")
 
+        self.service_name = service_name
         self.config = {
             "METADATA__DATABASE_URL": ingest_settings.driver_pg_url,
             "SEARCHER__METADATA_REFRESH_INTERVAL": str(
@@ -107,10 +108,10 @@ class NidxBindingUtility(NidxUtility):
 
         self.binding = nidx_binding.NidxBinding(self.config)
         self.api_client = NidxApiStub(
-            get_traced_grpc_channel(f"localhost:{self.binding.api_port}", "nidx_api")
+            get_traced_grpc_channel(f"localhost:{self.binding.api_port}", self.service_name)
         )
         self.searcher_client = NidxSearcherStub(
-            get_traced_grpc_channel(f"localhost:{self.binding.searcher_port}", "nidx_searcher")
+            get_traced_grpc_channel(f"localhost:{self.binding.searcher_port}", self.service_name)
         )
 
     async def finalize(self):
@@ -124,12 +125,13 @@ class NidxBindingUtility(NidxUtility):
 
 
 class NidxNatsIndexer:
-    def __init__(self):
+    def __init__(self, service_name: str):
         self.nats_connection_manager = NatsConnectionManager(
-            service_name="NidxIndexer",
+            service_name=service_name,
             nats_servers=indexing_settings.index_jetstream_servers,
             nats_creds=indexing_settings.index_jetstream_auth,
         )
+        assert indexing_settings.index_nidx_subject is not None
         self.subject = indexing_settings.index_nidx_subject
 
     async def initialize(self):
@@ -147,11 +149,12 @@ class NidxNatsIndexer:
 
 
 class NidxGrpcIndexer:
-    def __init__(self, address):
+    def __init__(self, address: str, service_name: str):
         self.address = address
+        self.service_name = service_name
 
     async def initialize(self):
-        self.client = NidxIndexerStub(get_traced_grpc_channel(self.address, "nidx_indexer"))
+        self.client = NidxIndexerStub(get_traced_grpc_channel(self.address, self.service_name))
 
     async def finalize(self):
         pass
@@ -164,14 +167,16 @@ class NidxGrpcIndexer:
 class NidxServiceUtility(NidxUtility):
     """Implements Nidx utility connecting to the network service"""
 
-    def __init__(self):
+    indexer: Union[NidxNatsIndexer, NidxGrpcIndexer]
+
+    def __init__(self, service_name: str):
         if not settings.nidx_api_address or not settings.nidx_searcher_address:
             raise ValueError("NIDX_API_ADDRESS and NIDX_SEARCHER_ADDRESS are required")
 
         if indexing_settings.index_nidx_subject:
-            self.indexer = NidxNatsIndexer()
+            self.indexer = NidxNatsIndexer(service_name)
         elif settings.nidx_indexer_address is not None:
-            self.indexer = NidxGrpcIndexer(settings.nidx_indexer_address)
+            self.indexer = NidxGrpcIndexer(settings.nidx_indexer_address, service_name)
         else:
             raise ValueError("NIDX_INDEXER_ADDRESS or INDEX_NIDX_SUBJECT are required")
 
@@ -189,7 +194,7 @@ class NidxServiceUtility(NidxUtility):
         return await self.indexer.index(writer)
 
 
-async def start_nidx_utility() -> Optional[NidxUtility]:
+async def start_nidx_utility(service_name: str = "nucliadb.nidx") -> Optional[NidxUtility]:
     nidx = get_utility(Utility.NIDX)
     if nidx:
         return nidx
@@ -202,13 +207,13 @@ async def start_nidx_utility() -> Optional[NidxUtility]:
             and settings.nidx_indexer_address is not None
         ):
             # Standalone with nidx service (via grpc). This is used in clustered standalone mode
-            nidx_utility = NidxServiceUtility()
+            nidx_utility = NidxServiceUtility(service_name)
         else:
             # Normal standalone mode with binding
-            nidx_utility = NidxBindingUtility()
+            nidx_utility = NidxBindingUtility(service_name)
     else:
         # Component deploy with nidx service via grpc & nats (cloud)
-        nidx_utility = NidxServiceUtility()
+        nidx_utility = NidxServiceUtility(service_name)
 
     await nidx_utility.initialize()
     set_utility(Utility.NIDX, nidx_utility)

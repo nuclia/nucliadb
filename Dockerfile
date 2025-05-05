@@ -3,15 +3,6 @@
 # See also `Dockerfile.withbinding` for a version with a compiled binding (for standalone)
 #
 
-# Stage to extract the external requirements from the lockfile
-# This is to improve caching, `uv.lock` changes when our components
-# are updated. The generated requirements.txt does not, so it is
-# more cacheable.
-FROM python:3.13-slim-bookworm AS requirements
-RUN pip install uv
-COPY uv.lock pyproject.toml .
-RUN uv export --no-sources --frozen --no-emit-workspace > requirements.lock.txt
-
 #
 # This stage builds a virtual env with all dependencies
 #
@@ -21,8 +12,8 @@ RUN pip install uv
 
 # Install Python dependencies
 WORKDIR /usr/src/app
-COPY --from=requirements requirements.lock.txt /tmp
-RUN pip install uv && python -m venv /app && VIRTUAL_ENV=/app uv pip install -r /tmp/requirements.lock.txt
+COPY pyproject.toml uv.lock .
+RUN python -m venv /app && VIRTUAL_ENV=/app uv sync --active --no-group nidx --no-group sdk --no-install-workspace --frozen
 
 # Copy application
 COPY VERSION pyproject.toml uv.lock /usr/src/app

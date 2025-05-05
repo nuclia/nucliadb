@@ -40,13 +40,12 @@ def fmt_span(span):
     }
 
 
+def order_spans(spans):
+    return sorted([fmt_span(span) for span in spans], key=lambda x: x["time"])
+
+
 def debug_spans(spans):
-    print(
-        json.dumps(
-            sorted([fmt_span(span) for span in spans], key=lambda x: x["time"]),
-            indent=4,
-        )
-    )
+    print(json.dumps(spans, indent=4))
 
 
 async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
@@ -87,8 +86,19 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
 
     assert resp.json()["data"][0]["traceID"] == "f13dc5318bf3bef64a0a5ea607db93a1"
 
+    ordered_spans = order_spans(resp.json()["data"][0]["spans"])
     # Enable this block for debugging purposes, to see sunmmarized and sorted details of all spans
-    # debug_spans(resp.json()["data"][0]["spans"])
+    # debug_spans(ordered_spans)
+
+    # This order may change if the test is changed a lot, so make sure to enable debug_spans and
+    # set the asserts correctly
+    api_span = ordered_spans[1]
+    grpc_client_span = ordered_spans[2]
+    grpc_server_span = ordered_spans[3]
+
+    assert grpc_server_span["parent"] != grpc_client_span["parent"]
+    assert grpc_server_span["parent"] == grpc_client_span["id"]
+    assert grpc_client_span["parent"] == api_span["id"]
 
     assert len(resp.json()["data"][0]["spans"]) == expected_spans
     assert len(resp.json()["data"][0]["processes"]) == 3

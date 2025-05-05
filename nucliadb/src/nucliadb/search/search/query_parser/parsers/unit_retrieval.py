@@ -27,6 +27,7 @@ from nucliadb.search.search.metrics import node_features, query_parser_observer
 from nucliadb.search.search.query import apply_entities_filter, get_sort_field_proto
 from nucliadb.search.search.query_parser.filter_expression import add_and_expression
 from nucliadb.search.search.query_parser.models import ParsedQuery, PredictReranker, UnitRetrieval
+from nucliadb.search.search.query_parser.parsers.graph import parse_path_query
 from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
 from nucliadb_models.search import SortOrderMap
 from nucliadb_protos import utils_pb2
@@ -71,11 +72,12 @@ class _Converter:
         self._apply_text_queries()
         self._apply_semantic_query()
         self._apply_relation_query()
+        self._apply_graph_query()
         self._apply_filters()
         self._apply_top_k()
         return self.req
 
-    def _apply_text_queries(self):
+    def _apply_text_queries(self) -> None:
         text_query = self.retrieval.query.keyword or self.retrieval.query.fulltext
         if text_query is None:
             return
@@ -105,7 +107,7 @@ class _Converter:
             self.req.order.sort_by = sort_field
             self.req.order.type = SortOrderMap[text_query.sort]  # type: ignore
 
-    def _apply_semantic_query(self):
+    def _apply_semantic_query(self) -> None:
         if self.retrieval.query.semantic is None:
             return
 
@@ -118,7 +120,7 @@ class _Converter:
             self.req.vectorset = self.retrieval.query.semantic.vectorset
             self.req.vector.extend(query_vector)
 
-    def _apply_relation_query(self):
+    def _apply_relation_query(self) -> None:
         """Relation queries are the legacy way to query the knowledge graph.
         Given a set of entry points and some subtypes and entities to exclude
         from search, it'd find the distance 1 neighbours (BFS)."""
@@ -203,7 +205,14 @@ class _Converter:
         else:
             self.req.graph_search.query.path.bool_and.operands.extend(subqueries)
 
-    def _apply_filters(self):
+    def _apply_graph_query(self) -> None:
+        if self.retrieval.query.graph is None:
+            return
+
+        q = parse_path_query(self.retrieval.query.graph.query)
+        self.req.graph_search.query.path.CopyFrom(q)
+
+    def _apply_filters(self) -> None:
         self.req.with_duplicates = self.retrieval.filters.with_duplicates
 
         self.req.faceted.labels.extend(
@@ -239,7 +248,7 @@ class _Converter:
 
             add_and_expression(self.req.field_filter, expr)
 
-    def _apply_top_k(self):
+    def _apply_top_k(self) -> None:
         """Adjust requested page size depending on rank fusion and reranking
         algorithms.
 

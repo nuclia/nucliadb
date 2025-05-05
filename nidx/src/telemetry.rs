@@ -40,7 +40,7 @@ use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{Resource, trace::TracerProvider};
 use tracing::{Level, Metadata};
 use tracing_core::LevelFilter;
-use tracing_opentelemetry::OpenTelemetrySpanExt as _;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::layer::Filter;
 use tracing_subscriber::{EnvFilter, filter::FilterFn, fmt, prelude::*};
 
@@ -135,4 +135,9 @@ impl Extractor for NatsHeaders<'_> {
 pub fn set_trace_from_nats(span: &tracing::Span, headers: async_nats::HeaderMap) {
     let parent_context = get_text_map_propagator(|p| p.extract(&NatsHeaders(&headers)));
     span.add_link(parent_context.span().span_context().clone());
+
+    // Create a link back from the original trace to us
+    let link_span = tracing::span!(Level::INFO, "Link to nidx trace");
+    link_span.set_parent(parent_context);
+    link_span.add_link(span.context().span().span_context().clone());
 }

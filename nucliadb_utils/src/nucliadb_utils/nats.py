@@ -21,7 +21,7 @@ import asyncio
 import logging
 import sys
 import time
-from functools import cached_property
+from functools import cached_property, partial
 from typing import Any, Awaitable, Callable, Optional, Union
 
 import nats
@@ -33,23 +33,18 @@ from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
 
 from nucliadb_telemetry.errors import capture_exception
-from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
-from nucliadb_telemetry.utils import get_telemetry
+from nucliadb_telemetry.jetstream import (
+    JetStreamContextTelemetry,
+    NatsClientTelemetry,
+    get_traced_nats_client,
+)
+from nucliadb_telemetry.metrics import Counter
 
 logger = logging.getLogger(__name__)
 
-
-def get_traced_jetstream(
-    nc: NATSClient, service_name: str
-) -> Union[JetStreamContext, JetStreamContextTelemetry]:
-    jetstream = nc.jetstream()
-    tracer_provider = get_telemetry(service_name)
-
-    if tracer_provider is not None and jetstream is not None:  # pragma: no cover
-        logger.info(f"Configuring {service_name} jetstream with telemetry")
-        return JetStreamContextTelemetry(jetstream, service_name, tracer_provider)
-    else:
-        return jetstream
+# Re-export for bw/c. This function was defined here but makes more sense in the
+# telemetry library
+from nucliadb_telemetry.jetstream import get_traced_jetstream  # noqa
 
 
 class MessageProgressUpdater:
@@ -104,7 +99,7 @@ class MessageProgressUpdater:
 
 
 class NatsConnectionManager:
-    _nc: NATSClient
+    _nc: Union[NATSClient, NatsClientTelemetry]
     _subscriptions: list[tuple[Subscription, Callable[[], Awaitable[None]]]]
     _pull_subscriptions: list[
         tuple[
@@ -119,6 +114,7 @@ class NatsConnectionManager:
         service_name: str,
         nats_servers: list[str],
         nats_creds: Optional[str] = None,
+        pull_utilization_metrics: Optional[Counter] = None,
     ):
         self._service_name = service_name
         self._nats_servers = nats_servers
@@ -132,6 +128,7 @@ class NatsConnectionManager:
         self._reconnect_task: Optional[asyncio.Task] = None
         self._expected_subscriptions: set[str] = set()
         self._initialized = False
+        self.pull_utilization_metrics = pull_utilization_metrics
 
     def healthy(self) -> bool:
         if not self._healthy:
@@ -166,7 +163,8 @@ class NatsConnectionManager:
             options["servers"] = self._nats_servers
 
         async with self._lock:
-            self._nc = await nats.connect(**options)
+            nc = await nats.connect(**options)
+            self._nc = get_traced_nats_client(nc, self._service_name)
 
         self._expected_subscription_task = asyncio.create_task(self._verify_expected_subscriptions())
 
@@ -307,7 +305,7 @@ class NatsConnectionManager:
         logger.info("Connection is closed on NATS")
 
     @property
-    def nc(self) -> NATSClient:
+    def nc(self) -> Union[NATSClient, NatsClientTelemetry]:
         return self._nc
 
     @cached_property
@@ -350,13 +348,18 @@ class NatsConnectionManager:
         durable: Optional[str] = None,
         config: Optional[nats.js.api.ConsumerConfig] = None,
     ) -> JetStreamContext.PullSubscription:
+        wrapped_cb: Callable[[Msg], Awaitable[None]]
+        if isinstance(self.js, JetStreamContextTelemetry):
+            wrapped_cb = partial(self.js.trace_pull_subscriber_message, cb)
+        else:
+            wrapped_cb = cb
+
         psub = await self.js.pull_subscribe(
             subject,
-            durable=durable,  # type: ignore
+            durable=durable,
             stream=stream,
-            config=config,  # type: ignore
+            config=config,
         )
-
         cancelled = asyncio.Event()
 
         async def consume(psub: JetStreamContext.PullSubscription, subject: str):
@@ -364,15 +367,29 @@ class NatsConnectionManager:
                 if cancelled.is_set():
                     break
                 try:
+                    if self.pull_utilization_metrics:
+                        start_wait = time.monotonic()
+
                     messages = await psub.fetch(batch=1)
+
+                    if self.pull_utilization_metrics:
+                        received = time.monotonic()
+                        self.pull_utilization_metrics.inc({"status": "waiting"}, received - start_wait)
+
                     for message in messages:
-                        await cb(message)
+                        await wrapped_cb(message)
+
+                    if self.pull_utilization_metrics:
+                        processed = time.monotonic()
+                        self.pull_utilization_metrics.inc({"status": "processing"}, processed - received)
                 except asyncio.CancelledError:
                     # Handle task cancellation
                     logger.info("Pull subscription consume task cancelled", extra={"subject": subject})
                     break
                 except TimeoutError:
-                    pass
+                    if self.pull_utilization_metrics:
+                        received = time.monotonic()
+                        self.pull_utilization_metrics.inc({"status": "waiting"}, received - start_wait)
                 except Exception:
                     logger.exception("Error in pull_subscribe task", extra={"subject": subject})
 

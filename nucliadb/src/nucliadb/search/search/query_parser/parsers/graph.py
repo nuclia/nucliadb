@@ -33,7 +33,7 @@ from nucliadb_protos import utils_pb2
 
 async def parse_graph_search(kbid: str, item: graph_requests.GraphSearchRequest) -> GraphRetrieval:
     pb = await _parse_common(kbid, item)
-    pb.query.path.CopyFrom(_parse_path_query(item.query))
+    pb.query.path.CopyFrom(parse_path_query(item.query))
     pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.PATH
     return pb
 
@@ -111,19 +111,19 @@ def _parse_security(kbid: str, item: AnyGraphRequest) -> Optional[utils_pb2.Secu
         return None
 
 
-def _parse_path_query(expr: graph_requests.GraphPathQuery) -> nodereader_pb2.GraphQuery.PathQuery:
+def parse_path_query(expr: graph_requests.GraphPathQuery) -> nodereader_pb2.GraphQuery.PathQuery:
     pb = nodereader_pb2.GraphQuery.PathQuery()
 
     if isinstance(expr, graph_requests.And):
         for op in expr.operands:
-            pb.bool_and.operands.append(_parse_path_query(op))
+            pb.bool_and.operands.append(parse_path_query(op))
 
     elif isinstance(expr, graph_requests.Or):
         for op in expr.operands:
-            pb.bool_or.operands.append(_parse_path_query(op))
+            pb.bool_or.operands.append(parse_path_query(op))
 
     elif isinstance(expr, graph_requests.Not):
-        pb.bool_not.CopyFrom(_parse_path_query(expr.operand))
+        pb.bool_not.CopyFrom(parse_path_query(expr.operand))
 
     elif isinstance(expr, graph_requests.GraphPath):
         if expr.source is not None:
