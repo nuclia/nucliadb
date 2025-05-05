@@ -33,8 +33,6 @@ from nucliadb.ingest.orm.resource import Resource, get_file_page_positions
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import Basic, FieldID, FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 
 class IndexMessageBuilder:
@@ -403,14 +401,5 @@ async def get_resource_index_message(
     """
     Get the full index message for a resource.
     """
-    if has_feature(
-        const.Features.INDEX_MESSAGE_GENERATION_V2,
-        context={
-            "kbid": resource.kb.kbid,
-        },
-    ):
-        im_builder = IndexMessageBuilder(resource)
-        return await im_builder.full(reindex=reindex)
-    else:
-        # TODO: remove this code when we remove the old index message generation
-        return (await resource.generate_index_message(reindex=reindex)).brain
+    im_builder = IndexMessageBuilder(resource)
+    return await im_builder.full(reindex=reindex)
