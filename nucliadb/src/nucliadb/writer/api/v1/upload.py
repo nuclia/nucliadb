@@ -215,7 +215,7 @@ async def _tus_post(
             detail="Cannot hide a resource: the KB does not have hidden resources enabled",
         )
 
-    await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
+    await maybe_back_pressure(kbid, resource_uuid=path_rid)
 
     dm = get_dm()
     storage_manager = get_storage_manager()
@@ -713,7 +713,7 @@ async def _upload(
     if path_rid is not None:
         await validate_rid_exists_or_raise_error(kbid, path_rid)
 
-    await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
+    await maybe_back_pressure(kbid, resource_uuid=path_rid)
 
     md5_user = x_md5
     path, rid, valid_field = await validate_field_upload(kbid, path_rid, field, md5_user)
