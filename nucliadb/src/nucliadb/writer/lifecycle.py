@@ -25,7 +25,7 @@ from nucliadb.common.context.fastapi import inject_app_context
 from nucliadb.ingest.processing import start_processing_engine, stop_processing_engine
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.writer import SERVICE_NAME
-from nucliadb.writer.back_pressure import start_materializer, stop_materializer
+from nucliadb.common.back_pressure import start_materializer, stop_materializer
 from nucliadb.writer.settings import back_pressure_settings
 from nucliadb.writer.tus import finalize as storage_finalize
 from nucliadb.writer.tus import initialize as storage_initialize

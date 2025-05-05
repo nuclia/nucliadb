@@ -45,7 +45,7 @@ from nucliadb.writer.api.v1.router import (
     api,
 )
 from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_manager
-from nucliadb.writer.back_pressure import maybe_back_pressure
+from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
     parse_basic_creation,

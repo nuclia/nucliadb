@@ -43,7 +43,7 @@ from nucliadb.writer.api.v1.resource import (
     validate_rid_exists_or_raise_error,
 )
 from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_manager
-from nucliadb.writer.back_pressure import maybe_back_pressure
+from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import parse_basic_creation, parse_user_classifications
 from nucliadb.writer.resource.field import (
