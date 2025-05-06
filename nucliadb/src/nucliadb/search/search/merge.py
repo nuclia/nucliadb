@@ -38,13 +38,13 @@ from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.common.models_utils.from_proto import RelationTypePbMap
 from nucliadb.search.search import cache
-from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
     get_labels_resource,
     get_seconds_paragraph,
 )
+from nucliadb.search.search.plan.cut import cut_page
 from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label

@@ -23,7 +23,7 @@ from httpx import AsyncClient
 from nidx_protos.nodereader_pb2 import SearchRequest
 from pytest_mock import MockerFixture
 
-from nucliadb.search.search import find
+from nucliadb.search.search.plan import query
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -34,7 +34,7 @@ async def test_find_graph_request(
 ):
     """Validate how /find prepares a graph search"""
     kbid = standalone_knowledgebox
-    spy = mocker.spy(find, "node_query")
+    spy = mocker.spy(query, "node_query")
 
     # graph_query but missing features=graph
     resp = await nucliadb_reader.post(
@@ -110,7 +110,7 @@ async def test_find_graph_feature(
     """
 
     kbid = standalone_knowledgebox
-    spy = mocker.spy(find, "build_find_response")
+    spy = mocker.spy(query, "merge_shard_responses")
 
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/find",

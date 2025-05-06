@@ -144,7 +144,7 @@ async def test_vectorset_parameter_without_default_vectorset(
             new=AsyncMock(side_effect=mock_node_query),
         ),
         patch(
-            "nucliadb.search.search.find.node_query",
+            "nucliadb.search.search.plan.query.node_query",
             new=AsyncMock(side_effect=mock_node_query),
         ),
         patch(
@@ -198,7 +198,7 @@ async def test_vectorset_parameter_with_default_vectorset(
             new=AsyncMock(side_effect=mock_node_query),
         ),
         patch(
-            "nucliadb.search.search.find.node_query",
+            "nucliadb.search.search.plan.query.node_query",
             new=AsyncMock(side_effect=mock_node_query),
         ),
         patch(
