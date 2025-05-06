@@ -1721,6 +1721,8 @@ class SummarizeRequest(BaseModel):
 class SummarizedResource(BaseModel):
     summary: str = Field(..., title="Summary", description="Summary of the resource")
     tokens: int
+    input_tokens: int
+    output_tokens: int
 
 
 class SummarizedResponse(BaseModel):

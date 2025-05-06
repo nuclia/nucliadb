@@ -559,7 +559,9 @@ class DummyPredictEngine(PredictEngine):
             rsummary = []
             for field_id, field_text in item.resources[rid].fields.items():
                 rsummary.append(f"{field_id}: {field_text}")
-            response.resources[rid] = SummarizedResource(summary="\n\n".join(rsummary), tokens=10)
+            response.resources[rid] = SummarizedResource(
+                summary="\n\n".join(rsummary), tokens=10, input_tokens=10, output_tokens=10
+            )
         return response
 
     async def rerank(self, kbid: str, item: RerankModel) -> RerankResponse:
@@ -624,7 +626,7 @@ async def _parse_rephrase_response(
     resp: aiohttp.ClientResponse,
 ) -> str:
     """
-    Predict api is returning a json payload that is a string with the following format:
+    Predict API is returning a JSON payload that is a string with the following format:
     <rephrased_query><status_code>
     where status_code is "0" for success, "-1" for error and "-2" for no context
     it will raise an exception if the status code is not 0
