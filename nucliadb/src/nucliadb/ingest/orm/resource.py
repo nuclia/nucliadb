@@ -34,7 +34,7 @@ from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.generic import VALID_GENERIC_FIELDS, Generic
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
-from nucliadb.ingest.orm.brain_v2 import FilePagePositions
+from nucliadb.ingest.orm.brain import FilePagePositions
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb_models import content_types
 from nucliadb_models.common import CloudLink
