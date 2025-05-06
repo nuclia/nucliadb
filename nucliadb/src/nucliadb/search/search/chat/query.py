@@ -178,6 +178,7 @@ def add_resource_filter(request: Union[FindRequest, AskRequest], resources: list
 
 def find_request_from_ask_request(item: AskRequest, query: str) -> FindRequest:
     find_request = FindRequest()
+    find_request.filter_expression = item.filter_expression
     find_request.resource_filters = item.resource_filters
     find_request.features = []
     if ChatOptions.SEMANTIC in item.features:
