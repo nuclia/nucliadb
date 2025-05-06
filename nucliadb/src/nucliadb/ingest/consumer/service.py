@@ -59,6 +59,7 @@ async def _exit_tasks(tasks: list[asyncio.Task]) -> None:
 
 
 async def start_back_pressure() -> BackPressureMaterializer:
+    logger.info("Starting back pressure materializer")
     nats_manager = await start_nats_manager(
         SERVICE_NAME,
         indexing_settings.index_jetstream_servers,
