@@ -49,6 +49,7 @@ from nucliadb_models.search import (
     SyncAskResponse,
 )
 from nucliadb_protos.utils_pb2 import RelationNode
+from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -110,6 +111,9 @@ async def resource(nucliadb_writer: AsyncClient, standalone_knowledgebox: str):
     )
     assert resp.status_code in (200, 201)
     rid = resp.json()["uuid"]
+
+    await mark_dirty()
+    await wait_for_sync()
 
     yield rid
 
@@ -577,6 +581,38 @@ async def test_ask_on_resource(nucliadb_reader: AsyncClient, standalone_knowledg
     )
     assert resp.status_code == 200
     SyncAskResponse.model_validate_json(resp.content)
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_with_filter_expression(
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource
+):
+    # Search filtering in the field where we know there should be data
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={
+            "query": "title",
+            "features": ["keyword"],
+            "filter_expression": {"field": {"prop": "field", "type": "generic", "name": "title"}},
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    ask_resp = SyncAskResponse.model_validate_json(resp.content)
+    assert len(ask_resp.retrieval_best_matches) > 0
+
+    # Search filtering in the field where we know there should be no data
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={
+            "query": "title",
+            "filter_expression": {"field": {"prop": "field", "type": "text", "name": "foobar"}},
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    ask_resp = SyncAskResponse.model_validate_json(resp.content)
+    assert len(ask_resp.retrieval_best_matches) == 0
 
 
 @pytest.mark.deploy_modes("standalone")
