@@ -21,7 +21,7 @@
 import uuid
 
 from nucliadb.common import ids
-from nucliadb.ingest.orm.brain import ResourceBrain
+from nucliadb.ingest.orm.brain_v2 import ResourceBrain
 from nucliadb_protos import utils_pb2
 
 

@@ -22,7 +22,7 @@ from uuid import uuid4
 import pytest
 from nidx_protos.noderesources_pb2 import Resource as PBResource
 
-from nucliadb.ingest.orm.brain import ParagraphPages, ResourceBrain
+from nucliadb.ingest.orm.brain_v2 import ParagraphPages, ResourceBrain
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import (
     Basic,

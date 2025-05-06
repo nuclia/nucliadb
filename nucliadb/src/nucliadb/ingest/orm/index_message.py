@@ -27,7 +27,7 @@ from nidx_protos.noderesources_pb2 import Resource as IndexMessage
 from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb.ingest.fields.file import File
-from nucliadb.ingest.orm.brain import ResourceBrain
+from nucliadb.ingest.orm.brain_v2 import ResourceBrain
 from nucliadb.ingest.orm.metrics import index_message_observer as observer
 from nucliadb.ingest.orm.resource import Resource, get_file_page_positions
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
