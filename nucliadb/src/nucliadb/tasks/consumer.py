@@ -30,7 +30,7 @@ from nucliadb.tasks.logger import logger
 from nucliadb.tasks.models import Callback, MsgType
 from nucliadb.tasks.utils import NatsConsumer, NatsStream, create_nats_stream_if_not_exists
 from nucliadb_telemetry import errors
-from nucliadb_utils.nats import MessageProgressUpdater
+from nucliadb_utils.nats import NatsMessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 
 BEFORE_NAK_SLEEP_SECONDS = 2
@@ -124,7 +124,7 @@ class NatsTaskConsumer(Generic[MsgType]):
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}",
             extra={"consumer_name": self.name},
         )
-        async with MessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66):
+        async with NatsMessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66):
             try:
                 task_msg = self.msg_type.model_validate_json(msg.data)
             except pydantic.ValidationError as e:

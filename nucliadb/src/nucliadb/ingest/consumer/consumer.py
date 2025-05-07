@@ -39,7 +39,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from nucliadb_telemetry import context, errors, metrics
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.nats import MessageProgressUpdater, NatsConnectionManager
+from nucliadb_utils.nats import NatsConnectionManager, NatsMessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.storage import Storage
 
@@ -181,7 +181,7 @@ class IngestConsumer:
         start = time.monotonic()
 
         async with (
-            MessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66),
+            NatsMessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66),
             self.lock,
         ):
             try:
