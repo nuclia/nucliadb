@@ -60,7 +60,7 @@ async def predict_proxy(
 
     predict: PredictEngine = get_predict()
     predict_headers = predict.get_predict_headers(kbid)
-    allowed_headers = {k: v for k, v in headers.items() if k.capitalize() in ALLOWED_HEADERS}
+    user_headers = {k: v for k, v in headers.items() if k.capitalize() in ALLOWED_HEADERS}
 
     # Proxy the request to predict API
     predict_response = await predict.make_request(
@@ -68,7 +68,7 @@ async def predict_proxy(
         url=predict.get_predict_url(endpoint, kbid),
         json=json,
         params=params,
-        headers={**allowed_headers, **predict_headers},
+        headers={**user_headers, **predict_headers},
     )
 
     # Proxy the response back to the client
