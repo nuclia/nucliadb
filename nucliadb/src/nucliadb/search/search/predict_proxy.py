@@ -42,6 +42,11 @@ class PredictProxiedEndpoints(str, Enum):
     REMI = "remi"
 
 
+ALLOWED_HEADERS = [
+    "Accept",
+]
+
+
 async def predict_proxy(
     kbid: str,
     endpoint: PredictProxiedEndpoints,
@@ -54,9 +59,8 @@ async def predict_proxy(
         raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
     predict: PredictEngine = get_predict()
-
-    # Add KB configuration headers
     predict_headers = predict.get_predict_headers(kbid)
+    allowed_headers = {k: v for k, v in headers.items() if k.capitalize() in ALLOWED_HEADERS}
 
     # Proxy the request to predict API
     predict_response = await predict.make_request(
@@ -64,7 +68,7 @@ async def predict_proxy(
         url=predict.get_predict_url(endpoint, kbid),
         json=json,
         params=params,
-        headers={**headers, **predict_headers},
+        headers={**allowed_headers, **predict_headers},
     )
 
     # Proxy the response back to the client
