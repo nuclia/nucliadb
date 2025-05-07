@@ -198,7 +198,7 @@ async def test_message_progress_updater():
     in_progress = AsyncMock()
     msg = MagicMock(in_progress=in_progress, _ackd=False)
 
-    async with nats.MessageProgressUpdater(msg, 0.05):
+    async with nats.NatsMessageProgressUpdater(msg, 0.05):
         await asyncio.sleep(0.07)
 
     in_progress.assert_awaited_once()
@@ -208,7 +208,7 @@ async def test_message_progress_updater_does_not_update_ack():
     in_progress = AsyncMock()
     msg = MagicMock(in_progress=in_progress, _ackd=True)
 
-    async with nats.MessageProgressUpdater(msg, 0.05):
+    async with nats.NatsMessageProgressUpdater(msg, 0.05):
         await asyncio.sleep(0.07)
 
     in_progress.assert_not_awaited()

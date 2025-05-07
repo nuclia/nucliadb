@@ -17,8 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncGenerator
+import asyncio
+import logging
+from typing import AsyncGenerator, Awaitable, Callable
 
+from nucliadb_telemetry.errors import capture_exception
+
+logger = logging.getLogger(__name__)
 
 async def async_gen_lookahead(
     gen: AsyncGenerator[bytes, None],
@@ -44,3 +49,54 @@ async def async_gen_lookahead(
     # Yield the last chunk if there is one
     if buffered_chunk is not None:
         yield buffered_chunk, True
+
+
+class MessageProgressUpdater:
+    """
+    Context manager to send progress updates to NATS.
+
+    This should allow lower ack_wait time settings without causing
+    messages to be redelivered.
+    """
+
+    _task: asyncio.Task
+
+    def __init__(self, seqid: str, cb: Callable[[], Awaitable[bool]], timeout: float):
+        self.seqid = seqid
+        self.cb = cb
+        self.timeout = timeout
+
+    def start(self):
+        task_name = f"MessageProgressUpdater: {id(self)} (seqid={self.seqid})"
+        self._task = asyncio.create_task(self._progress(), name=task_name)
+
+    async def end(self):
+        self._task.cancel()
+        try:
+            await self._task
+        except asyncio.CancelledError:  # pragma: no cover
+            logger.info("MessageProgressUpdater cancelled")
+            pass
+        except Exception as exc:  # pragma: no cover
+            capture_exception(exc)
+            logger.exception("Error in MessageProgressUpdater")
+            pass
+
+    async def __aenter__(self):
+        self.start()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.end()
+
+    async def _progress(self):
+        while True:
+            try:
+                await asyncio.sleep(self.timeout)
+                done = await self.cb()
+                if done:  # all done, do not mark with in_progress
+                    return
+            except (RuntimeError, asyncio.CancelledError):
+                return
+            except Exception:  # pragma: no cover
+                logger.exception("Error sending task progress to NATS")
