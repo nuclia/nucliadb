@@ -323,18 +323,24 @@ def _test_predict_proxy_chat(kbid: str):
     lines = [line for line in resp.iter_lines()]
 
     # Check that the answer is in the response
-    text_answer = ""
-    for line in lines:
-        if line["type"] == "text":
-            text_answer += line["text"]
-    print(f"Answer: {text_answer}")
-    assert "Messi" in text_answer, f"Expected answer not found: {'\n'.join(lines)}"
+    try:
+        text_answer = ""
+        for line in lines:
+            if line["type"] == "text":
+                text_answer += line["text"]
+        print(f"Answer: {text_answer}")
+        assert "Messi" in text_answer, f"Expected answer not found: {'\n'.join(lines)}"
 
-    # Check that the tokens are reported
-    meta = next((line for line in lines if line["type"] == "meta"), None)
-    assert meta is not None, f"Meta line not found: {'\n'.join(lines)}"
-    assert meta["input_tokens"] >= 0
-    assert meta["output_tokens"] >= 0
+        # Check that the tokens are reported
+        meta = next((line for line in lines if line["type"] == "meta"), None)
+        assert meta is not None, f"Meta line not found: {'\n'.join(lines)}"
+        assert meta["input_tokens"] >= 0
+        assert meta["output_tokens"] >= 0
+    except Exception:
+        print("Response lines:")
+        for line in lines:
+            print(line)
+        raise
 
 
 def _test_predict_proxy_tokens(kbid: str):
