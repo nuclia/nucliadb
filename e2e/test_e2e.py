@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 import os
 import random
 import time
@@ -303,6 +304,39 @@ def _test_predict_proxy_chat(kbid: str):
     answer = data.read().decode("utf-8")
     print(f"Answer: {answer}")
     assert "Messi" in answer
+
+    # Test accepting application/x-ndjson content type
+    resp = requests.post(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/chat"),
+        headers={
+            "Content-type": "application/json",
+            "Accept": "application/x-ndjson",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+        json={
+            "question": "Who is the best football player?",
+            "query_context": ["Many football players have existed. Messi is by far the greatest."],
+            "user_id": "someone@company.uk",
+        },
+    )
+    raise_for_status(resp)
+    lines = [json.loads(line) for line in resp.iter_lines()]
+
+    # Check that the answer is in the response
+    text_answer = ""
+    for line in lines:
+        chunk = line["chunk"]
+        if chunk["type"] == "text":
+            text_answer += chunk["text"]
+    print(f"Answer: {text_answer}")
+    assert "Messi" in text_answer, f"Expected answer not found: {'\n'.join(lines)}"
+
+    # Check that the tokens are reported
+    meta = next(line["chunk"] for line in lines if line["chunk"]["type"] == "meta")
+    assert meta["input_tokens"] >= 0
+    assert meta["output_tokens"] >= 0
+
 
 
 def _test_predict_proxy_tokens(kbid: str):
