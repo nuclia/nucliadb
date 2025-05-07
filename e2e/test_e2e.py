@@ -322,18 +322,22 @@ def _test_predict_proxy_chat(kbid: str):
     )
     raise_for_status(resp)
     lines = [json.loads(line) for line in resp.iter_lines()]
+    print(f"Response lines:\n{'\n'.join(lines)}")
 
     # Check that the answer is in the response
     text_answer = ""
     for line in lines:
+        if not isinstance(line, dict):
+            continue
+        if "type" not in line:
+            continue
         if line["type"] == "text":
             text_answer += line["text"]
     print(f"Answer: {text_answer}")
     assert "Messi" in text_answer, f"Expected answer not found: {'\n'.join(lines)}"
 
     # Check that the tokens are reported
-    meta = next((line for line in lines if line["type"] == "meta"), None)
-    assert meta is not None, f"Meta line not found: {'\n'.join(lines)}"
+    meta = next(line for line in lines if line["type"] == "meta")
     assert meta["input_tokens"] >= 0
     assert meta["output_tokens"] >= 0
 
