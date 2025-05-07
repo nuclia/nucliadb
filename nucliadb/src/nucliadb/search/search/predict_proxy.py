@@ -43,7 +43,7 @@ class PredictProxiedEndpoints(str, Enum):
 
 
 ALLOWED_HEADERS = [
-    "Accept",
+    "Accept",  # To allow 'application/x-ndjson' on the /chat endpoint
 ]
 
 
