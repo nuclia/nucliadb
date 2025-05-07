@@ -322,7 +322,6 @@ def _test_predict_proxy_chat(kbid: str):
     )
     raise_for_status(resp)
     lines = [json.loads(line) for line in resp.iter_lines()]
-    print(f"Response lines:\n{'\n'.join(lines)}")
 
     # Check that the answer is in the response
     text_answer = ""
