@@ -396,6 +396,26 @@ async def test_catalog_filter_expression(
     )
     assert resp.status_code == 412
 
+    # Invalid resource id
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "filter_expression": {"resource": {"prop": "resource", "id": "not-a-uuid"}},
+        },
+    )
+    assert resp.status_code == 422
+    assert "Invalid UUID" in resp.json()["detail"][0]["msg"]
+
+    # Invalid resource slug
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "filter_expression": {"resource": {"prop": "resource", "slug": "Not A Slug at !All"}},
+        },
+    )
+    assert resp.status_code == 422
+    assert "Invalid slug" in resp.json()["detail"][0]["msg"]
+
     # By prefix
     resp = await nucliadb_reader.post(
         f"/kb/{standalone_knowledgebox}/catalog",
