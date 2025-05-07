@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 import os
 import random
 import time
@@ -320,27 +321,22 @@ def _test_predict_proxy_chat(kbid: str):
         },
     )
     raise_for_status(resp)
-    lines = [line for line in resp.iter_lines()]
+    lines = [json.loads(line) for line in resp.iter_lines()]
 
     # Check that the answer is in the response
-    try:
-        text_answer = ""
-        for line in lines:
-            if line["type"] == "text":
-                text_answer += line["text"]
-        print(f"Answer: {text_answer}")
-        assert "Messi" in text_answer, f"Expected answer not found: {'\n'.join(lines)}"
+    text_answer = ""
+    for line in lines:
+        if line["type"] == "text":
+            text_answer += line["text"]
+    print(f"Answer: {text_answer}")
+    assert "Messi" in text_answer, f"Expected answer not found: {'\n'.join(lines)}"
 
-        # Check that the tokens are reported
-        meta = next((line for line in lines if line["type"] == "meta"), None)
-        assert meta is not None, f"Meta line not found: {'\n'.join(lines)}"
-        assert meta["input_tokens"] >= 0
-        assert meta["output_tokens"] >= 0
-    except Exception:
-        print("Response lines:")
-        for line in lines:
-            print(line)
-        raise
+    # Check that the tokens are reported
+    meta = next((line for line in lines if line["type"] == "meta"), None)
+    assert meta is not None, f"Meta line not found: {'\n'.join(lines)}"
+    assert meta["input_tokens"] >= 0
+    assert meta["output_tokens"] >= 0
+
 
 
 def _test_predict_proxy_tokens(kbid: str):

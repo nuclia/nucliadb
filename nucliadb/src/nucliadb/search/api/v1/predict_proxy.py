@@ -59,6 +59,7 @@ async def predict_proxy_endpoint(
     kbid: str,
     endpoint: PredictProxiedEndpoints,
 ) -> Union[Response, StreamingResponse, HTTPClientError]:
+    breakpoint()
     try:
         payload = await request.json()
     except json.JSONDecodeError:
