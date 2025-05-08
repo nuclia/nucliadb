@@ -55,8 +55,6 @@ class NatsMessageProgressUpdater(MessageProgressUpdater):
     messages to be redelivered.
     """
 
-    _task: asyncio.Task
-
     def __init__(self, msg: Msg, timeout: float):
         async def update_msg() -> bool:
             if msg._ackd:  # all done, do not mark with in_progress

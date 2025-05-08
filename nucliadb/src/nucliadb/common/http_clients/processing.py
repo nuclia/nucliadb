@@ -25,6 +25,7 @@ import aiohttp
 import jwt
 import pydantic
 
+from nucliadb_utils.helpers import MessageProgressUpdater
 from nucliadb_utils.settings import nuclia_settings
 
 from .utils import check_status
@@ -193,6 +194,9 @@ class ProcessingHTTPClient:
             data = PullPosition.model_validate_json(resp_text)
             return data.cursor
 
+    async def in_progress(self, ack_token: str):
+        pass  # TODO
+
     async def requests(
         self,
         cursor: Optional[str] = None,
@@ -225,3 +229,20 @@ class ProcessingHTTPClient:
             resp_text = await resp.text()
             check_status(resp, resp_text)
             return StatsResponse.model_validate_json(resp_text)
+
+
+class ProcessingPullMessageProgressUpdater(MessageProgressUpdater):
+    """
+    Context manager to send progress updates to NATS.
+
+    This should allow lower ack_wait time settings without causing
+    messages to be redelivered.
+    """
+
+    def __init__(self, client: ProcessingHTTPClient, ack_token: str, timeout: float):
+        async def update_msg() -> bool:
+            await client.in_progress(ack_token)
+            return False
+
+        seqid = ack_token.split(".")[5]
+        super().__init__(seqid, update_msg, timeout)
