@@ -42,7 +42,7 @@ from nucliadb.search.search.hydrator import (
 )
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.query_parser.models import UnitRetrieval
-from nucliadb.search.search.rank_fusion import RankFusionAlgorithm
+from nucliadb.search.search.rank_fusion import IndexSource, RankFusionAlgorithm
 from nucliadb.search.search.rerankers import (
     RerankableItem,
     Reranker,
@@ -108,7 +108,13 @@ async def build_find_response(
     )
     graph_results = graph_results_to_text_block_matches(search_response.graph)
 
-    merged_text_blocks = rank_fusion_algorithm.fuse(keyword_results, semantic_results, graph_results)
+    merged_text_blocks = rank_fusion_algorithm.fuse(
+        {
+            IndexSource.KEYWORD: keyword_results,
+            IndexSource.SEMANTIC: semantic_results,
+            IndexSource.GRAPH: graph_results,
+        }
+    )
 
     # cut
     # we assume pagination + predict reranker is forbidden and has been already

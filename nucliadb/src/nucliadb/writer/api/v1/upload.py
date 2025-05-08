@@ -32,6 +32,7 @@ from fastapi_versioning import version
 from starlette.requests import Request as StarletteRequest
 
 from nucliadb.common import datamanagers
+from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.models.internal.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
@@ -43,7 +44,6 @@ from nucliadb.writer.api.v1.resource import (
     validate_rid_exists_or_raise_error,
 )
 from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_manager
-from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import parse_basic_creation, parse_user_classifications
 from nucliadb.writer.resource.field import (
@@ -215,7 +215,7 @@ async def _tus_post(
             detail="Cannot hide a resource: the KB does not have hidden resources enabled",
         )
 
-    await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
+    await maybe_back_pressure(kbid, resource_uuid=path_rid)
 
     dm = get_dm()
     storage_manager = get_storage_manager()
@@ -713,7 +713,7 @@ async def _upload(
     if path_rid is not None:
         await validate_rid_exists_or_raise_error(kbid, path_rid)
 
-    await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
+    await maybe_back_pressure(kbid, resource_uuid=path_rid)
 
     md5_user = x_md5
     path, rid, valid_field = await validate_field_upload(kbid, path_rid, field, md5_user)

@@ -184,6 +184,13 @@ def test_compute_best_matches():
     # The last paragraphs come from the main results
     assert best_matches[4].paragraph.id == "main-result/f/f1/0-10"
     assert best_matches[5].paragraph.id == "main-result/f/f1/10-20"
+    # validate score computation
+    assert best_matches[0].weighted_score == best_matches[0].paragraph.score * 90 / 101
+    assert best_matches[1].weighted_score == best_matches[1].paragraph.score * 90 / 101
+    assert best_matches[2].weighted_score == best_matches[2].paragraph.score * 10 / 101
+    assert best_matches[3].weighted_score == best_matches[3].paragraph.score * 10 / 101
+    assert best_matches[4].weighted_score == best_matches[4].paragraph.score * 1 / 101
+    assert best_matches[5].weighted_score == best_matches[5].paragraph.score * 1 / 101
 
     # Test that the main query weight can be set to a huge
     # value so that the main results are always at the beginning
@@ -202,3 +209,10 @@ def test_compute_best_matches():
     assert best_matches[3].paragraph.id == "prequery-2-result/f/f1/10-20"
     assert best_matches[4].paragraph.id == "prequery-1-result/f/f1/0-10"
     assert best_matches[5].paragraph.id == "prequery-1-result/f/f1/10-20"
+    # validate score computation
+    assert best_matches[0].weighted_score == best_matches[0].paragraph.score * 1000 / 1100
+    assert best_matches[1].weighted_score == best_matches[1].paragraph.score * 1000 / 1100
+    assert best_matches[2].weighted_score == best_matches[2].paragraph.score * 90 / 1100
+    assert best_matches[3].weighted_score == best_matches[3].paragraph.score * 90 / 1100
+    assert best_matches[4].weighted_score == best_matches[4].paragraph.score * 10 / 1100
+    assert best_matches[5].weighted_score == best_matches[5].paragraph.score * 10 / 1100

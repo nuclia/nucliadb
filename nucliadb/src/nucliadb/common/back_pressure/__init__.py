@@ -17,15 +17,4 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
-
-from pydantic_settings import BaseSettings
-
-
-class Settings(BaseSettings):
-    dm_enabled: bool = True
-    dm_redis_host: Optional[str] = None
-    dm_redis_port: Optional[int] = None
-
-
-settings = Settings()
+from .materializer import maybe_back_pressure, start_materializer, stop_materializer  # noqa

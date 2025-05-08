@@ -25,6 +25,7 @@ from fastapi_versioning import version
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
+from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
@@ -45,7 +46,6 @@ from nucliadb.writer import logger
 from nucliadb.writer.api.utils import only_for_onprem
 from nucliadb.writer.api.v1.knowledgebox import create_kb
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
-from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb_models.export_import import (
     CreateExportResponse,
     CreateImportResponse,
@@ -148,7 +148,7 @@ async def start_kb_import_endpoint(request: Request, kbid: str):
     if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
-    await maybe_back_pressure(request, kbid)
+    await maybe_back_pressure(kbid)
 
     stream = stream_compatible_with_kb(kbid, request.stream())
     try:

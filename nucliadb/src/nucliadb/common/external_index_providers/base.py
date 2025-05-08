@@ -55,16 +55,19 @@ class VectorsetExternalIndex:
     similarity: VectorSimilarity.ValueType
 
 
-class TextBlockMatch(BaseModel):
+class ScoredTextBlock(BaseModel):
+    paragraph_id: ParagraphId
+    score: float
+    score_type: SCORE_TYPE
+
+
+class TextBlockMatch(ScoredTextBlock):
     """
     Model a text block/paragraph retrieved from an external index with all the information
     needed in order to later hydrate retrieval results.
     """
 
-    paragraph_id: ParagraphId
     position: TextPosition
-    score: float
-    score_type: SCORE_TYPE
     order: int
     page_with_visual: bool = False
     fuzzy_search: bool

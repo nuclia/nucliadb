@@ -104,7 +104,9 @@ async def writer_api_server(
 
 @pytest.fixture(scope="function")
 def disabled_back_pressure():
-    with patch("nucliadb.writer.back_pressure.is_back_pressure_enabled", return_value=False) as mocked:
+    with patch(
+        "nucliadb.common.back_pressure.materializer.is_back_pressure_enabled", return_value=False
+    ) as mocked:
         yield mocked
 
 
