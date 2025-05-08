@@ -273,7 +273,11 @@ async def test_summarize():
     )
 
     summarized = SummarizedResponse(
-        resources={"r1": SummarizedResource(summary="resource summary", tokens=10)}
+        resources={
+            "r1": SummarizedResource(
+                summary="resource summary", tokens=10, input_tokens=10, output_tokens=10
+            )
+        }
     )
     pe.session = get_mocked_session("POST", 200, json=summarized.model_dump(), context_manager=False)
 
@@ -302,7 +306,11 @@ async def test_summarize_onprem():
     )
 
     summarized = SummarizedResponse(
-        resources={"r1": SummarizedResource(summary="resource summary", tokens=10)}
+        resources={
+            "r1": SummarizedResource(
+                summary="resource summary", tokens=10, input_tokens=10, output_tokens=10
+            )
+        }
     )
     pe.session = get_mocked_session("POST", 200, json=summarized.model_dump(), context_manager=False)
 
