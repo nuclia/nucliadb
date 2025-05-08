@@ -146,10 +146,16 @@ class PullWorker:
             while True:
                 acks = []
                 try:
+                    async with datamanagers.with_ro_transaction() as txn:
+                        cursor = await datamanagers.processing.get_pull_offset(
+                            txn, pull_type_id=pull_type_id, partition=self.partition
+                        )
+
                     data = await processing_http_client.pull(
                         limit=1,  # If changing this, be careful with MessageProgressUpdater, we should keep all of them for the duration of the entire batch
                         timeout=self.pull_api_timeout,
-                        acks=acks
+                        acks=acks,
+                        from_cursor=cursor,
                     )
                     acks = []
                     if data.status_code == 200:
