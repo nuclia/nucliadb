@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+import hashlib
 import uuid
 from datetime import datetime
 
@@ -43,9 +44,24 @@ from nucliadb.backups.settings import settings as backups_settings
 from nucliadb.backups.utils import exists_backup
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.utils import BM_FIELDS
+from nucliadb_models.search import (
+    FindOptions,
+    FindRequest,
+    KnowledgeboxFindResults,
+    RerankerName,
+)
+from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 
 N_RESOURCES = 10
+
+VECTORSETS = [
+    "en-2024-04-24",
+    "multilingual",
+]
 
 
 async def create_kb(
@@ -55,13 +71,101 @@ async def create_kb(
     resp = await nucliadb_writer_manager.post("/kbs", json={"slug": slug})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
+
+    # Create vectorsets on the KB
+    for vectorset in VECTORSETS:
+        if vectorset == "multilingual":
+            # This is the default vectorset, so we don't need to create it
+            continue
+        resp = await nucliadb_writer_manager.post(f"/kb/{kbid}/vectorsets/{vectorset}", json={})
+        resp.raise_for_status()
+
+    # Create a search configuration
     return kbid
+
+
+async def create_resource_with_text_field(
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    kbid: str,
+    idx: int,
+):
+    slug = f"test-{idx}"
+    title = "Test"
+    text_field_id = "text"
+    text_field_body = f"This is a test {idx}"
+
+    # Create a text field
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": title,
+            "thumbnail": "foobar",
+            "icon": "application/pdf",
+            "slug": slug,
+            "texts": {
+                text_field_id: {
+                    "body": text_field_body,
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Add processing metadata to the resource (vectors, paragraphs, etc.)
+    bmb = BrokerMessageBuilder(kbid=kbid, rid=rid, source=BrokerMessage.MessageSource.PROCESSOR)
+    bmb.with_title(title)
+    text_field = FieldBuilder(text_field_id, rpb.FieldType.TEXT)
+    text_field.with_extracted_text(text_field_body)
+    text_field.with_extracted_paragraph_metadata(
+        rpb.Paragraph(
+            start=0,
+            end=len(text_field_body),
+            key=f"{rid}/t/{text_field_id}/0-{len(text_field_body)}",
+            sentences=[
+                rpb.Sentence(
+                    start=0,
+                    end=len(text_field_body),
+                    key=f"{rid}/t/{text_field_id}/0/0-{len(text_field_body)}",
+                )
+            ],
+        )
+    )
+    # One vector per paragraph per vectorset
+    for vectorset in VECTORSETS:
+        text_field.with_extracted_vectors(
+            [rpb.Vector(start=0, end=len(text_field_body), vector=get_vector_for_rid(rid, vectorset))],
+            vectorset=vectorset,
+        )
+
+    bmb.add_field_builder(text_field)
+    bm = bmb.build()
+
+    await inject_message(nucliadb_ingest_grpc, bm, timeout=5.0, wait_for_ready=True)
+
+    return rid
+
+
+def get_vector_for_rid(rid: str, vectorset: str) -> list[float]:
+    """
+    Generate a different vector for each resource id and vectorset.
+    This is done to make sure every paragraph has a different vector for each resource but in a deterministic way.
+    The purpose is to be able to verify that the vectors are properly backed up and restored and search works as expected.
+    """
+    vector_dimension = 768
+    vector = [0.0] * vector_dimension
+    digest = hashlib.sha256(f"{rid}-{vectorset}".encode("utf-8")).digest()
+    floats = [float(x) for x in digest]
+    normalized = [x / 255.0 for x in floats]
+    return (normalized + vector)[:vector_dimension]
 
 
 @pytest.fixture(scope="function")
 async def src_kb(
     nucliadb_writer: AsyncClient,
     nucliadb_writer_manager: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
 ):
     kbid = await create_kb(nucliadb_writer_manager)
 
@@ -85,23 +189,12 @@ async def src_kb(
 
     # Create some simple resources with a text field
     for i in range(N_RESOURCES):
-        resp = await nucliadb_writer.post(
-            f"/kb/{kbid}/resources",
-            json={
-                "title": "Test",
-                "thumbnail": "foobar",
-                "icon": "application/pdf",
-                "slug": f"test-{i}",
-                "texts": {
-                    "text": {
-                        "body": f"This is a test {i}",
-                    }
-                },
-            },
+        rid = await create_resource_with_text_field(
+            nucliadb_writer,
+            nucliadb_ingest_grpc,
+            kbid=kbid,
+            idx=i,
         )
-        assert resp.status_code == 201
-        rid = resp.json()["uuid"]
-
         # Add some binary files to backup
         content = b"Test for /upload endpoint"
         resp = await nucliadb_writer.post(
@@ -278,6 +371,24 @@ async def check_resources(nucliadb_reader: AsyncClient, kbid: str):
         resp = await nucliadb_reader.get(field["uri"])
         assert resp.status_code == 200
         assert base64.b64decode(resp.content) == b"Test for /upload endpoint"
+
+        for vectorset in VECTORSETS:
+            # Searching on the vectors index with a top_k=1 and resource-specific vector should
+            # return the resource itself as the best match
+            resp = await nucliadb_reader.post(
+                f"/kb/{kbid}/find",
+                json=FindRequest(
+                    features=[FindOptions.SEMANTIC],
+                    vector=get_vector_for_rid(rid, vectorset),
+                    top_k=1,
+                    vectorset=vectorset,
+                    reranker=RerankerName.NOOP,
+                ).model_dump(),
+            )
+            resp.raise_for_status()
+            results = KnowledgeboxFindResults.model_validate(resp.json())
+            assert len(results.best_matches) == 1
+            assert results.best_matches[0].startswith(rid)
 
 
 @pytest.mark.deploy_modes("standalone")

@@ -485,6 +485,24 @@ _IN_MEMORY_CONFIGS: dict[str, LearningConfiguration] = {}
 class InMemoryLearningConfig(LearningConfigService):
     def __init__(self):
         self.in_memory_configs = {}
+        # NOTE: This is just a copy from the learning repo that is only used for testing purposes.
+        self.model_configs = {
+            "en-2024-04-24": SemanticConfig(
+                similarity=SimilarityFunction.DOT,
+                size=768,
+                threshold=0.47,
+            ),
+            "multilingual": SemanticConfig(
+                similarity=SimilarityFunction.COSINE,
+                size=768,
+                threshold=0.5,
+            ),
+            "multilingual-2023-02-21": SemanticConfig(
+                similarity=SimilarityFunction.DOT,
+                size=768,
+                threshold=1.0,
+            ),
+        }
 
     async def get_configuration(self, kbid: str) -> Optional[LearningConfiguration]:
         return _IN_MEMORY_CONFIGS.get(kbid, None)
@@ -493,29 +511,21 @@ class InMemoryLearningConfig(LearningConfigService):
         if not config:
             # generate a default config
             default_model = os.environ.get("TEST_SENTENCE_ENCODER", "multilingual")
-            size = 768 if default_model == "multilingual-2023-02-21" else 512
+            model_config = self.model_configs[default_model]
             # XXX for some reason, we override the model name and set this one
             # default_model = "multilingual"
             learning_config = LearningConfiguration(
                 semantic_model=default_model,
-                semantic_vector_similarity="cosine",
-                semantic_vector_size=size,
-                semantic_threshold=None,
+                semantic_vector_similarity=model_config.similarity.name.lower(),
+                semantic_vector_size=model_config.size,
+                semantic_threshold=model_config.threshold,
                 semantic_matryoshka_dims=[],
                 semantic_models=[default_model],
-                semantic_model_configs={
-                    default_model: SemanticConfig(
-                        similarity=SimilarityFunction.COSINE,
-                        size=size,
-                        threshold=0,
-                        matryoshka_dims=[],
-                    )
-                },
+                semantic_model_configs={default_model: self.model_configs[default_model]},
             )
 
         else:
             learning_config = LearningConfiguration.model_validate(config)
-
         _IN_MEMORY_CONFIGS[kbid] = learning_config
         return learning_config
 
@@ -524,6 +534,9 @@ class InMemoryLearningConfig(LearningConfigService):
             raise ValueError(f"Configuration for kbid {kbid} not found")
         learning_config = _IN_MEMORY_CONFIGS[kbid]
         learning_config = learning_config.model_copy(update=config)
+        learning_config.semantic_model_configs.clear()
+        for semantic_model in learning_config.semantic_models:
+            learning_config.semantic_model_configs[semantic_model] = self.model_configs[semantic_model]
         _IN_MEMORY_CONFIGS[kbid] = learning_config
 
     async def delete_configuration(self, kbid: str) -> None:
