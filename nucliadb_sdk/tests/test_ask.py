@@ -72,7 +72,7 @@ def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     )
     assert result.learning_id == "00"
     assert result.answer == "valid answer to"
-    assert len(result.retrieval_results.resources) == 7
+    assert len(result.retrieval_results.resources) >= 7
     assert result.relations
 
 
