@@ -494,7 +494,7 @@ class InMemoryLearningConfig(LearningConfigService):
             ),
             "multilingual": SemanticConfig(
                 similarity=SimilarityFunction.COSINE,
-                size=768,
+                size=512,
                 threshold=0.5,
             ),
             "multilingual-2023-02-21": SemanticConfig(

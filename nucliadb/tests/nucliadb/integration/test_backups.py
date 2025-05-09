@@ -153,12 +153,12 @@ def get_vector_for_rid(rid: str, vectorset: str) -> list[float]:
     This is done to make sure every paragraph has a different vector for each resource but in a deterministic way.
     The purpose is to be able to verify that the vectors are properly backed up and restored and search works as expected.
     """
-    vector_dimension = 768
-    vector = [0.0] * vector_dimension
+    vector_dimension = {"en-2024-04-24": 768, "multilingual": 512}[vectorset]
+    padding = [0.0] * vector_dimension
     digest = hashlib.sha256(f"{rid}-{vectorset}".encode("utf-8")).digest()
     floats = [float(x) for x in digest]
     normalized = [x / 255.0 for x in floats]
-    return (normalized + vector)[:vector_dimension]
+    return (normalized + padding)[:vector_dimension]
 
 
 @pytest.fixture(scope="function")
