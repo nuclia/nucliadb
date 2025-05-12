@@ -1528,3 +1528,20 @@ async def test_ask_calls_predict_query_once(
     assert len(predict.calls) == 2
     assert predict.calls[0][0] == "query"
     assert predict.calls[1][0] == "chat_query_ndjson"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    resources: list[str],
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        headers={"X-Synchronous": "True"},
+        json=AskRequest(
+            query="title",
+            chat_history_relevance_threshold=0.5,
+        ).model_dump(),
+    )
+    assert resp.status_code == 200, resp.text
