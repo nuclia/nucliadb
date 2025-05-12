@@ -498,9 +498,11 @@ async def ask(
                     user_id=user_id,
                     user_context=user_context,
                     generative_model=ask_request.generative_model,
+                    chat_history_relevance_threshold=ask_request.chat_history_relevance_threshold,
                 )
                 rephrased_query = response.rephrased_query
                 if response.use_chat_history is False:
+                    # Ignored if the question is not relevant enough with the chat history
                     chat_history = []
         except RephraseMissingContextError:
             logger.info("Failed to rephrase ask query, using original")

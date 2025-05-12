@@ -996,32 +996,12 @@ class ChatModel(BaseModel):
 class RephraseModel(BaseModel):
     question: str
     chat_history: list[ChatContextMessage] = []
-    context: list[Message] = Field(default_factory=list)
     user_id: str
     user_context: list[str] = []
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
         description="The generative model to use for the rephrase endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
-    )
-    prompt: Optional[str] = Field(
-        default=None,
-        description="Prompt to send the model to rephrase the sentence, if not provided, the default prompt will be used. It must include the {question} placeholder. The placeholder will be replaced with the original question. It will only be used if no user_context is provided.",
-        examples=[
-            """Rephrase this question so its better for retrieval, and keep the rephrased question in the same language as the original.
-QUESTION: {question}
-Please return ONLY the question without any explanation. Just the rephrased question.""",
-            """Rephrase this question so its better for retrieval, identify any part numbers and append them to the end of the question separated by commas.
-QUESTION: {question}
-Please return ONLY the question without any explanation.""",
-            """Keeping the following context in mind,
-<context>
-{context}
-</context>
-Rephrase my question taking into account our previous conversation to transform it into standalone question that is suited for retrieval.
-QUESTION: "{question}"
-Return only the rephrased question without any explanation or formatting.""",
-        ],
     )
     chat_history_relevance_threshold: Optional[
         Annotated[
@@ -1613,6 +1593,21 @@ If empty, the default strategy is used, which simply adds the text of the matchi
             "Rephrase the query for a more efficient retrieval. This will consume LLM tokens and make the request slower."
         ),
     )
+    chat_history_relevance_threshold: Optional[
+        Annotated[
+            float,
+            Field(
+                ge=0.0,
+                le=1.0,
+                description=(
+                    "Threshold to determine if the past chat history is relevant to rephrase the user's question. "
+                    "0 - Always treat previous messages as relevant (always rephrase)."
+                    "1 – Always treat previous messages as irrelevant (never rephrase)."
+                    "Values in between adjust the sensitivity."
+                ),
+            ),
+        ]
+    ] = None
 
     prefer_markdown: bool = Field(
         default=False,
