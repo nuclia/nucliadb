@@ -464,7 +464,7 @@ async def run_prequeries(
 
     async def _prequery_find(prequery: PreQuery, index: int):
         async with max_parallel_prequeries:
-            prequery_id = prequery.id or str(index)
+            prequery_id = prequery.id or f"prequery-{index}"
             find_results, _, _ = await find(
                 kbid,
                 prequery.request,

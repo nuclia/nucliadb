@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 from unittest import mock
 
-from nucliadb.search.search.metrics import Metrics
 import pytest
 
 from nucliadb.search.predict import AnswerStatusCode
@@ -26,6 +25,7 @@ from nucliadb.search.search.chat.query import (
     get_find_results,
     parse_audit_answer,
 )
+from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.search import (
     AskRequest,
     ChatOptions,

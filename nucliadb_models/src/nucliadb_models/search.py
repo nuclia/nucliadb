@@ -1908,7 +1908,11 @@ class KnowledgeboxFindResults(JsonBaseModel):
     metrics: Optional[dict[str, Any]] = Field(
         default=None,
         title="Metrics",
-        description="Metrics information about the search operation. This is only available if the `debug` parameter is set to true in the request.",  # noqa: E501
+        description=(
+            "Metrics information about the search operation. "
+            "The metadata included in this field is subject to change and should not be used in production. "
+            "This is only available if the `debug` parameter is set to true in the request."
+        ),
     )
 
 
@@ -2082,7 +2086,11 @@ class SyncAskResponse(BaseModel):
     debug: Optional[dict[str, Any]] = Field(
         default=None,
         title="Debug information",
-        description="Debug information about the ask operation. This is only available if the `debug` parameter is set to true in the request.",  # noqa: E501
+        description=(
+            "Debug information about the ask operation. "
+            "The metadata included in this field is subject to change and should not be used in production. "
+            "Note that it is only available if the `debug` parameter is set to true in the request."
+        ),
     )
 
 
