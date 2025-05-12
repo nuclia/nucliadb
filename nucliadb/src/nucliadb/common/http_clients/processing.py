@@ -184,12 +184,15 @@ class PullResponseV2(pydantic.BaseModel):
     pending: int
 
 
+JSON_HEADERS = {"Content-Type": "application/json"}
+
+
 class ProcessingHTTPClient:
     def __init__(self):
         self.session = aiohttp.ClientSession()
         self.base_url = get_processing_api_url()
         self.base_url_v2 = get_processing_api_v2_url()
-        self.headers = {}
+        self.headers: dict[str, str] = {}
         if nuclia_settings.nuclia_service_account is not None:
             self.headers["X-STF-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
 
@@ -231,7 +234,9 @@ class ProcessingHTTPClient:
     async def in_progress(self, ack_token: str):
         url = self.base_url_v2 + "/pull/in_progress"
         request = InProgressRequest(ack=[ack_token])
-        async with self.session.post(url, headers=self.headers, data=request.model_dump_json()) as resp:
+        async with self.session.post(
+            url, headers=self.headers | JSON_HEADERS, data=request.model_dump_json()
+        ) as resp:
             resp_text = await resp.text()
             check_status(resp, resp_text)
 
@@ -240,7 +245,9 @@ class ProcessingHTTPClient:
     ) -> Optional[PullResponseV2]:
         url = self.base_url_v2 + "/pull"
         request = PullRequestV2(limit=limit, timeout=timeout, ack=ack_tokens)
-        async with self.session.post(url, headers=self.headers, data=request.model_dump_json()) as resp:
+        async with self.session.post(
+            url, headers=self.headers | JSON_HEADERS, data=request.model_dump_json()
+        ) as resp:
             resp_text = await resp.text()
             check_status(resp, resp_text)
 
