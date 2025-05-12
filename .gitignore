@@ -95,3 +95,5 @@ nucliadb-user.creds
 
 test.export.pb
 test.export.tar.bz2
+
+.devcontainer
