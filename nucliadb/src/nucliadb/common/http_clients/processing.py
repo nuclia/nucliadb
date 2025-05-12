@@ -52,6 +52,16 @@ def get_processing_api_url() -> str:
         return nuclia_settings.nuclia_processing_cluster_url + "/api/v1/internal/processing"
 
 
+def get_processing_api_v2_url() -> str:
+    if nuclia_settings.nuclia_service_account:
+        return (
+            nuclia_settings.nuclia_public_url.format(zone=nuclia_settings.nuclia_zone)
+            + "/api/v2/processing"
+        )
+    else:
+        return nuclia_settings.nuclia_processing_cluster_url + "/api/v2/internal/processing"
+
+
 class PullResponse(pydantic.BaseModel):
     status: str
     payload: Optional[str] = None
@@ -151,10 +161,33 @@ class StatsResponse(pydantic.BaseModel):
     scheduled: int
 
 
+class PullRequestV2(pydantic.BaseModel):
+    timeout: float = 5
+    limit: int = 1
+    ack: list[str] = []
+
+
+class InProgressRequest(pydantic.BaseModel):
+    ack: list[str] = []
+
+
+class PulledMessage(pydantic.BaseModel):
+    payload: bytes
+    headers: dict[str, str]
+    ack_token: str
+
+
+class PullResponseV2(pydantic.BaseModel):
+    messages: list[PulledMessage]
+    ttl: float
+    pending: int
+
+
 class ProcessingHTTPClient:
     def __init__(self):
         self.session = aiohttp.ClientSession()
         self.base_url = get_processing_api_url()
+        self.base_url_v2 = get_processing_api_v2_url()
         self.headers = {}
         if nuclia_settings.nuclia_service_account is not None:
             self.headers["X-STF-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
@@ -195,7 +228,19 @@ class ProcessingHTTPClient:
             return data.cursor
 
     async def in_progress(self, ack_token: str):
-        pass  # TODO
+        url = self.base_url_v2 + "/pull/in_progress"
+        request = InProgressRequest(ack=[ack_token])
+        async with self.session.post(url, headers=self.headers, data=request.model_dump_json()) as resp:
+            resp_text = await resp.text()
+            check_status(resp, resp_text)
+
+    async def pull_v2(self, ack_tokens: list[str], limit: int = 1, timeout: float = 5) -> PullResponseV2:
+        url = self.base_url_v2 + "/pull"
+        request = PullRequestV2(limit=limit, timeout=timeout, ack=ack_tokens)
+        async with self.session.post(url, headers=self.headers, data=request.model_dump_json()) as resp:
+            resp_text = await resp.text()
+            check_status(resp, resp_text)
+            return PullResponseV2.model_validate_json(resp_text)
 
     async def requests(
         self,
