@@ -139,10 +139,12 @@ class AnswerStatusCode(str, Enum):
             AnswerStatusCode.NO_RETRIEVAL_DATA: "no_retrieval_data",
         }[self]
 
+
 @dataclass
 class RephraseResponse:
     rephrased_query: str
     use_chat_history: Optional[bool]
+
 
 async def start_predict_engine():
     if nuclia_settings.dummy_predict:
@@ -626,6 +628,7 @@ def get_chat_ndjson_generator(
 
     return _parse_generative_chunks(response.content)
 
+
 async def _parse_rephrase_response(
     resp: aiohttp.ClientResponse,
 ) -> RephraseResponse:
@@ -644,4 +647,7 @@ async def _parse_rephrase_response(
     elif content.endswith("-2"):
         raise RephraseMissingContextError(content[:-2])
 
-    return RephraseResponse(rephrased_query=content, use_chat_history=resp.headers.get(NUCLIA_LEARNING_CHAT_HISTORY_HEADER))
+    use_chat_history = None
+    if NUCLIA_LEARNING_CHAT_HISTORY_HEADER in resp.headers:
+        use_chat_history = resp.headers[NUCLIA_LEARNING_CHAT_HISTORY_HEADER] == "true"
+    return RephraseResponse(rephrased_query=content, use_chat_history=use_chat_history)
