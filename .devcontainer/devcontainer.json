@@ -1,0 +1,34 @@
+{
+    "name": "Docker in Docker",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {
+            "version": "latest",
+            "enableNonRootDocker": "true",
+            "moby": "true"
+        },
+        "ghcr.io/devcontainers/features/python:1": {
+            "installTools": true,
+            "version": "3.12"
+        },
+        "ghcr.io/jungaretti/features/make:1": {},
+        "ghcr.io/gvatsal60/dev-container-features/pre-commit:1": {},
+        "ghcr.io/dhoeric/features/google-cloud-cli:1": {}
+    },
+    "postCreateCommand": "/bin/bash .devcontainer/setup.sh",
+    "remoteUser": "root",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "charliermarsh.ruff",
+                "ms-python.debugpy",
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "waderyan.gitblame",
+                "tamasfe.even-better-toml",
+                "zxh404.vscode-proto3",
+                "cweijan.vscode-postgresql-client2"
+            ]
+        }
+    }
+}
