@@ -43,7 +43,7 @@ from nucliadb.search.search.find_merge import (
     hydrate_and_rerank,
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
-from nucliadb.search.search.metrics import RAGMetrics
+from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.rerankers import (
     Reranker,
     RerankingOptions,
@@ -305,8 +305,8 @@ async def get_graph_results(
     origin: str,
     graph_strategy: GraphStrategy,
     text_block_reranker: Reranker,
+    metrics: Metrics,
     generative_model: Optional[str] = None,
-    metrics: RAGMetrics = RAGMetrics(),
     shards: Optional[list[str]] = None,
 ) -> tuple[KnowledgeboxFindResults, FindRequest]:
     relations = Relations(entities={})

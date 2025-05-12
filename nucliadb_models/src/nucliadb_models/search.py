@@ -1905,6 +1905,15 @@ class KnowledgeboxFindResults(JsonBaseModel):
         title="Best matches",
         description="List of ids of best matching paragraphs. The list is sorted by decreasing relevance (most relevant first).",  # noqa: E501
     )
+    metrics: Optional[dict[str, Any]] = Field(
+        default=None,
+        title="Metrics",
+        description=(
+            "Metrics information about the search operation. "
+            "The metadata included in this field is subject to change and should not be used in production. "
+            "This is only available if the `debug` parameter is set to true in the request."
+        ),
+    )
 
 
 class FeedbackTasks(str, Enum):
@@ -2077,7 +2086,11 @@ class SyncAskResponse(BaseModel):
     debug: Optional[dict[str, Any]] = Field(
         default=None,
         title="Debug information",
-        description="Debug information about predict",
+        description=(
+            "Debug information about the ask operation. "
+            "The metadata included in this field is subject to change and should not be used in production. "
+            "Note that it is only available if the `debug` parameter is set to true in the request."
+        ),
     )
 
 
@@ -2137,6 +2150,7 @@ class RelationsAskResponseItem(BaseModel):
 class DebugAskResponseItem(BaseModel):
     type: Literal["debug"] = "debug"
     metadata: dict[str, Any]
+    metrics: dict[str, Any]
 
 
 AskResponseItemType = Union[

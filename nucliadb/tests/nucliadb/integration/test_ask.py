@@ -224,9 +224,12 @@ async def test_sync_ask_returns_debug_mode(
         assert resp_data.prompt_context
         assert resp_data.predict_request
         assert isinstance(resp_data.predict_request, dict)
+        assert isinstance(resp_data.debug, dict)
+        assert len(resp_data.debug["metrics"]) > 0
     else:
         assert resp_data.prompt_context is None
         assert resp_data.predict_request is None
+        assert resp_data.debug is None
 
 
 @pytest.fixture

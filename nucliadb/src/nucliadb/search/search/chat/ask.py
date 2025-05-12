@@ -62,7 +62,7 @@ from nucliadb.search.search.exceptions import (
     InvalidQueryError,
 )
 from nucliadb.search.search.graph_strategy import get_graph_results
-from nucliadb.search.search.metrics import RAGMetrics
+from nucliadb.search.search.metrics import AskMetrics, Metrics
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
 from nucliadb.search.search.rank_fusion import WeightedCombSum
@@ -140,7 +140,7 @@ class AskResult:
         prompt_context: PromptContext,
         prompt_context_order: PromptContextOrder,
         auditor: ChatAuditor,
-        metrics: RAGMetrics,
+        metrics: AskMetrics,
         best_matches: list[RetrievalMatch],
         debug_chat_model: Optional[ChatModel],
     ):
@@ -155,7 +155,7 @@ class AskResult:
         self.debug_chat_model = debug_chat_model
         self.prompt_context_order = prompt_context_order
         self.auditor: ChatAuditor = auditor
-        self.metrics: RAGMetrics = metrics
+        self.metrics: AskMetrics = metrics
         self.best_matches: list[RetrievalMatch] = best_matches
 
         # Computed from the predict chat answer stream
@@ -264,18 +264,11 @@ class AskResult:
             audit_answer = self._answer_text.encode("utf-8")
         else:
             audit_answer = json.dumps(self._object.object).encode("utf-8")
-
-        try:
-            rephrase_time = self.metrics.elapsed("rephrase")
-        except KeyError:
-            # Not all ask requests have a rephrase step
-            rephrase_time = None
-
         self.auditor.audit(
             text_answer=audit_answer,
-            generative_answer_time=self.metrics.elapsed("stream_predict_answer"),
+            generative_answer_time=self.metrics["stream_predict_answer"],
             generative_answer_first_chunk_time=self.metrics.get_first_chunk_time() or 0,
-            rephrase_time=rephrase_time,
+            rephrase_time=self.metrics.get("rephrase"),
             status_code=self.status_code,
         )
 
@@ -317,7 +310,8 @@ class AskResult:
                         self.prompt_context, self.prompt_context_order
                     ),
                     "predict_request": predict_request,
-                }
+                },
+                metrics=self.metrics.dump(),
             )
 
     async def json(self) -> str:
@@ -382,6 +376,9 @@ class AskResult:
             response.prompt_context = sorted_prompt_context
             if self.debug_chat_model:
                 response.predict_request = self.debug_chat_model.model_dump(mode="json")
+            response.debug = {
+                "metrics": self.metrics.dump(),
+            }
         return response.model_dump_json(exclude_none=True, by_alias=True)
 
     async def get_relations_results(self) -> Relations:
@@ -481,7 +478,7 @@ async def ask(
     origin: str,
     resource: Optional[str] = None,
 ) -> AskResult:
-    metrics = RAGMetrics()
+    metrics = AskMetrics()
     chat_history = ask_request.chat_history or []
     user_context = ask_request.extra_context or []
     user_query = ask_request.query
@@ -515,12 +512,6 @@ async def ask(
             resource=resource,
         )
     except NoRetrievalResultsError as err:
-        try:
-            rephrase_time = metrics.elapsed("rephrase")
-        except KeyError:
-            # Not all ask requests have a rephrase step
-            rephrase_time = None
-
         maybe_audit_chat(
             kbid=kbid,
             user_id=user_id,
@@ -528,7 +519,7 @@ async def ask(
             origin=origin,
             generative_answer_time=0,
             generative_answer_first_chunk_time=0,
-            rephrase_time=rephrase_time,
+            rephrase_time=metrics.get("rephrase"),
             user_query=user_query,
             rephrased_query=rephrased_query,
             retrieval_rephrase_query=err.main_query.rephrased_query if err.main_query else None,
@@ -709,7 +700,7 @@ async def retrieval_step(
     client_type: NucliaDBClientType,
     user_id: str,
     origin: str,
-    metrics: RAGMetrics,
+    metrics: Metrics,
     resource: Optional[str] = None,
 ) -> RetrievalResults:
     """
@@ -745,7 +736,7 @@ async def retrieval_in_kb(
     client_type: NucliaDBClientType,
     user_id: str,
     origin: str,
-    metrics: RAGMetrics,
+    metrics: Metrics,
 ) -> RetrievalResults:
     prequeries = parse_prequeries(ask_request)
     graph_strategy = parse_graph_strategy(ask_request)
@@ -812,7 +803,7 @@ async def retrieval_in_resource(
     client_type: NucliaDBClientType,
     user_id: str,
     origin: str,
-    metrics: RAGMetrics,
+    metrics: Metrics,
 ) -> RetrievalResults:
     if any(strategy.name == "full_resource" for strategy in ask_request.rag_strategies):
         # Retrieval is not needed if we are chatting on a specific resource and the full_resource strategy is enabled
