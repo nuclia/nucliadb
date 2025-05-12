@@ -27,32 +27,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from tests.ingest.fixtures import create_resource
 
 
-async def test_generate_index_message_bw_compat(
-    storage, maindb_driver: Driver, dummy_nidx_utility, knowledgebox_ingest: str
-):
-    full_resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
-
-    async with maindb_driver.transaction(read_only=True) as txn:
-        kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
-        resource = await kb_obj.get(full_resource.uuid)
-        assert resource is not None
-
-        # Make sure that both the old and new way of generating index messages are equivalent
-        imv1 = (await resource.generate_index_message(reindex=True)).brain
-        imv2 = await IndexMessageBuilder(resource).full(reindex=True)
-
-        # Relation fields to remove is not fully implemented in v1, so we skip it from the comparison
-        imv1.ClearField("relation_fields_to_delete")
-        imv2.ClearField("relation_fields_to_delete")
-
-        # field_relations needs special treatment because it is a map of repeated fields
-        assert flatten_field_relations(imv1) == flatten_field_relations(imv2)
-        imv1.ClearField("field_relations")
-        imv2.ClearField("field_relations")
-
-        assert imv1 == imv2
-
-
 def flatten_field_relations(r: noderesources_pb2.Resource):
     result = set()
     for field, field_relations in r.field_relations.items():

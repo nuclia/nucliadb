@@ -22,18 +22,22 @@ import sys
 from functools import partial
 from typing import Awaitable, Callable, Optional
 
+from nucliadb.common.back_pressure.materializer import BackPressureMaterializer
+from nucliadb.common.back_pressure.settings import settings as back_pressure_settings
+from nucliadb.common.back_pressure.utils import is_back_pressure_enabled
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.consumer.consumer import IngestConsumer, IngestProcessedConsumer
 from nucliadb.ingest.consumer.pull import PullWorker
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.exceptions import ConfigurationError
-from nucliadb_utils.settings import transaction_settings
+from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.utilities import (
     get_audit,
     get_nats_manager,
     get_pubsub,
     get_storage,
+    start_nats_manager,
 )
 
 from .auditing import IndexAuditHandler, ResourceWritesAuditHandler
@@ -54,12 +58,39 @@ async def _exit_tasks(tasks: list[asyncio.Task]) -> None:
     await asyncio.gather(*tasks, return_exceptions=True)
 
 
+async def start_back_pressure() -> BackPressureMaterializer:
+    logger.info("Starting back pressure materializer")
+    nats_manager = await start_nats_manager(
+        SERVICE_NAME,
+        indexing_settings.index_jetstream_servers,
+        indexing_settings.index_jetstream_auth,
+    )
+    back_pressure = BackPressureMaterializer(
+        nats_manager,
+        indexing_check_interval=back_pressure_settings.indexing_check_interval,
+        ingest_check_interval=back_pressure_settings.ingest_check_interval,
+    )
+    await back_pressure.start()
+    return back_pressure
+
+
+async def stop_back_pressure(materializer: BackPressureMaterializer) -> None:
+    await materializer.stop()
+    await materializer.nats_manager.finalize()
+
+
 async def start_pull_workers(
     service_name: Optional[str] = None,
-) -> Callable[[], Awaitable[None]]:
+) -> list[Callable[[], Awaitable[None]]]:
+    finalizers: list[Callable[[], Awaitable[None]]] = []
+
     driver = await setup_driver()
     pubsub = await get_pubsub()
     storage = await get_storage(service_name=service_name or SERVICE_NAME)
+    back_pressure = None
+    if is_back_pressure_enabled():
+        back_pressure = await start_back_pressure()
+        finalizers.append(partial(stop_back_pressure, back_pressure))
     tasks = []
     for partition in settings.partitions:
         worker = PullWorker(
@@ -70,12 +101,14 @@ async def start_pull_workers(
             pubsub=pubsub,
             local_subscriber=transaction_settings.transaction_local,
             pull_api_timeout=settings.pull_api_timeout,
+            back_pressure=back_pressure,
         )
         task = asyncio.create_task(worker.loop())
         task.add_done_callback(_handle_task_result)
         tasks.append(task)
-
-    return partial(_exit_tasks, tasks)
+    if len(tasks):
+        finalizers.append(partial(_exit_tasks, tasks))
+    return finalizers
 
 
 async def start_ingest_consumers(

@@ -24,14 +24,15 @@ from httpx import AsyncClient
 
 
 @pytest.mark.parametrize(
-    "method,endpoint,params,payload",
+    "method,endpoint,params,payload,headers",
     [
-        ("GET", "tokens", {"text": "foo"}, None),
+        ("GET", "tokens", {"text": "foo"}, None, {"foo": "bar"}),
         (
             "POST",
             "chat",
             None,
             {"question": "foo", "query_context": ["foobar"], "user_id": "foo"},
+            {"foo": "bar"},
         ),
         (
             "POST",
@@ -42,6 +43,7 @@ from httpx import AsyncClient
                 "chat_histoy": [{"author": "USER", "text": "foo"}],
                 "user_id": "bar",
             },
+            {"foo": "bar"},
         ),
     ],
 )
@@ -53,10 +55,11 @@ async def test_predict_proxy(
     endpoint: str,
     params,
     payload,
+    headers: dict[str, str],
 ):
     kbid = standalone_knowledgebox
     http_func = getattr(nucliadb_reader, method.lower())
-    http_func_kwargs = {"params": params}
+    http_func_kwargs = {"params": params, "headers": headers}
     if method == "POST":
         http_func_kwargs["json"] = payload
     resp = await http_func(

@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nucliadb.ingest.orm.brain import ResourceBrain
+from nucliadb.ingest.orm.brain_v2 import ResourceBrain
 from nucliadb.ingest.orm.resource import (
     Resource,
     get_file_page_positions,
@@ -293,7 +293,7 @@ async def test_apply_extracted_vectors_cut_by_dimension(txn, storage, kb):
     )
 
     brain = ResourceBrain("rid")
-    brain.apply_field_vectors(
+    brain.generate_vectors(
         "t/text",
         vectors,
         vectorset="my-vectorset",
@@ -313,7 +313,7 @@ async def test_apply_extracted_vectors_cut_by_dimension(txn, storage, kb):
     assert len(sentences["rid/t/text/0/0-10"].vector) == STORED_VECTOR_DIMENSION
 
     brain = ResourceBrain("rid")
-    brain.apply_field_vectors(
+    brain.generate_vectors(
         "t/text",
         vectors,
         vectorset="my-vectorset",

@@ -70,7 +70,7 @@ class ParagraphClassifications:
     denied: dict[str, list[str]]
 
 
-class ResourceBrainV2:
+class ResourceBrain:
     def __init__(self, rid: str):
         self.rid = rid
         self.brain: PBBrainResource = PBBrainResource(resource=ResourceID(uuid=rid))

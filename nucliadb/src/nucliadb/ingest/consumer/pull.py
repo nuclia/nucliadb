@@ -19,12 +19,15 @@
 #
 import asyncio
 import base64
+from datetime import datetime, timezone
 from typing import Optional
 
 from aiohttp.client_exceptions import ClientConnectorError
 
 from nucliadb.common import datamanagers
-from nucliadb.common.http_clients.processing import ProcessingHTTPClient, get_nua_api_id, ProcessingPullMessageProgressUpdater
+from nucliadb.common.back_pressure.materializer import BackPressureMaterializer
+from nucliadb.common.back_pressure.utils import BackPressureException
+from nucliadb.common.http_clients.processing import ProcessingHTTPClient, get_nua_api_id
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import logger, logger_activity
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
@@ -57,6 +60,7 @@ class PullWorker:
         local_subscriber: bool = False,
         pull_time_empty_backoff: float = 5.0,
         pull_api_timeout: int = 60,
+        back_pressure: Optional[BackPressureMaterializer] = None,
     ):
         self.partition = partition
         self.pull_time_error_backoff = pull_time_error_backoff
@@ -65,6 +69,7 @@ class PullWorker:
         self.local_subscriber = local_subscriber
 
         self.processor = Processor(driver, storage, pubsub, partition)
+        self.back_pressure = back_pressure
 
     def __str__(self) -> str:
         return f"PullWorker(partition={self.partition})"
@@ -72,9 +77,9 @@ class PullWorker:
     def __repr__(self) -> str:
         return str(self)
 
-    async def handle_message(self, msg: PulledMessage) -> None:
+    async def handle_message(self, payload: str) -> None:
         pb = BrokerMessage()
-        data = base64.b64decode(msg.payload)
+        data = base64.b64decode(payload)
         pb.ParseFromString(data)
 
         logger.debug(f"Resource: {pb.uuid} KB: {pb.kbid} ProcessingID: {pb.processing_id}")
@@ -112,11 +117,29 @@ class PullWorker:
                 transaction_check=False,
             )
 
+    async def back_pressure_check(self) -> None:
+        if self.back_pressure is None:
+            return
+        while True:
+            try:
+                self.back_pressure.check_indexing()
+                self.back_pressure.check_ingest()
+                break
+            except BackPressureException as exc:
+                sleep_time = (datetime.now(timezone.utc) - exc.data.try_after).total_seconds()
+                logger.warning(f"Back pressure active! Sleeping for {sleep_time} seconds", exc_info=True)
+                await asyncio.sleep(sleep_time)
+            except Exception as e:
+                errors.capture_exception(e)
+                logger.exception("Error while checking back pressure. Moving on")
+                break
+
     async def loop(self):
         """
         Run this forever
         """
         while True:
+            await self.back_pressure_check()
             try:
                 await self._loop()
             except ReallyStopPulling:
@@ -144,29 +167,42 @@ class PullWorker:
         async with ProcessingHTTPClient() as processing_http_client:
             logger.info(f"Collecting from NucliaDB Cloud {self.partition} partition")
             while True:
-                acks = []
                 try:
+                    async with datamanagers.with_ro_transaction() as txn:
+                        cursor = await datamanagers.processing.get_pull_offset(
+                            txn, pull_type_id=pull_type_id, partition=self.partition
+                        )
+
                     data = await processing_http_client.pull(
-                        limit=1,  # If changing this, be careful with MessageProgressUpdater, we should keep all of them for the duration of the entire batch
+                        self.partition,
+                        cursor=cursor,
                         timeout=self.pull_api_timeout,
-                        acks=acks
                     )
-                    acks = []
-                    if data.status_code == 200:
+                    if data.status == "ok":
                         logger.info(
                             "Message received from proxy",
                             extra={"partition": self.partition, "cursor": data.cursor},
                         )
                         try:
-                            for msg in data.messages:
-                                async with ProcessingPullMessageProgressUpdater(processing_http_client, msg.ack_token, data.ttl * 0.66):
-                                    await self.handle_message(msg)
-                                    acks.append(msg.ack_token)
+                            if data.payload is not None:
+                                await self.handle_message(data.payload)
+                            for payload in data.payloads:
+                                # If using cursors and multiple messages are returned, it will be in the
+                                # `payloads` property
+                                await self.handle_message(payload)
                         except Exception as e:
                             errors.capture_exception(e)
                             logger.exception("Error while pulling and processing message/s")
                             raise e
-                    elif data.status_code == 204:
+                        async with datamanagers.with_transaction() as txn:
+                            await datamanagers.processing.set_pull_offset(
+                                txn,
+                                pull_type_id=pull_type_id,
+                                partition=self.partition,
+                                offset=data.cursor,
+                            )
+                            await txn.commit()
+                    elif data.status == "empty":
                         logger_activity.debug(f"No messages waiting in partition #{self.partition}")
                         await asyncio.sleep(self.pull_time_empty_backoff)
                     else:
@@ -178,12 +214,6 @@ class PullWorker:
                     KeyboardInterrupt,
                     SystemExit,
                 ):
-                    if acks:
-                        data = await processing_http_client.pull(
-                            limit=0
-                            timeout=self.pull_api_timeout,
-                            acks=acks
-                        )
                     logger.info(f"Pull task for partition #{self.partition} was canceled, exiting")
                     raise ReallyStopPulling()
 

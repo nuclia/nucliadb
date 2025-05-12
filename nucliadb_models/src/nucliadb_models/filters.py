@@ -20,14 +20,15 @@
 
 from enum import Enum
 from typing import Any, Generic, Literal, Optional, TypeVar, Union
+from uuid import UUID
 
 import pydantic
-from pydantic import AliasChoices, BaseModel, Discriminator, Tag, model_validator
+from pydantic import AliasChoices, BaseModel, Discriminator, Tag, field_validator, model_validator
 from typing_extensions import Annotated, Self
 
 from .common import FieldTypeName, Paragraph
 from .metadata import ResourceProcessingStatus
-from .utils import DateTime
+from .utils import DateTime, SlugString
 
 F = TypeVar("F", bound=BaseModel)
 
@@ -72,8 +73,19 @@ class Resource(BaseModel, extra="forbid"):
     """Matches all fields of a resource given its id or slug"""
 
     prop: Literal["resource"] = "resource"
-    id: Optional[str] = pydantic.Field(default=None, description="ID of the resource to match")
-    slug: Optional[str] = pydantic.Field(default=None, description="Slug of the resource to match")
+    id: Optional[str] = pydantic.Field(default=None, description="UUID of the resource to match")
+    slug: Optional[SlugString] = pydantic.Field(
+        default=None, description="Slug of the resource to match"
+    )
+
+    @field_validator("id", mode="after")
+    def validate_id(cls, v: str) -> str:
+        if v is not None:
+            try:
+                UUID(v)
+            except ValueError:
+                raise ValueError("Invalid UUID")
+        return v
 
     @model_validator(mode="after")
     def single_field(self) -> Self:
