@@ -32,7 +32,7 @@ from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.partitions import assign_partitions
 from nucliadb.ingest.processing import start_processing_engine, stop_processing_engine
 from nucliadb.ingest.service import start_grpc
-from nucliadb.ingest.settings import settings
+from nucliadb.ingest.settings import settings, ProcessingPullMode
 from nucliadb.ingest.utils import start_ingest as start_ingest_utility
 from nucliadb.ingest.utils import stop_ingest as stop_ingest_utility
 from nucliadb_telemetry import errors
@@ -101,7 +101,12 @@ async def initialize_grpc():  # pragma: no cover
 
 async def initialize_pull_workers() -> list[Callable[[], Awaitable[None]]]:
     finalizers = await initialize_grpc()
-    pull_workers = await consumer_service.start_pull_workers(SERVICE_NAME)
+    if settings.processing_pull_mode == ProcessingPullMode.V1:
+        pull_workers = await consumer_service.start_pull_workers(SERVICE_NAME)
+    elif settings.processing_pull_mode == ProcessingPullMode.V2:
+        pull_workers = [await consumer_service.start_ingest_processed_consumer_v2(SERVICE_NAME)]
+    else:
+        raise Exception("Processing pull workers not enabled and it is required")
 
     return pull_workers + finalizers
 
@@ -113,7 +118,11 @@ async def main_consumer():  # pragma: no cover
     grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
 
     # pull workers could be pulled out into it's own deployment
-    pull_workers = await consumer_service.start_pull_workers(SERVICE_NAME)
+    if settings.processing_pull_mode == ProcessingPullMode.V1:
+        pull_workers = await consumer_service.start_pull_workers(SERVICE_NAME)
+    else:
+        # In v2, pull workers run inside the ingest consumer
+        pull_workers = []
     ingest_consumers = await consumer_service.start_ingest_consumers(SERVICE_NAME)
 
     await run_until_exit(
@@ -134,7 +143,16 @@ async def main_ingest_processed_consumer():  # pragma: no cover
     await start_processing_engine()
     metrics_server = await serve_metrics()
     grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
-    consumer = await consumer_service.start_ingest_processed_consumer(SERVICE_NAME)
+
+    if settings.processing_pull_mode == ProcessingPullMode.V1:
+        consumer = await consumer_service.start_ingest_processed_consumer(SERVICE_NAME)
+    elif settings.processing_pull_mode == ProcessingPullMode.V2:
+        consumer = await consumer_service.start_ingest_processed_consumer(SERVICE_NAME)
+    else:
+        # Off
+        async def fake_consumer(): ...
+
+        consumer = fake_consumer
 
     await run_until_exit(
         [grpc_health_finalizer, consumer, metrics_server.shutdown, stop_processing_engine] + finalizers
