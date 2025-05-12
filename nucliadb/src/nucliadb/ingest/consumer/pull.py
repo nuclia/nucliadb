@@ -19,25 +19,33 @@
 #
 import asyncio
 import base64
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Optional
 
 from aiohttp.client_exceptions import ClientConnectorError
+from opentelemetry import trace
+from opentelemetry.context import Context
+from opentelemetry.propagate import extract
+from opentelemetry.trace import (
+    Link,
+)
 
 from nucliadb.common import datamanagers
 from nucliadb.common.back_pressure.materializer import BackPressureMaterializer
 from nucliadb.common.back_pressure.utils import BackPressureException
 from nucliadb.common.http_clients.processing import (
     ProcessingHTTPClient,
-    get_nua_api_id,
     ProcessingPullMessageProgressUpdater,
+    get_nua_api_id,
 )
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest import logger, logger_activity
+from nucliadb.ingest import SERVICE_NAME, logger, logger_activity
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from nucliadb_telemetry import errors
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.settings import nuclia_settings
@@ -240,6 +248,34 @@ class PullWorker:
                     await asyncio.sleep(self.pull_time_error_backoff)
 
 
+@contextmanager
+def run_in_span(headers: dict[str, str]):
+    # Create a span for handling this message
+    tracer_provider = get_telemetry(SERVICE_NAME)
+    if tracer_provider is None:
+        yield
+        return
+
+    tracer = tracer_provider.get_tracer(__name__)
+    our_span = tracer.start_span("handle_processing_pull")
+
+    # Try to retrieve processing context to link to it
+    witness = Context()
+    processor_context = extract(headers, context=witness)
+    if processor_context != witness:
+        # We successfully extracted a context, we link from the processor span to ours for ease of navigation
+        with tracer.start_as_current_span(
+            f"Pulled from proxy", links=[Link(our_span.get_span_context())], context=processor_context
+        ):
+            # And link from our span back to the processor span
+            our_span.add_link(trace.get_current_span().get_span_context())
+
+    # Go back to our context
+    trace.set_span_in_context(our_span)
+    with trace.use_span(our_span, end_on_exit=True):
+        yield
+
+
 class PullV2Worker:
     """
     The pull worker is responsible for pulling messages from the pull processing
@@ -321,9 +357,9 @@ class PullV2Worker:
                             async with ProcessingPullMessageProgressUpdater(
                                 processing_http_client, message.ack_token, pull.ttl * 0.66
                             ):
-                                # TODO: tracing
-                                await self.handle_message(message.seq, message.payload)
-                                ack_tokens.append(message.ack_token)
+                                with run_in_span(message.headers):
+                                    await self.handle_message(message.seq, message.payload)
+                                    ack_tokens.append(message.ack_token)
                     except Exception as e:
                         errors.capture_exception(e)
                         logger.exception("Error while pulling and processing message/s")

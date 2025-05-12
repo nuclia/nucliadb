@@ -32,7 +32,7 @@ from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.partitions import assign_partitions
 from nucliadb.ingest.processing import start_processing_engine, stop_processing_engine
 from nucliadb.ingest.service import start_grpc
-from nucliadb.ingest.settings import settings, ProcessingPullMode
+from nucliadb.ingest.settings import ProcessingPullMode, settings
 from nucliadb.ingest.utils import start_ingest as start_ingest_utility
 from nucliadb.ingest.utils import stop_ingest as stop_ingest_utility
 from nucliadb_telemetry import errors

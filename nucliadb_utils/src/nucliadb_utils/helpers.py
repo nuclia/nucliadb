@@ -25,6 +25,7 @@ from nucliadb_telemetry.errors import capture_exception
 
 logger = logging.getLogger(__name__)
 
+
 async def async_gen_lookahead(
     gen: AsyncGenerator[bytes, None],
 ) -> AsyncGenerator[tuple[bytes, bool], None]:
