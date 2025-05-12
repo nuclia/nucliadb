@@ -175,6 +175,7 @@ class PulledMessage(pydantic.BaseModel):
     payload: bytes
     headers: dict[str, str]
     ack_token: str
+    seq: int
 
 
 class PullResponseV2(pydantic.BaseModel):
@@ -234,13 +235,19 @@ class ProcessingHTTPClient:
             resp_text = await resp.text()
             check_status(resp, resp_text)
 
-    async def pull_v2(self, ack_tokens: list[str], limit: int = 1, timeout: float = 5) -> PullResponseV2:
+    async def pull_v2(
+        self, ack_tokens: list[str], limit: int = 1, timeout: float = 5
+    ) -> Optional[PullResponseV2]:
         url = self.base_url_v2 + "/pull"
         request = PullRequestV2(limit=limit, timeout=timeout, ack=ack_tokens)
         async with self.session.post(url, headers=self.headers, data=request.model_dump_json()) as resp:
             resp_text = await resp.text()
             check_status(resp, resp_text)
-            return PullResponseV2.model_validate_json(resp_text)
+
+            if resp.status == 204:
+                return None
+            else:
+                return PullResponseV2.model_validate_json(resp_text)
 
     async def requests(
         self,

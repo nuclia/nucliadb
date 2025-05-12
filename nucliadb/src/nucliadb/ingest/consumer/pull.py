@@ -27,7 +27,11 @@ from aiohttp.client_exceptions import ClientConnectorError
 from nucliadb.common import datamanagers
 from nucliadb.common.back_pressure.materializer import BackPressureMaterializer
 from nucliadb.common.back_pressure.utils import BackPressureException
-from nucliadb.common.http_clients.processing import ProcessingHTTPClient, get_nua_api_id
+from nucliadb.common.http_clients.processing import (
+    ProcessingHTTPClient,
+    get_nua_api_id,
+    ProcessingPullMessageProgressUpdater,
+)
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import logger, logger_activity
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
@@ -215,6 +219,125 @@ class PullWorker:
                     SystemExit,
                 ):
                     logger.info(f"Pull task for partition #{self.partition} was canceled, exiting")
+                    raise ReallyStopPulling()
+
+                except ClientConnectorError:
+                    logger.error(
+                        f"Could not connect to processing engine, \
+                         {processing_http_client.base_url} verify your internet connection"
+                    )
+                    await asyncio.sleep(self.pull_time_error_backoff)
+
+                except MaxTransactionSizeExceededError as e:
+                    if data is not None:
+                        payload_length = 0
+                        if data.payload:
+                            payload_length = len(base64.b64decode(data.payload))
+                        logger.error(f"Message too big for transaction: {payload_length}")
+                    raise e
+                except Exception:
+                    logger.exception("Unhandled error pulling messages from processing")
+                    await asyncio.sleep(self.pull_time_error_backoff)
+
+
+class PullV2Worker:
+    """
+    The pull worker is responsible for pulling messages from the pull processing
+    http endpoint and processing them
+
+    The processing pull endpoint is also described as the "processing proxy" at times.
+    """
+
+    def __init__(
+        self,
+        driver: Driver,
+        storage: Storage,
+        pull_time_error_backoff: int,
+        pubsub: Optional[PubSubDriver] = None,
+        pull_time_empty_backoff: float = 5.0,
+        pull_api_timeout: int = 60,
+    ):
+        self.pull_time_error_backoff = pull_time_error_backoff
+        self.pull_time_empty_backoff = pull_time_empty_backoff
+        self.pull_api_timeout = pull_api_timeout
+
+        self.processor = Processor(driver, storage, pubsub, "-1")
+
+    async def handle_message(self, seq: int, payload: bytes) -> None:
+        pb = BrokerMessage()
+        data = base64.b64decode(payload)
+        pb.ParseFromString(data)
+
+        logger.debug(f"Resource: {pb.uuid} KB: {pb.kbid} ProcessingID: {pb.processing_id}")
+
+        await self.processor.process(
+            pb,
+            seq,
+            transaction_check=False,
+        )
+
+    async def loop(self):
+        """
+        Run this forever
+        """
+        while True:
+            try:
+                await self._loop()
+            except ReallyStopPulling:
+                logger.info("Exiting...")
+                break
+            except Exception as e:
+                errors.capture_exception(e)
+                logger.exception("Exception on worker", exc_info=e)
+                await asyncio.sleep(10)
+
+    async def _loop(self):
+        headers = {}
+        data = None
+        if nuclia_settings.nuclia_service_account is not None:
+            headers["X-STF-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
+            # parse jwt sub to get pull type id
+            try:
+                get_nua_api_id()
+            except Exception as exc:
+                logger.exception("Could not read NUA API Key. Can not start pull worker")
+                raise ReallyStopPulling() from exc
+
+        ack_tokens = []
+        async with ProcessingHTTPClient() as processing_http_client:
+            while True:
+                try:
+                    # The code is only really prepared to pull 1 message at a time. If changing this, review MessageProgressUpdate usage
+                    pull = await processing_http_client.pull_v2(ack_tokens=ack_tokens, limit=1)
+                    ack_tokens.clear()
+                    if pull is None:
+                        logger_activity.debug(f"No messages waiting in processing pull")
+                        await asyncio.sleep(self.pull_time_empty_backoff)
+                        continue
+
+                    logger.info("Message received from proxy", extra={"seq": [pull.messages[0].seq]})
+                    try:
+                        for message in pull.messages:
+                            async with ProcessingPullMessageProgressUpdater(
+                                processing_http_client, message.ack_token, pull.ttl * 0.66
+                            ):
+                                # TODO: tracing
+                                await self.handle_message(message.seq, message.payload)
+                                ack_tokens.append(message.ack_token)
+                    except Exception as e:
+                        errors.capture_exception(e)
+                        logger.exception("Error while pulling and processing message/s")
+                        raise e
+
+                except (
+                    asyncio.exceptions.CancelledError,
+                    RuntimeError,
+                    KeyboardInterrupt,
+                    SystemExit,
+                ):
+                    if ack_tokens:
+                        await processing_http_client.pull_v2(ack_tokens=ack_tokens, limit=0)
+                    logger.info(f"Pull task was canceled, exiting")
                     raise ReallyStopPulling()
 
                 except ClientConnectorError:
