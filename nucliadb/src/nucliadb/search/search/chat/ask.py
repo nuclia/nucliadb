@@ -310,7 +310,8 @@ class AskResult:
                         self.prompt_context, self.prompt_context_order
                     ),
                     "predict_request": predict_request,
-                }
+                },
+                metrics=self.metrics.dump(),
             )
 
     async def json(self) -> str:

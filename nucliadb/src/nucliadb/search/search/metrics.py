@@ -62,7 +62,7 @@ MetricsData = dict[str, Union[int, float]]
 
 
 class Metrics:
-    def __init__(self, id: str):
+    def __init__(self: "Metrics", id: str):
         self.id = id
         self.child_spans: list[Metrics] = []
         self._metrics: MetricsData = {}
@@ -103,7 +103,7 @@ class Metrics:
 
 
 class AskMetrics(Metrics):
-    def __init__(self):
+    def __init__(self: "AskMetrics"):
         super().__init__(id="ask")
         self.global_start = time.monotonic()
         self.first_chunk_yielded_at: Optional[float] = None

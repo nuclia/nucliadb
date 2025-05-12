@@ -1905,6 +1905,11 @@ class KnowledgeboxFindResults(JsonBaseModel):
         title="Best matches",
         description="List of ids of best matching paragraphs. The list is sorted by decreasing relevance (most relevant first).",  # noqa: E501
     )
+    metrics: Optional[dict[str, Any]] = Field(
+        default=None,
+        title="Metrics",
+        description="Metrics information about the search operation. This is only available if the `debug` parameter is set to true in the request.",  # noqa: E501
+    )
 
 
 class FeedbackTasks(str, Enum):
@@ -2137,6 +2142,7 @@ class RelationsAskResponseItem(BaseModel):
 class DebugAskResponseItem(BaseModel):
     type: Literal["debug"] = "debug"
     metadata: dict[str, Any]
+    metrics: dict[str, Any]
 
 
 AskResponseItemType = Union[
