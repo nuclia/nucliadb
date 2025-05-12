@@ -488,7 +488,7 @@ async def ask(
     if len(chat_history) > 0 or len(user_context) > 0:
         try:
             with metrics.time("rephrase"):
-                rephrased_query = await rephrase_query(
+                response = await rephrase_query(
                     kbid,
                     chat_history=chat_history,
                     query=user_query,
@@ -496,6 +496,9 @@ async def ask(
                     user_context=user_context,
                     generative_model=ask_request.generative_model,
                 )
+                rephrased_query = response.rephrased_query
+                if response.use_chat_history is False:
+                    chat_history = []
         except RephraseMissingContextError:
             logger.info("Failed to rephrase ask query, using original")
 

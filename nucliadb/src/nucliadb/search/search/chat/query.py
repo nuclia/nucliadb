@@ -27,7 +27,7 @@ from nidx_protos.nodereader_pb2 import (
 
 from nucliadb.common.models_utils import to_proto
 from nucliadb.search import logger
-from nucliadb.search.predict import AnswerStatusCode
+from nucliadb.search.predict import AnswerStatusCode, RephraseResponse
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
@@ -71,7 +71,7 @@ async def rephrase_query(
     user_id: str,
     user_context: list[str],
     generative_model: Optional[str] = None,
-) -> str:
+) -> RephraseResponse:
     predict = get_predict()
     req = RephraseModel(
         question=query,
