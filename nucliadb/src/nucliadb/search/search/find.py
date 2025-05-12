@@ -34,7 +34,7 @@ from nucliadb.search.search.hydrator import (
     TextBlockHydrationOptions,
 )
 from nucliadb.search.search.metrics import (
-    Durations,
+    Metrics,
 )
 from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.search.query_parser.parsers import parse_find
@@ -64,7 +64,7 @@ async def find(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    durations: Durations = Durations("main_query"),
+    metrics: Metrics = Metrics("find"),
 ) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     external_index_manager = await get_external_index_manager(kbid=kbid)
     if external_index_manager is not None:
@@ -75,7 +75,7 @@ async def find(
         )
     else:
         return await _index_node_retrieval(
-            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, durations
+            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, metrics
         )
 
 
@@ -85,12 +85,12 @@ async def _index_node_retrieval(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    durations: Durations,
+    metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     audit = get_audit()
     start_time = time()
 
-    with durations.time("query_parse"):
+    with metrics.time("query_parse"):
         parsed = await parse_find(kbid, item)
         assert parsed.retrieval.rank_fusion is not None and parsed.retrieval.reranker is not None, (
             "find parser must provide rank fusion and reranker algorithms"
@@ -104,14 +104,14 @@ async def _index_node_retrieval(
             rephrased_query,
         ) = await legacy_convert_retrieval_to_proto(parsed)
 
-    with durations.time("index_search"):
+    with metrics.time("index_search"):
         results, query_incomplete_results, queried_shards = await node_query(
             kbid, Method.SEARCH, pb_query
         )
     incomplete_results = incomplete_results or query_incomplete_results
 
     # Rank fusion merge, cut, hydrate and rerank
-    with durations.time("results_merge"):
+    with metrics.time("results_merge"):
         search_results = await build_find_response(
             results,
             retrieval=parsed.retrieval,
@@ -142,8 +142,8 @@ async def _index_node_retrieval(
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
 
-    ndb_time = durations.elapsed("index_search") + durations.elapsed("results_merge")
-    if durations.elapsed("index_search") > settings.slow_node_query_log_threshold:
+    ndb_time = metrics["index_search"] + metrics["results_merge"]
+    if metrics["index_search"] > settings.slow_node_query_log_threshold:
         logger.warning(
             "Slow nidx query",
             extra={
@@ -152,7 +152,7 @@ async def _index_node_retrieval(
                 "client": x_ndb_client,
                 "query": item.model_dump_json(),
                 "time": search_time,
-                "durations": durations.steps(),
+                "metrics": metrics.to_dict(),
             },
         )
     elif ndb_time > settings.slow_find_log_threshold:
@@ -164,7 +164,7 @@ async def _index_node_retrieval(
                 "client": x_ndb_client,
                 "query": item.model_dump_json(),
                 "time": search_time,
-                "durations": durations.steps(),
+                "metrics": metrics.to_dict(),
             },
         )
 

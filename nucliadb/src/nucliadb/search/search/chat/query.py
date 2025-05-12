@@ -33,7 +33,7 @@ from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
-from nucliadb.search.search.metrics import Durations
+from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.query_parser.models import ParsedQuery, Query, RelationQuery, UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.settings import settings
@@ -91,7 +91,7 @@ async def get_find_results(
     ndb_client: NucliaDBClientType,
     user: str,
     origin: str,
-    durations: Durations,
+    metrics: Metrics,
     prequeries_strategy: Optional[PreQueriesStrategy] = None,
 ) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], ParsedQuery]:
     prequeries_results = None
@@ -101,14 +101,14 @@ async def get_find_results(
         prefilters = [prequery for prequery in prequeries_strategy.queries if prequery.prefilter]
         prequeries = [prequery for prequery in prequeries_strategy.queries if not prequery.prefilter]
         if len(prefilters) > 0:
-            with durations.time("prefilters"):
+            with metrics.time("prefilters"):
                 prefilter_queries_results = await run_prequeries(
                     kbid,
                     prefilters,
                     x_ndb_client=ndb_client,
                     x_nucliadb_user=user,
                     x_forwarded_for=origin,
-                    durations=durations,
+                    metrics=metrics.child_span("prefilters"),
                 )
                 prefilter_matching_resources = {
                     resource
@@ -126,19 +126,19 @@ async def get_find_results(
                     prequery.request.show_hidden = item.show_hidden
 
         if prequeries:
-            with durations.time("prequeries"):
+            with metrics.time("prequeries"):
                 queries_results = await run_prequeries(
                     kbid,
                     prequeries,
                     x_ndb_client=ndb_client,
                     x_nucliadb_user=user,
                     x_forwarded_for=origin,
-                    durations=durations,
+                    metrics=metrics.child_span("prequeries"),
                 )
 
         prequeries_results = (prefilter_queries_results or []) + (queries_results or [])
 
-    with durations.time("main_query"):
+    with metrics.time("main_query"):
         main_results, query_parser = await run_main_query(
             kbid,
             query,
@@ -146,7 +146,7 @@ async def get_find_results(
             ndb_client,
             user,
             origin,
-            durations=durations,
+            metrics=metrics.child_span("main_query"),
         )
     return main_results, prequeries_results, query_parser
 
@@ -222,7 +222,7 @@ async def run_main_query(
     ndb_client: NucliaDBClientType,
     user: str,
     origin: str,
-    durations: Durations = Durations("main_query"),
+    metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, ParsedQuery]:
     find_request = find_request_from_ask_request(item, query)
 
@@ -232,7 +232,7 @@ async def run_main_query(
         ndb_client,
         user,
         origin,
-        durations=durations,
+        metrics=metrics,
     )
     if incomplete:
         raise IncompleteFindResultsError()
@@ -454,7 +454,7 @@ async def run_prequeries(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    durations: Durations,
+    metrics: Metrics,
 ) -> list[PreQueryResult]:
     """
     Runs simultaneous find requests for each prequery and returns the merged results according to the normalized weights.
@@ -472,7 +472,7 @@ async def run_prequeries(
                 x_ndb_client,
                 x_nucliadb_user,
                 x_forwarded_for,
-                durations=durations,
+                metrics=metrics,
             )
             return prequery, find_results
 

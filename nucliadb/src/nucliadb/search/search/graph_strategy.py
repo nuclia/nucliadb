@@ -43,7 +43,7 @@ from nucliadb.search.search.find_merge import (
     hydrate_and_rerank,
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
-from nucliadb.search.search.metrics import Durations
+from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.rerankers import (
     Reranker,
     RerankingOptions,
@@ -305,7 +305,7 @@ async def get_graph_results(
     origin: str,
     graph_strategy: GraphStrategy,
     text_block_reranker: Reranker,
-    durations: Durations,
+    metrics: Metrics,
     generative_model: Optional[str] = None,
     shards: Optional[list[str]] = None,
 ) -> tuple[KnowledgeboxFindResults, FindRequest]:
@@ -319,7 +319,7 @@ async def get_graph_results(
 
         if hop == 0:
             # Get the entities from the query
-            with durations.time("graph_strat_query_entities"):
+            with metrics.time("graph_strat_query_entities"):
                 if graph_strategy.query_entity_detection == QueryEntityDetection.SUGGEST:
                     relation_result = await fuzzy_search_entities(
                         kbid=kbid,
@@ -365,7 +365,7 @@ async def get_graph_results(
             )
 
         # Get the relations for the new entities
-        with durations.time("graph_strat_neighbor_relations"):
+        with metrics.time("graph_strat_neighbor_relations"):
             try:
                 new_relations = await get_relations_results_from_entities(
                     kbid=kbid,
@@ -392,7 +392,7 @@ async def get_graph_results(
             relations.entities.update(new_subgraphs)
 
         # Rank the relevance of the relations
-        with durations.time("graph_strat_rank_relations"):
+        with metrics.time("graph_strat_rank_relations"):
             try:
                 if graph_strategy.relation_ranking == RelationRanking.RERANKER:
                     relations, scores = await rank_relations_reranker(
@@ -419,7 +419,7 @@ async def get_graph_results(
                 break
 
     # Get the text blocks of the paragraphs that contain the top relations
-    with durations.time("graph_strat_build_response"):
+    with metrics.time("graph_strat_build_response"):
         find_request = find_request_from_ask_request(item, query)
         find_results = await build_graph_response(
             kbid=kbid,

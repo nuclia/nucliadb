@@ -19,7 +19,7 @@
 #
 import contextlib
 import time
-from typing import Optional
+from typing import Optional, Union
 
 from nucliadb_telemetry import metrics
 
@@ -58,59 +58,54 @@ rag_histogram = metrics.Histogram(
     buckets=buckets,
 )
 
+MetricsData = dict[str, Union[int, float]]
 
-class Durations:
-    def __init__(self: "Durations", id: str):
+
+class Metrics:
+    def __init__(self, id: str):
         self.id = id
-        self.global_start = time.monotonic()
-        self._start_times: dict[str, float] = {}
-        self._end_times: dict[str, float] = {}
-        self.child_spans: list[Durations] = []
+        self.child_spans: list[Metrics] = []
+        self._metrics: MetricsData = {}
 
     @contextlib.contextmanager
     def time(self, step: str):
-        self._start(step)
+        start_time = time.monotonic()
         try:
             yield
         finally:
-            self._end(step)
+            elapsed = time.monotonic() - start_time
+            self._metrics[step] = elapsed
+            rag_histogram.observe(elapsed, labels={"step": step})
 
-    def steps(self) -> dict[str, float]:
-        return {step: self.elapsed(step) for step in self._end_times.keys()}
-
-    def elapsed(self, step: str) -> float:
-        return self._end_times[step] - self._start_times[step]
-
-    def get_elapsed(self, step: str) -> Optional[float]:
-        try:
-            return self.elapsed(step)
-        except KeyError:
-            return None
-
-    def _start(self, step: str):
-        self._start_times[step] = time.monotonic()
-
-    def _end(self, step: str):
-        self._end_times[step] = time.monotonic()
-        elapsed = self.elapsed(step)
-        rag_histogram.observe(elapsed, labels={"step": step})
-
-    def child_span(self, id: str) -> "Durations":
-        child_span = Durations(id)
+    def child_span(self, id: str) -> "Metrics":
+        child_span = Metrics(id)
         self.child_spans.append(child_span)
         return child_span
 
-    def dict(self) -> dict[str, dict[str, float]]:
+    def set(self, key: str, value: Union[int, float]):
+        self._metrics[key] = value
+
+    def get(self, key: str) -> Optional[Union[int, float]]:
+        return self._metrics.get(key)
+
+    def to_dict(self) -> MetricsData:
+        return self._metrics
+
+    def dump(self) -> dict[str, MetricsData]:
         result = {}
         for child in self.child_spans:
-            result.update(child.dict())
-        result[self.id] = self.steps()
+            result.update(child.dump())
+        result[self.id] = self.to_dict()
         return result
 
+    def __getitem__(self, key: str) -> Union[int, float]:
+        return self._metrics[key]
 
-class AskDurations(Durations):
-    def __init__(self: "AskDurations"):
+
+class AskMetrics(Metrics):
+    def __init__(self):
         super().__init__(id="ask")
+        self.global_start = time.monotonic()
 
     def record_first_chunk_yielded(self):
         self.first_chunk_yielded_at = time.monotonic()
