@@ -19,7 +19,7 @@
 #
 import contextlib
 import time
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from nucliadb_telemetry import metrics
 
@@ -91,7 +91,7 @@ class Metrics:
     def to_dict(self) -> MetricsData:
         return self._metrics
 
-    def dump(self) -> dict[str, MetricsData]:
+    def dump(self) -> dict[str, Any]:
         result = {}
         for child in self.child_spans:
             result.update(child.dump())
@@ -106,6 +106,7 @@ class AskMetrics(Metrics):
     def __init__(self):
         super().__init__(id="ask")
         self.global_start = time.monotonic()
+        self.first_chunk_yielded_at: Optional[float] = None
 
     def record_first_chunk_yielded(self):
         self.first_chunk_yielded_at = time.monotonic()

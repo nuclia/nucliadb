@@ -462,23 +462,22 @@ async def run_prequeries(
     results: list[PreQueryResult] = []
     max_parallel_prequeries = asyncio.Semaphore(settings.prequeries_max_parallel)
 
-    async def _prequery_find(
-        prequery: PreQuery,
-    ):
+    async def _prequery_find(prequery: PreQuery, index: int):
         async with max_parallel_prequeries:
+            prequery_id = prequery.id or str(index)
             find_results, _, _ = await find(
                 kbid,
                 prequery.request,
                 x_ndb_client,
                 x_nucliadb_user,
                 x_forwarded_for,
-                metrics=metrics,
+                metrics=metrics.child_span(prequery_id),
             )
             return prequery, find_results
 
     ops = []
-    for prequery in prequeries:
-        ops.append(asyncio.create_task(_prequery_find(prequery)))
+    for idx, prequery in enumerate(prequeries):
+        ops.append(asyncio.create_task(_prequery_find(prequery, idx)))
     ops_results = await asyncio.gather(*ops)
     for prequery, find_results in ops_results:
         results.append((prequery, find_results))
