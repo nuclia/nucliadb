@@ -2082,7 +2082,7 @@ class SyncAskResponse(BaseModel):
     debug: Optional[dict[str, Any]] = Field(
         default=None,
         title="Debug information",
-        description="Debug information about predict",
+        description="Debug information about the ask operation. This is only available if the `debug` parameter is set to true in the request.",  # noqa: E501
     )
 
 
