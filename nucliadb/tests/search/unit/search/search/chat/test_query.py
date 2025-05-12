@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 from unittest import mock
 
+from nucliadb.search.search.metrics import Metrics
 import pytest
 
 from nucliadb.search.predict import AnswerStatusCode
@@ -96,6 +97,7 @@ async def test_get_find_results_vector_search_is_optional(predict, chat_features
             ndb_client=NucliaDBClientType.API,
             user="user_id",
             origin="origin",
+            metrics=Metrics("foo"),
         )
         find_request = find_mock.call_args[0][1]
         assert set(find_request.features) == set(find_features)
