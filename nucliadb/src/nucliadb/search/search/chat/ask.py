@@ -62,7 +62,7 @@ from nucliadb.search.search.exceptions import (
     InvalidQueryError,
 )
 from nucliadb.search.search.graph_strategy import get_graph_results
-from nucliadb.search.search.metrics import RAGMetrics
+from nucliadb.search.search.metrics import AskDurations, Durations
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
 from nucliadb.search.search.rank_fusion import WeightedCombSum
@@ -140,7 +140,7 @@ class AskResult:
         prompt_context: PromptContext,
         prompt_context_order: PromptContextOrder,
         auditor: ChatAuditor,
-        metrics: RAGMetrics,
+        durations: AskDurations,
         best_matches: list[RetrievalMatch],
         debug_chat_model: Optional[ChatModel],
     ):
@@ -155,7 +155,7 @@ class AskResult:
         self.debug_chat_model = debug_chat_model
         self.prompt_context_order = prompt_context_order
         self.auditor: ChatAuditor = auditor
-        self.metrics: RAGMetrics = metrics
+        self.durations: AskDurations = durations
         self.best_matches: list[RetrievalMatch] = best_matches
 
         # Computed from the predict chat answer stream
@@ -212,11 +212,11 @@ class AskResult:
     async def _stream(self) -> AsyncGenerator[AskResponseItemType, None]:
         # First, stream out the predict answer
         first_chunk_yielded = False
-        with self.metrics.time("stream_predict_answer"):
+        with self.durations.time("stream_predict_answer"):
             async for answer_chunk in self._stream_predict_answer_text():
                 yield AnswerAskResponseItem(text=answer_chunk)
                 if not first_chunk_yielded:
-                    self.metrics.record_first_chunk_yielded()
+                    self.durations.record_first_chunk_yielded()
                     first_chunk_yielded = True
 
         if self._object is not None:
@@ -224,7 +224,7 @@ class AskResult:
             if not first_chunk_yielded:
                 # When there is a JSON generative response, we consider the first chunk yielded
                 # to be the moment when the JSON object is yielded, not the text
-                self.metrics.record_first_chunk_yielded()
+                self.durations.record_first_chunk_yielded()
                 first_chunk_yielded = True
 
         yield RetrievalAskResponseItem(
@@ -264,17 +264,11 @@ class AskResult:
             audit_answer = self._answer_text.encode("utf-8")
         else:
             audit_answer = json.dumps(self._object.object).encode("utf-8")
-
-        try:
-            rephrase_time = self.metrics.elapsed("rephrase")
-        except KeyError:
-            # Not all ask requests have a rephrase step
-            rephrase_time = None
-
+        rephrase_time = self.durations.get_elapsed("rephrase")
         self.auditor.audit(
             text_answer=audit_answer,
-            generative_answer_time=self.metrics.elapsed("stream_predict_answer"),
-            generative_answer_first_chunk_time=self.metrics.get_first_chunk_time() or 0,
+            generative_answer_time=self.durations.elapsed("stream_predict_answer"),
+            generative_answer_first_chunk_time=self.durations.get_first_chunk_time() or 0,
             rephrase_time=rephrase_time,
             status_code=self.status_code,
         )
@@ -386,7 +380,7 @@ class AskResult:
 
     async def get_relations_results(self) -> Relations:
         if self._relations is None:
-            with self.metrics.time("relations"):
+            with self.durations.time("relations"):
                 self._relations = await get_relations_results(
                     kbid=self.kbid,
                     text_answer=self._answer_text,
@@ -481,7 +475,7 @@ async def ask(
     origin: str,
     resource: Optional[str] = None,
 ) -> AskResult:
-    metrics = RAGMetrics()
+    durations = AskDurations()
     chat_history = ask_request.chat_history or []
     user_context = ask_request.extra_context or []
     user_query = ask_request.query
@@ -490,7 +484,7 @@ async def ask(
     rephrased_query = None
     if len(chat_history) > 0 or len(user_context) > 0:
         try:
-            with metrics.time("rephrase"):
+            with durations.time("rephrase"):
                 rephrased_query = await rephrase_query(
                     kbid,
                     chat_history=chat_history,
@@ -511,12 +505,12 @@ async def ask(
             client_type=client_type,
             user_id=user_id,
             origin=origin,
-            metrics=metrics,
+            durations=durations,
             resource=resource,
         )
     except NoRetrievalResultsError as err:
         try:
-            rephrase_time = metrics.elapsed("rephrase")
+            rephrase_time = durations.elapsed("rephrase")
         except KeyError:
             # Not all ask requests have a rephrase step
             rephrase_time = None
@@ -553,7 +547,7 @@ async def ask(
     generation = await parse_ask(kbid, ask_request, fetcher=retrieval_results.fetcher)
 
     # Now we build the prompt context
-    with metrics.time("context_building"):
+    with durations.time("context_building"):
         prompt_context_builder = PromptContextBuilder(
             kbid=kbid,
             ordered_paragraphs=[match.paragraph for match in retrieval_results.best_matches],
@@ -596,7 +590,7 @@ async def ask(
     nuclia_learning_model = None
     predict_answer_stream = None
     if ask_request.generate_answer:
-        with metrics.time("stream_start"):
+        with durations.time("stream_start"):
             predict = get_predict()
             (
                 nuclia_learning_id,
@@ -628,7 +622,7 @@ async def ask(
         prompt_context=prompt_context,
         prompt_context_order=prompt_context_order,
         auditor=auditor,
-        metrics=metrics,
+        durations=durations,
         best_matches=retrieval_results.best_matches,
         debug_chat_model=chat_model,
     )
@@ -709,7 +703,7 @@ async def retrieval_step(
     client_type: NucliaDBClientType,
     user_id: str,
     origin: str,
-    metrics: RAGMetrics,
+    durations: Durations,
     resource: Optional[str] = None,
 ) -> RetrievalResults:
     """
@@ -723,7 +717,7 @@ async def retrieval_step(
             client_type,
             user_id,
             origin,
-            metrics,
+            durations,
         )
     else:
         return await retrieval_in_resource(
@@ -734,7 +728,7 @@ async def retrieval_step(
             client_type,
             user_id,
             origin,
-            metrics,
+            durations,
         )
 
 
@@ -745,11 +739,11 @@ async def retrieval_in_kb(
     client_type: NucliaDBClientType,
     user_id: str,
     origin: str,
-    metrics: RAGMetrics,
+    durations: Durations,
 ) -> RetrievalResults:
     prequeries = parse_prequeries(ask_request)
     graph_strategy = parse_graph_strategy(ask_request)
-    with metrics.time("retrieval"):
+    with durations.time("retrieval"):
         main_results, prequeries_results, parsed_query = await get_find_results(
             kbid=kbid,
             query=main_query,
@@ -757,7 +751,7 @@ async def retrieval_in_kb(
             ndb_client=client_type,
             user=user_id,
             origin=origin,
-            metrics=metrics,
+            durations=durations,
             prequeries_strategy=prequeries,
         )
 
@@ -774,7 +768,7 @@ async def retrieval_in_kb(
                 user=user_id,
                 origin=origin,
                 graph_strategy=graph_strategy,
-                metrics=metrics,
+                durations=durations,
                 text_block_reranker=reranker,
             )
 
@@ -812,7 +806,7 @@ async def retrieval_in_resource(
     client_type: NucliaDBClientType,
     user_id: str,
     origin: str,
-    metrics: RAGMetrics,
+    durations: Durations,
 ) -> RetrievalResults:
     if any(strategy.name == "full_resource" for strategy in ask_request.rag_strategies):
         # Retrieval is not needed if we are chatting on a specific resource and the full_resource strategy is enabled
@@ -838,7 +832,7 @@ async def retrieval_in_resource(
                 )
             add_resource_filter(prequery.request, [resource])
 
-    with metrics.time("retrieval"):
+    with durations.time("retrieval"):
         main_results, prequeries_results, parsed_query = await get_find_results(
             kbid=kbid,
             query=main_query,
@@ -846,7 +840,7 @@ async def retrieval_in_resource(
             ndb_client=client_type,
             user=user_id,
             origin=origin,
-            metrics=metrics,
+            durations=durations,
             prequeries_strategy=prequeries,
         )
         if len(main_results.resources) == 0 and all(

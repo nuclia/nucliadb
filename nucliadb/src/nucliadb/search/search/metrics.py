@@ -59,12 +59,13 @@ rag_histogram = metrics.Histogram(
 )
 
 
-class RAGMetrics:
-    def __init__(self: "RAGMetrics"):
+class Durations:
+    def __init__(self: "Durations", id: str):
+        self.id = id
         self.global_start = time.monotonic()
         self._start_times: dict[str, float] = {}
         self._end_times: dict[str, float] = {}
-        self.first_chunk_yielded_at: Optional[float] = None
+        self.child_spans: list[Durations] = []
 
     @contextlib.contextmanager
     def time(self, step: str):
@@ -80,14 +81,11 @@ class RAGMetrics:
     def elapsed(self, step: str) -> float:
         return self._end_times[step] - self._start_times[step]
 
-    def record_first_chunk_yielded(self):
-        self.first_chunk_yielded_at = time.monotonic()
-        generative_first_chunk_histogram.observe(self.first_chunk_yielded_at - self.global_start)
-
-    def get_first_chunk_time(self) -> Optional[float]:
-        if self.first_chunk_yielded_at is None:
+    def get_elapsed(self, step: str) -> Optional[float]:
+        try:
+            return self.elapsed(step)
+        except KeyError:
             return None
-        return self.first_chunk_yielded_at - self.global_start
 
     def _start(self, step: str):
         self._start_times[step] = time.monotonic()
@@ -96,3 +94,29 @@ class RAGMetrics:
         self._end_times[step] = time.monotonic()
         elapsed = self.elapsed(step)
         rag_histogram.observe(elapsed, labels={"step": step})
+
+    def child_span(self, id: str) -> "Durations":
+        child_span = Durations(id)
+        self.child_spans.append(child_span)
+        return child_span
+
+    def dict(self) -> dict[str, dict[str, float]]:
+        result = {}
+        for child in self.child_spans:
+            result.update(child.dict())
+        result[self.id] = self.steps()
+        return result
+
+
+class AskDurations(Durations):
+    def __init__(self: "AskDurations"):
+        super().__init__(id="ask")
+
+    def record_first_chunk_yielded(self):
+        self.first_chunk_yielded_at = time.monotonic()
+        generative_first_chunk_histogram.observe(self.first_chunk_yielded_at - self.global_start)
+
+    def get_first_chunk_time(self) -> Optional[float]:
+        if self.first_chunk_yielded_at is None:
+            return None
+        return self.first_chunk_yielded_at - self.global_start
