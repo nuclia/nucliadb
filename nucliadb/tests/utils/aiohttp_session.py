@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, Mock
 
 
 def get_mocked_session(
-    http_method: str, status: int, text=None, json=None, read=None, context_manager=True
+    http_method: str, status: int, text=None, json=None, read=None, context_manager=True, headers=None
 ):
     response = Mock(status=status)
     if text is not None:
@@ -32,6 +32,8 @@ def get_mocked_session(
         if isinstance(read, str):
             read = read.encode()
         response.read = AsyncMock(return_value=read)
+    if headers is not None:
+        response.headers = headers
     if context_manager:
         # For when async with self.session.post() as response: is called
         session = Mock()
