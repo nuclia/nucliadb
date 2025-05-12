@@ -1531,7 +1531,7 @@ async def test_ask_calls_predict_query_once(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_(
+async def test_ask_chat_history_relevance_threshold(
     nucliadb_reader: AsyncClient,
     standalone_knowledgebox: str,
     resources: list[str],
