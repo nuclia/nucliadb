@@ -22,8 +22,8 @@ from typing import AsyncGenerator, Optional
 
 from nidx_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
+from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_protos.dataset_pb2 import (
@@ -38,10 +38,9 @@ from nucliadb_protos.utils_pb2 import ExtractedText
 def field_streaming_batch_generator(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[FieldStreamingBatch, None]:
-    generator = generate_field_streaming_payloads(kbid, trainset, node, shard_replica_id)
+    generator = generate_field_streaming_payloads(kbid, trainset, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, FieldStreamingBatch)
     return batch_generator
 
@@ -49,7 +48,6 @@ def field_streaming_batch_generator(
 async def generate_field_streaming_payloads(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[FieldSplitData, None]:
     # Query how many resources has each label
@@ -77,7 +75,7 @@ async def generate_field_streaming_payloads(
     total = 0
     resources = set()
 
-    async for document_item in node.stream_get_fields(request):
+    async for document_item in get_nidx_searcher_client().Documents(request):
         text_labels = []
         for label in document_item.labels:
             text_labels.append(label)

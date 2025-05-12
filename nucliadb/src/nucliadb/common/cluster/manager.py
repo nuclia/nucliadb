@@ -23,17 +23,21 @@ import uuid
 from typing import Any, Awaitable, Callable, Optional
 
 from nidx_protos import noderesources_pb2, nodewriter_pb2
-from nidx_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, NewShardRequest, TypeMessage
+from nidx_protos.nodewriter_pb2 import (
+    IndexMessage,
+    IndexMessageSource,
+    NewShardRequest,
+    NewVectorSetRequest,
+    TypeMessage,
+)
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import (
     NodeError,
-    ShardNotFound,
     ShardsNotFound,
 )
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.nidx import get_nidx, get_nidx_api_client, get_nidx_fake_node
+from nucliadb.common.nidx import get_nidx, get_nidx_api_client
 from nucliadb.common.vector_index_config import nucliadb_index_config_to_nidx
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_telemetry import errors
@@ -63,18 +67,14 @@ class KBShardManager:
     async def apply_for_all_shards(
         self,
         kbid: str,
-        aw: Callable[[AbstractIndexNode, str], Awaitable[Any]],
+        aw: Callable[[str], Awaitable[Any]],
         timeout: float,
     ) -> list[Any]:
         shards = await self.get_shards_by_kbid(kbid)
         ops = []
 
         for shard_obj in shards:
-            node, shard_id = choose_node(shard_obj)
-            if shard_id is None:
-                raise ShardNotFound("Found a node but not a shard")
-
-            ops.append(aw(node, shard_id))
+            ops.append(aw(shard_obj.nidx_shard_id))
 
         try:
             results = await asyncio.wait_for(
@@ -252,10 +252,18 @@ class KBShardManager:
     async def create_vectorset(self, kbid: str, config: knowledgebox_pb2.VectorSetConfig):
         """Create a new vectorset in all KB shards."""
 
-        async def _create_vectorset(node: AbstractIndexNode, shard_id: str):
+        async def _create_vectorset(shard_id: str):
             vectorset_id = config.vectorset_id
             index_config = nucliadb_index_config_to_nidx(config.vectorset_index_config)
-            result = await node.add_vectorset(shard_id, vectorset_id, index_config)
+
+            req = NewVectorSetRequest(
+                id=noderesources_pb2.VectorSetID(
+                    shard=noderesources_pb2.ShardId(id=shard_id), vectorset=vectorset_id
+                ),
+                config=index_config,
+            )
+
+            result = await get_nidx_api_client().AddVectorSet(req)
             if result.status != result.Status.OK:
                 raise NodeError(
                     f"Unable to create vectorset {vectorset_id} in kb {kbid} shard {shard_id}"
@@ -266,8 +274,12 @@ class KBShardManager:
     async def delete_vectorset(self, kbid: str, vectorset_id: str):
         """Delete a vectorset from all KB shards"""
 
-        async def _delete_vectorset(node: AbstractIndexNode, shard_id: str):
-            result = await node.remove_vectorset(shard_id, vectorset_id)
+        async def _delete_vectorset(shard_id: str):
+            req = noderesources_pb2.VectorSetID()
+            req.shard.id = shard_id
+            req.vectorset = vectorset_id
+
+            result = await get_nidx_api_client().RemoveVectorSet(req)
             if result.status != result.Status.OK:
                 raise NodeError(
                     f"Unable to delete vectorset {vectorset_id} in kb {kbid} shard {shard_id}"
@@ -341,10 +353,3 @@ class StandaloneKBShardManager(KBShardManager):
                     await storage.delete_upload(storage_key, storage.indexing_bucket)
             except Exception:
                 pass
-
-
-def choose_node(
-    shard: writer_pb2.ShardObject,
-) -> tuple[AbstractIndexNode, str]:
-    fake_node = get_nidx_fake_node()
-    return fake_node, shard.nidx_shard_id

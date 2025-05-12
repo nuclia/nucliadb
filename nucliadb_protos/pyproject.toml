@@ -10,7 +10,7 @@ build-backend = "pdm.backend"
 
 [project]
 name = "nucliadb_protos"
-version = "6.3.7"
+version = "6.4.0"
 license = { text = "AGPL" }
 description = "Protobuf definitions for nucliadb"
 authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
@@ -26,9 +26,9 @@ classifiers = [
 ]
 requires-python = ">=3.9, <4"
 dependencies = [
-    "protobuf >= 4.22.3",
+    "protobuf >= 5",
     "mypy-protobuf >= 3.4.0",
-    "types-protobuf >= 4.24",
+    "types-protobuf >= 5",
 ]
 
 [project.urls]

@@ -45,14 +45,6 @@ message IndexMessage {
     IndexMessageSource source = 10;
 }
 
-message GarbageCollectorResponse {
-    enum Status {
-        OK = 0;
-        TRY_LATER = 1;
-    }
-    Status status = 1;
-}
-
 enum VectorType {
     DENSE_F32 = 0;
 }
@@ -80,31 +72,4 @@ message NewVectorSetRequest {
     utils.VectorSimilarity similarity = 2 [deprecated = true];
     bool normalize_vectors = 3 [deprecated = true];
     VectorIndexConfig config = 4;
-}
-
-message MergeResponse {
-    enum MergeStatus {
-        OK = 0;
-    }
-    MergeStatus status = 1;
-    uint32 merged_segments = 2;
-    uint32 remaining_segments = 3;
-}
-
-service NodeWriter {
-    rpc NewShard(NewShardRequest) returns (noderesources.ShardCreated) {}
-    rpc DeleteShard(noderesources.ShardId) returns (noderesources.ShardId) {}
-    rpc ListShards(noderesources.EmptyQuery) returns (noderesources.ShardIds) {}
-    rpc GC(noderesources.ShardId) returns (GarbageCollectorResponse) {}
-    rpc Merge(noderesources.ShardId) returns (MergeResponse) {}
-
-    rpc SetResource(noderesources.Resource) returns (OpStatus) {}
-    rpc SetResourceFromStorage(IndexMessage) returns (OpStatus) {}
-    rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}
-
-    rpc AddVectorSet(NewVectorSetRequest) returns (OpStatus) {}  // New
-    rpc RemoveVectorSet(noderesources.VectorSetID) returns (OpStatus) {}
-    rpc ListVectorSets(noderesources.ShardId) returns (noderesources.VectorSetList) {}
-
-    rpc GetMetadata(noderesources.EmptyQuery) returns (noderesources.NodeMetadata) {}
 }

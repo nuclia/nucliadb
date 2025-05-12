@@ -19,21 +19,14 @@
 #
 from typing import Any
 
-from nidx_protos.nodereader_pb2 import (
-    EdgeList,
-    RelationEdge,
-)
+from nidx_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nidx_protos.noderesources_pb2 import (
-    EmptyResponse,
     ShardCreated,
     ShardId,
     ShardIds,
     VectorSetList,
 )
-from nidx_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nidx_protos.nodewriter_pb2 import OpStatus
-
-from nucliadb_protos.utils_pb2 import Relation
 
 
 class DummyWriterStub:  # pragma: no cover
@@ -77,10 +70,6 @@ class DummyWriterStub:  # pragma: no cover
         result.vectorsets.append("base")
         return result
 
-    async def GC(self, request: ShardId) -> EmptyResponse:  # pragma: no cover
-        self.calls.setdefault("GC", []).append(request)
-        return EmptyResponse()
-
 
 class DummyReaderStub:  # pragma: no cover
     def __init__(self: "DummyReaderStub"):
@@ -89,9 +78,3 @@ class DummyReaderStub:  # pragma: no cover
     async def GetShard(self, data):  # pragma: no cover
         self.calls.setdefault("GetShard", []).append(data)
         return NodeResourcesShard(shard_id="shard", fields=2, paragraphs=2, sentences=2)
-
-    async def RelationEdges(self, data):  # pragma: no cover
-        self.calls.setdefault("RelationEdges", []).append(data)
-        result = EdgeList()
-        result.list.append(RelationEdge(edge_type=Relation.RelationType.ENTITY, property="dummy"))
-        return result

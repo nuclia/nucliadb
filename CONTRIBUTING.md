@@ -30,6 +30,6 @@ The process is simple and fast. Upon your first pull request, you will be prompt
 
 ### Setup & run tests NucliaDB
 
-1. Install Python == 3.12 with a virtualenv with your prefered tool (pyenv, conda, pipenv,...)
+1. Install Python == 3.13 with a virtualenv with your prefered tool (pyenv, conda, pipenv,...)
 2. Install NucliaDB Dev Dependencies `make install`
 3. Run `pytest nucliadb/tests`

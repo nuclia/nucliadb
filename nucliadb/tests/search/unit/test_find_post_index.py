@@ -31,7 +31,7 @@ from nucliadb.search.search.query_parser.models import (
     SemanticQuery,
     UnitRetrieval,
 )
-from nucliadb.search.search.rank_fusion import LegacyRankFusion
+from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
 from nucliadb.search.search.rerankers import PredictReranker
 from nucliadb_models.internal.predict import (
     RerankModel,
@@ -177,7 +177,7 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
             field_type_filter=[],
             extracted=[],
             highlight=True,
-            rank_fusion_algorithm=LegacyRankFusion(window=20),
+            rank_fusion_algorithm=ReciprocalRankFusion(window=20),
             reranker=PredictReranker(window=20),
         )
         resp = find_response.model_dump()

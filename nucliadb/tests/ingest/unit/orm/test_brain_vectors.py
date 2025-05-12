@@ -21,7 +21,7 @@
 import uuid
 
 from nucliadb.common import ids
-from nucliadb.ingest.orm.brain import ResourceBrain
+from nucliadb.ingest.orm.brain_v2 import ResourceBrain
 from nucliadb_protos import utils_pb2
 
 
@@ -58,7 +58,7 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
     )
 
     brain = ResourceBrain(rid=rid)
-    brain.apply_field_vectors(field_id, vectors, vector_dimension=None, vectorset="my-vectorset")
+    brain.generate_vectors(field_id, vectors, vector_dimension=None, vectorset="my-vectorset")
     vector = (
         brain.brain.paragraphs[field_id]
         .paragraphs[paragraph_key.full()]
@@ -68,7 +68,7 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
     assert len(vector.vector) == STORED_VECTOR_DIMENSION
 
     brain = ResourceBrain(rid=rid)
-    brain.apply_field_vectors(
+    brain.generate_vectors(
         field_id, vectors, vector_dimension=MATRYOSHKA_DIMENSION, vectorset="my-vectorset"
     )
     vector = (

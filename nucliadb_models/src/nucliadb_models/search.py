@@ -27,6 +27,7 @@ from typing_extensions import Annotated, Self
 
 from nucliadb_models import RelationMetadata
 from nucliadb_models.common import FieldTypeName, ParamDefault
+from nucliadb_models.graph.requests import GraphPathQuery
 
 # Bw/c import to avoid breaking users
 # noqa isort: skip
@@ -104,9 +105,10 @@ class SearchOptions(str, Enum):
 
 
 class FindOptions(str, Enum):
-    RELATIONS = "relations"
     KEYWORD = "keyword"
     SEMANTIC = "semantic"
+    RELATIONS = "relations"
+    GRAPH = "graph"
 
 
 class ChatOptions(str, Enum):
@@ -359,6 +361,7 @@ class _BaseRankFusion(BaseModel):
 class ReciprocalRankFusionWeights(BaseModel):
     keyword: float = 1.0
     semantic: float = 1.0
+    graph: SkipJsonSchema[float] = 1.0
 
 
 class ReciprocalRankFusion(_BaseRankFusion):
@@ -604,6 +607,12 @@ class SearchParamDefaults:
         description="Vectors index to perform the search in. If not provided, NucliaDB will use the default one",
     )
     chat_context = ParamDefault(
+        default=None,
+        title="Chat history",
+        description="DEPRECATED! Please, use `chat_history` instead.",
+        deprecated=True,
+    )
+    chat_history = ParamDefault(
         default=None,
         title="Chat history",
         description="Use to rephrase the new LLM query by taking into account the chat conversation history",  # noqa: E501
@@ -1486,6 +1495,9 @@ class AskRequest(AuditMetadataBase):
     field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
     extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
     context: Optional[list[ChatContextMessage]] = SearchParamDefaults.chat_context.to_pydantic_field()
+    chat_history: Optional[list[ChatContextMessage]] = (
+        SearchParamDefaults.chat_history.to_pydantic_field()
+    )
     extra_context: Optional[list[str]] = Field(
         default=None,
         title="Extra query context",
@@ -1673,6 +1685,16 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
                 values["rank_fusion"] = RankFusionName.RECIPROCAL_RANK_FUSION
         return values
 
+    @model_validator(mode="after")
+    def rename_context_to_chat_history(self) -> Self:
+        """Bw/c rename from `context` to `chat_history`"""
+        if self.context is not None and self.chat_history is not None:
+            raise ValueError("`context` and `chat_history` are the same, please, use the latter")
+        elif self.context is not None:
+            self.chat_history = self.context
+            self.context = None
+        return self
+
 
 # Alias (for backwards compatiblity with testbed)
 class ChatRequest(AskRequest):
@@ -1759,6 +1781,11 @@ class FindRequest(BaseSearchRequest):
     query_entities: SkipJsonSchema[Optional[list[KnowledgeGraphEntity]]] = Field(
         default=None, title="Query entities", description="Entities to use in a knowledge graph search"
     )
+    graph_query: SkipJsonSchema[Optional[GraphPathQuery]] = Field(
+        default=None,
+        title="Graph query",
+        description="Query for the knowledge graph. Paths (node-relation-node) extracted from a paragraph_id will be used to extend the results",
+    )
     features: list[FindOptions] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
             FindOptions.KEYWORD,
@@ -1803,6 +1830,13 @@ class FindRequest(BaseSearchRequest):
             if isinstance(rank_fusion, str) and rank_fusion == "legacy":
                 values["rank_fusion"] = RankFusionName.RECIPROCAL_RANK_FUSION
         return values
+
+    @field_validator("features")
+    @classmethod
+    def incompatible_features(cls, features: list[FindOptions]):
+        if FindOptions.RELATIONS in features and FindOptions.GRAPH in features:
+            raise ValueError("Relations and graph are incompatible features, please, use only one")
+        return features
 
 
 class SCORE_TYPE(str, Enum):
@@ -2174,3 +2208,7 @@ def parse_custom_prompt(item: AskRequest) -> CustomPrompt:
 def parse_rephrase_prompt(item: AskRequest) -> Optional[str]:
     prompt = parse_custom_prompt(item)
     return prompt.rephrase
+
+
+# We need this to avoid issues with pydantic and generic types defined in another module
+FindRequest.model_rebuild()

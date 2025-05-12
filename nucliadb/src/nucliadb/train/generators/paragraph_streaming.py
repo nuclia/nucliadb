@@ -22,8 +22,8 @@ from typing import AsyncGenerator
 
 from nidx_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
+from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_protos.dataset_pb2 import (
@@ -36,10 +36,9 @@ from nucliadb_protos.dataset_pb2 import (
 def paragraph_streaming_batch_generator(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[ParagraphStreamingBatch, None]:
-    generator = generate_paragraph_streaming_payloads(kbid, trainset, node, shard_replica_id)
+    generator = generate_paragraph_streaming_payloads(kbid, trainset, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, ParagraphStreamingBatch)
     return batch_generator
 
@@ -47,7 +46,6 @@ def paragraph_streaming_batch_generator(
 async def generate_paragraph_streaming_payloads(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[ParagraphStreamItem, None]:
     """Streams paragraphs ordered as if they were read sequentially from each
@@ -57,7 +55,7 @@ async def generate_paragraph_streaming_payloads(
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
 
-    async for document_item in node.stream_get_fields(request):
+    async for document_item in get_nidx_searcher_client().Documents(request):
         field_id = f"{document_item.uuid}{document_item.field}"
         rid, field_type, field = field_id.split("/")
 

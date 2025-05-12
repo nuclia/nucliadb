@@ -32,7 +32,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
-from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
+from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
@@ -265,7 +265,7 @@ async def search(
     pb_query, incomplete_results, autofilters, _ = await legacy_convert_retrieval_to_proto(parsed)
 
     # We need to query all nodes
-    results, query_incomplete_results, queried_nodes = await node_query(kbid, Method.SEARCH, pb_query)
+    results, query_incomplete_results, queried_shards = await node_query(kbid, Method.SEARCH, pb_query)
     incomplete_results = incomplete_results or query_incomplete_results
 
     # We need to merge
@@ -290,10 +290,6 @@ async def search(
             len(search_results.resources),
         )
 
-    if item.debug:
-        search_results.nodes = debug_nodes_info(queried_nodes)
-
-    queried_shards = [shard_id for _, shard_id in queried_nodes]
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
     return search_results, incomplete_results

@@ -50,18 +50,13 @@ def kbdm():
 
 
 @pytest.fixture()
-def shard_manager(reader):
+def shard_manager(dummy_nidx_utility, reader):
     sm = MagicMock()
-    node = MagicMock(reader=reader)
     shards = Shards(shards=[ShardObject(read_only=False)], actual=0)
     sm.get_current_active_shard = AsyncMock(return_value=shards.shards[0])
     sm.maybe_create_new_shard = AsyncMock()
     with (
         patch("nucliadb.ingest.consumer.shard_creator.get_shard_manager", return_value=sm),
-        patch(
-            "nucliadb.ingest.consumer.shard_creator.choose_node",
-            return_value=(node, "shard_id"),
-        ),
         patch(
             "nucliadb.ingest.consumer.shard_creator.locking.distributed_lock",
             return_value=AsyncMock(),
@@ -88,8 +83,11 @@ async def test_handle_message_create_new_shard(
     reader,
     kbdm,
     shard_manager,
+    dummy_nidx_utility,
 ):
-    reader.GetShard.return_value = nodereader_pb2.Shard(paragraphs=settings.max_shard_paragraphs + 1)
+    dummy_nidx_utility.api_client.GetShard.return_value = nodereader_pb2.Shard(
+        paragraphs=settings.max_shard_paragraphs + 1
+    )
 
     notif = Notification(
         kbid="kbid",

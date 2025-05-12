@@ -22,8 +22,8 @@ from typing import AsyncGenerator
 
 from nidx_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
+from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_protos.dataset_pb2 import (
@@ -37,10 +37,9 @@ from nucliadb_protos.dataset_pb2 import (
 def field_classification_batch_generator(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[FieldClassificationBatch, None]:
-    generator = generate_field_classification_payloads(kbid, trainset, node, shard_replica_id)
+    generator = generate_field_classification_payloads(kbid, trainset, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, FieldClassificationBatch)
     return batch_generator
 
@@ -48,7 +47,6 @@ def field_classification_batch_generator(
 async def generate_field_classification_payloads(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[TextLabel, None]:
     labelset = f"/l/{trainset.filter.labels[0]}"
@@ -59,7 +57,7 @@ async def generate_field_classification_payloads(
     request.filter.labels.append(labelset)
     total = 0
 
-    async for document_item in node.stream_get_fields(request):
+    async for document_item in get_nidx_searcher_client().Documents(request):
         text_labels = []
         for label in document_item.labels:
             if label.startswith(labelset):

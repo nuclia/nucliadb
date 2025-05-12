@@ -23,7 +23,7 @@ from typing import AsyncGenerator
 from fastapi import HTTPException
 from nidx_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.common.cluster.base import AbstractIndexNode
+from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train.generators.utils import batchify, get_paragraph
 from nucliadb_protos.dataset_pb2 import (
     Label,
@@ -36,7 +36,6 @@ from nucliadb_protos.dataset_pb2 import (
 def paragraph_classification_batch_generator(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[ParagraphClassificationBatch, None]:
     if len(trainset.filter.labels) != 1:
@@ -45,7 +44,7 @@ def paragraph_classification_batch_generator(
             detail="Paragraph Classification should be of 1 labelset",
         )
 
-    generator = generate_paragraph_classification_payloads(kbid, trainset, node, shard_replica_id)
+    generator = generate_paragraph_classification_payloads(kbid, trainset, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, ParagraphClassificationBatch)
     return batch_generator
 
@@ -53,7 +52,6 @@ def paragraph_classification_batch_generator(
 async def generate_paragraph_classification_payloads(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[TextLabel, None]:
     labelset = f"/l/{trainset.filter.labels[0]}"
@@ -63,7 +61,7 @@ async def generate_paragraph_classification_payloads(
     request.shard_id.id = shard_replica_id
     request.filter.labels.append(labelset)
 
-    async for paragraph_item in node.stream_get_paragraphs(request):
+    async for paragraph_item in get_nidx_searcher_client().Paragraphs(request):
         text_labels = []
         for label in paragraph_item.labels:
             if label.startswith(labelset):

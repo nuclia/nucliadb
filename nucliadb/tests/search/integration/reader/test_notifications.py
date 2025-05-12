@@ -46,7 +46,7 @@ async def nidx_reader_api_server(
     reader_api_server,
     nidx,
 ):
-    nidx_util = NidxServiceUtility()
+    nidx_util = NidxServiceUtility("nucliadb.tests")
     await nidx_util.initialize()
 
     with patch.dict(MAIN, values={Utility.NIDX: nidx_util}, clear=False):

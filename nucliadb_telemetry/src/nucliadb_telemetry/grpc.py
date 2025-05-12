@@ -31,7 +31,7 @@ from opentelemetry.propagate import extract, inject
 from opentelemetry.propagators.textmap import CarrierT, Setter
 from opentelemetry.sdk.trace import Span, TracerProvider
 from opentelemetry.semconv.trace import SpanAttributes
-from opentelemetry.trace import SpanKind, Tracer
+from opentelemetry.trace import SpanKind, Tracer, set_span_in_context
 from opentelemetry.trace.status import Status, StatusCode
 
 from nucliadb_telemetry import grpc_metrics, logger
@@ -52,7 +52,11 @@ _carrier_setter = _CarrierSetter()
 
 def finish_span_grpc(span: Span, result):
     code = result._cython_call._status.code()
-    if code != grpc.StatusCode.OK:
+
+    # grpc.StatusCode value is a tuple like:
+    #    <StatusCode.OK: (0, 'ok')>
+    # so we cannot compare it with the code we get from the result directly
+    if code == grpc.StatusCode.OK.value[0]:  # type: ignore
         span.set_status(
             Status(
                 status_code=StatusCode.OK,
@@ -87,19 +91,25 @@ def start_span_client(
         SpanAttributes.RPC_SERVICE: service,
     }
 
-    # add some attributes from the metadata
-    if client_call_details.metadata is not None:
-        mutable_metadata = OrderedDict(tuple(client_call_details.metadata))
-        inject(mutable_metadata, setter=_carrier_setter)  # type: ignore
-        for key, value in mutable_metadata.items():
-            client_call_details.metadata.add(key=key, value=value)  # type: ignore
-
     span = tracer.start_span(
         name=method_name,
         kind=SpanKind.CLIENT,
         attributes=attributes,
         set_status_on_exception=set_status_on_exception,
     )
+
+    # Create a context containing the new span
+    span_context = set_span_in_context(span)
+
+    if client_call_details.metadata is not None:
+        mutable_metadata = OrderedDict(tuple(client_call_details.metadata))
+    else:
+        mutable_metadata = OrderedDict()
+    inject(mutable_metadata, context=span_context, setter=_carrier_setter)
+    if client_call_details.metadata is not None:
+        for key, value in mutable_metadata.items():
+            client_call_details.metadata.add(key=key, value=value)  # type: ignore
+
     return span
 
 

@@ -22,7 +22,7 @@ from uuid import uuid4
 import pytest
 from nidx_protos.noderesources_pb2 import Resource as PBResource
 
-from nucliadb.ingest.orm.brain import ParagraphPages, ResourceBrain
+from nucliadb.ingest.orm.brain_v2 import ParagraphPages, ResourceBrain
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import (
     Basic,
@@ -37,7 +37,7 @@ from nucliadb_protos.resources_pb2 import (
 )
 
 
-def test_apply_field_metadata_marks_duplicated_paragraphs():
+def test_apply_field_paragraphs_marks_duplicated_paragraphs():
     # Simulate a field with two paragraphs that contain the same text
     br = ResourceBrain(rid=str(uuid4()))
     field_key = "text1"
@@ -56,11 +56,14 @@ def test_apply_field_metadata_marks_duplicated_paragraphs():
     fcmw.metadata.metadata.paragraphs.append(p1)
     fcmw.metadata.metadata.paragraphs.append(p2)
 
-    br.apply_field_metadata(
+    br.apply_field_paragraphs(
         field_key,
         fcmw.metadata,
-        page_positions={},
         extracted_text=et,
+        page_positions=None,
+        user_field_metadata=None,
+        replace_field=False,
+        skip_paragraphs=False,
     )
 
     assert len(br.brain.paragraphs[field_key].paragraphs) == 2
@@ -72,7 +75,7 @@ def test_apply_field_metadata_marks_duplicated_paragraphs():
             assert paragraph.repeated_in_field is True
 
 
-def test_apply_field_metadata_marks_duplicated_paragraphs_on_split_metadata():
+def test_apply_field_paragraphs_marks_duplicated_paragraphs_on_split_metadata():
     # # Test now the split text path
     br = ResourceBrain(rid=str(uuid4()))
     field_key = "text1"
@@ -93,11 +96,14 @@ def test_apply_field_metadata_marks_duplicated_paragraphs_on_split_metadata():
     fcmw.metadata.split_metadata[split_key].paragraphs.append(p1)
     fcmw.metadata.split_metadata[split_key].paragraphs.append(p2)
 
-    br.apply_field_metadata(
+    br.apply_field_paragraphs(
         field_key,
         fcmw.metadata,
-        page_positions={},
         extracted_text=et,
+        page_positions=None,
+        user_field_metadata=None,
+        replace_field=False,
+        skip_paragraphs=False,
     )
 
     assert len(br.brain.paragraphs[field_key].paragraphs) == 2
@@ -167,11 +173,13 @@ def test_set_processing_status(new_status, previous_status, expected_brain_statu
     br = ResourceBrain(rid="foo")
     basic = Basic()
     basic.metadata.status = new_status
-    br.set_processing_status(basic, previous_status)
+    br.generate_resource_metadata(
+        basic, Relations(), None, previous_processing_status=previous_status, security=None
+    )
     assert br.brain.status == expected_brain_status
 
 
-def test_apply_field_metadata_populates_page_number():
+def test_apply_field_paragraphs_populates_page_number():
     br = ResourceBrain(rid="foo")
     field_key = "text1"
 
@@ -190,11 +198,14 @@ def test_apply_field_metadata_populates_page_number():
         1: (21, 39),
         2: (40, 100),
     }
-    br.apply_field_metadata(
+    br.apply_field_paragraphs(
         field_key,
         fcmw.metadata,
         page_positions=page_positions,
         extracted_text=None,
+        user_field_metadata=None,
+        replace_field=False,
+        skip_paragraphs=False,
     )
 
     assert len(br.brain.paragraphs[field_key].paragraphs) == 2
@@ -206,7 +217,7 @@ def test_apply_field_metadata_populates_page_number():
         assert paragraph.metadata.position.end_seconds == [10]
 
 
-def test_set_resource_metadata_promotes_origin_dates():
+def test_generate_resource_metadata_promotes_origin_dates():
     resource_brain = ResourceBrain("rid")
     basic = Basic()
     basic.created.seconds = 1
@@ -215,16 +226,28 @@ def test_set_resource_metadata_promotes_origin_dates():
     origin.created.seconds = 3
     origin.modified.seconds = 4
 
-    resource_brain.set_resource_metadata(basic, origin, Relations())
+    resource_brain.generate_resource_metadata(
+        basic=basic,
+        user_relations=Relations(),
+        origin=origin,
+        previous_processing_status=None,
+        security=None,
+    )
 
     assert resource_brain.brain.metadata.created.seconds == 3
     assert resource_brain.brain.metadata.modified.seconds == 4
 
 
-def test_set_resource_metadata_handles_timestamp_not_present():
+def test_generate_resource_metadata_handles_timestamp_not_present():
     resource_brain = ResourceBrain("rid")
     basic = Basic()
-    resource_brain.set_resource_metadata(basic, None, Relations())
+    resource_brain.generate_resource_metadata(
+        basic=basic,
+        user_relations=Relations(),
+        origin=None,
+        previous_processing_status=None,
+        security=None,
+    )
     created = resource_brain.brain.metadata.created.seconds
     modified = resource_brain.brain.metadata.modified.seconds
     assert created > 0

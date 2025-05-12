@@ -18,11 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import json
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastapi.datastructures import QueryParams
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.search.search.predict_proxy import PredictProxiedEndpoints, predict_proxy
@@ -44,9 +45,11 @@ def predict_response():
 
     resp = Mock()
     resp.status = 200
-    resp.headers = {}
+    resp.headers = {"Content-Type": "application/json"}
     resp.content = Mock(iter_any=iter_any)
-    resp.json = AsyncMock(return_value={"answer": "foo"})
+    json_answer = {"answer": "foo"}
+    resp.json = AsyncMock(return_value=json_answer)
+    resp.read = AsyncMock(return_value=json.dumps(json_answer))
     yield resp
 
 
@@ -99,8 +102,30 @@ async def test_json_response(exists_kb, predict, predict_response):
         QueryParams(),
     )
 
-    assert isinstance(resp, JSONResponse)
+    assert isinstance(resp, Response)
     assert resp.status_code == 200
     assert resp.headers["NUCLIA-LEARNING-ID"] == "foo"
     assert resp.headers["Access-Control-Expose-Headers"] == "NUCLIA-LEARNING-ID"
-    assert resp.body == b'{"answer":"foo"}'
+    assert resp.headers["Content-Type"] == "application/json"
+    assert json.loads(resp.body) == {"answer": "foo"}
+
+
+async def test_500_text_response(exists_kb, predict, predict_response):
+    predict_response.headers["Content-Type"] = "text/plain"
+    predict_response.status = 500
+    predict_response.headers["NUCLIA-LEARNING-ID"] = "foo"
+    predict_response.read = AsyncMock(return_value="foo")
+
+    resp = await predict_proxy(
+        "foo",
+        PredictProxiedEndpoints.CHAT,
+        "GET",
+        QueryParams(),
+    )
+
+    assert isinstance(resp, Response)
+    assert resp.status_code == 500
+    assert resp.headers["NUCLIA-LEARNING-ID"] == "foo"
+    assert resp.headers["Access-Control-Expose-Headers"] == "NUCLIA-LEARNING-ID"
+    assert resp.headers["Content-Type"].startswith("text/plain")
+    assert resp.body == b"foo"

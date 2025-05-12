@@ -3,26 +3,17 @@
 # See also `Dockerfile.withbinding` for a version with a compiled binding (for standalone)
 #
 
-# Stage to extract the external requirements from the lockfile
-# This is to improve caching, `uv.lock` changes when our components
-# are updated. The generated requirements.txt does not, so it is
-# more cacheable.
-FROM python:3.12-slim-bookworm AS requirements
-RUN pip install uv
-COPY uv.lock pyproject.toml .
-RUN uv export --no-sources --frozen --no-emit-workspace > requirements.lock.txt
-
 #
 # This stage builds a virtual env with all dependencies
 #
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.13-slim-bookworm AS builder
 RUN mkdir -p /usr/src/app
 RUN pip install uv
 
 # Install Python dependencies
 WORKDIR /usr/src/app
-COPY --from=requirements requirements.lock.txt /tmp
-RUN pip install uv && python -m venv /app && VIRTUAL_ENV=/app uv pip install -r /tmp/requirements.lock.txt
+COPY pyproject.toml uv.lock .
+RUN python -m venv /app && VIRTUAL_ENV=/app uv sync --active --no-group nidx --no-group sdk --no-install-workspace --frozen
 
 # Copy application
 COPY VERSION pyproject.toml uv.lock /usr/src/app
@@ -44,7 +35,7 @@ RUN VIRTUAL_ENV=/app uv sync --active --no-editable --no-group nidx --no-group s
 #
 # This is the main image, it just copies the virtual env into the base image
 #
-FROM python:3.12-slim-bookworm
+FROM python:3.13-slim-bookworm
 # media-types needed for content type checks (python mimetype module uses this)
 RUN apt update && apt install -y media-types && apt clean && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app /app

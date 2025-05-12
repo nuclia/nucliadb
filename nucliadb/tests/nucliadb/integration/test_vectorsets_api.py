@@ -37,7 +37,7 @@ from nucliadb.learning_proxy import (
 from nucliadb.purge import purge_kb_vectorsets
 from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxSearchResults
 from nucliadb_protos import utils_pb2
-from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType, Paragraph
+from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType, Paragraph, Sentence
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     FieldID,
@@ -209,15 +209,12 @@ async def test_learning_config_errors_are_proxied_correctly(
         assert resp.json() == {"detail": "Learning Internal Server Error"}
 
 
-@pytest.mark.parametrize("bwc_with_default_vectorset", [False])
-# @pytest.mark.parametrize("bwc_with_default_vectorset", [True, False])
 @pytest.mark.deploy_modes("standalone")
 async def test_vectorset_migration(
     nucliadb_writer: AsyncClient,
     nucliadb_writer_manager: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
-    bwc_with_default_vectorset: bool,
 ):
     """Test workflow for adding a vectorset to an existing KB and ingesting
     partial updates (only for the new vectors).
@@ -301,7 +298,7 @@ async def test_vectorset_migration(
     assert counters.fields == 2  # the title and the link field
 
     # Make a search and check that the document is found
-    await _check_search(nucliadb_reader, kbid)
+    await _check_search(nucliadb_reader, kbid, query="football")
 
     # Now add a new vectorset
     vectorset_id = "en-2024-05-06"
@@ -344,17 +341,16 @@ async def test_vectorset_migration(
     assert counters_after.fields == counters.fields
 
     # Make a search with the new vectorset and check that the document is found
-    await _check_search(nucliadb_reader, kbid, vectorset="en-2024-05-06")
+    await _check_search(nucliadb_reader, kbid, query="football", vectorset="en-2024-05-06")
 
     # With the default vectorset the document should also be found
-    await _check_search(nucliadb_reader, kbid, vectorset="multilingual-2024-05-06")
-    await _check_search(nucliadb_reader, kbid)
+    await _check_search(nucliadb_reader, kbid, query="football", vectorset="multilingual-2024-05-06")
+    await _check_search(nucliadb_reader, kbid, query="football")
 
     # Do a rollover and test again
 
     app_context = ApplicationContext()
     await app_context.initialize()
-    # await app_context.finalize()
 
     await rollover_kb_index(app_context, kbid)
 
@@ -362,11 +358,13 @@ async def test_vectorset_migration(
     await wait_for_sync()
 
     # Make a search with the new vectorset and check that the document is found
-    await _check_search(nucliadb_reader, kbid, vectorset="en-2024-05-06")
+    await _check_search(nucliadb_reader, kbid, vectorset="en-2024-05-06", query="football")
 
     # With the default vectorset the document should also be found
-    await _check_search(nucliadb_reader, kbid, vectorset="multilingual-2024-05-06")
-    await _check_search(nucliadb_reader, kbid)
+    await _check_search(nucliadb_reader, kbid, vectorset="multilingual-2024-05-06", query="football")
+    await _check_search(nucliadb_reader, kbid, query="football")
+
+    await app_context.finalize()
 
 
 async def get_counters(nucliadb_reader: AsyncClient, kbid: str) -> KnowledgeboxCounters:
@@ -402,7 +400,12 @@ async def get_counters(nucliadb_reader: AsyncClient, kbid: str) -> KnowledgeboxC
     return counters
 
 
-async def _check_search(nucliadb_reader: AsyncClient, kbid: str, vectorset: Optional[str] = None):
+async def _check_search(
+    nucliadb_reader: AsyncClient,
+    kbid: str,
+    query: str,
+    vectorset: Optional[str] = None,
+):
     # check semantic search
     payload = {
         "features": ["semantic"],
@@ -418,7 +421,7 @@ async def _check_search(nucliadb_reader: AsyncClient, kbid: str, vectorset: Opti
 
     # check keyword search
     payload = {
-        "query": "football",
+        "query": query,
         "features": ["keyword"],
         "min_score": {"bm25": 0},
     }
@@ -426,3 +429,205 @@ async def _check_search(nucliadb_reader: AsyncClient, kbid: str, vectorset: Opti
     assert resp.status_code == 200, resp.text
     results = resp.json()
     assert len(results["resources"]) == 1
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_vectorset_migration_split_field(
+    nucliadb_writer: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+):
+    """Test workflow for adding a vectorset to an existing KB and ingesting
+    partial updates (only for the new vectors).
+
+    """
+    old_vectorset_id = "multilingual-2024-05-06"
+    new_vectorset_id = "en-2024-05-06"
+
+    # Create a KB
+    resp = await nucliadb_writer_manager.post(
+        "/kbs",
+        json={
+            "title": "migrationexamples",
+            "description": "",
+            "zone": "",
+            "slug": "migrationexamples",
+            "learning_configuration": {
+                "semantic_vector_similarity": "cosine",
+                "anonymization_model": "disabled",
+                "semantic_models": [old_vectorset_id],
+                "semantic_model_configs": {
+                    old_vectorset_id: {
+                        "similarity": 0,
+                        "size": 1024,
+                        "threshold": 0.5,
+                    }
+                },
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    kbid = resp.json()["uuid"]
+
+    def _get_message(
+        ident: str,
+        who: str,
+        to: list[str],
+        text: str,
+    ):
+        return {
+            "ident": ident,
+            "who": who,
+            "to": to,
+            "content": {
+                "text": text,
+            },
+        }
+
+    # Create a conversation resource
+    messages = [
+        ("Alice", ["Bob"], "What is the plan of study for today?"),
+        (
+            "Bob",
+            ["Alice"],
+            "We will study the following topics: 1. Python basics 2. Data structures 3. Algorithms",
+        ),
+    ]
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "conversation",
+            "conversations": {
+                "conversation": {
+                    "messages": [
+                        _get_message(str(i + 1), src, dsts, text)  # split "0" is forbidden
+                        for i, (src, dsts, text) in enumerate(messages)
+                    ],
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    # Ingest a processing broker message
+    bmb = BrokerMessageBuilder(
+        kbid=kbid,
+        rid=rid,
+        source=BrokerMessage.MessageSource.PROCESSOR,
+    )
+    conv_field = FieldBuilder("conversation", FieldType.CONVERSATION)
+    for idx, (_, _, text) in enumerate(messages):
+        split = str(idx + 1)  # split "0" is forbidden
+        conv_field.with_extracted_text(text, split=split)
+        conv_field.with_extracted_paragraph_metadata(
+            Paragraph(
+                start=0,
+                end=len(text),
+                key=split,
+                sentences=[
+                    Sentence(
+                        start=0,
+                        end=len(text),
+                    )
+                ],
+            ),
+            split=split,
+        )
+        vectors = [
+            utils_pb2.Vector(
+                start=0,
+                end=len(text),
+                start_paragraph=0,
+                end_paragraph=len(text),
+                vector=[float(split) for _ in range(1024)],
+            )
+        ]
+        conv_field.with_extracted_vectors(vectors, vectorset=old_vectorset_id, split=split)
+    bmb.add_field_builder(conv_field)
+    bm = bmb.build()
+
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    await wait_for_sync()
+
+    counters = await get_counters(nucliadb_reader, kbid)
+    assert counters.resources == 1
+    assert counters.paragraphs == 3  # one for the title and one for each split of the conv field
+    assert counters.sentences == 2  # only the vectors of each split of the conv field
+    assert counters.fields == 2  # the title and the conv field
+
+    # Make a search and check that the document is found
+    await _check_search(nucliadb_reader, kbid, query="Python")
+
+    # Now add a new vectorset
+    resp = await add_vectorset(
+        nucliadb_writer,
+        kbid,
+        new_vectorset_id,
+        similarity=SimilarityFunction.COSINE,
+        vector_dimension=1024,
+    )
+    assert resp.status_code == 201
+
+    # Ingest a new broker message as if it was coming from the migration
+    bm2 = BrokerMessage(
+        kbid=kbid,
+        uuid=rid,
+        type=BrokerMessage.MessageType.AUTOCOMMIT,
+        source=BrokerMessage.MessageSource.PROCESSOR,
+    )
+    field = FieldID(field_type=FieldType.CONVERSATION, field="conversation")
+
+    # Right now, the semantic model migrator will add a field_vector item for each split
+    for idx, (_, _, text) in enumerate(messages):
+        split = str(idx + 1)
+        ev = ExtractedVectorsWrapper()
+        ev.field.CopyFrom(field)
+        ev.vectorset_id = new_vectorset_id
+        vector = utils_pb2.Vector(
+            start=0,
+            end=len(text),
+            start_paragraph=0,
+            end_paragraph=len(text),
+        )
+        vector.vector.extend([2.0 for _ in range(1024)])
+        ev.vectors.split_vectors[split].vectors.append(vector)
+        bm2.field_vectors.append(ev)
+
+    await inject_message(nucliadb_ingest_grpc, bm2)
+
+    await wait_for_sync()
+
+    # Check that the counters have been updated correctly: that is, only the sentences counter should have increased
+    counters_after = await get_counters(nucliadb_reader, kbid)
+    assert counters_after.sentences > counters.sentences
+    assert counters_after.resources == counters.resources
+    assert counters_after.paragraphs == counters.paragraphs
+    assert counters_after.fields == counters.fields
+
+    # Make a search with the new vectorset and check that the document is found
+    await _check_search(nucliadb_reader, kbid, vectorset=new_vectorset_id, query="Python")
+
+    # With the default vectorset the document should also be found
+    await _check_search(nucliadb_reader, kbid, vectorset=old_vectorset_id, query="Python")
+    await _check_search(nucliadb_reader, kbid, query="Python")
+
+    # Do a rollover and test again
+    app_context = ApplicationContext()
+    await app_context.initialize()
+
+    await rollover_kb_index(app_context, kbid)
+
+    await mark_dirty()
+    await wait_for_sync()
+
+    # Make a search with the new vectorset and check that the document is found
+    await _check_search(nucliadb_reader, kbid, vectorset=new_vectorset_id, query="Python")
+
+    # With the default vectorset the document should also be found
+    await _check_search(nucliadb_reader, kbid, vectorset=old_vectorset_id, query="Python")
+    await _check_search(nucliadb_reader, kbid, query="Python")
+
+    await app_context.finalize()

@@ -20,14 +20,15 @@
 
 from enum import Enum
 from typing import Any, Generic, Literal, Optional, TypeVar, Union
+from uuid import UUID
 
 import pydantic
-from pydantic import BaseModel, Discriminator, Tag, model_validator
+from pydantic import AliasChoices, BaseModel, Discriminator, Tag, field_validator, model_validator
 from typing_extensions import Annotated, Self
 
 from .common import FieldTypeName, Paragraph
 from .metadata import ResourceProcessingStatus
-from .utils import DateTime
+from .utils import DateTime, SlugString
 
 F = TypeVar("F", bound=BaseModel)
 
@@ -35,7 +36,9 @@ F = TypeVar("F", bound=BaseModel)
 class And(BaseModel, Generic[F], extra="forbid"):
     """AND of other expressions"""
 
-    operands: list[F] = pydantic.Field(alias="and", min_length=1)
+    operands: list[F] = pydantic.Field(
+        serialization_alias="and", validation_alias=AliasChoices("operands", "and"), min_length=1
+    )
 
     @pydantic.model_serializer
     def serialize_boolean(self) -> dict[str, Any]:
@@ -45,7 +48,9 @@ class And(BaseModel, Generic[F], extra="forbid"):
 class Or(BaseModel, Generic[F], extra="forbid"):
     """OR of other expressions"""
 
-    operands: list[F] = pydantic.Field(alias="or", min_length=1)
+    operands: list[F] = pydantic.Field(
+        serialization_alias="or", validation_alias=AliasChoices("operands", "or"), min_length=1
+    )
 
     @pydantic.model_serializer
     def serialize_boolean(self) -> dict[str, Any]:
@@ -55,7 +60,9 @@ class Or(BaseModel, Generic[F], extra="forbid"):
 class Not(BaseModel, Generic[F], extra="forbid"):
     """NOT another expression"""
 
-    operand: F = pydantic.Field(alias="not")
+    operand: F = pydantic.Field(
+        serialization_alias="not", validation_alias=AliasChoices("operand", "not")
+    )
 
     @pydantic.model_serializer
     def serialize_boolean(self) -> dict[str, Any]:
@@ -65,9 +72,20 @@ class Not(BaseModel, Generic[F], extra="forbid"):
 class Resource(BaseModel, extra="forbid"):
     """Matches all fields of a resource given its id or slug"""
 
-    prop: Literal["resource"]
-    id: Optional[str] = pydantic.Field(default=None, description="ID of the resource to match")
-    slug: Optional[str] = pydantic.Field(default=None, description="Slug of the resource to match")
+    prop: Literal["resource"] = "resource"
+    id: Optional[str] = pydantic.Field(default=None, description="UUID of the resource to match")
+    slug: Optional[SlugString] = pydantic.Field(
+        default=None, description="Slug of the resource to match"
+    )
+
+    @field_validator("id", mode="after")
+    def validate_id(cls, v: str) -> str:
+        if v is not None:
+            try:
+                UUID(v)
+            except ValueError:
+                raise ValueError("Invalid UUID")
+        return v
 
     @model_validator(mode="after")
     def single_field(self) -> Self:
@@ -81,7 +99,7 @@ class Resource(BaseModel, extra="forbid"):
 class Field(BaseModel, extra="forbid"):
     """Matches a field or set of fields"""
 
-    prop: Literal["field"]
+    prop: Literal["field"] = "field"
     type: FieldTypeName = pydantic.Field(description="Type of the field to match, ")
     name: Optional[str] = pydantic.Field(
         default=None,
@@ -92,14 +110,14 @@ class Field(BaseModel, extra="forbid"):
 class Keyword(BaseModel, extra="forbid"):
     """Matches all fields that contain a keyword"""
 
-    prop: Literal["keyword"]
+    prop: Literal["keyword"] = "keyword"
     word: str = pydantic.Field(description="Keyword to find")
 
 
 class DateCreated(BaseModel, extra="forbid"):
     """Matches all fields created in a date range"""
 
-    prop: Literal["created"]
+    prop: Literal["created"] = "created"
     since: Optional[DateTime] = pydantic.Field(
         default=None, description="Start of the date range. Leave blank for unbounded"
     )
@@ -117,7 +135,7 @@ class DateCreated(BaseModel, extra="forbid"):
 class DateModified(BaseModel, extra="forbid"):
     """Matches all fields modified in a date range"""
 
-    prop: Literal["modified"]
+    prop: Literal["modified"] = "modified"
     since: Optional[DateTime] = pydantic.Field(
         default=None, description="Start of the date range. Leave blank for unbounded"
     )
@@ -135,7 +153,7 @@ class DateModified(BaseModel, extra="forbid"):
 class Label(BaseModel, extra="forbid"):
     """Matches fields/paragraphs with a label (or labelset)"""
 
-    prop: Literal["label"]
+    prop: Literal["label"] = "label"
     labelset: str = pydantic.Field(description="The labelset to match")
     label: Optional[str] = pydantic.Field(
         default=None,
@@ -149,7 +167,7 @@ class ResourceMimetype(BaseModel, extra="forbid"):
     The mimetype of a resource can be assigned independently of the mimetype of its fields.
     In resources with multiple fields, you may prefer to use `field_mimetype`"""
 
-    prop: Literal["resource_mimetype"]
+    prop: Literal["resource_mimetype"] = "resource_mimetype"
     type: str = pydantic.Field(
         description="Type of the mimetype to match. e.g: In image/jpeg, type is image"
     )
@@ -165,7 +183,7 @@ class ResourceMimetype(BaseModel, extra="forbid"):
 class FieldMimetype(BaseModel, extra="forbid"):
     """Matches fields with a mimetype"""
 
-    prop: Literal["field_mimetype"]
+    prop: Literal["field_mimetype"] = "field_mimetype"
     type: str = pydantic.Field(
         description="Type of the mimetype to match. e.g: In image/jpeg, type is image"
     )
@@ -181,7 +199,7 @@ class FieldMimetype(BaseModel, extra="forbid"):
 class Entity(BaseModel, extra="forbid"):
     """Matches fields that contains a detected entity"""
 
-    prop: Literal["entity"]
+    prop: Literal["entity"] = "entity"
     subtype: str = pydantic.Field(description="Type of the entity. e.g: PERSON")
     value: Optional[str] = pydantic.Field(
         default=None,
@@ -192,7 +210,7 @@ class Entity(BaseModel, extra="forbid"):
 class Language(BaseModel, extra="forbid"):
     """Matches the language of the field"""
 
-    prop: Literal["language"]
+    prop: Literal["language"] = "language"
     only_primary: bool = pydantic.Field(
         default=False,
         description="Match only the primary language of the document. By default, matches any language that appears in the document",
@@ -203,14 +221,14 @@ class Language(BaseModel, extra="forbid"):
 class OriginTag(BaseModel, extra="forbid"):
     """Matches all fields with a given origin tag"""
 
-    prop: Literal["origin_tag"]
+    prop: Literal["origin_tag"] = "origin_tag"
     tag: str = pydantic.Field(description="The tag to match")
 
 
 class OriginMetadata(BaseModel, extra="forbid"):
     """Matches metadata from the origin"""
 
-    prop: Literal["origin_metadata"]
+    prop: Literal["origin_metadata"] = "origin_metadata"
     field: str = pydantic.Field(description="Metadata field")
     value: Optional[str] = pydantic.Field(
         default=None,
@@ -221,7 +239,7 @@ class OriginMetadata(BaseModel, extra="forbid"):
 class OriginPath(BaseModel, extra="forbid"):
     """Matches the origin path"""
 
-    prop: Literal["origin_path"]
+    prop: Literal["origin_path"] = "origin_path"
     prefix: Optional[str] = pydantic.Field(
         default=None,
         description=(
@@ -234,21 +252,21 @@ class OriginPath(BaseModel, extra="forbid"):
 class OriginSource(BaseModel, extra="forbid"):
     """Matches the origin source id"""
 
-    prop: Literal["origin_source"]
+    prop: Literal["origin_source"] = "origin_source"
     id: Optional[str] = pydantic.Field(default=None, description=("Source ID"))
 
 
 class OriginCollaborator(BaseModel, extra="forbid"):
     """Matches the origin collaborators"""
 
-    prop: Literal["origin_collaborator"]
+    prop: Literal["origin_collaborator"] = "origin_collaborator"
     collaborator: str = pydantic.Field(description=("Collaborator"))
 
 
 class Generated(BaseModel, extra="forbid"):
     """Matches if the field was generated by the given source"""
 
-    prop: Literal["generated"]
+    prop: Literal["generated"] = "generated"
     by: Literal["data-augmentation"] = pydantic.Field(
         description="Generator for this field. Currently, only data-augmentation is supported"
     )
@@ -260,14 +278,14 @@ class Generated(BaseModel, extra="forbid"):
 class Kind(BaseModel, extra="forbid"):
     """Matches paragraphs of a certain kind"""
 
-    prop: Literal["kind"]
+    prop: Literal["kind"] = "kind"
     kind: Paragraph.TypeParagraph = pydantic.Field(description="The kind of paragraph to match")
 
 
 class Status(BaseModel, extra="forbid"):
     """Matches resource in a certain processing status"""
 
-    prop: Literal["status"]
+    prop: Literal["status"] = "status"
     status: ResourceProcessingStatus = pydantic.Field(description="The status of the resource")
 
 

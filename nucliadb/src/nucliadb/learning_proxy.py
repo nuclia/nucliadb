@@ -30,7 +30,6 @@ import backoff
 import httpx
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
-from lru import LRU
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
@@ -480,8 +479,7 @@ class ProxiedLearningConfig(LearningConfigService):
             yield client
 
 
-_IN_MEMORY_CONFIGS: dict[str, LearningConfiguration]
-_IN_MEMORY_CONFIGS = LRU(50)  # type: ignore
+_IN_MEMORY_CONFIGS: dict[str, LearningConfiguration] = {}
 
 
 class InMemoryLearningConfig(LearningConfigService):

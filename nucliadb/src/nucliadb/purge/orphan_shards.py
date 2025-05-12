@@ -23,14 +23,17 @@ import importlib.metadata
 from typing import Optional
 
 from grpc.aio import AioRpcError
+from nidx_protos import nodereader_pb2, noderesources_pb2
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
-from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
+from nucliadb.common.nidx import (
+    get_nidx_api_client,
+    start_nidx_utility,
+    stop_nidx_utility,
+)
 from nucliadb.ingest import logger
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
@@ -69,9 +72,8 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardKb]:
 
     orphan_shard_ids = indexed_shards.keys() - stored_shards.keys()
     orphan_shards: dict[str, ShardKb] = {}
-    node = manager.get_nidx_fake_node()
     for shard_id in orphan_shard_ids:
-        kbid = await _get_kbid(node, shard_id) or UNKNOWN_KB
+        kbid = await _get_kbid(shard_id) or UNKNOWN_KB
         # Shards with knwon KB ids can be checked and ignore those comming from
         # an ongoing migration/rollover (ongoing or finished)
         if kbid != UNKNOWN_KB:
@@ -84,15 +86,15 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardKb]:
         orphan_shards[shard_id] = kbid
 
     for shard_id in orphan_shard_ids:
-        kbid = await _get_kbid(node, shard_id) or UNKNOWN_KB
+        kbid = await _get_kbid(shard_id) or UNKNOWN_KB
         orphan_shards[shard_id] = kbid
     return orphan_shards
 
 
 async def _get_indexed_shards() -> dict[str, ShardKb]:
-    nidx = manager.get_nidx_fake_node()
-    shards = await nidx.list_shards()
-    return {shard_id: UNKNOWN_KB for shard_id in shards}
+    shards = await get_nidx_api_client().ListShards(noderesources_pb2.EmptyQuery())
+
+    return {shard.id: UNKNOWN_KB for shard in shards.ids}
 
 
 async def _get_stored_shards(driver: Driver) -> dict[str, ShardKb]:
@@ -111,16 +113,17 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardKb]:
     return stored_shards
 
 
-async def _get_kbid(node: AbstractIndexNode, shard_id: str) -> Optional[str]:
+async def _get_kbid(shard_id: str) -> Optional[str]:
     kbid = None
     try:
-        shard_pb = await node.get_shard(shard_id)
+        req = nodereader_pb2.GetShardRequest()
+        req.shard_id.id = shard_id
+        shard_pb = await get_nidx_api_client().GetShard(req)
     except AioRpcError as grpc_error:
         logger.error(
             "Can't get shard while looking for orphans in nidx, is there something broken?",
             exc_info=grpc_error,
             extra={
-                "node_id": node.id,
                 "shard_id": shard_id,
             },
         )
@@ -156,7 +159,6 @@ async def purge_orphan_shards(driver: Driver):
     orphan_shards = await detect_orphan_shards(driver)
     logger.info(f"Found {len(orphan_shards)} orphan shards. Purge starts...")
 
-    node = manager.get_nidx_fake_node()
     for shard_id, kbid in orphan_shards.items():
         logger.info(
             "Deleting orphan shard from index node",
@@ -165,7 +167,8 @@ async def purge_orphan_shards(driver: Driver):
                 "kbid": kbid,
             },
         )
-        await node.delete_shard(shard_id)
+        req = noderesources_pb2.ShardId(id=shard_id)
+        await get_nidx_api_client().DeleteShard(req)
 
 
 def parse_arguments():

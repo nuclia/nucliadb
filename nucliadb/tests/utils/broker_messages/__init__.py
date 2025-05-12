@@ -150,7 +150,7 @@ class BrokerMessageBuilder:
                 # we don't need to do anything else
                 pass
 
-            elif field.id.field_type == rpb.FieldType.TEXT:
+            elif field.id.field_type in (rpb.FieldType.TEXT, rpb.FieldType.CONVERSATION):
                 assert field.extracted.text is not None, (
                     "only text fields with extracted data are supported nowadays"
                 )
@@ -166,7 +166,6 @@ class BrokerMessageBuilder:
             ):
                 # we don't need to do anything else
                 pass
-
             else:
                 raise Exception("Unsupported field type: {field.id.field_type}")
 

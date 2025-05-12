@@ -22,13 +22,12 @@ import os
 
 import pytest
 from httpx import AsyncClient
-from nidx_protos.nodereader_pb2 import (
-    SearchRequest,
-)
+from nidx_protos.nodereader_pb2 import GetShardRequest, SearchRequest
+from nidx_protos.noderesources_pb2 import ShardId
 
 from nucliadb.common.datamanagers.cluster import KB_SHARDS
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.nidx import get_nidx_fake_node
+from nucliadb.common.nidx import get_nidx_api_client, get_nidx_searcher_client
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.tests.vectors import Q
 from nucliadb_protos.writer_pb2 import Shards as PBShards
@@ -84,7 +83,6 @@ async def test_search_resource_all(
     # get shards ids
 
     driver = get_driver()
-    node_obj = get_nidx_fake_node()
     async with driver.transaction(read_only=True) as txn:
         key = KB_SHARDS.format(kbid=kbid)
         async for key in txn.keys(key):
@@ -93,7 +91,7 @@ async def test_search_resource_all(
             shards = PBShards()
             shards.ParseFromString(value)
             shard_id = shards.shards[0].nidx_shard_id
-            shard = await node_obj.get_shard(shard_id)
+            shard = await get_nidx_api_client().GetShard(GetShardRequest(shard_id=ShardId(id=shard_id)))
             assert shard.shard_id == shard_id
             assert shard.fields == 3
             assert shard.paragraphs == 2
@@ -109,7 +107,7 @@ async def test_search_resource_all(
             request.vector.extend(Q)
             request.min_score_semantic = -1.0
 
-            response = await node_obj.reader.Search(request)  # type: ignore
+            response = await get_nidx_searcher_client().Search(request)  # type: ignore
             paragraphs = response.paragraph
             documents = response.document
             vectors = response.vector

@@ -40,16 +40,14 @@ async def test_run_exporter_task():
 
 async def test_run_exporter():
     with mock.patch("nucliadb.metrics_exporter.update_migration_metrics") as update_migration_metrics:
-        with mock.patch("nucliadb.metrics_exporter.update_node_metrics") as update_node_metrics:
-            context = Mock()
-            task = asyncio.create_task(run_exporter(context))
+        context = Mock()
+        task = asyncio.create_task(run_exporter(context))
 
-            await asyncio.sleep(1)
+        await asyncio.sleep(1)
 
-            update_node_metrics.assert_called()
-            update_migration_metrics.assert_called()
+        update_migration_metrics.assert_called()
 
-            task.cancel()
+        task.cancel()
 
 
 async def test_update_migration_metrics():

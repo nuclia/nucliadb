@@ -19,11 +19,13 @@
 
 from datetime import datetime
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
+from urllib.parse import ParseResult
 
 import nats
 from nats.aio.client import Client
 from nats.aio.msg import Msg
+from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
 from opentelemetry.propagate import extract, inject
 from opentelemetry.sdk.trace import TracerProvider
@@ -32,6 +34,7 @@ from opentelemetry.trace import SpanKind, Tracer
 
 from nucliadb_telemetry import logger, metrics
 from nucliadb_telemetry.common import set_span_exception
+from nucliadb_telemetry.utils import get_telemetry
 
 msg_consume_time_histo = metrics.Histogram(
     # time it takes from when msg was queue to when it finished processing
@@ -69,7 +72,7 @@ def start_span_message_receiver(tracer: Tracer, msg: Msg):
     }
 
     # add some attributes from the metadata
-    ctx = extract(msg.headers)
+    ctx = extract(msg.headers or {})
 
     span = tracer.start_as_current_span(
         name=f"Received from {msg.subject}",
@@ -95,6 +98,24 @@ def start_span_message_publisher(tracer: Tracer, subject: str):
     return span
 
 
+async def _traced_callback(origin_cb: Callable[[Msg], Awaitable[None]], tracer: Tracer, msg: Msg):
+    with start_span_message_receiver(tracer, msg) as span:
+        try:
+            await origin_cb(msg)
+        except Exception as error:
+            set_span_exception(span, error)
+            raise error
+        finally:
+            msg_consume_time_histo.observe(
+                (datetime.now() - msg.metadata.timestamp).total_seconds(),
+                {
+                    "stream": msg.metadata.stream,
+                    "consumer": msg.metadata.consumer or "",
+                    "acked": "yes" if msg._ackd else "no",
+                },
+            )
+
+
 class JetStreamContextTelemetry:
     def __init__(self, js: JetStreamContext, service_name: str, tracer_provider: TracerProvider):
         self.js = js
@@ -107,34 +128,20 @@ class JetStreamContextTelemetry:
     async def add_stream(self, name: str, subjects: List[str]):
         return await self.js.add_stream(name=name, subjects=subjects)
 
-    async def subscribe(self, cb, **kwargs):
+    async def subscribe(
+        self,
+        subject: str,
+        queue: Optional[str] = None,
+        cb: Optional[Callable[[Msg], Awaitable[None]]] = None,
+        **kwargs,
+    ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_subscriber")
-
-        async def wrapper(origin_cb, tracer, msg: Msg):
-            # Execute the callback without tracing
-            if msg.headers is None:
-                logger.debug("Message received without headers, skipping span")
-                await origin_cb(msg)
-                return
-
-            with start_span_message_receiver(tracer, msg) as span:
-                try:
-                    await origin_cb(msg)
-                except Exception as error:
-                    set_span_exception(span, error)
-                    raise error
-                finally:
-                    msg_consume_time_histo.observe(
-                        (datetime.now() - msg.metadata.timestamp).total_seconds(),
-                        {
-                            "stream": msg.metadata.stream,
-                            "consumer": msg.metadata.consumer or "",
-                            "acked": "yes" if msg._ackd else "no",  # type: ignore
-                        },
-                    )
-
-        wrapped_cb = partial(wrapper, cb, tracer)
-        return await self.js.subscribe(cb=wrapped_cb, **kwargs)
+        wrapped_cb: Optional[Callable[[Msg], Awaitable[None]]]
+        if cb is not None:
+            wrapped_cb = partial(_traced_callback, cb, tracer)
+        else:
+            wrapped_cb = cb
+        return await self.js.subscribe(subject, queue=queue, cb=wrapped_cb, **kwargs)
 
     async def publish(
         self,
@@ -145,8 +152,8 @@ class JetStreamContextTelemetry:
     ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_publisher")
         headers = {} if headers is None else headers
-        inject(headers)
         with start_span_message_publisher(tracer, subject) as span:
+            inject(headers)
             try:
                 result = await self.js.publish(subject, body, headers=headers, **kwargs)
                 msg_sent_counter.inc({"subject": subject, "status": metrics.OK})
@@ -156,6 +163,10 @@ class JetStreamContextTelemetry:
                 raise error
 
         return result
+
+    async def trace_pull_subscriber_message(self, cb: Callable[[Msg], Awaitable[None]], msg: Msg):
+        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_pull_subscriber")
+        await _traced_callback(cb, tracer, msg)
 
     # Just for convenience, to wrap all we use in the context of
     # telemetry-instrumented stuff using the JetStreamContextTelemetry class
@@ -215,7 +226,13 @@ class NatsClientTelemetry:
         self.service_name = service_name
         self.tracer_provider = tracer_provider
 
-    async def subscribe(self, cb, **kwargs):
+    async def subscribe(
+        self,
+        subject: str,
+        queue: str = "",
+        cb: Optional[Callable[[Msg], Awaitable[None]]] = None,
+        **kwargs,
+    ) -> Subscription:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_subscriber")
 
         async def wrapper(origin_cb, tracer, msg: Msg):
@@ -233,22 +250,22 @@ class NatsClientTelemetry:
                     raise error
 
         wrapped_cb = partial(wrapper, cb, tracer)
-        return await self.nc.subscribe(cb=wrapped_cb, **kwargs)
+        return await self.nc.subscribe(subject, queue=queue, cb=wrapped_cb, **kwargs)
 
     async def publish(
         self,
         subject: str,
-        body: bytes,
+        body: bytes = b"",
+        reply: str = "",
         headers: Optional[Dict[str, str]] = None,
-        **kwargs,
-    ):
+    ) -> None:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_publisher")
         headers = {} if headers is None else headers
-        inject(headers)
 
         with start_span_message_publisher(tracer, subject) as span:
+            inject(headers)
             try:
-                await self.nc.publish(subject, body, headers=headers, **kwargs)
+                await self.nc.publish(subject, body, reply, headers)
                 msg_sent_counter.inc({"subject": subject, "status": metrics.OK})
             except Exception as error:
                 set_span_exception(span, error)
@@ -264,9 +281,9 @@ class NatsClientTelemetry:
         headers: Optional[Dict[str, Any]] = None,
     ) -> Msg:
         headers = {} if headers is None else headers
-        inject(headers)
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_request")
         with start_span_message_publisher(tracer, subject) as span:
+            inject(headers)
             try:
                 result = await self.nc.request(subject, payload, timeout, old_style, headers)
             except Exception as error:
@@ -274,3 +291,49 @@ class NatsClientTelemetry:
                 raise error
 
         return result
+
+    # Other methods we use but don't need telemetry
+
+    @property
+    def is_connected(self) -> bool:
+        return self.nc.is_connected
+
+    @property
+    def connected_url(self) -> Optional[ParseResult]:
+        return self.nc.connected_url
+
+    def jetstream(self, **opts) -> nats.js.JetStreamContext:
+        return self.nc.jetstream(**opts)
+
+    def jsm(self, **opts) -> nats.js.JetStreamManager:
+        return self.nc.jsm(**opts)
+
+    async def drain(self) -> None:
+        return await self.nc.drain()
+
+    async def flush(self, timeout: int = nats.aio.client.DEFAULT_FLUSH_TIMEOUT) -> None:
+        return await self.nc.flush(timeout)
+
+    async def close(self) -> None:
+        return await self.nc.close()
+
+
+def get_traced_nats_client(nc: Client, service_name: str) -> Union[Client, NatsClientTelemetry]:
+    tracer_provider = get_telemetry(service_name)
+    if tracer_provider is not None:
+        return NatsClientTelemetry(nc, service_name, tracer_provider)
+    else:
+        return nc
+
+
+def get_traced_jetstream(
+    nc: Union[Client, NatsClientTelemetry], service_name: str
+) -> Union[JetStreamContext, JetStreamContextTelemetry]:
+    jetstream = nc.jetstream()
+    tracer_provider = get_telemetry(service_name)
+
+    if tracer_provider is not None and jetstream is not None:  # pragma: no cover
+        logger.info(f"Configuring {service_name} jetstream with telemetry")
+        return JetStreamContextTelemetry(jetstream, service_name, tracer_provider)
+    else:
+        return jetstream

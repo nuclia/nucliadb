@@ -23,7 +23,7 @@ from time import time
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.common.models_utils import to_proto
-from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
+from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.find_merge import (
     build_find_response,
     compose_find_resources,
@@ -105,7 +105,7 @@ async def _index_node_retrieval(
         ) = await legacy_convert_retrieval_to_proto(parsed)
 
     with metrics.time("node_query"):
-        results, query_incomplete_results, queried_nodes = await node_query(
+        results, query_incomplete_results, queried_shards = await node_query(
             kbid, Method.SEARCH, pb_query
         )
     incomplete_results = incomplete_results or query_incomplete_results
@@ -139,10 +139,6 @@ async def _index_node_retrieval(
             retrieval_rephrased_question=rephrased_query,
         )
 
-    if item.debug:
-        search_results.nodes = debug_nodes_info(queried_nodes)
-
-    queried_shards = [shard_id for _, shard_id in queried_nodes]
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
 
@@ -156,7 +152,6 @@ async def _index_node_retrieval(
                 "client": x_ndb_client,
                 "query": item.model_dump_json(),
                 "time": search_time,
-                "nodes": debug_nodes_info(queried_nodes),
                 "durations": metrics.steps(),
             },
         )
@@ -169,7 +164,6 @@ async def _index_node_retrieval(
                 "client": x_ndb_client,
                 "query": item.model_dump_json(),
                 "time": search_time,
-                "nodes": debug_nodes_info(queried_nodes),
                 "durations": metrics.steps(),
             },
         )

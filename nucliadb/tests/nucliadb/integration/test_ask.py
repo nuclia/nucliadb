@@ -48,10 +48,8 @@ from nucliadb_models.search import (
     RagStrategies,
     SyncAskResponse,
 )
-from nucliadb_protos.utils_pb2 import Relation, RelationMetadata, RelationNode
-from nucliadb_protos.writer_pb2 import BrokerMessage
-from tests.utils import inject_message
-from tests.utils.dirty_index import wait_for_sync
+from nucliadb_protos.utils_pb2 import RelationNode
+from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -69,12 +67,12 @@ async def test_ask(
     resp = await nucliadb_reader.post(f"/kb/{standalone_knowledgebox}/ask", json={"query": "query"})
     assert resp.status_code == 200
 
-    context = [{"author": "USER", "text": "query"}]
+    chat_history = [{"author": "USER", "text": "query"}]
     resp = await nucliadb_reader.post(
         f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "query",
-            "context": context,
+            "chat_history": chat_history,
         },
     )
     assert resp.status_code == 200
@@ -96,7 +94,7 @@ async def test_ask_handles_incomplete_find_results(
     find_incomplete_results,
 ):
     resp = await nucliadb_reader.post(f"/kb/{standalone_knowledgebox}/ask", json={"query": "query"})
-    assert resp.status_code == 529
+    assert resp.status_code == 530
     assert resp.json() == {"detail": "Temporary error on information retrieval. Please try again."}
 
 
@@ -114,93 +112,10 @@ async def resource(nucliadb_writer: AsyncClient, standalone_knowledgebox: str):
     assert resp.status_code in (200, 201)
     rid = resp.json()["uuid"]
 
-    yield rid
-
-
-@pytest.fixture
-async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, standalone_knowledgebox):
-    resp = await nucliadb_writer.post(
-        f"/kb/{standalone_knowledgebox}/resources",
-        json={
-            "title": "Knowledge graph",
-            "slug": "knowledgegraph",
-            "summary": "Test knowledge graph",
-            "texts": {
-                "inception1": {"body": "Christopher Nolan directed Inception. Very interesting movie."},
-                "inception2": {"body": "Leonardo DiCaprio starred in Inception."},
-                "inception3": {"body": "Joseph Gordon-Levitt starred in Inception."},
-                "leo": {"body": "Leonardo DiCaprio is a great actor. DiCaprio started acting in 1989."},
-            },
-        },
-    )
-    assert resp.status_code == 201
-    rid = resp.json()["uuid"]
-
-    nodes = {
-        "nolan": RelationNode(
-            value="Christopher Nolan", ntype=RelationNode.NodeType.ENTITY, subtype="DIRECTOR"
-        ),
-        "inception": RelationNode(
-            value="Inception", ntype=RelationNode.NodeType.ENTITY, subtype="MOVIE"
-        ),
-        "leo": RelationNode(
-            value="Leonardo DiCaprio", ntype=RelationNode.NodeType.ENTITY, subtype="ACTOR"
-        ),
-        "dicaprio": RelationNode(value="DiCaprio", ntype=RelationNode.NodeType.ENTITY, subtype="ACTOR"),
-        "levitt": RelationNode(
-            value="Joseph Gordon-Levitt", ntype=RelationNode.NodeType.ENTITY, subtype="ACTOR"
-        ),
-    }
-    edges = [
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=nodes["nolan"],
-            to=nodes["inception"],
-            relation_label="directed",
-            metadata=RelationMetadata(
-                # Set this field id as int enum value since this is how legacy relations reported paragraph_id
-                paragraph_id=rid + "/4/inception1/0-37",
-                data_augmentation_task_id="my_graph_task_id",
-            ),
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=nodes["leo"],
-            to=nodes["inception"],
-            relation_label="starred",
-            metadata=RelationMetadata(
-                paragraph_id=rid + "/t/inception2/0-39",
-                data_augmentation_task_id="my_graph_task_id",
-            ),
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=nodes["levitt"],
-            to=nodes["inception"],
-            relation_label="starred",
-            metadata=RelationMetadata(
-                paragraph_id=rid + "/t/inception3/0-42",
-                data_augmentation_task_id="",
-            ),
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=nodes["leo"],
-            to=nodes["dicaprio"],
-            relation_label="analogy",
-            metadata=RelationMetadata(
-                paragraph_id=rid + "/t/leo/0-70",
-                data_augmentation_task_id="my_graph_task_id",
-            ),
-        ),
-    ]
-    bm = BrokerMessage()
-    bm.uuid = rid
-    bm.kbid = standalone_knowledgebox
-    bm.user_relations.relations.extend(edges)
-    await inject_message(nucliadb_ingest_grpc, bm)
+    await mark_dirty()
     await wait_for_sync()
-    return rid
+
+    yield rid
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -666,6 +581,38 @@ async def test_ask_on_resource(nucliadb_reader: AsyncClient, standalone_knowledg
     )
     assert resp.status_code == 200
     SyncAskResponse.model_validate_json(resp.content)
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_with_filter_expression(
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource
+):
+    # Search filtering in the field where we know there should be data
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={
+            "query": "title",
+            "features": ["keyword"],
+            "filter_expression": {"field": {"prop": "field", "type": "generic", "name": "title"}},
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    ask_resp = SyncAskResponse.model_validate_json(resp.content)
+    assert len(ask_resp.retrieval_best_matches) > 0
+
+    # Search filtering in the field where we know there should be no data
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={
+            "query": "title",
+            "filter_expression": {"field": {"prop": "field", "type": "text", "name": "foobar"}},
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    ask_resp = SyncAskResponse.model_validate_json(resp.content)
+    assert len(ask_resp.retrieval_best_matches) == 0
 
 
 @pytest.mark.deploy_modes("standalone")

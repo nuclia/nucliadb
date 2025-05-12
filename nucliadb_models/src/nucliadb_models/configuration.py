@@ -23,6 +23,7 @@ from typing import Annotated, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, create_model
 
+from .graph.requests import GraphPathQuery  # noqa # we need this import for pydantic magic
 from .search import AskRequest, FindRequest
 
 
@@ -79,3 +80,7 @@ class AskSearchConfiguration(BaseModel):
 SearchConfiguration = Annotated[
     Union[FindSearchConfiguration, AskSearchConfiguration], Field(discriminator="kind")
 ]
+
+# We need this to avoid issues with pydantic and generic types defined in another module
+FindConfig.model_rebuild()
+AskConfig.model_rebuild()

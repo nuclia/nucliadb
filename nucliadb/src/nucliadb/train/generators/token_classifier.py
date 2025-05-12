@@ -23,8 +23,8 @@ from typing import AsyncGenerator, cast
 
 from nidx_protos.nodereader_pb2 import StreamFilter, StreamRequest
 
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
+from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_protos.dataset_pb2 import (
@@ -41,10 +41,9 @@ MAIN = "__main__"
 def token_classification_batch_generator(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[TokenClassificationBatch, None]:
-    generator = generate_token_classification_payloads(kbid, trainset, node, shard_replica_id)
+    generator = generate_token_classification_payloads(kbid, trainset, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, TokenClassificationBatch)
     return batch_generator
 
@@ -52,7 +51,6 @@ def token_classification_batch_generator(
 async def generate_token_classification_payloads(
     kbid: str,
     trainset: TrainSet,
-    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[TokensClassification, None]:
     request = StreamRequest()
@@ -60,7 +58,7 @@ async def generate_token_classification_payloads(
     for entitygroup in trainset.filter.labels:
         request.filter.labels.append(f"/e/{entitygroup}")
         request.filter.conjunction = StreamFilter.Conjunction.OR
-    async for field_item in node.stream_get_fields(request):
+    async for field_item in get_nidx_searcher_client().Documents(request):
         _, field_type, field = field_item.field.split("/")
         (
             split_text,

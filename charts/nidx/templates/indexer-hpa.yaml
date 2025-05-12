@@ -17,4 +17,7 @@ spec:
   maxReplicas: {{ dig "hpa" "maxReplicas" 10 .Values.indexer}}
   {{- with .Values.indexer.hpa }}
   metrics: {{- toYaml .metrics | nindent 4}}
+  {{- with .behavior }}
+  behavior: {{- toYaml . | nindent 4}}
+  {{- end }}
   {{- end }}

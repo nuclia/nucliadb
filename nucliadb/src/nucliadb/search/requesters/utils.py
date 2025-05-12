@@ -35,8 +35,6 @@ from nidx_protos.nodereader_pb2 import (
     SuggestResponse,
 )
 
-from nucliadb.common.cluster import manager as cluster_manager
-from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.search import logger
@@ -78,7 +76,7 @@ async def node_query(
     method: Method,
     pb_query: SuggestRequest,
     timeout: Optional[float] = None,
-) -> tuple[list[SuggestResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
+) -> tuple[list[SuggestResponse], bool, list[str]]: ...
 
 
 @overload
@@ -87,7 +85,7 @@ async def node_query(
     method: Method,
     pb_query: SearchRequest,
     timeout: Optional[float] = None,
-) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
+) -> tuple[list[SearchResponse], bool, list[str]]: ...
 
 
 @overload
@@ -96,7 +94,7 @@ async def node_query(
     method: Method,
     pb_query: GraphSearchRequest,
     timeout: Optional[float] = None,
-) -> tuple[list[GraphSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
+) -> tuple[list[GraphSearchResponse], bool, list[str]]: ...
 
 
 async def node_query(
@@ -104,7 +102,7 @@ async def node_query(
     method: Method,
     pb_query: REQUEST_TYPE,
     timeout: Optional[float] = None,
-) -> tuple[Sequence[Union[T, BaseException]], bool, list[tuple[AbstractIndexNode, str]]]:
+) -> tuple[Sequence[Union[T, BaseException]], bool, list[str]]:
     timeout = timeout or settings.search_timeout
     shard_manager = get_shard_manager()
     try:
@@ -116,21 +114,17 @@ async def node_query(
         )
 
     ops = []
-    queried_nodes = []
+    queried_shards = []
     incomplete_results = False
 
     for shard_obj in shard_groups:
-        try:
-            node, shard_id = cluster_manager.choose_node(shard_obj)
-        except KeyError:
-            incomplete_results = True
-        else:
-            if shard_id is not None:
-                # At least one node is alive for this shard group
-                # let's add it ot the query list if has a valid value
-                func = METHODS[method]
-                ops.append(func(node, shard_id, pb_query))  # type: ignore
-                queried_nodes.append((node, shard_id))
+        shard_id = shard_obj.nidx_shard_id
+        if shard_id is not None:
+            # At least one node is alive for this shard group
+            # let's add it ot the query list if has a valid value
+            func = METHODS[method]
+            ops.append(func(shard_id, pb_query))  # type: ignore
+            queried_shards.append(shard_id)
 
     if not ops:
         logger.warning(f"No node found for any of this resources shards {kbid}")
@@ -146,8 +140,7 @@ async def node_query(
         )
     except asyncio.TimeoutError as exc:  # pragma: no cover
         logger.warning(
-            "Timeout while querying nodes",
-            extra={"nodes": debug_nodes_info(queried_nodes)},
+            "Timeout while querying nidx",
         )
         results = [exc]
 
@@ -164,7 +157,7 @@ async def node_query(
         )
         raise error
 
-    return results, incomplete_results, queried_nodes
+    return results, incomplete_results, queried_shards
 
 
 def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
@@ -201,15 +194,3 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
             return HTTPException(status_code=status_code, detail=reason)
 
     return None
-
-
-def debug_nodes_info(nodes: list[tuple[AbstractIndexNode, str]]) -> list[dict[str, str]]:
-    details: list[dict[str, str]] = []
-    for node, shard_id in nodes:
-        info = {
-            "id": node.id,
-            "shard_id": shard_id,
-            "address": "nidx",
-        }
-        details.append(info)
-    return details
