@@ -951,6 +951,7 @@ class PromptContextBuilder:
         return context, context_order, context_images
 
     async def _build_context_images(self, context: CappedPromptContext) -> None:
+        ops = 0
         if self.image_strategies is None or len(self.image_strategies) == 0:
             # Nothing to do
             return
@@ -989,6 +990,7 @@ class PromptContextBuilder:
                 if page_image_id not in context.images:
                     image = await get_page_image(self.kbid, pid, paragraph_page_number)
                     if image is not None:
+                        ops += 1
                         context.images[page_image_id] = image
                         page_images_added += 1
                     else:
@@ -1008,6 +1010,7 @@ class PromptContextBuilder:
             ):
                 pimage = await get_paragraph_image(self.kbid, pid, paragraph.reference)
                 if pimage is not None:
+                    ops += 1
                     context.images[paragraph.id] = pimage
                 else:
                     logger.warning(
@@ -1018,6 +1021,7 @@ class PromptContextBuilder:
                             "reference": paragraph.reference,
                         },
                     )
+        self.metrics.set("image_ops", ops)
 
     async def _build_context(self, context: CappedPromptContext) -> None:
         if self.strategies is None or len(self.strategies) == 0:
