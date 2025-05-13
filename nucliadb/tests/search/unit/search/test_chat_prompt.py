@@ -24,6 +24,7 @@ import pytest
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.search.search.chat import prompt as chat_prompt
+from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
@@ -348,7 +349,7 @@ async def test_hierarchy_promp_context(kb):
         )
         ordered_paragraphs = get_ordered_paragraphs(find_results)
         await chat_prompt.hierarchy_prompt_context(
-            context, "kbid", ordered_paragraphs, HierarchyResourceStrategy()
+            context, "kbid", ordered_paragraphs, HierarchyResourceStrategy(), Metrics("foo")
         )
         assert (
             context.output["r1/f/f1/0-10"]
@@ -428,7 +429,7 @@ async def test_extend_prompt_context_with_metadata():
         context[paragraph_id.full()] = "Paragraph text"
         kbid = "foo"
         strategy = MetadataExtensionStrategy(types=list(MetadataExtensionType))
-        await chat_prompt.extend_prompt_context_with_metadata(context, kbid, strategy)
+        await chat_prompt.extend_prompt_context_with_metadata(context, kbid, strategy, Metrics("foo"))
 
         text_block = context.output[paragraph_id.full()]
         assert "DOCUMENT METADATA AT ORIGIN" in text_block

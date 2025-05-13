@@ -41,6 +41,7 @@ from nucliadb.search.search.chat.images import (
     get_paragraph_image,
 )
 from nucliadb.search.search.hydrator import hydrate_field_text, hydrate_resource_text
+from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.paragraphs import get_paragraph_text
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.metadata import Extra, Origin
@@ -244,6 +245,7 @@ async def full_resource_prompt_context(
     ordered_paragraphs: list[FindParagraph],
     resource: Optional[str],
     strategy: FullResourceStrategy,
+    metrics: Metrics,
 ) -> None:
     """
     Algorithm steps:
@@ -298,6 +300,8 @@ async def full_resource_prompt_context(
             context[field.full()] = extracted_text
             added_fields.add(field.full())
 
+    metrics.set("full_resource_ops", len(added_fields))
+
     if strategy.include_remaining_text_blocks:
         for paragraph in ordered_paragraphs:
             pid = cast(ParagraphId, parse_text_block_id(paragraph.id))
@@ -309,6 +313,7 @@ async def extend_prompt_context_with_metadata(
     context: CappedPromptContext,
     kbid: str,
     strategy: MetadataExtensionStrategy,
+    metrics: Metrics,
 ) -> None:
     text_block_ids: list[TextBlockId] = []
     for text_block_id in context.text_block_ids():
@@ -321,17 +326,24 @@ async def extend_prompt_context_with_metadata(
     if len(text_block_ids) == 0:  # pragma: no cover
         return
 
+    ops = 0
     if MetadataExtensionType.ORIGIN in strategy.types:
+        ops += 1
         await extend_prompt_context_with_origin_metadata(context, kbid, text_block_ids)
 
     if MetadataExtensionType.CLASSIFICATION_LABELS in strategy.types:
+        ops += 1
         await extend_prompt_context_with_classification_labels(context, kbid, text_block_ids)
 
     if MetadataExtensionType.NERS in strategy.types:
+        ops += 1
         await extend_prompt_context_with_ner(context, kbid, text_block_ids)
 
     if MetadataExtensionType.EXTRA_METADATA in strategy.types:
+        ops += 1
         await extend_prompt_context_with_extra_metadata(context, kbid, text_block_ids)
+
+    metrics.set("metadata_extension_ops", ops * len(text_block_ids))
 
 
 def parse_text_block_id(text_block_id: str) -> TextBlockId:
@@ -464,6 +476,7 @@ async def field_extension_prompt_context(
     kbid: str,
     ordered_paragraphs: list[FindParagraph],
     strategy: FieldExtensionStrategy,
+    metrics: Metrics,
 ) -> None:
     """
     Algorithm steps:
@@ -492,6 +505,8 @@ async def field_extension_prompt_context(
 
     tasks = [hydrate_field_text(kbid, fid) for fid in extend_field_ids]
     field_extracted_texts = await run_concurrently(tasks)
+
+    metrics.set("field_extension_ops", len(field_extracted_texts))
 
     for result in field_extracted_texts:
         if result is None:  # pragma: no cover
@@ -619,6 +634,7 @@ async def neighbouring_paragraphs_prompt_context(
     kbid: str,
     ordered_text_blocks: list[FindParagraph],
     strategy: NeighbouringParagraphsStrategy,
+    metrics: Metrics,
 ) -> None:
     """
     This function will get the paragraph texts and then craft a context with the neighbouring paragraphs of the
@@ -658,6 +674,9 @@ async def neighbouring_paragraphs_prompt_context(
         return
 
     results: list[tuple[ParagraphId, str]] = await asyncio.gather(*paragraph_ops)
+
+    metrics.set("neighbouring_paragraphs_ops", len(results))
+
     # Add the paragraph texts to the context
     for pid, text in results:
         if text != "":
@@ -670,8 +689,10 @@ async def conversation_prompt_context(
     ordered_paragraphs: list[FindParagraph],
     conversational_strategy: ConversationalStrategy,
     visual_llm: bool,
+    metrics: Metrics,
 ):
     analyzed_fields: List[str] = []
+    ops = 0
     async with get_driver().transaction(read_only=True) as txn:
         storage = await get_storage()
         kb = KnowledgeBoxORM(txn, storage, kbid)
@@ -701,6 +722,7 @@ async def conversation_prompt_context(
 
                 attachments: List[resources_pb2.FieldRef] = []
                 if conversational_strategy.full:
+                    ops += 5
                     extracted_text = await field_obj.get_extracted_text()
                     for current_page in range(1, cmetadata.pages + 1):
                         conv = await field_obj.db_get_value(current_page)
@@ -749,6 +771,7 @@ async def conversation_prompt_context(
                             break
 
                     for message in messages:
+                        ops += 1
                         text = message.content.text.strip()
                         pid = f"{rid}/{field_type}/{field_id}/{message.ident}/0-{len(message.content.text) + 1}"
                         context[pid] = text
@@ -757,6 +780,7 @@ async def conversation_prompt_context(
                 if conversational_strategy.attachments_text:
                     # add on the context the images if vlm enabled
                     for attachment in attachments:
+                        ops += 1
                         field: File = await resource.get_field(
                             attachment.field_id, attachment.field_type, load=True
                         )  # type: ignore
@@ -767,6 +791,7 @@ async def conversation_prompt_context(
 
                 if conversational_strategy.attachments_images and visual_llm:
                     for attachment in attachments:
+                        ops += 1
                         file_field: File = await resource.get_field(
                             attachment.field_id, attachment.field_type, load=True
                         )  # type: ignore
@@ -776,6 +801,7 @@ async def conversation_prompt_context(
                             context.images[pid] = image
 
                 analyzed_fields.append(field_unique_id)
+    metrics.set("conversation_ops", ops)
 
 
 async def hierarchy_prompt_context(
@@ -783,6 +809,7 @@ async def hierarchy_prompt_context(
     kbid: str,
     ordered_paragraphs: list[FindParagraph],
     strategy: HierarchyResourceStrategy,
+    metrics: Metrics,
 ) -> None:
     """
     This function will get the paragraph texts (possibly with extra characters, if extra_characters > 0) and then
@@ -842,6 +869,8 @@ async def hierarchy_prompt_context(
         else:
             resources[rid].paragraphs.append((paragraph, extended_paragraph_text))
 
+    metrics.set("hierarchy_ops", len(resources))
+
     # Modify the first paragraph of each resource to include the title and summary of the resource, as well as the
     # extended paragraph text of all the paragraphs in the resource.
     for values in resources.values():
@@ -886,6 +915,7 @@ class PromptContextBuilder:
         image_strategies: Optional[Sequence[ImageRagStrategy]] = None,
         max_context_characters: Optional[int] = None,
         visual_llm: bool = False,
+        metrics: Metrics = Metrics("prompt_context_builder"),
     ):
         self.kbid = kbid
         self.ordered_paragraphs = ordered_paragraphs
@@ -896,6 +926,7 @@ class PromptContextBuilder:
         self.image_strategies = image_strategies
         self.max_context_characters = max_context_characters
         self.visual_llm = visual_llm
+        self.metrics = metrics
 
     def prepend_user_context(self, context: CappedPromptContext):
         # Chat extra context passed by the user is the most important, therefore
@@ -920,6 +951,7 @@ class PromptContextBuilder:
         return context, context_order, context_images
 
     async def _build_context_images(self, context: CappedPromptContext) -> None:
+        ops = 0
         if self.image_strategies is None or len(self.image_strategies) == 0:
             # Nothing to do
             return
@@ -958,6 +990,7 @@ class PromptContextBuilder:
                 if page_image_id not in context.images:
                     image = await get_page_image(self.kbid, pid, paragraph_page_number)
                     if image is not None:
+                        ops += 1
                         context.images[page_image_id] = image
                         page_images_added += 1
                     else:
@@ -977,6 +1010,7 @@ class PromptContextBuilder:
             ):
                 pimage = await get_paragraph_image(self.kbid, pid, paragraph.reference)
                 if pimage is not None:
+                    ops += 1
                     context.images[paragraph.id] = pimage
                 else:
                     logger.warning(
@@ -987,6 +1021,7 @@ class PromptContextBuilder:
                             "reference": paragraph.reference,
                         },
                     )
+        self.metrics.set("image_ops", ops)
 
     async def _build_context(self, context: CappedPromptContext) -> None:
         if self.strategies is None or len(self.strategies) == 0:
@@ -1038,17 +1073,17 @@ class PromptContextBuilder:
                 self.ordered_paragraphs,
                 self.resource,
                 full_resource,
+                self.metrics,
             )
             if metadata_extension:
-                await extend_prompt_context_with_metadata(context, self.kbid, metadata_extension)
+                await extend_prompt_context_with_metadata(
+                    context, self.kbid, metadata_extension, self.metrics
+                )
             return
 
         if hierarchy:
             await hierarchy_prompt_context(
-                context,
-                self.kbid,
-                self.ordered_paragraphs,
-                hierarchy,
+                context, self.kbid, self.ordered_paragraphs, hierarchy, self.metrics
             )
         if neighbouring_paragraphs:
             await neighbouring_paragraphs_prompt_context(
@@ -1056,6 +1091,7 @@ class PromptContextBuilder:
                 self.kbid,
                 self.ordered_paragraphs,
                 neighbouring_paragraphs,
+                self.metrics,
             )
         if field_extension:
             await field_extension_prompt_context(
@@ -1063,6 +1099,7 @@ class PromptContextBuilder:
                 self.kbid,
                 self.ordered_paragraphs,
                 field_extension,
+                self.metrics,
             )
         if conversational_strategy:
             await conversation_prompt_context(
@@ -1071,9 +1108,12 @@ class PromptContextBuilder:
                 self.ordered_paragraphs,
                 conversational_strategy,
                 self.visual_llm,
+                self.metrics,
             )
         if metadata_extension:
-            await extend_prompt_context_with_metadata(context, self.kbid, metadata_extension)
+            await extend_prompt_context_with_metadata(
+                context, self.kbid, metadata_extension, self.metrics
+            )
 
 
 def get_paragraph_page_number(paragraph: FindParagraph) -> Optional[int]:
