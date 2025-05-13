@@ -507,17 +507,18 @@ async def ask(
             logger.info("Failed to rephrase ask query, using original")
 
     try:
-        retrieval_results = await retrieval_step(
-            kbid=kbid,
-            # Prefer the rephrased query for retrieval if available
-            main_query=rephrased_query or user_query,
-            ask_request=ask_request,
-            client_type=client_type,
-            user_id=user_id,
-            origin=origin,
-            metrics=metrics,
-            resource=resource,
-        )
+        with metrics.time("retrieval"):
+            retrieval_results = await retrieval_step(
+                kbid=kbid,
+                # Prefer the rephrased query for retrieval if available
+                main_query=rephrased_query or user_query,
+                ask_request=ask_request,
+                client_type=client_type,
+                user_id=user_id,
+                origin=origin,
+                metrics=metrics,
+                resource=resource,
+            )
     except NoRetrievalResultsError as err:
         maybe_audit_chat(
             kbid=kbid,
@@ -562,6 +563,7 @@ async def ask(
             image_strategies=ask_request.rag_images_strategies,
             max_context_characters=tokens_to_chars(generation.max_context_tokens),
             visual_llm=generation.use_visual_llm,
+            metrics=metrics.child_span("context_building"),
         )
         (
             prompt_context,
@@ -747,45 +749,44 @@ async def retrieval_in_kb(
 ) -> RetrievalResults:
     prequeries = parse_prequeries(ask_request)
     graph_strategy = parse_graph_strategy(ask_request)
-    with metrics.time("retrieval"):
-        main_results, prequeries_results, parsed_query = await get_find_results(
+    main_results, prequeries_results, parsed_query = await get_find_results(
+        kbid=kbid,
+        query=main_query,
+        item=ask_request,
+        ndb_client=client_type,
+        user=user_id,
+        origin=origin,
+        metrics=metrics.child_span("hybrid_retrieval"),
+        prequeries_strategy=prequeries,
+    )
+
+    if graph_strategy is not None:
+        assert parsed_query.retrieval.reranker is not None, (
+            "find parser must provide a reranking algorithm"
+        )
+        reranker = get_reranker(parsed_query.retrieval.reranker)
+        graph_results, graph_request = await get_graph_results(
             kbid=kbid,
             query=main_query,
             item=ask_request,
             ndb_client=client_type,
             user=user_id,
             origin=origin,
-            metrics=metrics,
-            prequeries_strategy=prequeries,
+            graph_strategy=graph_strategy,
+            metrics=metrics.child_span("graph_retrieval"),
+            text_block_reranker=reranker,
         )
 
-        if graph_strategy is not None:
-            assert parsed_query.retrieval.reranker is not None, (
-                "find parser must provide a reranking algorithm"
-            )
-            reranker = get_reranker(parsed_query.retrieval.reranker)
-            graph_results, graph_request = await get_graph_results(
-                kbid=kbid,
-                query=main_query,
-                item=ask_request,
-                ndb_client=client_type,
-                user=user_id,
-                origin=origin,
-                graph_strategy=graph_strategy,
-                metrics=metrics,
-                text_block_reranker=reranker,
-            )
+        if prequeries_results is None:
+            prequeries_results = []
 
-            if prequeries_results is None:
-                prequeries_results = []
+        prequery = PreQuery(id="graph", request=graph_request, weight=graph_strategy.weight)
+        prequeries_results.append((prequery, graph_results))
 
-            prequery = PreQuery(id="graph", request=graph_request, weight=graph_strategy.weight)
-            prequeries_results.append((prequery, graph_results))
-
-        if len(main_results.resources) == 0 and all(
-            len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
-        ):
-            raise NoRetrievalResultsError(main_results, prequeries_results)
+    if len(main_results.resources) == 0 and all(
+        len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
+    ):
+        raise NoRetrievalResultsError(main_results, prequeries_results)
 
     main_query_weight = prequeries.main_query_weight if prequeries is not None else 1.0
     best_matches = compute_best_matches(
@@ -836,21 +837,20 @@ async def retrieval_in_resource(
                 )
             add_resource_filter(prequery.request, [resource])
 
-    with metrics.time("retrieval"):
-        main_results, prequeries_results, parsed_query = await get_find_results(
-            kbid=kbid,
-            query=main_query,
-            item=ask_request,
-            ndb_client=client_type,
-            user=user_id,
-            origin=origin,
-            metrics=metrics,
-            prequeries_strategy=prequeries,
-        )
-        if len(main_results.resources) == 0 and all(
-            len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
-        ):
-            raise NoRetrievalResultsError(main_results, prequeries_results)
+    main_results, prequeries_results, parsed_query = await get_find_results(
+        kbid=kbid,
+        query=main_query,
+        item=ask_request,
+        ndb_client=client_type,
+        user=user_id,
+        origin=origin,
+        metrics=metrics.child_span("hybrid_retrieval"),
+        prequeries_strategy=prequeries,
+    )
+    if len(main_results.resources) == 0 and all(
+        len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
+    ):
+        raise NoRetrievalResultsError(main_results, prequeries_results)
     main_query_weight = prequeries.main_query_weight if prequeries is not None else 1.0
     best_matches = compute_best_matches(
         main_results=main_results,
