@@ -45,6 +45,7 @@ from nucliadb.ingest.orm.exceptions import ReallyStopPulling
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from nucliadb_telemetry import errors
+from nucliadb_telemetry.metrics import Gauge
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -52,6 +53,8 @@ from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.transaction import MaxTransactionSizeExceededError
 from nucliadb_utils.utilities import get_storage, get_transaction_utility
+
+processing_pending_messages = Gauge("nucliadb_processing_pending_messages")
 
 
 class PullWorker:
@@ -347,11 +350,13 @@ class PullV2Worker:
                     pull = await processing_http_client.pull_v2(ack_tokens=ack_tokens, limit=1)
                     ack_tokens.clear()
                     if pull is None:
+                        processing_pending_messages.set(0)
                         logger_activity.debug(f"No messages waiting in processing pull")
                         await asyncio.sleep(self.pull_time_empty_backoff)
                         continue
 
                     logger.info("Message received from proxy", extra={"seq": [pull.messages[0].seq]})
+                    processing_pending_messages.set(pull.pending)
                     try:
                         for message in pull.messages:
                             async with ProcessingPullMessageProgressUpdater(
