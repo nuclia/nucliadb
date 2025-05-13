@@ -185,13 +185,13 @@ async def test_rephrase():
         zone="europe1",
         onprem=False,
     )
-    pe.session = get_mocked_session("POST", 200, json="rephrased", context_manager=False)
+    pe.session = get_mocked_session("POST", 200, json="rephrased", context_manager=False, headers={})
 
     item = RephraseModel(question="question", chat_history=[], user_id="foo", user_context=["foo"])
-    rephrased_query = await pe.rephrase_query("kbid", item)
+    rephrase = await pe.rephrase_query("kbid", item)
     # The rephrase query should not be wrapped in quotes, otherwise it will trigger an exact match query to the index
-    assert rephrased_query.strip('"') == rephrased_query
-    assert rephrased_query == "rephrased"
+    assert rephrase.rephrased_query.strip('"') == rephrase.rephrased_query
+    assert rephrase.rephrased_query == "rephrased"
 
     pe.session.post.assert_awaited_once_with(
         url="cluster/api/internal/predict/rephrase",
@@ -208,13 +208,13 @@ async def test_rephrase_onprem():
         onprem=True,
         nuclia_service_account="nuakey",
     )
-    pe.session = get_mocked_session("POST", 200, json="rephrased", context_manager=False)
+    pe.session = get_mocked_session("POST", 200, json="rephrased", context_manager=False, headers={})
 
     item = RephraseModel(question="question", chat_history=[], user_id="foo", user_context=["foo"])
-    rephrased_query = await pe.rephrase_query("kbid", item)
+    rephrase = await pe.rephrase_query("kbid", item)
     # The rephrase query should not be wrapped in quotes, otherwise it will trigger an exact match query to the index
-    assert rephrased_query.strip('"') == rephrased_query
-    assert rephrased_query == "rephrased"
+    assert rephrase.rephrased_query.strip('"') == rephrase.rephrased_query
+    assert rephrase.rephrased_query == "rephrased"
 
     pe.session.post.assert_awaited_once_with(
         url="public-europe1/api/v1/predict/rephrase/kbid",
@@ -224,22 +224,29 @@ async def test_rephrase_onprem():
 
 
 @pytest.mark.parametrize(
-    "content,exception",
+    "content,exception,use_chat_history",
     [
-        ("foobar", None),
-        ("foobar0", None),
-        ("foobar-1", RephraseError),
-        ("foobar-2", RephraseMissingContextError),
+        ("foobar", None, False),
+        ("foobar", None, True),
+        ("foobar0", None, None),
+        ("foobar-1", RephraseError, None),
+        ("foobar-2", RephraseMissingContextError, None),
     ],
 )
-async def test_parse_rephrase_response(content, exception):
+async def test_parse_rephrase_response(content, exception, use_chat_history):
     resp = Mock()
     resp.json = AsyncMock(return_value=content)
+    resp.headers = {}
+    if isinstance(use_chat_history, bool):
+        resp.headers = {"NUCLIA-LEARNING-CHAT-HISTORY": "true" if use_chat_history else "false"}
+
     if exception:
         with pytest.raises(exception):
             await _parse_rephrase_response(resp)
     else:
-        assert await _parse_rephrase_response(resp) == content.rstrip("0")
+        rephrase = await _parse_rephrase_response(resp)
+        assert rephrase.rephrased_query == content.rstrip("0")
+        assert rephrase.use_chat_history == use_chat_history
 
 
 async def test_check_response_error():

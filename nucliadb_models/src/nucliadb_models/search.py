@@ -1003,6 +1003,21 @@ class RephraseModel(BaseModel):
         title="Generative model",
         description="The generative model to use for the rephrase endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
     )
+    chat_history_relevance_threshold: Optional[
+        Annotated[
+            float,
+            Field(
+                ge=0.0,
+                le=1.0,
+                description=(
+                    "Threshold to determine if the past chat history is relevant to rephrase the user's question. "
+                    "0 - Always treat previous messages as relevant (always rephrase)."
+                    "1 – Always treat previous messages as irrelevant (never rephrase)."
+                    "Values in between adjust the sensitivity."
+                ),
+            ),
+        ]
+    ] = None
 
 
 class RagStrategyName:
@@ -1578,6 +1593,21 @@ If empty, the default strategy is used, which simply adds the text of the matchi
             "Rephrase the query for a more efficient retrieval. This will consume LLM tokens and make the request slower."
         ),
     )
+    chat_history_relevance_threshold: Optional[
+        Annotated[
+            float,
+            Field(
+                ge=0.0,
+                le=1.0,
+                description=(
+                    "Threshold to determine if the past chat history is relevant to rephrase the user's question. "
+                    "0 - Always treat previous messages as relevant (always rephrase)."
+                    "1 – Always treat previous messages as irrelevant (never rephrase)."
+                    "Values in between adjust the sensitivity."
+                ),
+            ),
+        ]
+    ] = None
 
     prefer_markdown: bool = Field(
         default=False,
