@@ -147,7 +147,7 @@ async def main_ingest_processed_consumer():  # pragma: no cover
     if settings.processing_pull_mode == ProcessingPullMode.V1:
         consumer = await consumer_service.start_ingest_processed_consumer(SERVICE_NAME)
     elif settings.processing_pull_mode == ProcessingPullMode.V2:
-        consumer = await consumer_service.start_ingest_processed_consumer(SERVICE_NAME)
+        consumer = await consumer_service.start_ingest_processed_consumer_v2(SERVICE_NAME)
     else:
         # Off
         async def fake_consumer(): ...
