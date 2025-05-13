@@ -63,6 +63,13 @@ class DriverSettings(BaseSettings):
     )
 
 
+# For use during migration from pull v1 to pull v2
+class ProcessingPullMode(Enum):
+    OFF = "off"
+    V1 = "v1"
+    V2 = "v2"
+
+
 class Settings(DriverSettings):
     grpc_port: int = 8030
 
@@ -84,6 +91,8 @@ class Settings(DriverSettings):
     relation_types_timeout: float = 10.0
 
     max_concurrent_ingest_processing: int = 5
+
+    processing_pull_mode: ProcessingPullMode = ProcessingPullMode.V1
 
 
 settings = Settings()

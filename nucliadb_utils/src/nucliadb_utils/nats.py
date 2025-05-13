@@ -28,17 +28,17 @@ import nats
 import nats.errors
 import nats.js.api
 from nats.aio.client import Client as NATSClient
-from nats.aio.client import Msg
+from nats.aio.msg import Msg
 from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
 
-from nucliadb_telemetry.errors import capture_exception
 from nucliadb_telemetry.jetstream import (
     JetStreamContextTelemetry,
     NatsClientTelemetry,
     get_traced_nats_client,
 )
 from nucliadb_telemetry.metrics import Counter
+from nucliadb_utils.helpers import MessageProgressUpdater
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 from nucliadb_telemetry.jetstream import get_traced_jetstream  # noqa
 
 
-class MessageProgressUpdater:
+class NatsMessageProgressUpdater(MessageProgressUpdater):
     """
     Context manager to send progress updates to NATS.
 
@@ -55,47 +55,15 @@ class MessageProgressUpdater:
     messages to be redelivered.
     """
 
-    _task: asyncio.Task
-
     def __init__(self, msg: Msg, timeout: float):
-        self.msg = msg
-        self.timeout = timeout
+        async def update_msg() -> bool:
+            if msg._ackd:  # all done, do not mark with in_progress
+                return True
+            await msg.in_progress()
+            return False
 
-    def start(self):
-        seqid = self.msg.reply.split(".")[5]
-        task_name = f"MessageProgressUpdater: {id(self)} (seqid={seqid})"
-        self._task = asyncio.create_task(self._progress(), name=task_name)
-
-    async def end(self):
-        self._task.cancel()
-        try:
-            await self._task
-        except asyncio.CancelledError:  # pragma: no cover
-            logger.info("MessageProgressUpdater cancelled")
-            pass
-        except Exception as exc:  # pragma: no cover
-            capture_exception(exc)
-            logger.exception("Error in MessageProgressUpdater")
-            pass
-
-    async def __aenter__(self):
-        self.start()
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        await self.end()
-
-    async def _progress(self):
-        while True:
-            try:
-                await asyncio.sleep(self.timeout)
-                if self.msg._ackd:  # all done, do not mark with in_progress
-                    return
-                await self.msg.in_progress()
-            except (RuntimeError, asyncio.CancelledError):
-                return
-            except Exception:  # pragma: no cover
-                logger.exception("Error sending task progress to NATS")
+        seqid = msg.reply.split(".")[5]
+        super().__init__(seqid, update_msg, timeout)
 
 
 class NatsConnectionManager:

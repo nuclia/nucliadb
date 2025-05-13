@@ -28,7 +28,7 @@ from nucliadb.common.back_pressure.utils import is_back_pressure_enabled
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.consumer.consumer import IngestConsumer, IngestProcessedConsumer
-from nucliadb.ingest.consumer.pull import PullWorker
+from nucliadb.ingest.consumer.pull import PullV2Worker, PullWorker
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.settings import indexing_settings, transaction_settings
@@ -175,6 +175,32 @@ async def start_ingest_processed_consumer(
     await consumer.initialize()
 
     return nats_connection_manager.finalize
+
+
+async def start_ingest_processed_consumer_v2(
+    service_name: Optional[str] = None,
+) -> Callable[[], Awaitable[None]]:
+    """
+    This is not meant to be deployed with a stateful set like the other consumers.
+
+    We are not maintaining transactionability based on the nats sequence id from this
+    consumer and we will start off by not separating writes by partition AND
+    allowing NATS to manage the queue group for us.
+    """
+    driver = await setup_driver()
+    pubsub = await get_pubsub()
+    storage = await get_storage(service_name=service_name or SERVICE_NAME)
+
+    consumer = PullV2Worker(
+        driver=driver,
+        storage=storage,
+        pubsub=pubsub,
+        pull_time_error_backoff=settings.pull_time_error_backoff,
+        pull_api_timeout=settings.pull_api_timeout,
+    )
+    task = asyncio.create_task(consumer.loop())
+    task.add_done_callback(_handle_task_result)
+    return partial(_exit_tasks, [task])
 
 
 async def start_auditor() -> Callable[[], Awaitable[None]]:
