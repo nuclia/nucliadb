@@ -298,10 +298,9 @@ class ProcessingPullMessageProgressUpdater(MessageProgressUpdater):
     messages to be redelivered.
     """
 
-    def __init__(self, client: ProcessingHTTPClient, ack_token: str, timeout: float):
+    def __init__(self, client: ProcessingHTTPClient, msg: PulledMessage, timeout: float):
         async def update_msg() -> bool:
-            await client.in_progress(ack_token)
+            await client.in_progress(msg.ack_token)
             return False
 
-        seqid = ack_token.split(".")[5]
-        super().__init__(seqid, update_msg, timeout)
+        super().__init__(str(msg.seq), update_msg, timeout)

@@ -355,7 +355,7 @@ class PullV2Worker:
                     try:
                         for message in pull.messages:
                             async with ProcessingPullMessageProgressUpdater(
-                                processing_http_client, message.ack_token, pull.ttl * 0.66
+                                processing_http_client, message, pull.ttl * 0.66
                             ):
                                 with run_in_span(message.headers):
                                     await self.handle_message(message.seq, message.payload)

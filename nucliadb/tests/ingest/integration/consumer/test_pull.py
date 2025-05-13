@@ -23,16 +23,23 @@ import time
 import uuid
 from dataclasses import dataclass
 from typing import AsyncIterator, Optional
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
+from starlette.responses import Response
 from uvicorn.config import Config  # type: ignore
 from uvicorn.server import Server  # type: ignore
 
 from nucliadb.common.back_pressure.materializer import BackPressureMaterializer
 from nucliadb.common.back_pressure.settings import BackPressureSettings
-from nucliadb.ingest.consumer.pull import PullWorker
+from nucliadb.common.http_clients.processing import (
+    InProgressRequest,
+    PulledMessage,
+    PullRequestV2,
+    PullResponseV2,
+)
+from nucliadb.ingest.consumer.pull import PullV2Worker, PullWorker
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
 from nucliadb_utils.fastapi.run import start_server
@@ -46,7 +53,7 @@ def create_broker_message(kbid: str) -> BrokerMessage:
     bm.kbid = kbid
     bm.texts["text1"].body = "My text1"
     bm.basic.title = "My Title"
-    bm.source == BrokerMessage.MessageSource.PROCESSOR
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
 
     return bm
 
@@ -55,12 +62,14 @@ def create_broker_message(kbid: str) -> BrokerMessage:
 class PullProcessorAPI:
     url: str
     messages: list[BrokerMessage]
+    acked: list[str]
 
 
 @pytest.fixture()
 async def pull_processor_api():
     app = FastAPI()
     messages = []
+    acked = []
 
     @app.get("/api/v1/internal/processing/pull")
     async def pull():
@@ -73,6 +82,31 @@ async def pull_processor_api():
             "msgid": str(len(messages)),
         }
 
+    @app.post("/api/v2/internal/processing/pull")
+    async def pull_v2(req: PullRequestV2):
+        print(req)
+        acked.extend(req.ack)
+        if len(messages) == 0:
+            return Response(status_code=204)
+
+        message = messages.pop()
+        return PullResponseV2(
+            messages=[
+                PulledMessage(
+                    headers={},
+                    ack_token="1234",
+                    payload=base64.b64encode(message.SerializeToString()),
+                    seq=1,
+                )
+            ],
+            pending=len(messages),
+            ttl=10,
+        )
+
+    @app.post("/api/v2/internal/processing/pull/in_progress")
+    async def pull_in_progress(req: InProgressRequest):
+        return Response(status_code=204)
+
     port = free_port()
     config = Config(app, host="0.0.0.0", port=port, http="auto")
     server = Server(config=config)
@@ -84,7 +118,7 @@ async def pull_processor_api():
         "nucliadb.common.http_clients.processing.nuclia_settings.nuclia_processing_cluster_url",
         url,
     ):
-        yield PullProcessorAPI(url=url, messages=messages)
+        yield PullProcessorAPI(url=url, messages=messages, acked=acked)
 
     await server.shutdown()
 
@@ -101,6 +135,21 @@ async def pull_worker(
         pull_time_error_backoff=5,
         pull_time_empty_backoff=0.1,
     )
+
+    task = asyncio.create_task(worker.loop())
+    yield worker
+    task.cancel()
+
+
+@pytest.fixture()
+async def pull_v2_worker(maindb_driver, pull_processor_api: PullProcessorAPI, storage):
+    worker = PullV2Worker(
+        driver=maindb_driver,
+        storage=storage,
+        pull_time_error_backoff=5,
+        pull_time_empty_backoff=0.1,
+    )
+    worker.processor = AsyncMock()
 
     task = asyncio.create_task(worker.loop())
     yield worker
@@ -213,3 +262,26 @@ async def test_pull_full_integration_with_back_pressure(
     )
 
     assert consumer_info1.delivered.stream_seq == 1
+
+
+async def test_pull_v2(
+    shard_manager,
+    dummy_nidx_utility,
+    pull_v2_worker: PullV2Worker,
+    pull_processor_api: PullProcessorAPI,
+    knowledgebox_ingest: str,
+    nats_manager: NatsConnectionManager,
+):
+    # add message that should go to first consumer
+    bm = create_broker_message(knowledgebox_ingest)
+    pull_processor_api.messages.append(bm)
+
+    for i in range(50):
+        if len(pull_processor_api.acked) > 0:
+            break
+
+        await asyncio.sleep(0.1)
+
+    assert pull_processor_api.messages == []
+    assert pull_processor_api.acked == ["1234"]
+    pull_v2_worker.processor.process.assert_awaited_with(bm, 1, transaction_check=False)  # type: ignore
