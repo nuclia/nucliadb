@@ -32,7 +32,6 @@ use object_store::{DynObjectStore, ObjectStore};
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 use std::time::Instant;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
