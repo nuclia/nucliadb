@@ -19,6 +19,7 @@
 #
 import asyncio
 import base64
+import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Optional
@@ -41,6 +42,7 @@ from nucliadb.common.http_clients.processing import (
 )
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import SERVICE_NAME, logger, logger_activity
+from nucliadb.ingest.consumer.consumer import consumer_observer
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
@@ -52,7 +54,7 @@ from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.transaction import MaxTransactionSizeExceededError
-from nucliadb_utils.utilities import get_storage, get_transaction_utility
+from nucliadb_utils.utilities import get_storage, get_transaction_utility, pull_subscriber_utilization
 
 processing_pending_messages = Gauge("nucliadb_processing_pending_messages")
 
@@ -309,11 +311,13 @@ class PullV2Worker:
 
         logger.debug(f"Resource: {pb.uuid} KB: {pb.kbid} ProcessingID: {pb.processing_id}")
 
-        await self.processor.process(
-            pb,
-            seq,
-            transaction_check=False,
-        )
+        source = "writer" if pb.source == pb.MessageSource.WRITER else "processor"
+        with consumer_observer({"source": source, "partition": "-1"}):
+            await self.processor.process(
+                pb,
+                seq,
+                transaction_check=False,
+            )
 
     async def loop(self):
         """
@@ -331,6 +335,7 @@ class PullV2Worker:
                 await asyncio.sleep(10)
 
     async def _loop(self):
+        usage_metric = pull_subscriber_utilization
         headers = {}
         data = None
         if nuclia_settings.nuclia_service_account is not None:
@@ -346,6 +351,8 @@ class PullV2Worker:
         async with ProcessingHTTPClient() as processing_http_client:
             while True:
                 try:
+                    start_time = time.monotonic()
+
                     # The code is only really prepared to pull 1 message at a time. If changing this, review MessageProgressUpdate usage
                     pull = await processing_http_client.pull_v2(ack_tokens=ack_tokens, limit=1)
                     ack_tokens.clear()
@@ -353,10 +360,14 @@ class PullV2Worker:
                         processing_pending_messages.set(0)
                         logger_activity.debug(f"No messages waiting in processing pull")
                         await asyncio.sleep(self.pull_time_empty_backoff)
+                        usage_metric.inc({"status": "waiting"}, time.monotonic() - start_time)
                         continue
 
-                    logger.info("Message received from proxy", extra={"seq": [pull.messages[0].seq]})
+                    received_time = time.monotonic()
+                    usage_metric.inc({"status": "waiting"}, received_time - start_time)
                     processing_pending_messages.set(pull.pending)
+
+                    logger.info("Message received from proxy", extra={"seq": [pull.messages[0].seq]})
                     try:
                         for message in pull.messages:
                             async with ProcessingPullMessageProgressUpdater(
@@ -365,6 +376,8 @@ class PullV2Worker:
                                 with run_in_span(message.headers):
                                     await self.handle_message(message.seq, message.payload)
                                     ack_tokens.append(message.ack_token)
+
+                        usage_metric.inc({"status": "processing"}, time.monotonic() - received_time)
                     except Exception as e:
                         errors.capture_exception(e)
                         logger.exception("Error while pulling and processing message/s")
