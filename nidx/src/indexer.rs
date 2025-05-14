@@ -32,6 +32,7 @@ use object_store::{DynObjectStore, ObjectStore};
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use std::time::Instant;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
@@ -130,6 +131,8 @@ pub async fn run_nats(settings: Settings, shutdown: CancellationToken) -> anyhow
     let nats_client = async_nats::connect(&indexer_settings.nats_server.as_ref().unwrap()).await?;
     let jetstream = async_nats::jetstream::new(nats_client);
     let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
+    let message_ttl = consumer.cached_info().config.ack_wait;
+    let in_progress_interval = message_ttl.mul_f32(0.8);
     let mut subscription = consumer.stream().max_messages_per_batch(1).messages().await?;
 
     let work_path = match &settings.work_path {
@@ -185,6 +188,23 @@ pub async fn run_nats(settings: Settings, shutdown: CancellationToken) -> anyhow
             }
         };
 
+        // Start keepalive task to mark progress
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel::<()>();
+        let keepalive = tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = tokio::time::sleep(in_progress_interval) => {
+                        if let Err(e) = acker.ack_with(async_nats::jetstream::AckKind::Progress).await {
+                            warn!("Error acking message as in progress: {e:?}");
+                        }
+                    },
+                    _ = &mut ack_rx => {
+                        return acker;
+                    }
+                }
+            }
+        });
+
         if let Err(e) = process_index_message(
             &meta,
             indexer_storage.clone(),
@@ -202,6 +222,12 @@ pub async fn run_nats(settings: Settings, shutdown: CancellationToken) -> anyhow
         }
         INDEXING_COUNTER.get_or_create(&OperationStatusLabels::success()).inc();
 
+        // Stop keepalive task and send final ACK
+        if let Err(e) = ack.send(()) {
+            error!("Cannot stop keepalive task: {e:?}");
+            continue;
+        };
+        let acker = keepalive.await?;
         if let Err(e) = acker.double_ack().await {
             warn!("Error acking index message: {e:?}");
             continue;
