@@ -104,37 +104,30 @@ BM_FIELDS = {
 }
 
 
-async def import_broker_message(
-    context: ApplicationContext, kbid: str, bm: writer_pb2.BrokerMessage
-) -> None:
-    bm.kbid = kbid
-    partition = context.partitioning.generate_partition(kbid, bm.uuid)
-    for pb in [get_writer_bm(bm), get_processor_bm(bm)]:
-        await transaction_commit(context, pb, partition)
-
-
 async def restore_broker_message(
     context: ApplicationContext, kbid: str, bm: writer_pb2.BrokerMessage
 ) -> None:
+    bm.kbid = kbid
     await send_writer_bm(context, bm)
     await send_processor_bm(context, bm)
 
 
-@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8)
 async def send_writer_bm(context: ApplicationContext, bm: writer_pb2.BrokerMessage) -> None:
+    await process_bm_grpc(context, get_writer_bm(bm))
+
+
+async def send_processor_bm(context: ApplicationContext, bm: writer_pb2.BrokerMessage) -> None:
+    await process_bm_grpc(context, get_processor_bm(bm))
+
+
+@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8)
+async def process_bm_grpc(context: ApplicationContext, bm: writer_pb2.BrokerMessage) -> None:
     async def _iterator() -> AsyncIterator[writer_pb2.BrokerMessage]:
-        yield get_writer_bm(bm)
+        yield bm
 
     ingest_grpc: WriterStub = get_ingest()
     response: writer_pb2.OpStatusWriter = await ingest_grpc.ProcessMessage(_iterator())  # type: ignore
     assert response.status == writer_pb2.OpStatusWriter.Status.OK, "Failed to process broker message"
-
-
-async def send_processor_bm(context: ApplicationContext, bm: writer_pb2.BrokerMessage) -> None:
-    # Then enqueue the processor part asynchronously
-    processor_bm = get_processor_bm(bm)
-    partition = context.partitioning.generate_partition(bm.kbid, bm.uuid)
-    await transaction_commit(context, processor_bm, partition)
 
 
 async def transaction_commit(

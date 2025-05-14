@@ -188,7 +188,7 @@ JSON_HEADERS = {"Content-Type": "application/json"}
 
 
 class ProcessingHTTPClient:
-    def __init__(self):
+    def __init__(self) -> None:
         self.session = aiohttp.ClientSession()
         self.base_url = get_processing_api_url()
         self.base_url_v2 = get_processing_api_v2_url()
