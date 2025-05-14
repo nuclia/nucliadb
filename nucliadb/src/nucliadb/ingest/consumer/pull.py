@@ -42,6 +42,7 @@ from nucliadb.common.http_clients.processing import (
 )
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import SERVICE_NAME, logger, logger_activity
+from nucliadb.ingest.consumer.consumer import consumer_observer
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
@@ -310,11 +311,13 @@ class PullV2Worker:
 
         logger.debug(f"Resource: {pb.uuid} KB: {pb.kbid} ProcessingID: {pb.processing_id}")
 
-        await self.processor.process(
-            pb,
-            seq,
-            transaction_check=False,
-        )
+        source = "writer" if pb.source == pb.MessageSource.WRITER else "processor"
+        with consumer_observer({"source": source, "partition": "-1"}):
+            await self.processor.process(
+                pb,
+                seq,
+                transaction_check=False,
+            )
 
     async def loop(self):
         """
