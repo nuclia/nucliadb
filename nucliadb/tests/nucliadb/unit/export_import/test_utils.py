@@ -21,7 +21,6 @@ import asyncio
 from io import BytesIO
 from unittest.mock import AsyncMock, Mock, patch
 
-from nucliadb_protos import writer_pb2
 import pytest
 from starlette.requests import Request
 
@@ -35,9 +34,8 @@ from nucliadb.export_import.utils import (
     transaction_commit,
 )
 from nucliadb_models.export_import import Status
-from nucliadb_protos import resources_pb2
+from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
-from nucliadb_utils.const import Streams
 from nucliadb_utils.transaction import MaxTransactionSizeExceededError
 
 
