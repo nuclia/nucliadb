@@ -99,7 +99,7 @@ pub fn index_paragraphs(
             );
 
             if let Some(ref metadata) = p.metadata {
-                doc.add_bytes(schema.metadata, metadata.encode_to_vec());
+                doc.add_bytes(schema.metadata, &metadata.encode_to_vec());
             }
 
             paragraph_labels

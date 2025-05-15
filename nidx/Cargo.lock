@@ -1796,19 +1796,6 @@ dependencies = [
 
 [[package]]
 name = "k8s-openapi"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c8847402328d8301354c94d605481f25a6bdc1ed65471fd96af8eca71141b13"
-dependencies = [
- "base64 0.22.1",
- "chrono",
- "serde",
- "serde-value",
- "serde_json",
-]
-
-[[package]]
-name = "k8s-openapi"
 version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa60a41b57ae1a0a071af77dbcf89fc9819cfe66edaf2beeb204c34459dcf0b2"
@@ -1825,7 +1812,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b49c39074089233c2bb7b1791d1b6c06c84dbab26757491fad9d233db0d432f"
 dependencies = [
- "k8s-openapi 0.25.0",
+ "k8s-openapi",
  "kube-client",
  "kube-core",
  "kube-runtime",
@@ -1852,7 +1839,7 @@ dependencies = [
  "hyper-timeout",
  "hyper-util",
  "jsonpath-rust",
- "k8s-openapi 0.25.0",
+ "k8s-openapi",
  "kube-core",
  "pem",
  "rustls",
@@ -1879,7 +1866,7 @@ dependencies = [
  "form_urlencoded",
  "http",
  "json-patch",
- "k8s-openapi 0.25.0",
+ "k8s-openapi",
  "serde",
  "serde-value",
  "serde_json",
@@ -1901,7 +1888,7 @@ dependencies = [
  "hashbrown 0.15.3",
  "hostname",
  "json-patch",
- "k8s-openapi 0.25.0",
+ "k8s-openapi",
  "kube-client",
  "parking_lot",
  "pin-project",
@@ -2151,7 +2138,7 @@ dependencies = [
  "config",
  "futures",
  "itertools 0.13.0",
- "k8s-openapi 0.23.0",
+ "k8s-openapi",
  "kube",
  "lazy_static",
  "lru",
@@ -2220,7 +2207,7 @@ dependencies = [
  "regex",
  "serde_json",
  "tantivy",
- "tantivy-common 0.7.0",
+ "tantivy-common",
  "tantivy-fst",
  "tempfile",
  "tracing",
@@ -2263,7 +2250,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tantivy",
- "tantivy-common 0.7.0",
+ "tantivy-common",
  "tempfile",
 ]
 
@@ -2648,15 +2635,6 @@ name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
-
-[[package]]
-name = "ownedbytes"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3a059efb063b8f425b948e042e6b9bd85edfe60e913630ed727b23e2dfcc558"
-dependencies = [
- "stable_deref_trait",
-]
 
 [[package]]
 name = "ownedbytes"
@@ -4248,7 +4226,7 @@ dependencies = [
  "smallvec",
  "tantivy-bitpacker",
  "tantivy-columnar",
- "tantivy-common 0.9.0",
+ "tantivy-common",
  "tantivy-fst",
  "tantivy-query-grammar",
  "tantivy-stacker",
@@ -4280,22 +4258,9 @@ dependencies = [
  "itertools 0.14.0",
  "serde",
  "tantivy-bitpacker",
- "tantivy-common 0.9.0",
+ "tantivy-common",
  "tantivy-sstable",
  "tantivy-stacker",
-]
-
-[[package]]
-name = "tantivy-common"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8019e3cabcfd20a1380b491e13ff42f57bb38bf97c3d5fa5c07e50816e0621f4"
-dependencies = [
- "async-trait",
- "byteorder",
- "ownedbytes 0.7.0",
- "serde",
- "time",
 ]
 
 [[package]]
@@ -4306,7 +4271,7 @@ checksum = "e91b6ea6090ce03dc72c27d0619e77185d26cc3b20775966c346c6d4f7e99d7f"
 dependencies = [
  "async-trait",
  "byteorder",
- "ownedbytes 0.9.0",
+ "ownedbytes",
  "serde",
  "time",
 ]
@@ -4342,7 +4307,7 @@ dependencies = [
  "futures-util",
  "itertools 0.14.0",
  "tantivy-bitpacker",
- "tantivy-common 0.9.0",
+ "tantivy-common",
  "tantivy-fst",
  "zstd",
 ]
@@ -4355,7 +4320,7 @@ checksum = "2bcdebb267671311d1e8891fd9d1301803fdb8ad21ba22e0a30d0cab49ba59c1"
 dependencies = [
  "murmurhash32",
  "rand_distr",
- "tantivy-common 0.9.0",
+ "tantivy-common",
 ]
 
 [[package]]

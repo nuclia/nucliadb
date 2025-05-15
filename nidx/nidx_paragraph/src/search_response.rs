@@ -21,18 +21,21 @@ use std::collections::HashMap;
 
 use lazy_static::lazy_static;
 use nidx_protos::{FacetResult, FacetResults, ParagraphResult, ParagraphSearchResponse, ResultScore};
+use nidx_tantivy::utils::decode_facet;
 use tantivy::collector::FacetCounts;
-use tantivy::schema::{Facet, OwnedValue, Value};
+use tantivy::schema::document::CompactDocValue;
+use tantivy::schema::{Facet, Value};
 use tantivy::{DateTime, DocAddress, TantivyDocument};
 use tracing::*;
 
 use crate::reader::ParagraphReaderService;
 use crate::search_query::TermCollector;
 
-pub fn extract_labels<'a>(facets_iterator: impl Iterator<Item = &'a OwnedValue>) -> Vec<String> {
+pub fn extract_labels<'a>(facets_iterator: impl Iterator<Item = CompactDocValue<'a>>) -> Vec<String> {
     facets_iterator
         .flat_map(|x| x.as_facet())
-        .filter(|x| is_label(x))
+        .map(decode_facet)
+        .filter(is_label)
         .map(|x| x.to_path_string())
         .collect()
 }
@@ -121,7 +124,6 @@ impl From<SearchIntResponse<'_>> for ParagraphSearchResponse {
         let no_results = std::cmp::min(obtained, requested);
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(no_results);
         let searcher = response.searcher;
-        let default_split = OwnedValue::Str("".to_string());
         for (_, doc_address) in response.top_docs.into_iter().take(no_results) {
             match searcher.doc::<TantivyDocument>(doc_address) {
                 Ok(doc) => {
@@ -137,7 +139,7 @@ impl From<SearchIntResponse<'_>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_string();
 
-                    let field = doc
+                    let field_facet = doc
                         // This can be used instead of get_first() considering there is only one
                         // field. Done because of a bug in the writing
                         // process [sc 1604].
@@ -145,8 +147,8 @@ impl From<SearchIntResponse<'_>> for ParagraphSearchResponse {
                         .last()
                         .expect("document doesn't appear to have uuid.")
                         .as_facet()
-                        .unwrap()
-                        .to_path_string();
+                        .unwrap();
+                    let field = decode_facet(field_facet).to_path_string();
 
                     let labels = extract_labels(doc.get_all(schema.facets));
 
@@ -163,8 +165,8 @@ impl From<SearchIntResponse<'_>> for ParagraphSearchResponse {
 
                     let split = doc
                         .get_first(schema.split)
-                        .unwrap_or(&default_split)
-                        .as_str()
+                        .map(|v| v.as_str())
+                        .unwrap_or(Some(""))
                         .unwrap()
                         .to_string();
 
@@ -219,7 +221,6 @@ impl From<SearchBm25Response<'_>> for ParagraphSearchResponse {
         let no_results = std::cmp::min(obtained, requested);
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(no_results);
         let searcher = response.searcher;
-        let default_split = OwnedValue::Str("".to_string());
         for (score, doc_address) in response.top_docs.into_iter().take(no_results) {
             match searcher.doc::<TantivyDocument>(doc_address) {
                 Ok(doc) => {
@@ -235,16 +236,12 @@ impl From<SearchBm25Response<'_>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_string();
 
-                    let field = doc
-                        // This can be used instead of get_first() considering there is only one
-                        // field. Done because of a bug in the writing
-                        // process [sc 1604].
-                        .get_all(schema.field)
-                        .last()
+                    let field_facet = doc
+                        .get_first(schema.field)
                         .expect("document doesn't appear to have uuid.")
                         .as_facet()
-                        .unwrap()
-                        .to_path_string();
+                        .unwrap();
+                    let field = decode_facet(field_facet).to_path_string();
 
                     let labels = extract_labels(doc.get_all(schema.facets));
 
@@ -261,8 +258,8 @@ impl From<SearchBm25Response<'_>> for ParagraphSearchResponse {
 
                     let split = doc
                         .get_first(schema.split)
-                        .unwrap_or(&default_split)
-                        .as_str()
+                        .map(|v| v.as_str())
+                        .unwrap_or(Some(""))
                         .unwrap()
                         .to_string();
 
