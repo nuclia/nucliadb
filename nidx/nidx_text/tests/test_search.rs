@@ -173,6 +173,19 @@ fn test_keywords_prefilter_search() {
         panic!("Response is not on the right variant");
     };
     assert_eq!(fields.len(), 1);
+
+    let request = PreFilterRequest {
+        security: None,
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Keyword(KeywordFilter {
+                keyword: "%".into(),
+            })),
+        }),
+    };
+    let response = reader.prefilter(&request).unwrap();
+    let PrefilterResult::None = response else {
+        panic!("Response is not on the right variant");
+    };
 }
 
 #[test]
