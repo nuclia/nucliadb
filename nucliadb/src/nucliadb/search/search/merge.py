@@ -48,7 +48,6 @@ from nucliadb.search.search.fetch import (
 from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
-from nucliadb_models.metadata import RelationType
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
     DirectionalRelation,
@@ -90,6 +89,15 @@ def relation_node_type_to_entity_type(node_type: RelationNode.NodeType.ValueType
         RelationNode.NodeType.LABEL: EntityType.LABEL,
         RelationNode.NodeType.RESOURCE: EntityType.RESOURCE,
         RelationNode.NodeType.USER: EntityType.USER,
+    }[node_type]
+
+
+def entity_type_to_relation_node_type(node_type: EntityType) -> RelationNode.NodeType.ValueType:
+    return {
+        EntityType.ENTITY: RelationNode.NodeType.ENTITY,
+        EntityType.LABEL: RelationNode.NodeType.LABEL,
+        EntityType.RESOURCE: RelationNode.NodeType.RESOURCE,
+        EntityType.USER: RelationNode.NodeType.USER,
     }[node_type]
 
 
@@ -442,18 +450,10 @@ async def merge_relations_results(
     graph_responses: list[GraphSearchResponse],
     query_entry_points: Iterable[RelationNode],
     only_with_metadata: bool = False,
-    only_agentic: bool = False,
-    only_entity_to_entity: bool = False,
 ) -> Relations:
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
-        None,
-        _merge_relations_results,
-        graph_responses,
-        query_entry_points,
-        only_with_metadata,
-        only_agentic,
-        only_entity_to_entity,
+        None, _merge_relations_results, graph_responses, query_entry_points, only_with_metadata
     )
 
 
@@ -461,21 +461,8 @@ def _merge_relations_results(
     graph_responses: list[GraphSearchResponse],
     query_entry_points: Iterable[RelationNode],
     only_with_metadata: bool,
-    only_agentic: bool,
-    only_entity_to_entity: bool,
 ) -> Relations:
-    """Merge relation search responses into a single Relations object while applying filters.
-
-    - When `only_with_metadata` is enabled, only include paths with metadata
-      (this can include paragraph_id and entity positions among other things)
-
-    - When `only_agentic` is enabled, ony include relations extracted by a Graph
-      Extraction Agent
-
-    - When `only_entity_to_entity` is enabled, only include relations between
-    nodes with type ENTITY
-
-    """
+    """Merge relation search responses into a single Relations object while applying filters."""
     relations = Relations(entities={})
 
     for entry_point in query_entry_points:
@@ -492,16 +479,7 @@ def _merge_relations_results(
             if path.resource_field_id is not None:
                 resource_id = path.resource_field_id.split("/")[0]
 
-            # If only_with_metadata is True, we check that metadata for the relation is not None
-            # If only_agentic is True, we check that metadata for the relation is not None and that it has a data_augmentation_task_id
-            # TODO: This is suboptimal, we should be able to filter this in the query to the index,
             if only_with_metadata and not metadata:
-                continue
-
-            if only_agentic and (not metadata or not metadata.data_augmentation_task_id):
-                continue
-
-            if only_entity_to_entity and relation_type != RelationType.ENTITY:
                 continue
 
             if origin.value in relations.entities:
