@@ -95,10 +95,10 @@ async def predict_proxy(
         headers={**user_headers, **predict_headers},
     )
 
-    user_query = json.get("question") if json is not None else ""
     status_code = predict_response.status
     media_type = predict_response.headers.get("Content-Type")
     response: Union[Response, StreamingResponse]
+    user_query = json.get("question") if json is not None else ""
     if predict_response.headers.get("Transfer-Encoding") == "chunked":
         if endpoint == PredictProxiedEndpoints.CHAT:
             streaming_generator = chat_streaming_generator(
@@ -108,7 +108,7 @@ async def predict_proxy(
                 client_type=client_type,
                 origin=origin,
                 user_query=user_query,
-                is_json= "json" in (media_type or "")
+                is_json="json" in (media_type or ""),
             )
         else:
             streaming_generator = predict_response.content.iter_any()
