@@ -86,65 +86,69 @@ async def predict_proxy(
     predict_headers = predict.get_predict_headers(kbid)
     user_headers = {k: v for k, v in headers.items() if k.capitalize() in ALLOWED_HEADERS}
 
-    metrics = AskMetrics()
-    with metrics.time(PREDICT_ANSWER_METRIC):
-        # Proxy the request to predict API
-        predict_response = await predict.make_request(
-            method=method,
-            url=predict.get_predict_url(endpoint, kbid),
-            json=json,
-            params=params,
-            headers={**user_headers, **predict_headers},
-        )
+    # Proxy the request to predict API
+    predict_response = await predict.make_request(
+        method=method,
+        url=predict.get_predict_url(endpoint, kbid),
+        json=json,
+        params=params,
+        headers={**user_headers, **predict_headers},
+    )
 
-        user_query = json.get("question") if json is not None else ""
-        status_code = predict_response.status
-        media_type = predict_response.headers.get("Content-Type")
-        response: Union[Response, StreamingResponse]
-        if predict_response.headers.get("Transfer-Encoding") == "chunked":
-            if endpoint == PredictProxiedEndpoints.CHAT:
-                streaming_generator = chat_streaming_generator(
-                    predict_response=predict_response,
-                    metrics=metrics,
-                    kbid=kbid,
-                    user_id=user_id,
-                    client_type=client_type,
-                    origin=origin,
-                    user_query=user_query,
-                )
-            else:
-                streaming_generator = predict_response.content.iter_any()
-
-            response = StreamingResponse(
-                content=streaming_generator,
-                status_code=status_code,
-                media_type=media_type,
+    user_query = json.get("question") if json is not None else ""
+    status_code = predict_response.status
+    media_type = predict_response.headers.get("Content-Type")
+    response: Union[Response, StreamingResponse]
+    if predict_response.headers.get("Transfer-Encoding") == "chunked":
+        if endpoint == PredictProxiedEndpoints.CHAT:
+            streaming_generator = chat_streaming_generator(
+                predict_response=predict_response,
+                kbid=kbid,
+                user_id=user_id,
+                client_type=client_type,
+                origin=origin,
+                user_query=user_query,
+                is_json= "json" in (media_type or "")
             )
         else:
+            streaming_generator = predict_response.content.iter_any()
+
+        response = StreamingResponse(
+            content=streaming_generator,
+            status_code=status_code,
+            media_type=media_type,
+        )
+    else:
+        metrics = AskMetrics()
+        with metrics.time(PREDICT_ANSWER_METRIC):
             content = await predict_response.read()
-            if endpoint == PredictProxiedEndpoints.CHAT:
-                status_code = int(content[-1:].decode())  # Decode just the last char
-                if status_code != 0:
-                    status_code = -status_code
 
-                audit_predict_proxy_endpoint(
-                    predict_response.headers,
-                    kbid=kbid,
-                    user_id=user_id,
-                    user_query=user_query,
-                    client_type=client_type,
-                    origin=origin,
-                    text_answer=content,
-                    generative_answer_time=metrics[PREDICT_ANSWER_METRIC],
-                    generative_answer_first_chunk_time=None,
-                    status_code=AnswerStatusCode(str(status_code)),
-                )
+        if endpoint == PredictProxiedEndpoints.CHAT:
+            try:
+                llm_status_code = int(content[-1:].decode())  # Decode just the last char
+                if llm_status_code != 0:
+                    llm_status_code = -llm_status_code
+            except ValueError:
+                llm_status_code = -1
 
-            response = Response(
-                content=content,
-                status_code=status_code,
-                media_type=media_type,
+            audit_predict_proxy_endpoint(
+                predict_response.headers,
+                kbid=kbid,
+                user_id=user_id,
+                user_query=user_query,
+                client_type=client_type,
+                origin=origin,
+                text_answer=content,
+                generative_answer_time=metrics[PREDICT_ANSWER_METRIC],
+                generative_answer_first_chunk_time=None,
+                status_code=AnswerStatusCode(str(llm_status_code)),
             )
+
+        response = Response(
+            content=content,
+            status_code=status_code,
+            media_type=media_type,
+        )
 
     nuclia_learning_id = predict_response.headers.get("NUCLIA-LEARNING-ID")
     if nuclia_learning_id:
@@ -160,42 +164,43 @@ async def exists_kb(kbid: str) -> bool:
 
 async def chat_streaming_generator(
     predict_response: aiohttp.ClientResponse,
-    metrics: AskMetrics,
     kbid: str,
     user_id: str,
     client_type: NucliaDBClientType,
     origin: str,
     user_query: str,
+    is_json: bool,
 ):
     stream = predict_response.content.iter_any()
     first = True
-    is_json = "json" in predict_response.headers["content-type"]
     status_code = AnswerStatusCode.ERROR.value
     text_answer = ""
     json_object = None
-    async for chunk in stream:
-        if first:
-            metrics.record_first_chunk_yielded()
-            first = False
+    metrics = AskMetrics()
+    with metrics.time(PREDICT_ANSWER_METRIC):
+        async for chunk in stream:
+            if first:
+                metrics.record_first_chunk_yielded()
+                first = False
 
-        yield chunk
+            yield chunk
 
-        if is_json:
-            try:
-                parsed_chunk = GenerativeChunk.model_validate(chunk)
-                if isinstance(parsed_chunk, TextGenerativeResponse):
-                    text_answer += parsed_chunk.text
-                elif isinstance(parsed_chunk, JSONGenerativeResponse):
-                    json_object = parsed_chunk.object
-                elif isinstance(parsed_chunk, StatusGenerativeResponse):
-                    status_code = parsed_chunk.code
-            except ValidationError:
-                logger.warning(
-                    f"Unexpected item in predict answer stream: {chunk.decode()}",
-                    extra={"kbid": kbid},
-                )
-        else:
-            text_answer += chunk.decode()
+            if is_json:
+                try:
+                    parsed_chunk = GenerativeChunk.model_validate(chunk)
+                    if isinstance(parsed_chunk, TextGenerativeResponse):
+                        text_answer += parsed_chunk.text
+                    elif isinstance(parsed_chunk, JSONGenerativeResponse):
+                        json_object = parsed_chunk.object
+                    elif isinstance(parsed_chunk, StatusGenerativeResponse):
+                        status_code = parsed_chunk.code
+                except ValidationError:
+                    logger.warning(
+                        f"Unexpected item in predict answer stream: {chunk.decode()}",
+                        extra={"kbid": kbid},
+                    )
+            else:
+                text_answer += chunk.decode()
 
     if is_json is False:
         # If response is text the status_code comes at the last chunk of data
