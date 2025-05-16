@@ -21,7 +21,7 @@
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.query_parser.parsers.search import parse_search
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import legacy_convert_retrieval_to_proto
 from nucliadb_models.search import (
@@ -59,6 +59,6 @@ async def test_vector_result_metadata(
     )
     pb_query, _, _, _ = await legacy_convert_retrieval_to_proto(parsed)
 
-    results, _, _ = await node_query(kbid, Method.SEARCH, pb_query)
+    results, _ = await nidx_query(kbid, Method.SEARCH, pb_query)
     assert len(results[0].vector.documents) > 0
     assert results[0].vector.documents[0].HasField("metadata")

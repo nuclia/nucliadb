@@ -21,7 +21,7 @@ from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.graph_merge import (
     build_graph_nodes_response,
     build_graph_relations_response,
@@ -71,7 +71,7 @@ async def graph_search_knowledgebox(
 ) -> GraphSearchResponse:
     pb_query = await parse_graph_search(kbid, item)
 
-    results, _, _ = await node_query(kbid, Method.GRAPH, pb_query)
+    results, _ = await nidx_query(kbid, Method.GRAPH, pb_query)
 
     return build_graph_response(results)
 
@@ -98,7 +98,7 @@ async def graph_nodes_search_knowledgebox(
 ) -> GraphNodesSearchResponse:
     pb_query = await parse_graph_node_search(kbid, item)
 
-    results, _, _ = await node_query(kbid, Method.GRAPH, pb_query)
+    results, _ = await nidx_query(kbid, Method.GRAPH, pb_query)
 
     return build_graph_nodes_response(results)
 
@@ -125,6 +125,6 @@ async def graph_relations_search_knowledgebox(
 ) -> GraphRelationsSearchResponse:
     pb_query = await parse_graph_relation_search(kbid, item)
 
-    results, _, _ = await node_query(kbid, Method.GRAPH, pb_query)
+    results, _ = await nidx_query(kbid, Method.GRAPH, pb_query)
 
     return build_graph_relations_response(results)
