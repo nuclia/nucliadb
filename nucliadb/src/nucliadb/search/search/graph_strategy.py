@@ -19,6 +19,7 @@
 import heapq
 import json
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Any, Collection, Iterable, Optional, Union
 
 from nidx_protos import nodereader_pb2
@@ -36,13 +37,13 @@ from nucliadb.search import logger
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.chat.query import (
     find_request_from_ask_request,
-    get_relations_results_from_entities,
 )
 from nucliadb.search.search.find_merge import (
     compose_find_resources,
     hydrate_and_rerank,
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
+from nucliadb.search.search.merge import entity_type_to_relation_node_type, merge_relations_results
 from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.rerankers import (
     Reranker,
@@ -74,7 +75,7 @@ from nucliadb_models.search import (
     TextPosition,
     UserPrompt,
 )
-from nucliadb_protos.utils_pb2 import RelationNode
+from nucliadb_protos.utils_pb2 import Relation, RelationNode
 
 SCHEMA = {
     "title": "score_triplets",
@@ -289,6 +290,17 @@ Now, let's get started! Here are the triplets you need to score:
 """
 
 
+@dataclass(frozen=True)
+class FrozenRelationNode:
+    ntype: RelationNode.NodeType.ValueType
+    subtype: str
+    value: str
+
+
+def freeze_node(r: RelationNode):
+    return FrozenRelationNode(ntype=r.ntype, subtype=r.subtype, value=r.value)
+
+
 class RelationsParagraphMatch(BaseModel):
     paragraph_id: ParagraphId
     score: float
@@ -310,13 +322,12 @@ async def get_graph_results(
     shards: Optional[list[str]] = None,
 ) -> tuple[KnowledgeboxFindResults, FindRequest]:
     relations = Relations(entities={})
-    explored_entities: set[str] = set()
+    explored_entities: set[FrozenRelationNode] = set()
     scores: dict[str, list[float]] = {}
     predict = get_predict()
+    entities_to_explore: list[RelationNode] = []
 
     for hop in range(graph_strategy.hops):
-        entities_to_explore: Iterable[RelationNode] = []
-
         if hop == 0:
             # Get the entities from the query
             with metrics.time("graph_strat_query_entities"):
@@ -326,14 +337,14 @@ async def get_graph_results(
                         query=query,
                     )
                     if relation_result is not None:
-                        entities_to_explore = (
+                        entities_to_explore = [
                             RelationNode(
                                 ntype=RelationNode.NodeType.ENTITY,
                                 value=result.value,
                                 subtype=result.family,
                             )
                             for result in relation_result.entities
-                        )
+                        ]
                 elif (
                     not entities_to_explore
                     or graph_strategy.query_entity_detection == QueryEntityDetection.PREDICT
@@ -353,7 +364,7 @@ async def get_graph_results(
                         entities_to_explore = []
         else:
             # Find neighbors of the current relations and remove the ones already explored
-            entities_to_explore = (
+            entities_to_explore = [
                 RelationNode(
                     ntype=RelationNode.NodeType.ENTITY,
                     value=relation.entity,
@@ -361,35 +372,50 @@ async def get_graph_results(
                 )
                 for subgraph in relations.entities.values()
                 for relation in subgraph.related_to
-                if relation.entity not in explored_entities
-            )
+                if FrozenRelationNode(
+                    ntype=entity_type_to_relation_node_type(relation.entity_type),
+                    subtype=relation.entity_subtype,
+                    value=relation.entity,
+                )
+                not in explored_entities
+            ]
+
+        if not entities_to_explore:
+            break
 
         # Get the relations for the new entities
+        relations_results = []
         with metrics.time("graph_strat_neighbor_relations"):
             try:
-                new_relations = await get_relations_results_from_entities(
-                    kbid=kbid,
-                    entities=entities_to_explore,
-                    timeout=5.0,
+                relations_results = await find_graph_neighbours(
+                    kbid,
+                    entities_to_explore,
+                    explored_entities,
+                    exclude_processor_relations=graph_strategy.exclude_processor_relations,
+                )
+                new_relations = await merge_relations_results(
+                    relations_results,
+                    entities_to_explore,
                     only_with_metadata=not graph_strategy.relation_text_as_paragraphs,
-                    only_agentic_relations=graph_strategy.agentic_graph_only,
-                    # We only want entity to entity relations (skip resource/labels/collaborators/etc.)
-                    only_entity_to_entity=True,
-                    deleted_entities=explored_entities,
                 )
             except Exception as e:
                 capture_exception(e)
                 logger.exception("Error in getting query relations for graph strategy")
                 new_relations = Relations(entities={})
 
-            new_subgraphs = new_relations.entities
+            relations.entities.update(new_relations.entities)
+            discovered_entities = []
 
-            explored_entities.update(new_subgraphs.keys())
+            for shard in relations_results:
+                for node in shard.nodes:
+                    if node not in entities_to_explore and freeze_node(node) not in explored_entities:
+                        discovered_entities.append(node)
 
-            if not new_subgraphs or all(not subgraph.related_to for subgraph in new_subgraphs.values()):
+            if not discovered_entities:
                 break
 
-            relations.entities.update(new_subgraphs)
+            explored_entities.update([freeze_node(n) for n in entities_to_explore])
+            entities_to_explore = discovered_entities
 
         # Rank the relevance of the relations
         with metrics.time("graph_strat_rank_relations"):
@@ -898,3 +924,51 @@ def relations_matches_to_text_block_matches(
     paragraph_matches: Collection[RelationsParagraphMatch],
 ) -> list[TextBlockMatch]:
     return [relations_match_to_text_block_match(match) for match in paragraph_matches]
+
+
+async def find_graph_neighbours(
+    kbid: str,
+    entities_to_explore: list[RelationNode],
+    explored_entities: set[FrozenRelationNode],
+    exclude_processor_relations: bool,
+) -> list[nodereader_pb2.GraphSearchResponse]:
+    graph_query = nodereader_pb2.GraphSearchRequest(
+        kind=nodereader_pb2.GraphSearchRequest.QueryKind.PATH, top_k=100
+    )
+
+    # Explore starting from some entities
+    query_to_explore = nodereader_pb2.GraphQuery.PathQuery()
+    for entity in entities_to_explore:
+        entity_query = nodereader_pb2.GraphQuery.PathQuery()
+        entity_query.path.source.node_type = entity.ntype
+        entity_query.path.source.node_subtype = entity.subtype
+        entity_query.path.source.value = entity.value
+        entity_query.path.undirected = True
+        query_to_explore.bool_or.operands.append(entity_query)
+    graph_query.query.path.bool_and.operands.append(query_to_explore)
+
+    # Do not return already known entities
+    if explored_entities:
+        query_exclude_explored = nodereader_pb2.GraphQuery.PathQuery()
+        for explored in explored_entities:
+            entity_query = nodereader_pb2.GraphQuery.PathQuery()
+            entity_query.path.source.node_type = explored.ntype
+            entity_query.path.source.node_subtype = explored.subtype
+            entity_query.path.source.value = explored.value
+            entity_query.path.undirected = True
+            query_exclude_explored.bool_not.bool_or.operands.append(entity_query)
+        graph_query.query.path.bool_and.operands.append(query_exclude_explored)
+
+    # Only include relations between entities
+    only_entities = nodereader_pb2.GraphQuery.PathQuery()
+    only_entities.path.relation.relation_type = Relation.RelationType.ENTITY
+    graph_query.query.path.bool_and.operands.append(only_entities)
+
+    # Exclude processor entities
+    if exclude_processor_relations:
+        exclude_processor = nodereader_pb2.GraphQuery.PathQuery()
+        exclude_processor.facet.facet = "/g"
+        graph_query.query.path.bool_and.operands.append(exclude_processor)
+
+    (relations_results, _, _) = await node_query(kbid, Method.GRAPH, graph_query, timeout=5.0)
+    return relations_results
