@@ -118,7 +118,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         context.audit_request.trace_id = get_trace_id() or ""
         context.path = request.url.path
 
-        if request.url.path.split("/")[-1] in ("ask", "search", "find"):
+        if request.url.path.split("/")[-1] in ("ask", "search", "find", "chat"):
             if request.method == "POST":
                 body = (await request.body()).decode(errors="replace")
                 context.audit_request.user_request = body
