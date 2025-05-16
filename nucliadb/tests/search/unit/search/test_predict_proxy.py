@@ -27,6 +27,7 @@ from fastapi.responses import Response, StreamingResponse
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.search.search.predict_proxy import PredictProxiedEndpoints, predict_proxy
+from nucliadb_models.search import NucliaDBClientType
 
 MODULE = "nucliadb.search.search.predict_proxy"
 
@@ -49,7 +50,7 @@ def predict_response():
     resp.content = Mock(iter_any=iter_any)
     json_answer = {"answer": "foo"}
     resp.json = AsyncMock(return_value=json_answer)
-    resp.read = AsyncMock(return_value=json.dumps(json_answer))
+    resp.read = AsyncMock(return_value=json.dumps(json_answer).encode())
     yield resp
 
 
@@ -66,10 +67,13 @@ async def test_raises_error_on_non_existing_kb(exists_kb):
     exists_kb.return_value = False
     with pytest.raises(KnowledgeBoxNotFound):
         await predict_proxy(
-            "foo",
-            PredictProxiedEndpoints.CHAT,
-            "GET",
-            QueryParams(),
+            kbid="foo",
+            endpoint=PredictProxiedEndpoints.CHAT,
+            method="GET",
+            params=QueryParams(),
+            user_id="test-user",
+            client_type=NucliaDBClientType.API,
+            origin="test-origin",
         )
 
 
@@ -78,10 +82,13 @@ async def test_stream_response(exists_kb, predict, predict_response):
     predict_response.headers["NUCLIA-LEARNING-ID"] = "foo"
 
     resp = await predict_proxy(
-        "foo",
-        PredictProxiedEndpoints.CHAT,
-        "GET",
-        QueryParams(),
+        kbid="foo",
+        endpoint=PredictProxiedEndpoints.CHAT,
+        method="GET",
+        params=QueryParams(),
+        user_id="test-user",
+        client_type=NucliaDBClientType.API,
+        origin="test-origin",
     )
 
     assert isinstance(resp, StreamingResponse)
@@ -96,10 +103,13 @@ async def test_json_response(exists_kb, predict, predict_response):
     predict_response.headers["NUCLIA-LEARNING-ID"] = "foo"
 
     resp = await predict_proxy(
-        "foo",
-        PredictProxiedEndpoints.CHAT,
-        "GET",
-        QueryParams(),
+        kbid="foo",
+        endpoint=PredictProxiedEndpoints.CHAT,
+        method="GET",
+        params=QueryParams(),
+        user_id="test-user",
+        client_type=NucliaDBClientType.API,
+        origin="test-origin",
     )
 
     assert isinstance(resp, Response)
@@ -114,13 +124,16 @@ async def test_500_text_response(exists_kb, predict, predict_response):
     predict_response.headers["Content-Type"] = "text/plain"
     predict_response.status = 500
     predict_response.headers["NUCLIA-LEARNING-ID"] = "foo"
-    predict_response.read = AsyncMock(return_value="foo")
+    predict_response.read = AsyncMock(return_value=b"foo")
 
     resp = await predict_proxy(
-        "foo",
-        PredictProxiedEndpoints.CHAT,
-        "GET",
-        QueryParams(),
+        kbid="foo",
+        endpoint=PredictProxiedEndpoints.CHAT,
+        method="GET",
+        params=QueryParams(),
+        user_id="test-user",
+        client_type=NucliaDBClientType.API,
+        origin="test-origin",
     )
 
     assert isinstance(resp, Response)
@@ -129,3 +142,46 @@ async def test_500_text_response(exists_kb, predict, predict_response):
     assert resp.headers["Access-Control-Expose-Headers"] == "NUCLIA-LEARNING-ID"
     assert resp.headers["Content-Type"].startswith("text/plain")
     assert resp.body == b"foo"
+
+
+async def test_json_response_rephrase(exists_kb, predict, predict_response):
+    predict_response.headers["NUCLIA-LEARNING-ID"] = "foo"
+
+    resp = await predict_proxy(
+        kbid="foo",
+        endpoint=PredictProxiedEndpoints.REPHRASE,
+        method="GET",
+        params=QueryParams(),
+        user_id="test-user",
+        client_type=NucliaDBClientType.API,
+        origin="test-origin",
+    )
+
+    assert isinstance(resp, Response)
+    assert resp.status_code == 200
+    assert resp.headers["NUCLIA-LEARNING-ID"] == "foo"
+    assert resp.headers["Access-Control-Expose-Headers"] == "NUCLIA-LEARNING-ID"
+    assert resp.headers["Content-Type"] == "application/json"
+    assert json.loads(resp.body) == {"answer": "foo"}
+
+
+async def test_stream_response_rerank(exists_kb, predict, predict_response):
+    predict_response.headers["Transfer-Encoding"] = "chunked"
+    predict_response.headers["NUCLIA-LEARNING-ID"] = "foo"
+
+    resp = await predict_proxy(
+        kbid="foo",
+        endpoint=PredictProxiedEndpoints.RERANK,
+        method="GET",
+        params=QueryParams(),
+        user_id="test-user",
+        client_type=NucliaDBClientType.API,
+        origin="test-origin",
+    )
+
+    assert isinstance(resp, StreamingResponse)
+    assert resp.status_code == 200
+    assert resp.headers["NUCLIA-LEARNING-ID"] == "foo"
+    assert resp.headers["Access-Control-Expose-Headers"] == "NUCLIA-LEARNING-ID"
+    body = [chunk async for chunk in resp.body_iterator]
+    assert list(map(lambda x: x.to_bytes(x, "big"), range(3))) == body
