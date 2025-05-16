@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - run: rustup component add rustfmt
       - name: rustfmt
         run: cd nidx && cargo fmt --check --all
 

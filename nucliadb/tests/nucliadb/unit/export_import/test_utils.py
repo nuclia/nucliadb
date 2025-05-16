@@ -19,7 +19,7 @@
 #
 import asyncio
 from io import BytesIO
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from starlette.requests import Request
@@ -30,13 +30,12 @@ from nucliadb.export_import.utils import (
     ExportStream,
     TaskRetryHandler,
     get_cloud_files,
-    import_broker_message,
+    restore_broker_message,
     transaction_commit,
 )
 from nucliadb_models.export_import import Status
-from nucliadb_protos import resources_pb2
+from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
-from nucliadb_utils.const import Streams
 from nucliadb_utils.transaction import MaxTransactionSizeExceededError
 
 
@@ -110,23 +109,31 @@ class ContextMock:
         self.partitioning = partitioning
 
 
-async def test_import_broker_message(broker_message, transaction, partitioning):
+async def test_restore_broker_message(broker_message, transaction, partitioning):
     context = ContextMock(transaction, partitioning)
 
     import_kbid = "import_kbid"
     assert broker_message.kbid != import_kbid
 
-    await import_broker_message(context, import_kbid, broker_message)
+    with patch("nucliadb.export_import.utils.process_bm_grpc", AsyncMock()) as mock_process:
+        await restore_broker_message(context, import_kbid, broker_message)
 
     # Sends two messages
-    assert transaction.commit.call_count == 2
+    assert mock_process.call_count == 2
 
-    for call in transaction.commit.call_args_list:
+    for call in mock_process.call_args_list:
         # Message contains import kbid
-        assert call[0][0].kbid == import_kbid
+        assert call[0][1].kbid == import_kbid
 
-        # Sends to correct topic
-        assert call[1]["target_subject"] == Streams.INGEST_PROCESSED.subject
+    # First one is writer
+    writer = mock_process.call_args_list[0][0][1]
+    assert writer.source == writer_pb2.BrokerMessage.MessageSource.WRITER
+    assert not writer.field_metadata
+
+    # Second one is processor
+    processor = mock_process.call_args_list[1][0][1]
+    assert processor.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR
+    assert processor.field_metadata
 
 
 def test_get_cloud_files(broker_message):

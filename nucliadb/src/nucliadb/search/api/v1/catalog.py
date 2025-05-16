@@ -184,7 +184,8 @@ async def catalog(
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     finally:
         duration = time() - start_time
-        if duration > 2:  # pragma: no cover
+        max_time = 5 if item.faceted else 2
+        if duration > max_time:  # pragma: no cover
             logger.warning(
                 "Slow catalog request",
                 extra={
