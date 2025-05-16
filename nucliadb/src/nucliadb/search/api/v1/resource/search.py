@@ -27,7 +27,7 @@ from pydantic import ValidationError
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
-from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_paragraphs_results
@@ -110,7 +110,7 @@ async def resource_search(
             detail = json.loads(exc.json())
             return HTTPClientError(status_code=422, detail=detail)
 
-        results, incomplete_results, queried_shards = await node_query(kbid, Method.SEARCH, pb_query)
+        results, queried_shards = await nidx_query(kbid, Method.SEARCH, pb_query)
 
         # We need to merge
         search_results = await merge_paragraphs_results(
@@ -120,8 +120,5 @@ async def resource_search(
             highlight_split=highlight,
             min_score=0.0,
         )
-
-        response.status_code = 206 if incomplete_results else 200
-
         search_results.shards = queried_shards
         return search_results
