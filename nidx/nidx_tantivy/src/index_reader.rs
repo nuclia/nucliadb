@@ -25,8 +25,9 @@ use std::{
 };
 
 use nidx_types::{OpenIndexMetadata, Seq};
+use tantivy::index::SegmentId;
 use tantivy::{
-    Directory, Index, IndexMeta, IndexSettings, SegmentId, SegmentReader,
+    Directory, Index, IndexMeta, IndexSettings, SegmentReader,
     directory::{MmapDirectory, RamDirectory, error::OpenReadError},
     fastfield::write_alive_bitset,
     query::Query,
@@ -217,8 +218,9 @@ mod tests {
 
     use crate::TantivySegmentMetadata;
     use serde_json::Value;
+    use tantivy::index::SegmentId;
     use tantivy::{
-        Directory, SegmentId,
+        Directory,
         schema::{NumericOptions, Schema},
     };
     use tantivy_common::TerminatingWrite;

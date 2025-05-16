@@ -33,6 +33,7 @@ use nidx_protos::{
     DocumentItem, DocumentResult, DocumentSearchResponse, FacetResult, FacetResults, OrderBy, ResultScore,
     StreamRequest,
 };
+use nidx_tantivy::utils::decode_facet;
 use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
 use tantivy::columnar::Column;
@@ -281,16 +282,17 @@ impl TextReaderService {
                     )
                     .unwrap();
 
-                    let field = doc
+                    let field_facet = doc
                         .get_first(self.schema.field)
                         .expect("document doesn't appear to have field.")
                         .as_facet()
-                        .unwrap()
-                        .to_path_string();
+                        .unwrap();
+                    let field = decode_facet(field_facet).to_path_string();
 
                     let labels = doc
                         .get_all(self.schema.facets)
-                        .map(|x| x.as_facet().unwrap().to_path_string())
+                        .flat_map(|x| x.as_facet())
+                        .map(|x| decode_facet(x).to_path_string())
                         .filter(|x| x.starts_with("/l/"))
                         .collect_vec();
 
@@ -351,17 +353,16 @@ impl TextReaderService {
                     )
                     .unwrap();
 
-                    let field = doc
+                    let field_facet = doc
                         .get_first(self.schema.field)
                         .expect("document doesn't appear to have field.")
                         .as_facet()
-                        .unwrap()
-                        .to_path_string();
+                        .unwrap();
+                    let field = decode_facet(field_facet).to_path_string();
 
                     let labels = doc
                         .get_all(self.schema.facets)
-                        .flat_map(|x| x.as_facet())
-                        .map(|x| x.to_path_string())
+                        .map(|x| decode_facet(x.as_facet().unwrap()).to_path_string())
                         .filter(|x| x.starts_with("/l/"))
                         .collect_vec();
 
@@ -538,17 +539,17 @@ impl Iterator for BatchProducer {
             )
             .unwrap();
 
-            let field = doc
+            let field_facet = doc
                 .get_first(self.field_field)
                 .expect("document doesn't appear to have field.")
                 .as_facet()
-                .unwrap()
-                .to_path_string();
+                .unwrap();
+            let field = decode_facet(field_facet).to_path_string();
 
             let labels = doc
                 .get_all(self.facet_field)
                 .flat_map(|x| x.as_facet())
-                .map(|x| x.to_path_string())
+                .map(|x| decode_facet(x).to_path_string())
                 .filter(|x| x.starts_with("/l/"))
                 .collect_vec();
             items.push(DocumentItem { field, uuid, labels });

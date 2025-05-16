@@ -11,7 +11,7 @@ nidx_protos = { version = "0.1.0", path = "../nidx_protos" }
 nidx_tantivy = { version = "0.1.0", path = "../nidx_tantivy" }
 nidx_types = { version = "0.1.0", path = "../nidx_types" }
 serde = { version = "1.0.219", features = ["derive"] }
-tantivy = "0.22"
+tantivy = "0.24"
 tracing = "0.1.41"
 uuid = "1.16.0"
 

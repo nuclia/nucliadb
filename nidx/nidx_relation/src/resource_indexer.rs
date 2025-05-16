@@ -92,7 +92,7 @@ pub fn index_relations(
 
             if let Some(metadata) = relation.metadata.as_ref() {
                 let encoded_metadata = metadata.encode_to_vec();
-                new_doc.add_bytes(schema.metadata, encoded_metadata);
+                new_doc.add_bytes(schema.metadata, &encoded_metadata);
             }
 
             writer.add_document(new_doc)?;
