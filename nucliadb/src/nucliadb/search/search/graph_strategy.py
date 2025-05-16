@@ -970,5 +970,5 @@ async def find_graph_neighbours(
         exclude_processor.facet.facet = "/g"
         graph_query.query.path.bool_and.operands.append(exclude_processor)
 
-    (relations_results, _, _) = await node_query(kbid, Method.GRAPH, graph_query, timeout=5.0)
+    (relations_results, _) = await nidx_query(kbid, Method.GRAPH, graph_query, timeout=5.0)
     return relations_results
