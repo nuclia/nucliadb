@@ -273,6 +273,10 @@ class _Converter:
 
 
 def is_incomplete(retrieval: UnitRetrieval) -> bool:
+    """
+    Return true if the retrieval had the semantic feature on but the query endpoint
+    did not return the vector in the response.
+    """
     if retrieval.query.semantic is None:
         return False
     incomplete = retrieval.query.semantic.query is None or len(retrieval.query.semantic.query) == 0

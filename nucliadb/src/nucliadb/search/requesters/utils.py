@@ -71,38 +71,38 @@ T = TypeVar(
 
 
 @overload
-async def node_query(
+async def nidx_query(
     kbid: str,
     method: Method,
     pb_query: SuggestRequest,
     timeout: Optional[float] = None,
-) -> tuple[list[SuggestResponse], bool, list[str]]: ...
+) -> tuple[list[SuggestResponse], list[str]]: ...
 
 
 @overload
-async def node_query(
+async def nidx_query(
     kbid: str,
     method: Method,
     pb_query: SearchRequest,
     timeout: Optional[float] = None,
-) -> tuple[list[SearchResponse], bool, list[str]]: ...
+) -> tuple[list[SearchResponse], list[str]]: ...
 
 
 @overload
-async def node_query(
+async def nidx_query(
     kbid: str,
     method: Method,
     pb_query: GraphSearchRequest,
     timeout: Optional[float] = None,
-) -> tuple[list[GraphSearchResponse], bool, list[str]]: ...
+) -> tuple[list[GraphSearchResponse], list[str]]: ...
 
 
-async def node_query(
+async def nidx_query(
     kbid: str,
     method: Method,
     pb_query: REQUEST_TYPE,
     timeout: Optional[float] = None,
-) -> tuple[Sequence[Union[T, BaseException]], bool, list[str]]:
+) -> tuple[Sequence[Union[T, BaseException]], list[str]]:
     timeout = timeout or settings.search_timeout
     shard_manager = get_shard_manager()
     try:
@@ -115,7 +115,6 @@ async def node_query(
 
     ops = []
     queried_shards = []
-    incomplete_results = False
 
     for shard_obj in shard_groups:
         shard_id = shard_obj.nidx_shard_id
@@ -127,10 +126,10 @@ async def node_query(
             queried_shards.append(shard_id)
 
     if not ops:
-        logger.warning(f"No node found for any of this resources shards {kbid}")
+        logger.warning(f"No shards found for kb", extra={"kbid": kbid})
         raise HTTPException(
             status_code=512,
-            detail=f"No node found for any of this resources shards {kbid}",
+            detail=f"No shards found for kb",
         )
 
     try:
@@ -144,12 +143,12 @@ async def node_query(
         )
         results = [exc]
 
-    error = validate_node_query_results(results or [])
+    error = validate_nidx_query_results(results or [])
     if error is not None:
         query_dict = MessageToDict(pb_query)
         query_dict.pop("vector", None)
         logger.error(
-            "Error while querying nodes",
+            "Error while querying nidx",
             extra={
                 "kbid": kbid,
                 "query": json.dumps(query_dict),
@@ -157,12 +156,12 @@ async def node_query(
         )
         raise error
 
-    return results, incomplete_results, queried_shards
+    return results, queried_shards
 
 
-def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
+def validate_nidx_query_results(results: list[Any]) -> Optional[HTTPException]:
     """
-    Validate the results of a node query and return an exception if any error is found
+    Validate the results of a nidx query and return an exception if any error is found
 
     Handling of exception is responsibility of caller.
     """
@@ -175,14 +174,14 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
             reason = "Error while querying shard data."
             if isinstance(result, AioRpcError):
                 if result.code() is GrpcStatusCode.INTERNAL:
-                    # handle node response errors
+                    # handle nidx response errors
                     details = result.details() or "gRPC error without details"
                     if "AllButQueryForbidden" in details:
                         status_code = 412
                         reason = details.split(":")[-1].strip().strip("'")
                     else:
                         reason = details
-                        logger.exception(f"Unhandled node error", exc_info=result)
+                        logger.exception(f"Unhandled nidx error", exc_info=result)
                 else:
                     logger.error(
                         f"Unhandled GRPC error while querying shard data: {result.debug_error_string()}"
