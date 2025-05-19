@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nucliadb_sdk"
 version = "6.4.0"
-license = { text = "AGPL" }
+license = "Apache-2.0"
 description = "NucliaDB SDK"
-authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
+authors = [{ name = "Nuclia", email = "nucliadb@nuclia.com" }]
 readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -29,7 +29,7 @@ dependencies = [
     "pydantic>=2.6",
     "nuclia-models>=0.24.2",
     # automatically bumped during release
-    "nucliadb-models"
+    "nucliadb-models",
 ]
 
 [project.urls]
