@@ -22,6 +22,7 @@ from enum import Enum
 from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic.aliases import AliasChoices
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Annotated, Self
 
@@ -1294,10 +1295,11 @@ Bigger values will discover more intricate relationships but will also take more
         ge=1,
         le=300,
     )
-    agentic_graph_only: bool = Field(
+    exclude_processor_relations: bool = Field(
         default=True,
-        title="Use only the graph extracted by an agent.",
+        title="Do not use relations extracted by processor.",
         description="If set to true, only relationships extracted from a graph extraction agent are considered for context expansion.",
+        validation_alias=AliasChoices("agentic_graph_only", "exclude_processor_relations"),
     )
     relation_text_as_paragraphs: bool = Field(
         default=False,
