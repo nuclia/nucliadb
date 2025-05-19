@@ -72,8 +72,8 @@ async def generate_field_streaming_payloads(
     for status in trainset.filter.status:
         request.filter.labels.append(f"/n/s/{status}")
 
-    total = 0
     resources = set()
+    fields = set()
 
     async for document_item in get_nidx_searcher_client().Documents(request):
         text_labels = []
@@ -81,7 +81,6 @@ async def generate_field_streaming_payloads(
             text_labels.append(label)
 
         field_id = f"{document_item.uuid}{document_item.field}"
-        total += 1
         resources.add(document_item.uuid)
 
         field_parts = document_item.field.split("/")
@@ -99,6 +98,15 @@ async def generate_field_streaming_payloads(
         tl.field = field
         tl.field_type = field_type
         tl.split = split
+
+        field_unique_key = f"{rid}/{field_type}/{field}/{split}"
+        if field_unique_key in fields:
+            # This field has already been yielded. This can happen as we are streaming directly from nidx
+            # and field deletions may not be reflected immediately in the index.
+            logger.info(f"Duplicated field found {field_unique_key}. Skipping.", extra={"kbid": kbid})
+            continue
+
+        fields.add(field_unique_key)
 
         if trainset.exclude_text:
             tl.text.text = ""
@@ -119,11 +127,11 @@ async def generate_field_streaming_payloads(
 
         yield tl
 
-        if total % 1000 == 0:
+        if len(fields) % 1000 == 0:
             logger.info(
                 "Field streaming in progress",
                 extra={
-                    "fields": total,
+                    "fields": len(fields),
                     "resources": len(resources),
                     "kbid": kbid,
                     "shard_replica_id": shard_replica_id,
@@ -133,7 +141,7 @@ async def generate_field_streaming_payloads(
     logger.info(
         "Field streaming finished",
         extra={
-            "fields": total,
+            "fields": len(fields),
             "resources": len(resources),
             "kbid": kbid,
             "shard_replica_id": shard_replica_id,
