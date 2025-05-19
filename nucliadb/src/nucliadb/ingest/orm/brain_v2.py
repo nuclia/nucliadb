@@ -215,7 +215,7 @@ class ResourceBrain:
         page_positions: Optional[FilePagePositions],
         user_field_metadata: Optional[UserFieldMetadata],
         replace_field: bool,
-        skip_index: Optional[bool],
+        skip_paragraphs_index: Optional[bool],
         skip_texts_index: Optional[bool],
     ) -> None:
         # We need to add the extracted text to the texts section of the Resource so that
@@ -233,7 +233,7 @@ class ResourceBrain:
             page_positions,
             user_field_metadata,
             replace_field=replace_field,
-            skip_paragraphs=skip_index,
+            skip_paragraphs=skip_paragraphs_index,
         )
 
     @observer.wrap({"type": "apply_field_paragraphs"})
