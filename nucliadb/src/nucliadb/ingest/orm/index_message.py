@@ -102,6 +102,7 @@ class IndexMessageBuilder:
             # The paragraphs are needed to generate the vectors. However, we don't need to index them
             # in all cases.
             skip_index_paragraphs = not paragraphs
+            skip_index_texts = not texts
             replace_paragraphs = replace and not skip_index_paragraphs
 
             # We need to compute the paragraphs when we're going to generate the vectors too.
@@ -118,6 +119,7 @@ class IndexMessageBuilder:
                     user_field_metadata,
                     replace_field=replace_paragraphs,
                     skip_index=skip_index_paragraphs,
+                    skip_texts_index=skip_index_texts,
                 )
         if vectors:
             assert vectorset_configs is not None

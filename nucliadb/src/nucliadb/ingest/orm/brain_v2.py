@@ -216,6 +216,7 @@ class ResourceBrain:
         user_field_metadata: Optional[UserFieldMetadata],
         replace_field: bool,
         skip_index: Optional[bool],
+        skip_texts_index: Optional[bool],
     ) -> None:
         # We need to add the extracted text to the texts section of the Resource so that
         # the paragraphs can be indexed
@@ -223,7 +224,7 @@ class ResourceBrain:
             field_key,
             extracted_text,
             replace_field=False,
-            skip_texts=None,
+            skip_texts=skip_texts_index,
         )
         self.apply_field_paragraphs(
             field_key,

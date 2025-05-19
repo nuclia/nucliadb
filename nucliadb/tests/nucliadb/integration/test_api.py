@@ -50,12 +50,15 @@ from nucliadb_protos.resources_pb2 import (
     LinkExtractedData,
     Paragraph,
     QuestionAnswer,
+    Vector,
 )
 from nucliadb_protos.train_pb2 import GetSentencesRequest, TrainParagraph
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder
+from tests.utils.broker_messages.fields import FieldBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
 from tests.writer.test_fields import (
     TEST_CONVERSATION_PAYLOAD,
@@ -1554,6 +1557,7 @@ async def test_classification_labels_are_sent_to_processing(
 async def test_deletions_on_text_index(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
     standalone_knowledgebox: str,
 ):
     kbid = standalone_knowledgebox
@@ -1700,6 +1704,24 @@ async def test_deletions_on_text_index(
     counters = await kb_counters(kbid)
     assert counters.resources == 1
     assert counters.fields == 3
+
+    # Check that we don't duplicate fields when a broker message from the
+    # semantic model migration worker is ingested
+    bmb = BrokerMessageBuilder(kbid=kbid, rid=rid, source=BrokerMessage.MessageSource.PROCESSOR)
+    fb = FieldBuilder("title", field_type=FieldType.GENERIC)
+    fb.with_extracted_vectors(
+        vectors=[Vector(start=0, end=10, vector=[1.0 for i in range(1024)])], vectorset="multilingual"
+    )
+    bmb.add_field_builder(fb)
+    bm = bmb.build()
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    await mark_dirty()
+    await wait_for_sync()
+
+    counters = await kb_counters(kbid)
+    assert counters.resources == 1
+    assert counters.fields == 3  # the two fields plus the title
 
     # Now delete the resource
     resp = await nucliadb_writer.delete(f"kb/{kbid}/resource/{rid}")
