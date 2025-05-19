@@ -1,0 +1,10 @@
+version: 3
+project:
+  id: nuclia/nucliadb
+  name: nucliadb (CI)
+targets:
+  only:
+    - type: cargo
+      path: nidx
+    - type: setuptools
+      path: python-lock
