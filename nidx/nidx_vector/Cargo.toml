@@ -2,7 +2,7 @@
 name = "nidx_vector"
 version = "0.1.0"
 edition = "2024"
-license = "AGPL-3.0"
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 nidx_types = { version = "0.1.0", path = "../nidx_types" }

@@ -5,15 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nucliadb_dataset"
 version = "6.4.0"
-license = { text = "AGPL" }
+license = "Apache-2.0"
 description = "NucliaDB Train Python client"
-authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
+authors = [{ name = "Nuclia", email = "nucliadb@nuclia.com" }]
 readme = "README.md"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
