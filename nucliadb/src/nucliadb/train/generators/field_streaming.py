@@ -103,7 +103,7 @@ async def generate_field_streaming_payloads(
         if field_unique_key in fields:
             # This field has already been yielded. This can happen as we are streaming directly from nidx
             # and field deletions may not be reflected immediately in the index.
-            logger.info(f"Duplicated field found {field_unique_key}. Skipping.", extra={"kbid": kbid})
+            logger.warning(f"Duplicated field found {field_unique_key}. Skipping.", extra={"kbid": kbid})
             continue
 
         fields.add(field_unique_key)
