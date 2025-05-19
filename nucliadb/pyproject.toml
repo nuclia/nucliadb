@@ -5,15 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nucliadb"
 version = "6.4.0"
-license = { text = "AGPL" }
+license = "AGPL-3.0-or-later"
 description = "NucliaDB"
-authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
+authors = [{ name = "Nuclia", email = "nucliadb@nuclia.com" }]
 readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -94,9 +93,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-redis = [
-    "redis>=4.3.4"
-]
+redis = ["redis>=4.3.4"]
 
 [project.scripts]
 # Service commands
