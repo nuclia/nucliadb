@@ -2,6 +2,8 @@ name: Fossa
 
 on:
   push:
+    branches:
+      - main
 
 jobs:
   fossa:
