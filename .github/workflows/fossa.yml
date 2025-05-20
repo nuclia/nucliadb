@@ -1,0 +1,26 @@
+name: Fossa
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  fossa:
+    name: "Fossa Scan"
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Export python lockfiles
+        run: |
+          mkdir python-lock
+          for lockfile in $(find . -name uv.lock)
+          do
+            destname=requirements$(dirname $lockfile | sed s%^.%%g | sed s%/%_%g).txt
+            uv export --frozen --directory $(dirname $lockfile) > python-lock/$destname
+          done
+      - uses: fossas/fossa-action@main
+        with:
+          api-key: ${{secrets.FOSSA_API_KEY}}
