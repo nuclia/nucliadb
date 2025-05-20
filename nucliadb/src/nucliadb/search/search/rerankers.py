@@ -77,11 +77,14 @@ class Reranker(ABC):
         list of reranked items sorted by decreasing score. The list will contain
         at most, `window` elements.
 
+        NOTE: Other search engines allow a mix of reranked and not reranked
+        results, there's no technical reason we can't do it
+
         """
         # Enforce reranker window and drop the rest
-        # XXX: other search engines allow a mix of reranked and not reranked
-        # results, there's no technical reason we can't do it
         items = items[: self.window]
+        if len(items) == 0:
+            return []
         reranked = await self._rerank(items, options)
         return reranked
 
