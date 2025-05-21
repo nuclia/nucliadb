@@ -184,6 +184,10 @@ class PullResponseV2(pydantic.BaseModel):
     pending: int
 
 
+class PullStatusResponse(pydantic.BaseModel):
+    pending: int
+
+
 JSON_HEADERS = {"Content-Type": "application/json"}
 
 
@@ -229,6 +233,14 @@ class ProcessingHTTPClient:
                 return None
             else:
                 return PullResponseV2.model_validate_json(resp_text)
+
+    async def pull_status(self) -> PullStatusResponse:
+        url = self.base_url_v2 + "/pull/status"
+        async with self.session.get(url, headers=self.headers) as resp:
+            resp_text = await resp.text()
+            check_status(resp, resp_text)
+
+            return PullStatusResponse.model_validate_json(resp_text)
 
     async def requests(
         self,
