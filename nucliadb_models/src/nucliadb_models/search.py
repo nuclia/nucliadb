@@ -604,14 +604,14 @@ class SearchParamDefaults:
     )
     chat_context = ParamDefault(
         default=None,
-        title="Chat history",
+        title="Chat context (deprecated)",
         description="DEPRECATED! Please, use `chat_history` instead.",
         deprecated=True,
     )
     chat_history = ParamDefault(
         default=None,
         title="Chat history",
-        description="Use to rephrase the new LLM query by taking into account the chat conversation history",  # noqa: E501
+        description="Use to rephrase the new LLM query by taking into account the chat conversation history. This will be passed to the LLM so that it is aware of the previous conversation.",  # noqa: E501
     )
     chat_features = ParamDefault(
         default=[ChatOptions.SEMANTIC, ChatOptions.KEYWORD],
@@ -1599,7 +1599,7 @@ If empty, the default strategy is used, which simply adds the text of the matchi
                 description=(
                     "Threshold to determine if the past chat history is relevant to rephrase the user's question. "
                     "0 - Always treat previous messages as relevant (always rephrase)."
-                    "1 – Always treat previous messages as irrelevant (never rephrase)."
+                    "1 - Always treat previous messages as irrelevant (never rephrase)."
                     "Values in between adjust the sensitivity."
                 ),
             ),
