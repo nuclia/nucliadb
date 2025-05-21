@@ -19,8 +19,6 @@
 #
 import uuid
 
-from nucliadb.common.back_pressure.settings import settings as back_pressure_settings
-from nucliadb.ingest.consumer.service import start_pull_workers
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
 from nucliadb_utils.nats import NatsConnectionManager
@@ -79,20 +77,3 @@ async def test_separated_ingest_consumer(
 
     assert consumer_info1.delivered.stream_seq == 1
     assert consumer_info2.delivered.stream_seq == 2
-
-
-async def test_start_pull_workers_with_back_pressure(
-    shard_manager,
-    dummy_nidx_utility,
-    ingest_consumers,
-    ingest_processed_consumer,
-    knowledgebox_ingest,
-    transaction_utility: TransactionUtility,
-    nats_manager: NatsConnectionManager,
-    pubsub,
-) -> None:
-    back_pressure_settings.enabled = True
-    finalizers = await start_pull_workers("test")
-    assert len(finalizers) > 0
-    for finalizer in finalizers:
-        await finalizer()

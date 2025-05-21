@@ -113,7 +113,7 @@ async def ingest_processed_consumer(
     indexing_utility,
     nats_manager: NatsConnectionManager,
 ):
-    ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
+    ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer_v2()
 
     yield
 
