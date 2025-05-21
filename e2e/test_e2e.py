@@ -12,26 +12,7 @@ BASE_URL = os.environ.get("NUCLIADB_URL", "http://localhost:8080")
 
 
 @pytest.fixture(scope="session")
-def pull_offset():
-    """
-    Setup our pull consumer to start at end of queue and use ephemeral consumers
-
-    This allows us to pull data for the resource we're creating in this test
-    """
-    resp = requests.get(os.path.join(BASE_URL, "api/v1/pull/position"))
-    raise_for_status(resp)
-    end_offset = resp.json()["end_offset"]
-    resp = requests.patch(
-        os.path.join(BASE_URL, "api/v1/pull/position"),
-        headers={"content-type": "application/json"},
-        json={"cursor": end_offset - 1},
-    )
-    raise_for_status(resp)
-    yield end_offset
-
-
-@pytest.fixture(scope="session")
-def kbid(pull_offset: int):
+def kbid():
     # generate random slug
     slug = "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=10))
     resp = requests.post(
@@ -336,7 +317,6 @@ def _test_predict_proxy_chat(kbid: str):
     meta = next(line["chunk"] for line in lines if line["chunk"]["type"] == "meta")
     assert meta["input_tokens"] >= 0
     assert meta["output_tokens"] >= 0
-
 
 
 def _test_predict_proxy_tokens(kbid: str):
