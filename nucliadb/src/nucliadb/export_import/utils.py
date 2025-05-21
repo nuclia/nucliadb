@@ -130,37 +130,6 @@ async def process_bm_grpc(context: ApplicationContext, bm: writer_pb2.BrokerMess
     assert response.status == writer_pb2.OpStatusWriter.Status.OK, "Failed to process broker message"
 
 
-async def transaction_commit(
-    context: ApplicationContext, bm: writer_pb2.BrokerMessage, partition: int
-) -> None:
-    """
-    Try to send the broker message over nats. If it's too big, upload
-    it to blob storage and over nats only send a reference to it.
-    """
-    try:
-        await context.transaction.commit(
-            bm,
-            partition,
-            wait=False,
-            target_subject=Streams.INGEST_PROCESSED.subject,
-        )
-    except MaxTransactionSizeExceededError:
-        stored_key = await context.blob_storage.set_stream_message(
-            kbid=bm.kbid, rid=bm.uuid, data=bm.SerializeToString()
-        )
-        referenced_bm = writer_pb2.BrokerMessageBlobReference(
-            uuid=bm.uuid, kbid=bm.kbid, storage_key=stored_key
-        )
-        await context.transaction.commit(
-            writer=referenced_bm,
-            partition=partition,
-            target_subject=Streams.INGEST_PROCESSED.subject,
-            # This header is needed as it's the way we flag the transaction
-            # consumer to download from storage
-            headers={"X-MESSAGE-TYPE": "PROXY"},
-        )
-
-
 def get_writer_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
     wbm = writer_pb2.BrokerMessage()
     wbm.CopyFrom(bm)
