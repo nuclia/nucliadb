@@ -39,9 +39,8 @@ from nucliadb.common.http_clients.processing import (
     PullRequestV2,
     PullResponseV2,
 )
-from nucliadb.ingest.consumer.pull import PullV2Worker, PullWorker
+from nucliadb.ingest.consumer.pull import PullV2Worker
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from nucliadb_utils import const
 from nucliadb_utils.fastapi.run import start_server
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.tests import free_port
@@ -124,24 +123,6 @@ async def pull_processor_api():
 
 
 @pytest.fixture()
-async def pull_worker(
-    maindb_driver,
-    pull_processor_api: PullProcessorAPI,
-):
-    worker = PullWorker(
-        driver=maindb_driver,
-        partition="1",
-        storage=None,  # type: ignore
-        pull_time_error_backoff=5,
-        pull_time_empty_backoff=0.1,
-    )
-
-    task = asyncio.create_task(worker.loop())
-    yield worker
-    task.cancel()
-
-
-@pytest.fixture()
 async def pull_v2_worker(maindb_driver, pull_processor_api: PullProcessorAPI, storage):
     worker = PullV2Worker(
         driver=maindb_driver,
@@ -172,26 +153,6 @@ async def back_pressure(
     await back_pressure.stop()
 
 
-@pytest.fixture()
-async def pull_worker_with_back_pressure(
-    maindb_driver,
-    pull_processor_api: PullProcessorAPI,
-    back_pressure: BackPressureMaterializer,
-):
-    worker = PullWorker(
-        driver=maindb_driver,
-        partition="1",
-        storage=None,  # type: ignore
-        pull_time_error_backoff=5,
-        pull_time_empty_backoff=0.1,
-        back_pressure=back_pressure,
-    )
-
-    task = asyncio.create_task(worker.loop())
-    yield worker
-    task.cancel()
-
-
 async def wait_for_messages(messages: list[BrokerMessage], max_time: int = 10) -> None:
     start = time.monotonic()
     while time.monotonic() - start < max_time:
@@ -200,68 +161,6 @@ async def wait_for_messages(messages: list[BrokerMessage], max_time: int = 10) -
             return
 
         await asyncio.sleep(0.1)
-
-
-async def test_pull_full_integration(
-    shard_manager,
-    dummy_nidx_utility,
-    ingest_consumers,
-    ingest_processed_consumer,
-    pull_worker: PullWorker,
-    pull_processor_api: PullProcessorAPI,
-    knowledgebox_ingest: str,
-    nats_manager: NatsConnectionManager,
-):
-    # make sure stream is empty
-    consumer_info1 = await nats_manager.js.consumer_info(
-        const.Streams.INGEST.name, const.Streams.INGEST.group.format(partition="1")
-    )
-    consumer_info2 = await nats_manager.js.consumer_info(
-        const.Streams.INGEST_PROCESSED.name, const.Streams.INGEST_PROCESSED.group
-    )
-    assert consumer_info1.delivered.stream_seq == 0
-    assert consumer_info2.delivered.stream_seq == 0
-
-    # add message that should go to first consumer
-    pull_processor_api.messages.append(create_broker_message(knowledgebox_ingest))
-    await wait_for_messages(pull_processor_api.messages)
-
-    consumer_info1 = await nats_manager.js.consumer_info(
-        const.Streams.INGEST.name, const.Streams.INGEST_PROCESSED.group
-    )
-
-    assert consumer_info1.delivered.stream_seq == 1
-
-
-async def test_pull_full_integration_with_back_pressure(
-    shard_manager,
-    dummy_nidx_utility,
-    ingest_consumers,
-    ingest_processed_consumer,
-    pull_worker_with_back_pressure: PullWorker,
-    pull_processor_api: PullProcessorAPI,
-    knowledgebox_ingest: str,
-    nats_manager: NatsConnectionManager,
-):
-    # make sure stream is empty
-    consumer_info1 = await nats_manager.js.consumer_info(
-        const.Streams.INGEST.name, const.Streams.INGEST.group.format(partition="1")
-    )
-    consumer_info2 = await nats_manager.js.consumer_info(
-        const.Streams.INGEST_PROCESSED.name, const.Streams.INGEST_PROCESSED.group
-    )
-    assert consumer_info1.delivered.stream_seq == 0
-    assert consumer_info2.delivered.stream_seq == 0
-
-    # add message that should go to first consumer
-    pull_processor_api.messages.append(create_broker_message(knowledgebox_ingest))
-    await wait_for_messages(pull_processor_api.messages)
-
-    consumer_info1 = await nats_manager.js.consumer_info(
-        const.Streams.INGEST.name, const.Streams.INGEST_PROCESSED.group
-    )
-
-    assert consumer_info1.delivered.stream_seq == 1
 
 
 async def test_pull_v2(

@@ -113,7 +113,7 @@ async def ingest_processed_consumer(
     indexing_utility,
     nats_manager: NatsConnectionManager,
 ):
-    ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
+    ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer_v2()
 
     yield
 
@@ -261,10 +261,7 @@ async def nats_ingest_processed_stream(nats_server: str):
     streams = [
         (const.Streams.INGEST.name, const.Streams.INGEST.subject.format(partition=">")),
     ]
-    consumers = [
-        (const.Streams.INGEST_PROCESSED.name, const.Streams.INGEST_PROCESSED.group),
-    ]
-    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
+    async with _nats_streams_and_consumers_setup(nats_server, streams, []):
         yield
 
 
