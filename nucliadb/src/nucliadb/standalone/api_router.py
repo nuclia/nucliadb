@@ -21,15 +21,12 @@ import logging
 import time
 
 import orjson
-import pydantic
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
 from fastapi_versioning import version
 from jwcrypto import jwe, jwk  # type: ignore
 
-from nucliadb.common import datamanagers
-from nucliadb.common.http_clients import processing
 from nucliadb.common.http_clients.auth import NucliaAuthHTTPClient
 from nucliadb.standalone import versions
 from nucliadb_models.resource import NucliaDBRoles

@@ -261,8 +261,7 @@ async def nats_ingest_processed_stream(nats_server: str):
     streams = [
         (const.Streams.INGEST.name, const.Streams.INGEST.subject.format(partition=">")),
     ]
-    consumers = []
-    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
+    async with _nats_streams_and_consumers_setup(nats_server, streams, []):
         yield
 
 

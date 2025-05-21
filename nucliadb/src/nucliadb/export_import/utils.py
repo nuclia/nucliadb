@@ -40,8 +40,6 @@ from nucliadb_models.export_import import Status
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.const import Streams
-from nucliadb_utils.transaction import MaxTransactionSizeExceededError
 from nucliadb_utils.utilities import get_ingest
 
 BinaryStream = AsyncIterator[bytes]
