@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb"
-version = "6.4.0"
+version = "6.4.1"
 license = "AGPL-3.0-or-later"
 description = "NucliaDB"
 authors = [{ name = "Nuclia", email = "nucliadb@nuclia.com" }]
