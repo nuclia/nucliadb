@@ -20,7 +20,7 @@
 import json
 from typing import Union
 
-from fastapi import Request
+from fastapi import Header, Request
 from fastapi.responses import Response, StreamingResponse
 from fastapi_versioning import version
 
@@ -30,10 +30,17 @@ from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.predict_proxy import PredictProxiedEndpoints, predict_proxy
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.search import NucliaDBClientType
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 
-DESCRIPTION = "Convenience endpoint that proxies requests to the Predict API. It adds the Knowledge Box configuration settings as headers to the predict API request. Refer to the Predict API documentation for more details about the request and response models: https://docs.nuclia.dev/docs/nua-api#tag/Predict"  # noqa: E501
+DESCRIPTION = (
+    "Convenience endpoint that proxies requests to the Predict API."
+    " It adds the Knowledge Box configuration settings as headers to"
+    " the predict API request. Refer to the Predict API documentation"
+    " for more details about the request and response models:"
+    " https://docs.nuclia.dev/docs/nua-api#tag/Predict"
+)
 
 
 @api.get(
@@ -58,20 +65,28 @@ async def predict_proxy_endpoint(
     request: Request,
     kbid: str,
     endpoint: PredictProxiedEndpoints,
+    x_nucliadb_user: str = Header(""),
+    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
+    x_forwarded_for: str = Header(""),
 ) -> Union[Response, StreamingResponse, HTTPClientError]:
     try:
         payload = await request.json()
     except json.JSONDecodeError:
         payload = None
     try:
-        return await predict_proxy(
+        response = await predict_proxy(
             kbid,
             endpoint,
             request.method,
             params=request.query_params,
             json=payload,
             headers=dict(request.headers),
+            user_id=x_nucliadb_user,
+            client_type=x_ndb_client,
+            origin=x_forwarded_for,
         )
+
+        return response
     except KnowledgeBoxNotFound:
         return HTTPClientError(status_code=404, detail="Knowledge box not found")
     except LimitsExceededError as exc:
