@@ -273,13 +273,14 @@ async def test_vectorset_migration(
     text = "Lionel Messi is a football player."
     link_field.with_extracted_text(text)
     link_field.with_extracted_paragraph_metadata(Paragraph(start=0, end=len(text)))
+    link_vector = [1.0 for _ in range(1024)]
     vectors = [
         utils_pb2.Vector(
             start=0,
             end=len(text),
             start_paragraph=0,
             end_paragraph=len(text),
-            vector=[1.0 for _ in range(1024)],
+            vector=link_vector,
         )
     ]
     link_field.with_extracted_vectors(vectors, vectorset="multilingual-2024-05-06")
@@ -289,13 +290,14 @@ async def test_vectorset_migration(
     text = "link"
     title_field.with_extracted_text(text)
     title_field.with_extracted_paragraph_metadata(Paragraph(start=0, end=len(text)))
+    title_vector = [5.0 for _ in range(1024)]
     vectors = [
         utils_pb2.Vector(
             start=0,
             end=len(text),
             start_paragraph=0,
             end_paragraph=len(text),
-            vector=[5.0 for _ in range(1024)],
+            vector=title_vector,
         )
     ]
     title_field.with_extracted_vectors(vectors, vectorset="multilingual-2024-05-06")
@@ -313,7 +315,7 @@ async def test_vectorset_migration(
     assert counters.fields == 2  # the title and the link field
 
     # Make a search and check that the document is found
-    await _check_search(nucliadb_reader, kbid, query="football", vector=[1.0 for _ in range(1024)])
+    await _check_search(nucliadb_reader, kbid, query="football", vector=link_vector)
 
     # Now add a new vectorset
     vectorset_id = "en-2024-05-06"
@@ -334,13 +336,14 @@ async def test_vectorset_migration(
     ev = ExtractedVectorsWrapper()
     ev.field.CopyFrom(field)
     ev.vectorset_id = "en-2024-05-06"
+    link_vector_migrated = [2.0 for _ in range(1024)]
     vector = utils_pb2.Vector(
         start=0,
         end=len(text),
         start_paragraph=0,
         end_paragraph=len(text),
     )
-    vector.vector.extend([2.0 for _ in range(1024)])
+    vector.vector.extend(link_vector_migrated)
     ev.vectors.vectors.vectors.append(vector)
     bm2.field_vectors.append(ev)
 
@@ -361,7 +364,7 @@ async def test_vectorset_migration(
         kbid,
         query="football",
         vectorset="en-2024-05-06",
-        vector=[2.0 for _ in range(1024)],
+        vector=link_vector_migrated,
     )
 
     # With the default vectorset the document should also be found
@@ -370,62 +373,62 @@ async def test_vectorset_migration(
         kbid,
         query="football",
         vectorset="multilingual-2024-05-06",
-        vector=[1.0 for _ in range(1024)],
+        vector=link_vector,
     )
-    await _check_search(nucliadb_reader, kbid, query="football", vector=[1.0 for _ in range(1024)])
+    await _check_search(nucliadb_reader, kbid, query="football", vector=link_vector)
 
     await _check_search(
         nucliadb_reader,
         kbid,
         query="link",
         vectorset="en-2024-05-06",
-        vector=[5.0 for _ in range(1024)],
+        vector=title_vector,
     )
 
-    # # Simulate that embeddings for the title field of this resource are also migrated
-    # # Ingest a new broker message as if it was coming from the migration
-    # bm3 = BrokerMessage(
-    #     kbid=kbid,
-    #     uuid=rid,
-    #     type=BrokerMessage.MessageType.AUTOCOMMIT,
-    #     source=BrokerMessage.MessageSource.PROCESSOR,
-    # )
-    # ev = ExtractedVectorsWrapper()
-    # ev.field.CopyFrom(FieldID(field_type=FieldType.GENERIC, field="title"))
-    # ev.vectorset_id = "en-2024-05-06"
-    # vector = utils_pb2.Vector(
-    #     start=0,
-    #     end=len(text),
-    #     start_paragraph=0,
-    #     end_paragraph=len(text),
-    # )
-    # vector.vector.extend([6.0 for _ in range(1024)])
-    # ev.vectors.vectors.vectors.append(vector)
-    # bm3.field_vectors.append(ev)
+    # Simulate that embeddings for the title field of this resource are also migrated
+    # Ingest a new broker message as if it was coming from the migration
+    bm3 = BrokerMessage(
+        kbid=kbid,
+        uuid=rid,
+        type=BrokerMessage.MessageType.AUTOCOMMIT,
+        source=BrokerMessage.MessageSource.PROCESSOR,
+    )
+    ev = ExtractedVectorsWrapper()
+    ev.field.CopyFrom(FieldID(field_type=FieldType.GENERIC, field="title"))
+    ev.vectorset_id = "en-2024-05-06"
+    title_vector_migrated = [6.0 for _ in range(1024)]
+    vector = utils_pb2.Vector(
+        start=0,
+        end=len(text),
+        start_paragraph=0,
+        end_paragraph=len(text),
+    )
+    vector.vector.extend(title_vector_migrated)
+    ev.vectors.vectors.vectors.append(vector)
+    bm3.field_vectors.append(ev)
 
-    # breakpoint()
-    # await inject_message(nucliadb_ingest_grpc, bm3)
+    await inject_message(nucliadb_ingest_grpc, bm3)
 
-    # await wait_for_sync()
+    await wait_for_sync()
 
     # Make a search with the new vectorset and check that the document is found
-    # await _check_search(
-    #     nucliadb_reader,
-    #     kbid,
-    #     query="football",
-    #     vectorset="en-2024-05-06",
-    #     vector=[2.0 for _ in range(1024)],
-    # )
+    await _check_search(
+        nucliadb_reader,
+        kbid,
+        query="football",
+        vectorset="en-2024-05-06",
+        vector=link_vector_migrated,
+    )
 
-    # # With the default vectorset the document should also be found
-    # await _check_search(
-    #     nucliadb_reader,
-    #     kbid,
-    #     query="football",
-    #     vectorset="multilingual-2024-05-06",
-    #     vector=[1.0 for _ in range(1024)],
-    # )
-    # await _check_search(nucliadb_reader, kbid, query="football", vector=[1.0 for _ in range(1024)])
+    # With the default vectorset the document should also be found
+    await _check_search(
+        nucliadb_reader,
+        kbid,
+        query="football",
+        vectorset="multilingual-2024-05-06",
+        vector=link_vector,
+    )
+    await _check_search(nucliadb_reader, kbid, query="football", vector=link_vector)
 
     # Do a rollover and test again
 
@@ -443,7 +446,7 @@ async def test_vectorset_migration(
         kbid,
         vectorset="en-2024-05-06",
         query="football",
-        vector=[2.0 for _ in range(1024)],
+        vector=link_vector_migrated,
     )
 
     # With the default vectorset the document should also be found
@@ -452,9 +455,9 @@ async def test_vectorset_migration(
         kbid,
         vectorset="multilingual-2024-05-06",
         query="football",
-        vector=[1.0 for _ in range(1024)],
+        vector=link_vector,
     )
-    await _check_search(nucliadb_reader, kbid, query="football", vector=[1.0 for _ in range(1024)])
+    await _check_search(nucliadb_reader, kbid, query="football", vector=link_vector)
 
     await app_context.finalize()
 
