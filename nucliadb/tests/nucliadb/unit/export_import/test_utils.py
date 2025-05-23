@@ -31,12 +31,10 @@ from nucliadb.export_import.utils import (
     TaskRetryHandler,
     get_cloud_files,
     restore_broker_message,
-    transaction_commit,
 )
 from nucliadb_models.export_import import Status
 from nucliadb_protos import resources_pb2, writer_pb2
-from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
-from nucliadb_utils.transaction import MaxTransactionSizeExceededError
+from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
 @pytest.fixture(scope="function")
@@ -278,19 +276,3 @@ class TestTaskRetryHandler:
             metadata.task.status = status
             await callback_retried("foo", bar="baz")
             callback.assert_not_called()
-
-
-async def test_transaction_commit_sends_storage_reference_on_max_payload_error():
-    context = Mock()
-    context.transaction.commit = AsyncMock(side_effect=[MaxTransactionSizeExceededError, None])
-    context.blob_storage = AsyncMock()
-    context.blob_storage.set_stream_message.return_value = "key"
-
-    bm = BrokerMessage(kbid="kbid", uuid="uuid")
-
-    await transaction_commit(context, bm, 1)
-
-    assert context.transaction.commit.call_count == 2
-    call = context.transaction.commit.call_args_list[-1]
-    assert isinstance(call[1]["writer"], BrokerMessageBlobReference)
-    assert call[1]["headers"] == {"X-MESSAGE-TYPE": "PROXY"}
