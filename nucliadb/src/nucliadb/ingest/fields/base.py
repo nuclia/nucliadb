@@ -209,6 +209,7 @@ class Field(Generic[PbType]):
     ) -> None:
         # Try delete vectors
         sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
+        # This is a very chatty log. It is just a temporary hint while debugging an issue.
         logger.info(
             "Deleting vectors from storage",
             extra={
