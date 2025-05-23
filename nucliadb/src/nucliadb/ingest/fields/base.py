@@ -210,13 +210,15 @@ class Field(Generic[PbType]):
         # Try delete vectors
         sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
         logger.info(
-            "Deleting vectors",
+            "Deleting vectors from storage",
             extra={
                 "kbid": self.kbid,
                 "rid": self.resource.uuid,
                 "field": f"{self.type}/{self.id}",
                 "vectorset": vectorset,
                 "storage_key_kind": storage_key_kind,
+                "key": sf.key,
+                "bucket": sf.bucket,
             },
         )
         try:
