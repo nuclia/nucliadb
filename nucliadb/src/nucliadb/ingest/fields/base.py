@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import enum
+import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar
 
@@ -45,6 +46,8 @@ from nucliadb_protos.utils_pb2 import ExtractedText, VectorObject
 from nucliadb_protos.writer_pb2 import Error, FieldStatus
 from nucliadb_utils.storages.exceptions import CouldNotCopyNotFound
 from nucliadb_utils.storages.storage import Storage, StorageField
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.resource import Resource
@@ -206,6 +209,16 @@ class Field(Generic[PbType]):
     ) -> None:
         # Try delete vectors
         sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
+        logger.info(
+            "Deleting vectors",
+            extra={
+                "kbid": self.kbid,
+                "rid": self.resource.uuid,
+                "field": f"{self.type}/{self.id}",
+                "vectorset": vectorset,
+                "storage_key_kind": storage_key_kind,
+            },
+        )
         try:
             await self.storage.delete_upload(sf.key, sf.bucket)
         except KeyError:
