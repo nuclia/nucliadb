@@ -721,6 +721,8 @@ def build_text_blocks_from_relations(
     )
     paragraph_count = 0
     for ent, subgraph in relations.entities.items():
+        if ent not in scores:
+            continue
         for rel, score in zip(subgraph.related_to, scores[ent]):
             key = (
                 (
