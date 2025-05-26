@@ -179,6 +179,7 @@ class NatsConnectionManager:
             try:
                 await asyncio.wait_for(self._nc.drain(), timeout=1)
             except (
+                nats.errors.ConnectionReconnectingError,
                 nats.errors.ConnectionClosedError,
                 asyncio.TimeoutError,
             ):  # pragma: no cover
