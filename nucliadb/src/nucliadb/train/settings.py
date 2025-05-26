@@ -34,7 +34,7 @@ class Settings(DriverSettings):
     internal_search_api: str = "http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{kbid}/search"
 
     resource_cache_size: int = 2
-    field_streaming_parallelization = 5
+    field_streaming_parallelisation = 5
 
 
 settings = Settings()
