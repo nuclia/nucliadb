@@ -92,7 +92,5 @@ class Settings(DriverSettings):
 
     max_concurrent_ingest_processing: int = 5
 
-    processing_pull_mode: ProcessingPullMode = ProcessingPullMode.V1
-
 
 settings = Settings()

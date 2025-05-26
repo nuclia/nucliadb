@@ -37,7 +37,6 @@ from nucliadb.common.back_pressure.utils import (
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb_telemetry import metrics
-from nucliadb_utils import const
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import is_onprem_nucliadb
 
@@ -162,11 +161,8 @@ class BackPressureMaterializer:
             while True:
                 try:
                     with back_pressure_observer({"type": "get_ingest_pending"}):
-                        self.ingest_pending = await get_nats_consumer_pending_messages(
-                            self.nats_manager,
-                            stream=const.Streams.INGEST_PROCESSED.name,
-                            consumer=const.Streams.INGEST_PROCESSED.group,
-                        )
+                        status = await self.processing_http_client.pull_status()
+                        self.ingest_pending = status.pending
                 except Exception:  # pragma: no cover
                     logger.exception(
                         "Error getting pending messages to ingest",

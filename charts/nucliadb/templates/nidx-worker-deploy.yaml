@@ -69,8 +69,6 @@ spec:
           {{- if .Values.nidx.envSecrets }}
 {{ toYaml .Values.nidx.envSecrets | indent 10 }}
           {{- end }}
-          - name: WORK_PATH
-            value: "/data"
         {{- if .Values.nidx.envFrom }}
         envFrom:
           {{- toYaml .Values.nidx.envFrom | nindent 10 }}

@@ -55,7 +55,6 @@ from nucliadb_utils.authentication import requires
     summary="Search Knowledge Box graph",
     description="Search on the Knowledge Box graph and retrieve triplets of vertex-edge-vertex",
     response_model_exclude_unset=True,
-    include_in_schema=False,
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
@@ -82,7 +81,6 @@ async def graph_search_knowledgebox(
     summary="Search Knowledge Box graph nodes",
     description="Search on the Knowledge Box graph and retrieve nodes (vertices)",
     response_model_exclude_unset=True,
-    include_in_schema=False,
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
@@ -109,7 +107,6 @@ async def graph_nodes_search_knowledgebox(
     summary="Search Knowledge Box graph relations",
     description="Search on the Knowledge Box graph and retrieve relations (edges)",
     response_model_exclude_unset=True,
-    include_in_schema=False,
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)

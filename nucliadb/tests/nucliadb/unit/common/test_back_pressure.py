@@ -40,6 +40,7 @@ from nucliadb.common.back_pressure.utils import (
     BackPressureException,
     estimate_try_after,
 )
+from nucliadb.common.http_clients.processing import PullStatusResponse
 
 MODULE = "nucliadb.common.back_pressure"
 
@@ -230,6 +231,8 @@ def processing_client():
     resp = mock.Mock(incomplete=10)
     processing_client.stats = mock.AsyncMock(return_value=resp)
     processing_client.close = mock.AsyncMock()
+    processing_client.pull_status = mock.AsyncMock()
+    processing_client.pull_status.return_value = PullStatusResponse(pending=10)
     yield processing_client
 
 
@@ -251,12 +254,14 @@ async def test_materializer(nats_conn, js, processing_client):
     await asyncio.sleep(0.1)
 
     # one index nodes and ingest streams are queried
-    assert len(js.consumer_info.call_args_list) == 2
+    assert len(js.consumer_info.call_args_list) == 1
+    assert len(processing_client.pull_status.call_args_list) == 1
 
     # Wait for the next check
     await asyncio.sleep(0.5)
 
-    assert len(js.consumer_info.call_args_list) == 4
+    assert len(js.consumer_info.call_args_list) == 2
+    assert len(processing_client.pull_status.call_args_list) == 2
 
     # Make sure the values are materialized
     assert materializer.get_indexing_pending() == 10

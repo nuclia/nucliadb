@@ -36,18 +36,9 @@ class Streams:
         subject = "ndb.consumer.{partition}"
         group = "nucliadb-pull-{partition}"
 
-    class INGEST_PROCESSED:
-        """
-        Resources that have been processed by learning need to be
-        written to the database and then Indexed.
-        """
-
-        name = "nucliadb"
-        subject = "ndb.consumer.processed"
-        group = "nucliadb-pull-processed"
-
 
 class Features:
     SKIP_EXTERNAL_INDEX = "nucliadb_skip_external_index"
     LOG_REQUEST_PAYLOADS = "nucliadb_log_request_payloads"
     IGNORE_EXTRACTED_IN_SEARCH = "nucliadb_ignore_extracted_in_search"
+    DEBUG_MISSING_VECTORS = "nucliadb_debug_missing_vectors"
