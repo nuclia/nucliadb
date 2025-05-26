@@ -72,7 +72,7 @@ async def generate_field_streaming_payloads(
     fields = set()
 
     async for fsd in iter_field_split_data(
-        request, kbid, trainset, max_parallel=settings.field_streaming_parallelization
+        request, kbid, trainset, max_parallel=settings.field_streaming_parallelisation
     ):
         resources.add(fsd.rid)
         field_unique_key = f"{fsd.rid}/{fsd.field_type}/{fsd.field}/{fsd.split}"
