@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
 from typing import AsyncGenerator, Optional
 
 from nidx_protos.nodereader_pb2 import StreamRequest
@@ -50,25 +51,19 @@ async def generate_field_streaming_payloads(
     trainset: TrainSet,
     shard_replica_id: str,
 ) -> AsyncGenerator[FieldSplitData, None]:
-    # Query how many resources has each label
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
 
     for label in trainset.filter.labels:
         request.filter.labels.append(f"/l/{label}")
-
     for path in trainset.filter.paths:
         request.filter.labels.append(f"/p/{path}")
-
     for metadata in trainset.filter.metadata:
         request.filter.labels.append(f"/m/{metadata}")
-
     for entity in trainset.filter.entities:
         request.filter.labels.append(f"/e/{entity}")
-
     for field in trainset.filter.fields:
         request.filter.labels.append(f"/f/{field}")
-
     for status in trainset.filter.status:
         request.filter.labels.append(f"/n/s/{status}")
 
@@ -76,10 +71,6 @@ async def generate_field_streaming_payloads(
     fields = set()
 
     async for document_item in get_nidx_searcher_client().Documents(request):
-        text_labels = []
-        for label in document_item.labels:
-            text_labels.append(label)
-
         field_id = f"{document_item.uuid}{document_item.field}"
         resources.add(document_item.uuid)
 
@@ -92,12 +83,12 @@ async def generate_field_streaming_payloads(
         else:
             raise Exception(f"Invalid field definition {document_item.field}")
 
-        tl = FieldSplitData()
+        fsd = FieldSplitData()
         rid, field_type, field = field_id.split("/")
-        tl.rid = document_item.uuid
-        tl.field = field
-        tl.field_type = field_type
-        tl.split = split
+        fsd.rid = document_item.uuid
+        fsd.field = field
+        fsd.field_type = field_type
+        fsd.split = split
 
         field_unique_key = f"{rid}/{field_type}/{field}/{split}"
         if field_unique_key in fields:
@@ -108,24 +99,17 @@ async def generate_field_streaming_payloads(
 
         fields.add(field_unique_key)
 
+        tasks = []
         if trainset.exclude_text:
-            tl.text.text = ""
+            fsd.text.text = ""
         else:
-            extracted = await get_field_text(kbid, rid, field, field_type)
-            if extracted is not None:
-                tl.text.CopyFrom(extracted)
+            tasks.append(asyncio.create_task(_fetch_field_extracted_text(kbid, fsd)))
+        tasks.append(asyncio.create_task(_fetch_field_metadata(kbid, fsd)))
+        tasks.append(asyncio.create_task(_fetch_basic(kbid, fsd)))
+        await asyncio.gather(*tasks)
 
-        metadata_obj = await get_field_metadata(kbid, rid, field, field_type)
-        if metadata_obj is not None:
-            tl.metadata.CopyFrom(metadata_obj)
-
-        basic = await get_field_basic(kbid, rid, field, field_type)
-        if basic is not None:
-            tl.basic.CopyFrom(basic)
-
-        tl.labels.extend(text_labels)
-
-        yield tl
+        fsd.labels.extend(document_item.labels)
+        yield fsd
 
         if len(fields) % 1000 == 0:
             logger.info(
@@ -147,6 +131,24 @@ async def generate_field_streaming_payloads(
             "shard_replica_id": shard_replica_id,
         },
     )
+
+
+async def _fetch_field_extracted_text(kbid: str, fsd: FieldSplitData):
+    extracted = await get_field_text(kbid, fsd.rid, fsd.field, fsd.field_type)
+    if extracted is not None:
+        fsd.text.CopyFrom(extracted)
+
+
+async def _fetch_field_metadata(kbid: str, fsd: FieldSplitData):
+    metadata_obj = await get_field_metadata(kbid, fsd.rid, fsd.field, fsd.field_type)
+    if metadata_obj is not None:
+        fsd.metadata.CopyFrom(metadata_obj)
+
+
+async def _fetch_basic(kbid: str, fsd: FieldSplitData):
+    basic = await get_field_basic(kbid, fsd.rid, fsd.field, fsd.field_type)
+    if basic is not None:
+        fsd.basic.CopyFrom(basic)
 
 
 async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> Optional[ExtractedText]:
