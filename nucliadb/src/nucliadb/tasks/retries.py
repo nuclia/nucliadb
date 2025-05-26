@@ -194,7 +194,7 @@ async def purge_batch(
             await cur.execute(
                 """
                 SELECT key from resources
-                WHERE key  ~ '^/kbs/[^/]*/tasks/[^/]*/[^/]*$'
+                WHERE key ~ '^/kbs/[^/]*/tasks/[^/]*/[^/]*$'
                 AND key > %s
                 ORDER BY key
                 LIMIT %s
