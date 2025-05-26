@@ -175,7 +175,7 @@ class NatsConnectionManager:
                 await pull_sub.unsubscribe()
             self._pull_subscriptions = []
 
-            # Close the connection
+            # close the connection
             try:
                 await asyncio.wait_for(self._nc.drain(), timeout=1)
             except (
