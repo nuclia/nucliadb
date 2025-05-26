@@ -19,9 +19,9 @@
 //
 use nidx_protos::ParagraphMetadata;
 use nidx_protos::prost::*;
-use tantivy::DateOptions;
 use tantivy::DateTime;
 use tantivy::TantivyDocument;
+use tantivy::schema::DateOptions;
 use tantivy::schema::Value;
 use tantivy::schema::{FacetOptions, Field, NumericOptions, STORED, STRING, Schema, TEXT};
 
