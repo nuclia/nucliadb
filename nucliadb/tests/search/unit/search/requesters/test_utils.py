@@ -59,22 +59,22 @@ def mocked_search_methods():
         yield methods
 
 
-def test_validate_node_query_results():
-    assert utils.validate_node_query_results([Mock()]) is None
+def test_validate_nidx_query_results():
+    assert utils.validate_nidx_query_results([Mock()]) is None
 
 
-def test_validate_node_query_results_no_results():
-    assert isinstance(utils.validate_node_query_results([]), HTTPException)
-    assert isinstance(utils.validate_node_query_results(None), HTTPException)
+def test_validate_nidx_query_results_no_results():
+    assert isinstance(utils.validate_nidx_query_results([]), HTTPException)
+    assert isinstance(utils.validate_nidx_query_results(None), HTTPException)
 
 
-def test_validate_node_query_results_unhandled_error():
-    error = utils.validate_node_query_results([Exception()])
+def test_validate_nidx_query_results_unhandled_error():
+    error = utils.validate_nidx_query_results([Exception()])
     assert isinstance(error, HTTPException)
 
 
-def test_validate_node_query_results_invalid_query():
-    result = utils.validate_node_query_results(
+def test_validate_nidx_query_results_invalid_query():
+    result = utils.validate_nidx_query_results(
         [
             AioRpcError(
                 code=StatusCode.INTERNAL,
@@ -91,8 +91,8 @@ def test_validate_node_query_results_invalid_query():
     assert result.detail == "Query is invalid. AllButQueryForbidden"
 
 
-def test_validate_node_query_results_internal_unhandled():
-    result = utils.validate_node_query_results(
+def test_validate_nidx_query_results_internal_unhandled():
+    result = utils.validate_nidx_query_results(
         [
             AioRpcError(
                 code=StatusCode.INTERNAL,

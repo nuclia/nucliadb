@@ -40,8 +40,6 @@ from nucliadb_models.export_import import Status
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.const import Streams
-from nucliadb_utils.transaction import MaxTransactionSizeExceededError
 from nucliadb_utils.utilities import get_ingest
 
 BinaryStream = AsyncIterator[bytes]
@@ -128,37 +126,6 @@ async def process_bm_grpc(context: ApplicationContext, bm: writer_pb2.BrokerMess
     ingest_grpc: WriterStub = get_ingest()
     response: writer_pb2.OpStatusWriter = await ingest_grpc.ProcessMessage(_iterator())  # type: ignore
     assert response.status == writer_pb2.OpStatusWriter.Status.OK, "Failed to process broker message"
-
-
-async def transaction_commit(
-    context: ApplicationContext, bm: writer_pb2.BrokerMessage, partition: int
-) -> None:
-    """
-    Try to send the broker message over nats. If it's too big, upload
-    it to blob storage and over nats only send a reference to it.
-    """
-    try:
-        await context.transaction.commit(
-            bm,
-            partition,
-            wait=False,
-            target_subject=Streams.INGEST_PROCESSED.subject,
-        )
-    except MaxTransactionSizeExceededError:
-        stored_key = await context.blob_storage.set_stream_message(
-            kbid=bm.kbid, rid=bm.uuid, data=bm.SerializeToString()
-        )
-        referenced_bm = writer_pb2.BrokerMessageBlobReference(
-            uuid=bm.uuid, kbid=bm.kbid, storage_key=stored_key
-        )
-        await context.transaction.commit(
-            writer=referenced_bm,
-            partition=partition,
-            target_subject=Streams.INGEST_PROCESSED.subject,
-            # This header is needed as it's the way we flag the transaction
-            # consumer to download from storage
-            headers={"X-MESSAGE-TYPE": "PROXY"},
-        )
 
 
 def get_writer_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:

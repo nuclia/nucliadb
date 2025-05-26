@@ -1,27 +1,23 @@
-# Copyright (C) 2021 Bosutech XXI S.L.
+# Copyright 2025 Bosutech XXI S.L.
 #
-# nucliadb is offered under the AGPL v3.0 and as commercial software.
-# For commercial licensing, contact us at info@nuclia.com.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# AGPL:
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
 import json
 from enum import Enum
 from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic.aliases import AliasChoices
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Annotated, Self
 
@@ -608,14 +604,14 @@ class SearchParamDefaults:
     )
     chat_context = ParamDefault(
         default=None,
-        title="Chat history",
+        title="Chat context (deprecated)",
         description="DEPRECATED! Please, use `chat_history` instead.",
         deprecated=True,
     )
     chat_history = ParamDefault(
         default=None,
         title="Chat history",
-        description="Use to rephrase the new LLM query by taking into account the chat conversation history",  # noqa: E501
+        description="Use to rephrase the new LLM query by taking into account the chat conversation history. This will be passed to the LLM so that it is aware of the previous conversation.",  # noqa: E501
     )
     chat_features = ParamDefault(
         default=[ChatOptions.SEMANTIC, ChatOptions.KEYWORD],
@@ -1294,10 +1290,11 @@ Bigger values will discover more intricate relationships but will also take more
         ge=1,
         le=300,
     )
-    agentic_graph_only: bool = Field(
+    exclude_processor_relations: bool = Field(
         default=True,
-        title="Use only the graph extracted by an agent.",
+        title="Do not use relations extracted by processor.",
         description="If set to true, only relationships extracted from a graph extraction agent are considered for context expansion.",
+        validation_alias=AliasChoices("agentic_graph_only", "exclude_processor_relations"),
     )
     relation_text_as_paragraphs: bool = Field(
         default=False,
@@ -1593,21 +1590,17 @@ If empty, the default strategy is used, which simply adds the text of the matchi
             "Rephrase the query for a more efficient retrieval. This will consume LLM tokens and make the request slower."
         ),
     )
-    chat_history_relevance_threshold: Optional[
-        Annotated[
-            float,
-            Field(
-                ge=0.0,
-                le=1.0,
-                description=(
-                    "Threshold to determine if the past chat history is relevant to rephrase the user's question. "
-                    "0 - Always treat previous messages as relevant (always rephrase)."
-                    "1 – Always treat previous messages as irrelevant (never rephrase)."
-                    "Values in between adjust the sensitivity."
-                ),
-            ),
-        ]
-    ] = None
+    chat_history_relevance_threshold: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Threshold to determine if the past chat history is relevant to rephrase the user's question. "
+            "0 - Always treat previous messages as relevant (always rephrase)."
+            "1 - Always treat previous messages as irrelevant (never rephrase)."
+            "Values in between adjust the sensitivity."
+        ),
+    )
 
     prefer_markdown: bool = Field(
         default=False,

@@ -28,7 +28,7 @@ from nidx_protos.nodereader_pb2 import (
 from nucliadb.common.models_utils import to_proto
 from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode, RephraseResponse
-from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
@@ -246,8 +246,6 @@ async def get_relations_results(
     kbid: str,
     text_answer: str,
     timeout: Optional[float] = None,
-    only_with_metadata: bool = False,
-    only_agentic_relations: bool = False,
 ) -> Relations:
     try:
         predict = get_predict()
@@ -257,8 +255,6 @@ async def get_relations_results(
             kbid=kbid,
             entities=detected_entities,
             timeout=timeout,
-            only_with_metadata=only_with_metadata,
-            only_agentic_relations=only_agentic_relations,
         )
     except Exception as exc:
         capture_exception(exc)
@@ -271,9 +267,6 @@ async def get_relations_results_from_entities(
     kbid: str,
     entities: Iterable[RelationNode],
     timeout: Optional[float] = None,
-    only_with_metadata: bool = False,
-    only_agentic_relations: bool = False,
-    only_entity_to_entity: bool = False,
     deleted_entities: set[str] = set(),
 ) -> Relations:
     entry_points = list(entities)
@@ -293,8 +286,7 @@ async def get_relations_results_from_entities(
     (
         results,
         _,
-        _,
-    ) = await node_query(
+    ) = await nidx_query(
         kbid,
         Method.SEARCH,
         request,
@@ -304,9 +296,6 @@ async def get_relations_results_from_entities(
     return await merge_relations_results(
         relations_results,
         entry_points,
-        only_with_metadata,
-        only_agentic_relations,
-        only_entity_to_entity,
     )
 
 

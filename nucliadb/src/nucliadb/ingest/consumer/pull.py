@@ -21,7 +21,6 @@ import asyncio
 import base64
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
 from typing import Optional
 
 from aiohttp.client_exceptions import ClientConnectorError
@@ -32,9 +31,6 @@ from opentelemetry.trace import (
     Link,
 )
 
-from nucliadb.common import datamanagers
-from nucliadb.common.back_pressure.materializer import BackPressureMaterializer
-from nucliadb.common.back_pressure.utils import BackPressureException
 from nucliadb.common.http_clients.processing import (
     ProcessingHTTPClient,
     ProcessingPullMessageProgressUpdater,
@@ -45,212 +41,17 @@ from nucliadb.ingest import SERVICE_NAME, logger, logger_activity
 from nucliadb.ingest.consumer.consumer import consumer_observer
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
 from nucliadb.ingest.orm.processor import Processor
-from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.metrics import Gauge
 from nucliadb_telemetry.utils import get_telemetry
-from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.transaction import MaxTransactionSizeExceededError
-from nucliadb_utils.utilities import get_storage, get_transaction_utility, pull_subscriber_utilization
+from nucliadb_utils.utilities import pull_subscriber_utilization
 
 processing_pending_messages = Gauge("nucliadb_processing_pending_messages")
-
-
-class PullWorker:
-    """
-    The pull worker is responsible for pulling messages from the pull processing
-    http endpoint and injecting them into the processing write queue.
-
-    The processing pull endpoint is also described as the "processing proxy" at times.
-    """
-
-    def __init__(
-        self,
-        driver: Driver,
-        partition: str,
-        storage: Storage,
-        pull_time_error_backoff: int,
-        pubsub: Optional[PubSubDriver] = None,
-        local_subscriber: bool = False,
-        pull_time_empty_backoff: float = 5.0,
-        pull_api_timeout: int = 60,
-        back_pressure: Optional[BackPressureMaterializer] = None,
-    ):
-        self.partition = partition
-        self.pull_time_error_backoff = pull_time_error_backoff
-        self.pull_time_empty_backoff = pull_time_empty_backoff
-        self.pull_api_timeout = pull_api_timeout
-        self.local_subscriber = local_subscriber
-
-        self.processor = Processor(driver, storage, pubsub, partition)
-        self.back_pressure = back_pressure
-
-    def __str__(self) -> str:
-        return f"PullWorker(partition={self.partition})"
-
-    def __repr__(self) -> str:
-        return str(self)
-
-    async def handle_message(self, payload: str) -> None:
-        pb = BrokerMessage()
-        data = base64.b64decode(payload)
-        pb.ParseFromString(data)
-
-        logger.debug(f"Resource: {pb.uuid} KB: {pb.kbid} ProcessingID: {pb.processing_id}")
-
-        if not self.local_subscriber:
-            transaction_utility = get_transaction_utility()
-            if transaction_utility is None:
-                raise Exception("No transaction utility defined")
-            try:
-                await transaction_utility.commit(
-                    writer=pb,
-                    partition=int(self.partition),
-                    # send to separate processor
-                    target_subject=const.Streams.INGEST_PROCESSED.subject,
-                )
-            except MaxTransactionSizeExceededError:
-                storage = await get_storage()
-                stored_key = await storage.set_stream_message(kbid=pb.kbid, rid=pb.uuid, data=data)
-                referenced_pb = BrokerMessageBlobReference(
-                    uuid=pb.uuid, kbid=pb.kbid, storage_key=stored_key
-                )
-                await transaction_utility.commit(
-                    writer=referenced_pb,
-                    partition=int(self.partition),
-                    # send to separate processor
-                    target_subject=const.Streams.INGEST_PROCESSED.subject,
-                    headers={"X-MESSAGE-TYPE": "PROXY"},
-                )
-        else:
-            # No nats defined == monolitic nucliadb
-            await self.processor.process(
-                pb,
-                0,  # Fake sequence id as in local mode there's no transactions
-                partition=self.partition,
-                transaction_check=False,
-            )
-
-    async def back_pressure_check(self) -> None:
-        if self.back_pressure is None:
-            return
-        while True:
-            try:
-                self.back_pressure.check_indexing()
-                self.back_pressure.check_ingest()
-                break
-            except BackPressureException as exc:
-                sleep_time = (datetime.now(timezone.utc) - exc.data.try_after).total_seconds()
-                logger.warning(f"Back pressure active! Sleeping for {sleep_time} seconds", exc_info=True)
-                await asyncio.sleep(sleep_time)
-            except Exception as e:
-                errors.capture_exception(e)
-                logger.exception("Error while checking back pressure. Moving on")
-                break
-
-    async def loop(self):
-        """
-        Run this forever
-        """
-        while True:
-            await self.back_pressure_check()
-            try:
-                await self._loop()
-            except ReallyStopPulling:
-                logger.info("Exiting...")
-                break
-            except Exception as e:
-                errors.capture_exception(e)
-                logger.exception("Exception on worker", exc_info=e)
-                await asyncio.sleep(10)
-
-    async def _loop(self):
-        headers = {}
-        data = None
-        if nuclia_settings.nuclia_service_account is not None:
-            headers["X-STF-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
-            # parse jwt sub to get pull type id
-            try:
-                pull_type_id = get_nua_api_id()
-            except Exception as exc:
-                logger.exception("Could not read NUA API Key. Can not start pull worker")
-                raise ReallyStopPulling() from exc
-        else:
-            pull_type_id = "main"
-
-        async with ProcessingHTTPClient() as processing_http_client:
-            logger.info(f"Collecting from NucliaDB Cloud {self.partition} partition")
-            while True:
-                try:
-                    async with datamanagers.with_ro_transaction() as txn:
-                        cursor = await datamanagers.processing.get_pull_offset(
-                            txn, pull_type_id=pull_type_id, partition=self.partition
-                        )
-
-                    data = await processing_http_client.pull(
-                        self.partition,
-                        cursor=cursor,
-                        timeout=self.pull_api_timeout,
-                    )
-                    if data.status == "ok":
-                        logger.info(
-                            "Message received from proxy",
-                            extra={"partition": self.partition, "cursor": data.cursor},
-                        )
-                        try:
-                            if data.payload is not None:
-                                await self.handle_message(data.payload)
-                            for payload in data.payloads:
-                                # If using cursors and multiple messages are returned, it will be in the
-                                # `payloads` property
-                                await self.handle_message(payload)
-                        except Exception as e:
-                            errors.capture_exception(e)
-                            logger.exception("Error while pulling and processing message/s")
-                            raise e
-                        async with datamanagers.with_transaction() as txn:
-                            await datamanagers.processing.set_pull_offset(
-                                txn,
-                                pull_type_id=pull_type_id,
-                                partition=self.partition,
-                                offset=data.cursor,
-                            )
-                            await txn.commit()
-                    elif data.status == "empty":
-                        logger_activity.debug(f"No messages waiting in partition #{self.partition}")
-                        await asyncio.sleep(self.pull_time_empty_backoff)
-                    else:
-                        logger.info(f"Proxy pull answered with error: {data}")
-                        await asyncio.sleep(self.pull_time_error_backoff)
-                except (
-                    asyncio.exceptions.CancelledError,
-                    RuntimeError,
-                    KeyboardInterrupt,
-                    SystemExit,
-                ):
-                    logger.info(f"Pull task for partition #{self.partition} was canceled, exiting")
-                    raise ReallyStopPulling()
-
-                except ClientConnectorError:
-                    logger.error(
-                        f"Could not connect to processing engine, \
-                         {processing_http_client.base_url} verify your internet connection"
-                    )
-                    await asyncio.sleep(self.pull_time_error_backoff)
-
-                except MaxTransactionSizeExceededError as e:
-                    if data is not None:
-                        payload_length = 0
-                        if data.payload:
-                            payload_length = len(base64.b64decode(data.payload))
-                        logger.error(f"Message too big for transaction: {payload_length}")
-                    raise e
-                except Exception:
-                    logger.exception("Unhandled error pulling messages from processing")
-                    await asyncio.sleep(self.pull_time_error_backoff)
 
 
 @contextmanager

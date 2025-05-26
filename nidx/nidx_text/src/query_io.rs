@@ -32,7 +32,13 @@ pub fn translate_keyword_to_text_query(literal: &str, schema: &TextSchema) -> Bo
         terms.push(Term::from_field_text(schema.text, &token.text));
     }
     // Create a query using the tokenized terms
-    if terms.len() == 1 {
+    if terms.is_empty() {
+        // This can happen for empty or non-alphanumeric keywords, fallback to avoid panic'ing
+        Box::new(TermQuery::new(
+            Term::from_field_text(schema.text, literal),
+            IndexRecordOption::Basic,
+        ))
+    } else if terms.len() == 1 {
         Box::new(TermQuery::new(terms[0].clone(), IndexRecordOption::Basic))
     } else {
         Box::new(PhraseQuery::new(terms))

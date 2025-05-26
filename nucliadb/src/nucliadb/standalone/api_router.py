@@ -21,15 +21,12 @@ import logging
 import time
 
 import orjson
-import pydantic
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
 from fastapi_versioning import version
 from jwcrypto import jwe, jwk  # type: ignore
 
-from nucliadb.common import datamanagers
-from nucliadb.common.http_clients import processing
 from nucliadb.common.http_clients.auth import NucliaAuthHTTPClient
 from nucliadb.standalone import versions
 from nucliadb_models.resource import NucliaDBRoles
@@ -123,35 +120,3 @@ async def versions_endpoint(request: Request) -> JSONResponse:
             for package in versions.WatchedPackages
         }
     )
-
-
-@standalone_api_router.get("/pull/position")
-async def pull_status(request: Request) -> JSONResponse:
-    async with datamanagers.with_ro_transaction() as txn:
-        # standalone assumes 1 partition
-        current_offset = await datamanagers.processing.get_pull_offset(
-            txn, pull_type_id=processing.get_nua_api_id(), partition="1"
-        )
-
-    async with processing.ProcessingHTTPClient() as client:
-        end_offset = await client.pull_position(partition="1")
-
-    return JSONResponse({"current_offset": current_offset, "end_offset": end_offset})
-
-
-class UpdatePullPosition(pydantic.BaseModel):
-    cursor: int
-
-
-@standalone_api_router.patch("/pull/position")
-async def update_pull_position(request: Request, item: UpdatePullPosition) -> JSONResponse:
-    async with datamanagers.with_transaction() as txn:
-        # standalone assumes 1 partition
-        await datamanagers.processing.set_pull_offset(
-            txn,
-            pull_type_id=processing.get_nua_api_id(),
-            partition="1",
-            offset=item.cursor,
-        )
-        await txn.commit()
-    return JSONResponse({})

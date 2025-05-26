@@ -24,11 +24,10 @@ from typing import Awaitable, Callable, Optional
 
 from nucliadb.common.back_pressure.materializer import BackPressureMaterializer
 from nucliadb.common.back_pressure.settings import settings as back_pressure_settings
-from nucliadb.common.back_pressure.utils import is_back_pressure_enabled
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.consumer.consumer import IngestConsumer, IngestProcessedConsumer
-from nucliadb.ingest.consumer.pull import PullV2Worker, PullWorker
+from nucliadb.ingest.consumer.consumer import IngestConsumer
+from nucliadb.ingest.consumer.pull import PullV2Worker
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.settings import indexing_settings, transaction_settings
@@ -79,38 +78,6 @@ async def stop_back_pressure(materializer: BackPressureMaterializer) -> None:
     await materializer.nats_manager.finalize()
 
 
-async def start_pull_workers(
-    service_name: Optional[str] = None,
-) -> list[Callable[[], Awaitable[None]]]:
-    finalizers: list[Callable[[], Awaitable[None]]] = []
-
-    driver = await setup_driver()
-    pubsub = await get_pubsub()
-    storage = await get_storage(service_name=service_name or SERVICE_NAME)
-    back_pressure = None
-    if is_back_pressure_enabled():
-        back_pressure = await start_back_pressure()
-        finalizers.append(partial(stop_back_pressure, back_pressure))
-    tasks = []
-    for partition in settings.partitions:
-        worker = PullWorker(
-            driver=driver,
-            partition=partition,
-            storage=storage,
-            pull_time_error_backoff=settings.pull_time_error_backoff,
-            pubsub=pubsub,
-            local_subscriber=transaction_settings.transaction_local,
-            pull_api_timeout=settings.pull_api_timeout,
-            back_pressure=back_pressure,
-        )
-        task = asyncio.create_task(worker.loop())
-        task.add_done_callback(_handle_task_result)
-        tasks.append(task)
-    if len(tasks):
-        finalizers.append(partial(_exit_tasks, tasks))
-    return finalizers
-
-
 async def start_ingest_consumers(
     service_name: Optional[str] = None,
 ) -> Callable[[], Awaitable[None]]:
@@ -145,36 +112,6 @@ async def start_ingest_consumers(
         await nats_connection_manager.finalize()
 
     return _finalize
-
-
-async def start_ingest_processed_consumer(
-    service_name: Optional[str] = None,
-) -> Callable[[], Awaitable[None]]:
-    """
-    This is not meant to be deployed with a stateful set like the other consumers.
-
-    We are not maintaining transactionability based on the nats sequence id from this
-    consumer and we will start off by not separating writes by partition AND
-    allowing NATS to manage the queue group for us.
-    """
-    if transaction_settings.transaction_local:
-        raise ConfigurationError("Can not start ingest consumers in local mode")
-
-    driver = await setup_driver()
-    pubsub = await get_pubsub()
-    storage = await get_storage(service_name=service_name or SERVICE_NAME)
-    nats_connection_manager = get_nats_manager()
-
-    consumer = IngestProcessedConsumer(
-        driver=driver,
-        partition="-1",
-        storage=storage,
-        pubsub=pubsub,
-        nats_connection_manager=nats_connection_manager,
-    )
-    await consumer.initialize()
-
-    return nats_connection_manager.finalize
 
 
 async def start_ingest_processed_consumer_v2(

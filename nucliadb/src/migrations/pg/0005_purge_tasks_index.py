@@ -17,25 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import logging
-from typing import Optional
 
-from nucliadb.common.maindb.driver import Transaction
-
-logger = logging.getLogger(__name__)
+from nucliadb.common.maindb.pg import PGTransaction
 
 
-PULL_PARTITION_OFFSET = "/processing/pull-offset/{pull_type_id}/{partition}"
-
-
-async def get_pull_offset(txn: Transaction, *, pull_type_id: str, partition: str) -> Optional[int]:
-    key = PULL_PARTITION_OFFSET.format(pull_type_id=pull_type_id, partition=partition)
-    val: Optional[bytes] = await txn.get(key)
-    if val is not None:
-        return int(val)
-    return None
-
-
-async def set_pull_offset(txn: Transaction, *, pull_type_id: str, partition: str, offset: int) -> None:
-    key = PULL_PARTITION_OFFSET.format(pull_type_id=pull_type_id, partition=partition)
-    await txn.set(key, str(offset).encode())
+async def migrate(txn: PGTransaction) -> None:
+    async with txn.connection.cursor() as cur:
+        await cur.execute(
+            "CREATE INDEX resources_purge_tasks_idx ON resources (key) WHERE key ~ '^/kbs/[^/]*/tasks/[^/]*/[^/]*$';"
+        )

@@ -3,7 +3,7 @@ name = "nidx_protos"
 version = "0.1.0"
 edition = "2024"
 build = "build.rs"
-license = "AGPL-3.0"
+license = "AGPL-3.0-or-later"
 
 [build-dependencies]
 tonic-build = "0.12.3"
