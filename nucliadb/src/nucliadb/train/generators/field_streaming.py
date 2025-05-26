@@ -21,7 +21,7 @@
 import asyncio
 from typing import AsyncGenerator, Optional
 
-from nidx_protos.nodereader_pb2 import StreamRequest
+from nidx_protos.nodereader_pb2 import DocumentItem, StreamRequest
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.nidx import get_nidx_searcher_client
@@ -71,44 +71,16 @@ async def generate_field_streaming_payloads(
     fields = set()
 
     async for document_item in get_nidx_searcher_client().Documents(request):
-        field_id = f"{document_item.uuid}{document_item.field}"
-        resources.add(document_item.uuid)
-
-        field_parts = document_item.field.split("/")
-        if len(field_parts) == 3:
-            _, field_type, field = field_parts
-            split = "0"
-        elif len(field_parts) == 4:
-            _, field_type, field, split = field_parts
-        else:
-            raise Exception(f"Invalid field definition {document_item.field}")
-
-        fsd = FieldSplitData()
-        rid, field_type, field = field_id.split("/")
-        fsd.rid = document_item.uuid
-        fsd.field = field
-        fsd.field_type = field_type
-        fsd.split = split
-
-        field_unique_key = f"{rid}/{field_type}/{field}/{split}"
+        fsd = await fetch_field_split_data(document_item, kbid, trainset)
+        resources.add(fsd.rid)
+        field_unique_key = f"{fsd.rid}/{fsd.field_type}/{fsd.field}/{fsd.split}"
         if field_unique_key in fields:
             # This field has already been yielded. This can happen as we are streaming directly from nidx
             # and field deletions may not be reflected immediately in the index.
             logger.warning(f"Duplicated field found {field_unique_key}. Skipping.", extra={"kbid": kbid})
             continue
+        fields.add(fsd)
 
-        fields.add(field_unique_key)
-
-        tasks = []
-        if trainset.exclude_text:
-            fsd.text.text = ""
-        else:
-            tasks.append(asyncio.create_task(_fetch_field_extracted_text(kbid, fsd)))
-        tasks.append(asyncio.create_task(_fetch_field_metadata(kbid, fsd)))
-        tasks.append(asyncio.create_task(_fetch_basic(kbid, fsd)))
-        await asyncio.gather(*tasks)
-
-        fsd.labels.extend(document_item.labels)
         yield fsd
 
         if len(fields) % 1000 == 0:
@@ -131,6 +103,36 @@ async def generate_field_streaming_payloads(
             "shard_replica_id": shard_replica_id,
         },
     )
+
+
+async def fetch_field_split_data(
+    document_item: DocumentItem, kbid: str, trainset: TrainSet
+) -> FieldSplitData:
+    field_id = f"{document_item.uuid}{document_item.field}"
+    field_parts = document_item.field.split("/")
+    if len(field_parts) == 3:
+        _, field_type, field = field_parts
+        split = "0"
+    elif len(field_parts) == 4:
+        _, field_type, field, split = field_parts
+    else:
+        raise Exception(f"Invalid field definition {document_item.field}")
+    _, field_type, field = field_id.split("/")
+    fsd = FieldSplitData()
+    fsd.rid = document_item.uuid
+    fsd.field = field
+    fsd.field_type = field_type
+    fsd.split = split
+    tasks = []
+    if trainset.exclude_text:
+        fsd.text.text = ""
+    else:
+        tasks.append(asyncio.create_task(_fetch_field_extracted_text(kbid, fsd)))
+    tasks.append(asyncio.create_task(_fetch_field_metadata(kbid, fsd)))
+    tasks.append(asyncio.create_task(_fetch_basic(kbid, fsd)))
+    await asyncio.gather(*tasks)
+    fsd.labels.extend(document_item.labels)
+    return fsd
 
 
 async def _fetch_field_extracted_text(kbid: str, fsd: FieldSplitData):
