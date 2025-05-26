@@ -798,6 +798,8 @@ def get_paragraph_info_from_relations(
 
     # Loop over each entity in the relation graph
     for ent, subgraph in relations.entities.items():
+        if ent not in scores:
+            continue
         for rel_score, rel in zip(scores[ent], subgraph.related_to):
             if rel.metadata and rel.metadata.paragraph_id:
                 p_id = ParagraphId.from_string(rel.metadata.paragraph_id)
