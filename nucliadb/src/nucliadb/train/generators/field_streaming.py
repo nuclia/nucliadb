@@ -81,7 +81,7 @@ async def generate_field_streaming_payloads(
             # and field deletions may not be reflected immediately in the index.
             logger.warning(f"Duplicated field found {field_unique_key}. Skipping.", extra={"kbid": kbid})
             continue
-        fields.add(fsd)
+        fields.add(field_unique_key)
 
         yield fsd
 
