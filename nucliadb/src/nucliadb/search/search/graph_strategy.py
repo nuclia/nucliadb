@@ -943,6 +943,7 @@ async def find_graph_neighbours(
         entity_query.path.source.node_type = entity.ntype
         entity_query.path.source.node_subtype = entity.subtype
         entity_query.path.source.value = entity.value
+        entity_query.path.destination.node_type = RelationNode.NodeType.ENTITY
         entity_query.path.undirected = True
         query_to_explore.bool_or.operands.append(entity_query)
     graph_query.query.path.bool_and.operands.append(query_to_explore)

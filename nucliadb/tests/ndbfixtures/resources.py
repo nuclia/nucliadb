@@ -525,6 +525,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
             value="Joseph Gordon-Levitt", ntype=RelationNode.NodeType.ENTITY, subtype="ACTOR"
         ),
     }
+
     edges = [
         Relation(
             relation=Relation.RelationType.ENTITY,
@@ -567,6 +568,17 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
             ),
         ),
     ]
+
+    # Add relations to the resource as processor does
+    for n in nodes.values():
+        edges.append(
+            Relation(
+                relation=Relation.RelationType.ENTITY,
+                source=RelationNode(value=rid, ntype=RelationNode.NodeType.RESOURCE),
+                to=n,
+            )
+        )
+
     bm = BrokerMessage()
     bm.uuid = rid
     bm.kbid = standalone_knowledgebox
