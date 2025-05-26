@@ -19,7 +19,7 @@
 #
 
 import asyncio
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, AsyncIterable, Optional
 
 from nidx_protos.nodereader_pb2 import DocumentItem, StreamRequest
 
@@ -27,6 +27,7 @@ from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
+from nucliadb.train.settings import settings
 from nucliadb_protos.dataset_pb2 import (
     FieldSplitData,
     FieldStreamingBatch,
@@ -70,8 +71,9 @@ async def generate_field_streaming_payloads(
     resources = set()
     fields = set()
 
-    async for document_item in get_nidx_searcher_client().Documents(request):
-        fsd = await fetch_field_split_data(document_item, kbid, trainset)
+    async for fsd in iter_field_split_data(
+        request, kbid, trainset, max_parallel=settings.field_streaming_parallelization
+    ):
         resources.add(fsd.rid)
         field_unique_key = f"{fsd.rid}/{fsd.field_type}/{fsd.field}/{fsd.split}"
         if field_unique_key in fields:
@@ -103,6 +105,24 @@ async def generate_field_streaming_payloads(
             "shard_replica_id": shard_replica_id,
         },
     )
+
+
+async def iter_field_split_data(
+    request: StreamRequest, kbid: str, trainset: TrainSet, max_parallel: int = 5
+) -> AsyncIterable[FieldSplitData]:
+    tasks: list[asyncio.Task] = []
+    async for document_item in get_nidx_searcher_client().Documents(request):
+        if len(tasks) >= max_parallel:
+            results = await asyncio.gather(*tasks)
+            for fsd in results:
+                yield fsd
+            tasks.clear()
+        tasks.append(asyncio.create_task(fetch_field_split_data(document_item, kbid, trainset)))
+    if len(tasks):
+        results = await asyncio.gather(*tasks)
+        for fsd in results:
+            yield fsd
+        tasks.clear()
 
 
 async def fetch_field_split_data(
