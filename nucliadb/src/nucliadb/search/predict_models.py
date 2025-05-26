@@ -72,6 +72,10 @@ class RunAgentsRequest(BaseModel):
         title="The fields to be augmented with the Knowledge Box's Data Augmentation Agents",
     )
     user_id: str = Field(..., title="The user ID of the user making the request")
+    agent_ids: list[str] = Field(
+        default_factory=list,
+        title="An optional list of Data Augmentation Agent IDs to run. If empty, all configured agents that match the filters are run.",
+    )
     filters: Optional[list[NameOperationFilter]] = Field(
         default=None,
         title="Filters to select which Data Augmentation Agents are applied to the text. If empty, all configured agents for the Knowledge Box are applied.",
