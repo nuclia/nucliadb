@@ -21,7 +21,6 @@
 import asyncio
 from typing import AsyncGenerator, AsyncIterable, Optional
 
-from nidx_protos import nodereader_pb2
 from nidx_protos.nodereader_pb2 import DocumentItem, StreamRequest
 
 from nucliadb.common.filter_expression import parse_expression
@@ -110,16 +109,6 @@ async def parse_filter_expression(
         expr = await parse_expression(filter_expression.field, kbid)
         if expr:
             request.field_filter.CopyFrom(expr)
-
-    if filter_expression.paragraph:
-        expr = await parse_expression(filter_expression.paragraph, kbid)
-        if expr:
-            request.paragraph_filter.CopyFrom(expr)
-
-    if filter_expression.operator == FilterExpression.Operator.OR:
-        request.filter_operator = nodereader_pb2.FilterOperator.OR
-    else:
-        request.filter_operator = nodereader_pb2.FilterOperator.AND
 
 
 def parse_legacy_filters(request: StreamRequest, trainset: TrainSet):

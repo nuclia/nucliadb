@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+
 class InvalidQueryError(Exception):
     """Raised when parsing a query containing an invalid parameter"""
 
