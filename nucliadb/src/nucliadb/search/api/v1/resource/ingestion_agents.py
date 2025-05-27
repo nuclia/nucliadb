@@ -92,7 +92,11 @@ async def _run_agents_endpoint(
 ) -> Union[ResourceAgentsResponse, HTTPClientError]:
     try:
         run_agents_response: RunAgentsResponse = await run_agents(
-            kbid, resource_id, user_id, filters=item.filters
+            kbid,
+            resource_id,
+            user_id,
+            filters=item.filters,
+            agent_ids=item.agent_ids,
         )
     except ResourceNotFoundError:
         return HTTPClientError(status_code=404, detail="Resource not found")
