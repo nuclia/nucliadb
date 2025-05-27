@@ -59,8 +59,9 @@ pub fn create_streaming_query(schema: &TextSchema, request: &StreamRequest) -> B
 
     if let Some(ref filter) = request.filter {
         queries.extend(create_stream_filter_queries(schema, filter))
+    } else if let Some(ref filter_expression) = request.field_filter {
+        queries.push((Occur::Must, filter_to_query(schema, filter_expression)))
     }
-
     Box::new(BooleanQuery::new(queries))
 }
 

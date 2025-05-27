@@ -61,8 +61,6 @@ async def generate_field_streaming_payloads(
 
     if filter_expression:
         await parse_filter_expression(kbid, request, filter_expression)
-        # parse filter expression
-        pass
     else:
         parse_legacy_filters(request, trainset)
 
