@@ -107,8 +107,34 @@ class Generated(BaseModel, extra="forbid"):
 ## Requests models
 
 
+class GraphFilterExpression(BaseModel, extra="forbid"):
+    """Returns only relations from documents that match this filter expression.
+    Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters
+    """
+
+    field: FieldFilterExpression = Field(description="Filter to apply to fields")
+
+
 class BaseGraphSearchRequest(BaseModel):
     top_k: int = Field(default=50, title="Number of results to retrieve")
+    filter_expression: Optional[GraphFilterExpression] = Field(
+        default=None,
+        title="Filter resource by an expression",
+        description=(
+            "Returns only relations from documents that match this filter expression."
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
+        ),
+    )
+    security: Optional[RequestSecurity] = Field(
+        default=None,
+        title="Security",
+        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",  # noqa: E501
+    )
+    show_hidden: bool = Field(
+        default=False,
+        title="Show hidden resources",
+        description="If set to false (default), excludes hidden resources from search",
+    )
 
 
 graph_query_discriminator = filter_discriminator
@@ -137,34 +163,8 @@ GraphPathQuery = Annotated[
 ]
 
 
-class GraphFilterExpression(BaseModel, extra="forbid"):
-    """Returns only relations from documents that match this filter expression.
-    Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters
-    """
-
-    field: FieldFilterExpression = Field(description="Filter to apply to fields")
-
-
 class GraphSearchRequest(BaseGraphSearchRequest):
     query: GraphPathQuery
-    filter_expression: Optional[GraphFilterExpression] = Field(
-        default=None,
-        title="Filter resource by an expression",
-        description=(
-            "Returns only relations from documents that match this filter expression."
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
-        ),
-    )
-    security: Optional[RequestSecurity] = Field(
-        default=None,
-        title="Security",
-        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",  # noqa: E501
-    )
-    show_hidden: bool = Field(
-        default=False,
-        title="Show hidden resources",
-        description="If set to false (default), excludes hidden resources from search",
-    )
 
 
 # Nodes search
@@ -183,24 +183,6 @@ GraphNodesQuery = Annotated[
 
 class GraphNodesSearchRequest(BaseGraphSearchRequest):
     query: GraphNodesQuery
-    filter_expression: Optional[GraphFilterExpression] = Field(
-        default=None,
-        title="Filter resource by an expression",
-        description=(
-            "Returns only relations from documents that match this filter expression."
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
-        ),
-    )
-    security: Optional[RequestSecurity] = Field(
-        default=None,
-        title="Security",
-        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",  # noqa: E501
-    )
-    show_hidden: bool = Field(
-        default=False,
-        title="Show hidden resources",
-        description="If set to false (default), excludes hidden resources from search",
-    )
 
 
 # Relations search
@@ -219,24 +201,6 @@ GraphRelationsQuery = Annotated[
 
 class GraphRelationsSearchRequest(BaseGraphSearchRequest):
     query: GraphRelationsQuery
-    filter_expression: Optional[GraphFilterExpression] = Field(
-        default=None,
-        title="Filter resource by an expression",
-        description=(
-            "Returns only relations from documents that match this filter expression."
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
-        ),
-    )
-    security: Optional[RequestSecurity] = Field(
-        default=None,
-        title="Security",
-        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",  # noqa: E501
-    )
-    show_hidden: bool = Field(
-        default=False,
-        title="Show hidden resources",
-        description="If set to false (default), excludes hidden resources from search",
-    )
 
 
 # We need this to avoid issues with pydantic and generic types defined in another module

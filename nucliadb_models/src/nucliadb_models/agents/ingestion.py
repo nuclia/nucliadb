@@ -45,6 +45,10 @@ class ResourceAgentsRequest(BaseModel):
         default=None,
         description="Filters to apply to the agents. If None, all curently configured agents are applied.",
     )
+    agent_ids: Optional[list[str]] = Field(
+        default=None,
+        title="An optional list of Data Augmentation Agent IDs to run. If None, all configured agents that match the filters are run.",
+    )
 
 
 class NewTextField(BaseModel):

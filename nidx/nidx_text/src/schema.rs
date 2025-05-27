@@ -20,8 +20,9 @@
 
 use std::cmp::min;
 
+use tantivy::schema::DateOptions;
 use tantivy::{
-    DateOptions, DateTime,
+    DateTime,
     schema::{FAST, FacetOptions, Field, INDEXED, NumericOptions, STORED, Schema, TEXT},
 };
 

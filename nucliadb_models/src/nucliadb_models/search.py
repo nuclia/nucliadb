@@ -1769,7 +1769,7 @@ class FindRequest(BaseSearchRequest):
     query_entities: SkipJsonSchema[Optional[list[KnowledgeGraphEntity]]] = Field(
         default=None, title="Query entities", description="Entities to use in a knowledge graph search"
     )
-    graph_query: SkipJsonSchema[Optional[GraphPathQuery]] = Field(
+    graph_query: Optional[GraphPathQuery] = Field(
         default=None,
         title="Graph query",
         description="Query for the knowledge graph. Paths (node-relation-node) extracted from a paragraph_id will be used to extend the results",
