@@ -404,7 +404,7 @@ message DocumentItem {
 
 message StreamRequest {
     noderesources.ShardId shard_id = 3;
-    StreamFilter filter = 4 [deprecated = true];
+    StreamFilter filter = 4;
     optional FilterExpression field_filter = 5;
     optional FilterExpression paragraph_filter = 6;
     FilterOperator filter_operator = 7;
