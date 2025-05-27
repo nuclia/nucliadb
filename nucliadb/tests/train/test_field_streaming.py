@@ -24,6 +24,8 @@ import pytest
 
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb_models.trainset import TrainSet as TrainSetModel
+from nucliadb_models.trainset import TrainSetType
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.dataset_pb2 import (
     FieldStreamingBatch,
@@ -39,7 +41,7 @@ from tests.utils.dirty_index import wait_for_sync
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_generator_field_streaming(
+async def test_generator_field_streaming_legacy(
     nucliadb_train: aiohttp.ClientSession,
     nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
@@ -76,6 +78,56 @@ async def test_generator_field_streaming(
     async with nucliadb_train.post(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}",
         data=trainset.SerializeToString(),
+    ) as response:
+        assert response.status == 200
+        batches = []
+        async for batch in get_batches_from_train_response_stream(response, FieldStreamingBatch):
+            batches.append(batch)
+            assert len(batch.data) == 3
+            for field_split_data in batch.data:
+                assert field_split_data.text.text == ""
+        assert len(batches) == 1
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_generator_field_streaming_new(
+    nucliadb_train: aiohttp.ClientSession,
+    nucliadb_ingest_grpc: WriterStub,
+    knowledgebox: str,
+):
+    kbid = knowledgebox
+
+    await inject_resources_with_paragraphs(kbid, nucliadb_ingest_grpc)
+
+    async with nucliadb_train.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
+        assert partitions.status == 200
+        data = await partitions.json()
+        assert len(data["partitions"]) == 1
+        partition_id = data["partitions"][0]
+
+    trainset = TrainSetModel(
+        type=TrainSetType.FIELD_STREAMING,
+        batch_size=5,
+        exclude_text=False,
+    )
+
+    async with nucliadb_train.post(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}",
+        json=trainset.model_dump(),
+    ) as response:
+        assert response.status == 200
+        batches = []
+        async for batch in get_batches_from_train_response_stream(response, FieldStreamingBatch):
+            batches.append(batch)
+            assert len(batch.data) == 3
+            for field_split_data in batch.data:
+                assert field_split_data.text.text
+        assert len(batches) == 1
+
+    # Try now excluding the text serialization
+    trainset.exclude_text = True
+    async with nucliadb_train.post(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}", json=trainset.model_dump()
     ) as response:
         assert response.status == 200
         batches = []
