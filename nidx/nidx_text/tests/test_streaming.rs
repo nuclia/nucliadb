@@ -27,7 +27,7 @@ fn test_stream_request_iterator() {
     let reader = common::test_reader();
     let request = StreamRequest {
         shard_id: None,
-        filter: None,
+        ..Default::default()
     };
     let iter = reader.iterator(&request).unwrap();
     let count = iter.count();
