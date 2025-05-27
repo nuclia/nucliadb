@@ -21,8 +21,8 @@ import re
 import string
 from typing import Optional, Union
 
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.search import logger
-from nucliadb.search.search.query_parser.exceptions import InvalidQueryError
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
     KeywordQuery,

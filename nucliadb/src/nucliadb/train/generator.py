@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator, Callable, Optional
 
 from fastapi import HTTPException
 
@@ -48,10 +48,15 @@ from nucliadb.train.generators.token_classifier import (
 from nucliadb.train.settings import settings
 from nucliadb.train.types import TrainBatch
 from nucliadb.train.utils import get_shard_manager
+from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
+BatchGenerator = Callable[[str, TrainSet, str, Optional[FilterExpression]], AsyncIterator[TrainBatch]]
 
-async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
+
+async def generate_train_data(
+    kbid: str, shard: str, trainset: TrainSet, filter_expression: Optional[FilterExpression] = None
+):
     # Get the data structure to generate data
     shard_manager = get_shard_manager()
     shard_replica_id = await shard_manager.get_shard_id(kbid, shard)
@@ -59,25 +64,25 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
     if trainset.batch_size == 0:
         trainset.batch_size = 50
 
-    batch_generator: Optional[AsyncIterator[TrainBatch]] = None
+    batch_generator: Optional[BatchGenerator] = None
 
     if trainset.type == TaskType.FIELD_CLASSIFICATION:
-        batch_generator = field_classification_batch_generator(kbid, trainset, shard_replica_id)
+        batch_generator = field_classification_batch_generator
     elif trainset.type == TaskType.IMAGE_CLASSIFICATION:
-        batch_generator = image_classification_batch_generator(kbid, trainset, shard_replica_id)
+        batch_generator = image_classification_batch_generator
     elif trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
-        batch_generator = paragraph_classification_batch_generator(kbid, trainset, shard_replica_id)
+        batch_generator = paragraph_classification_batch_generator
     elif trainset.type == TaskType.TOKEN_CLASSIFICATION:
-        batch_generator = token_classification_batch_generator(kbid, trainset, shard_replica_id)
+        batch_generator = token_classification_batch_generator
     elif trainset.type == TaskType.SENTENCE_CLASSIFICATION:
-        batch_generator = sentence_classification_batch_generator(kbid, trainset, shard_replica_id)
+        batch_generator = sentence_classification_batch_generator
     elif trainset.type == TaskType.PARAGRAPH_STREAMING:
-        batch_generator = paragraph_streaming_batch_generator(kbid, trainset, shard_replica_id)
+        batch_generator = paragraph_streaming_batch_generator
 
     elif trainset.type == TaskType.QUESTION_ANSWER_STREAMING:
-        batch_generator = question_answer_batch_generator(kbid, trainset, shard_replica_id)
+        batch_generator = question_answer_batch_generator
     elif trainset.type == TaskType.FIELD_STREAMING:
-        batch_generator = field_streaming_batch_generator(kbid, trainset, shard_replica_id)
+        batch_generator = field_streaming_batch_generator
 
     if batch_generator is None:
         raise HTTPException(
@@ -85,10 +90,16 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             detail=f"Invalid train type '{TaskType.Name(trainset.type)}'",
         )
 
+    if trainset.type != TaskType.FIELD_STREAMING and filter_expression is not None:
+        raise HTTPException(
+            status_code=412,
+            detail=f"'{TaskType.Name(trainset.type)}' task does not support 'filter_expression' parameter yet.",
+        )
+
     # This cache size is an arbitrary number, once we have a metric in place and
     # we analyze memory consumption, we can adjust it with more knoweldge
     with resource_cache(size=settings.resource_cache_size):
-        async for item in batch_generator:
+        async for item in batch_generator(kbid, trainset, shard_replica_id, filter_expression):
             payload = item.SerializeToString()
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
             yield payload

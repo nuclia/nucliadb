@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 from nidx_protos.nodereader_pb2 import StreamRequest
 
@@ -30,6 +30,7 @@ from nucliadb.train.generators.utils import (
     get_paragraph,
     get_resource_from_cache_or_db,
 )
+from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import (
     QuestionAnswerStreamingBatch,
     QuestionAnswerStreamItem,
@@ -46,6 +47,7 @@ def question_answer_batch_generator(
     kbid: str,
     trainset: TrainSet,
     shard_replica_id: str,
+    filter_expression: Optional[FilterExpression],
 ) -> AsyncGenerator[QuestionAnswerStreamingBatch, None]:
     generator = generate_question_answer_streaming_payloads(kbid, trainset, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, QuestionAnswerStreamingBatch)

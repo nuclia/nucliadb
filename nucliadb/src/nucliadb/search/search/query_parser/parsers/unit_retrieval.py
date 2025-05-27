@@ -22,10 +22,10 @@ from typing import Optional
 from nidx_protos import nodereader_pb2
 from nidx_protos.nodereader_pb2 import SearchRequest
 
+from nucliadb.common.filter_expression import add_and_expression
 from nucliadb.search.search.filters import translate_label
 from nucliadb.search.search.metrics import node_features, query_parser_observer
 from nucliadb.search.search.query import apply_entities_filter, get_sort_field_proto
-from nucliadb.search.search.query_parser.filter_expression import add_and_expression
 from nucliadb.search.search.query_parser.models import ParsedQuery, PredictReranker, UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.graph import parse_path_query
 from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label

@@ -23,8 +23,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from nidx_protos.nodereader_pb2 import SearchRequest
 
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.search.predict import PredictEngine
-from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.query import (
     apply_entities_filter,
     check_supported_filters,

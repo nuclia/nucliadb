@@ -22,7 +22,6 @@
 from typing import Optional
 
 from nucliadb.train.utils import get_shard_manager
-from nucliadb_protos.dataset_pb2 import TrainSet
 
 
 async def get_kb_partitions(kbid: str, prefix: Optional[str] = None):
@@ -35,9 +34,3 @@ async def get_kb_partitions(kbid: str, prefix: Optional[str] = None):
         if shard.shard.startswith(prefix):
             valid_shards.append(shard.shard)
     return valid_shards
-
-
-def get_train(trainset: bytes) -> TrainSet:
-    train = TrainSet()
-    train.ParseFromString(trainset)
-    return train

@@ -23,10 +23,12 @@ from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 from fastapi_versioning import version
 
-from nucliadb.train.api.utils import get_kb_partitions, get_train
+from nucliadb.train.api.utils import get_kb_partitions
 from nucliadb.train.api.v1.router import KB_PREFIX, api
 from nucliadb.train.generator import generate_train_data
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.trainset import TrainSet as TrainSetModel
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_utils.authentication import requires_one
 
 
@@ -43,14 +45,26 @@ async def object_get_response(
     kbid: str,
     shard: str,
 ) -> StreamingResponse:
-    item: bytes = await request.body()
-    trainset = get_train(item)
-    all_keys = await get_kb_partitions(kbid, shard)
+    if request.headers.get("Content-Type") == "application/json":
+        trainset_model = TrainSetModel.model_validate_json(await request.json())
+        trainset_pb = TrainSet(
+            type=TaskType.ValueType(trainset_model.type.value),
+            batch_size=trainset_model.batch_size,
+            exclude_text=trainset_model.exclude_text,
+        )
+        filter_expression = trainset_model.filter_expression
+    else:
+        # Legacy version of the endpoint where the encoded TrainSet protobuf is passed as request body.
+        trainset_pb = TrainSet()
+        trainset_pb.ParseFromString(await request.body())
+        # Filter expressions not supported on legacy version of the endpoint
+        filter_expression = None
 
-    if len(all_keys) == 0:
+    partitions = await get_kb_partitions(kbid, shard)
+    if shard not in partitions:
         raise HTTPException(status_code=404)
 
     return StreamingResponse(
-        generate_train_data(kbid, shard, trainset),
+        generate_train_data(kbid, shard, trainset_pb, filter_expression),
         media_type="application/octet-stream",
     )
