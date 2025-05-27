@@ -458,6 +458,7 @@ fn test_new_paragraph() -> anyhow::Result<()> {
 
     let request = StreamRequest {
         shard_id: None,
+        field_filter: None,
         ..Default::default()
     };
     let iter = paragraph_reader_service.iterator(&request).unwrap();
