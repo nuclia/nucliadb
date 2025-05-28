@@ -26,6 +26,8 @@ mod common;
 #[test]
 fn test_stream_request_iterator() {
     let reader = common::test_reader();
+
+    // There are two fields in total
     let request = StreamRequest {
         shard_id: None,
         ..Default::default()
@@ -33,11 +35,22 @@ fn test_stream_request_iterator() {
     let iter = reader.iterator(&request).unwrap();
     let count = iter.count();
     assert_eq!(count, 2);
-}
 
-#[test]
-fn test_stream_request_iterator_with_filters() {
-    let reader = common::test_reader();
+    // Filtering on a non-existing label should not yield any result
+    let request = StreamRequest {
+        shard_id: None,
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/l/non-existing-label".into(),
+            })),
+        }),
+        ..Default::default()
+    };
+    let iter = reader.iterator(&request).unwrap();
+    let count = iter.count();
+    assert_eq!(count, 0);
+
+    // The label /l/mylabel should match the title field
     let request = StreamRequest {
         shard_id: None,
         filter_expression: Some(FilterExpression {
@@ -49,5 +62,5 @@ fn test_stream_request_iterator_with_filters() {
     };
     let iter = reader.iterator(&request).unwrap();
     let count = iter.count();
-    assert_eq!(count, 2);
+    assert_eq!(count, 1);
 }
