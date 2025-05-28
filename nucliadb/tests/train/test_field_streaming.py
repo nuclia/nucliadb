@@ -90,7 +90,7 @@ async def test_generator_field_streaming_legacy(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_generator_field_streaming_new(
+async def test_generator_field_streaming_json(
     nucliadb_train: aiohttp.ClientSession,
     nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
@@ -111,8 +111,10 @@ async def test_generator_field_streaming_new(
         exclude_text=False,
     )
 
+    stream_partition_url = f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}"
+
     async with nucliadb_train.post(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}",
+        stream_partition_url,
         json=trainset.model_dump(),
     ) as response:
         assert response.status == 200
@@ -126,9 +128,7 @@ async def test_generator_field_streaming_new(
 
     # Try now excluding the text serialization
     trainset.exclude_text = True
-    async with nucliadb_train.post(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}", json=trainset.model_dump()
-    ) as response:
+    async with nucliadb_train.post(stream_partition_url, json=trainset.model_dump()) as response:
         assert response.status == 200
         batches = []
         async for batch in get_batches_from_train_response_stream(response, FieldStreamingBatch):
@@ -137,6 +137,14 @@ async def test_generator_field_streaming_new(
             for field_split_data in batch.data:
                 assert field_split_data.text.text == ""
         assert len(batches) == 1
+
+    # Test that wrong payloads are validated
+    resp = await nucliadb_train.post(
+        stream_partition_url, data=b"fppp*}", headers={"Content-Type": "application/json"}
+    )
+    assert resp.status == 422
+    resp = await nucliadb_train.post(stream_partition_url, json={"type": 50})
+    assert resp.status == 422
 
 
 async def inject_resources_with_paragraphs(kbid: str, nucliadb_ingest_grpc: WriterStub):

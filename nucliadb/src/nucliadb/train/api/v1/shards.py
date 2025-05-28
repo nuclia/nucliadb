@@ -19,6 +19,10 @@
 #
 
 
+import json
+from typing import Optional
+
+import pydantic
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 from fastapi_versioning import version
@@ -26,6 +30,7 @@ from fastapi_versioning import version
 from nucliadb.train.api.utils import get_kb_partitions
 from nucliadb.train.api.v1.router import KB_PREFIX, api
 from nucliadb.train.generator import generate_train_data
+from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.trainset import TrainSet as TrainSetModel
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
@@ -45,8 +50,22 @@ async def object_get_response(
     kbid: str,
     shard: str,
 ) -> StreamingResponse:
+    partitions = await get_kb_partitions(kbid, shard)
+    if shard not in partitions:
+        raise HTTPException(status_code=404)
+    trainset, filter_expression = await get_trainset(request)
+    return StreamingResponse(
+        generate_train_data(kbid, shard, trainset, filter_expression),
+        media_type="application/octet-stream",
+    )
+
+
+async def get_trainset(request: Request) -> tuple[TrainSet, Optional[FilterExpression]]:
     if request.headers.get("Content-Type") == "application/json":
-        trainset_model = TrainSetModel.model_validate_json(await request.json())
+        try:
+            trainset_model = TrainSetModel.model_validate(await request.json())
+        except (pydantic.ValidationError, json.JSONDecodeError) as err:
+            raise HTTPException(status_code=422, detail=str(err))
         trainset_pb = TrainSet(
             type=TaskType.ValueType(trainset_model.type.value),
             batch_size=trainset_model.batch_size,
@@ -59,12 +78,4 @@ async def object_get_response(
         trainset_pb.ParseFromString(await request.body())
         # Filter expressions not supported on legacy version of the endpoint
         filter_expression = None
-
-    partitions = await get_kb_partitions(kbid, shard)
-    if shard not in partitions:
-        raise HTTPException(status_code=404)
-
-    return StreamingResponse(
-        generate_train_data(kbid, shard, trainset_pb, filter_expression),
-        media_type="application/octet-stream",
-    )
+    return trainset_pb, filter_expression
