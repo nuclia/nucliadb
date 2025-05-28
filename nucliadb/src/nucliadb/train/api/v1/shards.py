@@ -17,11 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-
 import json
 from typing import Optional
 
+import google.protobuf.message
 import pydantic
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -75,7 +74,10 @@ async def get_trainset(request: Request) -> tuple[TrainSet, Optional[FilterExpre
     else:
         # Legacy version of the endpoint where the encoded TrainSet protobuf is passed as request body.
         trainset_pb = TrainSet()
-        trainset_pb.ParseFromString(await request.body())
+        try:
+            trainset_pb.ParseFromString(await request.body())
+        except google.protobuf.message.DecodeError as err:
+            raise HTTPException(status_code=422, detail=str(err))
         # Filter expressions not supported on legacy version of the endpoint
         filter_expression = None
     return trainset_pb, filter_expression
