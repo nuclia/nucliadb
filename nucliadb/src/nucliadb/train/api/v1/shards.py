@@ -51,7 +51,7 @@ async def object_get_response(
 ) -> StreamingResponse:
     partitions = await get_kb_partitions(kbid, shard)
     if shard not in partitions:
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail=f"Partition {shard} not found")
     trainset, filter_expression = await get_trainset(request)
     return StreamingResponse(
         generate_train_data(kbid, shard, trainset, filter_expression),
