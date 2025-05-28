@@ -23,11 +23,15 @@ from typing import AsyncGenerator, AsyncIterable, Optional
 
 from nidx_protos.nodereader_pb2 import DocumentItem, StreamRequest
 
+from nucliadb.common.filter_expression import parse_expression
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb.train.settings import settings
+from nucliadb_models.filters import (
+    FilterExpression,
+)
 from nucliadb_protos.dataset_pb2 import (
     FieldSplitData,
     FieldStreamingBatch,
@@ -41,32 +45,23 @@ def field_streaming_batch_generator(
     kbid: str,
     trainset: TrainSet,
     shard_replica_id: str,
+    filter_expression: Optional[FilterExpression],
 ) -> AsyncGenerator[FieldStreamingBatch, None]:
-    generator = generate_field_streaming_payloads(kbid, trainset, shard_replica_id)
+    generator = generate_field_streaming_payloads(kbid, trainset, shard_replica_id, filter_expression)
     batch_generator = batchify(generator, trainset.batch_size, FieldStreamingBatch)
     return batch_generator
 
 
 async def generate_field_streaming_payloads(
-    kbid: str,
-    trainset: TrainSet,
-    shard_replica_id: str,
+    kbid: str, trainset: TrainSet, shard_replica_id: str, filter_expression: Optional[FilterExpression]
 ) -> AsyncGenerator[FieldSplitData, None]:
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
 
-    for label in trainset.filter.labels:
-        request.filter.labels.append(f"/l/{label}")
-    for path in trainset.filter.paths:
-        request.filter.labels.append(f"/p/{path}")
-    for metadata in trainset.filter.metadata:
-        request.filter.labels.append(f"/m/{metadata}")
-    for entity in trainset.filter.entities:
-        request.filter.labels.append(f"/e/{entity}")
-    for field in trainset.filter.fields:
-        request.filter.labels.append(f"/f/{field}")
-    for status in trainset.filter.status:
-        request.filter.labels.append(f"/n/s/{status}")
+    if filter_expression:
+        await parse_filter_expression(kbid, request, filter_expression)
+    else:
+        parse_legacy_filters(request, trainset)
 
     resources = set()
     fields = set()
@@ -105,6 +100,30 @@ async def generate_field_streaming_payloads(
             "shard_replica_id": shard_replica_id,
         },
     )
+
+
+async def parse_filter_expression(
+    kbid: str, request: StreamRequest, filter_expression: FilterExpression
+):
+    if filter_expression.field:
+        expr = await parse_expression(filter_expression.field, kbid)
+        if expr:
+            request.filter_expression.CopyFrom(expr)
+
+
+def parse_legacy_filters(request: StreamRequest, trainset: TrainSet):
+    for label in trainset.filter.labels:
+        request.filter.labels.append(f"/l/{label}")
+    for path in trainset.filter.paths:
+        request.filter.labels.append(f"/p/{path}")
+    for metadata in trainset.filter.metadata:
+        request.filter.labels.append(f"/m/{metadata}")
+    for entity in trainset.filter.entities:
+        request.filter.labels.append(f"/e/{entity}")
+    for field in trainset.filter.fields:
+        request.filter.labels.append(f"/f/{field}")
+    for status in trainset.filter.status:
+        request.filter.labels.append(f"/n/s/{status}")
 
 
 async def iter_field_split_data(

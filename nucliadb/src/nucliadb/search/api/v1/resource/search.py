@@ -24,12 +24,12 @@ from fastapi import Header, Request, Response
 from fastapi_versioning import version
 from pydantic import ValidationError
 
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search import cache
-from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
 from nucliadb_models.filters import FilterExpression

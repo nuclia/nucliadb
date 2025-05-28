@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 from fastapi import HTTPException
 from nidx_protos.nodereader_pb2 import StreamRequest
@@ -27,6 +27,7 @@ from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
+from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import (
     Label,
     MultipleTextSameLabels,
@@ -39,6 +40,7 @@ def sentence_classification_batch_generator(
     kbid: str,
     trainset: TrainSet,
     shard_replica_id: str,
+    filter_expression: Optional[FilterExpression],
 ) -> AsyncGenerator[SentenceClassificationBatch, None]:
     if len(trainset.filter.labels) == 0:
         raise HTTPException(

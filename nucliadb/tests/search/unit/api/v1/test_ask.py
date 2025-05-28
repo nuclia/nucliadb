@@ -24,12 +24,12 @@ import pytest
 from starlette.requests import Request
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.ask import ask_knowledgebox_endpoint
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
-    InvalidQueryError,
 )
 from nucliadb_utils.exceptions import LimitsExceededError
 

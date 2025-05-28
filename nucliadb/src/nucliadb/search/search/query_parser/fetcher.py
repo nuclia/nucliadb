@@ -24,13 +24,13 @@ from async_lru import alru_cache
 from typing_extensions import TypeIs
 
 from nucliadb.common import datamanagers
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError, convert_relations
 from nucliadb.search.search.metrics import (
     query_parse_dependency_observer,
 )
-from nucliadb.search.search.query_parser.exceptions import InvalidQueryError
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.search import (

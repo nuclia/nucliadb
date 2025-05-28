@@ -193,6 +193,16 @@ class FieldTypeName(str, Enum):
     CONVERSATION = "conversation"
     GENERIC = "generic"
 
+    @classmethod
+    def from_abbreviation(cls, abbr: str) -> "FieldTypeName":
+        return {
+            "t": FieldTypeName.TEXT,
+            "f": FieldTypeName.FILE,
+            "u": FieldTypeName.LINK,
+            "c": FieldTypeName.CONVERSATION,
+            "a": FieldTypeName.GENERIC,
+        }[abbr]
+
 
 class FieldRef(BaseModel):
     field_type: FieldTypeName

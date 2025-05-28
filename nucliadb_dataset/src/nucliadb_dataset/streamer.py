@@ -13,11 +13,12 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 import requests
 
-from nucliadb_protos.dataset_pb2 import TrainSet
+from nucliadb_models.trainset import TrainSet as TrainSetModel
+from nucliadb_protos.dataset_pb2 import TrainSet as TrainSetPB
 
 logger = logging.getLogger("nucliadb_dataset")
 
@@ -29,7 +30,7 @@ class Streamer:
 
     def __init__(
         self,
-        trainset: TrainSet,
+        trainset: Union[TrainSetPB, TrainSetModel],
         reader_headers: Dict[str, str],
         base_url: str,
         kbid: str,
@@ -47,12 +48,23 @@ class Streamer:
     def initialize(self, partition_id: str):
         self.stream_session = requests.Session()
         self.stream_session.headers.update(self.reader_headers)
-        self.resp = self.stream_session.post(
-            f"{self.base_url}/v1/kb/{self.kbid}/trainset/{partition_id}",
-            data=self.trainset.SerializeToString(),
-            stream=True,
-            timeout=None,
-        )
+        if isinstance(self.trainset, TrainSetPB):
+            # Legacy version of the endpoint is passing the protobuffer as bytes in the request content
+            self.resp = self.stream_session.post(
+                f"{self.base_url}/v1/kb/{self.kbid}/trainset/{partition_id}",
+                data=self.trainset.SerializeToString(),
+                stream=True,
+                timeout=None,
+            )
+        elif isinstance(self.trainset, TrainSetModel):
+            self.resp = self.stream_session.post(
+                f"{self.base_url}/v1/kb/{self.kbid}/trainset/{partition_id}",
+                json=self.trainset.model_dump(),
+                stream=True,
+                timeout=None,
+            )
+        else:  # pragma: no cover
+            raise ValueError("Invalid trainset type")
         self.resp.raise_for_status()
 
     def finalize(self):

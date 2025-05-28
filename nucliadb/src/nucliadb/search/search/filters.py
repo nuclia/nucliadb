@@ -20,11 +20,10 @@
 from collections.abc import Iterator
 from typing import Any, Optional, Union
 
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.search import Filter
 from nucliadb_protos import knowledgebox_pb2
-
-from .exceptions import InvalidQueryError
 
 ENTITY_PREFIX = "/e/"
 CLASSIFICATION_LABEL_PREFIX = "/l/"

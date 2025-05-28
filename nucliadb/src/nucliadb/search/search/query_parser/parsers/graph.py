@@ -22,8 +22,8 @@ from typing import Optional, Union
 
 from nidx_protos import nodereader_pb2
 
+from nucliadb.common.filter_expression import add_and_expression, parse_expression
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap, RelationTypeMap
-from nucliadb.search.search.query_parser.filter_expression import add_and_expression, parse_expression
 from nucliadb.search.search.query_parser.models import GraphRetrieval
 from nucliadb.search.search.utils import filter_hidden_resources
 from nucliadb_models.graph import requests as graph_requests

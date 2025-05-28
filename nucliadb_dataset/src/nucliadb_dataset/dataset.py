@@ -15,7 +15,7 @@
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 
 import pyarrow as pa  # type: ignore
 
@@ -29,8 +29,9 @@ from nucliadb_dataset.tasks import (
 from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_models.trainset import TrainSet as TrainSetModel
 from nucliadb_models.trainset import TrainSetPartitions
-from nucliadb_protos.dataset_pb2 import TrainSet
+from nucliadb_protos.dataset_pb2 import TrainSet as TrainSetPB
 from nucliadb_sdk.v2.sdk import NucliaDB
 
 logger = logging.getLogger("nucliadb_dataset")
@@ -104,7 +105,7 @@ class NucliaDBDataset(NucliaDataset):
         kbid: str,
         task: Optional[Task] = None,
         labels: Optional[List[str]] = None,
-        trainset: Optional[TrainSet] = None,
+        trainset: Optional[Union[TrainSetPB, TrainSetModel]] = None,
         base_path: Optional[str] = None,
         search_sdk: Optional[NucliaDB] = None,
         reader_sdk: Optional[NucliaDB] = None,
@@ -119,7 +120,7 @@ class NucliaDBDataset(NucliaDataset):
             task_definition = TASK_DEFINITIONS.get(task)
             if task_definition is None:
                 raise KeyError("Not a valid task")
-            trainset = TrainSet(type=task_definition.proto)
+            trainset = TrainSetPB(type=task_definition.proto)
             if task_definition.labels:
                 trainset.filter.labels.extend(labels)
         elif trainset is not None:

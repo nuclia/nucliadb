@@ -27,6 +27,7 @@ from fastapi_versioning import version
 from pydantic import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.models_utils import to_proto
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
@@ -34,7 +35,6 @@ from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search import cache
-from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query_parser.parsers.search import parse_search
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import legacy_convert_retrieval_to_proto
