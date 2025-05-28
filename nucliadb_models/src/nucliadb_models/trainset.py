@@ -17,7 +17,7 @@
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from nucliadb_models.filters import FilterExpression
 
@@ -44,10 +44,9 @@ class TrainSet(BaseModel):
         default=None,
         title="Filter resource by an expression",
         description=(
-            "Returns only documents that match this filter expression."
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
-            "This allows building complex filtering expressions and replaces the following parameters:"
-            "`fields`, `filters`, `range_*`, `resource_filters`, `keyword_filters`."
+            "Returns only documents that match this filter expression. "
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters. "
+            "It is only supported on FIELD_STREAMING types."
         ),
     )
     batch_size: int = Field(
@@ -58,3 +57,9 @@ class TrainSet(BaseModel):
         default=False,
         description="Set to True if the extracted text is not needed for the stream and it will not be added. This is useful to reduce the amount of data streamed.",
     )
+
+    @model_validator(mode="after")
+    def validate_filter_expressions_supported_on_stream(self):
+        if self.filter_expression is not None and self.type != TrainSetType.FIELD_STREAMING:
+            raise ValueError(f"{self.type.name} does not support `filter_expression` parameter yet.")
+        return self

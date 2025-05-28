@@ -24,6 +24,7 @@ import pytest
 
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb_models.filters import FilterExpression, Label
 from nucliadb_models.trainset import TrainSet as TrainSetModel
 from nucliadb_models.trainset import TrainSetType
 from nucliadb_protos import resources_pb2 as rpb
@@ -38,6 +39,19 @@ from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 from tests.utils.dirty_index import wait_for_sync
+
+
+def test_model():
+    # Should not work unless field streaming type is selected
+    with pytest.raises(ValueError):
+        TrainSetModel(
+            type=TrainSetType.IMAGE_CLASSIFICATION,
+            filter_expression=FilterExpression(field=Label(labelset="foo")),
+        )
+    TrainSetModel(
+        type=TrainSetType.FIELD_STREAMING,
+        filter_expression=FilterExpression(field=Label(labelset="foo")),
+    )
 
 
 @pytest.mark.deploy_modes("standalone")

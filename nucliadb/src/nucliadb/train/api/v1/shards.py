@@ -63,7 +63,7 @@ async def get_trainset(request: Request) -> tuple[TrainSet, Optional[FilterExpre
     if request.headers.get("Content-Type") == "application/json":
         try:
             trainset_model = TrainSetModel.model_validate(await request.json())
-        except (pydantic.ValidationError, json.JSONDecodeError) as err:
+        except (pydantic.ValidationError, json.JSONDecodeError, ValueError) as err:
             raise HTTPException(status_code=422, detail=str(err))
         trainset_pb = TrainSet(
             type=TaskType.ValueType(trainset_model.type.value),

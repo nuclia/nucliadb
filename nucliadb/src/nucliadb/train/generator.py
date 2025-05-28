@@ -90,12 +90,6 @@ async def generate_train_data(
             detail=f"Invalid train type '{TaskType.Name(trainset.type)}'",
         )
 
-    if trainset.type != TaskType.FIELD_STREAMING and filter_expression is not None:
-        raise HTTPException(
-            status_code=412,
-            detail=f"'{TaskType.Name(trainset.type)}' task does not support 'filter_expression' parameter yet.",
-        )
-
     # This cache size is an arbitrary number, once we have a metric in place and
     # we analyze memory consumption, we can adjust it with more knoweldge
     with resource_cache(size=settings.resource_cache_size):
