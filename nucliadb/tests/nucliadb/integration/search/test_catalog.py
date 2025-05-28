@@ -501,3 +501,69 @@ async def test_catalog_filter_expression(
     )
     assert resp.status_code == 200
     assert set(resp.json()["resources"].keys()) == {resource1, resource3}
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_catalog_query(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={"title": f"French Law: An in-depth study. Volume 1", "slug": "french_law_volume_1"},
+    )
+    assert resp.status_code == 201
+    resource1 = resp.json()["uuid"]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={"title": f"Learn the french language in two easy steps", "slug": "learn_french"},
+    )
+    assert resp.status_code == 201
+    resource2 = resp.json()["uuid"]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={"title": f"El ingenioso hidalgo don Quijote de la Mancha", "slug": "quijote"},
+    )
+    assert resp.status_code == 201
+    resource3 = resp.json()["uuid"]
+
+    async def assert_query_results(query, expected):
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/catalog",
+            json={"query": query},
+        )
+        assert resp.status_code == 200
+        assert set(resp.json()["resources"].keys()) == expected
+
+    # Old style search (by words)
+    await assert_query_results("law", {resource1})
+
+    # Same with new style
+    await assert_query_results({"match": "words", "query": "law"}, {resource1})
+
+    # Fuzzy
+    await assert_query_results({"match": "fuzzy", "query": "french law"}, {resource1, resource2})
+    await assert_query_results({"match": "fuzzy", "query": "french languege"}, {resource2})
+    await assert_query_results({"match": "fuzzy", "query": "hello"}, set())
+
+    # Starts with
+    await assert_query_results({"match": "starts_with", "query": "french"}, {resource1})
+    await assert_query_results({"match": "starts_with", "query": "law"}, set())
+
+    # Contains
+    await assert_query_results({"match": "contains", "query": "the"}, {resource2})
+    await assert_query_results({"match": "contains", "query": "teh"}, set())
+
+    # Ends with
+    await assert_query_results({"match": "ends_with", "query": "mancha"}, {resource3})
+    await assert_query_results({"match": "ends_with", "query": "ingenioso"}, set())
+
+    # Exact
+    await assert_query_results({"match": "exact", "query": "Quijote"}, set())
+    await assert_query_results(
+        {"match": "exact", "query": "El ingenioso hidalgo don Quijote de la Mancha"}, {resource3}
+    )
