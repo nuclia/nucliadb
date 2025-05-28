@@ -108,7 +108,7 @@ async def parse_filter_expression(
     if filter_expression.field:
         expr = await parse_expression(filter_expression.field, kbid)
         if expr:
-            request.field_filter.CopyFrom(expr)
+            request.filter_expression.CopyFrom(expr)
 
 
 def parse_legacy_filters(request: StreamRequest, trainset: TrainSet):

@@ -405,5 +405,5 @@ message DocumentItem {
 message StreamRequest {
     noderesources.ShardId shard_id = 3;
     StreamFilter filter = 4;
-    optional FilterExpression field_filter = 5;
+    optional FilterExpression filter_expression = 5;
 }

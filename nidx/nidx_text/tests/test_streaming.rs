@@ -18,8 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use nidx_protos::FilterExpression;
 use nidx_protos::StreamRequest;
-
+use nidx_protos::filter_expression::FacetFilter;
 mod common;
 
 #[test]
@@ -27,6 +28,22 @@ fn test_stream_request_iterator() {
     let reader = common::test_reader();
     let request = StreamRequest {
         shard_id: None,
+        ..Default::default()
+    };
+    let iter = reader.iterator(&request).unwrap();
+    let count = iter.count();
+    assert_eq!(count, 2);
+}
+
+fn test_stream_request_iterator_with_filters() {
+    let reader = common::test_reader();
+    let request = StreamRequest {
+        shard_id: None,
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/l/mylabel".into(),
+            })),
+        }),
         ..Default::default()
     };
     let iter = reader.iterator(&request).unwrap();
