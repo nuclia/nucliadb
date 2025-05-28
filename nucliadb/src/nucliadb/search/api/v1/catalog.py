@@ -45,9 +45,6 @@ from nucliadb_models.filters import CatalogFilterExpression
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
-    CatalogQuery,
-    CatalogQueryField,
-    CatalogQueryMatch,
     CatalogRequest,
     CatalogResponse,
     KnowledgeboxSearchResults,
@@ -112,7 +109,7 @@ async def catalog_get(
         return HTTPClientError(status_code=422, detail=detail)
 
     item = CatalogRequest(
-        query=CatalogQuery(field=CatalogQueryField.Title, match=CatalogQueryMatch.Words, query=query),
+        query=query,
         filter_expression=expr,
         filters=filters,
         faceted=faceted,

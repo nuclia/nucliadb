@@ -708,7 +708,7 @@ class CatalogQueryMatch(str, Enum):
 class CatalogQuery(BaseModel):
     field: CatalogQueryField = CatalogQueryField.Title
     match: CatalogQueryMatch = CatalogQueryMatch.Exact
-    query: str
+    query: str = Field(min_length=1)
 
     @model_validator(mode="after")
     def check_match_field(self) -> Self:
@@ -722,8 +722,8 @@ class CatalogQuery(BaseModel):
 
 
 class CatalogRequest(BaseModel):
-    query: Optional[CatalogQuery] = ParamDefault(
-        default=None,
+    query: Union[str, CatalogQuery] = ParamDefault(
+        default="",
         title="Query",
         description="The query to search for",
     ).to_pydantic_field()
@@ -777,19 +777,6 @@ class CatalogRequest(BaseModel):
     @classmethod
     def nested_facets_not_supported(cls, facets):
         return validate_facets(facets)
-
-    @field_validator("query", mode="before")
-    @classmethod
-    def convert_query(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            if value:
-                return CatalogQuery(
-                    field=CatalogQueryField.Title, match=CatalogQueryMatch.Words, query=value
-                )
-            else:
-                return None
-        else:
-            return value
 
 
 class MinScore(BaseModel):
