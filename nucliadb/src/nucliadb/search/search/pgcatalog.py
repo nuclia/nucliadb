@@ -116,7 +116,7 @@ def _prepare_query_filters(catalog_query: CatalogQuery) -> tuple[str, dict[str, 
     filter_sql = ["kbid = %(kbid)s"]
     filter_params: dict[str, Any] = {"kbid": catalog_query.kbid}
 
-    if catalog_query.query.query:
+    if catalog_query.query and catalog_query.query.query:
         filter_sql.append(_prepare_query_search(catalog_query.query, filter_params))
 
     if catalog_query.filters:
@@ -267,7 +267,7 @@ async def pgcatalog_search(catalog_query: CatalogQuery) -> Resources:
             )
             for r in data
         ],
-        query=catalog_query.query.query,
+        query=catalog_query.query.query if catalog_query.query else "",
         total=total,
         page_number=catalog_query.page_number,
         page_size=catalog_query.page_size,

@@ -722,8 +722,8 @@ class CatalogQuery(BaseModel):
 
 
 class CatalogRequest(BaseModel):
-    query: CatalogQuery = ParamDefault(
-        default="",
+    query: Optional[CatalogQuery] = ParamDefault(
+        default=None,
         title="Query",
         description="The query to search for",
     ).to_pydantic_field()
@@ -782,9 +782,12 @@ class CatalogRequest(BaseModel):
     @classmethod
     def convert_query(cls, value: Any) -> Any:
         if isinstance(value, str):
-            return CatalogQuery(
-                field=CatalogQueryField.Title, match=CatalogQueryMatch.Words, query=value
-            )
+            if value:
+                return CatalogQuery(
+                    field=CatalogQueryField.Title, match=CatalogQueryMatch.Words, query=value
+                )
+            else:
+                return None
         else:
             return value
 
