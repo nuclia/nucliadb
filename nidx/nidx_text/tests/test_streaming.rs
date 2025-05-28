@@ -35,6 +35,7 @@ fn test_stream_request_iterator() {
     assert_eq!(count, 2);
 }
 
+#[test]
 fn test_stream_request_iterator_with_filters() {
     let reader = common::test_reader();
     let request = StreamRequest {
