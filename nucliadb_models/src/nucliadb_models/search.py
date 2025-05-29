@@ -691,40 +691,86 @@ class Filter(BaseModel):
         return self
 
 
+class CatalogQueryField(str, Enum):
+    Title = "title"
+    # Slug = "slug"
+
+
+class CatalogQueryMatch(str, Enum):
+    Exact = "exact"
+    Words = "words"
+    Fuzzy = "fuzzy"
+    StartsWith = "starts_with"
+    EndsWith = "ends_with"
+    Contains = "contains"
+
+
+class CatalogQuery(BaseModel):
+    field: CatalogQueryField = CatalogQueryField.Title
+    match: CatalogQueryMatch = CatalogQueryMatch.Exact
+    query: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def check_match_field(self) -> Self:
+        if self.field != CatalogQueryField.Title:
+            if self.match not in [CatalogQueryMatch.Exact, CatalogQueryMatch.StartsWith]:
+                raise ValueError(
+                    f"Match type `{self.match.value}` not supported for {self.field.value}. Use `exact` or `starts_with`."
+                )
+
+        return self
+
+
 class CatalogRequest(BaseModel):
-    query: str = SearchParamDefaults.query.to_pydantic_field()
+    query: Union[str, CatalogQuery] = ParamDefault(
+        default="",
+        title="Query",
+        description="The query to search for",
+    ).to_pydantic_field()
     filter_expression: Optional[CatalogFilterExpression] = (
         SearchParamDefaults.catalog_filter_expression.to_pydantic_field()
-    )
-    filters: Union[list[str], list[Filter]] = Field(
-        default=[],
-        title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
     )
     faceted: list[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
     page_number: int = SearchParamDefaults.catalog_page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.catalog_page_size.to_pydantic_field()
+    hidden: Optional[bool] = SearchParamDefaults.hidden.to_pydantic_field()
+    show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field(
+        default=[ResourceProperties.BASIC, ResourceProperties.ERRORS]
+    )
+
     debug: SkipJsonSchema[bool] = SearchParamDefaults.debug.to_pydantic_field()
+
+    # Deprecated filter parameters
+    filters: Union[list[str], list[Filter]] = Field(
+        default=[],
+        title="Filters",
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
+        deprecated="Use filter_expression instead",
+    )
     with_status: Optional[ResourceProcessingStatus] = Field(
         default=None,
         title="With processing status",
         description="Filter results by resource processing status",
-        deprecated="Use filters instead",
+        deprecated="Use filter_expression instead",
     )
     range_creation_start: Optional[DateTime] = (
-        SearchParamDefaults.range_creation_start.to_pydantic_field()
+        SearchParamDefaults.range_creation_start.to_pydantic_field(
+            deprecated="Use filter_expression instead",
+        )
     )
-    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field(
+        deprecated="Use filter_expression instead",
+    )
     range_modification_start: Optional[DateTime] = (
-        SearchParamDefaults.range_modification_start.to_pydantic_field()
+        SearchParamDefaults.range_modification_start.to_pydantic_field(
+            deprecated="Use filter_expression instead",
+        )
     )
     range_modification_end: Optional[DateTime] = (
-        SearchParamDefaults.range_modification_end.to_pydantic_field()
-    )
-    hidden: Optional[bool] = SearchParamDefaults.hidden.to_pydantic_field()
-    show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field(
-        default=[ResourceProperties.BASIC, ResourceProperties.ERRORS]
+        SearchParamDefaults.range_modification_end.to_pydantic_field(
+            deprecated="Use filter_expression instead",
+        )
     )
 
     @field_validator("faceted")
