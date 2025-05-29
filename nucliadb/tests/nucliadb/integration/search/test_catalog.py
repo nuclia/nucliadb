@@ -569,11 +569,15 @@ async def test_catalog_query(
     )
 
     # Slug exact
-    await assert_query_results({"field": "slug", "match": "exact", "query": "french_law_volume_1"}, {resource1})
+    await assert_query_results(
+        {"field": "slug", "match": "exact", "query": "french_law_volume_1"}, {resource1}
+    )
     await assert_query_results({"field": "slug", "match": "exact", "query": "french_law_volume"}, set())
 
     # Slug start
-    await assert_query_results({"field": "slug", "match": "starts_with", "query": "french"}, {resource1, resource2})
+    await assert_query_results(
+        {"field": "slug", "match": "starts_with", "query": "french"}, {resource1, resource2}
+    )
 
     # Slug others (validation error)
     resp = await nucliadb_reader.post(

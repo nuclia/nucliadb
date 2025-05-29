@@ -25,13 +25,13 @@ Rollover to update to nidx_texts v4
 """
 
 import logging
-
 from typing import cast
-from nucliadb.common.cluster.rollover import rollover_kb_index
+
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
+
 
 async def migrate(context: ExecutionContext) -> None:
     driver = cast(PGDriver, context.kv_driver)
@@ -57,11 +57,13 @@ async def migrate(context: ExecutionContext) -> None:
                         AND key > %s
                         ORDER BY key
                         LIMIT %s
-                    """, (start_key, BATCH_SIZE))
+                    """,
+                    (start_key, BATCH_SIZE),
+                )
 
                 # Set the key for next iteration
                 await cur.execute("SELECT MAX(key) FROM tmp_0036_backfill_catalog")
-                start_key = (await cur.fetchone())[0]
+                start_key = (await cur.fetchone())[0]  # type: ignore
                 if start_key is None:
                     break
 
@@ -71,7 +73,9 @@ async def migrate(context: ExecutionContext) -> None:
                         UPDATE catalog c SET slug = tmp.slug
                         FROM tmp_0036_backfill_catalog tmp
                         WHERE c.kbid = tmp.kbid AND c.rid = tmp.rid
-                    """)
+                    """
+                )
                 await txn.commit()
+
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None: ...
