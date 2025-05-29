@@ -19,18 +19,10 @@
 #
 
 
-from typing import Optional
+class InvalidQueryError(Exception):
+    """Raised when parsing a query containing an invalid parameter"""
 
-from nucliadb.train.utils import get_shard_manager
-
-
-async def get_kb_partitions(kbid: str, prefix: Optional[str] = None):
-    shard_manager = get_shard_manager()
-    shards = await shard_manager.get_shards_by_kbid_inner(kbid=kbid)
-    valid_shards = []
-    if prefix is None:
-        prefix = ""
-    for shard in shards.shards:
-        if shard.shard.startswith(prefix):
-            valid_shards.append(shard.shard)
-    return valid_shards
+    def __init__(self, param: str, reason: str):
+        self.param = param
+        self.reason = reason
+        super().__init__(f"Invalid query. Error in {param}: {reason}")

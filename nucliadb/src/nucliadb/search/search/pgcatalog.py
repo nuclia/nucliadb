@@ -27,6 +27,7 @@ from psycopg.rows import dict_row
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search.search.query_parser.models import CatalogExpression, CatalogQuery
+from nucliadb_models import search as search_models
 from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.search import (
     ResourceResult,
@@ -115,14 +116,8 @@ def _prepare_query_filters(catalog_query: CatalogQuery) -> tuple[str, dict[str, 
     filter_sql = ["kbid = %(kbid)s"]
     filter_params: dict[str, Any] = {"kbid": catalog_query.kbid}
 
-    if catalog_query.query:
-        # This is doing tokenization inside the SQL server (to keep the index updated). We could move it to
-        # the python code at update/query time if it ever becomes a problem but for now, a single regex
-        # executed per query is not a problem.
-        filter_sql.append(
-            "regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W')"
-        )
-        filter_params["query"] = catalog_query.query
+    if catalog_query.query and catalog_query.query.query:
+        filter_sql.append(_prepare_query_search(catalog_query.query, filter_params))
 
     if catalog_query.filters:
         filter_sql.append(_convert_filter(catalog_query.filters, filter_params))
@@ -131,6 +126,41 @@ def _prepare_query_filters(catalog_query: CatalogQuery) -> tuple[str, dict[str, 
         f"SELECT * FROM catalog WHERE {' AND '.join(filter_sql)}",
         filter_params,
     )
+
+
+def _prepare_query_search(query: search_models.CatalogQuery, params: dict[str, Any]) -> str:
+    if query.match == search_models.CatalogQueryMatch.Exact:
+        params["query"] = query.query
+        return f"{query.field.value} = %(query)s"
+    elif query.match == search_models.CatalogQueryMatch.StartsWith:
+        params["query"] = query.query + "%"
+        if query.field == search_models.CatalogQueryField.Title:
+            # Insensitive search supported by pg_trgm for title
+            return f"{query.field.value} ILIKE %(query)s"
+        else:
+            # Sensitive search for slug (btree does not support ILIKE and slugs are all lowercase anyway)
+            return f"{query.field.value} LIKE %(query)s"
+    # The rest of operators only supported by title
+    elif query.match == search_models.CatalogQueryMatch.Words:
+        # This is doing tokenization inside the SQL server (to keep the index updated). We could move it to
+        # the python code at update/query time if it ever becomes a problem but for now, a single regex
+        # executed per query is not a problem.
+        params["query"] = query.query
+        return "regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W')"
+    elif query.match == search_models.CatalogQueryMatch.Fuzzy:
+        params["query"] = query.query
+        # Note: the operator is %>, We use %%> for psycopg escaping
+        return "title %%> %(query)s"
+    elif query.match == search_models.CatalogQueryMatch.EndsWith:
+        params["query"] = "%" + query.query
+        return "title ILIKE %(query)s"
+    elif query.match == search_models.CatalogQueryMatch.Contains:
+        params["query"] = "%" + query.query + "%"
+        return "title ILIKE %(query)s"
+    else:  # pragma: nocover
+        # This is a trick so mypy generates an error if this branch can be reached,
+        # that is, if we are missing some ifs
+        _a: int = "a"
 
 
 def _prepare_query(catalog_query: CatalogQuery) -> tuple[str, dict[str, Any]]:
@@ -188,7 +218,7 @@ async def pgcatalog_search(catalog_query: CatalogQuery) -> Resources:
                     if not (
                         facet.startswith("/n/s") or facet.startswith("/n/i") or facet.startswith("/l")
                     ):
-                        logger.warn(
+                        logger.warning(
                             f"Unexpected facet used at catalog: {facet}, kbid={catalog_query.kbid}"
                         )
 
@@ -239,7 +269,7 @@ async def pgcatalog_search(catalog_query: CatalogQuery) -> Resources:
             )
             for r in data
         ],
-        query=catalog_query.query,
+        query=catalog_query.query.query if catalog_query.query else "",
         total=total,
         page_number=catalog_query.page_number,
         page_size=catalog_query.page_size,

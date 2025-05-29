@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 from nidx_protos.nodereader_pb2 import StreamRequest
 
@@ -26,6 +26,7 @@ from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
+from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
     Label,
@@ -38,6 +39,7 @@ def field_classification_batch_generator(
     kbid: str,
     trainset: TrainSet,
     shard_replica_id: str,
+    filter_expression: Optional[FilterExpression],
 ) -> AsyncGenerator[FieldClassificationBatch, None]:
     generator = generate_field_classification_payloads(kbid, trainset, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, FieldClassificationBatch)

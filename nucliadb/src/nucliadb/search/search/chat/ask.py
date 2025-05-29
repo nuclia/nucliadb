@@ -33,6 +33,7 @@ from nuclia_models.predict.generative_responses import (
 from pydantic_core import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.external_index_providers.base import ScoredTextBlock
 from nucliadb.common.ids import ParagraphId
 from nucliadb.models.responses import HTTPClientError
@@ -59,7 +60,6 @@ from nucliadb.search.search.chat.query import (
 )
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
-    InvalidQueryError,
 )
 from nucliadb.search.search.graph_strategy import get_graph_results
 from nucliadb.search.search.metrics import AskMetrics, Metrics

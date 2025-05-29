@@ -385,6 +385,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.resources = resources
         if "/ask" in context.path:
             auditrequest.type = AuditRequest.CHAT
+            auditrequest.chat.question = ""
         else:
             auditrequest.type = AuditRequest.SEARCH
 

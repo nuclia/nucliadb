@@ -26,6 +26,7 @@ from fastapi_versioning import version
 from pydantic import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.models.responses import HTTPClientError
@@ -33,7 +34,6 @@ from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.search import cache
-from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import fetch_resources
 from nucliadb.search.search.pgcatalog import pgcatalog_search
 from nucliadb.search.search.query_parser.parsers import parse_catalog
@@ -99,7 +99,7 @@ async def catalog_get(
     show: list[ResourceProperties] = fastapi_query(
         SearchParamDefaults.show, default=[ResourceProperties.BASIC, ResourceProperties.ERRORS]
     ),
-) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
+) -> Union[CatalogResponse, HTTPClientError]:
     try:
         expr = (
             CatalogFilterExpression.model_validate_json(filter_expression) if filter_expression else None
@@ -151,7 +151,7 @@ async def catalog_post(
 async def catalog(
     kbid: str,
     item: CatalogRequest,
-):
+) -> Union[HTTPClientError, CatalogResponse]:
     """
     Catalog endpoint is a simplified version of the search endpoint, it only
     returns bm25 results on titles and it does not support vector search.
