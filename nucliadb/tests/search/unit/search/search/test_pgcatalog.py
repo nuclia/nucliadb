@@ -174,12 +174,12 @@ async def test_prepare_query_filters_kbid():
 
 async def test_prepare_query_fulltext():
     kbid = "84ed9257-04ef-41d1-b1d2-26286b92777f"
-    request = CatalogRequest(
-        features=[],  # Ignored by pgcatalog
-        query="This is my query",
-        page_number=0,
-        page_size=25,
-        min_score=0,  # Ignored by pgcatalog
+    request = CatalogRequest.model_validate(
+        {
+            "query": "This is my query",
+            "page_number": 0,
+            "page_size": 25,
+        }
     )
     parsed = await parse_catalog(kbid, request)
     query, params = _prepare_query(parsed)
@@ -187,19 +187,19 @@ async def test_prepare_query_fulltext():
         "regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W')"
         in query
     )
-    assert params["query"] == parsed.query
+    assert params["query"] == "This is my query"
 
 
 async def test_old_filters():
     kbid = "84ed9257-04ef-41d1-b1d2-26286b92777f"
-    request = CatalogRequest(
-        features=[],  # Ignored by pgcatalog
-        query="This is my query",
-        filters=["/classification.labels/topic/boats"],
-        range_creation_start=datetime.fromisoformat("2020-01-01T00:00:00"),
-        page_number=0,
-        page_size=25,
-        min_score=0,  # Ignored by pgcatalog
+    request = CatalogRequest.model_validate(
+        {
+            "query": "This is my query",
+            "filters": ["/classification.labels/topic/boats"],
+            "range_creation_start": datetime.fromisoformat("2020-01-01T00:00:00"),
+            "page_number": 0,
+            "page_size": 25,
+        }
     )
     parsed = await parse_catalog(kbid, request)
     query, params = _prepare_query(parsed)
@@ -211,26 +211,28 @@ async def test_old_filters():
 
 async def test_filter_expression():
     kbid = "84ed9257-04ef-41d1-b1d2-26286b92777f"
-    request = CatalogRequest(
-        query="This is my query",
-        filter_expression=CatalogFilterExpression.model_validate(
-            {
-                "resource": {
-                    "or": [
-                        {
-                            "and": [
-                                {"prop": "label", "labelset": "topic", "label": "boats"},
-                                {"prop": "origin_path", "prefix": "folder"},
-                                {"not": {"prop": "modified", "since": "2019-01-01T11:00:00"}},
-                            ]
-                        },
-                        {"prop": "resource", "id": "00112233445566778899aabbccddeeff"},
-                    ]
+    request = CatalogRequest.model_validate(
+        {
+            "query": "This is my query",
+            "filter_expression": CatalogFilterExpression.model_validate(
+                {
+                    "resource": {
+                        "or": [
+                            {
+                                "and": [
+                                    {"prop": "label", "labelset": "topic", "label": "boats"},
+                                    {"prop": "origin_path", "prefix": "folder"},
+                                    {"not": {"prop": "modified", "since": "2019-01-01T11:00:00"}},
+                                ]
+                            },
+                            {"prop": "resource", "id": "00112233445566778899aabbccddeeff"},
+                        ]
+                    }
                 }
-            }
-        ),
-        page_number=0,
-        page_size=25,
+            ),
+            "page_number": 0,
+            "page_size": 25,
+        }
     )
     parsed = await parse_catalog(kbid, request)
     query, params = _prepare_query(parsed)

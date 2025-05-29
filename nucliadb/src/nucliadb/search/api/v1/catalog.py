@@ -99,7 +99,7 @@ async def catalog_get(
     show: list[ResourceProperties] = fastapi_query(
         SearchParamDefaults.show, default=[ResourceProperties.BASIC, ResourceProperties.ERRORS]
     ),
-) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
+) -> Union[CatalogResponse, HTTPClientError]:
     try:
         expr = (
             CatalogFilterExpression.model_validate_json(filter_expression) if filter_expression else None
@@ -151,7 +151,7 @@ async def catalog_post(
 async def catalog(
     kbid: str,
     item: CatalogRequest,
-):
+) -> Union[HTTPClientError, CatalogResponse]:
     """
     Catalog endpoint is a simplified version of the search endpoint, it only
     returns bm25 results on titles and it does not support vector search.

@@ -84,9 +84,20 @@ async def parse_catalog(kbid: str, item: search_models.CatalogRequest) -> Catalo
             limit=None,
         )
 
+    if isinstance(item.query, search_models.CatalogQuery):
+        query = item.query
+    elif isinstance(item.query, str) and len(item.query) > 0:
+        query = search_models.CatalogQuery(
+            field=search_models.CatalogQueryField.Title,
+            match=search_models.CatalogQueryMatch.Words,
+            query=item.query,
+        )
+    else:
+        query = None
+
     return CatalogQuery(
         kbid=kbid,
-        query=item.query,
+        query=query,
         filters=catalog_expr,
         sort=sort,
         faceted=item.faceted,

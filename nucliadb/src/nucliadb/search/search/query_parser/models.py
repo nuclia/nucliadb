@@ -172,7 +172,7 @@ class CatalogExpression:
 
 class CatalogQuery(BaseModel):
     kbid: str
-    query: str
+    query: Optional[search_models.CatalogQuery]
     filters: Optional[CatalogExpression]
     sort: search_models.SortOptions
     faceted: list[str]
