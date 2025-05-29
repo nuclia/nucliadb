@@ -135,8 +135,10 @@ def _prepare_query_search(query: search_models.CatalogQuery, params: dict[str, A
     elif query.match == search_models.CatalogQueryMatch.StartsWith:
         params["query"] = query.query + "%"
         if query.field == search_models.CatalogQueryField.Title:
+            # Insensitive search supported by pg_trgm for title
             return f"{query.field.value} ILIKE %(query)s"
         else:
+            # Sensitive search for slug (btree does not support ILIKE and slugs are all lowercase anyway)
             return f"{query.field.value} LIKE %(query)s"
     # The rest of operators only supported by title
     elif query.match == search_models.CatalogQueryMatch.Words:
