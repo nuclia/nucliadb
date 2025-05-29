@@ -693,7 +693,7 @@ class Filter(BaseModel):
 
 class CatalogQueryField(str, Enum):
     Title = "title"
-    # Slug = "slug"
+    Slug = "slug"
 
 
 class CatalogQueryMatch(str, Enum):
