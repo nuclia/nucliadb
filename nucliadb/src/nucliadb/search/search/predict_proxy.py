@@ -202,7 +202,7 @@ async def chat_streaming_generator(
             else:
                 text_answer += chunk.decode()
 
-    if is_json is False:
+    if is_json is False and chunk:  # Ensure chunk is not empty before decoding
         # If response is text the status_code comes at the last chunk of data
         status_code = chunk.decode()
 
