@@ -188,7 +188,7 @@ async def pgcatalog_search(catalog_query: CatalogQuery) -> Resources:
                     if not (
                         facet.startswith("/n/s") or facet.startswith("/n/i") or facet.startswith("/l")
                     ):
-                        logger.warn(
+                        logger.warning(
                             f"Unexpected facet used at catalog: {facet}, kbid={catalog_query.kbid}"
                         )
 
