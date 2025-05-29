@@ -20,9 +20,10 @@
 
 from typing import Optional
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi_versioning import version
 
+from nucliadb.common.cluster.exceptions import ShardNotFound
 from nucliadb.train.api.utils import get_kb_partitions
 from nucliadb.train.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
@@ -57,5 +58,8 @@ async def get_partitions_prefix(request: Request, kbid: str, prefix: str) -> Tra
 
 
 async def get_partitions(kbid: str, prefix: Optional[str] = None) -> TrainSetPartitions:
-    all_keys = await get_kb_partitions(kbid, prefix)
+    try:
+        all_keys = await get_kb_partitions(kbid, prefix)
+    except ShardNotFound:
+        raise HTTPException(status_code=404, detail=f"No shards found for kb")
     return TrainSetPartitions(partitions=all_keys)
