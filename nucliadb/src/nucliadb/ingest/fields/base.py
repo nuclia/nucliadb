@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar
 from google.protobuf.message import DecodeError, Message
 
 from nucliadb.common import datamanagers
+from nucliadb.common.models_utils import to_proto
 from nucliadb.ingest.fields.exceptions import InvalidFieldClass, InvalidPBClass
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import (
@@ -36,6 +37,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldAuthor,
     FieldComputedMetadata,
     FieldComputedMetadataWrapper,
+    FieldMetadataDiffWrapper,
     FieldQuestionAnswers,
     FieldQuestionAnswerWrapper,
     LargeComputedMetadata,
@@ -496,6 +498,34 @@ class Field(Generic[PbType]):
             self.computed_metadata = actual_payload
 
         return self.computed_metadata
+
+    async def set_field_metadata_diff(self, diff: FieldMetadataDiffWrapper):
+        """
+        TODO: manage entities
+        TODO: manage splits
+        """
+        fm = await self.get_field_metadata()
+        if fm is None:
+            fm = FieldComputedMetadata()
+
+        if diff.metadata_diff.classifications.deleted_labelsets:
+            new_classifications = [
+                cf
+                for cf in fm.metadata.classifications
+                if cf.labelset not in diff.metadata_diff.classifications.deleted_labelsets
+            ]
+            fm.metadata.ClearField("classifications")
+            fm.metadata.classifications.extend(new_classifications)
+
+        for classif in diff.metadata_diff.classifications.added:
+            if classif not in fm.metadata.classifications:
+                fm.metadata.classifications.append(classif)
+
+        fcmw = FieldComputedMetadataWrapper()
+        fcmw.field.field = self.id
+        fcmw.field.field_type = to_proto.field_type(self.type)
+        fcmw.metadata.CopyFrom(fm)
+        await self.set_field_metadata(fcmw)
 
     async def get_field_metadata(self, force: bool = False) -> Optional[FieldComputedMetadata]:
         if self.computed_metadata is None or force:

@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import Union
+
 from nucliadb_models.common import FieldID, FieldTypeName
 from nucliadb_models.search import FeedbackTasks, NucliaDBClientType
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
@@ -43,13 +45,18 @@ def field_type_name(obj: FieldTypeName) -> resources_pb2.FieldType.ValueType:
     }[obj]
 
 
-def field_type(obj: FieldID.FieldType) -> resources_pb2.FieldType.ValueType:
+def field_type(obj: Union[str, FieldID.FieldType]) -> resources_pb2.FieldType.ValueType:
     return {
         FieldID.FieldType.LINK: resources_pb2.FieldType.LINK,
+        "u": resources_pb2.FieldType.LINK,
         FieldID.FieldType.FILE: resources_pb2.FieldType.FILE,
+        "f": resources_pb2.FieldType.FILE,
         FieldID.FieldType.TEXT: resources_pb2.FieldType.TEXT,
+        "t": resources_pb2.FieldType.TEXT,
         FieldID.FieldType.GENERIC: resources_pb2.FieldType.GENERIC,
+        "a": resources_pb2.FieldType.GENERIC,
         FieldID.FieldType.CONVERSATION: resources_pb2.FieldType.CONVERSATION,
+        "c": resources_pb2.FieldType.CONVERSATION,
     }[obj]
 
 

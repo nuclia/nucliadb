@@ -50,6 +50,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldFile,
     FieldID,
+    FieldMetadataDiffWrapper,
     FieldQuestionAnswerWrapper,
     FieldText,
     FieldType,
@@ -548,10 +549,12 @@ class Resource:
 
         await self.maybe_update_resource_title_from_file_extracted_data(message)
 
-        # Metadata should go first
         for field_metadata in message.field_metadata:
             await self._apply_field_computed_metadata(field_metadata)
             extracted_languages.extend(extract_field_metadata_languages(field_metadata))
+
+        for field_metadata_diff in message.field_metadata_diff:
+            await self._apply_field_computed_metadata_diff(field_metadata_diff)
 
         update_basic_languages(self.basic, extracted_languages)
 
@@ -721,6 +724,14 @@ class Resource:
 
         update_basic_computedmetadata_classifications(self.basic, field_metadata)
         self.modified = True
+
+    async def _apply_field_computed_metadata_diff(self, diff: FieldMetadataDiffWrapper):
+        field_obj = await self.get_field(
+            diff.field.field,
+            diff.field.field_type,
+            load=False,
+        )
+        await field_obj.set_field_metadata_diff(diff)
 
     async def _apply_extracted_vectors(
         self,

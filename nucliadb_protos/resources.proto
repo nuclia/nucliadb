@@ -390,8 +390,8 @@ message FieldComputedMetadataWrapper {
 
 
 message ClassificationsDiff {
-    repeated string added = 1;
-    repeated string deleted = 2;
+    repeated Classification added = 1;
+    repeated string deleted_labelsets = 2;
 }
 
 message FieldEntitiesDiff {
