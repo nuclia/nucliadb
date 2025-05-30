@@ -388,6 +388,30 @@ message FieldComputedMetadataWrapper {
     FieldID field = 4;
 }
 
+
+message ClassificationsDiff {
+    repeated string added = 1;
+    repeated string deleted = 2;
+}
+
+message FieldEntitiesDiff {
+    repeated FieldEntity added = 1;
+    repeated FieldEntity deleted = 2;
+}
+
+
+message FieldComputedMetadataDiff {
+    ClassificationsDiff classifications = 1;
+    map<string, FieldEntitiesDiff> entities = 2;
+}
+
+
+message FieldMetadataDiffWrapper {
+    FieldComputedMetadataDiff metadata_diff = 1;
+    map<string, FieldComputedMetadataDiff> split_metadata_diff = 2;
+    FieldID field = 3;
+}
+
 // Mutable behaviors
 
 message Metadata {

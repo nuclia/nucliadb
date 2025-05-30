@@ -142,6 +142,10 @@ message BrokerMessage {
     repeated FieldIDStatus field_statuses = 41;
 
     repeated resources.FieldID delete_question_answers = 42;
+
+    // Optimized protocol for workers to be able to send only the augmented diff
+    repeated resources.FieldMetadataDiffWrapper field_metadata_diff = 43;
+
 }
 
 message BrokerMessageBlobReference {
