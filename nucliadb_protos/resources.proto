@@ -394,15 +394,15 @@ message ClassificationsDiff {
     repeated string deleted_labelsets = 2;
 }
 
-message FieldEntitiesDiff {
-    repeated FieldEntity added = 1;
-    repeated FieldEntity deleted = 2;
-}
+// message FieldEntitiesDiff {
+//     repeated FieldEntity added = 1;
+//     repeated FieldEntity deleted = 2;
+// }
 
 
 message FieldComputedMetadataDiff {
     ClassificationsDiff classifications = 1;
-    map<string, FieldEntitiesDiff> entities = 2;
+//    map<string, FieldEntitiesDiff> entities = 2;
 }
 
 
