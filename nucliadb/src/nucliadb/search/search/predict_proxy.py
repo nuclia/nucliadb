@@ -187,7 +187,7 @@ async def chat_streaming_generator(
 
             if is_json:
                 try:
-                    parsed_chunk = GenerativeChunk.model_validate(chunk)
+                    parsed_chunk = GenerativeChunk.model_validate_json(chunk).chunk
                     if isinstance(parsed_chunk, TextGenerativeResponse):
                         text_answer += parsed_chunk.text
                     elif isinstance(parsed_chunk, JSONGenerativeResponse):
@@ -195,7 +195,7 @@ async def chat_streaming_generator(
                     elif isinstance(parsed_chunk, StatusGenerativeResponse):
                         status_code = parsed_chunk.code
                 except ValidationError:
-                    logger.warning(
+                    logger.exception(
                         f"Unexpected item in predict answer stream: {chunk.decode()}",
                         extra={"kbid": kbid},
                     )
