@@ -595,11 +595,14 @@ async def get_paragraph_text_with_neighbours(
 
     # Sort the results by the paragraph start
     results.sort(key=lambda x: x[0].paragraph_start)
-    paragraph_texts = []
-    for _, text in results:
-        if text != "":
-            paragraph_texts.append(text)
-    return pid, "\n\n".join(paragraph_texts)
+    results = [(_pid, _ptext) for _pid, _ptext in results if _ptext != ""]
+
+    # Join all the collected text blocks and modify the original paragraph id so
+    # that it spans across all collected blocks.
+    joined_text = "\n\n".join([ptext for (_, ptext) in results])
+    pid.paragraph_start = min(_pid.paragraph_start for _pid, _ in results)
+    pid.paragraph_end = max(_pid.paragraph_end for _pid, _ in results)
+    return pid, joined_text
 
 
 async def get_field_paragraphs_list(
@@ -659,6 +662,10 @@ async def neighbouring_paragraphs_prompt_context(
     paragraph_ops = []
     for text_block in ordered_text_blocks:
         pid = ParagraphId.from_string(text_block.id)
+
+        # Delete the original paragraph from the context to avoid duplicates
+        del context[pid.full()]
+
         paragraph_ops.append(
             asyncio.create_task(
                 get_paragraph_text_with_neighbours(
@@ -948,6 +955,7 @@ class PromptContextBuilder:
         context = ccontext.output
         context_images = ccontext.images
         context_order = {text_block_id: order for order, text_block_id in enumerate(context.keys())}
+        print(f"FFFFF: {'\n'.join(context_order.keys())}")
         return context, context_order, context_images
 
     async def _build_context_images(self, context: CappedPromptContext) -> None:
