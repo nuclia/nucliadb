@@ -57,14 +57,15 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource, inde
         await cur.execute(
             """
             INSERT INTO catalog
-            (kbid, rid, title, created_at, modified_at, labels)
+            (kbid, rid, title, created_at, modified_at, labels, slug)
             VALUES
-            (%(kbid)s, %(rid)s, %(title)s, %(created_at)s, %(modified_at)s, %(labels)s)
+            (%(kbid)s, %(rid)s, %(title)s, %(created_at)s, %(modified_at)s, %(labels)s, %(slug)s)
             ON CONFLICT (kbid, rid) DO UPDATE SET
             title = excluded.title,
             created_at = excluded.created_at,
             modified_at = excluded.modified_at,
-            labels = excluded.labels""",
+            labels = excluded.labels,
+            slug = excluded.slug""",
             {
                 "kbid": resource.kb.kbid,
                 "rid": resource.uuid,
@@ -72,6 +73,7 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource, inde
                 "created_at": created_at,
                 "modified_at": modified_at,
                 "labels": list(index_message.labels),
+                "slug": resource.basic.slug,
             },
         )
 

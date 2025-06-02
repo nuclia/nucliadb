@@ -519,7 +519,7 @@ async def test_catalog_query(
 
     resp = await nucliadb_writer.post(
         f"/kb/{standalone_knowledgebox}/resources",
-        json={"title": f"Learn the french language in two easy steps", "slug": "learn_french"},
+        json={"title": f"Learn the french language in two easy steps", "slug": "french_lang"},
     )
     assert resp.status_code == 201
     resource2 = resp.json()["uuid"]
@@ -567,3 +567,21 @@ async def test_catalog_query(
     await assert_query_results(
         {"match": "exact", "query": "El ingenioso hidalgo don Quijote de la Mancha"}, {resource3}
     )
+
+    # Slug exact
+    await assert_query_results(
+        {"field": "slug", "match": "exact", "query": "french_law_volume_1"}, {resource1}
+    )
+    await assert_query_results({"field": "slug", "match": "exact", "query": "french_law_volume"}, set())
+
+    # Slug start
+    await assert_query_results(
+        {"field": "slug", "match": "starts_with", "query": "french"}, {resource1, resource2}
+    )
+
+    # Slug others (validation error)
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={"query": {"field": "slug", "match": "contains", "query": "french"}},
+    )
+    assert resp.status_code == 422
