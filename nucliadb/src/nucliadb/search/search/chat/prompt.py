@@ -647,10 +647,11 @@ async def neighbouring_paragraphs_prompt_context(
     This function will get the paragraph texts and then craft a context with the neighbouring paragraphs of the
     paragraphs in the ordered_paragraphs list. The number of paragraphs to include before and after each paragraph
     """
-    # First, get the sorted list of paragraphs for each matching field
-    # so we can know the indexes of the neighbouring paragraphs
+    retrieved_paragraphs_ids = {
+        ParagraphId.from_string(text_block.id) for text_block in ordered_text_blocks
+    }
     unique_fields = {
-        ParagraphId.from_string(text_block.id).field_id for text_block in ordered_text_blocks
+        pid.field_id for pid in retrieved_paragraphs_ids
     }
     paragraphs_by_field: dict[FieldId, list[ParagraphId]] = {}
     field_ops = []
@@ -688,7 +689,8 @@ async def neighbouring_paragraphs_prompt_context(
     for pid, text in results:
         if text != "":
             context[pid.full()] = text
-            augmented_context["fields"].append(pid.full())
+            # if pid not in retrieved_paragraphs_ids:
+            augmented_context["paragraphs"].append(pid.full())
 
 
 async def conversation_prompt_context(
