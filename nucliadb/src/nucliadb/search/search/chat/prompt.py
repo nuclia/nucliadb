@@ -21,7 +21,7 @@ import asyncio
 import copy
 from collections import deque
 from dataclasses import dataclass
-from typing import Deque, Dict, List, Optional, Sequence, Tuple, Union, cast
+from typing import Deque, Dict, List, Optional, Sequence, Tuple, TypedDict, Union, cast
 
 import yaml
 from pydantic import BaseModel
@@ -86,13 +86,15 @@ class ParagraphIdNotFoundInExtractedMetadata(Exception):
     pass
 
 
+class AugmentedContext(TypedDict):
+    paragraphs: list[str]
+    fields: list[str]
+
+
 class CappedPromptContext:
     """
     Class to keep track of the size (in number of characters) of the prompt context
-    and raise an exception if it exceeds the configured limit.
-
-    This class will automatically trim data that exceeds the limit when it's being
-    set on the dictionary.
+    and automatically trim data that exceeds the limit when it's being set on the dictionary.
     """
 
     def __init__(self, max_size: Optional[int]):
@@ -246,6 +248,7 @@ async def full_resource_prompt_context(
     resource: Optional[str],
     strategy: FullResourceStrategy,
     metrics: Metrics,
+    augmented_context: AugmentedContext,
 ) -> None:
     """
     Algorithm steps:
@@ -298,6 +301,7 @@ async def full_resource_prompt_context(
                     del context[tb_id]
             # Add the extracted text of each field to the context.
             context[field.full()] = extracted_text
+            augmented_context["fields"].append(field.full())
             added_fields.add(field.full())
 
     metrics.set("full_resource_ops", len(added_fields))
@@ -477,6 +481,7 @@ async def field_extension_prompt_context(
     ordered_paragraphs: list[FindParagraph],
     strategy: FieldExtensionStrategy,
     metrics: Metrics,
+    augmented_context: AugmentedContext,
 ) -> None:
     """
     Algorithm steps:
@@ -519,6 +524,7 @@ async def field_extension_prompt_context(
                 del context[tb_id]
         # Add the extracted text of each field to the beginning of the context.
         context[field.full()] = extracted_text
+        augmented_context["fields"].append(field.full())
 
     # Add the extracted text of each paragraph to the end of the context.
     for paragraph in ordered_paragraphs:
@@ -635,6 +641,7 @@ async def neighbouring_paragraphs_prompt_context(
     ordered_text_blocks: list[FindParagraph],
     strategy: NeighbouringParagraphsStrategy,
     metrics: Metrics,
+    augmented_context: AugmentedContext,
 ) -> None:
     """
     This function will get the paragraph texts and then craft a context with the neighbouring paragraphs of the
@@ -681,6 +688,7 @@ async def neighbouring_paragraphs_prompt_context(
     for pid, text in results:
         if text != "":
             context[pid.full()] = text
+            augmented_context["fields"].append(pid.full())
 
 
 async def conversation_prompt_context(
@@ -690,6 +698,7 @@ async def conversation_prompt_context(
     conversational_strategy: ConversationalStrategy,
     visual_llm: bool,
     metrics: Metrics,
+    augmented_context: AugmentedContext,
 ):
     analyzed_fields: List[str] = []
     ops = 0
@@ -735,6 +744,7 @@ async def conversation_prompt_context(
                                 text = message.content.text.strip()
                             pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
                             context[pid] = text
+                            augmented_context["paragraphs"].append(pid)
                             attachments.extend(message.content.attachments_fields)
                 else:
                     # Add first message
@@ -749,6 +759,7 @@ async def conversation_prompt_context(
                             text = message.content.text.strip()
                         pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
                         context[pid] = text
+                        augmented_context["paragraphs"].append(pid)
                         attachments.extend(message.content.attachments_fields)
 
                     messages: Deque[resources_pb2.Message] = deque(
@@ -775,6 +786,7 @@ async def conversation_prompt_context(
                         text = message.content.text.strip()
                         pid = f"{rid}/{field_type}/{field_id}/{message.ident}/0-{len(message.content.text) + 1}"
                         context[pid] = text
+                        augmented_context["paragraphs"].append(pid)
                         attachments.extend(message.content.attachments_fields)
 
                 if conversational_strategy.attachments_text:
@@ -787,7 +799,9 @@ async def conversation_prompt_context(
                         extracted_text = await field.get_extracted_text()
                         if extracted_text is not None:
                             pid = f"{rid}/{field_type}/{attachment.field_id}/0-{len(extracted_text.text) + 1}"
-                            context[pid] = f"Attachment {attachment.field_id}: {extracted_text.text}\n\n"
+                            text = f"Attachment {attachment.field_id}: {extracted_text.text}\n\n"
+                            context[pid] = text
+                            augmented_context["paragraphs"].append(pid)
 
                 if conversational_strategy.attachments_images and visual_llm:
                     for attachment in attachments:
@@ -810,6 +824,7 @@ async def hierarchy_prompt_context(
     ordered_paragraphs: list[FindParagraph],
     strategy: HierarchyResourceStrategy,
     metrics: Metrics,
+    augmented_context: AugmentedContext,
 ) -> None:
     """
     This function will get the paragraph texts (possibly with extra characters, if extra_characters > 0) and then
@@ -870,6 +885,7 @@ async def hierarchy_prompt_context(
             resources[rid].paragraphs.append((paragraph, extended_paragraph_text))
 
     metrics.set("hierarchy_ops", len(resources))
+    augmented_paragraphs = set()
 
     # Modify the first paragraph of each resource to include the title and summary of the resource, as well as the
     # extended paragraph text of all the paragraphs in the resource.
@@ -889,13 +905,18 @@ async def hierarchy_prompt_context(
         if first_paragraph is not None:
             # The first paragraph is the only one holding the hierarchy information
             first_paragraph.text = f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n RESOURCE CONTENT: {text_with_hierarchy}"
+            augmented_paragraphs.add(first_paragraph.id)
 
     # Now that the paragraphs have been modified, we can add them to the context
     for paragraph in ordered_paragraphs_copy:
         if paragraph.text == "":
             # Skip paragraphs that were cleared in the hierarchy expansion
             continue
-        context[paragraph.id] = _clean_paragraph_text(paragraph)
+        paragraph_text = _clean_paragraph_text(paragraph)
+        context[paragraph.id] = paragraph_text
+        if paragraph.id in augmented_paragraphs:
+            field_id = ParagraphId.from_string(paragraph.id).field_id.full()
+            augmented_context["fields"].append(field_id)
     return
 
 
@@ -927,6 +948,7 @@ class PromptContextBuilder:
         self.max_context_characters = max_context_characters
         self.visual_llm = visual_llm
         self.metrics = metrics
+        self.augmented_context = AugmentedContext(paragraphs=[], fields=[])
 
     def prepend_user_context(self, context: CappedPromptContext):
         # Chat extra context passed by the user is the most important, therefore
@@ -938,17 +960,16 @@ class PromptContextBuilder:
 
     async def build(
         self,
-    ) -> tuple[PromptContext, PromptContextOrder, PromptContextImages]:
+    ) -> tuple[PromptContext, PromptContextOrder, PromptContextImages, AugmentedContext]:
         ccontext = CappedPromptContext(max_size=self.max_context_characters)
         self.prepend_user_context(ccontext)
         await self._build_context(ccontext)
         if self.visual_llm:
             await self._build_context_images(ccontext)
-
         context = ccontext.output
         context_images = ccontext.images
         context_order = {text_block_id: order for order, text_block_id in enumerate(context.keys())}
-        return context, context_order, context_images
+        return context, context_order, context_images, self.augmented_context
 
     async def _build_context_images(self, context: CappedPromptContext) -> None:
         ops = 0
@@ -1074,6 +1095,7 @@ class PromptContextBuilder:
                 self.resource,
                 full_resource,
                 self.metrics,
+                self.augmented_context,
             )
             if metadata_extension:
                 await extend_prompt_context_with_metadata(
@@ -1083,7 +1105,12 @@ class PromptContextBuilder:
 
         if hierarchy:
             await hierarchy_prompt_context(
-                context, self.kbid, self.ordered_paragraphs, hierarchy, self.metrics
+                context,
+                self.kbid,
+                self.ordered_paragraphs,
+                hierarchy,
+                self.metrics,
+                self.augmented_context,
             )
         if neighbouring_paragraphs:
             await neighbouring_paragraphs_prompt_context(
@@ -1092,6 +1119,7 @@ class PromptContextBuilder:
                 self.ordered_paragraphs,
                 neighbouring_paragraphs,
                 self.metrics,
+                self.augmented_context,
             )
         if field_extension:
             await field_extension_prompt_context(
@@ -1100,6 +1128,7 @@ class PromptContextBuilder:
                 self.ordered_paragraphs,
                 field_extension,
                 self.metrics,
+                self.augmented_context,
             )
         if conversational_strategy:
             await conversation_prompt_context(
@@ -1109,6 +1138,7 @@ class PromptContextBuilder:
                 conversational_strategy,
                 self.visual_llm,
                 self.metrics,
+                self.augmented_context,
             )
         if metadata_extension:
             await extend_prompt_context_with_metadata(

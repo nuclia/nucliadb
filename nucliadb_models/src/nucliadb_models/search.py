@@ -2194,9 +2194,24 @@ class MetadataAskResponseItem(BaseModel):
     timings: AskTimings
 
 
+class AugmentedContextReferences(BaseModel):
+    paragraphs: list[str] = Field(
+        default=[],
+        description="Paragraphs ids added to the context as a result of using the `rag_strategies` parameter, typically the neighbouring_paragraphs or the conversation strategies",
+    )
+    fields: list[str] = Field(
+        default=[],
+        description="Field ids added to the context as a result of using the `rag_strategies` parameter, typically the hierarcy or full_resource strategies.",
+    )
+
+
 class CitationsAskResponseItem(BaseModel):
     type: Literal["citations"] = "citations"
     citations: dict[str, Any]
+    augmented_context: AugmentedContextReferences = Field(
+        default=AugmentedContextReferences(),
+        description="References to elements that the LLM context has been augmented with but are not part of the retrieval nor the prequeries results.",
+    )
 
 
 class StatusAskResponseItem(BaseModel):

@@ -46,7 +46,7 @@ from nucliadb.search.search.chat.exceptions import (
     AnswerJsonSchemaTooLong,
     NoRetrievalResultsError,
 )
-from nucliadb.search.search.chat.prompt import PromptContextBuilder
+from nucliadb.search.search.chat.prompt import AugmentedContext, PromptContextBuilder
 from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
     ChatAuditor,
@@ -78,6 +78,7 @@ from nucliadb_models.search import (
     AskRetrievalMatch,
     AskTimings,
     AskTokens,
+    AugmentedContextReferences,
     ChatModel,
     ChatOptions,
     CitationsAskResponseItem,
@@ -143,6 +144,7 @@ class AskResult:
         metrics: AskMetrics,
         best_matches: list[RetrievalMatch],
         debug_chat_model: Optional[ChatModel],
+        augmented_context: AugmentedContext,
     ):
         # Initial attributes
         self.kbid = kbid
@@ -157,6 +159,7 @@ class AskResult:
         self.auditor: ChatAuditor = auditor
         self.metrics: AskMetrics = metrics
         self.best_matches: list[RetrievalMatch] = best_matches
+        self.augmented_context = augmented_context
 
         # Computed from the predict chat answer stream
         self._answer_text = ""
@@ -274,7 +277,13 @@ class AskResult:
 
         # Stream out the citations
         if self._citations is not None:
-            yield CitationsAskResponseItem(citations=self._citations.citations)
+            yield CitationsAskResponseItem(
+                citations=self._citations.citations,
+                augmented_context=AugmentedContextReferences(
+                    paragraphs=self.augmented_context["paragraphs"],
+                    fields=self.augmented_context["fields"],
+                ),
+            )
 
         # Stream out generic metadata about the answer
         if self._metadata is not None:
@@ -569,6 +578,7 @@ async def ask(
             prompt_context,
             prompt_context_order,
             prompt_context_images,
+            augmented_context,
         ) = await prompt_context_builder.build()
 
     # Make the chat request to the predict API
@@ -631,6 +641,7 @@ async def ask(
         metrics=metrics,
         best_matches=retrieval_results.best_matches,
         debug_chat_model=chat_model,
+        augmented_context=augmented_context,
     )
 
 

@@ -269,7 +269,7 @@ async def test_prompt_context_builder_prepends_user_context(
         context["resource2/a/title"] = "Resource 2"
 
     with mock.patch.object(builder, "_build_context", new=_mock_build_context):
-        context, context_order, image_context = await builder.build()
+        context, context_order, image_context, augmented_context = await builder.build()
         assert len(context) == 3
         assert len(context_order) == 3
         assert len(image_context) == 0
