@@ -30,6 +30,7 @@ from nats.aio.client import Msg
 from nats.js import JetStreamContext
 
 from nucliadb.common.cluster.exceptions import ShardsNotFound
+from nucliadb.common.locking import ResourceLocked
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.ingest import logger
@@ -195,9 +196,9 @@ class IngestConsumer:
                 else:
                     audit_time = ""
 
-                context.add_context({"kbid": pb.kbid, "rid": pb.uuid})
+                kbid, rid = pb.kbid, pb.uuid
+                context.add_context({"kbid": kbid, "rid": rid})
                 logger.info(f"Message processing: subject:{subject}, seqid: {seqid}, reply: {reply}")
-                kbid = pb.kbid
                 try:
                     source = "writer" if pb.source == pb.MessageSource.WRITER else "processor"
                     with consumer_observer({"source": source, "partition": self.partition}):
@@ -210,10 +211,16 @@ class IngestConsumer:
                             "stored_seqid": err.last_seqid,
                             "message_seqid": seqid,
                             "partition": self.partition,
-                            "kbid": pb.kbid,
+                            "kbid": kbid,
                             "msg_delivered_count": msg.metadata.num_delivered,
                         },
                     )
+                except ResourceLocked:
+                    logger.warning(
+                        "Resource is already being modified. Will be redelivered",
+                        extra={"kbid": kbid, "rid": rid},
+                    )
+                    await msg.nak()
                 else:
                     message_type_name = pb.MessageType.Name(pb.type)
                     time_to_process = time.monotonic() - start
@@ -222,8 +229,8 @@ class IngestConsumer:
                         log_level,
                         f"Successfully processed {message_type_name} message",
                         extra={
-                            "kbid": pb.kbid,
-                            "rid": pb.uuid,
+                            "kbid": kbid,
+                            "rid": rid,
                             "message_source": message_source,
                             "nucliadb_seqid": seqid,
                             "partition": self.partition,
@@ -240,7 +247,7 @@ class IngestConsumer:
                     f"A copy of the message has been stored on {self.processor.storage.deadletter_bucket}. "
                     f"Check sentry for more details: {str(e)}"
                 )
-                await self.ack_message(msg, kbid)
+                await msg.ack()
                 logger.info("Message acked because of deadletter", extra={"seqid": seqid})
             except (ShardsNotFound,) as e:
                 # Any messages that for some unexpected inconsistency have failed and won't be tried again
@@ -252,7 +259,7 @@ class IngestConsumer:
                     f"This message has been dropped and won't be retried again"
                     f"Check sentry for more details: {str(e)}"
                 )
-                await self.ack_message(msg, kbid)
+                await msg.ack()
                 logger.info("Message acked because of drop", extra={"seqid": seqid})
             except Exception as e:
                 # Unhandled exceptions that need to be retried after a small delay
@@ -267,6 +274,6 @@ class IngestConsumer:
                 raise e
             else:
                 # Successful processing
-                await self.ack_message(msg, kbid)
+                await msg.ack()
                 logger.info("Message acked because of success", extra={"seqid": seqid})
                 await self.clean_broker_message(msg)

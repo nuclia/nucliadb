@@ -143,21 +143,24 @@ class Processor:
             if last_seqid is not None and seqid <= last_seqid:
                 raise SequenceOrderViolation(last_seqid)
 
-        if message.type == writer_pb2.BrokerMessage.MessageType.DELETE:
-            await self.delete_resource(message, seqid, partition, transaction_check)
-        elif message.type == writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT:
-            await self.txn([message], seqid, partition, transaction_check)
-        elif message.type == writer_pb2.BrokerMessage.MessageType.MULTI:
-            # XXX Not supported right now
-            # MULTI, COMMIT and ROLLBACK are all not supported in transactional mode right now
-            # This concept is probably not tenable with current architecture because
-            # of how nats works and how we would need to manage rollbacks.
-            # XXX Should this be removed?
-            await self.multi(message, seqid)
-        elif message.type == writer_pb2.BrokerMessage.MessageType.COMMIT:
-            await self.commit(message, seqid, partition)
-        elif message.type == writer_pb2.BrokerMessage.MessageType.ROLLBACK:
-            await self.rollback(message, seqid, partition)
+        async with locking.distributed_lock(
+            locking.RESOURCE_MODIFICATION_LOCK.format(kbid=message.kbid, resource_id=message.uuid)
+        ):
+            if message.type == writer_pb2.BrokerMessage.MessageType.DELETE:
+                await self.delete_resource(message, seqid, partition, transaction_check)
+            elif message.type == writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT:
+                await self.txn([message], seqid, partition, transaction_check)
+            elif message.type == writer_pb2.BrokerMessage.MessageType.MULTI:
+                # XXX Not supported right now
+                # MULTI, COMMIT and ROLLBACK are all not supported in transactional mode right now
+                # This concept is probably not tenable with current architecture because
+                # of how nats works and how we would need to manage rollbacks.
+                # XXX Should this be removed?
+                await self.multi(message, seqid)
+            elif message.type == writer_pb2.BrokerMessage.MessageType.COMMIT:
+                await self.commit(message, seqid, partition)
+            elif message.type == writer_pb2.BrokerMessage.MessageType.ROLLBACK:
+                await self.rollback(message, seqid, partition)
 
     async def get_resource_uuid(self, kb: KnowledgeBox, message: writer_pb2.BrokerMessage) -> str:
         if message.uuid is None:
@@ -179,14 +182,9 @@ class Processor:
                 kb = KnowledgeBox(txn, self.storage, message.kbid)
 
                 uuid = await self.get_resource_uuid(kb, message)
-                async with locking.distributed_lock(
-                    locking.RESOURCE_INDEX_LOCK.format(kbid=message.kbid, resource_id=uuid)
-                ):
-                    # we need to have a lock at indexing time because we don't know if
-                    # a resource was in the process of being moved when a delete occurred
-                    shard_id = await datamanagers.resources.get_resource_shard_id(
-                        txn, kbid=message.kbid, rid=uuid
-                    )
+                shard_id = await datamanagers.resources.get_resource_shard_id(
+                    txn, kbid=message.kbid, rid=uuid
+                )
                 if shard_id is None:
                     logger.warning(f"Resource {uuid} does not exist")
                 else:
@@ -410,12 +408,7 @@ class Processor:
         self, txn: Transaction, kb: KnowledgeBox, uuid: str
     ) -> writer_pb2.ShardObject:
         kbid = kb.kbid
-        async with locking.distributed_lock(
-            locking.RESOURCE_INDEX_LOCK.format(kbid=kbid, resource_id=uuid)
-        ):
-            # we need to have a lock at indexing time because we don't know if
-            # a resource was move to another shard while it was being indexed
-            shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
+        shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
 
         shard = None
         if shard_id is not None:
