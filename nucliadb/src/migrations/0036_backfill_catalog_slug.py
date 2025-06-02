@@ -18,9 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""Migration #35
+"""Migration #36
 
-Rollover to update to nidx_texts v4
+Backfill catalog slug field
 
 """
 
