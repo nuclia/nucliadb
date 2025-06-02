@@ -138,8 +138,8 @@ async def pg_maindb_driver(pg_maindb_settings: DriverSettings) -> AsyncIterator[
         patch.object(ingest_settings, "driver_pg_url", url),
     ):
         async with await psycopg.AsyncConnection.connect(url) as conn, conn.cursor() as cur:
-            await cur.execute("TRUNCATE table resources")
-            await cur.execute("TRUNCATE table catalog")
+            await cur.execute("TRUNCATE TABLE resources")
+            await cur.execute("TRUNCATE TABLE catalog CASCADE")
 
         driver = PGDriver(
             url=url,
