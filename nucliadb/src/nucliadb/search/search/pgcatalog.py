@@ -22,7 +22,8 @@ import logging
 from collections import defaultdict
 from typing import Any, Literal, Union, cast
 
-from psycopg.rows import dict_row
+from psycopg import AsyncCursor
+from psycopg.rows import DictRow, dict_row
 
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
@@ -213,33 +214,11 @@ async def pgcatalog_search(catalog_query: CatalogQuery) -> Resources:
                 tmp_facets: dict[str, dict[str, int]] = {
                     translate_label(f): defaultdict(int) for f in catalog_query.faceted
                 }
-                facet_filters = " OR ".join(f"label LIKE '{f}/%%'" for f in tmp_facets.keys())
-                for facet in tmp_facets.keys():
-                    if not (
-                        facet.startswith("/n/s") or facet.startswith("/n/i") or facet.startswith("/l")
-                    ):
-                        logger.warning(
-                            f"Unexpected facet used at catalog: {facet}, kbid={catalog_query.kbid}"
-                        )
 
-                await cur.execute(
-                    f"SELECT label, COUNT(*) FROM (SELECT unnest(labels) AS label FROM ({query}) fc) nl WHERE ({facet_filters}) GROUP BY 1 ORDER BY 1",
-                    query_params,
-                )
-
-                for row in await cur.fetchall():
-                    label = row["label"]
-                    label_parts = label.split("/")
-                    parent = "/".join(label_parts[:-1])
-                    count = row["count"]
-                    if parent in tmp_facets:
-                        tmp_facets[parent][translate_system_to_alias_label(label)] = count
-
-                    # No need to get recursive because our facets are at most 3 levels deep (e.g: /l/set/label)
-                    if len(label_parts) >= 3:
-                        grandparent = "/".join(label_parts[:-2])
-                        if grandparent in tmp_facets:
-                            tmp_facets[grandparent][translate_system_to_alias_label(parent)] += count
+                if catalog_query.filters is None:
+                    await _faceted_search_unfiltered(cur, catalog_query, tmp_facets)
+                else:
+                    await _faceted_search_filtered(cur, catalog_query, tmp_facets, query, query_params)
 
                 facets = {translate_system_to_alias_label(k): v for k, v in tmp_facets.items()}
 
@@ -276,3 +255,71 @@ async def pgcatalog_search(catalog_query: CatalogQuery) -> Resources:
         next_page=(catalog_query.page_size * catalog_query.page_number + len(data) < total),
         min_score=0,
     )
+
+
+async def _faceted_search_unfiltered(
+    cur: AsyncCursor[DictRow], catalog_query: CatalogQuery, tmp_facets: dict[str, dict[str, int]]
+):
+    facet_params: dict[str, Any] = {}
+    if len(tmp_facets) <= 5:
+        # Asking for few facets, strictly filter to what we need in the query
+        prefixes_sql = []
+        for cnt, prefix in enumerate(tmp_facets.keys()):
+            prefixes_sql.append(
+                f"(facet LIKE %(facet_{cnt})s AND POSITION('/' IN RIGHT(facet, %(facet_len_{cnt})s)) = 0)"
+            )
+            facet_params[f"facet_{cnt}"] = f"{prefix}/%"
+            facet_params[f"facet_len_{cnt}"] = -(len(prefix) + 1)
+        facet_sql = f"AND ({' OR '.join(prefixes_sql)})"
+    elif all((facet.startswith("/l") or facet.startswith("/n/i") for facet in tmp_facets.keys())):
+        # Special case for the catalog query, which can have many facets asked for
+        # Filter for the categories (icon and labels) in the query, filter the rest in the code below
+        facet_sql = "AND (facet LIKE '/l/%%' OR facet like '/n/i/%%')"
+    else:
+        # Worst case: ask for all facets and filter here. This is faster than applying lots of filters
+        facet_sql = ""
+
+    await cur.execute(
+        f"SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s {facet_sql} GROUP BY facet",
+        {"kbid": catalog_query.kbid, **facet_params},
+    )
+
+    # Only keep the facets we asked for
+    for row in await cur.fetchall():
+        facet = row["facet"]
+        facet_parts = facet.split("/")
+        parent = "/".join(facet_parts[:-1])
+        if parent in tmp_facets:
+            tmp_facets[parent][translate_system_to_alias_label(facet)] = row["count"]
+
+
+async def _faceted_search_filtered(
+    cur: AsyncCursor[DictRow],
+    catalog_query: CatalogQuery,
+    tmp_facets: dict[str, dict[str, int]],
+    query: str,
+    query_params: dict[str, Any],
+):
+    facet_filters = " OR ".join(f"label LIKE '{f}/%%'" for f in tmp_facets.keys())
+    for facet in tmp_facets.keys():
+        if not (facet.startswith("/n/s") or facet.startswith("/n/i") or facet.startswith("/l")):
+            logger.warning(f"Unexpected facet used at catalog: {facet}, kbid={catalog_query.kbid}")
+
+    await cur.execute(
+        f"SELECT label, COUNT(*) FROM (SELECT unnest(labels) AS label FROM ({query}) fc) nl WHERE ({facet_filters}) GROUP BY 1 ORDER BY 1",
+        query_params,
+    )
+
+    for row in await cur.fetchall():
+        label = row["label"]
+        label_parts = label.split("/")
+        parent = "/".join(label_parts[:-1])
+        count = row["count"]
+        if parent in tmp_facets:
+            tmp_facets[parent][translate_system_to_alias_label(label)] = count
+
+        # No need to get recursive because our facets are at most 3 levels deep (e.g: /l/set/label)
+        if len(label_parts) >= 3:
+            grandparent = "/".join(label_parts[:-2])
+            if grandparent in tmp_facets:
+                tmp_facets[grandparent][translate_system_to_alias_label(parent)] += count

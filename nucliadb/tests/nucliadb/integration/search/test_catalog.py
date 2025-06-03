@@ -164,7 +164,7 @@ async def test_catalog_status_faceted(
     resp = await nucliadb_reader.get(
         f"/kb/{standalone_knowledgebox}/catalog?faceted=/metadata.status",
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     body = resp.json()
     assert len(body["resources"]) == 3
     facets = body["fulltext"]["facets"]["/metadata.status"]
@@ -233,6 +233,39 @@ async def test_catalog_faceted_labels(
             "/classification.labels/labelset0": 3,
             "/classification.labels/labelset1": 1,
         }
+    }
+
+    # This is the default faceted query from the catalog
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "page_size": 0,
+            "faceted": [
+                "/classification.labels/labelset0",
+                "/classification.labels/labelset1",
+                "/icon/application",
+                "/icon/audio",
+                "/icon/image",
+                "/icon/text",
+                "/icon/video",
+                "/icon/message",
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["fulltext"]["facets"] == {
+        "/classification.labels/labelset0": {
+            "/classification.labels/labelset0/label0": 1,
+            "/classification.labels/labelset0/label1": 2,
+        },
+        "/classification.labels/labelset1": {"/classification.labels/labelset1/label0": 1},
+        "/icon/application": {},
+        "/icon/audio": {},
+        "/icon/image": {},
+        "/icon/message": {},
+        "/icon/text": {"/icon/text/plain": 4},
+        "/icon/video": {},
     }
 
 
