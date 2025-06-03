@@ -76,5 +76,5 @@ spec:
       route:
         - destination:
             port:
-              number: { { .Values.serving.port } }
+              number: {{.Values.serving.port}}
             host: "search.{{ .Release.Namespace }}.svc.cluster.local"
