@@ -178,10 +178,10 @@ async def hydrate_text_block(
             extended_paragraph_id = await get_extended_paragraph_id(
                 kbid, text_block.paragraph_id, options.neighbouring_paragraphs
             )
-            text_block.extended_id = extended_paragraph_id
+            text_block.paragraph_id = extended_paragraph_id
         text_block.text = await paragraphs.get_paragraph_text(
             kbid=kbid,
-            paragraph_id=text_block.extended_id or text_block.paragraph_id,
+            paragraph_id=text_block.paragraph_id,
             highlight=options.highlight,
             matches=[],  # TODO: this was never implemented
             ematches=options.ematches,
@@ -236,7 +236,7 @@ async def get_extended_paragraph_id(
 
 def text_block_to_find_paragraph(text_block: TextBlockMatch) -> FindParagraph:
     return FindParagraph(
-        id=text_block.extended_id.full() if text_block.extended_id else text_block.paragraph_id.full(),
+        id=text_block.paragraph_id.full(),
         text=text_block.text or "",
         score=text_block.score,
         score_type=text_block.score_type,

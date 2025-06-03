@@ -919,6 +919,7 @@ def compute_best_matches(
                 for paragraph in field.paragraphs.values():
                     paragraphs.append(
                         _FindParagraph(
+                            id=paragraph.id,
                             paragraph_id=ParagraphId.from_string(paragraph.id),
                             score=paragraph.score,
                             score_type=paragraph.score_type,

@@ -56,6 +56,7 @@ class VectorsetExternalIndex:
 
 
 class ScoredTextBlock(BaseModel):
+    id: str
     paragraph_id: ParagraphId
     score: float
     score_type: SCORE_TYPE
@@ -77,10 +78,6 @@ class TextBlockMatch(ScoredTextBlock):
     field_labels: list[str] = []
     text: Optional[str] = None
     relevant_relations: Optional[Relations] = None
-
-    # If the hydration option of neighbouring paragraphs is active, the id of the final
-    # paragraph return is modified to contain all text blocks added
-    extended_id: Optional[ParagraphId] = None
 
 
 class QueryResults(BaseModel):

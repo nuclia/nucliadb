@@ -266,6 +266,7 @@ def merge_shards_graph_responses(
 def keyword_result_to_text_block_match(item: ParagraphResult) -> TextBlockMatch:
     fuzzy_result = len(item.matches) > 0
     return TextBlockMatch(
+        id=item.paragraph,
         paragraph_id=ParagraphId.from_string(item.paragraph),
         score=item.score.bm25,
         score_type=SCORE_TYPE.BM25,
@@ -308,6 +309,7 @@ def semantic_result_to_text_block_match(item: DocumentScored) -> TextBlockMatch:
         raise InvalidDocId(item.doc_id.id)
 
     return TextBlockMatch(
+        id=vector_id.full(),
         paragraph_id=ParagraphId.from_vector_id(vector_id),
         score=item.score,
         score_type=SCORE_TYPE.VECTOR,
@@ -354,6 +356,7 @@ def graph_results_to_text_block_matches(item: GraphSearchResponse) -> list[TextB
         paragraph_id = ParagraphId.from_string(metadata.paragraph_id)
         matches.append(
             TextBlockMatch(
+                id=paragraph_id.full(),
                 paragraph_id=paragraph_id,
                 score=FAKE_GRAPH_SCORE,
                 score_type=SCORE_TYPE.RELATION_RELEVANCE,
@@ -408,13 +411,11 @@ async def hydrate_and_rerank(
     text_block_hydration_ops = []
     for text_block in text_blocks:
         rid = text_block.paragraph_id.rid
-        paragraph_id = text_block.paragraph_id.full()
-
         # If we find multiple results (from different indexes) with different
         # metadata, this statement will only get the metadata from the first on
         # the list. We assume metadata is the same on all indexes, otherwise
         # this would be a BUG
-        text_blocks_by_id.setdefault(paragraph_id, text_block)
+        text_blocks_by_id.setdefault(text_block.id, text_block)
 
         # rerankers that need extra results may end with less resources than the
         # ones we see now, so we'll skip this step and recompute the resources
@@ -459,7 +460,7 @@ async def hydrate_and_rerank(
     # with the hydrated text, rerank and apply new scores to the text blocks
     to_rerank = [
         RerankableItem(
-            id=text_block.paragraph_id.full(),
+            id=text_block.id,
             score=text_block.score,
             score_type=text_block.score_type,
             content=text_block.text or "",  # TODO: add a warning, this shouldn't usually happen
@@ -474,30 +475,30 @@ async def hydrate_and_rerank(
 
     matches = []
     for item in reranked:
-        paragraph_id = item.id
+        text_block_id = item.id
         score = item.score
         score_type = item.score_type
 
-        text_block = text_blocks_by_id[paragraph_id]
+        text_block = text_blocks_by_id[text_block_id]
         text_block.score = score
         text_block.score_type = score_type
 
-        matches.append((paragraph_id, score))
+        matches.append((text_block_id, score))
 
     matches.sort(key=lambda x: x[1], reverse=True)
 
     best_matches = []
     best_text_blocks = []
     resource_hydration_ops = {}
-    for order, (paragraph_id, _) in enumerate(matches):
-        text_block = text_blocks_by_id[paragraph_id]
+    for order, (text_block_id, _) in enumerate(matches):
+        text_block = text_blocks_by_id[text_block_id]
         text_block.order = order
-        best_matches.append(text_block.extended_id.full() if text_block.extended_id else paragraph_id)
+        best_matches.append(text_block.paragraph_id.full())
         best_text_blocks.append(text_block)
 
         # now we have removed the text block surplus, fetch resource metadata
         if reranker.needs_extra_results:
-            rid = ParagraphId.from_string(paragraph_id).rid
+            rid = text_block.paragraph_id.rid
             if rid not in resource_hydration_ops:
                 resource_hydration_ops[rid] = asyncio.create_task(
                     hydrate_resource_metadata(
@@ -542,9 +543,7 @@ def compose_find_resources(
         field_id = text_block.paragraph_id.field_id.short_without_subfield()
         find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
 
-        paragraph_id = (
-            text_block.extended_id.full() if text_block.extended_id else text_block.paragraph_id.full()
-        )
+        paragraph_id = text_block.paragraph_id.full()
         find_paragraph = text_block_to_find_paragraph(text_block)
 
         find_field.paragraphs[paragraph_id] = find_paragraph
