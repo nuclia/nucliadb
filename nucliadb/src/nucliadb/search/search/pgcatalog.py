@@ -22,7 +22,7 @@ import logging
 from collections import defaultdict
 from typing import Any, Literal, Union, cast
 
-from psycopg import AsyncCursor
+from psycopg import AsyncCursor, sql
 from psycopg.rows import DictRow, dict_row
 
 from nucliadb.common.maindb.pg import PGDriver
@@ -56,65 +56,75 @@ def _filter_operands(operands: list[CatalogExpression]) -> tuple[list[str], list
     return facets, nonfacets
 
 
-def _convert_filter(expr: CatalogExpression, filter_params: dict[str, Any]) -> str:
+def _convert_filter(expr: CatalogExpression, filter_params: dict[str, Any]) -> sql.Composable:
     if expr.bool_and:
         return _convert_boolean_op(expr.bool_and, "and", filter_params)
     elif expr.bool_or:
         return _convert_boolean_op(expr.bool_or, "or", filter_params)
     elif expr.bool_not:
-        return f"(NOT {_convert_filter(expr.bool_not, filter_params)})"
+        return sql.SQL("(NOT {})").format(_convert_filter(expr.bool_not, filter_params))
     elif expr.date:
         return _convert_date_filter(expr.date, filter_params)
     elif expr.facet:
         param_name = f"param{len(filter_params)}"
         filter_params[param_name] = [expr.facet]
-        return f"extract_facets(labels) @> %({param_name})s"
+        return sql.SQL("extract_facets(labels) @> {}").format(sql.Placeholder(param_name))
     elif expr.resource_id:
         param_name = f"param{len(filter_params)}"
         filter_params[param_name] = [expr.resource_id]
-        return f"rid = %({param_name})s"
+        return sql.SQL("rid = {}").format(sql.Placeholder(param_name))
     else:
-        return ""
+        return sql.SQL("")
 
 
 def _convert_boolean_op(
     operands: list[CatalogExpression],
     op: Union[Literal["and"], Literal["or"]],
     filter_params: dict[str, Any],
-) -> str:
-    array_op = "@>" if op == "and" else "&&"
-    sql = []
+) -> sql.Composable:
+    array_op = sql.SQL("@>" if op == "and" else "&&")
+    operands_sql: list[sql.Composable] = []
     facets, nonfacets = _filter_operands(operands)
     if facets:
         param_name = f"param{len(filter_params)}"
         filter_params[param_name] = facets
-        sql.append(f"extract_facets(labels) {array_op} %({param_name})s")
+        operands_sql.append(
+            sql.SQL("extract_facets(labels) {} {}").format(array_op, sql.Placeholder(param_name))
+        )
     for nonfacet in nonfacets:
-        sql.append(_convert_filter(nonfacet, filter_params))
-    return "(" + f" {op.upper()} ".join(sql) + ")"
+        operands_sql.append(_convert_filter(nonfacet, filter_params))
+    return sql.SQL("({})").format(sql.SQL(f" {op.upper()} ").join(operands_sql))
 
 
-def _convert_date_filter(date: CatalogExpression.Date, filter_params: dict[str, Any]) -> str:
+def _convert_date_filter(date: CatalogExpression.Date, filter_params: dict[str, Any]) -> sql.Composable:
     if date.since and date.until:
         since_name = f"param{len(filter_params)}"
         filter_params[since_name] = date.since
         until_name = f"param{len(filter_params)}"
         filter_params[until_name] = date.until
-        return f"{date.field} BETWEEN %({since_name})s AND %({until_name})s"
+        return sql.SQL("{field} BETWEEN {since} AND {until}").format(
+            field=sql.Identifier(date.field),
+            since=sql.Placeholder(since_name),
+            until=sql.Placeholder(until_name),
+        )
     elif date.since:
         since_name = f"param{len(filter_params)}"
         filter_params[since_name] = date.since
-        return f"{date.field} > %({since_name})s"
+        return sql.SQL("{field} > {since}").format(
+            field=sql.Identifier(date.field), since=sql.Placeholder(since_name)
+        )
     elif date.until:
         until_name = f"param{len(filter_params)}"
         filter_params[until_name] = date.until
-        return f"{date.field} < %({until_name})s"
+        return sql.SQL("{field} < {until}").format(
+            field=sql.Identifier(date.field), until=sql.Placeholder(until_name)
+        )
     else:
         raise ValueError(f"Invalid date operator")
 
 
-def _prepare_query_filters(catalog_query: CatalogQuery) -> tuple[str, dict[str, Any]]:
-    filter_sql = ["kbid = %(kbid)s"]
+def _prepare_query_filters(catalog_query: CatalogQuery) -> tuple[sql.Composable, dict[str, Any]]:
+    filter_sql: list[sql.Composable] = [sql.SQL("kbid = %(kbid)s")]
     filter_params: dict[str, Any] = {"kbid": catalog_query.kbid}
 
     if catalog_query.query and catalog_query.query.query:
@@ -124,47 +134,50 @@ def _prepare_query_filters(catalog_query: CatalogQuery) -> tuple[str, dict[str, 
         filter_sql.append(_convert_filter(catalog_query.filters, filter_params))
 
     return (
-        f"SELECT * FROM catalog WHERE {' AND '.join(filter_sql)}",
+        sql.SQL("SELECT * FROM catalog WHERE {}").format(sql.SQL(" AND ").join(filter_sql)),
         filter_params,
     )
 
 
-def _prepare_query_search(query: search_models.CatalogQuery, params: dict[str, Any]) -> str:
+def _prepare_query_search(query: search_models.CatalogQuery, params: dict[str, Any]) -> sql.Composable:
     if query.match == search_models.CatalogQueryMatch.Exact:
         params["query"] = query.query
-        return f"{query.field.value} = %(query)s"
+        return sql.SQL("{} = %(query)s").format(sql.Identifier(query.field.value))
     elif query.match == search_models.CatalogQueryMatch.StartsWith:
         params["query"] = query.query + "%"
         if query.field == search_models.CatalogQueryField.Title:
             # Insensitive search supported by pg_trgm for title
-            return f"{query.field.value} ILIKE %(query)s"
+            return sql.SQL("{} ILIKE %(query)s").format(sql.Identifier(query.field.value))
         else:
             # Sensitive search for slug (btree does not support ILIKE and slugs are all lowercase anyway)
-            return f"{query.field.value} LIKE %(query)s"
+            return sql.SQL("{} LIKE %(query)s").format(sql.Identifier(query.field.value))
     # The rest of operators only supported by title
     elif query.match == search_models.CatalogQueryMatch.Words:
         # This is doing tokenization inside the SQL server (to keep the index updated). We could move it to
         # the python code at update/query time if it ever becomes a problem but for now, a single regex
         # executed per query is not a problem.
         params["query"] = query.query
-        return "regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W')"
+        return sql.SQL(
+            "regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W')"
+        )
     elif query.match == search_models.CatalogQueryMatch.Fuzzy:
         params["query"] = query.query
         # Note: the operator is %>, We use %%> for psycopg escaping
-        return "title %%> %(query)s"
+        return sql.SQL("title %%> %(query)s")
     elif query.match == search_models.CatalogQueryMatch.EndsWith:
         params["query"] = "%" + query.query
-        return "title ILIKE %(query)s"
+        return sql.SQL("title ILIKE %(query)s")
     elif query.match == search_models.CatalogQueryMatch.Contains:
         params["query"] = "%" + query.query + "%"
-        return "title ILIKE %(query)s"
+        return sql.SQL("title ILIKE %(query)s")
     else:  # pragma: nocover
         # This is a trick so mypy generates an error if this branch can be reached,
         # that is, if we are missing some ifs
         _a: int = "a"
+        return sql.SQL("")
 
 
-def _prepare_query(catalog_query: CatalogQuery) -> tuple[str, dict[str, Any]]:
+def _prepare_query(catalog_query: CatalogQuery) -> tuple[sql.Composed, dict[str, Any]]:
     # Base query with all the filters
     query, filter_params = _prepare_query_filters(catalog_query)
 
@@ -185,11 +198,11 @@ def _prepare_query(catalog_query: CatalogQuery) -> tuple[str, dict[str, Any]]:
         else:
             order_dir = "DESC"
 
-        query += f" ORDER BY {order_field} {order_dir}"
+        query += sql.SQL(" ORDER BY {} {}").format(sql.Identifier(order_field), sql.SQL(order_dir))
 
     # Pagination
     offset = catalog_query.page_size * catalog_query.page_number
-    query += f" LIMIT %(page_size)s OFFSET %(offset)s"
+    query += sql.SQL(" LIMIT %(page_size)s OFFSET %(offset)s")
     filter_params["page_size"] = catalog_query.page_size
     filter_params["offset"] = offset
 
@@ -225,7 +238,7 @@ async def pgcatalog_search(catalog_query: CatalogQuery) -> Resources:
         # Totals
         with observer({"op": "totals"}):
             await cur.execute(
-                f"SELECT COUNT(*) FROM ({query}) fc",
+                sql.SQL("SELECT COUNT(*) FROM ({}) fc").format(query),
                 query_params,
             )
             total = (await cur.fetchone())["count"]  # type: ignore
@@ -261,26 +274,31 @@ async def _faceted_search_unfiltered(
     cur: AsyncCursor[DictRow], catalog_query: CatalogQuery, tmp_facets: dict[str, dict[str, int]]
 ):
     facet_params: dict[str, Any] = {}
+    facet_sql: sql.Composable
     if len(tmp_facets) <= 5:
         # Asking for few facets, strictly filter to what we need in the query
         prefixes_sql = []
         for cnt, prefix in enumerate(tmp_facets.keys()):
             prefixes_sql.append(
-                f"(facet LIKE %(facet_{cnt})s AND POSITION('/' IN RIGHT(facet, %(facet_len_{cnt})s)) = 0)"
+                sql.SQL("(facet LIKE {} AND POSITION('/' IN RIGHT(facet, {})) = 0)").format(
+                    sql.Placeholder(f"facet_{cnt}"), sql.Placeholder(f"facet_len_{cnt}")
+                )
             )
             facet_params[f"facet_{cnt}"] = f"{prefix}/%"
             facet_params[f"facet_len_{cnt}"] = -(len(prefix) + 1)
-        facet_sql = f"AND ({' OR '.join(prefixes_sql)})"
+        facet_sql = sql.SQL("AND {}").format(sql.SQL(" OR ").join(prefixes_sql))
     elif all((facet.startswith("/l") or facet.startswith("/n/i") for facet in tmp_facets.keys())):
         # Special case for the catalog query, which can have many facets asked for
         # Filter for the categories (icon and labels) in the query, filter the rest in the code below
-        facet_sql = "AND (facet LIKE '/l/%%' OR facet like '/n/i/%%')"
+        facet_sql = sql.SQL("AND (facet LIKE '/l/%%' OR facet like '/n/i/%%')")
     else:
         # Worst case: ask for all facets and filter here. This is faster than applying lots of filters
-        facet_sql = ""
+        facet_sql = sql.SQL("")
 
     await cur.execute(
-        f"SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s {facet_sql} GROUP BY facet",
+        sql.SQL(
+            "SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s {} GROUP BY facet"
+        ).format(facet_sql),
         {"kbid": catalog_query.kbid, **facet_params},
     )
 
@@ -297,17 +315,24 @@ async def _faceted_search_filtered(
     cur: AsyncCursor[DictRow],
     catalog_query: CatalogQuery,
     tmp_facets: dict[str, dict[str, int]],
-    query: str,
+    query: sql.Composable,
     query_params: dict[str, Any],
 ):
-    facet_filters = " OR ".join(f"label LIKE '{f}/%%'" for f in tmp_facets.keys())
+    facet_params = {}
+    facet_filters = []
+    for cnt, facet in enumerate(tmp_facets.keys()):
+        facet_filters.append(sql.SQL("label LIKE {}'").format(sql.Placeholder(f"facet_{cnt}")))
+        facet_params["facet_{cnt}"] = facet
+
     for facet in tmp_facets.keys():
         if not (facet.startswith("/n/s") or facet.startswith("/n/i") or facet.startswith("/l")):
             logger.warning(f"Unexpected facet used at catalog: {facet}, kbid={catalog_query.kbid}")
 
     await cur.execute(
-        f"SELECT label, COUNT(*) FROM (SELECT unnest(labels) AS label FROM ({query}) fc) nl WHERE ({facet_filters}) GROUP BY 1 ORDER BY 1",
-        query_params,
+        sql.SQL(
+            "SELECT label, COUNT(*) FROM (SELECT unnest(labels) AS label FROM ({query}) fc) nl WHERE ({facet_filters}) GROUP BY 1 ORDER BY 1"
+        ).format(query=query, facet_filters=sql.SQL(" OR ").join(facet_filters)),
+        {**query_params, **facet_params},
     )
 
     for row in await cur.fetchall():
