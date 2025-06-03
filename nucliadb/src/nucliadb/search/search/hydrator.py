@@ -214,7 +214,9 @@ async def get_field_paragraphs_list(
 
 
 async def get_extended_paragraph_id(
-    kbid: str, paragraph_id: ParagraphId, neighbouring_paragraphs: NeighbouringParagraphs
+    kbid: str,
+    paragraph_id: ParagraphId,
+    neighbouring_paragraphs: NeighbouringParagraphs,
 ) -> ParagraphId:
     field_paragraphs = await get_field_paragraphs_list(kbid, paragraph_id.field_id)
     try:
