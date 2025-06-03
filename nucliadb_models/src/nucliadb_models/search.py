@@ -228,12 +228,15 @@ class Resources(BaseModel):
 
 
 class NeighbouringParagraphs(BaseModel):
-    before: int = 0
-    after: int = 0
+    before: int = Field(default=0, ge=0, lt=200)
+    after: int = Field(default=0, ge=0, lt=200)
 
 
 class HydrationOptions(BaseModel):
-    neighbouring_paragraphs: Optional[NeighbouringParagraphs] = None
+    neighbouring_paragraphs: Optional[NeighbouringParagraphs] = Field(
+        default=None,
+        description="Control how many sorrounding paragraphs are added to the ones retrieved at search time",
+    )
 
 
 class RelationDirection(str, Enum):
