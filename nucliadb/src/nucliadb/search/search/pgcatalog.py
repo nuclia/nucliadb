@@ -30,12 +30,7 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search.search.query_parser.models import CatalogExpression, CatalogQuery
 from nucliadb_models import search as search_models
 from nucliadb_models.labels import translate_system_to_alias_label
-from nucliadb_models.search import (
-    ResourceResult,
-    Resources,
-    SortField,
-    SortOrder,
-)
+from nucliadb_models.search import CatalogFacetsRequest, ResourceResult, Resources, SortField, SortOrder
 from nucliadb_telemetry import metrics
 
 from .filters import translate_label
@@ -348,3 +343,35 @@ async def _faceted_search_filtered(
             grandparent = "/".join(label_parts[:-2])
             if grandparent in tmp_facets:
                 tmp_facets[grandparent][translate_system_to_alias_label(parent)] += count
+
+
+@observer.wrap({"op": "search"})
+async def pgcatalog_facets(kbid: str, request: CatalogFacetsRequest) -> dict[str, int]:
+    async with _pg_driver()._get_connection() as conn, conn.cursor() as cur:
+        prefix_filters: list[sql.Composable] = []
+        prefix_params: dict[str, Any] = {}
+        for cnt, prefix in enumerate(request.prefixes):
+            prefix_sql = sql.SQL("facet LIKE {}").format(sql.Placeholder(f"prefix{cnt}"))
+            prefix_params[f"prefix{cnt}"] = f"{prefix.prefix}%"
+            if prefix.depth is not None:
+                prefix_parts = len(prefix.prefix.split("/"))
+                depth_sql = sql.SQL("SPLIT_PART(facet, '/', {}) = ''").format(
+                    sql.Placeholder(f"depth{cnt}")
+                )
+                prefix_params[f"depth{cnt}"] = prefix_parts + prefix.depth + 1
+                prefix_sql = sql.SQL("({} AND {})").format(prefix_sql, depth_sql)
+            prefix_filters.append(prefix_sql)
+
+        filter_sql: sql.Composable
+        if prefix_filters:
+            filter_sql = sql.SQL("AND {}").format(sql.SQL(" OR ").join(prefix_filters))
+        else:
+            filter_sql = sql.SQL("")
+
+        await cur.execute(
+            sql.SQL(
+                "SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s {} GROUP BY facet"
+            ).format(filter_sql),
+            {"kbid": kbid, **prefix_params},
+        )
+        return {k: v for k, v in await cur.fetchall()}
