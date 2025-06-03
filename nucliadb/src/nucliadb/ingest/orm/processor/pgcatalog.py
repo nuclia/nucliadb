@@ -40,6 +40,17 @@ def pgcatalog_enabled(kbid):
     return isinstance(get_driver(), PGDriver)
 
 
+def extract_facets(labels):
+    facets = set()
+    for label in labels:
+        parts = label.split("/")
+        facet = ""
+        for part in parts[1:]:
+            facet += f"/{part}"
+            facets.add(facet)
+    return facets
+
+
 @observer.wrap({"type": "update"})
 async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource, index_message: IndexMessage):
     if not pgcatalog_enabled(kbid):
@@ -74,6 +85,21 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource, inde
                 "modified_at": modified_at,
                 "labels": list(index_message.labels),
                 "slug": resource.basic.slug,
+            },
+        )
+        await cur.execute(
+            "DELETE FROM catalog_facets WHERE kbid = %(kbid)s AND rid = %(rid)s",
+            {
+                "kbid": resource.kb.kbid,
+                "rid": resource.uuid,
+            },
+        )
+        await cur.execute(
+            "INSERT INTO catalog_facets (kbid, rid, facet) SELECT %(kbid)s AS kbid, %(rid)s AS rid, unnest(%(facets)s::text[]) AS facet",
+            {
+                "kbid": resource.kb.kbid,
+                "rid": resource.uuid,
+                "facets": list(extract_facets(index_message.labels)),
             },
         )
 
