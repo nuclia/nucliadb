@@ -26,7 +26,7 @@ async def migrate(txn: PGTransaction) -> None:
         # IF NOT EXISTS just for compatibility with older install predating the migration system
         await cur.execute("""
             CREATE TABLE IF NOT EXISTS resources (
-                key TEXT PRIMARY KEY,
+                key TEXT COLLATE ucs_basic PRIMARY KEY,
                 value BYTEA
             );
         """)
