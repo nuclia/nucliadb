@@ -307,10 +307,10 @@ def semantic_result_to_text_block_match(item: DocumentScored) -> TextBlockMatch:
         vector_id = VectorId.from_string(item.doc_id.id)
     except (IndexError, ValueError):
         raise InvalidDocId(item.doc_id.id)
-
+    pid = ParagraphId.from_vector_id(vector_id)
     return TextBlockMatch(
-        id=vector_id.full(),
-        paragraph_id=ParagraphId.from_vector_id(vector_id),
+        id=pid.full(),
+        paragraph_id=pid,
         score=item.score,
         score_type=SCORE_TYPE.VECTOR,
         order=0,  # NOTE: this will be filled later
