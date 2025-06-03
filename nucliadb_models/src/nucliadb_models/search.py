@@ -1037,7 +1037,6 @@ class ChatModel(BaseModel):
         default=None,
         description="Seed use for the generative model for a deterministic output.",
     )
-    
 
 
 class RephraseModel(BaseModel):
