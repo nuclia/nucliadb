@@ -150,6 +150,18 @@ async def test_catalog_date_range_filtering(
     body = resp.json()
     assert len(body["resources"]) == 0
 
+    one_hour_later = now + timedelta(hours=1)
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "range_creation_start": one_hour_ago.isoformat(),
+            "range_creation_end": one_hour_later.isoformat(),
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1
+
 
 @pytest.mark.deploy_modes("standalone")
 async def test_catalog_status_faceted(
