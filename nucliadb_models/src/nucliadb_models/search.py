@@ -227,6 +227,15 @@ class Resources(BaseModel):
     )
 
 
+class NeighbouringParagraphs(BaseModel):
+    before: int = 0
+    after: int = 0
+
+
+class HydrationOptions(BaseModel):
+    neighbouring_paragraphs: Optional[NeighbouringParagraphs] = None
+
+
 class RelationDirection(str, Enum):
     IN = "in"
     OUT = "out"
@@ -1674,6 +1683,8 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
         default=None, description="Load ask parameters from this configuration"
     )
 
+    hydration: SkipJsonSchema[Optional[HydrationOptions]] = None
+
     @field_validator("rag_strategies", mode="before")
     @classmethod
     def validate_rag_strategies(cls, rag_strategies: list[RagStrategies]) -> list[RagStrategies]:
@@ -1853,6 +1864,8 @@ class FindRequest(BaseSearchRequest):
         title="Generative model",
         description="The generative model used to rephrase the query. If not provided, the model configured for the Knowledge Box is used.",
     )
+
+    hydration: SkipJsonSchema[Optional[HydrationOptions]] = None
 
     @model_validator(mode="before")
     @classmethod

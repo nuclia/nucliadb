@@ -34,6 +34,7 @@ from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.hydrator import (
+    NeighbouringParagraphs,
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
     hydrate_resource_metadata,
@@ -86,6 +87,7 @@ async def build_find_response(
     extracted: list[ExtractedDataTypeName] = [],
     field_type_filter: list[FieldTypeName] = [],
     highlight: bool = False,
+    neighbouring_paragraphs: Optional[NeighbouringParagraphs] = None,
 ) -> KnowledgeboxFindResults:
     # XXX: we shouldn't need a min score that we haven't used. Previous
     # implementations got this value from the proto request (i.e., default to 0)
@@ -132,6 +134,7 @@ async def build_find_response(
     text_block_hydration_options = TextBlockHydrationOptions(
         highlight=highlight,
         ematches=search_response.paragraph.ematches,  # type: ignore
+        neighbouring_paragraphs=neighbouring_paragraphs,
     )
     reranking_options = RerankingOptions(kbid=kbid, query=query)
     text_blocks, resources, best_matches = await hydrate_and_rerank(
@@ -489,7 +492,7 @@ async def hydrate_and_rerank(
     for order, (paragraph_id, _) in enumerate(matches):
         text_block = text_blocks_by_id[paragraph_id]
         text_block.order = order
-        best_matches.append(paragraph_id)
+        best_matches.append(text_block.extended_id.full() if text_block.extended_id else paragraph_id)
         best_text_blocks.append(text_block)
 
         # now we have removed the text block surplus, fetch resource metadata
@@ -539,7 +542,9 @@ def compose_find_resources(
         field_id = text_block.paragraph_id.field_id.short_without_subfield()
         find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
 
-        paragraph_id = text_block.paragraph_id.full()
+        paragraph_id = (
+            text_block.extended_id.full() if text_block.extended_id else text_block.paragraph_id.full()
+        )
         find_paragraph = text_block_to_find_paragraph(text_block)
 
         find_field.paragraphs[paragraph_id] = find_paragraph
