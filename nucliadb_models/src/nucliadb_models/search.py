@@ -1683,7 +1683,9 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
         default=None, description="Load ask parameters from this configuration"
     )
 
-    hydration: SkipJsonSchema[Optional[HydrationOptions]] = None
+    hydration: SkipJsonSchema[Optional[HydrationOptions]] = Field(
+        default=None, description="Results hydration options"
+    )
 
     @field_validator("rag_strategies", mode="before")
     @classmethod
@@ -1865,7 +1867,9 @@ class FindRequest(BaseSearchRequest):
         description="The generative model used to rephrase the query. If not provided, the model configured for the Knowledge Box is used.",
     )
 
-    hydration: SkipJsonSchema[Optional[HydrationOptions]] = None
+    hydration: SkipJsonSchema[Optional[HydrationOptions]] = Field(
+        default=None, description="Results hydration options"
+    )
 
     @model_validator(mode="before")
     @classmethod
