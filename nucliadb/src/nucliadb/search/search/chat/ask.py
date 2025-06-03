@@ -585,6 +585,7 @@ async def ask(
         citations=ask_request.citations,
         citation_threshold=ask_request.citation_threshold,
         generative_model=ask_request.generative_model,
+        seed=ask_request.generative_model_seed,
         max_tokens=generation.max_answer_tokens,
         query_context_images=prompt_context_images,
         json_schema=ask_request.answer_json_schema,
