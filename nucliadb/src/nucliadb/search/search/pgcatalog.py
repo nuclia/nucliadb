@@ -321,8 +321,8 @@ async def _faceted_search_filtered(
     facet_params = {}
     facet_filters = []
     for cnt, facet in enumerate(tmp_facets.keys()):
-        facet_filters.append(sql.SQL("label LIKE {}'").format(sql.Placeholder(f"facet_{cnt}")))
-        facet_params["facet_{cnt}"] = facet
+        facet_filters.append(sql.SQL("label LIKE {}").format(sql.Placeholder(f"facet_{cnt}")))
+        facet_params[f"facet_{cnt}"] = f"{facet}/%"
 
     for facet in tmp_facets.keys():
         if not (facet.startswith("/n/s") or facet.startswith("/n/i") or facet.startswith("/l")):
