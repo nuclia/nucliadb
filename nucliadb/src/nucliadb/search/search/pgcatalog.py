@@ -345,7 +345,7 @@ async def _faceted_search_filtered(
                 tmp_facets[grandparent][translate_system_to_alias_label(parent)] += count
 
 
-@observer.wrap({"op": "search"})
+@observer.wrap({"op": "catalog_facets"})
 async def pgcatalog_facets(kbid: str, request: CatalogFacetsRequest) -> dict[str, int]:
     async with _pg_driver()._get_connection() as conn, conn.cursor() as cur:
         prefix_filters: list[sql.Composable] = []
