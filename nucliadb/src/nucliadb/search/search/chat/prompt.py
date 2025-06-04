@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import copy
 from collections import deque
 from dataclasses import dataclass
@@ -29,7 +28,6 @@ from pydantic import BaseModel
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.models_utils import from_proto
-from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -57,7 +55,6 @@ from nucliadb_models.search import (
     ImageRagStrategyName,
     MetadataExtensionStrategy,
     MetadataExtensionType,
-    NeighbouringParagraphsStrategy,
     PageImageStrategy,
     ParagraphImageStrategy,
     PromptContext,
@@ -525,164 +522,6 @@ async def field_extension_prompt_context(
         context[paragraph.id] = _clean_paragraph_text(paragraph)
 
 
-async def get_paragraph_text_with_neighbours(
-    kbid: str,
-    pid: ParagraphId,
-    field_paragraphs: list[ParagraphId],
-    before: int = 0,
-    after: int = 0,
-) -> tuple[ParagraphId, str]:
-    """
-    This function will get the paragraph text of the paragraph with the neighbouring paragraphs included.
-    Parameters:
-        kbid: The knowledge box id.
-        pid: The matching paragraph id.
-        field_paragraphs: The list of paragraph ids of the field.
-        before: The number of paragraphs to include before the matching paragraph.
-        after: The number of paragraphs to include after the matching paragraph.
-    """
-
-    async def _get_paragraph_text(
-        kbid: str,
-        pid: ParagraphId,
-    ) -> tuple[ParagraphId, str]:
-        return pid, await get_paragraph_text(
-            kbid=kbid,
-            paragraph_id=pid,
-            log_on_missing_field=True,
-        )
-
-    ops = []
-    try:
-        for paragraph_index in get_neighbouring_paragraph_indexes(
-            field_paragraphs=field_paragraphs,
-            matching_paragraph=pid,
-            before=before,
-            after=after,
-        ):
-            neighbour_pid = field_paragraphs[paragraph_index]
-            ops.append(
-                asyncio.create_task(
-                    _get_paragraph_text(
-                        kbid=kbid,
-                        pid=neighbour_pid,
-                    )
-                )
-            )
-    except ParagraphIdNotFoundInExtractedMetadata:
-        logger.warning(
-            "Could not find matching paragraph in extracted metadata. This is odd and needs to be investigated.",
-            extra={
-                "kbid": kbid,
-                "matching_paragraph": pid.full(),
-                "field_paragraphs": [p.full() for p in field_paragraphs],
-            },
-        )
-        # If we could not find the matching paragraph in the extracted metadata, we can't retrieve
-        # the neighbouring paragraphs and we simply fetch the text of the matching paragraph.
-        ops.append(
-            asyncio.create_task(
-                _get_paragraph_text(
-                    kbid=kbid,
-                    pid=pid,
-                )
-            )
-        )
-
-    results = []
-    if len(ops) > 0:
-        results = await asyncio.gather(*ops)
-
-    # Sort the results by the paragraph start
-    results.sort(key=lambda x: x[0].paragraph_start)
-    paragraph_texts = []
-    for _, text in results:
-        if text != "":
-            paragraph_texts.append(text)
-    return pid, "\n\n".join(paragraph_texts)
-
-
-async def get_field_paragraphs_list(
-    kbid: str,
-    field: FieldId,
-    paragraphs: list[ParagraphId],
-) -> None:
-    """
-    Modifies the paragraphs list by adding the paragraph ids of the field, sorted by position.
-    """
-    resource = await cache.get_resource(kbid, field.rid)
-    if resource is None:  # pragma: no cover
-        return
-    field_obj: Field = await resource.get_field(key=field.key, type=field.pb_type, load=False)
-    field_metadata: Optional[resources_pb2.FieldComputedMetadata] = await field_obj.get_field_metadata(
-        force=True
-    )
-    if field_metadata is None:  # pragma: no cover
-        return
-    for paragraph in field_metadata.metadata.paragraphs:
-        paragraphs.append(
-            ParagraphId(
-                field_id=field,
-                paragraph_start=paragraph.start,
-                paragraph_end=paragraph.end,
-            )
-        )
-
-
-async def neighbouring_paragraphs_prompt_context(
-    context: CappedPromptContext,
-    kbid: str,
-    ordered_text_blocks: list[FindParagraph],
-    strategy: NeighbouringParagraphsStrategy,
-    metrics: Metrics,
-) -> None:
-    """
-    This function will get the paragraph texts and then craft a context with the neighbouring paragraphs of the
-    paragraphs in the ordered_paragraphs list. The number of paragraphs to include before and after each paragraph
-    """
-    # First, get the sorted list of paragraphs for each matching field
-    # so we can know the indexes of the neighbouring paragraphs
-    unique_fields = {
-        ParagraphId.from_string(text_block.id).field_id for text_block in ordered_text_blocks
-    }
-    paragraphs_by_field: dict[FieldId, list[ParagraphId]] = {}
-    field_ops = []
-    for field_id in unique_fields:
-        plist = paragraphs_by_field.setdefault(field_id, [])
-        field_ops.append(
-            asyncio.create_task(get_field_paragraphs_list(kbid=kbid, field=field_id, paragraphs=plist))
-        )
-    if field_ops:
-        await asyncio.gather(*field_ops)
-
-    # Now, get the paragraph texts with the neighbouring paragraphs
-    paragraph_ops = []
-    for text_block in ordered_text_blocks:
-        pid = ParagraphId.from_string(text_block.id)
-        paragraph_ops.append(
-            asyncio.create_task(
-                get_paragraph_text_with_neighbours(
-                    kbid=kbid,
-                    pid=pid,
-                    before=strategy.before,
-                    after=strategy.after,
-                    field_paragraphs=paragraphs_by_field.get(pid.field_id, []),
-                )
-            )
-        )
-    if not paragraph_ops:  # pragma: no cover
-        return
-
-    results: list[tuple[ParagraphId, str]] = await asyncio.gather(*paragraph_ops)
-
-    metrics.set("neighbouring_paragraphs_ops", len(results))
-
-    # Add the paragraph texts to the context
-    for pid, text in results:
-        if text != "":
-            context[pid.full()] = text
-
-
 async def conversation_prompt_context(
     context: CappedPromptContext,
     kbid: str,
@@ -1033,9 +872,14 @@ class PromptContextBuilder:
             for paragraph in self.ordered_paragraphs:
                 context[paragraph.id] = _clean_paragraph_text(paragraph)
 
+        strategies_not_handled_here = [
+            RagStrategyName.PREQUERIES,
+            RagStrategyName.GRAPH,
+            RagStrategyName.NEIGHBOURING_PARAGRAPHS,
+        ]
+
         full_resource: Optional[FullResourceStrategy] = None
         hierarchy: Optional[HierarchyResourceStrategy] = None
-        neighbouring_paragraphs: Optional[NeighbouringParagraphsStrategy] = None
         field_extension: Optional[FieldExtensionStrategy] = None
         metadata_extension: Optional[MetadataExtensionStrategy] = None
         conversational_strategy: Optional[ConversationalStrategy] = None
@@ -1052,14 +896,9 @@ class PromptContextBuilder:
                     full_resource.count = 1
             elif strategy.name == RagStrategyName.HIERARCHY:
                 hierarchy = cast(HierarchyResourceStrategy, strategy)
-            elif strategy.name == RagStrategyName.NEIGHBOURING_PARAGRAPHS:
-                neighbouring_paragraphs = cast(NeighbouringParagraphsStrategy, strategy)
             elif strategy.name == RagStrategyName.METADATA_EXTENSION:
                 metadata_extension = cast(MetadataExtensionStrategy, strategy)
-            elif (
-                strategy.name != RagStrategyName.PREQUERIES and strategy.name != RagStrategyName.GRAPH
-            ):  # pragma: no cover
-                # Prequeries and graph are not handled here
+            elif strategy.name not in strategies_not_handled_here:  # pragma: no cover
                 logger.warning(
                     "Unknown rag strategy",
                     extra={"strategy": strategy.name, "kbid": self.kbid},
@@ -1084,14 +923,6 @@ class PromptContextBuilder:
         if hierarchy:
             await hierarchy_prompt_context(
                 context, self.kbid, self.ordered_paragraphs, hierarchy, self.metrics
-            )
-        if neighbouring_paragraphs:
-            await neighbouring_paragraphs_prompt_context(
-                context,
-                self.kbid,
-                self.ordered_paragraphs,
-                neighbouring_paragraphs,
-                self.metrics,
             )
         if field_extension:
             await field_extension_prompt_context(
@@ -1136,25 +967,3 @@ def _clean_paragraph_text(paragraph: FindParagraph) -> str:
     # Do not send highlight marks on prompt context
     text = text.replace("<mark>", "").replace("</mark>", "")
     return text
-
-
-def get_neighbouring_paragraph_indexes(
-    field_paragraphs: list[ParagraphId],
-    matching_paragraph: ParagraphId,
-    before: int,
-    after: int,
-) -> list[int]:
-    """
-    Returns the indexes of the neighbouring paragraphs to fetch (including the matching paragraph).
-    """
-    assert before >= 0
-    assert after >= 0
-    try:
-        matching_index = field_paragraphs.index(matching_paragraph)
-    except ValueError:
-        raise ParagraphIdNotFoundInExtractedMetadata(
-            f"Matching paragraph {matching_paragraph.full()} not found in extracted metadata"
-        )
-    start_index = max(0, matching_index - before)
-    end_index = min(len(field_paragraphs), matching_index + after + 1)
-    return list(range(start_index, end_index))

@@ -62,6 +62,7 @@ from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
 )
 from nucliadb.search.search.graph_strategy import get_graph_results
+from nucliadb.search.search.hydrator import NeighbouringParagraphs
 from nucliadb.search.search.metrics import AskMetrics, Metrics
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
@@ -87,9 +88,11 @@ from nucliadb_models.search import (
     FindParagraph,
     FindRequest,
     GraphStrategy,
+    HydrationOptions,
     JSONAskResponseItem,
     KnowledgeboxFindResults,
     MetadataAskResponseItem,
+    NeighbouringParagraphsStrategy,
     NucliaDBClientType,
     PrequeriesAskResponseItem,
     PreQueriesStrategy,
@@ -469,6 +472,23 @@ class NotEnoughContextAskResult(AskResult):
         ).model_dump_json()
 
 
+def apply_neighbouring_paragraphs_strategy(
+    np_strategy: NeighbouringParagraphsStrategy, request: AskRequest
+):
+    hydration_options = HydrationOptions(
+        neighbouring_paragraphs=NeighbouringParagraphs(
+            before=np_strategy.before, after=np_strategy.after
+        )
+    )
+    # Add the hydration option to all retrieval queries
+    for rs in request.rag_strategies:
+        if rs.name != "prequeries":
+            continue
+        for pq in rs.queries:
+            pq.request.hydration = hydration_options
+    request.hydration = hydration_options
+
+
 async def ask(
     *,
     kbid: str,
@@ -508,6 +528,11 @@ async def ask(
 
     try:
         with metrics.time("retrieval"):
+            np_strategy = next(
+                (rs for rs in ask_request.rag_strategies if rs.name == "neighbouring_paragraphs"), None
+            )
+            if np_strategy is not None:
+                apply_neighbouring_paragraphs_strategy(np_strategy, ask_request)
             retrieval_results = await retrieval_step(
                 kbid=kbid,
                 # Prefer the rephrased query for retrieval if available
@@ -894,6 +919,7 @@ def compute_best_matches(
                 for paragraph in field.paragraphs.values():
                     paragraphs.append(
                         _FindParagraph(
+                            id=paragraph.id,
                             paragraph_id=ParagraphId.from_string(paragraph.id),
                             score=paragraph.score,
                             score_type=paragraph.score_type,

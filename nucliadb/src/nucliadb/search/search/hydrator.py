@@ -25,16 +25,19 @@ from typing import Optional
 from pydantic import BaseModel
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
-from nucliadb.common.ids import FieldId
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search.search import cache, paragraphs
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import (
     FindParagraph,
+    NeighbouringParagraphs,
     ResourceProperties,
 )
+from nucliadb_protos import resources_pb2 as rpb2
 from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils import const
 from nucliadb_utils.asyncio_utils import ConcurrentRunner
@@ -68,6 +71,8 @@ class TextBlockHydrationOptions(BaseModel):
 
     # If true, only hydrate the text block if its text is not already populated
     only_hydrate_empty: bool = False
+
+    neighbouring_paragraphs: Optional[NeighbouringParagraphs] = None
 
 
 @hydrator_observer.wrap({"type": "resource_text"})
@@ -169,7 +174,11 @@ async def hydrate_text_block(
     async with AsyncExitStack() as stack:
         if concurrency_control is not None:
             await stack.enter_async_context(concurrency_control)
-
+        if options.neighbouring_paragraphs is not None:
+            extended_paragraph_id = await get_extended_paragraph_id(
+                kbid, text_block.paragraph_id, options.neighbouring_paragraphs
+            )
+            text_block.paragraph_id = extended_paragraph_id
         text_block.text = await paragraphs.get_paragraph_text(
             kbid=kbid,
             paragraph_id=text_block.paragraph_id,
@@ -178,6 +187,59 @@ async def hydrate_text_block(
             ematches=options.ematches,
         )
     return text_block
+
+
+async def get_field_paragraphs_list(
+    kbid: str,
+    field: FieldId,
+) -> list[ParagraphId]:
+    """
+    Modifies the paragraphs list by adding the paragraph ids of the field, sorted by position.
+    """
+    resource = await cache.get_resource(kbid, field.rid)
+    if resource is None:  # pragma: no cover
+        return []
+    field_obj: Field = await resource.get_field(key=field.key, type=field.pb_type, load=False)
+    field_metadata: Optional[rpb2.FieldComputedMetadata] = await field_obj.get_field_metadata()
+    if field_metadata is None:  # pragma: no cover
+        return []
+    return [
+        ParagraphId(
+            field_id=field,
+            paragraph_start=paragraph.start,
+            paragraph_end=paragraph.end,
+        )
+        for paragraph in field_metadata.metadata.paragraphs
+    ]
+
+
+async def get_extended_paragraph_id(
+    kbid: str,
+    paragraph_id: ParagraphId,
+    neighbouring_paragraphs: NeighbouringParagraphs,
+) -> ParagraphId:
+    field_paragraphs = await get_field_paragraphs_list(kbid, paragraph_id.field_id)
+    try:
+        position = field_paragraphs.index(paragraph_id)
+        lb_position = max(0, position - neighbouring_paragraphs.before)
+        ub_position = min(len(field_paragraphs) - 1, position + neighbouring_paragraphs.after)
+        lb_pid = field_paragraphs[lb_position]
+        ub_pid = field_paragraphs[ub_position]
+    except IndexError:
+        # Do not extend the paragraph id if it can't be found on field paragraphs
+        logger.warning(
+            f"Paragraph not found in field extracted paragraphs.",
+            extra={
+                "kbid": kbid,
+                "paragraph_id": paragraph_id.full(),
+            },
+        )
+        return paragraph_id
+    return ParagraphId(
+        field_id=paragraph_id.field_id,
+        paragraph_start=lb_pid.paragraph_start,
+        paragraph_end=ub_pid.paragraph_end,
+    )
 
 
 def text_block_to_find_paragraph(text_block: TextBlockMatch) -> FindParagraph:
