@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 async def migrate(context: ExecutionContext) -> None:
     driver = cast(PGDriver, context.kv_driver)
 
-    BATCH_SIZE = 10_000
+    BATCH_SIZE = 1_000
     async with driver.transaction() as txn:
         txn = cast(PGTransaction, txn)
         start_kbid = "00000000000000000000000000000000"
@@ -49,10 +49,12 @@ async def migrate(context: ExecutionContext) -> None:
                     """
                         WITH i AS (
                             INSERT INTO catalog_facets (kbid, rid, facet)
-                            SELECT kbid, rid, unnest(extract_facets(labels)) FROM catalog
-                            WHERE (kbid = %(kbid)s AND rid > %(rid)s) OR kbid > %(kbid)s
-                            ORDER BY kbid, rid
-                            LIMIT %(batch)s
+                            SELECT kbid, rid, unnest(extract_facets(labels)) FROM (
+                                SELECT * FROM catalog
+                                WHERE (kbid = %(kbid)s AND rid > %(rid)s) OR kbid > %(kbid)s
+                                ORDER BY kbid, rid
+                                LIMIT %(batch)s
+                            ) rs
                             RETURNING kbid, rid
                         )
                         SELECT kbid, rid FROM i ORDER BY kbid DESC, rid DESC LIMIT 1;
