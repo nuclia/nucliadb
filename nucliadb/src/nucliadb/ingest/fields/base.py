@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
+from collections import defaultdict
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar
 
@@ -100,7 +101,7 @@ class Field(Generic[PbType]):
         self.computed_metadata = None
         self.large_computed_metadata = None
         self.question_answers = None
-        self.locks: dict[str, asyncio.Lock] = {}
+        self.locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self.id: str = id
         self.resource = resource
 
@@ -279,16 +280,19 @@ class Field(Generic[PbType]):
 
     async def get_question_answers(self, force=False) -> Optional[FieldQuestionAnswers]:
         if self.question_answers is None or force:
-            sf = self.get_storage_field(FieldTypes.QUESTION_ANSWERS)
-            try:
-                payload = await self.storage.download_pb(sf, FieldQuestionAnswers)
-            except DecodeError:
-                deprecated_payload = await self.storage.download_pb(sf, QuestionAnswers)
-                if deprecated_payload is not None:
-                    payload = FieldQuestionAnswers()
-                    payload.question_answers.CopyFrom(deprecated_payload)
-            if payload is not None:
-                self.question_answers = payload
+            async with self.locks["question_answers"]:
+                # Value could have been cached while waiting for the lock, so check again
+                if self.question_answers is None or force:
+                    sf = self.get_storage_field(FieldTypes.QUESTION_ANSWERS)
+                    try:
+                        payload = await self.storage.download_pb(sf, FieldQuestionAnswers)
+                    except DecodeError:
+                        deprecated_payload = await self.storage.download_pb(sf, QuestionAnswers)
+                        if deprecated_payload is not None:
+                            payload = FieldQuestionAnswers()
+                            payload.question_answers.CopyFrom(deprecated_payload)
+                    if payload is not None:
+                        self.question_answers = payload
         return self.question_answers
 
     async def set_question_answers(self, payload: FieldQuestionAnswerWrapper) -> None:
@@ -365,10 +369,13 @@ class Field(Generic[PbType]):
 
     async def get_extracted_text(self, force=False) -> Optional[ExtractedText]:
         if self.extracted_text is None or force:
-            sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
-            payload = await self.storage.download_pb(sf, ExtractedText)
-            if payload is not None:
-                self.extracted_text = payload
+            async with self.locks["extracted_text"]:
+                # Value could have been cached while waiting for the lock, so check again
+                if self.extracted_text is None or force:
+                    sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
+                    payload = await self.storage.download_pb(sf, ExtractedText)
+                    if payload is not None:
+                        self.extracted_text = payload
         return self.extracted_text
 
     async def set_vectors(
@@ -444,10 +451,13 @@ class Field(Generic[PbType]):
         force: bool = False,
     ) -> Optional[VectorObject]:
         if self.extracted_vectors.get(vectorset, None) is None or force:
-            sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
-            payload = await self.storage.download_pb(sf, VectorObject)
-            if payload is not None:
-                self.extracted_vectors[vectorset] = payload
+            async with self.locks[f"vectors_{vectorset}"]:
+                # Value could have been cached while waiting for the lock, so check again
+                if self.extracted_vectors.get(vectorset, None) is None or force:
+                    sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
+                    payload = await self.storage.download_pb(sf, VectorObject)
+                    if payload is not None:
+                        self.extracted_vectors[vectorset] = payload
         return self.extracted_vectors.get(vectorset, None)
 
     async def set_field_metadata(self, payload: FieldComputedMetadataWrapper) -> FieldComputedMetadata:
@@ -500,9 +510,9 @@ class Field(Generic[PbType]):
 
     async def get_field_metadata(self, force: bool = False) -> Optional[FieldComputedMetadata]:
         if self.computed_metadata is None or force:
-            async with self.locks.setdefault("field_metadata", asyncio.Lock()):
-                if self.computed_metadata is None:
-                    # Value can be fetch while waiting for the lock
+            async with self.locks["field_metadata"]:
+                # Value could have been cached while waiting for the lock, so check again
+                if self.computed_metadata is None or force:
                     sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
                     payload = await self.storage.download_pb(sf, FieldComputedMetadata)
                     if payload is not None:
@@ -551,13 +561,16 @@ class Field(Generic[PbType]):
 
     async def get_large_field_metadata(self, force: bool = False) -> Optional[LargeComputedMetadata]:
         if self.large_computed_metadata is None or force:
-            sf = self.get_storage_field(FieldTypes.FIELD_LARGE_METADATA)
-            payload = await self.storage.download_pb(
-                sf,
-                LargeComputedMetadata,
-            )
-            if payload is not None:
-                self.large_computed_metadata = payload
+            async with self.locks["large_field_metadata"]:
+                # Value could have been cached while waiting for the lock, so check again
+                if self.large_computed_metadata is None or force:
+                    sf = self.get_storage_field(FieldTypes.FIELD_LARGE_METADATA)
+                    payload = await self.storage.download_pb(
+                        sf,
+                        LargeComputedMetadata,
+                    )
+                    if payload is not None:
+                        self.large_computed_metadata = payload
         return self.large_computed_metadata
 
     async def generated_by(self) -> FieldAuthor:

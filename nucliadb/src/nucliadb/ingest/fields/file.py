@@ -103,8 +103,11 @@ class File(Field[FieldFile]):
 
     async def get_file_extracted_data(self) -> Optional[FileExtractedData]:
         if self.file_extracted_data is None:
-            sf: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, FILE_METADATA
-            )
-            self.file_extracted_data = await self.storage.download_pb(sf, FileExtractedData)
+            async with self.locks["file_extracted_data"]:
+                # Value could have been fetched while waiting for the lock
+                if self.file_extracted_data is None:
+                    sf: StorageField = self.storage.file_extracted(
+                        self.kbid, self.uuid, self.type, self.id, FILE_METADATA
+                    )
+                    self.file_extracted_data = await self.storage.download_pb(sf, FileExtractedData)
         return self.file_extracted_data
