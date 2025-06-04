@@ -152,18 +152,20 @@ class Field(Generic[PbType]):
 
     async def db_get_value(self) -> Optional[PbType]:
         if self.value is None:
-            payload = await datamanagers.fields.get_raw(
-                self.resource.txn,
-                kbid=self.kbid,
-                rid=self.uuid,
-                field_type=self.type,
-                field_id=self.id,
-            )
-            if payload is None:
-                return None
-
-            self.value = self.pbklass()
-            self.value.ParseFromString(payload)
+            async with self.locks["value"]:
+                # Value could have been cached while waiting for the lock, so check again
+                if self.value is None:
+                    payload = await datamanagers.fields.get_raw(
+                        self.resource.txn,
+                        kbid=self.kbid,
+                        rid=self.uuid,
+                        field_type=self.type,
+                        field_id=self.id,
+                    )
+                    if payload is None:
+                        return None
+                    self.value = self.pbklass()
+                    self.value.ParseFromString(payload)
         return self.value
 
     async def db_set_value(self, payload: Any):

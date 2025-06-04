@@ -136,19 +136,21 @@ class Conversation(Field[PBConversation]):
 
     async def get_metadata(self) -> FieldConversation:
         if self.metadata is None:
-            payload = await self.resource.txn.get(
-                KB_RESOURCE_FIELD_METADATA.format(
-                    kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
-                )
-            )
-            self.metadata = FieldConversation()
-            if payload:
-                self.metadata.ParseFromString(payload)
-            else:
-                self.metadata.size = PAGE_SIZE
-                self.metadata.pages = 0
-                self.metadata.total = 0
-                self._created = True
+            async with self.locks["conv_metadata"]:
+                if self.metadata is None:
+                    payload = await self.resource.txn.get(
+                        KB_RESOURCE_FIELD_METADATA.format(
+                            kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
+                        )
+                    )
+                    self.metadata = FieldConversation()
+                    if payload:
+                        self.metadata.ParseFromString(payload)
+                    else:
+                        self.metadata.size = PAGE_SIZE
+                        self.metadata.pages = 0
+                        self.metadata.total = 0
+                        self._created = True
         return self.metadata
 
     async def db_get_value(self, page: int = 1):
