@@ -56,7 +56,6 @@ class VectorsetExternalIndex:
 
 
 class ScoredTextBlock(BaseModel):
-    id: str
     paragraph_id: ParagraphId
     score: float
     score_type: SCORE_TYPE

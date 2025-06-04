@@ -75,12 +75,7 @@ async def find(
         )
     else:
         return await _index_node_retrieval(
-            kbid,
-            item,
-            x_ndb_client,
-            x_nucliadb_user,
-            x_forwarded_for,
-            metrics,
+            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, metrics
         )
 
 
@@ -126,9 +121,6 @@ async def _index_node_retrieval(
             highlight=item.highlight,
             rank_fusion_algorithm=rank_fusion,
             reranker=reranker,
-            neighbouring_paragraphs=item.hydration.neighbouring_paragraphs
-            if item.hydration and item.hydration.neighbouring_paragraphs
-            else None,
         )
 
     search_time = time() - start_time

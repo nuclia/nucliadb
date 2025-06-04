@@ -34,7 +34,6 @@ from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.hydrator import (
-    NeighbouringParagraphs,
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
     hydrate_resource_metadata,
@@ -87,7 +86,6 @@ async def build_find_response(
     extracted: list[ExtractedDataTypeName] = [],
     field_type_filter: list[FieldTypeName] = [],
     highlight: bool = False,
-    neighbouring_paragraphs: Optional[NeighbouringParagraphs] = None,
 ) -> KnowledgeboxFindResults:
     # XXX: we shouldn't need a min score that we haven't used. Previous
     # implementations got this value from the proto request (i.e., default to 0)
@@ -134,7 +132,6 @@ async def build_find_response(
     text_block_hydration_options = TextBlockHydrationOptions(
         highlight=highlight,
         ematches=search_response.paragraph.ematches,  # type: ignore
-        neighbouring_paragraphs=neighbouring_paragraphs,
     )
     reranking_options = RerankingOptions(kbid=kbid, query=query)
     text_blocks, resources, best_matches = await hydrate_and_rerank(
@@ -266,7 +263,6 @@ def merge_shards_graph_responses(
 def keyword_result_to_text_block_match(item: ParagraphResult) -> TextBlockMatch:
     fuzzy_result = len(item.matches) > 0
     return TextBlockMatch(
-        id=item.paragraph,
         paragraph_id=ParagraphId.from_string(item.paragraph),
         score=item.score.bm25,
         score_type=SCORE_TYPE.BM25,
@@ -307,10 +303,9 @@ def semantic_result_to_text_block_match(item: DocumentScored) -> TextBlockMatch:
         vector_id = VectorId.from_string(item.doc_id.id)
     except (IndexError, ValueError):
         raise InvalidDocId(item.doc_id.id)
-    pid = ParagraphId.from_vector_id(vector_id)
+
     return TextBlockMatch(
-        id=pid.full(),
-        paragraph_id=pid,
+        paragraph_id=ParagraphId.from_vector_id(vector_id),
         score=item.score,
         score_type=SCORE_TYPE.VECTOR,
         order=0,  # NOTE: this will be filled later
@@ -356,7 +351,6 @@ def graph_results_to_text_block_matches(item: GraphSearchResponse) -> list[TextB
         paragraph_id = ParagraphId.from_string(metadata.paragraph_id)
         matches.append(
             TextBlockMatch(
-                id=paragraph_id.full(),
                 paragraph_id=paragraph_id,
                 score=FAKE_GRAPH_SCORE,
                 score_type=SCORE_TYPE.RELATION_RELEVANCE,
@@ -411,11 +405,13 @@ async def hydrate_and_rerank(
     text_block_hydration_ops = []
     for text_block in text_blocks:
         rid = text_block.paragraph_id.rid
+        paragraph_id = text_block.paragraph_id.full()
+
         # If we find multiple results (from different indexes) with different
         # metadata, this statement will only get the metadata from the first on
         # the list. We assume metadata is the same on all indexes, otherwise
         # this would be a BUG
-        text_blocks_by_id.setdefault(text_block.id, text_block)
+        text_blocks_by_id.setdefault(paragraph_id, text_block)
 
         # rerankers that need extra results may end with less resources than the
         # ones we see now, so we'll skip this step and recompute the resources
@@ -460,7 +456,7 @@ async def hydrate_and_rerank(
     # with the hydrated text, rerank and apply new scores to the text blocks
     to_rerank = [
         RerankableItem(
-            id=text_block.id,
+            id=text_block.paragraph_id.full(),
             score=text_block.score,
             score_type=text_block.score_type,
             content=text_block.text or "",  # TODO: add a warning, this shouldn't usually happen
@@ -475,30 +471,30 @@ async def hydrate_and_rerank(
 
     matches = []
     for item in reranked:
-        text_block_id = item.id
+        paragraph_id = item.id
         score = item.score
         score_type = item.score_type
 
-        text_block = text_blocks_by_id[text_block_id]
+        text_block = text_blocks_by_id[paragraph_id]
         text_block.score = score
         text_block.score_type = score_type
 
-        matches.append((text_block_id, score))
+        matches.append((paragraph_id, score))
 
     matches.sort(key=lambda x: x[1], reverse=True)
 
     best_matches = []
     best_text_blocks = []
     resource_hydration_ops = {}
-    for order, (text_block_id, _) in enumerate(matches):
-        text_block = text_blocks_by_id[text_block_id]
+    for order, (paragraph_id, _) in enumerate(matches):
+        text_block = text_blocks_by_id[paragraph_id]
         text_block.order = order
-        best_matches.append(text_block.paragraph_id.full())
+        best_matches.append(paragraph_id)
         best_text_blocks.append(text_block)
 
         # now we have removed the text block surplus, fetch resource metadata
         if reranker.needs_extra_results:
-            rid = text_block.paragraph_id.rid
+            rid = ParagraphId.from_string(paragraph_id).rid
             if rid not in resource_hydration_ops:
                 resource_hydration_ops[rid] = asyncio.create_task(
                     hydrate_resource_metadata(

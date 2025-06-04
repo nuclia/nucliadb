@@ -757,7 +757,6 @@ def build_text_blocks_from_relations(
     text_blocks = [
         TextBlockMatch(
             # XXX: Even though we are setting a paragraph_id, the text is not coming from the paragraph
-            id=p_id.full(),
             paragraph_id=p_id,
             score=score,
             score_type=SCORE_TYPE.RELATION_RELEVANCE,
@@ -902,7 +901,6 @@ def relations_match_to_text_block_match(
     # the hydration and find response building code works with TextBlockMatch, we extended it to have relevant relations information
     parsed_paragraph_id = paragraph_match.paragraph_id
     return TextBlockMatch(
-        id=parsed_paragraph_id.full(),
         paragraph_id=parsed_paragraph_id,
         score=paragraph_match.score,
         score_type=SCORE_TYPE.RELATION_RELEVANCE,
