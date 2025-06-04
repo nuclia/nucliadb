@@ -127,7 +127,7 @@ class Resource:
         self.disable_vectors = disable_vectors
         self._previous_status: Optional[Metadata.Status.ValueType] = None
         self.user_relations: Optional[PBRelations] = None
-        self.field_lock = asyncio.Lock()
+        self.locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     async def set_slug(self):
         basic = await self.get_basic()
@@ -137,8 +137,12 @@ class Resource:
     # Basic
     async def get_basic(self) -> Optional[PBBasic]:
         if self.basic is None:
-            basic = await datamanagers.resources.get_basic(self.txn, kbid=self.kb.kbid, rid=self.uuid)
-            self.basic = basic if basic is not None else PBBasic()
+            async with self.locks["basic"]:
+                if self.basic is None:
+                    basic = await datamanagers.resources.get_basic(
+                        self.txn, kbid=self.kb.kbid, rid=self.uuid
+                    )
+                    self.basic = basic if basic is not None else PBBasic()
         return self.basic
 
     def set_processing_status(self, current_basic: PBBasic, basic_in_payload: PBBasic):
@@ -211,8 +215,12 @@ class Resource:
     # Origin
     async def get_origin(self) -> Optional[PBOrigin]:
         if self.origin is None:
-            origin = await datamanagers.resources.get_origin(self.txn, kbid=self.kb.kbid, rid=self.uuid)
-            self.origin = origin
+            async with self.locks["origin"]:
+                if self.origin is None:
+                    origin = await datamanagers.resources.get_origin(
+                        self.txn, kbid=self.kb.kbid, rid=self.uuid
+                    )
+                    self.origin = origin
         return self.origin
 
     async def set_origin(self, payload: PBOrigin):
@@ -225,8 +233,12 @@ class Resource:
     # Extra
     async def get_extra(self) -> Optional[PBExtra]:
         if self.extra is None:
-            extra = await datamanagers.resources.get_extra(self.txn, kbid=self.kb.kbid, rid=self.uuid)
-            self.extra = extra
+            async with self.locks["extra"]:
+                if self.extra is None:
+                    extra = await datamanagers.resources.get_extra(
+                        self.txn, kbid=self.kb.kbid, rid=self.uuid
+                    )
+                    self.extra = extra
         return self.extra
 
     async def set_extra(self, payload: PBExtra):
@@ -237,10 +249,12 @@ class Resource:
     # Security
     async def get_security(self) -> Optional[utils_pb2.Security]:
         if self.security is None:
-            security = await datamanagers.resources.get_security(
-                self.txn, kbid=self.kb.kbid, rid=self.uuid
-            )
-            self.security = security
+            async with self.locks["security"]:
+                if self.security is None:
+                    security = await datamanagers.resources.get_security(
+                        self.txn, kbid=self.kb.kbid, rid=self.uuid
+                    )
+                    self.security = security
         return self.security
 
     async def set_security(self, payload: utils_pb2.Security) -> None:
@@ -253,13 +267,15 @@ class Resource:
     # Relations
     async def get_user_relations(self) -> PBRelations:
         if self.user_relations is None:
-            sf = self.storage.user_relations(self.kb.kbid, self.uuid)
-            relations = await self.storage.download_pb(sf, PBRelations)
-            if relations is None:
-                # Key not found = no relations
-                self.user_relations = PBRelations()
-            else:
-                self.user_relations = relations
+            async with self.locks["user_relations"]:
+                if self.user_relations is None:
+                    sf = self.storage.user_relations(self.kb.kbid, self.uuid)
+                    relations = await self.storage.download_pb(sf, PBRelations)
+                    if relations is None:
+                        # Key not found = no relations
+                        self.user_relations = PBRelations()
+                    else:
+                        self.user_relations = relations
         return self.user_relations
 
     async def set_user_relations(self, payload: PBRelations):
@@ -308,7 +324,7 @@ class Resource:
     async def get_field(self, key: str, type: FieldType.ValueType, load: bool = True):
         field = (type, key)
         if field not in self.fields:
-            async with self.field_lock:
+            async with self.locks["field"]:
                 if field not in self.fields:
                     field_obj: Field = KB_FIELDS[type](id=key, resource=self)
                     if load:
