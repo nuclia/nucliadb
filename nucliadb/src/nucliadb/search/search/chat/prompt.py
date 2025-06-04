@@ -19,7 +19,6 @@
 #
 import asyncio
 import copy
-from nucliadb_protos.resources_pb2 import ExtractedText, FieldComputedMetadata
 from collections import deque
 from dataclasses import dataclass
 from typing import Deque, Dict, List, Optional, Sequence, Tuple, TypedDict, Union, cast
@@ -48,7 +47,7 @@ from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.search import (
     SCORE_TYPE,
-    AugmentedParagraph,
+    AugmentedTextBlock,
     ConversationalStrategy,
     FieldExtensionStrategy,
     FindParagraph,
@@ -70,6 +69,7 @@ from nucliadb_models.search import (
     TableImageStrategy,
 )
 from nucliadb_protos import resources_pb2
+from nucliadb_protos.resources_pb2 import ExtractedText, FieldComputedMetadata
 from nucliadb_utils.asyncio_utils import run_concurrently
 from nucliadb_utils.utilities import get_storage
 
@@ -89,8 +89,8 @@ class ParagraphIdNotFoundInExtractedMetadata(Exception):
 
 
 class AugmentedContext(TypedDict):
-    paragraphs: list[AugmentedParagraph]
-    fields: dict[str, str]
+    paragraphs: list[AugmentedTextBlock]
+    fields: list[AugmentedTextBlock]
 
 
 class CappedPromptContext:
@@ -303,7 +303,9 @@ async def full_resource_prompt_context(
                     del context[tb_id]
             # Add the extracted text of each field to the context.
             context[field.full()] = extracted_text
-            augmented_context["fields"].append(field.full())
+            augmented_context["fields"].append(
+                AugmentedTextBlock(id=field.full(), text=extracted_text, rag_strategy=strategy.name)
+            )
             added_fields.add(field.full())
 
     metrics.set("full_resource_ops", len(added_fields))
@@ -526,123 +528,20 @@ async def field_extension_prompt_context(
                 del context[tb_id]
         # Add the extracted text of each field to the beginning of the context.
         context[field.full()] = extracted_text
-        augmented_context["fields"].append(field.full())
+        augmented_context["fields"].append(
+            AugmentedTextBlock(id=field.full(), text=extracted_text, rag_strategy=strategy.name)
+        )
 
     # Add the extracted text of each paragraph to the end of the context.
     for paragraph in ordered_paragraphs:
         context[paragraph.id] = _clean_paragraph_text(paragraph)
 
 
-async def get_paragraph_text_with_neighbours(
-    kbid: str,
-    pid: ParagraphId,
-    field_paragraphs: list[ParagraphId],
-    before: int = 0,
-    after: int = 0,
-) -> tuple[ParagraphId, str]:
-    """
-    This function will get the paragraph text of the paragraph with the neighbouring paragraphs included.
-    Parameters:
-        kbid: The knowledge box id.
-        pid: The matching paragraph id.
-        field_paragraphs: The list of paragraph ids of the field.
-        before: The number of paragraphs to include before the matching paragraph.
-        after: The number of paragraphs to include after the matching paragraph.
-    """
-
-    async def _get_paragraph_text(
-        kbid: str,
-        pid: ParagraphId,
-    ) -> tuple[ParagraphId, str]:
-        return pid, await get_paragraph_text(
-            kbid=kbid,
-            paragraph_id=pid,
-            log_on_missing_field=True,
-        )
-
-    ops = []
-    try:
-        for paragraph_index in get_neighbouring_paragraph_indexes(
-            field_paragraphs=field_paragraphs,
-            matching_paragraph=pid,
-            before=before,
-            after=after,
-        ):
-            neighbour_pid = field_paragraphs[paragraph_index]
-            ops.append(
-                asyncio.create_task(
-                    _get_paragraph_text(
-                        kbid=kbid,
-                        pid=neighbour_pid,
-                    )
-                )
-            )
-    except ParagraphIdNotFoundInExtractedMetadata:
-        logger.warning(
-            "Could not find matching paragraph in extracted metadata. This is odd and needs to be investigated.",
-            extra={
-                "kbid": kbid,
-                "matching_paragraph": pid.full(),
-                "field_paragraphs": [p.full() for p in field_paragraphs],
-            },
-        )
-        # If we could not find the matching paragraph in the extracted metadata, we can't retrieve
-        # the neighbouring paragraphs and we simply fetch the text of the matching paragraph.
-        ops.append(
-            asyncio.create_task(
-                _get_paragraph_text(
-                    kbid=kbid,
-                    pid=pid,
-                )
-            )
-        )
-
-    results = []
-    if len(ops) > 0:
-        results = await asyncio.gather(*ops)
-
-    # Sort the results by the paragraph start
-    results.sort(key=lambda x: x[0].paragraph_start)
-    paragraph_texts = []
-    for _, text in results:
-        if text != "":
-            paragraph_texts.append(text)
-    return pid, "\n\n".join(paragraph_texts)
-
-
-async def get_orm_field(
-    kbid: str,
-    field_id: FieldId
-) -> Optional[Field]:
+async def get_orm_field(kbid: str, field_id: FieldId) -> Optional[Field]:
     resource = await cache.get_resource(kbid, field_id.rid)
     if resource is None:  # pragma: no cover
         return None
     return await resource.get_field(key=field_id.key, type=field_id.pb_type, load=False)
-
-
-
-async def get_field_paragraphs_list(
-    kbid: str,
-    field: FieldId,
-) -> list[ParagraphId]:
-    """
-    Modifies the paragraphs list by adding the paragraph ids of the field, sorted by position.
-    """
-    resource = await cache.get_resource(kbid, field.rid)
-    if resource is None:  # pragma: no cover
-        return []
-    field_obj: Field = await resource.get_field(key=field.key, type=field.pb_type, load=False)
-    field_metadata: Optional[resources_pb2.FieldComputedMetadata] = await field_obj.get_field_metadata()
-    if field_metadata is None:  # pragma: no cover
-        return []
-    return [
-        ParagraphId(
-            field_id=field,
-            paragraph_start=paragraph.start,
-            paragraph_end=paragraph.end,
-        )
-        for paragraph in field_metadata.metadata.paragraphs
-    ]
 
 
 async def neighbouring_paragraphs_prompt_context(
@@ -663,76 +562,87 @@ async def neighbouring_paragraphs_prompt_context(
     unique_field_ids = list({pid.field_id for pid in retrieved_paragraphs_ids})
 
     # Get extracted texts and metadatas for all fields
-    et_ops = []
     fm_ops = []
+    et_ops = []
     for field_id in unique_field_ids:
         field = await get_orm_field(kbid, field_id)
-        et_ops.append(asyncio.create_task(field.get_field_metadata()))
-        fm_ops.append(asyncio.create_task(field.get_extracted_text()))
+        if field is None:
+            continue
+        fm_ops.append(asyncio.create_task(field.get_field_metadata()))
+        et_ops.append(asyncio.create_task(field.get_extracted_text()))
 
-    extracted_texts: dict[FieldId, Optional[ExtractedText]] = {fid: et for fid, et in zip(unique_field_ids, await asyncio.gather(*et_ops))}
-    field_metadatas: dict[FieldId, Optional[FieldComputedMetadata]] = {fid: fm for fid, fm in zip(unique_field_ids, await asyncio.gather(*fm_ops))}
+    field_metadatas: dict[FieldId, FieldComputedMetadata] = {
+        fid: fm for fid, fm in zip(unique_field_ids, await asyncio.gather(*fm_ops)) if fm is not None
+    }
+    extracted_texts: dict[FieldId, ExtractedText] = {
+        fid: et for fid, et in zip(unique_field_ids, await asyncio.gather(*et_ops)) if et is not None
+    }
+
+    def _get_paragraph_text(extracted_text: ExtractedText, pid: ParagraphId) -> str:
+        if pid.field_id.subfield_id:
+            text = extracted_text.split_text.get(pid.field_id.subfield_id) or ""
+        else:
+            text = extracted_text.text
+        return text[pid.paragraph_start : pid.paragraph_end]
 
     for pid in retrieved_paragraphs_ids:
         # Add the retrieved paragraph first
         field_extracted_text = extracted_texts.get(pid.field_id, None)
         if field_extracted_text is None:
             continue
-        if pid.field_id.subfield_id not in (None, ""):
-            ptext = field_extracted_text.text[pid.paragraph_start:pid.paragraph_end]
-        else:
-            ptext = field_extracted_text.split_text[pid.field_id.subfield_id][pid.paragraph_start:pid.paragraph_end]
-        context[pid.full()] = ptext
+        ptext = _get_paragraph_text(field_extracted_text, pid)
+        if ptext:
+            context[pid.full()] = ptext
 
         # Now add the neighbouring paragraphs
         field_extracted_metadata = field_metadatas.get(pid.field_id, None)
         if field_extracted_metadata is None:
             continue
-        
-        pass
 
-
-    # Now, get the paragraph texts with the neighbouring paragraphs
-    paragraph_ops = []
-    for text_block in ordered_text_blocks:
-        pid = ParagraphId.from_string(text_block.id)
-        paragraph_ops.append(
-            asyncio.create_task(
-                get_paragraph_text_with_neighbours(
-                    kbid=kbid,
-                    pid=pid,
-                    before=strategy.before,
-                    after=strategy.after,
-                    field_paragraphs=paragraphs_by_field.get(pid.field_id, []),
-                )
+        field_pids = [
+            ParagraphId(
+                field_id=pid.field_id,
+                paragraph_start=p.start,
+                paragraph_end=p.end,
             )
-        )
-    if not paragraph_ops:  # pragma: no cover
-        return
+            for p in field_extracted_metadata.metadata.paragraphs
+        ]
+        try:
+            index = field_pids.index(pid)
+        except IndexError:
+            continue
 
-    results: list[tuple[ParagraphId, str]] = await asyncio.gather(*paragraph_ops)
-
-    metrics.set("neighbouring_paragraphs_ops", len(results))
-
-    # Add the paragraph texts to the context
-    for pid, text in results:
-        if text != "":
-            context[pid.full()] = text
-            # if pid not in retrieved_paragraphs_ids:
+        lb_index = max(0, index - strategy.before)
+        ub_index = min(len(field_pids), index + strategy.after + 1)
+        for neighbour_index in range(lb_index, ub_index):
+            if neighbour_index == index:
+                # Already handled above
+                continue
+            try:
+                npid = field_pids[neighbour_index]
+            except IndexError:
+                continue
+            ptext = _get_paragraph_text(field_extracted_text, npid)
+            if not ptext:
+                continue
+            context[npid.full()] = ptext
             augmented_context["paragraphs"].append(
-                AugmentedParagraph(
-                    id=pid,
-                    text=text,
-                    reference_paragraph=pid,
+                AugmentedTextBlock(
+                    id=npid.full(),
+                    text=ptext,
+                    reference_paragraph=pid.full(),
+                    rag_strategy=strategy.name,
                 )
             )
+
+    metrics.set("neighbouring_paragraphs_ops", len(augmented_context["paragraphs"]))
 
 
 async def conversation_prompt_context(
     context: CappedPromptContext,
     kbid: str,
     ordered_paragraphs: list[FindParagraph],
-    conversational_strategy: ConversationalStrategy,
+    strategy: ConversationalStrategy,
     visual_llm: bool,
     metrics: Metrics,
     augmented_context: AugmentedContext,
@@ -767,7 +677,7 @@ async def conversation_prompt_context(
                 cmetadata = await field_obj.get_metadata()
 
                 attachments: List[resources_pb2.FieldRef] = []
-                if conversational_strategy.full:
+                if strategy.full:
                     ops += 5
                     extracted_text = await field_obj.get_extracted_text()
                     for current_page in range(1, cmetadata.pages + 1):
@@ -781,7 +691,14 @@ async def conversation_prompt_context(
                                 text = message.content.text.strip()
                             pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
                             context[pid] = text
-                            augmented_context["paragraphs"].append(pid)
+                            augmented_context["paragraphs"].append(
+                                AugmentedTextBlock(
+                                    id=pid,
+                                    text=text,
+                                    reference_paragraph=paragraph.id,
+                                    rag_strategy=strategy.name,
+                                )
+                            )
                             attachments.extend(message.content.attachments_fields)
                 else:
                     # Add first message
@@ -796,12 +713,17 @@ async def conversation_prompt_context(
                             text = message.content.text.strip()
                         pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
                         context[pid] = text
-                        augmented_context["paragraphs"].append(pid)
+                        augmented_context["paragraphs"].append(
+                            AugmentedTextBlock(
+                                id=pid,
+                                text=text,
+                                reference_paragraph=paragraph.id,
+                                rag_strategy=strategy.name,
+                            )
+                        )
                         attachments.extend(message.content.attachments_fields)
 
-                    messages: Deque[resources_pb2.Message] = deque(
-                        maxlen=conversational_strategy.max_messages
-                    )
+                    messages: Deque[resources_pb2.Message] = deque(maxlen=strategy.max_messages)
 
                     pending = -1
                     for page in range(1, cmetadata.pages + 1):
@@ -812,7 +734,7 @@ async def conversation_prompt_context(
                             if pending > 0:
                                 pending -= 1
                             if message.ident == mident:
-                                pending = (conversational_strategy.max_messages - 1) // 2
+                                pending = (strategy.max_messages - 1) // 2
                             if pending == 0:
                                 break
                         if pending == 0:
@@ -823,10 +745,17 @@ async def conversation_prompt_context(
                         text = message.content.text.strip()
                         pid = f"{rid}/{field_type}/{field_id}/{message.ident}/0-{len(message.content.text) + 1}"
                         context[pid] = text
-                        augmented_context["paragraphs"].append(pid)
+                        augmented_context["paragraphs"].append(
+                            AugmentedTextBlock(
+                                id=pid,
+                                text=text,
+                                reference_paragraph=paragraph.id,
+                                rag_strategy=strategy.name,
+                            )
+                        )
                         attachments.extend(message.content.attachments_fields)
 
-                if conversational_strategy.attachments_text:
+                if strategy.attachments_text:
                     # add on the context the images if vlm enabled
                     for attachment in attachments:
                         ops += 1
@@ -838,9 +767,16 @@ async def conversation_prompt_context(
                             pid = f"{rid}/{field_type}/{attachment.field_id}/0-{len(extracted_text.text) + 1}"
                             text = f"Attachment {attachment.field_id}: {extracted_text.text}\n\n"
                             context[pid] = text
-                            augmented_context["paragraphs"].append(pid)
+                            augmented_context["paragraphs"].append(
+                                AugmentedTextBlock(
+                                    id=pid,
+                                    text=text,
+                                    reference_paragraph=paragraph.id,
+                                    rag_strategy=strategy.name,
+                                )
+                            )
 
-                if conversational_strategy.attachments_images and visual_llm:
+                if strategy.attachments_images and visual_llm:
                     for attachment in attachments:
                         ops += 1
                         file_field: File = await resource.get_field(
@@ -953,7 +889,9 @@ async def hierarchy_prompt_context(
         context[paragraph.id] = paragraph_text
         if paragraph.id in augmented_paragraphs:
             field_id = ParagraphId.from_string(paragraph.id).field_id.full()
-            augmented_context["fields"].append(field_id)
+            augmented_context["fields"].append(
+                AugmentedTextBlock(id=field_id, text=paragraph_text, rag_strategy=strategy.name)
+            )
     return
 
 
