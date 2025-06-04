@@ -280,8 +280,8 @@ class AskResult:
             yield CitationsAskResponseItem(
                 citations=self._citations.citations,
                 augmented_context=AugmentedContextReferences(
-                    paragraphs={ap.id: ap for ap in self.augmented_context["paragraphs"]},
-                    fields={af.id: af for af in self.augmented_context["fields"]},
+                    paragraphs=self.augmented_context["paragraphs"],
+                    fields=self.augmented_context["fields"],
                 ),
             )
 

@@ -89,8 +89,8 @@ class ParagraphIdNotFoundInExtractedMetadata(Exception):
 
 
 class AugmentedContext(TypedDict):
-    paragraphs: list[AugmentedTextBlock]
-    fields: list[AugmentedTextBlock]
+    paragraphs: dict[str, AugmentedTextBlock]
+    fields: dict[str, AugmentedTextBlock]
 
 
 class CappedPromptContext:
@@ -303,9 +303,10 @@ async def full_resource_prompt_context(
                     del context[tb_id]
             # Add the extracted text of each field to the context.
             context[field.full()] = extracted_text
-            augmented_context["fields"].append(
-                AugmentedTextBlock(id=field.full(), text=extracted_text, rag_strategy=strategy.name)
+            augmented_context["fields"][field.full()] = AugmentedTextBlock(
+                id=field.full(), text=extracted_text, rag_strategy=strategy.name
             )
+
             added_fields.add(field.full())
 
     metrics.set("full_resource_ops", len(added_fields))
@@ -528,8 +529,8 @@ async def field_extension_prompt_context(
                 del context[tb_id]
         # Add the extracted text of each field to the beginning of the context.
         context[field.full()] = extracted_text
-        augmented_context["fields"].append(
-            AugmentedTextBlock(id=field.full(), text=extracted_text, rag_strategy=strategy.name)
+        augmented_context["fields"][field.full()] = AugmentedTextBlock(
+            id=field.full(), text=extracted_text, rag_strategy=strategy.name
         )
 
     # Add the extracted text of each paragraph to the end of the context.
@@ -626,13 +627,11 @@ async def neighbouring_paragraphs_prompt_context(
             if not ptext:
                 continue
             context[npid.full()] = ptext
-            augmented_context["paragraphs"].append(
-                AugmentedTextBlock(
-                    id=npid.full(),
-                    text=ptext,
-                    reference_paragraph=pid.full(),
-                    rag_strategy=strategy.name,
-                )
+            augmented_context["paragraphs"][npid.full()] = AugmentedTextBlock(
+                id=npid.full(),
+                text=ptext,
+                reference_paragraph=pid.full(),
+                rag_strategy=strategy.name,
             )
 
     metrics.set("neighbouring_paragraphs_ops", len(augmented_context["paragraphs"]))
@@ -691,13 +690,11 @@ async def conversation_prompt_context(
                                 text = message.content.text.strip()
                             pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
                             context[pid] = text
-                            augmented_context["paragraphs"].append(
-                                AugmentedTextBlock(
-                                    id=pid,
-                                    text=text,
-                                    reference_paragraph=paragraph.id,
-                                    rag_strategy=strategy.name,
-                                )
+                            augmented_context["paragraphs"][pid] = AugmentedTextBlock(
+                                id=pid,
+                                text=text,
+                                reference_paragraph=paragraph.id,
+                                rag_strategy=strategy.name,
                             )
                             attachments.extend(message.content.attachments_fields)
                 else:
@@ -713,13 +710,11 @@ async def conversation_prompt_context(
                             text = message.content.text.strip()
                         pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
                         context[pid] = text
-                        augmented_context["paragraphs"].append(
-                            AugmentedTextBlock(
-                                id=pid,
-                                text=text,
-                                reference_paragraph=paragraph.id,
-                                rag_strategy=strategy.name,
-                            )
+                        augmented_context["paragraphs"][pid] = AugmentedTextBlock(
+                            id=pid,
+                            text=text,
+                            reference_paragraph=paragraph.id,
+                            rag_strategy=strategy.name,
                         )
                         attachments.extend(message.content.attachments_fields)
 
@@ -745,13 +740,11 @@ async def conversation_prompt_context(
                         text = message.content.text.strip()
                         pid = f"{rid}/{field_type}/{field_id}/{message.ident}/0-{len(message.content.text) + 1}"
                         context[pid] = text
-                        augmented_context["paragraphs"].append(
-                            AugmentedTextBlock(
-                                id=pid,
-                                text=text,
-                                reference_paragraph=paragraph.id,
-                                rag_strategy=strategy.name,
-                            )
+                        augmented_context["paragraphs"][pid] = AugmentedTextBlock(
+                            id=pid,
+                            text=text,
+                            reference_paragraph=paragraph.id,
+                            rag_strategy=strategy.name,
                         )
                         attachments.extend(message.content.attachments_fields)
 
@@ -767,13 +760,11 @@ async def conversation_prompt_context(
                             pid = f"{rid}/{field_type}/{attachment.field_id}/0-{len(extracted_text.text) + 1}"
                             text = f"Attachment {attachment.field_id}: {extracted_text.text}\n\n"
                             context[pid] = text
-                            augmented_context["paragraphs"].append(
-                                AugmentedTextBlock(
-                                    id=pid,
-                                    text=text,
-                                    reference_paragraph=paragraph.id,
-                                    rag_strategy=strategy.name,
-                                )
+                            augmented_context["paragraphs"][pid] = AugmentedTextBlock(
+                                id=pid,
+                                text=text,
+                                reference_paragraph=paragraph.id,
+                                rag_strategy=strategy.name,
                             )
 
                 if strategy.attachments_images and visual_llm:
@@ -889,8 +880,8 @@ async def hierarchy_prompt_context(
         context[paragraph.id] = paragraph_text
         if paragraph.id in augmented_paragraphs:
             field_id = ParagraphId.from_string(paragraph.id).field_id.full()
-            augmented_context["fields"].append(
-                AugmentedTextBlock(id=field_id, text=paragraph_text, rag_strategy=strategy.name)
+            augmented_context["fields"][field_id] = AugmentedTextBlock(
+                id=field_id, text=paragraph_text, rag_strategy=strategy.name
             )
     return
 
@@ -923,7 +914,7 @@ class PromptContextBuilder:
         self.max_context_characters = max_context_characters
         self.visual_llm = visual_llm
         self.metrics = metrics
-        self.augmented_context = AugmentedContext(paragraphs=[], fields=[])
+        self.augmented_context = AugmentedContext(paragraphs={}, fields={})
 
     def prepend_user_context(self, context: CappedPromptContext):
         # Chat extra context passed by the user is the most important, therefore
