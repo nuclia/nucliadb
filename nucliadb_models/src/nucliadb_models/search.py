@@ -2194,14 +2194,20 @@ class MetadataAskResponseItem(BaseModel):
     timings: AskTimings
 
 
+class AugmentedParagraph(BaseModel):
+    id: str
+    text: str
+    reference_paragraph: str
+
+
 class AugmentedContextReferences(BaseModel):
-    paragraphs: list[str] = Field(
-        default=[],
-        description="Paragraphs ids added to the context as a result of using the `rag_strategies` parameter, typically the neighbouring_paragraphs or the conversation strategies",
+    paragraphs: dict[str, AugmentedParagraph] = Field(
+        default={},
+        description="Paragraphs added to the context as a result of using the `rag_strategies` parameter, typically the neighbouring_paragraphs or the conversation strategies",
     )
-    fields: list[str] = Field(
-        default=[],
-        description="Field ids added to the context as a result of using the `rag_strategies` parameter, typically the hierarcy or full_resource strategies.",
+    fields: dict[str, str] = Field(
+        default={},
+        description="Field extracted texts added to the context as a result of using the `rag_strategies` parameter, typically the hierarcy or full_resource strategies.",
     )
 
 

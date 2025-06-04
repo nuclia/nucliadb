@@ -19,6 +19,7 @@
 #
 import asyncio
 import copy
+from nucliadb_protos.resources_pb2 import ExtractedText, FieldComputedMetadata
 from collections import deque
 from dataclasses import dataclass
 from typing import Deque, Dict, List, Optional, Sequence, Tuple, TypedDict, Union, cast
@@ -47,6 +48,7 @@ from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.search import (
     SCORE_TYPE,
+    AugmentedParagraph,
     ConversationalStrategy,
     FieldExtensionStrategy,
     FindParagraph,
@@ -87,8 +89,8 @@ class ParagraphIdNotFoundInExtractedMetadata(Exception):
 
 
 class AugmentedContext(TypedDict):
-    paragraphs: list[str]
-    fields: list[str]
+    paragraphs: list[AugmentedParagraph]
+    fields: dict[str, str]
 
 
 class CappedPromptContext:
@@ -608,31 +610,39 @@ async def get_paragraph_text_with_neighbours(
     return pid, "\n\n".join(paragraph_texts)
 
 
+async def get_orm_field(
+    kbid: str,
+    field_id: FieldId
+) -> Optional[Field]:
+    resource = await cache.get_resource(kbid, field_id.rid)
+    if resource is None:  # pragma: no cover
+        return None
+    return await resource.get_field(key=field_id.key, type=field_id.pb_type, load=False)
+
+
+
 async def get_field_paragraphs_list(
     kbid: str,
     field: FieldId,
-    paragraphs: list[ParagraphId],
-) -> None:
+) -> list[ParagraphId]:
     """
     Modifies the paragraphs list by adding the paragraph ids of the field, sorted by position.
     """
     resource = await cache.get_resource(kbid, field.rid)
     if resource is None:  # pragma: no cover
-        return
+        return []
     field_obj: Field = await resource.get_field(key=field.key, type=field.pb_type, load=False)
-    field_metadata: Optional[resources_pb2.FieldComputedMetadata] = await field_obj.get_field_metadata(
-        force=True
-    )
+    field_metadata: Optional[resources_pb2.FieldComputedMetadata] = await field_obj.get_field_metadata()
     if field_metadata is None:  # pragma: no cover
-        return
-    for paragraph in field_metadata.metadata.paragraphs:
-        paragraphs.append(
-            ParagraphId(
-                field_id=field,
-                paragraph_start=paragraph.start,
-                paragraph_end=paragraph.end,
-            )
+        return []
+    return [
+        ParagraphId(
+            field_id=field,
+            paragraph_start=paragraph.start,
+            paragraph_end=paragraph.end,
         )
+        for paragraph in field_metadata.metadata.paragraphs
+    ]
 
 
 async def neighbouring_paragraphs_prompt_context(
@@ -645,23 +655,42 @@ async def neighbouring_paragraphs_prompt_context(
 ) -> None:
     """
     This function will get the paragraph texts and then craft a context with the neighbouring paragraphs of the
-    paragraphs in the ordered_paragraphs list. The number of paragraphs to include before and after each paragraph
+    paragraphs in the ordered_paragraphs list.
     """
-    retrieved_paragraphs_ids = {
+    retrieved_paragraphs_ids = [
         ParagraphId.from_string(text_block.id) for text_block in ordered_text_blocks
-    }
-    unique_fields = {
-        pid.field_id for pid in retrieved_paragraphs_ids
-    }
-    paragraphs_by_field: dict[FieldId, list[ParagraphId]] = {}
-    field_ops = []
-    for field_id in unique_fields:
-        plist = paragraphs_by_field.setdefault(field_id, [])
-        field_ops.append(
-            asyncio.create_task(get_field_paragraphs_list(kbid=kbid, field=field_id, paragraphs=plist))
-        )
-    if field_ops:
-        await asyncio.gather(*field_ops)
+    ]
+    unique_field_ids = list({pid.field_id for pid in retrieved_paragraphs_ids})
+
+    # Get extracted texts and metadatas for all fields
+    et_ops = []
+    fm_ops = []
+    for field_id in unique_field_ids:
+        field = await get_orm_field(kbid, field_id)
+        et_ops.append(asyncio.create_task(field.get_field_metadata()))
+        fm_ops.append(asyncio.create_task(field.get_extracted_text()))
+
+    extracted_texts: dict[FieldId, Optional[ExtractedText]] = {fid: et for fid, et in zip(unique_field_ids, await asyncio.gather(*et_ops))}
+    field_metadatas: dict[FieldId, Optional[FieldComputedMetadata]] = {fid: fm for fid, fm in zip(unique_field_ids, await asyncio.gather(*fm_ops))}
+
+    for pid in retrieved_paragraphs_ids:
+        # Add the retrieved paragraph first
+        field_extracted_text = extracted_texts.get(pid.field_id, None)
+        if field_extracted_text is None:
+            continue
+        if pid.field_id.subfield_id not in (None, ""):
+            ptext = field_extracted_text.text[pid.paragraph_start:pid.paragraph_end]
+        else:
+            ptext = field_extracted_text.split_text[pid.field_id.subfield_id][pid.paragraph_start:pid.paragraph_end]
+        context[pid.full()] = ptext
+
+        # Now add the neighbouring paragraphs
+        field_extracted_metadata = field_metadatas.get(pid.field_id, None)
+        if field_extracted_metadata is None:
+            continue
+        
+        pass
+
 
     # Now, get the paragraph texts with the neighbouring paragraphs
     paragraph_ops = []
@@ -690,7 +719,13 @@ async def neighbouring_paragraphs_prompt_context(
         if text != "":
             context[pid.full()] = text
             # if pid not in retrieved_paragraphs_ids:
-            augmented_context["paragraphs"].append(pid.full())
+            augmented_context["paragraphs"].append(
+                AugmentedParagraph(
+                    id=pid,
+                    text=text,
+                    reference_paragraph=pid,
+                )
+            )
 
 
 async def conversation_prompt_context(
