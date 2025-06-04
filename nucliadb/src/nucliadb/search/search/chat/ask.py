@@ -46,7 +46,7 @@ from nucliadb.search.search.chat.exceptions import (
     AnswerJsonSchemaTooLong,
     NoRetrievalResultsError,
 )
-from nucliadb.search.search.chat.prompt import AugmentedContext, PromptContextBuilder
+from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
     ChatAuditor,
@@ -78,7 +78,7 @@ from nucliadb_models.search import (
     AskRetrievalMatch,
     AskTimings,
     AskTokens,
-    AugmentedContextReferences,
+    AugmentedContext,
     ChatModel,
     ChatOptions,
     CitationsAskResponseItem,
@@ -279,9 +279,9 @@ class AskResult:
         if self._citations is not None:
             yield CitationsAskResponseItem(
                 citations=self._citations.citations,
-                augmented_context=AugmentedContextReferences(
-                    paragraphs=self.augmented_context["paragraphs"],
-                    fields=self.augmented_context["fields"],
+                augmented_context=AugmentedContext(
+                    paragraphs=self.augmented_context.paragraphs,
+                    fields=self.augmented_context.fields,
                 ),
             )
 
