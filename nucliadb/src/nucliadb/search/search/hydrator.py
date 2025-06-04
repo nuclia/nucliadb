@@ -226,6 +226,14 @@ async def get_extended_paragraph_id(
         lb_pid = field_paragraphs[lb_position]
         ub_pid = field_paragraphs[ub_position]
     except IndexError:
+        # Do not extend the paragraph id if it can't be found on field paragraphs
+        logger.warning(
+            f"Paragraph not found in field extracted paragraphs.",
+            extra={
+                "kbid": kbid,
+                "paragraph_id": paragraph_id.full(),
+            },
+        )
         return paragraph_id
     return ParagraphId(
         field_id=paragraph_id.field_id,
