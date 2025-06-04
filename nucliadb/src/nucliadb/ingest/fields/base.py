@@ -19,7 +19,6 @@
 #
 from __future__ import annotations
 
-import asyncio
 import enum
 import logging
 from datetime import datetime
@@ -100,7 +99,7 @@ class Field(Generic[PbType]):
         self.computed_metadata = None
         self.large_computed_metadata = None
         self.question_answers = None
-        self.locks: dict[str, asyncio.Lock] = {}
+
         self.id: str = id
         self.resource = resource
 
@@ -500,13 +499,10 @@ class Field(Generic[PbType]):
 
     async def get_field_metadata(self, force: bool = False) -> Optional[FieldComputedMetadata]:
         if self.computed_metadata is None or force:
-            async with self.locks.setdefault("field_metadata", asyncio.Lock()):
-                if self.computed_metadata is None:
-                    # Value can be fetch while waiting for the lock
-                    sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
-                    payload = await self.storage.download_pb(sf, FieldComputedMetadata)
-                    if payload is not None:
-                        self.computed_metadata = payload
+            sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
+            payload = await self.storage.download_pb(sf, FieldComputedMetadata)
+            if payload is not None:
+                self.computed_metadata = payload
         return self.computed_metadata
 
     async def set_large_field_metadata(self, payload: LargeComputedMetadataWrapper):

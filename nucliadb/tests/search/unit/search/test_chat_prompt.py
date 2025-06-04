@@ -360,6 +360,40 @@ async def test_hierarchy_promp_context(kb):
         assert ordered_paragraphs[1].text == "Second paragraph text"
 
 
+def test_get_neighbouring_paragraph_indexes():
+    field_paragraphs = [
+        ParagraphId.from_string("r1/f/f1/0-10"),
+        ParagraphId.from_string("r1/f/f1/10-20"),
+        ParagraphId.from_string("r1/f/f1/20-30"),
+        ParagraphId.from_string("r1/f/f1/30-40"),
+        ParagraphId.from_string("r1/f/f1/40-50"),
+        ParagraphId.from_string("r1/f/f1/50-60"),
+        ParagraphId.from_string("r1/f/f1/60-70"),
+        ParagraphId.from_string("r1/f/f1/70-80"),
+    ]
+    matching_paragraph = field_paragraphs[2]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=100, after=100
+    ) == [0, 1, 2, 3, 4, 5, 6, 7]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=2, after=2
+    ) == [0, 1, 2, 3, 4]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=1, after=0
+    ) == [1, 2]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=0, after=1
+    ) == [2, 3]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=0, after=0
+    ) == [2]
+
+
 async def test_extend_prompt_context_with_metadata():
     origin = rpb2.Origin()
     origin.tags.extend(["tag1", "tag2"])

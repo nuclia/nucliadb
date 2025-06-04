@@ -42,7 +42,6 @@ async def test_hydrate_text_block():
         patch(f"{MODULE}.get_driver"),
     ):
         text_block = TextBlockMatch(
-            id="foobar",
             paragraph_id=ParagraphId.from_string("rid/f/field/0/0-10"),
             position=TextPosition(index=0, start=0, end=10),
             score=0.8,

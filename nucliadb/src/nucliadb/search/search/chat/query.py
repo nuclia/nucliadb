@@ -212,7 +212,6 @@ def find_request_from_ask_request(item: AskRequest, query: str) -> FindRequest:
     find_request.top_k = item.top_k
     find_request.show_hidden = item.show_hidden
     find_request.generative_model = item.generative_model
-    find_request.hydration = item.hydration
 
     # this executes the model validators, that can tweak some fields
     return FindRequest.model_validate(find_request)
