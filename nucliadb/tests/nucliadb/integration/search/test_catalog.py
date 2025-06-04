@@ -150,6 +150,18 @@ async def test_catalog_date_range_filtering(
     body = resp.json()
     assert len(body["resources"]) == 0
 
+    one_hour_later = now + timedelta(hours=1)
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "range_creation_start": one_hour_ago.isoformat(),
+            "range_creation_end": one_hour_later.isoformat(),
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1
+
 
 @pytest.mark.deploy_modes("standalone")
 async def test_catalog_status_faceted(
@@ -164,7 +176,7 @@ async def test_catalog_status_faceted(
     resp = await nucliadb_reader.get(
         f"/kb/{standalone_knowledgebox}/catalog?faceted=/metadata.status",
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     body = resp.json()
     assert len(body["resources"]) == 3
     facets = body["fulltext"]["facets"]["/metadata.status"]
@@ -184,11 +196,13 @@ async def test_catalog_status_faceted(
 
 
 @pytest.mark.deploy_modes("standalone")
+@pytest.mark.parametrize("with_filter", [True, False])
 async def test_catalog_faceted_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
     standalone_knowledgebox,
+    with_filter: bool,
 ):
     # 4 resources:
     # 1 with /l/labelset0/label0
@@ -210,8 +224,9 @@ async def test_catalog_faceted_labels(
     bm.basic.usermetadata.classifications.append(c)
     await inject_message(nucliadb_ingest_grpc, bm)
 
+    filter = "&range_creation_start=1999-01-01" if with_filter else ""
     resp = await nucliadb_reader.get(
-        f"/kb/{standalone_knowledgebox}/catalog?faceted=/classification.labels/labelset0",
+        f"/kb/{standalone_knowledgebox}/catalog?faceted=/classification.labels/labelset0{filter}",
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -224,7 +239,7 @@ async def test_catalog_faceted_labels(
 
     # This is used by the check missing labels button in dashboard
     resp = await nucliadb_reader.get(
-        f"/kb/{standalone_knowledgebox}/catalog?faceted=/classification.labels",
+        f"/kb/{standalone_knowledgebox}/catalog?faceted=/classification.labels{filter}",
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -233,6 +248,39 @@ async def test_catalog_faceted_labels(
             "/classification.labels/labelset0": 3,
             "/classification.labels/labelset1": 1,
         }
+    }
+
+    # This is the default faceted query from the catalog
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "page_size": 0,
+            "faceted": [
+                "/classification.labels/labelset0",
+                "/classification.labels/labelset1",
+                "/icon/application",
+                "/icon/audio",
+                "/icon/image",
+                "/icon/text",
+                "/icon/video",
+                "/icon/message",
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["fulltext"]["facets"] == {
+        "/classification.labels/labelset0": {
+            "/classification.labels/labelset0/label0": 1,
+            "/classification.labels/labelset0/label1": 2,
+        },
+        "/classification.labels/labelset1": {"/classification.labels/labelset1/label0": 1},
+        "/icon/application": {},
+        "/icon/audio": {},
+        "/icon/image": {},
+        "/icon/message": {},
+        "/icon/text": {"/icon/text/plain": 4},
+        "/icon/video": {},
     }
 
 

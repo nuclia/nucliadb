@@ -34,7 +34,7 @@ from nucliadb_models.search import (
 async def test_simple_filter():
     filter_params = {}
     query = _convert_filter(CatalogExpression(facet="/l/vegetable/potato"), filter_params)
-    assert query == "extract_facets(labels) @> %(param0)s"
+    assert query.as_string() == "extract_facets(labels) @> %(param0)s"
     assert filter_params == {"param0": ["/l/vegetable/potato"]}
 
 
@@ -49,7 +49,7 @@ async def test_any_filter():
         ),
         filter_params,
     )
-    assert query == "(extract_facets(labels) && %(param0)s)"
+    assert query.as_string() == "(extract_facets(labels) && %(param0)s)"
     assert filter_params == {"param0": ["/l/vegetable/potato", "/l/vegetable/carrot"]}
 
 
@@ -64,7 +64,7 @@ async def test_all_filter():
         ),
         filter_params,
     )
-    assert query == "(extract_facets(labels) @> %(param0)s)"
+    assert query.as_string() == "(extract_facets(labels) @> %(param0)s)"
     assert filter_params == {"param0": ["/l/vegetable/potato", "/l/vegetable/carrot"]}
 
 
@@ -81,7 +81,7 @@ async def test_none_filter():
         ),
         filter_params,
     )
-    assert query == "(NOT (extract_facets(labels) && %(param0)s))"
+    assert query.as_string() == "(NOT (extract_facets(labels) && %(param0)s))"
     assert filter_params == {"param0": ["/l/vegetable/potato", "/l/vegetable/carrot"]}
 
 
@@ -98,7 +98,7 @@ async def test_not_all_filter():
         ),
         filter_params,
     )
-    assert query == "(NOT (extract_facets(labels) @> %(param0)s))"
+    assert query.as_string() == "(NOT (extract_facets(labels) @> %(param0)s))"
     assert filter_params == {"param0": ["/l/vegetable/potato", "/l/vegetable/carrot"]}
 
 
@@ -123,7 +123,10 @@ async def test_catalog_filter():
         ),
         filter_params,
     )
-    assert query == "((extract_facets(labels) && %(param0)s) AND (extract_facets(labels) && %(param1)s))"
+    assert (
+        query.as_string()
+        == "((extract_facets(labels) && %(param0)s) AND (extract_facets(labels) && %(param1)s))"
+    )
     assert filter_params == {
         "param0": ["/l/vegetable/potato", "/l/vegetable/carrot"],
         "param1": ["/n/s/PENDING", "/n/s/PROCESSED"],
@@ -133,42 +136,36 @@ async def test_catalog_filter():
 async def test_prepare_query_sort():
     kbid = "84ed9257-04ef-41d1-b1d2-26286b92777f"
     request = CatalogRequest(
-        features=[],  # Ignored by pgcatalog
         query="",
         page_number=0,
         page_size=25,
         sort=SortOptions(field=SortField.CREATED, order=SortOrder.ASC),
-        min_score=0,  # Ignored by pgcatalog
     )
     parsed = await parse_catalog(kbid, request)
     query, params = _prepare_query(parsed)
-    assert "ORDER BY created_at ASC" in query
+    assert 'ORDER BY "created_at" ASC' in query.as_string()
 
     request = CatalogRequest(
-        features=[],  # Ignored by pgcatalog
         query="",
         page_number=0,
         page_size=25,
         sort=SortOptions(field=SortField.MODIFIED, order=SortOrder.DESC),
-        min_score=0,  # Ignored by pgcatalog
     )
     parsed = await parse_catalog(kbid, request)
     query, params = _prepare_query(parsed)
-    assert "ORDER BY modified_at DESC" in query
+    assert 'ORDER BY "modified_at" DESC' in query.as_string()
 
 
 async def test_prepare_query_filters_kbid():
     kbid = "84ed9257-04ef-41d1-b1d2-26286b92777f"
     request = CatalogRequest(
-        features=[],  # Ignored by pgcatalog
         query="",
         page_number=0,
         page_size=25,
-        min_score=0,  # Ignored by pgcatalog
     )
     parsed = await parse_catalog(kbid, request)
     query, params = _prepare_query(parsed)
-    assert "kbid = %(kbid)s" in query
+    assert "kbid = %(kbid)s" in query.as_string()
     assert params["kbid"] == parsed.kbid
 
 
@@ -185,7 +182,7 @@ async def test_prepare_query_fulltext():
     query, params = _prepare_query(parsed)
     assert (
         "regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W')"
-        in query
+        in query.as_string()
     )
     assert params["query"] == "This is my query"
 
@@ -203,7 +200,7 @@ async def test_old_filters():
     )
     parsed = await parse_catalog(kbid, request)
     query, params = _prepare_query(parsed)
-    assert "created_at > " in query
+    assert '"created_at" > ' in query.as_string()
     param_values = list(params.values())
     assert datetime.fromisoformat("2020-01-01T00:00:00") in param_values
     assert ["/l/topic/boats"] in param_values
@@ -238,14 +235,14 @@ async def test_filter_expression():
     query, params = _prepare_query(parsed)
 
     # This test is very sensitive to query generation changes
-    assert query == (
+    assert query.as_string() == (
         "SELECT * FROM catalog "
         "WHERE kbid = %(kbid)s AND regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W') "
         "AND ("
-        "(extract_facets(labels) @> %(param2)s AND (NOT modified_at > %(param3)s)) "
+        '(extract_facets(labels) @> %(param2)s AND (NOT "modified_at" > %(param3)s)) '
         "OR rid = %(param4)s"
         ") "
-        "ORDER BY created_at DESC "
+        'ORDER BY "created_at" DESC '
         "LIMIT %(page_size)s OFFSET %(offset)s"
     )
     assert params == {
