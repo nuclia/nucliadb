@@ -619,6 +619,9 @@ async def neighbouring_paragraphs_prompt_context(
                 npid = field_pids[neighbour_index]
             except IndexError:
                 continue
+            if npid in retrieved_paragraphs_ids or npid.full() in context.output:
+                # Already added above
+                continue
             ptext = _get_paragraph_text(field_extracted_text, npid)
             if not ptext:
                 continue
