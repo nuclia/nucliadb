@@ -300,7 +300,7 @@ async def full_resource_prompt_context(
             # Add the extracted text of each field to the context.
             context[field.full()] = extracted_text
             augmented_context.fields[field.full()] = AugmentedTextBlock(
-                id=field.full(), text=extracted_text, rag_strategy=strategy.name
+                id=field.full(), text=extracted_text, augmentation_type=strategy.name
             )
 
             added_fields.add(field.full())
@@ -526,7 +526,7 @@ async def field_extension_prompt_context(
         # Add the extracted text of each field to the beginning of the context.
         context[field.full()] = extracted_text
         augmented_context.fields[field.full()] = AugmentedTextBlock(
-            id=field.full(), text=extracted_text, rag_strategy=strategy.name
+            id=field.full(), text=extracted_text, augmentation_type=strategy.name
         )
 
     # Add the extracted text of each paragraph to the end of the context.
@@ -629,8 +629,8 @@ async def neighbouring_paragraphs_prompt_context(
             augmented_context.paragraphs[npid.full()] = AugmentedTextBlock(
                 id=npid.full(),
                 text=ptext,
-                reference_paragraph=pid.full(),
-                rag_strategy=strategy.name,
+                parent=pid.full(),
+                augmentation_type=strategy.name,
             )
 
     metrics.set("neighbouring_paragraphs_ops", len(augmented_context.paragraphs))
@@ -692,8 +692,8 @@ async def conversation_prompt_context(
                             augmented_context.paragraphs[pid] = AugmentedTextBlock(
                                 id=pid,
                                 text=text,
-                                reference_paragraph=paragraph.id,
-                                rag_strategy=strategy.name,
+                                parent=paragraph.id,
+                                augmentation_type=strategy.name,
                             )
                             attachments.extend(message.content.attachments_fields)
                 else:
@@ -712,8 +712,8 @@ async def conversation_prompt_context(
                         augmented_context.paragraphs[pid] = AugmentedTextBlock(
                             id=pid,
                             text=text,
-                            reference_paragraph=paragraph.id,
-                            rag_strategy=strategy.name,
+                            parent=paragraph.id,
+                            augmentation_type=strategy.name,
                         )
                         attachments.extend(message.content.attachments_fields)
 
@@ -742,8 +742,8 @@ async def conversation_prompt_context(
                         augmented_context.paragraphs[pid] = AugmentedTextBlock(
                             id=pid,
                             text=text,
-                            reference_paragraph=paragraph.id,
-                            rag_strategy=strategy.name,
+                            parent=paragraph.id,
+                            augmentation_type=strategy.name,
                         )
                         attachments.extend(message.content.attachments_fields)
 
@@ -762,8 +762,8 @@ async def conversation_prompt_context(
                             augmented_context.paragraphs[pid] = AugmentedTextBlock(
                                 id=pid,
                                 text=text,
-                                reference_paragraph=paragraph.id,
-                                rag_strategy=strategy.name,
+                                parent=paragraph.id,
+                                augmentation_type=strategy.name,
                             )
 
                 if strategy.attachments_images and visual_llm:
@@ -880,7 +880,7 @@ async def hierarchy_prompt_context(
         if paragraph.id in augmented_paragraphs:
             field_id = ParagraphId.from_string(paragraph.id).field_id.full()
             augmented_context.fields[field_id] = AugmentedTextBlock(
-                id=field_id, text=paragraph_text, rag_strategy=strategy.name
+                id=field_id, text=paragraph_text, augmentation_type=strategy.name
             )
     return
 
@@ -927,6 +927,7 @@ class PromptContextBuilder:
         self,
     ) -> tuple[PromptContext, PromptContextOrder, PromptContextImages, AugmentedContext]:
         ccontext = CappedPromptContext(max_size=self.max_context_characters)
+        print(".......................")
         self.prepend_user_context(ccontext)
         await self._build_context(ccontext)
         if self.visual_llm:
@@ -1131,25 +1132,3 @@ def _clean_paragraph_text(paragraph: FindParagraph) -> str:
     # Do not send highlight marks on prompt context
     text = text.replace("<mark>", "").replace("</mark>", "")
     return text
-
-
-def get_neighbouring_paragraph_indexes(
-    field_paragraphs: list[ParagraphId],
-    matching_paragraph: ParagraphId,
-    before: int,
-    after: int,
-) -> list[int]:
-    """
-    Returns the indexes of the neighbouring paragraphs to fetch (including the matching paragraph).
-    """
-    assert before >= 0
-    assert after >= 0
-    try:
-        matching_index = field_paragraphs.index(matching_paragraph)
-    except ValueError:
-        raise ParagraphIdNotFoundInExtractedMetadata(
-            f"Matching paragraph {matching_paragraph.full()} not found in extracted metadata"
-        )
-    start_index = max(0, matching_index - before)
-    end_index = min(len(field_paragraphs), matching_index + after + 1)
-    return list(range(start_index, end_index))

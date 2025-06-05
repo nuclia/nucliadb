@@ -27,6 +27,7 @@ from nucliadb.search.search.chat import prompt as chat_prompt
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.search import (
     SCORE_TYPE,
+    AugmentedContext,
     FindField,
     FindParagraph,
     FindResource,
@@ -348,8 +349,14 @@ async def test_hierarchy_promp_context(kb):
             },
         )
         ordered_paragraphs = get_ordered_paragraphs(find_results)
+        augmented_context = AugmentedContext()
         await chat_prompt.hierarchy_prompt_context(
-            context, "kbid", ordered_paragraphs, HierarchyResourceStrategy(), Metrics("foo")
+            context,
+            "kbid",
+            ordered_paragraphs,
+            HierarchyResourceStrategy(),
+            Metrics("foo"),
+            augmented_context=augmented_context,
         )
         assert (
             context.output["r1/f/f1/0-10"]
@@ -359,39 +366,9 @@ async def test_hierarchy_promp_context(kb):
         assert ordered_paragraphs[0].text == "First Paragraph text"
         assert ordered_paragraphs[1].text == "Second paragraph text"
 
-
-def test_get_neighbouring_paragraph_indexes():
-    field_paragraphs = [
-        ParagraphId.from_string("r1/f/f1/0-10"),
-        ParagraphId.from_string("r1/f/f1/10-20"),
-        ParagraphId.from_string("r1/f/f1/20-30"),
-        ParagraphId.from_string("r1/f/f1/30-40"),
-        ParagraphId.from_string("r1/f/f1/40-50"),
-        ParagraphId.from_string("r1/f/f1/50-60"),
-        ParagraphId.from_string("r1/f/f1/60-70"),
-        ParagraphId.from_string("r1/f/f1/70-80"),
-    ]
-    matching_paragraph = field_paragraphs[2]
-
-    assert chat_prompt.get_neighbouring_paragraph_indexes(
-        field_paragraphs, matching_paragraph, before=100, after=100
-    ) == [0, 1, 2, 3, 4, 5, 6, 7]
-
-    assert chat_prompt.get_neighbouring_paragraph_indexes(
-        field_paragraphs, matching_paragraph, before=2, after=2
-    ) == [0, 1, 2, 3, 4]
-
-    assert chat_prompt.get_neighbouring_paragraph_indexes(
-        field_paragraphs, matching_paragraph, before=1, after=0
-    ) == [1, 2]
-
-    assert chat_prompt.get_neighbouring_paragraph_indexes(
-        field_paragraphs, matching_paragraph, before=0, after=1
-    ) == [2, 3]
-
-    assert chat_prompt.get_neighbouring_paragraph_indexes(
-        field_paragraphs, matching_paragraph, before=0, after=0
-    ) == [2]
+        assert augmented_context.fields["r1/f/f1"].id == "r1/f/f1"
+        assert augmented_context.fields["r1/f/f1"].text.startswith("DOCUMENT: Title")
+        assert augmented_context.fields["r1/f/f1"].augmentation_type == "hierarchy"
 
 
 async def test_extend_prompt_context_with_metadata():
@@ -539,7 +516,7 @@ async def test_prompt_context_builder_with_extra_image_context():
     )
     with patch("nucliadb.search.search.chat.prompt.default_prompt_context"):
         # context = chat_prompt.CappedPromptContext(max_size=int(1e6))
-        _, _, context_images = await builder.build()
+        _, _, context_images, _ = await builder.build()
 
     assert len(context_images) == 1
     _, context_image = context_images.popitem()

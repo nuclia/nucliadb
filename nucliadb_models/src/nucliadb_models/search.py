@@ -2035,6 +2035,32 @@ def validate_facets(facets):
     return facets
 
 
+class AugmentedTextBlock(BaseModel):
+    id: str = Field(
+        description="The id of the augmented text bloc. It can be a paragraph id or a field id."
+    )
+    text: str = Field(
+        description="The text of the augmented text block. It may include additional metadata to enrich the context"
+    )
+    parent: Optional[str] = Field(
+        default=None, description="The parent text block that was augmented for."
+    )
+    augmentation_type: str = Field(
+        description="Type of augmentation. Typically the the rag strategy name."
+    )
+
+
+class AugmentedContext(BaseModel):
+    paragraphs: dict[str, AugmentedTextBlock] = Field(
+        default={},
+        description="Paragraphs added to the context as a result of using the `rag_strategies` parameter, typically the neighbouring_paragraphs or the conversation strategies",
+    )
+    fields: dict[str, AugmentedTextBlock] = Field(
+        default={},
+        description="Field extracted texts added to the context as a result of using the `rag_strategies` parameter, typically the hierarcy or full_resource strategies.",
+    )
+
+
 class AskTokens(BaseModel):
     input: int = Field(
         title="Input tokens",
@@ -2132,6 +2158,13 @@ class SyncAskResponse(BaseModel):
         title="Citations",
         description="The citations of the answer. List of references to the resources used to generate the answer.",
     )
+    augmented_context: Optional[AugmentedContext] = Field(
+        default=None,
+        description=(
+            "Augmented text blocks that were sent to the LLM as part of the RAG strategies "
+            "applied on the retrieval results in the request."
+        ),
+    )
     prompt_context: Optional[list[str]] = Field(
         default=None,
         title="Prompt context",
@@ -2194,31 +2227,19 @@ class MetadataAskResponseItem(BaseModel):
     timings: AskTimings
 
 
-class AugmentedTextBlock(BaseModel):
-    id: str
-    text: str
-    reference_paragraph: Optional[str] = None
-    rag_strategy: str
-
-
-class AugmentedContext(BaseModel):
-    paragraphs: dict[str, AugmentedTextBlock] = Field(
-        default={},
-        description="Paragraphs added to the context as a result of using the `rag_strategies` parameter, typically the neighbouring_paragraphs or the conversation strategies",
-    )
-    fields: dict[str, AugmentedTextBlock] = Field(
-        default={},
-        description="Field extracted texts added to the context as a result of using the `rag_strategies` parameter, typically the hierarcy or full_resource strategies.",
+class AugmentedContextResponseItem(BaseModel):
+    type: Literal["augmented_context"] = "augmented_context"
+    augmented: AugmentedContext = Field(
+        description=(
+            "Augmented text blocks that were sent to the LLM as part of the RAG strategies "
+            "applied on the retrieval results in the request."
+        )
     )
 
 
 class CitationsAskResponseItem(BaseModel):
     type: Literal["citations"] = "citations"
     citations: dict[str, Any]
-    augmented_context: AugmentedContext = Field(
-        default=AugmentedContext(),
-        description="References to elements that the LLM context has been augmented with but are not part of the retrieval nor the prequeries results.",
-    )
 
 
 class StatusAskResponseItem(BaseModel):
@@ -2248,6 +2269,7 @@ AskResponseItemType = Union[
     AnswerAskResponseItem,
     JSONAskResponseItem,
     MetadataAskResponseItem,
+    AugmentedContextResponseItem,
     CitationsAskResponseItem,
     StatusAskResponseItem,
     ErrorAskResponseItem,

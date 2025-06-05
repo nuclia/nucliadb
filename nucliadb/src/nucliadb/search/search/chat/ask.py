@@ -79,6 +79,7 @@ from nucliadb_models.search import (
     AskTimings,
     AskTokens,
     AugmentedContext,
+    AugmentedContextResponseItem,
     ChatModel,
     ChatOptions,
     CitationsAskResponseItem,
@@ -275,14 +276,12 @@ class AskResult:
             status_code=self.status_code,
         )
 
+        yield AugmentedContextResponseItem(augmented=self.augmented_context)
+
         # Stream out the citations
         if self._citations is not None:
             yield CitationsAskResponseItem(
                 citations=self._citations.citations,
-                augmented_context=AugmentedContext(
-                    paragraphs=self.augmented_context.paragraphs,
-                    fields=self.augmented_context.fields,
-                ),
             )
 
         # Stream out generic metadata about the answer
@@ -375,6 +374,7 @@ class AskResult:
             citations=citations,
             metadata=metadata,
             learning_id=self.nuclia_learning_id or "",
+            augmented_context=self.augmented_context,
         )
         if self.status_code == AnswerStatusCode.ERROR and self.status_error_details:
             response.error_details = self.status_error_details
