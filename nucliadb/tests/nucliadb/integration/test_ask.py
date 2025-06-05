@@ -1516,9 +1516,10 @@ async def test_ask_skip_answer_generation(
     assert len(results[0].item.results.resources) > 0
     assert results[1].item.type == "status"
     assert results[1].item.status == AnswerStatusCode.SUCCESS.prettify()
-    assert results[2].item.type == "debug"
-    assert results[2].item.metadata["prompt_context"] is not None
-    assert results[2].item.metadata["predict_request"] is not None
+    assert results[2].item.type == "augmented_context"
+    assert results[3].item.type == "debug"
+    assert results[3].item.metadata["prompt_context"] is not None
+    assert results[3].item.metadata["predict_request"] is not None
 
 
 @pytest.mark.deploy_modes("standalone")

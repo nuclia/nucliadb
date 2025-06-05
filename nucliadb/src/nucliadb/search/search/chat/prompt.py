@@ -391,7 +391,7 @@ async def extend_prompt_context_with_origin_metadata(
                 id=tb_id.full(),
                 text=extended_text,
                 parent=tb_id.full(),
-                augmentation_type=f"{MetadataExtensionStrategy.name}:{MetadataExtensionType.ORIGIN.name}",
+                augmentation_type=f"metadata_extension:{MetadataExtensionType.ORIGIN.name}",
             )
 
 
@@ -434,7 +434,7 @@ async def extend_prompt_context_with_classification_labels(
                 id=tb_id.full(),
                 text=extended_text,
                 parent=tb_id.full(),
-                augmentation_type=f"{MetadataExtensionStrategy.name}:{MetadataExtensionType.CLASSIFICATION_LABELS.name}",
+                augmentation_type=f"metadata_extension:{MetadataExtensionType.CLASSIFICATION_LABELS.name}",
             )
 
 
@@ -482,7 +482,7 @@ async def extend_prompt_context_with_ner(
                 id=tb_id.full(),
                 text=extended_text,
                 parent=tb_id.full(),
-                augmentation_type=f"{MetadataExtensionStrategy.name}:{MetadataExtensionType.NERS.name}",
+                augmentation_type=f"metadata_extension:{MetadataExtensionType.NERS.name}",
             )
 
 
@@ -511,7 +511,7 @@ async def extend_prompt_context_with_extra_metadata(
                 id=tb_id.full(),
                 text=extended_text,
                 parent=tb_id.full(),
-                augmentation_type=f"{MetadataExtensionStrategy.name}:{MetadataExtensionType.EXTRA_METADATA.name}",
+                augmentation_type=f"metadata_extension:{MetadataExtensionType.EXTRA_METADATA.name}",
             )
 
 

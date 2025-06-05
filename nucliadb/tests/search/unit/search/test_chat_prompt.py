@@ -406,13 +406,18 @@ async def test_extend_prompt_context_with_metadata():
         context[paragraph_id.full()] = "Paragraph text"
         kbid = "foo"
         strategy = MetadataExtensionStrategy(types=list(MetadataExtensionType))
-        await chat_prompt.extend_prompt_context_with_metadata(context, kbid, strategy, Metrics("foo"))
+        augmented_context = AugmentedContext()
+        await chat_prompt.extend_prompt_context_with_metadata(
+            context, kbid, strategy, Metrics("foo"), augmented_context
+        )
 
         text_block = context.output[paragraph_id.full()]
         assert "DOCUMENT METADATA AT ORIGIN" in text_block
         assert "DOCUMENT CLASSIFICATION LABELS" in text_block
         assert "DOCUMENT NAMED ENTITIES (NERs)" in text_block
         assert "DOCUMENT EXTRA METADATA" in text_block
+
+        assert augmented_context.paragraphs.popitem()[1].text == context.output[paragraph_id.full()]
 
 
 async def test_prompt_context_image_context_builder():
