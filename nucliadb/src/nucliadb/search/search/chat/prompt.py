@@ -319,6 +319,7 @@ async def extend_prompt_context_with_metadata(
     kbid: str,
     strategy: MetadataExtensionStrategy,
     metrics: Metrics,
+    augmented_context: AugmentedContext,
 ) -> None:
     text_block_ids: list[TextBlockId] = []
     for text_block_id in context.text_block_ids():
@@ -334,19 +335,23 @@ async def extend_prompt_context_with_metadata(
     ops = 0
     if MetadataExtensionType.ORIGIN in strategy.types:
         ops += 1
-        await extend_prompt_context_with_origin_metadata(context, kbid, text_block_ids)
+        await extend_prompt_context_with_origin_metadata(
+            context, kbid, text_block_ids, augmented_context
+        )
 
     if MetadataExtensionType.CLASSIFICATION_LABELS in strategy.types:
         ops += 1
-        await extend_prompt_context_with_classification_labels(context, kbid, text_block_ids)
+        await extend_prompt_context_with_classification_labels(
+            context, kbid, text_block_ids, augmented_context
+        )
 
     if MetadataExtensionType.NERS in strategy.types:
         ops += 1
-        await extend_prompt_context_with_ner(context, kbid, text_block_ids)
+        await extend_prompt_context_with_ner(context, kbid, text_block_ids, augmented_context)
 
     if MetadataExtensionType.EXTRA_METADATA in strategy.types:
         ops += 1
-        await extend_prompt_context_with_extra_metadata(context, kbid, text_block_ids)
+        await extend_prompt_context_with_extra_metadata(context, kbid, text_block_ids, augmented_context)
 
     metrics.set("metadata_extension_ops", ops * len(text_block_ids))
 
@@ -361,7 +366,9 @@ def parse_text_block_id(text_block_id: str) -> TextBlockId:
         return FieldId.from_string(text_block_id)
 
 
-async def extend_prompt_context_with_origin_metadata(context, kbid, text_block_ids: list[TextBlockId]):
+async def extend_prompt_context_with_origin_metadata(
+    context, kbid, text_block_ids: list[TextBlockId], augmented_context: AugmentedContext
+):
     async def _get_origin(kbid: str, rid: str) -> tuple[str, Optional[Origin]]:
         origin = None
         resource = await cache.get_resource(kbid, rid)
@@ -377,11 +384,19 @@ async def extend_prompt_context_with_origin_metadata(context, kbid, text_block_i
     for tb_id in text_block_ids:
         origin = rid_to_origin.get(tb_id.rid)
         if origin is not None and tb_id.full() in context.output:
-            context[tb_id.full()] += f"\n\nDOCUMENT METADATA AT ORIGIN:\n{to_yaml(origin)}"
+            text = context.output.pop(tb_id.full())
+            extended_text = text + f"\n\nDOCUMENT METADATA AT ORIGIN:\n{to_yaml(origin)}"
+            context[tb_id.full()] = extended_text
+            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                id=tb_id.full(),
+                text=extended_text,
+                parent=tb_id.full(),
+                augmentation_type=f"{MetadataExtensionStrategy.name}:{MetadataExtensionType.ORIGIN.name}",
+            )
 
 
 async def extend_prompt_context_with_classification_labels(
-    context, kbid, text_block_ids: list[TextBlockId]
+    context, kbid, text_block_ids: list[TextBlockId], augmented_context: AugmentedContext
 ):
     async def _get_labels(kbid: str, _id: TextBlockId) -> tuple[TextBlockId, list[tuple[str, str]]]:
         fid = _id if isinstance(_id, FieldId) else _id.field_id
@@ -407,13 +422,25 @@ async def extend_prompt_context_with_classification_labels(
     for tb_id in text_block_ids:
         labels = tb_id_to_labels.get(tb_id)
         if labels is not None and tb_id.full() in context.output:
+            text = context.output.pop(tb_id.full())
+
             labels_text = "DOCUMENT CLASSIFICATION LABELS:"
             for labelset, label in labels:
                 labels_text += f"\n - {label} ({labelset})"
-            context[tb_id.full()] += "\n\n" + labels_text
+            extended_text = text + "\n\n" + labels_text
+
+            context[tb_id.full()] = extended_text
+            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                id=tb_id.full(),
+                text=extended_text,
+                parent=tb_id.full(),
+                augmentation_type=f"{MetadataExtensionStrategy.name}:{MetadataExtensionType.CLASSIFICATION_LABELS.name}",
+            )
 
 
-async def extend_prompt_context_with_ner(context, kbid, text_block_ids: list[TextBlockId]):
+async def extend_prompt_context_with_ner(
+    context, kbid, text_block_ids: list[TextBlockId], augmented_context: AugmentedContext
+):
     async def _get_ners(kbid: str, _id: TextBlockId) -> tuple[TextBlockId, dict[str, set[str]]]:
         fid = _id if isinstance(_id, FieldId) else _id.field_id
         ners: dict[str, set[str]] = {}
@@ -440,15 +467,28 @@ async def extend_prompt_context_with_ner(context, kbid, text_block_ids: list[Tex
     for tb_id in text_block_ids:
         ners = tb_id_to_ners.get(tb_id)
         if ners is not None and tb_id.full() in context.output:
+            text = context.output.pop(tb_id.full())
+
             ners_text = "DOCUMENT NAMED ENTITIES (NERs):"
             for family, tokens in ners.items():
                 ners_text += f"\n - {family}:"
                 for token in sorted(list(tokens)):
                     ners_text += f"\n   - {token}"
-            context[tb_id.full()] += "\n\n" + ners_text
+
+            extended_text = text + "\n\n" + ners_text
+
+            context[tb_id.full()] = extended_text
+            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                id=tb_id.full(),
+                text=extended_text,
+                parent=tb_id.full(),
+                augmentation_type=f"{MetadataExtensionStrategy.name}:{MetadataExtensionType.NERS.name}",
+            )
 
 
-async def extend_prompt_context_with_extra_metadata(context, kbid, text_block_ids: list[TextBlockId]):
+async def extend_prompt_context_with_extra_metadata(
+    context, kbid, text_block_ids: list[TextBlockId], augmented_context: AugmentedContext
+):
     async def _get_extra(kbid: str, rid: str) -> tuple[str, Optional[Extra]]:
         extra = None
         resource = await cache.get_resource(kbid, rid)
@@ -464,7 +504,15 @@ async def extend_prompt_context_with_extra_metadata(context, kbid, text_block_id
     for tb_id in text_block_ids:
         extra = rid_to_extra.get(tb_id.rid)
         if extra is not None and tb_id.full() in context.output:
-            context[tb_id.full()] += f"\n\nDOCUMENT EXTRA METADATA:\n{to_yaml(extra)}"
+            text = context.output.pop(tb_id.full())
+            extended_text = text + f"\n\nDOCUMENT EXTRA METADATA:\n{to_yaml(extra)}"
+            context[tb_id.full()] = extended_text
+            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                id=tb_id.full(),
+                text=extended_text,
+                parent=tb_id.full(),
+                augmentation_type=f"{MetadataExtensionStrategy.name}:{MetadataExtensionType.EXTRA_METADATA.name}",
+            )
 
 
 def to_yaml(obj: BaseModel) -> str:
@@ -524,14 +572,16 @@ async def field_extension_prompt_context(
             if tb_id.startswith(field.full()):
                 del context[tb_id]
         # Add the extracted text of each field to the beginning of the context.
-        context[field.full()] = extracted_text
-        augmented_context.fields[field.full()] = AugmentedTextBlock(
-            id=field.full(), text=extracted_text, augmentation_type=strategy.name
-        )
+        if field.full() not in context.output:
+            context[field.full()] = extracted_text
+            augmented_context.fields[field.full()] = AugmentedTextBlock(
+                id=field.full(), text=extracted_text, augmentation_type=strategy.name
+            )
 
     # Add the extracted text of each paragraph to the end of the context.
     for paragraph in ordered_paragraphs:
-        context[paragraph.id] = _clean_paragraph_text(paragraph)
+        if paragraph.id not in context.output:
+            context[paragraph.id] = _clean_paragraph_text(paragraph)
 
 
 async def get_orm_field(kbid: str, field_id: FieldId) -> Optional[Field]:
@@ -688,6 +738,9 @@ async def conversation_prompt_context(
                             else:
                                 text = message.content.text.strip()
                             pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
+                            attachments.extend(message.content.attachments_fields)
+                            if pid in context.output:
+                                continue
                             context[pid] = text
                             augmented_context.paragraphs[pid] = AugmentedTextBlock(
                                 id=pid,
@@ -695,7 +748,6 @@ async def conversation_prompt_context(
                                 parent=paragraph.id,
                                 augmentation_type=strategy.name,
                             )
-                            attachments.extend(message.content.attachments_fields)
                 else:
                     # Add first message
                     extracted_text = await field_obj.get_extracted_text()
@@ -707,7 +759,10 @@ async def conversation_prompt_context(
                             text = extracted_text.split_text.get(ident, message.content.text.strip())
                         else:
                             text = message.content.text.strip()
+                        attachments.extend(message.content.attachments_fields)
                         pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
+                        if pid in context.output:
+                            continue
                         context[pid] = text
                         augmented_context.paragraphs[pid] = AugmentedTextBlock(
                             id=pid,
@@ -715,7 +770,6 @@ async def conversation_prompt_context(
                             parent=paragraph.id,
                             augmentation_type=strategy.name,
                         )
-                        attachments.extend(message.content.attachments_fields)
 
                     messages: Deque[resources_pb2.Message] = deque(maxlen=strategy.max_messages)
 
@@ -737,7 +791,10 @@ async def conversation_prompt_context(
                     for message in messages:
                         ops += 1
                         text = message.content.text.strip()
+                        attachments.extend(message.content.attachments_fields)
                         pid = f"{rid}/{field_type}/{field_id}/{message.ident}/0-{len(message.content.text) + 1}"
+                        if pid in context.output:
+                            continue
                         context[pid] = text
                         augmented_context.paragraphs[pid] = AugmentedTextBlock(
                             id=pid,
@@ -745,7 +802,6 @@ async def conversation_prompt_context(
                             parent=paragraph.id,
                             augmentation_type=strategy.name,
                         )
-                        attachments.extend(message.content.attachments_fields)
 
                 if strategy.attachments_text:
                     # add on the context the images if vlm enabled
@@ -757,6 +813,8 @@ async def conversation_prompt_context(
                         extracted_text = await field.get_extracted_text()
                         if extracted_text is not None:
                             pid = f"{rid}/{field_type}/{attachment.field_id}/0-{len(extracted_text.text) + 1}"
+                            if pid in context.output:
+                                continue
                             text = f"Attachment {attachment.field_id}: {extracted_text.text}\n\n"
                             context[pid] = text
                             augmented_context.paragraphs[pid] = AugmentedTextBlock(
@@ -1065,7 +1123,11 @@ class PromptContextBuilder:
             )
             if metadata_extension:
                 await extend_prompt_context_with_metadata(
-                    context, self.kbid, metadata_extension, self.metrics
+                    context,
+                    self.kbid,
+                    metadata_extension,
+                    self.metrics,
+                    self.augmented_context,
                 )
             return
 
@@ -1108,7 +1170,11 @@ class PromptContextBuilder:
             )
         if metadata_extension:
             await extend_prompt_context_with_metadata(
-                context, self.kbid, metadata_extension, self.metrics
+                context,
+                self.kbid,
+                metadata_extension,
+                self.metrics,
+                self.augmented_context,
             )
 
 
