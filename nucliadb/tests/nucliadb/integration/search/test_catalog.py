@@ -633,3 +633,111 @@ async def test_catalog_query(
         json={"query": {"field": "slug", "match": "contains", "query": "french"}},
     )
     assert resp.status_code == 422
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_catalog_facets(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": f"My resource 1",
+            "summary": "Some summary",
+            "origin": {"path": "/very/deep/path/to/no/where", "tags": ["wadus", "wadus1"]},
+            "usermetadata": {
+                "classifications": [
+                    {"labelset": "stuff", "label": "of_one_kind"},
+                ]
+            },
+        },
+    )
+    assert resp.status_code == 201
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": f"My resource 2",
+            "summary": "Some summary",
+            "origin": {"path": "/folder/file2", "tags": ["wadus", "wadus2"]},
+            "usermetadata": {
+                "classifications": [
+                    {"labelset": "stuff", "label": "of_another_kind"},
+                ]
+            },
+        },
+    )
+    assert resp.status_code == 201
+
+    # Request everything
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog/facets",
+        json={},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "/l": 2,
+        "/l/stuff": 2,
+        "/l/stuff/of_another_kind": 1,
+        "/l/stuff/of_one_kind": 1,
+        "/n": 2,
+        "/n/i": 2,
+        "/n/i/application": 2,
+        "/n/i/application/generic": 2,
+        "/n/s": 2,
+        "/n/s/PROCESSED": 2,
+        "/p": 2,
+        "/p/folder": 1,
+        "/p/folder/file2": 1,
+        "/p/very": 1,
+        "/p/very/deep": 1,
+        "/p/very/deep/path": 1,
+        "/p/very/deep/path/to": 1,
+        "/p/very/deep/path/to/no": 1,
+        "/p/very/deep/path/to/no/where": 1,
+        "/t": 2,
+        "/t/wadus": 2,
+        "/t/wadus1": 1,
+        "/t/wadus2": 1,
+    }
+
+    # Request labels
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog/facets",
+        json={"prefixes": ["/l"]},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "/l": 2,
+        "/l/stuff": 2,
+        "/l/stuff/of_another_kind": 1,
+        "/l/stuff/of_one_kind": 1,
+    }
+
+    # Request labelsets only
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog/facets",
+        json={"prefixes": [{"prefix": "/l", "depth": 1}]},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "/l": 2,
+        "/l/stuff": 2,
+    }
+
+    # Request icon and path at different depths
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog/facets",
+        json={"prefixes": [{"prefix": "/n/i"}, {"prefix": "/p/very/deep/path", "depth": 1}]},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "/n/i": 2,
+        "/n/i/application": 2,
+        "/n/i/application/generic": 2,
+        "/p/very/deep/path": 1,
+        "/p/very/deep/path/to": 1,
+    }

@@ -30,12 +30,7 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search.search.query_parser.models import CatalogExpression, CatalogQuery
 from nucliadb_models import search as search_models
 from nucliadb_models.labels import translate_system_to_alias_label
-from nucliadb_models.search import (
-    ResourceResult,
-    Resources,
-    SortField,
-    SortOrder,
-)
+from nucliadb_models.search import CatalogFacetsRequest, ResourceResult, Resources, SortField, SortOrder
 from nucliadb_telemetry import metrics
 
 from .filters import translate_label
@@ -68,7 +63,13 @@ def _convert_filter(expr: CatalogExpression, filter_params: dict[str, Any]) -> s
     elif expr.facet:
         param_name = f"param{len(filter_params)}"
         filter_params[param_name] = [expr.facet]
-        return sql.SQL("extract_facets(labels) @> {}").format(sql.Placeholder(param_name))
+        if expr.facet == "/n/s/PROCESSED":
+            # Optimization for the most common case, we know PROCESSED is a full label and can use the smaller labels index
+            # This is needed because PROCESSED is present in most catalog entries and PG is unlikely to use any index
+            # for it, falling back to executing the extract_facets function which can be slow
+            return sql.SQL("labels @> {}").format(sql.Placeholder(param_name))
+        else:
+            return sql.SQL("extract_facets(labels) @> {}").format(sql.Placeholder(param_name))
     elif expr.resource_id:
         param_name = f"param{len(filter_params)}"
         filter_params[param_name] = [expr.resource_id]
@@ -87,10 +88,16 @@ def _convert_boolean_op(
     facets, nonfacets = _filter_operands(operands)
     if facets:
         param_name = f"param{len(filter_params)}"
+        if facets == ["/n/s/PROCESSED"]:
+            # Optimization for the most common case, we know PROCESSED is a full label and can use the smaller labels index
+            # This is needed because PROCESSED is present in most catalog entries and PG is unlikely to use any index
+            # for it, falling back to executing the extract_facets function which can be slow
+            operands_sql.append(sql.SQL("labels @> {}").format(sql.Placeholder(param_name)))
+        else:
+            operands_sql.append(
+                sql.SQL("extract_facets(labels) {} {}").format(array_op, sql.Placeholder(param_name))
+            )
         filter_params[param_name] = facets
-        operands_sql.append(
-            sql.SQL("extract_facets(labels) {} {}").format(array_op, sql.Placeholder(param_name))
-        )
     for nonfacet in nonfacets:
         operands_sql.append(_convert_filter(nonfacet, filter_params))
     return sql.SQL("({})").format(sql.SQL(f" {op.upper()} ").join(operands_sql))
@@ -348,3 +355,35 @@ async def _faceted_search_filtered(
             grandparent = "/".join(label_parts[:-2])
             if grandparent in tmp_facets:
                 tmp_facets[grandparent][translate_system_to_alias_label(parent)] += count
+
+
+@observer.wrap({"op": "catalog_facets"})
+async def pgcatalog_facets(kbid: str, request: CatalogFacetsRequest) -> dict[str, int]:
+    async with _pg_driver()._get_connection() as conn, conn.cursor() as cur:
+        prefix_filters: list[sql.Composable] = []
+        prefix_params: dict[str, Any] = {}
+        for cnt, prefix in enumerate(request.prefixes):
+            prefix_sql = sql.SQL("facet LIKE {}").format(sql.Placeholder(f"prefix{cnt}"))
+            prefix_params[f"prefix{cnt}"] = f"{prefix.prefix}%"
+            if prefix.depth is not None:
+                prefix_parts = len(prefix.prefix.split("/"))
+                depth_sql = sql.SQL("SPLIT_PART(facet, '/', {}) = ''").format(
+                    sql.Placeholder(f"depth{cnt}")
+                )
+                prefix_params[f"depth{cnt}"] = prefix_parts + prefix.depth + 1
+                prefix_sql = sql.SQL("({} AND {})").format(prefix_sql, depth_sql)
+            prefix_filters.append(prefix_sql)
+
+        filter_sql: sql.Composable
+        if prefix_filters:
+            filter_sql = sql.SQL("AND {}").format(sql.SQL(" OR ").join(prefix_filters))
+        else:
+            filter_sql = sql.SQL("")
+
+        await cur.execute(
+            sql.SQL(
+                "SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s {} GROUP BY facet"
+            ).format(filter_sql),
+            {"kbid": kbid, **prefix_params},
+        )
+        return {k: v for k, v in await cur.fetchall()}

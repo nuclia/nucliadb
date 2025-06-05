@@ -2311,3 +2311,19 @@ def parse_rephrase_prompt(item: AskRequest) -> Optional[str]:
 
 # We need this to avoid issues with pydantic and generic types defined in another module
 FindRequest.model_rebuild()
+
+
+class CatalogFacetsPrefix(BaseModel):
+    prefix: str = Field(pattern="^((/[^/]+)*)$")
+    depth: Optional[int] = Field(default=None, ge=0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def build_from_string(cls, data: Any) -> Any:
+        if isinstance(data, str):
+            data = {"prefix": data}
+        return data
+
+
+class CatalogFacetsRequest(BaseModel):
+    prefixes: list[CatalogFacetsPrefix] = Field(default=[])
