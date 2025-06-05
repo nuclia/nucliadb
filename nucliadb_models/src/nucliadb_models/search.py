@@ -2035,6 +2035,15 @@ def validate_facets(facets):
     return facets
 
 
+class TextBlockAugmentationType(str, Enum):
+    NEIGHBOURING_PARAGRAPHS = "neighbouring_paragraphs"
+    CONVERSATION = "conversation"
+    HIERARCHY = "hierarchy"
+    FULL_RESOURCE = "full_resource"
+    FIELD_EXTENSION = "field_extension"
+    METADATA_EXTENSION = "metadata_extension"
+
+
 class AugmentedTextBlock(BaseModel):
     id: str = Field(
         description="The id of the augmented text bloc. It can be a paragraph id or a field id."
@@ -2045,9 +2054,7 @@ class AugmentedTextBlock(BaseModel):
     parent: Optional[str] = Field(
         default=None, description="The parent text block that was augmented for."
     )
-    augmentation_type: str = Field(
-        description="Type of augmentation. Typically the the rag strategy name."
-    )
+    augmentation_type: TextBlockAugmentationType = Field(description="Type of augmentation.")
 
 
 class AugmentedContext(BaseModel):

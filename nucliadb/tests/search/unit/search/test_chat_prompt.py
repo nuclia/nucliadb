@@ -526,3 +526,20 @@ async def test_prompt_context_builder_with_extra_image_context():
     assert len(context_images) == 1
     _, context_image = context_images.popitem()
     assert context_image == user_image
+
+
+def test_get_neighbouring_indices():
+    field_pids = [ParagraphId.from_string(f"r1/f/f1/0-{i}") for i in range(10)]
+    index = 5
+
+    for (before, after), expected in [
+        ((0, 0), []),
+        ((1, 0), [4]),
+        ((0, 1), [6]),
+        ((1, 1), [4, 6]),
+        ((2, 0), [3, 4]),
+        ((0, 2), [6, 7]),
+        ((2, 2), [3, 4, 6, 7]),
+        ((100, 100), [0, 1, 2, 3, 4, 6, 7, 8, 9]),
+    ]:
+        assert chat_prompt.get_neighbouring_indices(index, before, after, field_pids) == expected

@@ -68,6 +68,7 @@ from nucliadb_models.search import (
     RagStrategy,
     RagStrategyName,
     TableImageStrategy,
+    TextBlockAugmentationType,
 )
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import ExtractedText, FieldComputedMetadata
@@ -300,7 +301,9 @@ async def full_resource_prompt_context(
             # Add the extracted text of each field to the context.
             context[field.full()] = extracted_text
             augmented_context.fields[field.full()] = AugmentedTextBlock(
-                id=field.full(), text=extracted_text, augmentation_type=strategy.name
+                id=field.full(),
+                text=extracted_text,
+                augmentation_type=TextBlockAugmentationType.FULL_RESOURCE,
             )
 
             added_fields.add(field.full())
@@ -391,7 +394,7 @@ async def extend_prompt_context_with_origin_metadata(
                 id=tb_id.full(),
                 text=extended_text,
                 parent=tb_id.full(),
-                augmentation_type=f"metadata_extension:{MetadataExtensionType.ORIGIN.name}",
+                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
             )
 
 
@@ -434,7 +437,7 @@ async def extend_prompt_context_with_classification_labels(
                 id=tb_id.full(),
                 text=extended_text,
                 parent=tb_id.full(),
-                augmentation_type=f"metadata_extension:{MetadataExtensionType.CLASSIFICATION_LABELS.name}",
+                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
             )
 
 
@@ -482,7 +485,7 @@ async def extend_prompt_context_with_ner(
                 id=tb_id.full(),
                 text=extended_text,
                 parent=tb_id.full(),
-                augmentation_type=f"metadata_extension:{MetadataExtensionType.NERS.name}",
+                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
             )
 
 
@@ -511,7 +514,7 @@ async def extend_prompt_context_with_extra_metadata(
                 id=tb_id.full(),
                 text=extended_text,
                 parent=tb_id.full(),
-                augmentation_type=f"metadata_extension:{MetadataExtensionType.EXTRA_METADATA.name}",
+                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
             )
 
 
@@ -575,7 +578,9 @@ async def field_extension_prompt_context(
         if field.full() not in context.output:
             context[field.full()] = extracted_text
             augmented_context.fields[field.full()] = AugmentedTextBlock(
-                id=field.full(), text=extracted_text, augmentation_type=strategy.name
+                id=field.full(),
+                text=extracted_text,
+                augmentation_type=TextBlockAugmentationType.FIELD_EXTENSION,
             )
 
     # Add the extracted text of each paragraph to the end of the context.
@@ -659,9 +664,12 @@ async def neighbouring_paragraphs_prompt_context(
         except IndexError:
             continue
 
-        lb_index = max(0, index - strategy.before)
-        ub_index = min(len(field_pids), index + strategy.after + 1)
-        for neighbour_index in range(lb_index, ub_index):
+        for neighbour_index in get_neighbouring_indices(
+            index=index,
+            before=strategy.before,
+            after=strategy.after,
+            field_pids=field_pids,
+        ):
             if neighbour_index == index:
                 # Already handled above
                 continue
@@ -680,10 +688,18 @@ async def neighbouring_paragraphs_prompt_context(
                 id=npid.full(),
                 text=ptext,
                 parent=pid.full(),
-                augmentation_type=strategy.name,
+                augmentation_type=TextBlockAugmentationType.NEIGHBOURING_PARAGRAPHS,
             )
 
     metrics.set("neighbouring_paragraphs_ops", len(augmented_context.paragraphs))
+
+
+def get_neighbouring_indices(
+    index: int, before: int, after: int, field_pids: list[ParagraphId]
+) -> list[int]:
+    lb_index = max(0, index - before)
+    ub_index = min(len(field_pids), index + after + 1)
+    return list(range(lb_index, index)) + list(range(index + 1, ub_index))
 
 
 async def conversation_prompt_context(
@@ -746,7 +762,7 @@ async def conversation_prompt_context(
                                 id=pid,
                                 text=text,
                                 parent=paragraph.id,
-                                augmentation_type=strategy.name,
+                                augmentation_type=TextBlockAugmentationType.CONVERSATION,
                             )
                 else:
                     # Add first message
@@ -768,7 +784,7 @@ async def conversation_prompt_context(
                             id=pid,
                             text=text,
                             parent=paragraph.id,
-                            augmentation_type=strategy.name,
+                            augmentation_type=TextBlockAugmentationType.CONVERSATION,
                         )
 
                     messages: Deque[resources_pb2.Message] = deque(maxlen=strategy.max_messages)
@@ -800,7 +816,7 @@ async def conversation_prompt_context(
                             id=pid,
                             text=text,
                             parent=paragraph.id,
-                            augmentation_type=strategy.name,
+                            augmentation_type=TextBlockAugmentationType.CONVERSATION,
                         )
 
                 if strategy.attachments_text:
@@ -821,7 +837,7 @@ async def conversation_prompt_context(
                                 id=pid,
                                 text=text,
                                 parent=paragraph.id,
-                                augmentation_type=strategy.name,
+                                augmentation_type=TextBlockAugmentationType.CONVERSATION,
                             )
 
                 if strategy.attachments_images and visual_llm:
@@ -938,7 +954,7 @@ async def hierarchy_prompt_context(
         if paragraph.id in augmented_paragraphs:
             field_id = ParagraphId.from_string(paragraph.id).field_id.full()
             augmented_context.fields[field_id] = AugmentedTextBlock(
-                id=field_id, text=paragraph_text, augmentation_type=strategy.name
+                id=field_id, text=paragraph_text, augmentation_type=TextBlockAugmentationType.HIERARCHY
             )
     return
 
