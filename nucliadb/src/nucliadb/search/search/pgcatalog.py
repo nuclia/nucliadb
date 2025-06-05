@@ -68,7 +68,13 @@ def _convert_filter(expr: CatalogExpression, filter_params: dict[str, Any]) -> s
     elif expr.facet:
         param_name = f"param{len(filter_params)}"
         filter_params[param_name] = [expr.facet]
-        return sql.SQL("extract_facets(labels) @> {}").format(sql.Placeholder(param_name))
+        if expr.facet == "/n/s/PROCESSED":
+            # Optimization for the most common case, we know PROCESSED is a full label and can use the smaller labels index
+            # This is needed because PROCESSED is present in most catalog entries and PG is unlikely to use any index
+            # for it, falling back to executing the extract_facets function which can be slow
+            return sql.SQL("labels @> {}").format(sql.Placeholder(param_name))
+        else:
+            return sql.SQL("extract_facets(labels) @> {}").format(sql.Placeholder(param_name))
     elif expr.resource_id:
         param_name = f"param{len(filter_params)}"
         filter_params[param_name] = [expr.resource_id]
@@ -87,10 +93,16 @@ def _convert_boolean_op(
     facets, nonfacets = _filter_operands(operands)
     if facets:
         param_name = f"param{len(filter_params)}"
+        if facets == ["/n/s/PROCESSED"]:
+            # Optimization for the most common case, we know PROCESSED is a full label and can use the smaller labels index
+            # This is needed because PROCESSED is present in most catalog entries and PG is unlikely to use any index
+            # for it, falling back to executing the extract_facets function which can be slow
+            operands_sql.append(sql.SQL("labels @> {}").format(sql.Placeholder(param_name)))
+        else:
+            operands_sql.append(
+                sql.SQL("extract_facets(labels) {} {}").format(array_op, sql.Placeholder(param_name))
+            )
         filter_params[param_name] = facets
-        operands_sql.append(
-            sql.SQL("extract_facets(labels) {} {}").format(array_op, sql.Placeholder(param_name))
-        )
     for nonfacet in nonfacets:
         operands_sql.append(_convert_filter(nonfacet, filter_params))
     return sql.SQL("({})").format(sql.SQL(f" {op.upper()} ").join(operands_sql))
