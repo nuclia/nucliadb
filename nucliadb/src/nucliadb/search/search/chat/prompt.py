@@ -1078,6 +1078,11 @@ class PromptContextBuilder:
             for paragraph in self.ordered_paragraphs:
                 context[paragraph.id] = _clean_paragraph_text(paragraph)
 
+        strategies_not_handled_here = [
+            RagStrategyName.PREQUERIES,
+            RagStrategyName.GRAPH,
+        ]
+
         full_resource: Optional[FullResourceStrategy] = None
         hierarchy: Optional[HierarchyResourceStrategy] = None
         neighbouring_paragraphs: Optional[NeighbouringParagraphsStrategy] = None
@@ -1101,9 +1106,7 @@ class PromptContextBuilder:
                 neighbouring_paragraphs = cast(NeighbouringParagraphsStrategy, strategy)
             elif strategy.name == RagStrategyName.METADATA_EXTENSION:
                 metadata_extension = cast(MetadataExtensionStrategy, strategy)
-            elif (
-                strategy.name != RagStrategyName.PREQUERIES and strategy.name != RagStrategyName.GRAPH
-            ):  # pragma: no cover
+            elif strategy.name not in strategies_not_handled_here:  # pragma: no cover
                 # Prequeries and graph are not handled here
                 logger.warning(
                     "Unknown rag strategy",
