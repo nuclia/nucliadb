@@ -23,10 +23,9 @@ from nucliadb.common.maindb.pg import PGTransaction
 
 async def migrate(txn: PGTransaction) -> None:
     async with txn.connection.cursor() as cur:
-        # IF NOT EXISTS just for compatibility with older install predating the migration system
-        await cur.execute("""
-            CREATE TABLE IF NOT EXISTS resources (
-                key TEXT COLLATE ucs_basic PRIMARY KEY,
-                value BYTEA
-            );
-        """)
+        await cur.execute(
+            """
+            ALTER TABLE catalog ADD COLUMN slug TEXT;
+            CREATE INDEX ON catalog(slug);
+            """
+        )

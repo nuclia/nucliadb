@@ -23,10 +23,21 @@ from nucliadb.common.maindb.pg import PGTransaction
 
 async def migrate(txn: PGTransaction) -> None:
     async with txn.connection.cursor() as cur:
-        # IF NOT EXISTS just for compatibility with older install predating the migration system
-        await cur.execute("""
-            CREATE TABLE IF NOT EXISTS resources (
-                key TEXT COLLATE ucs_basic PRIMARY KEY,
-                value BYTEA
+        await cur.execute(
+            """
+            CREATE TABLE catalog_facets (
+                id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+                kbid UUID,
+                rid UUID,
+                facet TEXT COLLATE ucs_basic,
+
+                FOREIGN KEY (kbid, rid) REFERENCES catalog (kbid, rid) ON DELETE CASCADE
             );
-        """)
+
+            -- For FK checks
+            CREATE INDEX ON catalog_facets(kbid, rid);
+
+            -- Best for per-facet aggregation, also used by search with facet filter
+            CREATE INDEX ON catalog_facets(kbid, facet);
+            """
+        )

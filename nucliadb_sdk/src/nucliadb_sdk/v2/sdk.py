@@ -77,6 +77,8 @@ from nucliadb_models.search import (
     AnswerAskResponseItem,
     AskRequest,
     AskResponseItem,
+    AugmentedContext,
+    AugmentedContextResponseItem,
     CatalogRequest,
     CatalogResponse,
     CitationsAskResponseItem,
@@ -472,6 +474,7 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
     timings = None
     error: Optional[str] = None
     debug = None
+    augmented_context: Optional[AugmentedContext] = None
     for line in response.iter_lines():
         try:
             item = AskResponseItem.model_validate_json(line).item
@@ -496,6 +499,8 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
                 error = item.error
             elif isinstance(item, DebugAskResponseItem):
                 debug = item.metadata
+            elif isinstance(item, AugmentedContextResponseItem):
+                augmented_context = item.augmented
             else:
                 warnings.warn(f"Unknown item in ask endpoint response: {item}")
         except ValidationError:
@@ -520,6 +525,7 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
             "citations": citations,
             "debug": debug,
             "metadata": SyncAskMetadata(tokens=tokens, timings=timings),
+            "augmented_context": augmented_context,
         }
     )
 

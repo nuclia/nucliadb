@@ -62,12 +62,13 @@ MAX_RETRIES = 5
 
 RETRIABLE_EXCEPTIONS = (
     GoogleCloudException,
-    aiohttp.client_exceptions.ClientPayloadError,
-    aiohttp.client_exceptions.ClientConnectorError,
-    aiohttp.client_exceptions.ClientConnectionError,
-    aiohttp.client_exceptions.ClientOSError,
-    aiohttp.client_exceptions.ServerConnectionError,
-    aiohttp.client_exceptions.ServerDisconnectedError,
+    aiohttp.ClientPayloadError,
+    aiohttp.ClientConnectorError,
+    aiohttp.ClientConnectionError,
+    aiohttp.ClientOSError,
+    aiohttp.ServerConnectionError,
+    aiohttp.ServerDisconnectedError,
+    aiohttp.ServerTimeoutError,
     socket.gaierror,
 )
 
