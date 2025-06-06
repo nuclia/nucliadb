@@ -53,7 +53,7 @@ async def summarize_endpoint(
         return await summarize(
             kbid=kbid,
             request=item,
-            extra_predict_headers={"X-Show-Consumption": x_show_consumption},
+            extra_predict_headers={"X-Show-Consumption": str(x_show_consumption).lower()},
         )
     except KnowledgeBoxNotFound:
         return HTTPClientError(status_code=404, detail="Knowledge box not found")

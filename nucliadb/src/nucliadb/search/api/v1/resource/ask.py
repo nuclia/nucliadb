@@ -66,7 +66,7 @@ async def resource_ask_endpoint_by_uuid(
         origin=x_forwarded_for,
         x_synchronous=x_synchronous,
         resource=rid,
-        extra_predict_headers={"X-Show-Consumption": x_show_consumption},
+        extra_predict_headers={"X-Show-Consumption": str(x_show_consumption).lower()},
     )
 
 
@@ -106,5 +106,5 @@ async def resource_ask_endpoint_by_slug(
         origin=x_forwarded_for,
         x_synchronous=x_synchronous,
         resource=resource_id,
-        extra_predict_headers={"X-Show-Consumption": x_show_consumption},
+        extra_predict_headers={"X-Show-Consumption": str(x_show_consumption).lower()},
     )

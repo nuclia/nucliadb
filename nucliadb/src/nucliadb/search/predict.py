@@ -397,7 +397,7 @@ class PredictEngine:
 
     @predict_observer.wrap({"type": "summarize"})
     async def summarize(
-        self, kbid: str, item: SummarizeModel, extra_headers: Optional[dict]
+        self, kbid: str, item: SummarizeModel, extra_headers: Optional[dict[str, str]] = None
     ) -> SummarizedResponse:
         try:
             self.check_nua_key_is_configured_for_onprem()
@@ -491,7 +491,7 @@ class DummyPredictEngine(PredictEngine):
         return RephraseResponse(rephrased_query=DUMMY_REPHRASE_QUERY, use_chat_history=None)
 
     async def chat_query_ndjson(
-        self, kbid: str, item: ChatModel
+        self, kbid: str, item: ChatModel, extra_headers: Optional[dict[str, str]] = None
     ) -> tuple[str, str, AsyncGenerator[GenerativeChunk, None]]:
         self.calls.append(("chat_query_ndjson", item))
 
@@ -561,7 +561,9 @@ class DummyPredictEngine(PredictEngine):
         else:
             return DUMMY_RELATION_NODE
 
-    async def summarize(self, kbid: str, item: SummarizeModel) -> SummarizedResponse:
+    async def summarize(
+        self, kbid: str, item: SummarizeModel, extra_headers: Optional[dict[str, str]] = None
+    ) -> SummarizedResponse:
         self.calls.append(("summarize", (kbid, item)))
         response = SummarizedResponse(
             summary="global summary",

@@ -46,7 +46,7 @@ class NoResourcesToSummarize(Exception):
 
 
 async def summarize(
-    kbid: str, request: SummarizeRequest, extra_predict_headers: Optional[dict]
+    kbid: str, request: SummarizeRequest, extra_predict_headers: Optional[dict[str, str]]
 ) -> SummarizedResponse:
     predict_request = SummarizeModel()
     predict_request.generative_model = request.generative_model

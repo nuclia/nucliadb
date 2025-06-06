@@ -104,7 +104,7 @@ async def ask_knowledgebox_endpoint(
         client_type=x_ndb_client,
         origin=x_forwarded_for,
         x_synchronous=x_synchronous,
-        extra_predict_headers={"X-Show-Consumption": x_show_consumption},
+        extra_predict_headers={"X-Show-Consumption": str(x_show_consumption).lower()},
     )
 
 
