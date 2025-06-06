@@ -19,7 +19,7 @@
 #
 from typing import Union
 
-from fastapi import Request
+from fastapi import Header, Request
 from fastapi_versioning import version
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
