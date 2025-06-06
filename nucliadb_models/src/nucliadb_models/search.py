@@ -42,6 +42,8 @@ from nucliadb_models.internal.shards import (  # noqa isort: skip
     ShardReplica,
     KnowledgeboxShards,
 )
+from nuclia_models.common.consumption import Consumption
+
 from nucliadb_models.filters import CatalogFilterExpression, FilterExpression
 
 ANSWER_JSON_SCHEMA_EXAMPLE = {
@@ -1803,6 +1805,7 @@ class SummarizedResponse(BaseModel):
         title="Summary",
         description="Global summary of all resources combined.",
     )
+    consumption: Optional[Consumption] = None
 
 
 class KnowledgeGraphEntity(BaseModel):

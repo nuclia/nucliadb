@@ -30,7 +30,7 @@ dependencies = [
     "nidx-protos",
 
     "nucliadb-admin-assets>=1.0.0.post1224",
-    "nuclia-models>=0.24.2",
+    "nuclia-models>=0.43.0",
 
     # external dependencies
     "uvicorn[standard]",
