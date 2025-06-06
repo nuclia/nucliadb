@@ -27,6 +27,7 @@
 //! The indexes for merging and searching also take charge of applying the deletions, so each individual index does not have to worry about it.
 
 pub mod index_reader;
+pub mod utils;
 
 use nidx_types::SegmentMetadata;
 use serde::{Deserialize, Serialize};

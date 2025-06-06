@@ -33,6 +33,7 @@ from nuclia_models.predict.generative_responses import (
 from pydantic_core import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.external_index_providers.base import ScoredTextBlock
 from nucliadb.common.ids import ParagraphId
 from nucliadb.models.responses import HTTPClientError
@@ -59,10 +60,9 @@ from nucliadb.search.search.chat.query import (
 )
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
-    InvalidQueryError,
 )
 from nucliadb.search.search.graph_strategy import get_graph_results
-from nucliadb.search.search.metrics import RAGMetrics
+from nucliadb.search.search.metrics import AskMetrics, Metrics
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
 from nucliadb.search.search.rank_fusion import WeightedCombSum
@@ -78,6 +78,8 @@ from nucliadb_models.search import (
     AskRetrievalMatch,
     AskTimings,
     AskTokens,
+    AugmentedContext,
+    AugmentedContextResponseItem,
     ChatModel,
     ChatOptions,
     CitationsAskResponseItem,
@@ -140,9 +142,10 @@ class AskResult:
         prompt_context: PromptContext,
         prompt_context_order: PromptContextOrder,
         auditor: ChatAuditor,
-        metrics: RAGMetrics,
+        metrics: AskMetrics,
         best_matches: list[RetrievalMatch],
         debug_chat_model: Optional[ChatModel],
+        augmented_context: AugmentedContext,
     ):
         # Initial attributes
         self.kbid = kbid
@@ -155,8 +158,9 @@ class AskResult:
         self.debug_chat_model = debug_chat_model
         self.prompt_context_order = prompt_context_order
         self.auditor: ChatAuditor = auditor
-        self.metrics: RAGMetrics = metrics
+        self.metrics: AskMetrics = metrics
         self.best_matches: list[RetrievalMatch] = best_matches
+        self.augmented_context = augmented_context
 
         # Computed from the predict chat answer stream
         self._answer_text = ""
@@ -264,24 +268,21 @@ class AskResult:
             audit_answer = self._answer_text.encode("utf-8")
         else:
             audit_answer = json.dumps(self._object.object).encode("utf-8")
-
-        try:
-            rephrase_time = self.metrics.elapsed("rephrase")
-        except KeyError:
-            # Not all ask requests have a rephrase step
-            rephrase_time = None
-
         self.auditor.audit(
             text_answer=audit_answer,
-            generative_answer_time=self.metrics.elapsed("stream_predict_answer"),
+            generative_answer_time=self.metrics["stream_predict_answer"],
             generative_answer_first_chunk_time=self.metrics.get_first_chunk_time() or 0,
-            rephrase_time=rephrase_time,
+            rephrase_time=self.metrics.get("rephrase"),
             status_code=self.status_code,
         )
 
+        yield AugmentedContextResponseItem(augmented=self.augmented_context)
+
         # Stream out the citations
         if self._citations is not None:
-            yield CitationsAskResponseItem(citations=self._citations.citations)
+            yield CitationsAskResponseItem(
+                citations=self._citations.citations,
+            )
 
         # Stream out generic metadata about the answer
         if self._metadata is not None:
@@ -317,7 +318,8 @@ class AskResult:
                         self.prompt_context, self.prompt_context_order
                     ),
                     "predict_request": predict_request,
-                }
+                },
+                metrics=self.metrics.dump(),
             )
 
     async def json(self) -> str:
@@ -372,6 +374,7 @@ class AskResult:
             citations=citations,
             metadata=metadata,
             learning_id=self.nuclia_learning_id or "",
+            augmented_context=self.augmented_context,
         )
         if self.status_code == AnswerStatusCode.ERROR and self.status_error_details:
             response.error_details = self.status_error_details
@@ -382,6 +385,9 @@ class AskResult:
             response.prompt_context = sorted_prompt_context
             if self.debug_chat_model:
                 response.predict_request = self.debug_chat_model.model_dump(mode="json")
+            response.debug = {
+                "metrics": self.metrics.dump(),
+            }
         return response.model_dump_json(exclude_none=True, by_alias=True)
 
     async def get_relations_results(self) -> Relations:
@@ -481,7 +487,7 @@ async def ask(
     origin: str,
     resource: Optional[str] = None,
 ) -> AskResult:
-    metrics = RAGMetrics()
+    metrics = AskMetrics()
     chat_history = ask_request.chat_history or []
     user_context = ask_request.extra_context or []
     user_query = ask_request.query
@@ -491,36 +497,38 @@ async def ask(
     if len(chat_history) > 0 or len(user_context) > 0:
         try:
             with metrics.time("rephrase"):
-                rephrased_query = await rephrase_query(
+                rephrase_response = await rephrase_query(
                     kbid,
                     chat_history=chat_history,
                     query=user_query,
                     user_id=user_id,
                     user_context=user_context,
                     generative_model=ask_request.generative_model,
+                    chat_history_relevance_threshold=ask_request.chat_history_relevance_threshold,
                 )
+                rephrased_query = rephrase_response.rephrased_query
+                if rephrase_response.use_chat_history is False:
+                    # Ignored if the question is not relevant enough with the chat history
+                    logger.info("Chat history was ignored for this request")
+                    chat_history = []
+
         except RephraseMissingContextError:
             logger.info("Failed to rephrase ask query, using original")
 
     try:
-        retrieval_results = await retrieval_step(
-            kbid=kbid,
-            # Prefer the rephrased query for retrieval if available
-            main_query=rephrased_query or user_query,
-            ask_request=ask_request,
-            client_type=client_type,
-            user_id=user_id,
-            origin=origin,
-            metrics=metrics,
-            resource=resource,
-        )
+        with metrics.time("retrieval"):
+            retrieval_results = await retrieval_step(
+                kbid=kbid,
+                # Prefer the rephrased query for retrieval if available
+                main_query=rephrased_query or user_query,
+                ask_request=ask_request,
+                client_type=client_type,
+                user_id=user_id,
+                origin=origin,
+                metrics=metrics,
+                resource=resource,
+            )
     except NoRetrievalResultsError as err:
-        try:
-            rephrase_time = metrics.elapsed("rephrase")
-        except KeyError:
-            # Not all ask requests have a rephrase step
-            rephrase_time = None
-
         maybe_audit_chat(
             kbid=kbid,
             user_id=user_id,
@@ -528,7 +536,7 @@ async def ask(
             origin=origin,
             generative_answer_time=0,
             generative_answer_first_chunk_time=0,
-            rephrase_time=rephrase_time,
+            rephrase_time=metrics.get("rephrase"),
             user_query=user_query,
             rephrased_query=rephrased_query,
             retrieval_rephrase_query=err.main_query.rephrased_query if err.main_query else None,
@@ -564,11 +572,13 @@ async def ask(
             image_strategies=ask_request.rag_images_strategies,
             max_context_characters=tokens_to_chars(generation.max_context_tokens),
             visual_llm=generation.use_visual_llm,
+            metrics=metrics.child_span("context_building"),
         )
         (
             prompt_context,
             prompt_context_order,
             prompt_context_images,
+            augmented_context,
         ) = await prompt_context_builder.build()
 
     # Make the chat request to the predict API
@@ -631,6 +641,7 @@ async def ask(
         metrics=metrics,
         best_matches=retrieval_results.best_matches,
         debug_chat_model=chat_model,
+        augmented_context=augmented_context,
     )
 
 
@@ -709,7 +720,7 @@ async def retrieval_step(
     client_type: NucliaDBClientType,
     user_id: str,
     origin: str,
-    metrics: RAGMetrics,
+    metrics: Metrics,
     resource: Optional[str] = None,
 ) -> RetrievalResults:
     """
@@ -745,49 +756,48 @@ async def retrieval_in_kb(
     client_type: NucliaDBClientType,
     user_id: str,
     origin: str,
-    metrics: RAGMetrics,
+    metrics: Metrics,
 ) -> RetrievalResults:
     prequeries = parse_prequeries(ask_request)
     graph_strategy = parse_graph_strategy(ask_request)
-    with metrics.time("retrieval"):
-        main_results, prequeries_results, parsed_query = await get_find_results(
+    main_results, prequeries_results, parsed_query = await get_find_results(
+        kbid=kbid,
+        query=main_query,
+        item=ask_request,
+        ndb_client=client_type,
+        user=user_id,
+        origin=origin,
+        metrics=metrics.child_span("hybrid_retrieval"),
+        prequeries_strategy=prequeries,
+    )
+
+    if graph_strategy is not None:
+        assert parsed_query.retrieval.reranker is not None, (
+            "find parser must provide a reranking algorithm"
+        )
+        reranker = get_reranker(parsed_query.retrieval.reranker)
+        graph_results, graph_request = await get_graph_results(
             kbid=kbid,
             query=main_query,
             item=ask_request,
             ndb_client=client_type,
             user=user_id,
             origin=origin,
-            metrics=metrics,
-            prequeries_strategy=prequeries,
+            graph_strategy=graph_strategy,
+            metrics=metrics.child_span("graph_retrieval"),
+            text_block_reranker=reranker,
         )
 
-        if graph_strategy is not None:
-            assert parsed_query.retrieval.reranker is not None, (
-                "find parser must provide a reranking algorithm"
-            )
-            reranker = get_reranker(parsed_query.retrieval.reranker)
-            graph_results, graph_request = await get_graph_results(
-                kbid=kbid,
-                query=main_query,
-                item=ask_request,
-                ndb_client=client_type,
-                user=user_id,
-                origin=origin,
-                graph_strategy=graph_strategy,
-                metrics=metrics,
-                text_block_reranker=reranker,
-            )
+        if prequeries_results is None:
+            prequeries_results = []
 
-            if prequeries_results is None:
-                prequeries_results = []
+        prequery = PreQuery(id="graph", request=graph_request, weight=graph_strategy.weight)
+        prequeries_results.append((prequery, graph_results))
 
-            prequery = PreQuery(id="graph", request=graph_request, weight=graph_strategy.weight)
-            prequeries_results.append((prequery, graph_results))
-
-        if len(main_results.resources) == 0 and all(
-            len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
-        ):
-            raise NoRetrievalResultsError(main_results, prequeries_results)
+    if len(main_results.resources) == 0 and all(
+        len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
+    ):
+        raise NoRetrievalResultsError(main_results, prequeries_results)
 
     main_query_weight = prequeries.main_query_weight if prequeries is not None else 1.0
     best_matches = compute_best_matches(
@@ -812,7 +822,7 @@ async def retrieval_in_resource(
     client_type: NucliaDBClientType,
     user_id: str,
     origin: str,
-    metrics: RAGMetrics,
+    metrics: Metrics,
 ) -> RetrievalResults:
     if any(strategy.name == "full_resource" for strategy in ask_request.rag_strategies):
         # Retrieval is not needed if we are chatting on a specific resource and the full_resource strategy is enabled
@@ -838,21 +848,20 @@ async def retrieval_in_resource(
                 )
             add_resource_filter(prequery.request, [resource])
 
-    with metrics.time("retrieval"):
-        main_results, prequeries_results, parsed_query = await get_find_results(
-            kbid=kbid,
-            query=main_query,
-            item=ask_request,
-            ndb_client=client_type,
-            user=user_id,
-            origin=origin,
-            metrics=metrics,
-            prequeries_strategy=prequeries,
-        )
-        if len(main_results.resources) == 0 and all(
-            len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
-        ):
-            raise NoRetrievalResultsError(main_results, prequeries_results)
+    main_results, prequeries_results, parsed_query = await get_find_results(
+        kbid=kbid,
+        query=main_query,
+        item=ask_request,
+        ndb_client=client_type,
+        user=user_id,
+        origin=origin,
+        metrics=metrics.child_span("hybrid_retrieval"),
+        prequeries_strategy=prequeries,
+    )
+    if len(main_results.resources) == 0 and all(
+        len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
+    ):
+        raise NoRetrievalResultsError(main_results, prequeries_results)
     main_query_weight = prequeries.main_query_weight if prequeries is not None else 1.0
     best_matches = compute_best_matches(
         main_results=main_results,

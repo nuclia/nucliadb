@@ -19,6 +19,7 @@
 #
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -126,6 +127,7 @@ class Resource:
         self.disable_vectors = disable_vectors
         self._previous_status: Optional[Metadata.Status.ValueType] = None
         self.user_relations: Optional[PBRelations] = None
+        self.locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     async def set_slug(self):
         basic = await self.get_basic()
@@ -306,10 +308,13 @@ class Resource:
     async def get_field(self, key: str, type: FieldType.ValueType, load: bool = True):
         field = (type, key)
         if field not in self.fields:
-            field_obj: Field = KB_FIELDS[type](id=key, resource=self)
-            if load:
-                await field_obj.get_value()
-            self.fields[field] = field_obj
+            async with self.locks["field"]:
+                # Field could have been fetch while waiting for the lock
+                if field not in self.fields:
+                    field_obj: Field = KB_FIELDS[type](id=key, resource=self)
+                    if load:
+                        await field_obj.get_value()
+                    self.fields[field] = field_obj
         return self.fields[field]
 
     async def set_field(self, type: FieldType.ValueType, key: str, payload: Any):

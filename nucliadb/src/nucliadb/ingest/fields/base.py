@@ -19,7 +19,10 @@
 #
 from __future__ import annotations
 
+import asyncio
 import enum
+import logging
+from collections import defaultdict
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar
 
@@ -43,8 +46,12 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import ExtractedText, VectorObject
 from nucliadb_protos.writer_pb2 import Error, FieldStatus
+from nucliadb_utils import const
 from nucliadb_utils.storages.exceptions import CouldNotCopyNotFound
 from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.utilities import has_feature
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.resource import Resource
@@ -107,6 +114,8 @@ class Field(Generic[PbType]):
             if not isinstance(pb, self.pbklass):
                 raise InvalidPBClass(self.__class__, pb.__class__)
             self.value = pb
+
+        self.locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     @property
     def kbid(self) -> str:
@@ -206,6 +215,21 @@ class Field(Generic[PbType]):
     ) -> None:
         # Try delete vectors
         sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
+
+        if has_feature(const.Features.DEBUG_MISSING_VECTORS):
+            # This is a very chatty log. It is just a temporary hint while debugging an issue.
+            logger.info(
+                "Deleting vectors from storage",
+                extra={
+                    "kbid": self.kbid,
+                    "rid": self.resource.uuid,
+                    "field": f"{self.type}/{self.id}",
+                    "vectorset": vectorset,
+                    "storage_key_kind": storage_key_kind,
+                    "key": sf.key,
+                    "bucket": sf.bucket,
+                },
+            )
         try:
             await self.storage.delete_upload(sf.key, sf.bucket)
         except KeyError:
@@ -344,10 +368,13 @@ class Field(Generic[PbType]):
 
     async def get_extracted_text(self, force=False) -> Optional[ExtractedText]:
         if self.extracted_text is None or force:
-            sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
-            payload = await self.storage.download_pb(sf, ExtractedText)
-            if payload is not None:
-                self.extracted_text = payload
+            async with self.locks["extracted_text"]:
+                # Value could have been fetched while waiting for the lock
+                if self.extracted_text is None or force:
+                    sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
+                    payload = await self.storage.download_pb(sf, ExtractedText)
+                    if payload is not None:
+                        self.extracted_text = payload
         return self.extracted_text
 
     async def set_vectors(
@@ -479,10 +506,13 @@ class Field(Generic[PbType]):
 
     async def get_field_metadata(self, force: bool = False) -> Optional[FieldComputedMetadata]:
         if self.computed_metadata is None or force:
-            sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
-            payload = await self.storage.download_pb(sf, FieldComputedMetadata)
-            if payload is not None:
-                self.computed_metadata = payload
+            async with self.locks["field_metadata"]:
+                # Value could have been fetched while waiting for the lock
+                if self.computed_metadata is None or force:
+                    sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
+                    payload = await self.storage.download_pb(sf, FieldComputedMetadata)
+                    if payload is not None:
+                        self.computed_metadata = payload
         return self.computed_metadata
 
     async def set_large_field_metadata(self, payload: LargeComputedMetadataWrapper):

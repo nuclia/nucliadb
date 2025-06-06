@@ -24,13 +24,13 @@ from typing import Optional, Union
 
 from nidx_protos.nodereader_pb2 import FilterExpression
 
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.search.search.filters import translate_label
 from nucliadb_models.search import (
     Filter,
 )
 from nucliadb_protos import knowledgebox_pb2
 
-from .exceptions import InvalidQueryError
 from .fetcher import Fetcher
 
 

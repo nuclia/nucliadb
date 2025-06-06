@@ -28,12 +28,12 @@ use nidx_protos::{FilterExpression, StreamFilter, StreamRequest};
 use std::ops::Bound;
 use tantivy::Term;
 use tantivy::query::*;
-use tantivy::schema::{Facet, IndexRecordOption};
+use tantivy::schema::{Facet, Field, IndexRecordOption};
 
 use crate::schema::{self, TextSchema};
 
 pub fn produce_date_range_query(
-    field: &str,
+    field: Field,
     from: Option<&ProstTimestamp>,
     to: Option<&ProstTimestamp>,
 ) -> Option<RangeQuery> {
@@ -43,9 +43,13 @@ pub fn produce_date_range_query(
 
     let left_date_time = from.map(schema::timestamp_to_datetime_utc);
     let right_date_time = to.map(schema::timestamp_to_datetime_utc);
-    let left_bound = left_date_time.map(Bound::Included).unwrap_or(Bound::Unbounded);
-    let right_bound = right_date_time.map(Bound::Included).unwrap_or(Bound::Unbounded);
-    let query = RangeQuery::new_date_bounds(field.to_string(), left_bound, right_bound);
+    let left_bound = left_date_time
+        .map(|d| Bound::Included(Term::from_field_date(field, d)))
+        .unwrap_or(Bound::Unbounded);
+    let right_bound = right_date_time
+        .map(|d| Bound::Included(Term::from_field_date(field, d)))
+        .unwrap_or(Bound::Unbounded);
+    let query = RangeQuery::new(left_bound, right_bound);
     Some(query)
 }
 
@@ -55,8 +59,9 @@ pub fn create_streaming_query(schema: &TextSchema, request: &StreamRequest) -> B
 
     if let Some(ref filter) = request.filter {
         queries.extend(create_stream_filter_queries(schema, filter))
+    } else if let Some(ref filter_expression) = request.filter_expression {
+        queries.push((Occur::Must, filter_to_query(schema, filter_expression)))
     }
-
     Box::new(BooleanQuery::new(queries))
 }
 
@@ -148,8 +153,8 @@ pub fn filter_to_query(schema: &TextSchema, expr: &FilterExpression) -> Box<dyn 
         }
         nidx_protos::filter_expression::Expr::Date(range) => {
             let field = match range.field() {
-                DateField::Created => "created",
-                DateField::Modified => "modified",
+                DateField::Created => schema.created,
+                DateField::Modified => schema.modified,
             };
             let maybe_query = produce_date_range_query(field, range.since.as_ref(), range.until.as_ref());
             if let Some(query) = maybe_query {

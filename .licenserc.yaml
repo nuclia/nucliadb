@@ -1,99 +1,83 @@
 header:
-  license:
-    spdx-id: AGPL-3.0-or-later
-    copyright-owner: Bosutech XXI S.L.
-    software-name: nucliadb
-    content: |+
-      Copyright (C) 2021 Bosutech XXI S.L.
+  # nucliadb is AGPL-3.0
+  - license:
+      spdx-id: AGPL-3.0-or-later
+      copyright-owner: Bosutech XXI S.L.
+      software-name: nucliadb
+      content: |+
+        Copyright (C) 2021 Bosutech XXI S.L.
 
-      nucliadb is offered under the AGPL v3.0 and as commercial software.
-      For commercial licensing, contact us at info@nuclia.com.
+        nucliadb is offered under the AGPL v3.0 and as commercial software.
+        For commercial licensing, contact us at info@nuclia.com.
 
-      AGPL:
-      This program is free software: you can redistribute it and/or modify
-      it under the terms of the GNU Affero General Public License as
-      published by the Free Software Foundation, either version 3 of the
-      License, or (at your option) any later version.
+        AGPL:
+        This program is free software: you can redistribute it and/or modify
+        it under the terms of the GNU Affero General Public License as
+        published by the Free Software Foundation, either version 3 of the
+        License, or (at your option) any later version.
 
-      This program is distributed in the hope that it will be useful,
-      but WITHOUT ANY WARRANTY; without even the implied warranty of
-      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-      GNU Affero General Public License for more details.
+        This program is distributed in the hope that it will be useful,
+        but WITHOUT ANY WARRANTY; without even the implied warranty of
+        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+        GNU Affero General Public License for more details.
 
-      You should have received a copy of the GNU Affero General Public License
-      along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
-    pattern: |+
-      Copyright \(C\) [0-9-]+ Bosutech XXI S\.L\.
-
-      nucliadb is offered under the AGPL v3.0 and as commercial software.
-      For commercial licensing, contact us at info@nuclia\.com\.
-
-      AGPL:
-      This program is free software: you can redistribute it and/or modify
-      it under the terms of the GNU Affero General Public License as
-      published by the Free Software Foundation, either version 3 of the
-      License, or \(at your option\) any later version.
-
-      This program is distributed in the hope that it will be useful,
-      but WITHOUT ANY WARRANTY; without even the implied warranty of
-      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE\. See the
-      GNU Affero General Public License for more details\.
-
-      You should have received a copy of the GNU Affero General Public License
-      along with this program\. If not, see <http://www.gnu.org/licenses/>\.
+        You should have received a copy of the GNU Affero General Public License
+        along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-  paths:
-    - "nucliadb/**"
-    - "nucliadb_dataset/**"
-    - "nucliadb_protos/build.rs"
-    - "nucliadb_protos/src/lib.rs"
-    - "nucliadb_sdk/**"
-    - "nucliadb_telemetry/**"
-    - "nucliadb_utils/**"
-    - "nidx/**"
+      pattern: |+
+        Copyright \(C\) [0-9-]+ Bosutech XXI S\.L\.
 
-  paths-ignore:
-    - "**/*.proto"
-    - "**/pyproject.toml"
-    - "**/Cargo.toml"
-    - "**/Cargo.lock"
-    - "**/*.sh"
-    - "**/*.pb"
-    - "**/setup.cfg"
-    - "**/setup.py"
-    - "**/requirements*"
-    - "**/*.md"
-    - "**/*.in"
-    - "**/*.rst"
-    - "**/*.json"
-    - "**/CHANGELOG"
-    - "**/py.typed"
-    - "**/.mypy_cache/**"
-    - "**/.pytest_cache/**"
-    - "**/.eggs/**"
-    - "**/*.egg-info/**"
-    - "PKG-INFO"
-    - "**/*.pb"
-    - "nucliadb_node/data"
-    - "**/.pytest_cache"
-    - "**/__pycache__"
-    - "nucliadb_telemetry/src/nucliadb_telemetry/tests/grpc/*"
-    - "**/Makefile"
-    - "nucliadb/src/nucliadb/ingest/tests/orm/assets"
-    - "VERSION"
-    - "LICENSE"
-    - "NOTICE"
-    - "nucliadb_paragraphs/stop_words"
-    - "**/.gitignore"
-    - "nucliadb/tests/testdata/*"
-    - "**/*.drawio.svg"
-    - "nidx/migrations/*.sql"
+        nucliadb is offered under the AGPL v3.0 and as commercial software.
+        For commercial licensing, contact us at info@nuclia\.com\.
 
-  comment: on-failure
+        AGPL:
+        This program is free software: you can redistribute it and/or modify
+        it under the terms of the GNU Affero General Public License as
+        published by the Free Software Foundation, either version 3 of the
+        License, or \(at your option\) any later version.
 
-dependency: # <9>
-  files: # <10>
-    - go.mod
+        This program is distributed in the hope that it will be useful,
+        but WITHOUT ANY WARRANTY; without even the implied warranty of
+        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE\. See the
+        GNU Affero General Public License for more details\.
+
+        You should have received a copy of the GNU Affero General Public License
+        along with this program\. If not, see <http://www.gnu.org/licenses/>\.
+    paths:
+      - "nucliadb/**"
+      - "nucliadb_utils/**"
+      - "nidx/**"
+    paths-ignore:
+      - "**/*.json"
+      - "**/*.md"
+      - "**/*.pb"
+      - "**/*.proto"
+      - "**/Cargo.lock"
+      - "**/Cargo.toml"
+      - "**/Makefile"
+      - "**/py.typed"
+      - "**/pyproject.toml"
+      - "nidx/migrations/*.sql"
+      - "nucliadb/tests/writer/assets/"
+    comment: on-failure
+
+  # Libraries ar Apache 2.0
+  - license:
+      spdx-id: Apache-2.0
+      copyright-owner: Bosutech XXI S.L.
+      software-name: nucliadb
+    paths:
+      - "nucliadb_dataset/**"
+      - "nucliadb_models/**"
+      - "nucliadb_protos/**"
+      - "nucliadb_sdk/**"
+      - "nucliadb_telemetry/**"
+    paths-ignore:
+      - "**/*.md"
+      - "**/*.proto"
+      - "**/Makefile"
+      - "**/py.typed"
+      - "**/pyproject.toml"
+      - "nucliadb_telemetry/src/nucliadb_telemetry/tests/grpc/*"
+    comment: on-failure

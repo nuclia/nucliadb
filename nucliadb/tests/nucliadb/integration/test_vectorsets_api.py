@@ -273,18 +273,35 @@ async def test_vectorset_migration(
     text = "Lionel Messi is a football player."
     link_field.with_extracted_text(text)
     link_field.with_extracted_paragraph_metadata(Paragraph(start=0, end=len(text)))
+    link_vector = [1.0 for _ in range(1024)]
     vectors = [
         utils_pb2.Vector(
             start=0,
             end=len(text),
             start_paragraph=0,
             end_paragraph=len(text),
-            vector=[1.0 for _ in range(1024)],
+            vector=link_vector,
         )
     ]
     link_field.with_extracted_vectors(vectors, vectorset="multilingual-2024-05-06")
-
     bmb.add_field_builder(link_field)
+
+    title_field = FieldBuilder("title", FieldType.GENERIC)
+    text = "link"
+    title_field.with_extracted_text(text)
+    title_field.with_extracted_paragraph_metadata(Paragraph(start=0, end=len(text)))
+    title_vector = [5.0 for _ in range(1024)]
+    vectors = [
+        utils_pb2.Vector(
+            start=0,
+            end=len(text),
+            start_paragraph=0,
+            end_paragraph=len(text),
+            vector=title_vector,
+        )
+    ]
+    title_field.with_extracted_vectors(vectors, vectorset="multilingual-2024-05-06")
+    bmb.add_field_builder(title_field)
     bm = bmb.build()
 
     await inject_message(nucliadb_ingest_grpc, bm)
@@ -294,11 +311,11 @@ async def test_vectorset_migration(
     counters = await get_counters(nucliadb_reader, kbid)
     assert counters.resources == 1
     assert counters.paragraphs == 2  # one for the title and one for the link field
-    assert counters.sentences == 1  # only the vector of the link field
+    assert counters.sentences == 2  # one for the title and one for the link field
     assert counters.fields == 2  # the title and the link field
 
     # Make a search and check that the document is found
-    await _check_search(nucliadb_reader, kbid, query="football")
+    await _check_search(nucliadb_reader, kbid, query="football", vector=link_vector)
 
     # Now add a new vectorset
     vectorset_id = "en-2024-05-06"
@@ -319,13 +336,14 @@ async def test_vectorset_migration(
     ev = ExtractedVectorsWrapper()
     ev.field.CopyFrom(field)
     ev.vectorset_id = "en-2024-05-06"
+    link_vector_migrated = [2.0 for _ in range(1024)]
     vector = utils_pb2.Vector(
         start=0,
         end=len(text),
         start_paragraph=0,
         end_paragraph=len(text),
     )
-    vector.vector.extend([2.0 for _ in range(1024)])
+    vector.vector.extend(link_vector_migrated)
     ev.vectors.vectors.vectors.append(vector)
     bm2.field_vectors.append(ev)
 
@@ -341,11 +359,76 @@ async def test_vectorset_migration(
     assert counters_after.fields == counters.fields
 
     # Make a search with the new vectorset and check that the document is found
-    await _check_search(nucliadb_reader, kbid, query="football", vectorset="en-2024-05-06")
+    await _check_search(
+        nucliadb_reader,
+        kbid,
+        query="football",
+        vectorset="en-2024-05-06",
+        vector=link_vector_migrated,
+    )
 
     # With the default vectorset the document should also be found
-    await _check_search(nucliadb_reader, kbid, query="football", vectorset="multilingual-2024-05-06")
-    await _check_search(nucliadb_reader, kbid, query="football")
+    await _check_search(
+        nucliadb_reader,
+        kbid,
+        query="football",
+        vectorset="multilingual-2024-05-06",
+        vector=link_vector,
+    )
+    await _check_search(nucliadb_reader, kbid, query="football", vector=link_vector)
+
+    await _check_search(
+        nucliadb_reader,
+        kbid,
+        query="link",
+        vectorset="en-2024-05-06",
+        vector=title_vector,
+    )
+
+    # Simulate that embeddings for the title field of this resource are also migrated
+    # Ingest a new broker message as if it was coming from the migration
+    bm3 = BrokerMessage(
+        kbid=kbid,
+        uuid=rid,
+        type=BrokerMessage.MessageType.AUTOCOMMIT,
+        source=BrokerMessage.MessageSource.PROCESSOR,
+    )
+    ev = ExtractedVectorsWrapper()
+    ev.field.CopyFrom(FieldID(field_type=FieldType.GENERIC, field="title"))
+    ev.vectorset_id = "en-2024-05-06"
+    title_vector_migrated = [6.0 for _ in range(1024)]
+    vector = utils_pb2.Vector(
+        start=0,
+        end=len(text),
+        start_paragraph=0,
+        end_paragraph=len(text),
+    )
+    vector.vector.extend(title_vector_migrated)
+    ev.vectors.vectors.vectors.append(vector)
+    bm3.field_vectors.append(ev)
+
+    await inject_message(nucliadb_ingest_grpc, bm3)
+
+    await wait_for_sync()
+
+    # Make a search with the new vectorset and check that the document is found
+    await _check_search(
+        nucliadb_reader,
+        kbid,
+        query="football",
+        vectorset="en-2024-05-06",
+        vector=link_vector_migrated,
+    )
+
+    # With the default vectorset the document should also be found
+    await _check_search(
+        nucliadb_reader,
+        kbid,
+        query="football",
+        vectorset="multilingual-2024-05-06",
+        vector=link_vector,
+    )
+    await _check_search(nucliadb_reader, kbid, query="football", vector=link_vector)
 
     # Do a rollover and test again
 
@@ -358,11 +441,23 @@ async def test_vectorset_migration(
     await wait_for_sync()
 
     # Make a search with the new vectorset and check that the document is found
-    await _check_search(nucliadb_reader, kbid, vectorset="en-2024-05-06", query="football")
+    await _check_search(
+        nucliadb_reader,
+        kbid,
+        vectorset="en-2024-05-06",
+        query="football",
+        vector=link_vector_migrated,
+    )
 
     # With the default vectorset the document should also be found
-    await _check_search(nucliadb_reader, kbid, vectorset="multilingual-2024-05-06", query="football")
-    await _check_search(nucliadb_reader, kbid, query="football")
+    await _check_search(
+        nucliadb_reader,
+        kbid,
+        vectorset="multilingual-2024-05-06",
+        query="football",
+        vector=link_vector,
+    )
+    await _check_search(nucliadb_reader, kbid, query="football", vector=link_vector)
 
     await app_context.finalize()
 
@@ -404,13 +499,14 @@ async def _check_search(
     nucliadb_reader: AsyncClient,
     kbid: str,
     query: str,
+    vector: list[float],
     vectorset: Optional[str] = None,
 ):
     # check semantic search
     payload = {
         "features": ["semantic"],
-        "min_score": -1,
-        "vector": [1.0 for _ in range(1024)],
+        "min_score": 0.9,
+        "vector": vector,
     }
     if vectorset:
         payload["vectorset"] = vectorset
@@ -452,7 +548,7 @@ async def test_vectorset_migration_split_field(
             "title": "migrationexamples",
             "description": "",
             "zone": "",
-            "slug": "migrationexamples",
+            "slug": "migrationexamples2",
             "learning_configuration": {
                 "semantic_vector_similarity": "cosine",
                 "anonymization_model": "disabled",
@@ -559,7 +655,7 @@ async def test_vectorset_migration_split_field(
     assert counters.fields == 2  # the title and the conv field
 
     # Make a search and check that the document is found
-    await _check_search(nucliadb_reader, kbid, query="Python")
+    await _check_search(nucliadb_reader, kbid, query="Python", vector=[1.0 for _ in range(1024)])
 
     # Now add a new vectorset
     resp = await add_vectorset(
@@ -608,11 +704,23 @@ async def test_vectorset_migration_split_field(
     assert counters_after.fields == counters.fields
 
     # Make a search with the new vectorset and check that the document is found
-    await _check_search(nucliadb_reader, kbid, vectorset=new_vectorset_id, query="Python")
+    await _check_search(
+        nucliadb_reader,
+        kbid,
+        vectorset=new_vectorset_id,
+        query="Python",
+        vector=[2.0 for _ in range(1024)],
+    )
 
     # With the default vectorset the document should also be found
-    await _check_search(nucliadb_reader, kbid, vectorset=old_vectorset_id, query="Python")
-    await _check_search(nucliadb_reader, kbid, query="Python")
+    await _check_search(
+        nucliadb_reader,
+        kbid,
+        vectorset=old_vectorset_id,
+        query="Python",
+        vector=[1.0 for _ in range(1024)],
+    )
+    await _check_search(nucliadb_reader, kbid, query="Python", vector=[1.0 for _ in range(1024)])
 
     # Do a rollover and test again
     app_context = ApplicationContext()
@@ -624,10 +732,22 @@ async def test_vectorset_migration_split_field(
     await wait_for_sync()
 
     # Make a search with the new vectorset and check that the document is found
-    await _check_search(nucliadb_reader, kbid, vectorset=new_vectorset_id, query="Python")
+    await _check_search(
+        nucliadb_reader,
+        kbid,
+        vectorset=new_vectorset_id,
+        query="Python",
+        vector=[2.0 for _ in range(1024)],
+    )
 
     # With the default vectorset the document should also be found
-    await _check_search(nucliadb_reader, kbid, vectorset=old_vectorset_id, query="Python")
-    await _check_search(nucliadb_reader, kbid, query="Python")
+    await _check_search(
+        nucliadb_reader,
+        kbid,
+        vectorset=old_vectorset_id,
+        query="Python",
+        vector=[1.0 for _ in range(1024)],
+    )
+    await _check_search(nucliadb_reader, kbid, query="Python", vector=[1.0 for _ in range(1024)])
 
     await app_context.finalize()

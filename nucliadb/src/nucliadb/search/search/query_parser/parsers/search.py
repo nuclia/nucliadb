@@ -21,11 +21,11 @@ from typing import Optional
 
 from nidx_protos import nodereader_pb2
 
+from nucliadb.common.exceptions import InvalidQueryError
+from nucliadb.common.filter_expression import parse_expression
 from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query import expand_entities
-from nucliadb.search.search.query_parser.exceptions import InvalidQueryError
 from nucliadb.search.search.query_parser.fetcher import Fetcher
-from nucliadb.search.search.query_parser.filter_expression import parse_expression
 from nucliadb.search.search.query_parser.models import (
     Filters,
     ParsedQuery,

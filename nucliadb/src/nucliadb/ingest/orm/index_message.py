@@ -80,8 +80,8 @@ class IndexMessageBuilder:
         if texts or paragraphs:
             # We need to compute the texts when we're going to generate the paragraphs too, but we may not
             # want to index them always.
-            skip_index_texts = not texts
-            replace_texts = replace and not skip_index_texts
+            skip_texts_index = not texts
+            replace_texts = replace and not skip_texts_index
 
             if extracted_text is not None:
                 try:
@@ -96,13 +96,14 @@ class IndexMessageBuilder:
                     basic.usermetadata,
                     field_author,
                     replace_field=replace_texts,
-                    skip_index=skip_index_texts,
+                    skip_index=skip_texts_index,
                 )
         if paragraphs or vectors:
             # The paragraphs are needed to generate the vectors. However, we don't need to index them
             # in all cases.
-            skip_index_paragraphs = not paragraphs
-            replace_paragraphs = replace and not skip_index_paragraphs
+            skip_paragraphs_index = not paragraphs
+            skip_texts_index = not texts
+            replace_paragraphs = replace and not skip_paragraphs_index
 
             # We need to compute the paragraphs when we're going to generate the vectors too.
             if extracted_text is not None and field_computed_metadata is not None:
@@ -117,7 +118,8 @@ class IndexMessageBuilder:
                     page_positions,
                     user_field_metadata,
                     replace_field=replace_paragraphs,
-                    skip_index=skip_index_paragraphs,
+                    skip_paragraphs_index=skip_paragraphs_index,
+                    skip_texts_index=skip_texts_index,
                 )
         if vectors:
             assert vectorset_configs is not None

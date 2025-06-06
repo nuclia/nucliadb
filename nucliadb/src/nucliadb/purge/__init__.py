@@ -232,25 +232,38 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
                 async for resource in kb.iterate_resources():
                     fields.extend((await resource.get_fields(force=True)).values())
 
-            # we don't need the maindb transaction anymore to remove vectors from storage
-            for field in fields:
-                if purge_payload.storage_key_kind == VectorSetConfig.StorageKeyKind.UNSET:
-                    # Bw/c for purge before adding purge payload. We assume
-                    # there's only 2 kinds of KBs: with one or with more than
-                    # one vectorset. KBs with one vectorset are not allowed to
-                    # delete their vectorset, so we wouldn't be here. It has to
-                    # be a KB with multiple, so the storage key kind has to be
-                    # this:
-                    await field.delete_vectors(
-                        vectorset, VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
-                    )
-                else:
-                    await field.delete_vectors(vectorset, purge_payload.storage_key_kind)
+            logger.info(f"Purging {len(fields)} fields for vectorset {vectorset}", extra={"kbid": kbid})
+            for fields_batch in batchify(fields, 20):
+                tasks = []
+                for field in fields_batch:
+                    if purge_payload.storage_key_kind == VectorSetConfig.StorageKeyKind.UNSET:
+                        # Bw/c for purge before adding purge payload. We assume
+                        # there's only 2 kinds of KBs: with one or with more than
+                        # one vectorset. KBs with one vectorset are not allowed to
+                        # delete their vectorset, so we wouldn't be here. It has to
+                        # be a KB with multiple, so the storage key kind has to be
+                        # this:
+                        tasks.append(
+                            asyncio.create_task(
+                                field.delete_vectors(
+                                    vectorset, VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
+                                )
+                            )
+                        )
+                    else:
+                        tasks.append(
+                            asyncio.create_task(
+                                field.delete_vectors(vectorset, purge_payload.storage_key_kind)
+                            )
+                        )
+                await asyncio.gather(*tasks)
 
             # Finally, delete the key
             async with driver.transaction() as txn:
                 await txn.delete(key)
                 await txn.commit()
+
+            logger.info(f"Finished purging vectorset {vectorset} for KB", extra={"kbid": kbid})
 
         except Exception as exc:
             errors.capture_exception(exc)
@@ -304,3 +317,9 @@ def run() -> int:  # pragma: no cover
     setup_logging()
     errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
     return asyncio.run(main())
+
+
+def batchify(iterable, n=1):
+    """Yield successive n-sized chunks from iterable."""
+    for i in range(0, len(iterable), n):
+        yield iterable[i : i + n]

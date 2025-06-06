@@ -31,7 +31,7 @@ from nucliadb.export_import.utils import (
     ExportStreamReader,
     TaskRetryHandler,
     import_binary,
-    import_broker_message,
+    restore_broker_message,
     set_entities_groups,
     set_labels,
 )
@@ -64,7 +64,7 @@ async def import_kb(
         items_count += 1
         if item_type == ExportedItemType.RESOURCE:
             bm = cast(writer_pb2.BrokerMessage, data)
-            await import_broker_message(context, kbid, bm)
+            await restore_broker_message(context, kbid, bm)
 
         elif item_type == ExportedItemType.BINARY:
             cf = cast(resources_pb2.CloudFile, data[0])

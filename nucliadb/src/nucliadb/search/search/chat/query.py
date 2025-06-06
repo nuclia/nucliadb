@@ -27,13 +27,13 @@ from nidx_protos.nodereader_pb2 import (
 
 from nucliadb.common.models_utils import to_proto
 from nucliadb.search import logger
-from nucliadb.search.predict import AnswerStatusCode
-from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.predict import AnswerStatusCode, RephraseResponse
+from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
-from nucliadb.search.search.metrics import RAGMetrics
+from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.query_parser.models import ParsedQuery, Query, RelationQuery, UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.settings import settings
@@ -71,7 +71,8 @@ async def rephrase_query(
     user_id: str,
     user_context: list[str],
     generative_model: Optional[str] = None,
-) -> str:
+    chat_history_relevance_threshold: Optional[float] = None,
+) -> RephraseResponse:
     predict = get_predict()
     req = RephraseModel(
         question=query,
@@ -79,6 +80,7 @@ async def rephrase_query(
         user_id=user_id,
         user_context=user_context,
         generative_model=generative_model,
+        chat_history_relevance_threshold=chat_history_relevance_threshold,
     )
     return await predict.rephrase_query(kbid, req)
 
@@ -91,7 +93,7 @@ async def get_find_results(
     ndb_client: NucliaDBClientType,
     user: str,
     origin: str,
-    metrics: RAGMetrics = RAGMetrics(),
+    metrics: Metrics,
     prequeries_strategy: Optional[PreQueriesStrategy] = None,
 ) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], ParsedQuery]:
     prequeries_results = None
@@ -108,7 +110,7 @@ async def get_find_results(
                     x_ndb_client=ndb_client,
                     x_nucliadb_user=user,
                     x_forwarded_for=origin,
-                    metrics=metrics,
+                    metrics=metrics.child_span("prefilters"),
                 )
                 prefilter_matching_resources = {
                     resource
@@ -133,8 +135,7 @@ async def get_find_results(
                     x_ndb_client=ndb_client,
                     x_nucliadb_user=user,
                     x_forwarded_for=origin,
-                    generative_model=item.generative_model,
-                    metrics=metrics,
+                    metrics=metrics.child_span("prequeries"),
                 )
 
         prequeries_results = (prefilter_queries_results or []) + (queries_results or [])
@@ -147,7 +148,7 @@ async def get_find_results(
             ndb_client,
             user,
             origin,
-            metrics=metrics,
+            metrics=metrics.child_span("main_query"),
         )
     return main_results, prequeries_results, query_parser
 
@@ -223,7 +224,7 @@ async def run_main_query(
     ndb_client: NucliaDBClientType,
     user: str,
     origin: str,
-    metrics: RAGMetrics = RAGMetrics(),
+    metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, ParsedQuery]:
     find_request = find_request_from_ask_request(item, query)
 
@@ -245,8 +246,6 @@ async def get_relations_results(
     kbid: str,
     text_answer: str,
     timeout: Optional[float] = None,
-    only_with_metadata: bool = False,
-    only_agentic_relations: bool = False,
 ) -> Relations:
     try:
         predict = get_predict()
@@ -256,8 +255,6 @@ async def get_relations_results(
             kbid=kbid,
             entities=detected_entities,
             timeout=timeout,
-            only_with_metadata=only_with_metadata,
-            only_agentic_relations=only_agentic_relations,
         )
     except Exception as exc:
         capture_exception(exc)
@@ -270,9 +267,6 @@ async def get_relations_results_from_entities(
     kbid: str,
     entities: Iterable[RelationNode],
     timeout: Optional[float] = None,
-    only_with_metadata: bool = False,
-    only_agentic_relations: bool = False,
-    only_entity_to_entity: bool = False,
     deleted_entities: set[str] = set(),
 ) -> Relations:
     entry_points = list(entities)
@@ -292,8 +286,7 @@ async def get_relations_results_from_entities(
     (
         results,
         _,
-        _,
-    ) = await node_query(
+    ) = await nidx_query(
         kbid,
         Method.SEARCH,
         request,
@@ -303,9 +296,6 @@ async def get_relations_results_from_entities(
     return await merge_relations_results(
         relations_results,
         entry_points,
-        only_with_metadata,
-        only_agentic_relations,
-        only_entity_to_entity,
     )
 
 
@@ -455,8 +445,7 @@ async def run_prequeries(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    generative_model: Optional[str] = None,
-    metrics: RAGMetrics = RAGMetrics(),
+    metrics: Metrics,
 ) -> list[PreQueryResult]:
     """
     Runs simultaneous find requests for each prequery and returns the merged results according to the normalized weights.
@@ -464,23 +453,22 @@ async def run_prequeries(
     results: list[PreQueryResult] = []
     max_parallel_prequeries = asyncio.Semaphore(settings.prequeries_max_parallel)
 
-    async def _prequery_find(
-        prequery: PreQuery,
-    ):
+    async def _prequery_find(prequery: PreQuery, index: int):
         async with max_parallel_prequeries:
+            prequery_id = prequery.id or f"prequery-{index}"
             find_results, _, _ = await find(
                 kbid,
                 prequery.request,
                 x_ndb_client,
                 x_nucliadb_user,
                 x_forwarded_for,
-                metrics=metrics,
+                metrics=metrics.child_span(prequery_id),
             )
             return prequery, find_results
 
     ops = []
-    for prequery in prequeries:
-        ops.append(asyncio.create_task(_prequery_find(prequery)))
+    for idx, prequery in enumerate(prequeries):
+        ops.append(asyncio.create_task(_prequery_find(prequery, idx)))
     ops_results = await asyncio.gather(*ops)
     for prequery, find_results in ops_results:
         results.append((prequery, find_results))

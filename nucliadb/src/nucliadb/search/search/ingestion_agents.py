@@ -37,11 +37,20 @@ from nucliadb_protos.resources_pb2 import FieldMetadata
 
 
 async def run_agents(
-    kbid: str, rid: str, user_id: str, filters: Optional[list[AgentsFilter]] = None
+    kbid: str,
+    rid: str,
+    user_id: str,
+    filters: Optional[list[AgentsFilter]] = None,
+    agent_ids: Optional[list[str]] = None,
 ) -> RunAgentsResponse:
     fields = await fetch_resource_fields(kbid, rid)
 
-    item = RunAgentsRequest(user_id=user_id, filters=_parse_filters(filters), fields=fields)
+    item = RunAgentsRequest(
+        user_id=user_id,
+        filters=_parse_filters(filters),
+        fields=fields,
+        agent_ids=agent_ids if agent_ids else [],
+    )
 
     predict = get_predict()
     return await predict.run_agents(kbid, item)

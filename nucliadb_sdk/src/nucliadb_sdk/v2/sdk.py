@@ -1,21 +1,16 @@
-# Copyright (C) 2021 Bosutech XXI S.L.
+# Copyright 2025 Bosutech XXI S.L.
 #
-# nucliadb is offered under the AGPL v3.0 and as commercial software.
-# For commercial licensing, contact us at info@nuclia.com.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# AGPL:
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 from __future__ import annotations
 
 import enum
@@ -82,6 +77,8 @@ from nucliadb_models.search import (
     AnswerAskResponseItem,
     AskRequest,
     AskResponseItem,
+    AugmentedContext,
+    AugmentedContextResponseItem,
     CatalogRequest,
     CatalogResponse,
     CitationsAskResponseItem,
@@ -477,6 +474,7 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
     timings = None
     error: Optional[str] = None
     debug = None
+    augmented_context: Optional[AugmentedContext] = None
     for line in response.iter_lines():
         try:
             item = AskResponseItem.model_validate_json(line).item
@@ -501,6 +499,8 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
                 error = item.error
             elif isinstance(item, DebugAskResponseItem):
                 debug = item.metadata
+            elif isinstance(item, AugmentedContextResponseItem):
+                augmented_context = item.augmented
             else:
                 warnings.warn(f"Unknown item in ask endpoint response: {item}")
         except ValidationError:
@@ -525,6 +525,7 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
             "citations": citations,
             "debug": debug,
             "metadata": SyncAskMetadata(tokens=tokens, timings=timings),
+            "augmented_context": augmented_context,
         }
     )
 

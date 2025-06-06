@@ -125,12 +125,11 @@ async def test_vectorset_parameter_without_default_vectorset(
 
     calls: list[nodereader_pb2.SearchRequest] = []
 
-    async def mock_node_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
+    async def mock_nidx_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
         calls.append(pb_query)
         results = [nodereader_pb2.SearchResponse()]
-        incomplete_results = False
         queried_nodes = []  # type: ignore
-        return (results, incomplete_results, queried_nodes)
+        return (results, queried_nodes)
 
     def set_predict_default_vectorset(query_info: QueryInfo) -> QueryInfo:
         assert query_info.sentence is not None
@@ -140,12 +139,12 @@ async def test_vectorset_parameter_without_default_vectorset(
     with (
         predict_query_hook(set_predict_default_vectorset),
         patch(
-            "nucliadb.search.api.v1.search.node_query",
-            new=AsyncMock(side_effect=mock_node_query),
+            "nucliadb.search.api.v1.search.nidx_query",
+            new=AsyncMock(side_effect=mock_nidx_query),
         ),
         patch(
-            "nucliadb.search.search.find.node_query",
-            new=AsyncMock(side_effect=mock_node_query),
+            "nucliadb.search.search.find.nidx_query",
+            new=AsyncMock(side_effect=mock_nidx_query),
         ),
         patch(
             "nucliadb.search.search.query.datamanagers.vectorsets.exists",
@@ -185,21 +184,20 @@ async def test_vectorset_parameter_with_default_vectorset(
 
     calls: list[nodereader_pb2.SearchRequest] = []
 
-    async def mock_node_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
+    async def mock_nidx_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
         calls.append(pb_query)
         results = [nodereader_pb2.SearchResponse()]
-        incomplete_results = False
         queried_nodes = []  # type: ignore
-        return (results, incomplete_results, queried_nodes)
+        return (results, queried_nodes)
 
     with (
         patch(
-            "nucliadb.search.api.v1.search.node_query",
-            new=AsyncMock(side_effect=mock_node_query),
+            "nucliadb.search.api.v1.search.nidx_query",
+            new=AsyncMock(side_effect=mock_nidx_query),
         ),
         patch(
-            "nucliadb.search.search.find.node_query",
-            new=AsyncMock(side_effect=mock_node_query),
+            "nucliadb.search.search.find.nidx_query",
+            new=AsyncMock(side_effect=mock_nidx_query),
         ),
         patch(
             "nucliadb.search.search.query.datamanagers.vectorsets.exists",

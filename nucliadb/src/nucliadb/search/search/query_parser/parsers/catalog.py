@@ -19,9 +19,9 @@
 #
 
 from nucliadb.common import datamanagers
-from nucliadb.search.search.exceptions import InvalidQueryError
+from nucliadb.common.exceptions import InvalidQueryError
+from nucliadb.common.filter_expression import FacetFilterTypes, facet_from_filter
 from nucliadb.search.search.filters import translate_label
-from nucliadb.search.search.query_parser.filter_expression import FacetFilterTypes, facet_from_filter
 from nucliadb.search.search.query_parser.models import (
     CatalogExpression,
     CatalogQuery,
@@ -84,9 +84,20 @@ async def parse_catalog(kbid: str, item: search_models.CatalogRequest) -> Catalo
             limit=None,
         )
 
+    if isinstance(item.query, search_models.CatalogQuery):
+        query = item.query
+    elif isinstance(item.query, str) and len(item.query) > 0:
+        query = search_models.CatalogQuery(
+            field=search_models.CatalogQueryField.Title,
+            match=search_models.CatalogQueryMatch.Words,
+            query=item.query,
+        )
+    else:
+        query = None
+
     return CatalogQuery(
         kbid=kbid,
-        query=item.query,
+        query=query,
         filters=catalog_expr,
         sort=sort,
         faceted=item.faceted,

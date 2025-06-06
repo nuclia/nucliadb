@@ -25,12 +25,12 @@ from fastapi import Header, Request, Response
 from fastapi_versioning import version
 from pydantic import ValidationError
 
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
-from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search import cache
-from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query import suggest_query_to_pb
 from nucliadb.search.search.utils import filter_hidden_resources
@@ -160,7 +160,7 @@ async def suggest(
             range_modification_end,
             hidden,
         )
-        results, incomplete_results, queried_shards = await node_query(kbid, Method.SUGGEST, pb_query)
+        results, queried_shards = await nidx_query(kbid, Method.SUGGEST, pb_query)
 
         # We need to merge
         search_results = await merge_suggest_results(
@@ -168,9 +168,6 @@ async def suggest(
             kbid=kbid,
             highlight=highlight,
         )
-
-        response.status_code = 206 if incomplete_results else 200
-
         if debug and queried_shards:
             search_results.shards = queried_shards
 

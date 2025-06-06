@@ -4,16 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb"
-version = "6.4.0"
-license = { text = "AGPL" }
+version = "6.5.0"
+license = "AGPL-3.0-or-later"
 description = "NucliaDB"
-authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
+authors = [{ name = "Nuclia", email = "nucliadb@nuclia.com" }]
 readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -44,8 +43,8 @@ dependencies = [
     "psutil>=5.9.7",
     "types-psutil>=5.9.5.17",
     "types-aiofiles>=0.8.3",
-    "protobuf>=5",
-    "types-protobuf>=5",
+    "protobuf>=5,<6",                 # Matching opentelemetry-proto for easier pip resolution
+    "types-protobuf>=5,<6",
     "grpcio>=1.71.0",
     "grpcio-health-checking>=1.71.0",
     "grpcio-channelz>=1.71.0",
@@ -94,9 +93,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-redis = [
-    "redis>=4.3.4"
-]
+redis = ["redis>=4.3.4"]
 
 [project.scripts]
 # Service commands

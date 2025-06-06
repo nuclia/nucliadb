@@ -23,7 +23,7 @@ from time import time
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.common.models_utils import to_proto
-from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.find_merge import (
     build_find_response,
     compose_find_resources,
@@ -34,7 +34,7 @@ from nucliadb.search.search.hydrator import (
     TextBlockHydrationOptions,
 )
 from nucliadb.search.search.metrics import (
-    RAGMetrics,
+    Metrics,
 )
 from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.search.query_parser.parsers import parse_find
@@ -64,7 +64,7 @@ async def find(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    metrics: RAGMetrics = RAGMetrics(),
+    metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     external_index_manager = await get_external_index_manager(kbid=kbid)
     if external_index_manager is not None:
@@ -85,7 +85,7 @@ async def _index_node_retrieval(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    metrics: RAGMetrics = RAGMetrics(),
+    metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     audit = get_audit()
     start_time = time()
@@ -104,11 +104,8 @@ async def _index_node_retrieval(
             rephrased_query,
         ) = await legacy_convert_retrieval_to_proto(parsed)
 
-    with metrics.time("node_query"):
-        results, query_incomplete_results, queried_shards = await node_query(
-            kbid, Method.SEARCH, pb_query
-        )
-    incomplete_results = incomplete_results or query_incomplete_results
+    with metrics.time("index_search"):
+        results, queried_shards = await nidx_query(kbid, Method.SEARCH, pb_query)
 
     # Rank fusion merge, cut, hydrate and rerank
     with metrics.time("results_merge"):
@@ -142,8 +139,8 @@ async def _index_node_retrieval(
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
 
-    ndb_time = metrics.elapsed("node_query") + metrics.elapsed("results_merge")
-    if metrics.elapsed("node_query") > settings.slow_node_query_log_threshold:
+    ndb_time = metrics["index_search"] + metrics["results_merge"]
+    if metrics["index_search"] > settings.slow_node_query_log_threshold:
         logger.warning(
             "Slow nidx query",
             extra={
@@ -152,7 +149,7 @@ async def _index_node_retrieval(
                 "client": x_ndb_client,
                 "query": item.model_dump_json(),
                 "time": search_time,
-                "durations": metrics.steps(),
+                "metrics": metrics.to_dict(),
             },
         )
     elif ndb_time > settings.slow_find_log_threshold:
@@ -164,7 +161,7 @@ async def _index_node_retrieval(
                 "client": x_ndb_client,
                 "query": item.model_dump_json(),
                 "time": search_time,
-                "durations": metrics.steps(),
+                "metrics": metrics.to_dict(),
             },
         )
 

@@ -18,18 +18,49 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use nidx_protos::FilterExpression;
 use nidx_protos::StreamRequest;
-
+use nidx_protos::filter_expression::FacetFilter;
 mod common;
 
 #[test]
 fn test_stream_request_iterator() {
     let reader = common::test_reader();
+
+    // There are two fields in total
     let request = StreamRequest {
         shard_id: None,
-        filter: None,
+        ..Default::default()
     };
     let iter = reader.iterator(&request).unwrap();
     let count = iter.count();
     assert_eq!(count, 2);
+
+    // Filtering on a non-existing label should not yield any result
+    let request = StreamRequest {
+        shard_id: None,
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/l/non-existing-label".into(),
+            })),
+        }),
+        ..Default::default()
+    };
+    let iter = reader.iterator(&request).unwrap();
+    let count = iter.count();
+    assert_eq!(count, 0);
+
+    // The label /l/mylabel should match the title field
+    let request = StreamRequest {
+        shard_id: None,
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/l/mylabel".into(),
+            })),
+        }),
+        ..Default::default()
+    };
+    let iter = reader.iterator(&request).unwrap();
+    let count = iter.count();
+    assert_eq!(count, 1);
 }

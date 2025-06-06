@@ -39,7 +39,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from nucliadb_telemetry import context, errors, metrics
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.nats import MessageProgressUpdater, NatsConnectionManager
+from nucliadb_utils.nats import NatsConnectionManager, NatsMessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.storage import Storage
 
@@ -181,7 +181,7 @@ class IngestConsumer:
         start = time.monotonic()
 
         async with (
-            MessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66),
+            NatsMessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66),
             self.lock,
         ):
             try:
@@ -270,47 +270,3 @@ class IngestConsumer:
                 await self.ack_message(msg, kbid)
                 logger.info("Message acked because of success", extra={"seqid": seqid})
                 await self.clean_broker_message(msg)
-
-
-class IngestProcessedConsumer(IngestConsumer):
-    """
-    Consumer designed to write processed resources to the database.
-
-    This is so that we can have a single consumer for both the regular writer and writes
-    coming from processor.
-
-    This is important because writes coming from processor can be very large and slow and
-    other writes are going to be coming from user actions and we don't want to slow them down.
-    """
-
-    async def setup_nats_subscription(self):
-        subject = const.Streams.INGEST_PROCESSED.subject
-        durable_name = const.Streams.INGEST_PROCESSED.group
-        self.subscription = await self.nats_connection_manager.pull_subscribe(
-            stream=const.Streams.INGEST_PROCESSED.name,
-            subject=subject,
-            durable=durable_name,
-            cb=self.subscription_worker,
-            subscription_lost_cb=self.setup_nats_subscription,
-            config=nats.js.api.ConsumerConfig(
-                durable_name=durable_name,
-                ack_policy=nats.js.api.AckPolicy.EXPLICIT,
-                deliver_policy=nats.js.api.DeliverPolicy.ALL,
-                # We set it to 20 because we don't care about order here and we want to be able to HPA based
-                # on the number of pending messages in the queue.
-                max_ack_pending=20,
-                max_deliver=nats_consumer_settings.nats_max_deliver,
-                ack_wait=nats_consumer_settings.nats_ack_wait,
-            ),
-        )
-        logger.info(
-            f"Subscribed pull consumer to {subject} on stream {const.Streams.INGEST_PROCESSED.name}"
-        )
-
-    @backoff.on_exception(backoff.expo, (ConflictError,), jitter=backoff.random_jitter, max_tries=4)
-    async def _process(self, pb: BrokerMessage, seqid: int):
-        """
-        We are setting `transaction_check` to False here because we can not mix
-        transaction ids from regular ingest writes and writes coming from processor.
-        """
-        await self.processor.process(pb, seqid, self.partition, transaction_check=False)

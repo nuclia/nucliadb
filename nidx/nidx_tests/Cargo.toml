@@ -2,7 +2,7 @@
 name = "nidx_tests"
 version = "0.1.0"
 edition = "2024"
-license = "AGPL-3.0"
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 nidx_protos = { version = "0.1.0", path = "../nidx_protos" }

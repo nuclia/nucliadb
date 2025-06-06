@@ -101,7 +101,7 @@ async def initialize_grpc():  # pragma: no cover
 
 async def initialize_pull_workers() -> list[Callable[[], Awaitable[None]]]:
     finalizers = await initialize_grpc()
-    pull_workers = await consumer_service.start_pull_workers(SERVICE_NAME)
+    pull_workers = [await consumer_service.start_ingest_processed_consumer_v2(SERVICE_NAME)]
 
     return pull_workers + finalizers
 
@@ -112,13 +112,9 @@ async def main_consumer():  # pragma: no cover
 
     grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
 
-    # pull workers could be pulled out into it's own deployment
-    pull_workers = await consumer_service.start_pull_workers(SERVICE_NAME)
     ingest_consumers = await consumer_service.start_ingest_consumers(SERVICE_NAME)
 
-    await run_until_exit(
-        [grpc_health_finalizer, ingest_consumers, metrics_server.shutdown] + pull_workers + finalizers
-    )
+    await run_until_exit([grpc_health_finalizer, ingest_consumers, metrics_server.shutdown] + finalizers)
 
 
 async def main_orm_grpc():  # pragma: no cover
@@ -134,7 +130,8 @@ async def main_ingest_processed_consumer():  # pragma: no cover
     await start_processing_engine()
     metrics_server = await serve_metrics()
     grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
-    consumer = await consumer_service.start_ingest_processed_consumer(SERVICE_NAME)
+
+    consumer = await consumer_service.start_ingest_processed_consumer_v2(SERVICE_NAME)
 
     await run_until_exit(
         [grpc_health_finalizer, consumer, metrics_server.shutdown, stop_processing_engine] + finalizers

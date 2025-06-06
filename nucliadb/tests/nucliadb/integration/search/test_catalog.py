@@ -150,6 +150,18 @@ async def test_catalog_date_range_filtering(
     body = resp.json()
     assert len(body["resources"]) == 0
 
+    one_hour_later = now + timedelta(hours=1)
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "range_creation_start": one_hour_ago.isoformat(),
+            "range_creation_end": one_hour_later.isoformat(),
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1
+
 
 @pytest.mark.deploy_modes("standalone")
 async def test_catalog_status_faceted(
@@ -164,7 +176,7 @@ async def test_catalog_status_faceted(
     resp = await nucliadb_reader.get(
         f"/kb/{standalone_knowledgebox}/catalog?faceted=/metadata.status",
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     body = resp.json()
     assert len(body["resources"]) == 3
     facets = body["fulltext"]["facets"]["/metadata.status"]
@@ -184,11 +196,13 @@ async def test_catalog_status_faceted(
 
 
 @pytest.mark.deploy_modes("standalone")
+@pytest.mark.parametrize("with_filter", [True, False])
 async def test_catalog_faceted_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
     standalone_knowledgebox,
+    with_filter: bool,
 ):
     # 4 resources:
     # 1 with /l/labelset0/label0
@@ -210,8 +224,9 @@ async def test_catalog_faceted_labels(
     bm.basic.usermetadata.classifications.append(c)
     await inject_message(nucliadb_ingest_grpc, bm)
 
+    filter = "&range_creation_start=1999-01-01" if with_filter else ""
     resp = await nucliadb_reader.get(
-        f"/kb/{standalone_knowledgebox}/catalog?faceted=/classification.labels/labelset0",
+        f"/kb/{standalone_knowledgebox}/catalog?faceted=/classification.labels/labelset0{filter}",
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -224,7 +239,7 @@ async def test_catalog_faceted_labels(
 
     # This is used by the check missing labels button in dashboard
     resp = await nucliadb_reader.get(
-        f"/kb/{standalone_knowledgebox}/catalog?faceted=/classification.labels",
+        f"/kb/{standalone_knowledgebox}/catalog?faceted=/classification.labels{filter}",
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -233,6 +248,39 @@ async def test_catalog_faceted_labels(
             "/classification.labels/labelset0": 3,
             "/classification.labels/labelset1": 1,
         }
+    }
+
+    # This is the default faceted query from the catalog
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "page_size": 0,
+            "faceted": [
+                "/classification.labels/labelset0",
+                "/classification.labels/labelset1",
+                "/icon/application",
+                "/icon/audio",
+                "/icon/image",
+                "/icon/text",
+                "/icon/video",
+                "/icon/message",
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["fulltext"]["facets"] == {
+        "/classification.labels/labelset0": {
+            "/classification.labels/labelset0/label0": 1,
+            "/classification.labels/labelset0/label1": 2,
+        },
+        "/classification.labels/labelset1": {"/classification.labels/labelset1/label0": 1},
+        "/icon/application": {},
+        "/icon/audio": {},
+        "/icon/image": {},
+        "/icon/message": {},
+        "/icon/text": {"/icon/text/plain": 4},
+        "/icon/video": {},
     }
 
 
@@ -501,3 +549,195 @@ async def test_catalog_filter_expression(
     )
     assert resp.status_code == 200
     assert set(resp.json()["resources"].keys()) == {resource1, resource3}
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_catalog_query(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={"title": f"French Law: An in-depth study. Volume 1", "slug": "french_law_volume_1"},
+    )
+    assert resp.status_code == 201
+    resource1 = resp.json()["uuid"]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={"title": f"Learn the french language in two easy steps", "slug": "french_lang"},
+    )
+    assert resp.status_code == 201
+    resource2 = resp.json()["uuid"]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={"title": f"El ingenioso hidalgo don Quijote de la Mancha", "slug": "quijote"},
+    )
+    assert resp.status_code == 201
+    resource3 = resp.json()["uuid"]
+
+    async def assert_query_results(query, expected):
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/catalog",
+            json={"query": query},
+        )
+        assert resp.status_code == 200
+        assert set(resp.json()["resources"].keys()) == expected
+
+    # Old style search (by words)
+    await assert_query_results("law", {resource1})
+
+    # Same with new style
+    await assert_query_results({"match": "words", "query": "law"}, {resource1})
+
+    # Fuzzy
+    await assert_query_results({"match": "fuzzy", "query": "french law"}, {resource1, resource2})
+    await assert_query_results({"match": "fuzzy", "query": "french languege"}, {resource2})
+    await assert_query_results({"match": "fuzzy", "query": "hello"}, set())
+
+    # Starts with
+    await assert_query_results({"match": "starts_with", "query": "french"}, {resource1})
+    await assert_query_results({"match": "starts_with", "query": "law"}, set())
+
+    # Contains
+    await assert_query_results({"match": "contains", "query": "the"}, {resource2})
+    await assert_query_results({"match": "contains", "query": "teh"}, set())
+
+    # Ends with
+    await assert_query_results({"match": "ends_with", "query": "mancha"}, {resource3})
+    await assert_query_results({"match": "ends_with", "query": "ingenioso"}, set())
+
+    # Exact
+    await assert_query_results({"match": "exact", "query": "Quijote"}, set())
+    await assert_query_results(
+        {"match": "exact", "query": "El ingenioso hidalgo don Quijote de la Mancha"}, {resource3}
+    )
+
+    # Slug exact
+    await assert_query_results(
+        {"field": "slug", "match": "exact", "query": "french_law_volume_1"}, {resource1}
+    )
+    await assert_query_results({"field": "slug", "match": "exact", "query": "french_law_volume"}, set())
+
+    # Slug start
+    await assert_query_results(
+        {"field": "slug", "match": "starts_with", "query": "french"}, {resource1, resource2}
+    )
+
+    # Slug others (validation error)
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={"query": {"field": "slug", "match": "contains", "query": "french"}},
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_catalog_facets(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": f"My resource 1",
+            "summary": "Some summary",
+            "origin": {"path": "/very/deep/path/to/no/where", "tags": ["wadus", "wadus1"]},
+            "usermetadata": {
+                "classifications": [
+                    {"labelset": "stuff", "label": "of_one_kind"},
+                ]
+            },
+        },
+    )
+    assert resp.status_code == 201
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": f"My resource 2",
+            "summary": "Some summary",
+            "origin": {"path": "/folder/file2", "tags": ["wadus", "wadus2"]},
+            "usermetadata": {
+                "classifications": [
+                    {"labelset": "stuff", "label": "of_another_kind"},
+                ]
+            },
+        },
+    )
+    assert resp.status_code == 201
+
+    # Request everything
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog/facets",
+        json={},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "/l": 2,
+        "/l/stuff": 2,
+        "/l/stuff/of_another_kind": 1,
+        "/l/stuff/of_one_kind": 1,
+        "/n": 2,
+        "/n/i": 2,
+        "/n/i/application": 2,
+        "/n/i/application/generic": 2,
+        "/n/s": 2,
+        "/n/s/PROCESSED": 2,
+        "/p": 2,
+        "/p/folder": 1,
+        "/p/folder/file2": 1,
+        "/p/very": 1,
+        "/p/very/deep": 1,
+        "/p/very/deep/path": 1,
+        "/p/very/deep/path/to": 1,
+        "/p/very/deep/path/to/no": 1,
+        "/p/very/deep/path/to/no/where": 1,
+        "/t": 2,
+        "/t/wadus": 2,
+        "/t/wadus1": 1,
+        "/t/wadus2": 1,
+    }
+
+    # Request labels
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog/facets",
+        json={"prefixes": ["/l"]},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "/l": 2,
+        "/l/stuff": 2,
+        "/l/stuff/of_another_kind": 1,
+        "/l/stuff/of_one_kind": 1,
+    }
+
+    # Request labelsets only
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog/facets",
+        json={"prefixes": [{"prefix": "/l", "depth": 1}]},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "/l": 2,
+        "/l/stuff": 2,
+    }
+
+    # Request icon and path at different depths
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog/facets",
+        json={"prefixes": [{"prefix": "/n/i"}, {"prefix": "/p/very/deep/path", "depth": 1}]},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "/n/i": 2,
+        "/n/i/application": 2,
+        "/n/i/application/generic": 2,
+        "/p/very/deep/path": 1,
+        "/p/very/deep/path/to": 1,
+    }

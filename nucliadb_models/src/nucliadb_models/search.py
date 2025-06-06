@@ -1,27 +1,23 @@
-# Copyright (C) 2021 Bosutech XXI S.L.
+# Copyright 2025 Bosutech XXI S.L.
 #
-# nucliadb is offered under the AGPL v3.0 and as commercial software.
-# For commercial licensing, contact us at info@nuclia.com.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# AGPL:
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
 import json
 from enum import Enum
 from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic.aliases import AliasChoices
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Annotated, Self
 
@@ -608,14 +604,14 @@ class SearchParamDefaults:
     )
     chat_context = ParamDefault(
         default=None,
-        title="Chat history",
+        title="Chat context (deprecated)",
         description="DEPRECATED! Please, use `chat_history` instead.",
         deprecated=True,
     )
     chat_history = ParamDefault(
         default=None,
         title="Chat history",
-        description="Use to rephrase the new LLM query by taking into account the chat conversation history",  # noqa: E501
+        description="Use to rephrase the new LLM query by taking into account the chat conversation history. This will be passed to the LLM so that it is aware of the previous conversation.",  # noqa: E501
     )
     chat_features = ParamDefault(
         default=[ChatOptions.SEMANTIC, ChatOptions.KEYWORD],
@@ -695,40 +691,86 @@ class Filter(BaseModel):
         return self
 
 
+class CatalogQueryField(str, Enum):
+    Title = "title"
+    Slug = "slug"
+
+
+class CatalogQueryMatch(str, Enum):
+    Exact = "exact"
+    Words = "words"
+    Fuzzy = "fuzzy"
+    StartsWith = "starts_with"
+    EndsWith = "ends_with"
+    Contains = "contains"
+
+
+class CatalogQuery(BaseModel):
+    field: CatalogQueryField = CatalogQueryField.Title
+    match: CatalogQueryMatch = CatalogQueryMatch.Exact
+    query: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def check_match_field(self) -> Self:
+        if self.field != CatalogQueryField.Title:
+            if self.match not in [CatalogQueryMatch.Exact, CatalogQueryMatch.StartsWith]:
+                raise ValueError(
+                    f"Match type `{self.match.value}` not supported for {self.field.value}. Use `exact` or `starts_with`."
+                )
+
+        return self
+
+
 class CatalogRequest(BaseModel):
-    query: str = SearchParamDefaults.query.to_pydantic_field()
+    query: Union[str, CatalogQuery] = ParamDefault(
+        default="",
+        title="Query",
+        description="The query to search for",
+    ).to_pydantic_field()
     filter_expression: Optional[CatalogFilterExpression] = (
         SearchParamDefaults.catalog_filter_expression.to_pydantic_field()
-    )
-    filters: Union[list[str], list[Filter]] = Field(
-        default=[],
-        title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
     )
     faceted: list[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
     page_number: int = SearchParamDefaults.catalog_page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.catalog_page_size.to_pydantic_field()
+    hidden: Optional[bool] = SearchParamDefaults.hidden.to_pydantic_field()
+    show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field(
+        default=[ResourceProperties.BASIC, ResourceProperties.ERRORS]
+    )
+
     debug: SkipJsonSchema[bool] = SearchParamDefaults.debug.to_pydantic_field()
+
+    # Deprecated filter parameters
+    filters: Union[list[str], list[Filter]] = Field(
+        default=[],
+        title="Filters",
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
+        deprecated="Use filter_expression instead",
+    )
     with_status: Optional[ResourceProcessingStatus] = Field(
         default=None,
         title="With processing status",
         description="Filter results by resource processing status",
-        deprecated="Use filters instead",
+        deprecated="Use filter_expression instead",
     )
     range_creation_start: Optional[DateTime] = (
-        SearchParamDefaults.range_creation_start.to_pydantic_field()
+        SearchParamDefaults.range_creation_start.to_pydantic_field(
+            deprecated="Use filter_expression instead",
+        )
     )
-    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field(
+        deprecated="Use filter_expression instead",
+    )
     range_modification_start: Optional[DateTime] = (
-        SearchParamDefaults.range_modification_start.to_pydantic_field()
+        SearchParamDefaults.range_modification_start.to_pydantic_field(
+            deprecated="Use filter_expression instead",
+        )
     )
     range_modification_end: Optional[DateTime] = (
-        SearchParamDefaults.range_modification_end.to_pydantic_field()
-    )
-    hidden: Optional[bool] = SearchParamDefaults.hidden.to_pydantic_field()
-    show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field(
-        default=[ResourceProperties.BASIC, ResourceProperties.ERRORS]
+        SearchParamDefaults.range_modification_end.to_pydantic_field(
+            deprecated="Use filter_expression instead",
+        )
     )
 
     @field_validator("faceted")
@@ -1003,6 +1045,21 @@ class RephraseModel(BaseModel):
         title="Generative model",
         description="The generative model to use for the rephrase endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
     )
+    chat_history_relevance_threshold: Optional[
+        Annotated[
+            float,
+            Field(
+                ge=0.0,
+                le=1.0,
+                description=(
+                    "Threshold to determine if the past chat history is relevant to rephrase the user's question. "
+                    "0 - Always treat previous messages as relevant (always rephrase)."
+                    "1 – Always treat previous messages as irrelevant (never rephrase)."
+                    "Values in between adjust the sensitivity."
+                ),
+            ),
+        ]
+    ] = None
 
 
 class RagStrategyName:
@@ -1279,10 +1336,11 @@ Bigger values will discover more intricate relationships but will also take more
         ge=1,
         le=300,
     )
-    agentic_graph_only: bool = Field(
+    exclude_processor_relations: bool = Field(
         default=True,
-        title="Use only the graph extracted by an agent.",
+        title="Do not use relations extracted by processor.",
         description="If set to true, only relationships extracted from a graph extraction agent are considered for context expansion.",
+        validation_alias=AliasChoices("agentic_graph_only", "exclude_processor_relations"),
     )
     relation_text_as_paragraphs: bool = Field(
         default=False,
@@ -1578,6 +1636,17 @@ If empty, the default strategy is used, which simply adds the text of the matchi
             "Rephrase the query for a more efficient retrieval. This will consume LLM tokens and make the request slower."
         ),
     )
+    chat_history_relevance_threshold: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Threshold to determine if the past chat history is relevant to rephrase the user's question. "
+            "0 - Always treat previous messages as relevant (always rephrase)."
+            "1 - Always treat previous messages as irrelevant (never rephrase)."
+            "Values in between adjust the sensitivity."
+        ),
+    )
 
     prefer_markdown: bool = Field(
         default=False,
@@ -1746,7 +1815,7 @@ class FindRequest(BaseSearchRequest):
     query_entities: SkipJsonSchema[Optional[list[KnowledgeGraphEntity]]] = Field(
         default=None, title="Query entities", description="Entities to use in a knowledge graph search"
     )
-    graph_query: SkipJsonSchema[Optional[GraphPathQuery]] = Field(
+    graph_query: Optional[GraphPathQuery] = Field(
         default=None,
         title="Graph query",
         description="Query for the knowledge graph. Paths (node-relation-node) extracted from a paragraph_id will be used to extend the results",
@@ -1905,6 +1974,15 @@ class KnowledgeboxFindResults(JsonBaseModel):
         title="Best matches",
         description="List of ids of best matching paragraphs. The list is sorted by decreasing relevance (most relevant first).",  # noqa: E501
     )
+    metrics: Optional[dict[str, Any]] = Field(
+        default=None,
+        title="Metrics",
+        description=(
+            "Metrics information about the search operation. "
+            "The metadata included in this field is subject to change and should not be used in production. "
+            "This is only available if the `debug` parameter is set to true in the request."
+        ),
+    )
 
 
 class FeedbackTasks(str, Enum):
@@ -1955,6 +2033,39 @@ def validate_facets(facets):
                 )
         facet = next_facet
     return facets
+
+
+class TextBlockAugmentationType(str, Enum):
+    NEIGHBOURING_PARAGRAPHS = "neighbouring_paragraphs"
+    CONVERSATION = "conversation"
+    HIERARCHY = "hierarchy"
+    FULL_RESOURCE = "full_resource"
+    FIELD_EXTENSION = "field_extension"
+    METADATA_EXTENSION = "metadata_extension"
+
+
+class AugmentedTextBlock(BaseModel):
+    id: str = Field(
+        description="The id of the augmented text bloc. It can be a paragraph id or a field id."
+    )
+    text: str = Field(
+        description="The text of the augmented text block. It may include additional metadata to enrich the context"
+    )
+    parent: Optional[str] = Field(
+        default=None, description="The parent text block that was augmented for."
+    )
+    augmentation_type: TextBlockAugmentationType = Field(description="Type of augmentation.")
+
+
+class AugmentedContext(BaseModel):
+    paragraphs: dict[str, AugmentedTextBlock] = Field(
+        default={},
+        description="Paragraphs added to the context as a result of using the `rag_strategies` parameter, typically the neighbouring_paragraphs or the conversation strategies",
+    )
+    fields: dict[str, AugmentedTextBlock] = Field(
+        default={},
+        description="Field extracted texts added to the context as a result of using the `rag_strategies` parameter, typically the hierarcy or full_resource strategies.",
+    )
 
 
 class AskTokens(BaseModel):
@@ -2054,6 +2165,13 @@ class SyncAskResponse(BaseModel):
         title="Citations",
         description="The citations of the answer. List of references to the resources used to generate the answer.",
     )
+    augmented_context: Optional[AugmentedContext] = Field(
+        default=None,
+        description=(
+            "Augmented text blocks that were sent to the LLM as part of the RAG strategies "
+            "applied on the retrieval results in the request."
+        ),
+    )
     prompt_context: Optional[list[str]] = Field(
         default=None,
         title="Prompt context",
@@ -2077,7 +2195,11 @@ class SyncAskResponse(BaseModel):
     debug: Optional[dict[str, Any]] = Field(
         default=None,
         title="Debug information",
-        description="Debug information about predict",
+        description=(
+            "Debug information about the ask operation. "
+            "The metadata included in this field is subject to change and should not be used in production. "
+            "Note that it is only available if the `debug` parameter is set to true in the request."
+        ),
     )
 
 
@@ -2112,6 +2234,16 @@ class MetadataAskResponseItem(BaseModel):
     timings: AskTimings
 
 
+class AugmentedContextResponseItem(BaseModel):
+    type: Literal["augmented_context"] = "augmented_context"
+    augmented: AugmentedContext = Field(
+        description=(
+            "Augmented text blocks that were sent to the LLM as part of the RAG strategies "
+            "applied on the retrieval results in the request."
+        )
+    )
+
+
 class CitationsAskResponseItem(BaseModel):
     type: Literal["citations"] = "citations"
     citations: dict[str, Any]
@@ -2137,12 +2269,14 @@ class RelationsAskResponseItem(BaseModel):
 class DebugAskResponseItem(BaseModel):
     type: Literal["debug"] = "debug"
     metadata: dict[str, Any]
+    metrics: dict[str, Any]
 
 
 AskResponseItemType = Union[
     AnswerAskResponseItem,
     JSONAskResponseItem,
     MetadataAskResponseItem,
+    AugmentedContextResponseItem,
     CitationsAskResponseItem,
     StatusAskResponseItem,
     ErrorAskResponseItem,
@@ -2177,3 +2311,19 @@ def parse_rephrase_prompt(item: AskRequest) -> Optional[str]:
 
 # We need this to avoid issues with pydantic and generic types defined in another module
 FindRequest.model_rebuild()
+
+
+class CatalogFacetsPrefix(BaseModel):
+    prefix: str = Field(pattern="^((/[^/]+)*)$")
+    depth: Optional[int] = Field(default=None, ge=0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def build_from_string(cls, data: Any) -> Any:
+        if isinstance(data, str):
+            data = {"prefix": data}
+        return data
+
+
+class CatalogFacetsRequest(BaseModel):
+    prefixes: list[CatalogFacetsPrefix] = Field(default=[])

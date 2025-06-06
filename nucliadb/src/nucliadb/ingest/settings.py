@@ -63,6 +63,13 @@ class DriverSettings(BaseSettings):
     )
 
 
+# For use during migration from pull v1 to pull v2
+class ProcessingPullMode(Enum):
+    OFF = "off"
+    V1 = "v1"
+    V2 = "v2"
+
+
 class Settings(DriverSettings):
     grpc_port: int = 8030
 

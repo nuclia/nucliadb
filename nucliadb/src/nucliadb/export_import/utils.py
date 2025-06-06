@@ -40,8 +40,6 @@ from nucliadb_models.export_import import Status
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.const import Streams
-from nucliadb_utils.transaction import MaxTransactionSizeExceededError
 from nucliadb_utils.utilities import get_ingest
 
 BinaryStream = AsyncIterator[bytes]
@@ -104,68 +102,30 @@ BM_FIELDS = {
 }
 
 
-async def import_broker_message(
-    context: ApplicationContext, kbid: str, bm: writer_pb2.BrokerMessage
-) -> None:
-    bm.kbid = kbid
-    partition = context.partitioning.generate_partition(kbid, bm.uuid)
-    for pb in [get_writer_bm(bm), get_processor_bm(bm)]:
-        await transaction_commit(context, pb, partition)
-
-
 async def restore_broker_message(
     context: ApplicationContext, kbid: str, bm: writer_pb2.BrokerMessage
 ) -> None:
+    bm.kbid = kbid
     await send_writer_bm(context, bm)
     await send_processor_bm(context, bm)
 
 
-@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8)
 async def send_writer_bm(context: ApplicationContext, bm: writer_pb2.BrokerMessage) -> None:
+    await process_bm_grpc(context, get_writer_bm(bm))
+
+
+async def send_processor_bm(context: ApplicationContext, bm: writer_pb2.BrokerMessage) -> None:
+    await process_bm_grpc(context, get_processor_bm(bm))
+
+
+@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8)
+async def process_bm_grpc(context: ApplicationContext, bm: writer_pb2.BrokerMessage) -> None:
     async def _iterator() -> AsyncIterator[writer_pb2.BrokerMessage]:
-        yield get_writer_bm(bm)
+        yield bm
 
     ingest_grpc: WriterStub = get_ingest()
     response: writer_pb2.OpStatusWriter = await ingest_grpc.ProcessMessage(_iterator())  # type: ignore
     assert response.status == writer_pb2.OpStatusWriter.Status.OK, "Failed to process broker message"
-
-
-async def send_processor_bm(context: ApplicationContext, bm: writer_pb2.BrokerMessage) -> None:
-    # Then enqueue the processor part asynchronously
-    processor_bm = get_processor_bm(bm)
-    partition = context.partitioning.generate_partition(bm.kbid, bm.uuid)
-    await transaction_commit(context, processor_bm, partition)
-
-
-async def transaction_commit(
-    context: ApplicationContext, bm: writer_pb2.BrokerMessage, partition: int
-) -> None:
-    """
-    Try to send the broker message over nats. If it's too big, upload
-    it to blob storage and over nats only send a reference to it.
-    """
-    try:
-        await context.transaction.commit(
-            bm,
-            partition,
-            wait=False,
-            target_subject=Streams.INGEST_PROCESSED.subject,
-        )
-    except MaxTransactionSizeExceededError:
-        stored_key = await context.blob_storage.set_stream_message(
-            kbid=bm.kbid, rid=bm.uuid, data=bm.SerializeToString()
-        )
-        referenced_bm = writer_pb2.BrokerMessageBlobReference(
-            uuid=bm.uuid, kbid=bm.kbid, storage_key=stored_key
-        )
-        await context.transaction.commit(
-            writer=referenced_bm,
-            partition=partition,
-            target_subject=Streams.INGEST_PROCESSED.subject,
-            # This header is needed as it's the way we flag the transaction
-            # consumer to download from storage
-            headers={"X-MESSAGE-TYPE": "PROXY"},
-        )
 
 
 def get_writer_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:

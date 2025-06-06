@@ -170,7 +170,7 @@ impl NidxBinding {
         });
 
         // Scheduler
-        let seq = SeqSource(Arc::new(settings.metadata.max_seq().await?.into()));
+        let seq = SeqSource(Arc::new(AtomicI64::new(settings.metadata.max_seq().await? + 1i64)));
         tokio::task::spawn(scheduler::run_tasks(
             settings.metadata.clone(),
             settings.storage.as_ref().unwrap().object_store.clone(),

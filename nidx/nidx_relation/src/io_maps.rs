@@ -22,6 +22,7 @@ use nidx_protos::prost::*;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::{RelationMetadata, RelationNode};
+use nidx_tantivy::utils::decode_facet;
 use tantivy::TantivyDocument;
 use tantivy::schema::Value;
 
@@ -107,7 +108,7 @@ pub fn doc_to_resource_field_id(schema: &Schema, doc: &TantivyDocument) -> Optio
 
 pub fn doc_to_facets(schema: &Schema, doc: &TantivyDocument) -> Vec<String> {
     doc.get_all(schema.facets)
-        .map(|f| f.as_facet().unwrap().to_path_string())
+        .map(|f| decode_facet(f.as_facet().unwrap()).to_path_string())
         .collect()
 }
 

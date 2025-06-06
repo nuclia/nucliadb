@@ -34,7 +34,7 @@ async def test_find_graph_request(
 ):
     """Validate how /find prepares a graph search"""
     kbid = standalone_knowledgebox
-    spy = mocker.spy(find, "node_query")
+    spy = mocker.spy(find, "nidx_query")
 
     # graph_query but missing features=graph
     resp = await nucliadb_reader.post(

@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import random
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, AsyncGenerator, Optional
 from unittest.mock import AsyncMock, Mock
@@ -108,7 +109,7 @@ RERANK = "/rerank"
 
 NUCLIA_LEARNING_ID_HEADER = "NUCLIA-LEARNING-ID"
 NUCLIA_LEARNING_MODEL_HEADER = "NUCLIA-LEARNING-MODEL"
-
+NUCLIA_LEARNING_CHAT_HISTORY_HEADER = "NUCLIA-LEARNING-CHAT-HISTORY"
 
 predict_observer = metrics.Observer(
     "predict_engine",
@@ -137,6 +138,12 @@ class AnswerStatusCode(str, Enum):
             AnswerStatusCode.NO_CONTEXT: "no_context",
             AnswerStatusCode.NO_RETRIEVAL_DATA: "no_retrieval_data",
         }[self]
+
+
+@dataclass
+class RephraseResponse:
+    rephrased_query: str
+    use_chat_history: Optional[bool]
 
 
 async def start_predict_engine():
@@ -267,7 +274,7 @@ class PredictEngine:
         return await func(**request_args)
 
     @predict_observer.wrap({"type": "rephrase"})
-    async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
+    async def rephrase_query(self, kbid: str, item: RephraseModel) -> RephraseResponse:
         try:
             self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
@@ -477,9 +484,9 @@ class DummyPredictEngine(PredictEngine):
         response.headers = {NUCLIA_LEARNING_ID_HEADER: DUMMY_LEARNING_ID}
         return response
 
-    async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
+    async def rephrase_query(self, kbid: str, item: RephraseModel) -> RephraseResponse:
         self.calls.append(("rephrase_query", item))
-        return DUMMY_REPHRASE_QUERY
+        return RephraseResponse(rephrased_query=DUMMY_REPHRASE_QUERY, use_chat_history=None)
 
     async def chat_query_ndjson(
         self, kbid: str, item: ChatModel
@@ -624,7 +631,7 @@ def get_chat_ndjson_generator(
 
 async def _parse_rephrase_response(
     resp: aiohttp.ClientResponse,
-) -> str:
+) -> RephraseResponse:
     """
     Predict api is returning a json payload that is a string with the following format:
     <rephrased_query><status_code>
@@ -632,12 +639,15 @@ async def _parse_rephrase_response(
     it will raise an exception if the status code is not 0
     """
     content = await resp.json()
+
     if content.endswith("0"):
-        return content[:-1]
+        content = content[:-1]
     elif content.endswith("-1"):
         raise RephraseError(content[:-2])
     elif content.endswith("-2"):
         raise RephraseMissingContextError(content[:-2])
-    else:
-        # bw compatibility
-        return content
+
+    use_chat_history = None
+    if NUCLIA_LEARNING_CHAT_HISTORY_HEADER in resp.headers:
+        use_chat_history = resp.headers[NUCLIA_LEARNING_CHAT_HISTORY_HEADER] == "true"
+    return RephraseResponse(rephrased_query=content, use_chat_history=use_chat_history)
