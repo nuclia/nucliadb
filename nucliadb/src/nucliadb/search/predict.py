@@ -293,7 +293,7 @@ class PredictEngine:
 
     @predict_observer.wrap({"type": "chat_ndjson"})
     async def chat_query_ndjson(
-        self, kbid: str, item: ChatModel
+        self, kbid: str, item: ChatModel, extra_headers: Optional[dict[str, str]] = None
     ) -> tuple[str, str, AsyncGenerator[GenerativeChunk, None]]:
         """
         Chat query using the new stream format
@@ -314,7 +314,7 @@ class PredictEngine:
             "POST",
             url=self.get_predict_url(CHAT, kbid),
             json=item.model_dump(),
-            headers=headers,
+            headers={**headers, **(extra_headers or {})},
             timeout=None,
         )
         await self.check_response(kbid, resp, expected_status=200)
@@ -396,7 +396,9 @@ class PredictEngine:
         return convert_relations(data)
 
     @predict_observer.wrap({"type": "summarize"})
-    async def summarize(self, kbid: str, item: SummarizeModel) -> SummarizedResponse:
+    async def summarize(
+        self, kbid: str, item: SummarizeModel, extra_headers: Optional[dict]
+    ) -> SummarizedResponse:
         try:
             self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
@@ -407,7 +409,7 @@ class PredictEngine:
             "POST",
             url=self.get_predict_url(SUMMARIZE, kbid),
             json=item.model_dump(),
-            headers=self.get_predict_headers(kbid),
+            headers={**self.get_predict_headers(kbid), **(extra_headers or {})},
             timeout=None,
         )
         await self.check_response(kbid, resp, expected_status=200)

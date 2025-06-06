@@ -47,9 +47,14 @@ async def summarize_endpoint(
     request: Request,
     kbid: str,
     item: SummarizeRequest,
+    x_show_consumption: bool = Header(default=False),
 ) -> Union[SummarizedResponse, HTTPClientError]:
     try:
-        return await summarize(kbid, item)
+        return await summarize(
+            kbid=kbid,
+            request=item,
+            extra_predict_headers={"X-Show-Consumption": x_show_consumption},
+        )
     except KnowledgeBoxNotFound:
         return HTTPClientError(status_code=404, detail="Knowledge box not found")
     except NoResourcesToSummarize:

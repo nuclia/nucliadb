@@ -59,6 +59,7 @@ async def ask_knowledgebox_endpoint(
     kbid: str,
     item: AskRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
+    x_show_consumption: bool = Header(default=False),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
     x_synchronous: bool = Header(
@@ -97,7 +98,13 @@ async def ask_knowledgebox_endpoint(
             return HTTPClientError(status_code=422, detail=detail)
 
     return await create_ask_response(
-        kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
+        kbid=kbid,
+        ask_request=item,
+        user_id=x_nucliadb_user,
+        client_type=x_ndb_client,
+        origin=x_forwarded_for,
+        x_synchronous=x_synchronous,
+        extra_predict_headers={"X-Show-Consumption": x_show_consumption},
     )
 
 
@@ -110,6 +117,7 @@ async def create_ask_response(
     origin: str,
     x_synchronous: bool,
     resource: Optional[str] = None,
+    extra_predict_headers: Optional[dict[str, str]] = None,
 ) -> Response:
     maybe_log_request_payload(kbid, "/ask", ask_request)
     ask_request.max_tokens = parse_max_tokens(ask_request.max_tokens)
@@ -122,6 +130,7 @@ async def create_ask_response(
                 client_type=client_type,
                 origin=origin,
                 resource=resource,
+                extra_predict_headers=extra_predict_headers,
             )
         except AnswerJsonSchemaTooLong as err:
             return HTTPClientError(status_code=400, detail=str(err))

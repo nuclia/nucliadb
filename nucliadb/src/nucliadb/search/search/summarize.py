@@ -45,7 +45,9 @@ class NoResourcesToSummarize(Exception):
     pass
 
 
-async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
+async def summarize(
+    kbid: str, request: SummarizeRequest, extra_predict_headers: Optional[dict]
+) -> SummarizedResponse:
     predict_request = SummarizeModel()
     predict_request.generative_model = request.generative_model
     predict_request.user_prompt = request.user_prompt
@@ -62,7 +64,7 @@ async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
         raise NoResourcesToSummarize()
 
     predict = get_predict()
-    return await predict.summarize(kbid, predict_request)
+    return await predict.summarize(kbid=kbid, item=predict_request, extra_headers=extra_predict_headers)
 
 
 async def get_extracted_texts(kbid: str, resource_uuids_or_slugs: list[str]) -> ExtractedTexts:

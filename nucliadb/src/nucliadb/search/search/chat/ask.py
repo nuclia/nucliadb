@@ -477,6 +477,7 @@ async def ask(
     client_type: NucliaDBClientType,
     origin: str,
     resource: Optional[str] = None,
+    extra_predict_headers: Optional[dict[str, str]] = None,
 ) -> AskResult:
     metrics = AskMetrics()
     chat_history = ask_request.chat_history or []
@@ -602,7 +603,9 @@ async def ask(
                 nuclia_learning_id,
                 nuclia_learning_model,
                 predict_answer_stream,
-            ) = await predict.chat_query_ndjson(kbid, chat_model)
+            ) = await predict.chat_query_ndjson(
+                kbid=kbid, item=chat_model, extra_headers=extra_predict_headers
+            )
 
     auditor = ChatAuditor(
         kbid=kbid,

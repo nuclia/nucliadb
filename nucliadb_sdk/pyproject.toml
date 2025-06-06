@@ -26,7 +26,7 @@ dependencies = [
     "httpx",
     "orjson",
     "pydantic>=2.6",
-    "nuclia-models>=0.24.2",
+    "nuclia-models>=0.43.0",
     # automatically bumped during release
     "nucliadb-models",
 ]
