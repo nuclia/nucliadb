@@ -68,6 +68,7 @@ RETRIABLE_EXCEPTIONS = (
     aiohttp.client_exceptions.ClientOSError,
     aiohttp.client_exceptions.ServerConnectionError,
     aiohttp.client_exceptions.ServerDisconnectedError,
+    aiohttp.client_exceptions.ServerTimeoutError,
     socket.gaierror,
 )
 
