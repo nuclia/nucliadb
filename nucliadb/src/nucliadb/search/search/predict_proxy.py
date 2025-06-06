@@ -63,7 +63,7 @@ class PredictProxiedEndpoints(str, Enum):
 
 ALLOWED_HEADERS = [
     "Accept",  # To allow 'application/x-ndjson' on the /chat endpoint
-    "X-show-consumption", # To show token consumption in the response
+    "X-show-consumption",  # To show token consumption in the response
 ]
 
 PREDICT_ANSWER_METRIC = "predict_answer_proxy_metric"
@@ -205,7 +205,13 @@ async def chat_streaming_generator(
 
     if is_json is False and chunk:  # Ensure chunk is not empty before decoding
         # If response is text the status_code comes at the last chunk of data
-        status_code = chunk.decode()
+        try:
+            status_code = AnswerStatusCode(chunk.decode()).value
+        except ValueError:
+            logger.warning(
+                f"Unexpected status code in predict answer text stream: {chunk.decode()}",
+                extra={"kbid": kbid},
+            )
 
     audit_predict_proxy_endpoint(
         headers=predict_response.headers,
