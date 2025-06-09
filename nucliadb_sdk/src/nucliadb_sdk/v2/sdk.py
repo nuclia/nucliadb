@@ -243,7 +243,7 @@ SDK_DEFINITION = {
         path_params=("kbid", "rid", "field_id"),
     ),
     "add_conversation_message_by_slug": SdkEndpointDefinition(
-        path_template="/v1/kb/{kbid}/resource/{slug}/conversation/{field_id}/messages",
+        path_template="/v1/kb/{kbid}/slug/{slug}/conversation/{field_id}/messages",
         method="PUT",
         path_params=("kbid", "slug", "field_id"),
     ),
