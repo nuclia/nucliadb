@@ -661,7 +661,7 @@ async def neighbouring_paragraphs_prompt_context(
         ]
         try:
             index = field_pids.index(pid)
-        except IndexError:
+        except ValueError:
             continue
 
         for neighbour_index in get_neighbouring_indices(
