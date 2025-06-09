@@ -44,6 +44,7 @@ from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     CatalogFacetsRequest,
+    CatalogFacetsResponse,
     CatalogRequest,
     CatalogResponse,
     KnowledgeboxSearchResults,
@@ -195,12 +196,14 @@ async def catalog(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/catalog/facets",
     status_code=200,
-    response_model=dict[str, int],
+    response_model=CatalogFacetsResponse,
     response_model_exclude_unset=True,
     tags=["Search"],
     include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def catalog_facets(request: Request, kbid: str, item: CatalogFacetsRequest) -> dict[str, int]:
-    return await pgcatalog_facets(kbid, item)
+async def catalog_facets(
+    request: Request, kbid: str, item: CatalogFacetsRequest
+) -> CatalogFacetsResponse:
+    return CatalogFacetsResponse(facets=await pgcatalog_facets(kbid, item))

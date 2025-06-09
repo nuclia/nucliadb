@@ -2327,3 +2327,7 @@ class CatalogFacetsPrefix(BaseModel):
 
 class CatalogFacetsRequest(BaseModel):
     prefixes: list[CatalogFacetsPrefix] = Field(default=[])
+
+
+class CatalogFacetsResponse(BaseModel):
+    facets: dict[str, int]

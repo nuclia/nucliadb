@@ -678,7 +678,7 @@ async def test_catalog_facets(
         json={},
     )
     assert resp.status_code == 200
-    assert resp.json() == {
+    assert resp.json()["facets"] == {
         "/l": 2,
         "/l/stuff": 2,
         "/l/stuff/of_another_kind": 1,
@@ -710,7 +710,7 @@ async def test_catalog_facets(
         json={"prefixes": ["/l"]},
     )
     assert resp.status_code == 200
-    assert resp.json() == {
+    assert resp.json()["facets"] == {
         "/l": 2,
         "/l/stuff": 2,
         "/l/stuff/of_another_kind": 1,
@@ -723,7 +723,7 @@ async def test_catalog_facets(
         json={"prefixes": [{"prefix": "/l", "depth": 1}]},
     )
     assert resp.status_code == 200
-    assert resp.json() == {
+    assert resp.json()["facets"] == {
         "/l": 2,
         "/l/stuff": 2,
     }
@@ -734,7 +734,7 @@ async def test_catalog_facets(
         json={"prefixes": [{"prefix": "/n/i"}, {"prefix": "/p/very/deep/path", "depth": 1}]},
     )
     assert resp.status_code == 200
-    assert resp.json() == {
+    assert resp.json()["facets"] == {
         "/n/i": 2,
         "/n/i/application": 2,
         "/n/i/application/generic": 2,
