@@ -1033,6 +1033,10 @@ class ChatModel(BaseModel):
         default=True,
         description="If set to false, the prompt given as `user_prompt` will be used as is, without any formatting for question or context. If set to true, the prompt must contain the placeholders {question} and {context} to be replaced by the question and context respectively",  # noqa: E501
     )
+    seed: Optional[int] = Field(
+        default=None,
+        description="Seed use for the generative model for a deterministic output.",
+    )
 
 
 class RephraseModel(BaseModel):
@@ -1622,6 +1626,11 @@ If empty, the default strategy is used, which simply adds the text of the matchi
         default=None,
         title="Generative model",
         description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
+    )
+    generative_model_seed: Optional[int] = Field(
+        default=None,
+        title="Seed for the generative model",
+        description="The seed to use for the generative model for deterministic generation. Only supported by some models.",
     )
 
     max_tokens: Optional[Union[int, MaxTokens]] = Field(
