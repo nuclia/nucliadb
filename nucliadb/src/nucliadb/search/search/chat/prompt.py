@@ -142,7 +142,7 @@ class CappedPromptContext:
                 break
             # Remove text from the value
             text = self.output[key]
-            # If removing the whole text still keeps the total size below the limit, remove it
+            # If removing the whole text still keeps the total size above the limit, remove it
             if current_size - len(text) >= self.max_size:
                 del self.output[key]
             else:
