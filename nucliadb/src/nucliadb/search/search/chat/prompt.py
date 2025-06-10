@@ -1001,7 +1001,6 @@ class PromptContextBuilder:
         self,
     ) -> tuple[PromptContext, PromptContextOrder, PromptContextImages, AugmentedContext]:
         ccontext = CappedPromptContext(max_size=self.max_context_characters)
-        print(".......................")
         self.prepend_user_context(ccontext)
         await self._build_context(ccontext)
         if self.visual_llm:
