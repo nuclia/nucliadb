@@ -72,6 +72,13 @@ spec:
           periodSeconds: 120
           timeoutSeconds: 10
           failureThreshold: 10
+        readinessProbe:
+          grpc:
+            port: {{ .Values.serving.grpc }}
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         command: ["nucliadb-ingest"]
         envFrom:
           - configMapRef:

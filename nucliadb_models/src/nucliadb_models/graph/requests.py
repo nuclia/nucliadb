@@ -116,7 +116,7 @@ class GraphFilterExpression(BaseModel, extra="forbid"):
 
 
 class BaseGraphSearchRequest(BaseModel):
-    top_k: int = Field(default=50, title="Number of results to retrieve")
+    top_k: int = Field(default=50, le=500, title="Number of results to retrieve")
     filter_expression: Optional[GraphFilterExpression] = Field(
         default=None,
         title="Filter resource by an expression",

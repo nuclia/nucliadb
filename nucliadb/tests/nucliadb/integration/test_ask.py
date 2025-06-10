@@ -36,8 +36,10 @@ from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     AskRequest,
     AskResponseItem,
+    AugmentedTextBlock,
     ChatRequest,
     FieldExtensionStrategy,
+    FindParagraph,
     FindRequest,
     FullResourceStrategy,
     HierarchyResourceStrategy,
@@ -48,7 +50,13 @@ from nucliadb_models.search import (
     RagStrategies,
     SyncAskResponse,
 )
+from nucliadb_protos import resources_pb2 as rpb2
+from nucliadb_protos import writer_pb2 as wpb2
 from nucliadb_protos.utils_pb2 import RelationNode
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder
+from tests.utils.broker_messages.fields import FieldBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 
@@ -723,7 +731,7 @@ async def test_ask_with_json_schema_output(
     )
     assert resp.status_code == 200, resp.text
     results = parse_ask_response(resp)
-    assert len(results) == 4
+    assert len(results) == 5
     assert results[0].item.type == "answer_json"
     answer_json = results[0].item.object
     assert answer_json["answer"] == "valid answer to"
@@ -1508,9 +1516,10 @@ async def test_ask_skip_answer_generation(
     assert len(results[0].item.results.resources) > 0
     assert results[1].item.type == "status"
     assert results[1].item.status == AnswerStatusCode.SUCCESS.prettify()
-    assert results[2].item.type == "debug"
-    assert results[2].item.metadata["prompt_context"] is not None
-    assert results[2].item.metadata["predict_request"] is not None
+    assert results[2].item.type == "augmented_context"
+    assert results[3].item.type == "debug"
+    assert results[3].item.metadata["prompt_context"] is not None
+    assert results[3].item.metadata["predict_request"] is not None
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -1548,3 +1557,126 @@ async def test_ask_chat_history_relevance_threshold(
         ).model_dump(),
     )
     assert resp.status_code == 200, resp.text
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_neighbouring_paragraphs_rag_strategy(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+
+    # Create a resource with a text field that has 3 paragraphs
+    paragraphs = [
+        "Mario is my older brother.",
+        "Nuria used be friends with Mario.",
+        "We all know each other now.",
+    ]
+    extracted_text = "\n".join(paragraphs)
+
+    positions = {}
+    start = 0
+    for i, paragraph in enumerate(paragraphs):
+        end = start + len(paragraph)
+        positions[i] = (start, end)
+        start = end + 1
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={"title": "My resource", "texts": {"text1": {"body": extracted_text}}},
+    )
+    resp.raise_for_status()
+    rid = resp.json()["uuid"]
+
+    # Inject the processing broker message
+    bmb = BrokerMessageBuilder(kbid=kbid, rid=rid, source=wpb2.BrokerMessage.MessageSource.PROCESSOR)
+    fb = FieldBuilder(
+        field="text1",
+        field_type=wpb2.FieldType.TEXT,
+    )
+    fb.with_extracted_text(extracted_text)
+
+    for i, (start, end) in positions.items():
+        pbpar = rpb2.Paragraph(
+            start=start,
+            end=end,
+            text=paragraphs[i],
+        )
+        fb.with_extracted_paragraph_metadata(pbpar)
+    bmb.add_field_builder(fb)
+
+    await inject_message(nucliadb_ingest_grpc, bmb.build(), wait_for_ready=True)
+
+    await mark_dirty()
+    await wait_for_sync()
+
+    # Now check that neighbouring paragraphs rag strategy works
+    # First off, fetch only one of the paragraphs
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/ask",
+        json={
+            "query": "Nuria",  # To match the middle paragraph
+            "features": ["keyword"],
+            "top_k": 1,
+            "rag_strategies": [
+                {
+                    "name": "neighbouring_paragraphs",
+                    "before": 0,
+                    "after": 0,
+                }
+            ],
+        },
+        headers={"x-synchronous": "true"},
+    )
+    resp.raise_for_status()
+    ask = SyncAskResponse.model_validate(resp.json())
+
+    retrieved, augmented = _fetch_paragraphs(ask)
+    assert len(retrieved) == 1
+    assert retrieved[0].text == paragraphs[1]
+    assert len(augmented) == 0
+
+    # Now fetch all neighbouring paragraphs
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/ask",
+        json={
+            "query": "Nuria",  # To match the middle paragraph
+            "features": ["keyword"],
+            "top_k": 1,
+            "rag_strategies": [
+                {
+                    "name": "neighbouring_paragraphs",
+                    "before": 1,
+                    "after": 1,
+                }
+            ],
+        },
+        headers={"x-synchronous": "true"},
+    )
+    resp.raise_for_status()
+    ask = SyncAskResponse.model_validate(resp.json())
+
+    retrieved, augmented = _fetch_paragraphs(ask)
+    assert len(retrieved) == 1
+    assert retrieved[0].text == paragraphs[1]
+    assert len(augmented) == 2
+    augmented.sort(key=lambda p: p.id)
+    assert augmented[0].text == paragraphs[0]
+    assert augmented[1].text == paragraphs[2]
+
+
+def _fetch_paragraphs(
+    ask_response: SyncAskResponse,
+) -> tuple[list[FindParagraph], list[AugmentedTextBlock]]:
+    retrieval = [
+        paragraph
+        for resource in ask_response.retrieval_results.resources.values()
+        for field in resource.fields.values()
+        for paragraph in field.paragraphs.values()
+    ]
+    if ask_response.augmented_context is None:
+        return retrieval, []
+    augmented = [text_block for text_block in ask_response.augmented_context.paragraphs.values()]
+    return retrieval, augmented

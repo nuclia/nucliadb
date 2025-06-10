@@ -19,8 +19,10 @@
 #
 from __future__ import annotations
 
+import asyncio
 import enum
 import logging
+from collections import defaultdict
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar
 
@@ -112,6 +114,8 @@ class Field(Generic[PbType]):
             if not isinstance(pb, self.pbklass):
                 raise InvalidPBClass(self.__class__, pb.__class__)
             self.value = pb
+
+        self.locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     @property
     def kbid(self) -> str:
@@ -364,10 +368,13 @@ class Field(Generic[PbType]):
 
     async def get_extracted_text(self, force=False) -> Optional[ExtractedText]:
         if self.extracted_text is None or force:
-            sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
-            payload = await self.storage.download_pb(sf, ExtractedText)
-            if payload is not None:
-                self.extracted_text = payload
+            async with self.locks["extracted_text"]:
+                # Value could have been fetched while waiting for the lock
+                if self.extracted_text is None or force:
+                    sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
+                    payload = await self.storage.download_pb(sf, ExtractedText)
+                    if payload is not None:
+                        self.extracted_text = payload
         return self.extracted_text
 
     async def set_vectors(
@@ -499,10 +506,13 @@ class Field(Generic[PbType]):
 
     async def get_field_metadata(self, force: bool = False) -> Optional[FieldComputedMetadata]:
         if self.computed_metadata is None or force:
-            sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
-            payload = await self.storage.download_pb(sf, FieldComputedMetadata)
-            if payload is not None:
-                self.computed_metadata = payload
+            async with self.locks["field_metadata"]:
+                # Value could have been fetched while waiting for the lock
+                if self.computed_metadata is None or force:
+                    sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
+                    payload = await self.storage.download_pb(sf, FieldComputedMetadata)
+                    if payload is not None:
+                        self.computed_metadata = payload
         return self.computed_metadata
 
     async def set_large_field_metadata(self, payload: LargeComputedMetadataWrapper):

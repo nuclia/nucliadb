@@ -2044,6 +2044,39 @@ def validate_facets(facets):
     return facets
 
 
+class TextBlockAugmentationType(str, Enum):
+    NEIGHBOURING_PARAGRAPHS = "neighbouring_paragraphs"
+    CONVERSATION = "conversation"
+    HIERARCHY = "hierarchy"
+    FULL_RESOURCE = "full_resource"
+    FIELD_EXTENSION = "field_extension"
+    METADATA_EXTENSION = "metadata_extension"
+
+
+class AugmentedTextBlock(BaseModel):
+    id: str = Field(
+        description="The id of the augmented text bloc. It can be a paragraph id or a field id."
+    )
+    text: str = Field(
+        description="The text of the augmented text block. It may include additional metadata to enrich the context"
+    )
+    parent: Optional[str] = Field(
+        default=None, description="The parent text block that was augmented for."
+    )
+    augmentation_type: TextBlockAugmentationType = Field(description="Type of augmentation.")
+
+
+class AugmentedContext(BaseModel):
+    paragraphs: dict[str, AugmentedTextBlock] = Field(
+        default={},
+        description="Paragraphs added to the context as a result of using the `rag_strategies` parameter, typically the neighbouring_paragraphs or the conversation strategies",
+    )
+    fields: dict[str, AugmentedTextBlock] = Field(
+        default={},
+        description="Field extracted texts added to the context as a result of using the `rag_strategies` parameter, typically the hierarcy or full_resource strategies.",
+    )
+
+
 class AskTokens(BaseModel):
     input: int = Field(
         title="Input tokens",
@@ -2141,6 +2174,13 @@ class SyncAskResponse(BaseModel):
         title="Citations",
         description="The citations of the answer. List of references to the resources used to generate the answer.",
     )
+    augmented_context: Optional[AugmentedContext] = Field(
+        default=None,
+        description=(
+            "Augmented text blocks that were sent to the LLM as part of the RAG strategies "
+            "applied on the retrieval results in the request."
+        ),
+    )
     prompt_context: Optional[list[str]] = Field(
         default=None,
         title="Prompt context",
@@ -2203,6 +2243,16 @@ class MetadataAskResponseItem(BaseModel):
     timings: AskTimings
 
 
+class AugmentedContextResponseItem(BaseModel):
+    type: Literal["augmented_context"] = "augmented_context"
+    augmented: AugmentedContext = Field(
+        description=(
+            "Augmented text blocks that were sent to the LLM as part of the RAG strategies "
+            "applied on the retrieval results in the request."
+        )
+    )
+
+
 class CitationsAskResponseItem(BaseModel):
     type: Literal["citations"] = "citations"
     citations: dict[str, Any]
@@ -2235,6 +2285,7 @@ AskResponseItemType = Union[
     AnswerAskResponseItem,
     JSONAskResponseItem,
     MetadataAskResponseItem,
+    AugmentedContextResponseItem,
     CitationsAskResponseItem,
     StatusAskResponseItem,
     ErrorAskResponseItem,
@@ -2269,3 +2320,23 @@ def parse_rephrase_prompt(item: AskRequest) -> Optional[str]:
 
 # We need this to avoid issues with pydantic and generic types defined in another module
 FindRequest.model_rebuild()
+
+
+class CatalogFacetsPrefix(BaseModel):
+    prefix: str = Field(pattern="^((/[^/]+)*)$")
+    depth: Optional[int] = Field(default=None, ge=0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def build_from_string(cls, data: Any) -> Any:
+        if isinstance(data, str):
+            data = {"prefix": data}
+        return data
+
+
+class CatalogFacetsRequest(BaseModel):
+    prefixes: list[CatalogFacetsPrefix] = Field(default=[])
+
+
+class CatalogFacetsResponse(BaseModel):
+    facets: dict[str, int]

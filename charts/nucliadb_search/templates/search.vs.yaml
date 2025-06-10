@@ -31,6 +31,10 @@ spec:
           method:
             regex: "GET|POST|OPTIONS"
         - uri:
+            regex: '^/api/v\d+/kb/[^/]+/catalog/facets$'
+          method:
+            regex: "POST|OPTIONS"
+        - uri:
             regex: '^/api/v\d+/kb/[^/]+/summarize$'
           method:
             regex: "POST|OPTIONS"
@@ -41,7 +45,7 @@ spec:
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/predict/.*'
           method:
-            regex: "GET|POST|OPTIONS"            
+            regex: "GET|POST|OPTIONS"
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/(find|search|ask)$'
           method:

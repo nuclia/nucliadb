@@ -27,15 +27,13 @@ from pydantic import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.exceptions import InvalidQueryError
-from nucliadb.common.maindb.pg import PGDriver
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.search import cache
 from nucliadb.search.search.merge import fetch_resources
-from nucliadb.search.search.pgcatalog import pgcatalog_search
+from nucliadb.search.search.pgcatalog import pgcatalog_facets, pgcatalog_search
 from nucliadb.search.search.query_parser.parsers import parse_catalog
 from nucliadb.search.search.utils import (
     maybe_log_request_payload,
@@ -45,6 +43,8 @@ from nucliadb_models.filters import CatalogFilterExpression
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
+    CatalogFacetsRequest,
+    CatalogFacetsResponse,
     CatalogRequest,
     CatalogResponse,
     KnowledgeboxSearchResults,
@@ -157,9 +157,6 @@ async def catalog(
     returns bm25 results on titles and it does not support vector search.
     It is useful for listing resources in a knowledge box.
     """
-    if not pgcatalog_enabled():  # pragma: no cover
-        return HTTPClientError(status_code=501, detail="PG driver is needed for catalog search")
-
     maybe_log_request_payload(kbid, "/catalog", item)
     start_time = time()
     try:
@@ -196,5 +193,17 @@ async def catalog(
             )
 
 
-def pgcatalog_enabled():
-    return isinstance(get_driver(), PGDriver)
+@api.post(
+    f"/{KB_PREFIX}/{{kbid}}/catalog/facets",
+    status_code=200,
+    response_model=CatalogFacetsResponse,
+    response_model_exclude_unset=True,
+    tags=["Search"],
+    include_in_schema=False,
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def catalog_facets(
+    request: Request, kbid: str, item: CatalogFacetsRequest
+) -> CatalogFacetsResponse:
+    return CatalogFacetsResponse(facets=await pgcatalog_facets(kbid, item))

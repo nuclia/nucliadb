@@ -78,6 +78,8 @@ from nucliadb_models.search import (
     AskRetrievalMatch,
     AskTimings,
     AskTokens,
+    AugmentedContext,
+    AugmentedContextResponseItem,
     ChatModel,
     ChatOptions,
     CitationsAskResponseItem,
@@ -143,6 +145,7 @@ class AskResult:
         metrics: AskMetrics,
         best_matches: list[RetrievalMatch],
         debug_chat_model: Optional[ChatModel],
+        augmented_context: AugmentedContext,
     ):
         # Initial attributes
         self.kbid = kbid
@@ -157,6 +160,7 @@ class AskResult:
         self.auditor: ChatAuditor = auditor
         self.metrics: AskMetrics = metrics
         self.best_matches: list[RetrievalMatch] = best_matches
+        self.augmented_context = augmented_context
 
         # Computed from the predict chat answer stream
         self._answer_text = ""
@@ -272,9 +276,13 @@ class AskResult:
             status_code=self.status_code,
         )
 
+        yield AugmentedContextResponseItem(augmented=self.augmented_context)
+
         # Stream out the citations
         if self._citations is not None:
-            yield CitationsAskResponseItem(citations=self._citations.citations)
+            yield CitationsAskResponseItem(
+                citations=self._citations.citations,
+            )
 
         # Stream out generic metadata about the answer
         if self._metadata is not None:
@@ -366,6 +374,7 @@ class AskResult:
             citations=citations,
             metadata=metadata,
             learning_id=self.nuclia_learning_id or "",
+            augmented_context=self.augmented_context,
         )
         if self.status_code == AnswerStatusCode.ERROR and self.status_error_details:
             response.error_details = self.status_error_details
@@ -569,6 +578,7 @@ async def ask(
             prompt_context,
             prompt_context_order,
             prompt_context_images,
+            augmented_context,
         ) = await prompt_context_builder.build()
 
     # Make the chat request to the predict API
@@ -632,6 +642,7 @@ async def ask(
         metrics=metrics,
         best_matches=retrieval_results.best_matches,
         debug_chat_model=chat_model,
+        augmented_context=augmented_context,
     )
 
 
