@@ -180,11 +180,8 @@ async def test_prepare_query_fulltext():
     )
     parsed = await parse_catalog(kbid, request)
     query, params = _prepare_query(parsed)
-    assert (
-        "regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W')"
-        in query.as_string()
-    )
-    assert params["query"] == "This is my query"
+    assert "regexp_split_to_array(lower(title), '\\W') @> %(query)s" in query.as_string()
+    assert params["query"] == ["This", "is", "my", "query"]
 
 
 async def test_old_filters():
@@ -237,7 +234,7 @@ async def test_filter_expression():
     # This test is very sensitive to query generation changes
     assert query.as_string() == (
         "SELECT * FROM catalog "
-        "WHERE kbid = %(kbid)s AND regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W') "
+        "WHERE kbid = %(kbid)s AND regexp_split_to_array(lower(title), '\\W') @> %(query)s "
         "AND ("
         '(extract_facets(labels) @> %(param2)s AND (NOT "modified_at" > %(param3)s)) '
         "OR rid = %(param4)s"
@@ -250,7 +247,7 @@ async def test_filter_expression():
         "param2": ["/l/topic/boats", "/p/folder"],
         "param3": datetime(2019, 1, 1, 11, 0),
         "param4": ["00112233445566778899aabbccddeeff"],
-        "query": "This is my query",
+        "query": ["This", "is", "my", "query"],
         "page_size": 25,
         "offset": 0,
     }
