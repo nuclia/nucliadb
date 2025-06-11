@@ -203,7 +203,7 @@ async def chat_streaming_generator(
 
     if is_json is False and chunk:  # Ensure chunk is not empty before decoding
         # If response is text the status_code comes at the last chunk of data
-        status_code = chunk.decode()
+        status_code = chunk.decode().split(".")[-1]
 
     audit_predict_proxy_endpoint(
         headers=predict_response.headers,
