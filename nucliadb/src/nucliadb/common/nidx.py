@@ -170,6 +170,8 @@ class NidxServiceUtility(NidxUtility):
     indexer: Union[NidxNatsIndexer, NidxGrpcIndexer]
 
     def __init__(self, service_name: str):
+        self.service_name = service_name
+
         if not settings.nidx_api_address or not settings.nidx_searcher_address:
             raise ValueError("NIDX_API_ADDRESS and NIDX_SEARCHER_ADDRESS are required")
 
@@ -182,9 +184,11 @@ class NidxServiceUtility(NidxUtility):
 
     async def initialize(self):
         await self.indexer.initialize()
-        self.api_client = NidxApiStub(get_traced_grpc_channel(settings.nidx_api_address, "nidx_api"))
+        self.api_client = NidxApiStub(
+            get_traced_grpc_channel(settings.nidx_api_address, self.service_name)
+        )
         self.searcher_client = NidxSearcherStub(
-            get_traced_grpc_channel(settings.nidx_searcher_address, "nidx_searcher")
+            get_traced_grpc_channel(settings.nidx_searcher_address, self.service_name)
         )
 
     async def finalize(self):
