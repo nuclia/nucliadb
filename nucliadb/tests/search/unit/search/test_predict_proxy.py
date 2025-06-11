@@ -44,10 +44,14 @@ def predict_response():
         for i in range(3):
             yield i.to_bytes(i, "big")
 
+    async def iter_lines(_):
+        for i in range(3):
+            yield i.to_bytes(i, "big")
+
     resp = Mock()
     resp.status = 200
     resp.headers = {"Content-Type": "application/json"}
-    resp.content = Mock(iter_any=iter_any)
+    resp.content = Mock(iter_any=iter_any, __aiter__=iter_lines)
     json_answer = {"answer": "foo"}
     resp.json = AsyncMock(return_value=json_answer)
     resp.read = AsyncMock(return_value=json.dumps(json_answer).encode())
