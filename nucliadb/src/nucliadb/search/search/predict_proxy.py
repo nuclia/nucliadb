@@ -171,14 +171,13 @@ async def chat_streaming_generator(
     user_query: str,
     is_json: bool,
 ):
-    stream = predict_response.content.iter_any()
     first = True
     status_code = AnswerStatusCode.ERROR.value
     text_answer = ""
     json_object = None
     metrics = AskMetrics()
     with metrics.time(PREDICT_ANSWER_METRIC):
-        async for chunk in stream:
+        async for chunk in predict_response.content:
             if first:
                 metrics.record_first_chunk_yielded()
                 first = False
