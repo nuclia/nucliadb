@@ -171,13 +171,20 @@ async def chat_streaming_generator(
     user_query: str,
     is_json: bool,
 ):
+    if is_json:
+        # ndjson: stream lines
+        stream = predict_response.content
+    else:
+        # plain text: stream chunks (last chunk is status)
+        stream = predict_response.content.iter_any()
+
     first = True
     status_code = AnswerStatusCode.ERROR.value
     text_answer = ""
     json_object = None
     metrics = AskMetrics()
     with metrics.time(PREDICT_ANSWER_METRIC):
-        async for chunk in predict_response.content:
+        async for chunk in stream:
             if first:
                 metrics.record_first_chunk_yielded()
                 first = False
@@ -203,7 +210,7 @@ async def chat_streaming_generator(
 
     if is_json is False and chunk:  # Ensure chunk is not empty before decoding
         # If response is text the status_code comes at the last chunk of data
-        status_code = chunk.decode().split(".")[-1]
+        status_code = chunk.decode()
 
     audit_predict_proxy_endpoint(
         headers=predict_response.headers,
