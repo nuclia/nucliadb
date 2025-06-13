@@ -343,17 +343,6 @@ async def service_client(
             await client.aclose()
 
 
-@contextlib.asynccontextmanager
-async def learning_config_client() -> AsyncIterator[httpx.AsyncClient]:
-    """
-    Context manager for the learning config client.
-    """
-    async with service_client(
-        base_url=get_base_url(LearningService.CONFIG), headers=get_auth_headers()
-    ) as client:
-        yield client
-
-
 class DummyResponse(httpx.Response):
     def raise_for_status(self) -> httpx.Response:
         return self
@@ -388,12 +377,13 @@ class DummyClient(httpx.AsyncClient):
 
     async def _handle_request(self, *args: Any, **kwargs: Any) -> httpx.Response:
         """
-        Try to map HTTP Method + Path to methods of this class:
-        e.g: GET /config/{kbid} -> get_configuration
+        Try to map HTTP Method + Path to methods of the InMemoryLearningConfig class.:
+        e.g: GET /config/{kbid} -> InMemoryLearningConfig.get_configuration
         """
         http_method = args[0]
         http_url = args[1]
         method_in_url = f"{http_method.lower()}_{http_url.split('/')[0]}"
+        kbid = http_url.split("/")[1]
         method = {
             "get_config": "get_configuration",
             "post_config": "set_configuration",
@@ -404,7 +394,12 @@ class DummyClient(httpx.AsyncClient):
             return self._response()
         else:
             imlc = InMemoryLearningConfig()
-            return await getattr(imlc, method)(*args, **kwargs)
+            if method in ("set_configuration", "update_configuration"):
+                content = kwargs.get("content") or b"{}"
+                config = json.loads(content.decode("utf-8"))
+                return await getattr(imlc, method)(kbid, config)
+            else:
+                return await getattr(imlc, method)(kbid)
 
 
 class LearningConfigService(ABC):
