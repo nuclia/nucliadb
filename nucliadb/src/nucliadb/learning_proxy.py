@@ -474,12 +474,12 @@ class InMemoryLearningConfig(LearningConfigService):
             "multilingual": SemanticConfig(
                 similarity=SimilarityFunction.COSINE,
                 size=512,
-                threshold=0.5,
+                threshold=0.0,
             ),
             "multilingual-2023-02-21": SemanticConfig(
                 similarity=SimilarityFunction.DOT,
                 size=768,
-                threshold=0,
+                threshold=1.0,
             ),
         }
 
@@ -491,8 +491,6 @@ class InMemoryLearningConfig(LearningConfigService):
             # generate a default config
             default_model = os.environ.get("TEST_SENTENCE_ENCODER", "multilingual")
             model_config = self.model_configs[default_model]
-            # XXX for some reason, we override the model name and set this one
-            # default_model = "multilingual"
             learning_config = LearningConfiguration(
                 semantic_model=default_model,
                 semantic_vector_similarity=model_config.similarity.name.lower(),
