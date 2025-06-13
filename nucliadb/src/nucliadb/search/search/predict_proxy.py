@@ -177,7 +177,11 @@ async def chat_streaming_generator(
         stream = predict_response.content
     else:
         # plain text: stream chunks (last chunk is status)
-        stream = predict_response.content.iter_any()
+        async def _iter_chunks():
+            async for chunk_bytes, _ in predict_response.content.iter_chunks():
+                yield chunk_bytes
+
+        stream = _iter_chunks()
 
     first = True
     status_code = AnswerStatusCode.ERROR.value

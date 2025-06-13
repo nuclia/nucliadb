@@ -382,16 +382,21 @@ class DummyClient(httpx.AsyncClient):
         return self._handle_request("DELETE", *args, **kwargs)
 
     def get_config(self, *args: Any, **kwargs: Any):
-        size = 768 if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21" else 512
+        semantic_model = os.environ.get("TEST_SENTENCE_ENCODER", "multilingual")
+        semantic_vector_similarity = SimilarityFunction.COSINE
+        if semantic_model == "multilingual-2023-02-21":
+            size = 768
+        else:
+            size = 512
         lconfig = LearningConfiguration(
-            semantic_model="multilingual",
-            semantic_vector_similarity="cosine",
+            semantic_model=semantic_model,
+            semantic_vector_similarity=str(semantic_vector_similarity.value).lower(),
             semantic_vector_size=size,
             semantic_threshold=None,
             semantic_matryoshka_dims=[],
             semantic_model_configs={
                 "multilingual": SemanticConfig(
-                    similarity=SimilarityFunction.COSINE,
+                    similarity=semantic_vector_similarity,
                     size=size,
                     threshold=0,
                     matryoshka_dims=[],
@@ -500,7 +505,7 @@ class InMemoryLearningConfig(LearningConfigService):
             "multilingual-2023-02-21": SemanticConfig(
                 similarity=SimilarityFunction.DOT,
                 size=768,
-                threshold=1.0,
+                threshold=0,
             ),
         }
 
