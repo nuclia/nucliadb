@@ -1682,7 +1682,8 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
     )
 
     search_configuration: Optional[str] = Field(
-        default=None, description="Load ask parameters from this configuration"
+        default=None,
+        description="Load ask parameters from this configuration. Parameters in the request override parameters from the configuration.",
     )
 
     @field_validator("rag_strategies", mode="before")
@@ -1857,7 +1858,8 @@ class FindRequest(BaseSearchRequest):
     )
 
     search_configuration: Optional[str] = Field(
-        default=None, description="Load find parameters from this configuration"
+        default=None,
+        description="Load find parameters from this configuration. Parameters in the request override parameters from the configuration.",
     )
     generative_model: Optional[str] = Field(
         default=None,

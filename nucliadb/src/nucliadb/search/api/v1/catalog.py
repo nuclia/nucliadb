@@ -201,6 +201,7 @@ async def catalog(
     tags=["Search"],
     summary="Show facets in Knowledge Box",
     description="List all facets in a Knowledge Box and how many resources they apply to",
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)

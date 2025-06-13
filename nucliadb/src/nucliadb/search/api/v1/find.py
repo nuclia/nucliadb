@@ -133,7 +133,8 @@ async def find_knowledgebox(
     rank_fusion: RankFusionName = fastapi_query(SearchParamDefaults.rank_fusion),
     reranker: Union[RerankerName, Reranker] = fastapi_query(SearchParamDefaults.reranker),
     search_configuration: Optional[str] = Query(
-        default=None, description="Load find parameters from this configuration"
+        default=None,
+        description="Load find parameters from this configuration. Parameters in the request override parameters from the configuration.",
     ),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
