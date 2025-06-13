@@ -706,9 +706,11 @@ class CatalogQueryMatch(str, Enum):
 
 
 class CatalogQuery(BaseModel):
-    field: CatalogQueryField = CatalogQueryField.Title
-    match: CatalogQueryMatch = CatalogQueryMatch.Exact
-    query: str = Field(min_length=1)
+    field: CatalogQueryField = Field(default=CatalogQueryField.Title, description="Field to search in")
+    match: CatalogQueryMatch = Field(
+        default=CatalogQueryMatch.Exact, description="Operator to use for matching results"
+    )
+    query: str = Field(min_length=1, description="Text to search for")
 
     @model_validator(mode="after")
     def check_match_field(self) -> Self:
@@ -2324,7 +2326,11 @@ FindRequest.model_rebuild()
 
 class CatalogFacetsPrefix(BaseModel):
     prefix: str = Field(pattern="^((/[^/]+)*)$")
-    depth: Optional[int] = Field(default=None, ge=0)
+    depth: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Only include facets up to this depth from the prefix, leave empty to include all depths",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -2335,7 +2341,9 @@ class CatalogFacetsPrefix(BaseModel):
 
 
 class CatalogFacetsRequest(BaseModel):
-    prefixes: list[CatalogFacetsPrefix] = Field(default=[])
+    prefixes: list[CatalogFacetsPrefix] = Field(
+        default=[], description="List of facets prefixes to include (empty to includ everything)"
+    )
 
 
 class CatalogFacetsResponse(BaseModel):
