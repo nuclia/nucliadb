@@ -81,7 +81,7 @@ def test_ask_on_kb_with_citations(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
 
 
 def test_ask_on_kb_no_context_found(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
-    result = sdk.ask(kbid=docs_dataset, query="penguin")
+    result = sdk.ask(kbid=docs_dataset, query="penguin", features=["keyword"])
     assert result.answer == "Not enough data to answer this."
 
 
