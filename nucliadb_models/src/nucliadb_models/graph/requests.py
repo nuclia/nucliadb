@@ -207,3 +207,15 @@ class GraphRelationsSearchRequest(BaseGraphSearchRequest):
 GraphSearchRequest.model_rebuild()
 GraphNodesSearchRequest.model_rebuild()
 GraphRelationsSearchRequest.model_rebuild()
+
+And["GraphPathQuery"].model_rebuild()
+Or["GraphPathQuery"].model_rebuild()
+Not["GraphPathQuery"].model_rebuild()
+
+And["GraphNodesQuery"].model_rebuild()
+Or["GraphNodesQuery"].model_rebuild()
+Not["GraphNodesQuery"].model_rebuild()
+
+And["GraphRelationsQuery"].model_rebuild()
+Or["GraphRelationsQuery"].model_rebuild()
+Not["GraphRelationsQuery"].model_rebuild()
