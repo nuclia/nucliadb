@@ -381,55 +381,30 @@ class DummyClient(httpx.AsyncClient):
     async def delete(self, *args: Any, **kwargs: Any):
         return self._handle_request("DELETE", *args, **kwargs)
 
-    def get_config(self, *args: Any, **kwargs: Any):
-        semantic_model = os.environ.get("TEST_SENTENCE_ENCODER", "multilingual")
-        semantic_vector_similarity = SimilarityFunction.COSINE
-        if semantic_model == "multilingual-2023-02-21":
-            size = 768
-        else:
-            size = 512
-        lconfig = LearningConfiguration(
-            semantic_model=semantic_model,
-            semantic_vector_similarity=str(semantic_vector_similarity.value).lower(),
-            semantic_vector_size=size,
-            semantic_threshold=None,
-            semantic_matryoshka_dims=[],
-            semantic_model_configs={
-                "multilingual": SemanticConfig(
-                    similarity=semantic_vector_similarity,
-                    size=size,
-                    threshold=0,
-                    matryoshka_dims=[],
-                )
-            },
-        )
-        return self._response(content=lconfig.model_dump())
-
-    def post_config(self, *args: Any, **kwargs: Any):
-        # simulate post that returns the created config
-        return self.get_config(*args, **kwargs)
-
-    def patch_config(self, *args: Any, **kwargs: Any):
-        # simulate patch that returns the updated config
-        return self.get_config(*args, **kwargs)
-
     async def request(  # type: ignore
         self, method: str, url: str, params=None, content=None, headers=None, *args, **kwargs
     ) -> httpx.Response:
-        return self._handle_request(method, url, params=params, content=content, headers=headers)
+        return await self._handle_request(method, url, params=params, content=content, headers=headers)
 
-    def _handle_request(self, *args: Any, **kwargs: Any) -> httpx.Response:
+    async def _handle_request(self, *args: Any, **kwargs: Any) -> httpx.Response:
         """
         Try to map HTTP Method + Path to methods of this class:
-        e.g: GET /config/{kbid} -> get_config
+        e.g: GET /config/{kbid} -> get_configuration
         """
         http_method = args[0]
         http_url = args[1]
-        method = f"{http_method.lower()}_{http_url.split('/')[0]}"
-        if hasattr(self, method):
-            return getattr(self, method)(*args, **kwargs)
-        else:
+        method_in_url = f"{http_method.lower()}_{http_url.split('/')[0]}"
+        method = {
+            "get_config": "get_configuration",
+            "post_config": "set_configuration",
+            "patch_config": "update_configuration",
+            "delete_config": "delete_configuration",
+        }.get(method_in_url, None)
+        if not method:
             return self._response()
+        else:
+            imlc = InMemoryLearningConfig()
+            return await getattr(imlc, method)(*args, **kwargs)
 
 
 class LearningConfigService(ABC):
