@@ -53,6 +53,7 @@ from nucliadb_models.search import (
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils.dirty_index import mark_dirty, wait_for_sync
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 
@@ -284,6 +285,9 @@ async def test_backup(
     # Make sure that the restore metadata is cleaned up
     assert await get_last_restored(context, dst_kb, backup_id) is None
 
+    await mark_dirty()
+    await wait_for_sync()
+
     # Check that the resources were restored
     await check_kb(nucliadb_reader, src_kb)
     await check_kb(nucliadb_reader, dst_kb)
@@ -382,6 +386,7 @@ async def check_resources(nucliadb_reader: AsyncClient, kbid: str):
                     vector=get_vector_for_rid(rid, vectorset),
                     top_k=1,
                     vectorset=vectorset,
+                    min_score=0.3,
                     reranker=RerankerName.NOOP,
                 ).model_dump(),
             )
