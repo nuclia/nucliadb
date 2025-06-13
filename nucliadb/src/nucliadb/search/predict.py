@@ -33,6 +33,7 @@ from nuclia_models.predict.generative_responses import GenerativeChunk
 from pydantic import ValidationError
 
 from nucliadb.common import datamanagers
+from nucliadb.learning_proxy import InMemoryLearningConfig
 from nucliadb.search import logger
 from nucliadb.search.predict_models import (
     AppliedDataAugmentation,
@@ -476,6 +477,13 @@ class DummyPredictEngine(PredictEngine):
     def get_predict_headers(self, kbid: str) -> dict[str, str]:
         return {}
 
+    async def get_semantic_threshold(self, kbid: str, vectorset_id: str) -> float:
+        imlc = InMemoryLearningConfig()
+        config = await imlc.get_configuration(kbid)
+        if config is not None and vectorset_id in config.semantic_model_configs:
+            return config.semantic_model_configs[vectorset_id].threshold
+        return self.default_semantic_threshold
+
     async def make_request(self, method: str, **request_args):
         response = Mock(status=200)
         json_data = {"foo": "bar"}
@@ -521,19 +529,19 @@ class DummyPredictEngine(PredictEngine):
             vectors = {}
             timings = {}
             async for vectorset_id, config in datamanagers.vectorsets.iter(txn, kbid=kbid):
-                semantic_thresholds[vectorset_id] = self.default_semantic_threshold
+                semantic_thresholds[vectorset_id] = await self.get_semantic_threshold(kbid, vectorset_id)
                 vectorset_dimension = config.vectorset_index_config.vector_dimension
                 if vectorset_dimension > len(base_vector):
                     padding = vectorset_dimension - len(base_vector)
                     vectors[vectorset_id] = base_vector + [random.random()] * padding
                 else:
                     vectors[vectorset_id] = base_vector[:vectorset_dimension]
-
                 timings[vectorset_id] = 0.010
 
         # and fake data with the passed one too
         model = semantic_model or "<PREDICT-DEFAULT-SEMANTIC-MODEL>"
-        semantic_thresholds[model] = self.default_semantic_threshold
+        if model not in semantic_thresholds:
+            semantic_thresholds[model] = self.default_semantic_threshold
         vectors[model] = base_vector
         timings[model] = 0.0
 

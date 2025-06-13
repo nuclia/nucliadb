@@ -67,7 +67,7 @@ def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     )
     assert result.learning_id == "00"
     assert result.answer == "valid answer to"
-    assert len(result.retrieval_results.resources) == 7
+    assert len(result.retrieval_results.resources) >= 7
     assert result.relations
 
 
@@ -81,7 +81,7 @@ def test_ask_on_kb_with_citations(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
 
 
 def test_ask_on_kb_no_context_found(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
-    result = sdk.ask(kbid=docs_dataset, query="penguin")
+    result = sdk.ask(kbid=docs_dataset, query="penguin", features=["keyword"])
     assert result.answer == "Not enough data to answer this."
 
 

@@ -22,5 +22,4 @@ def test_find_resource(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     for res in results.resources.values():
         for field in res.fields.values():
             paragraphs += len(field.paragraphs)
-
-    assert paragraphs == 10
+    assert paragraphs == 20

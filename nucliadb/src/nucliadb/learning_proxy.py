@@ -343,17 +343,6 @@ async def service_client(
             await client.aclose()
 
 
-@contextlib.asynccontextmanager
-async def learning_config_client() -> AsyncIterator[httpx.AsyncClient]:
-    """
-    Context manager for the learning config client.
-    """
-    async with service_client(
-        base_url=get_base_url(LearningService.CONFIG), headers=get_auth_headers()
-    ) as client:
-        yield client
-
-
 class DummyResponse(httpx.Response):
     def raise_for_status(self) -> httpx.Response:
         return self
@@ -381,50 +370,36 @@ class DummyClient(httpx.AsyncClient):
     async def delete(self, *args: Any, **kwargs: Any):
         return self._handle_request("DELETE", *args, **kwargs)
 
-    def get_config(self, *args: Any, **kwargs: Any):
-        size = 768 if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21" else 512
-        lconfig = LearningConfiguration(
-            semantic_model="multilingual",
-            semantic_vector_similarity="cosine",
-            semantic_vector_size=size,
-            semantic_threshold=None,
-            semantic_matryoshka_dims=[],
-            semantic_model_configs={
-                "multilingual": SemanticConfig(
-                    similarity=SimilarityFunction.COSINE,
-                    size=size,
-                    threshold=0,
-                    matryoshka_dims=[],
-                )
-            },
-        )
-        return self._response(content=lconfig.model_dump())
-
-    def post_config(self, *args: Any, **kwargs: Any):
-        # simulate post that returns the created config
-        return self.get_config(*args, **kwargs)
-
-    def patch_config(self, *args: Any, **kwargs: Any):
-        # simulate patch that returns the updated config
-        return self.get_config(*args, **kwargs)
-
     async def request(  # type: ignore
         self, method: str, url: str, params=None, content=None, headers=None, *args, **kwargs
     ) -> httpx.Response:
-        return self._handle_request(method, url, params=params, content=content, headers=headers)
+        return await self._handle_request(method, url, params=params, content=content, headers=headers)
 
-    def _handle_request(self, *args: Any, **kwargs: Any) -> httpx.Response:
+    async def _handle_request(self, *args: Any, **kwargs: Any) -> httpx.Response:
         """
-        Try to map HTTP Method + Path to methods of this class:
-        e.g: GET /config/{kbid} -> get_config
+        Try to map HTTP Method + Path to methods of the InMemoryLearningConfig class.:
+        e.g: GET /config/{kbid} -> InMemoryLearningConfig.get_configuration
         """
         http_method = args[0]
         http_url = args[1]
-        method = f"{http_method.lower()}_{http_url.split('/')[0]}"
-        if hasattr(self, method):
-            return getattr(self, method)(*args, **kwargs)
-        else:
+        method_in_url = f"{http_method.lower()}_{http_url.split('/')[0]}"
+        kbid = http_url.split("/")[1]
+        method = {
+            "get_config": "get_configuration",
+            "post_config": "set_configuration",
+            "patch_config": "update_configuration",
+            "delete_config": "delete_configuration",
+        }.get(method_in_url, None)
+        if not method:
             return self._response()
+        else:
+            imlc = InMemoryLearningConfig()
+            if method in ("set_configuration", "update_configuration"):
+                content = kwargs.get("content") or b"{}"
+                config = json.loads(content.decode("utf-8"))
+                return await getattr(imlc, method)(kbid, config)
+            else:
+                return await getattr(imlc, method)(kbid)
 
 
 class LearningConfigService(ABC):
@@ -485,6 +460,23 @@ _IN_MEMORY_CONFIGS: dict[str, LearningConfiguration] = {}
 class InMemoryLearningConfig(LearningConfigService):
     def __init__(self):
         self.in_memory_configs = {}
+        self.model_configs = {
+            "en-2024-04-24": SemanticConfig(
+                similarity=SimilarityFunction.DOT,
+                size=768,
+                threshold=0.47,
+            ),
+            "multilingual": SemanticConfig(
+                similarity=SimilarityFunction.COSINE,
+                size=512,
+                threshold=0.0,
+            ),
+            "multilingual-2023-02-21": SemanticConfig(
+                similarity=SimilarityFunction.DOT,
+                size=768,
+                threshold=1.0,
+            ),
+        }
 
     async def get_configuration(self, kbid: str) -> Optional[LearningConfiguration]:
         return _IN_MEMORY_CONFIGS.get(kbid, None)
@@ -493,29 +485,19 @@ class InMemoryLearningConfig(LearningConfigService):
         if not config:
             # generate a default config
             default_model = os.environ.get("TEST_SENTENCE_ENCODER", "multilingual")
-            size = 768 if default_model == "multilingual-2023-02-21" else 512
-            # XXX for some reason, we override the model name and set this one
-            # default_model = "multilingual"
+            model_config = self.model_configs[default_model]
             learning_config = LearningConfiguration(
                 semantic_model=default_model,
-                semantic_vector_similarity="cosine",
-                semantic_vector_size=size,
-                semantic_threshold=None,
+                semantic_vector_similarity=model_config.similarity.name.lower(),
+                semantic_vector_size=model_config.size,
+                semantic_threshold=model_config.threshold,
                 semantic_matryoshka_dims=[],
                 semantic_models=[default_model],
-                semantic_model_configs={
-                    default_model: SemanticConfig(
-                        similarity=SimilarityFunction.COSINE,
-                        size=size,
-                        threshold=0,
-                        matryoshka_dims=[],
-                    )
-                },
+                semantic_model_configs={default_model: self.model_configs[default_model]},
             )
 
         else:
             learning_config = LearningConfiguration.model_validate(config)
-
         _IN_MEMORY_CONFIGS[kbid] = learning_config
         return learning_config
 
@@ -524,6 +506,9 @@ class InMemoryLearningConfig(LearningConfigService):
             raise ValueError(f"Configuration for kbid {kbid} not found")
         learning_config = _IN_MEMORY_CONFIGS[kbid]
         learning_config = learning_config.model_copy(update=config)
+        learning_config.semantic_model_configs.clear()
+        for semantic_model in learning_config.semantic_models:
+            learning_config.semantic_model_configs[semantic_model] = self.model_configs[semantic_model]
         _IN_MEMORY_CONFIGS[kbid] = learning_config
 
     async def delete_configuration(self, kbid: str) -> None:
