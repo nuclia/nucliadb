@@ -993,9 +993,9 @@ async def hierarchy_prompt_context(
         paragraph_text = _clean_paragraph_text(paragraph)
         context[paragraph.id] = paragraph_text
         if paragraph.id in augmented_paragraphs:
-            field_id = ParagraphId.from_string(paragraph.id).field_id.full()
-            augmented_context.fields[field_id] = AugmentedTextBlock(
-                id=field_id, text=paragraph_text, augmentation_type=TextBlockAugmentationType.HIERARCHY
+            pid = ParagraphId.from_string(paragraph.id)
+            augmented_context.paragraphs[pid.full()] = AugmentedTextBlock(
+                id=pid.full(), text=paragraph_text, augmentation_type=TextBlockAugmentationType.HIERARCHY
             )
     return
 
