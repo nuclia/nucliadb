@@ -176,7 +176,6 @@ async def main_subscriber_workers():  # pragma: no cover
 
 def setup_configuration():  # pragma: no cover
     setup_logging()
-    assign_partitions(settings)
 
     errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
@@ -188,9 +187,9 @@ def run_consumer() -> None:  # pragma: no cover
     """
     Running:
         - main consumer
-        - pull worker
     """
     setup_configuration()
+    assign_partitions(settings)
     asyncio.run(main_consumer())
 
 

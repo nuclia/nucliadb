@@ -19,7 +19,7 @@
 #
 import json
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any, AsyncIterable, Optional, Union
 
 import aiohttp
 from fastapi.datastructures import QueryParams
@@ -171,7 +171,14 @@ async def chat_streaming_generator(
     user_query: str,
     is_json: bool,
 ):
-    stream = predict_response.content.iter_any()
+    stream: AsyncIterable[bytes]
+    if is_json:
+        # ndjson: stream lines
+        stream = predict_response.content
+    else:
+        # plain text: stream chunks (last chunk is status)
+        stream = predict_response.content.iter_any()
+
     first = True
     status_code = AnswerStatusCode.ERROR.value
     text_answer = ""

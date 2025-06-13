@@ -100,33 +100,58 @@ class CappedPromptContext:
         self.output: PromptContext = {}
         self.images: PromptContextImages = {}
         self.max_size = max_size
-        self._size = 0
 
     def __setitem__(self, key: str, value: str) -> None:
-        prev_value_len = len(self.output.get(key, ""))
-        if self.max_size is None:
-            # Unbounded size context
-            to_add = value
-        else:
-            # Make sure we don't exceed the max size
-            size_available = max(self.max_size - self._size + prev_value_len, 0)
-            to_add = value[:size_available]
-        self.output[key] = to_add
-        self._size = self._size - prev_value_len + len(to_add)
+        self.output.__setitem__(key, value)
 
     def __getitem__(self, key: str) -> str:
         return self.output.__getitem__(key)
 
     def __delitem__(self, key: str) -> None:
-        value = self.output.pop(key, "")
-        self._size -= len(value)
+        try:
+            self.output.__delitem__(key)
+        except KeyError:
+            pass
 
     def text_block_ids(self) -> list[str]:
         return list(self.output.keys())
 
     @property
     def size(self) -> int:
-        return self._size
+        """
+        Returns the total size of the context in characters.
+        """
+        return sum(len(text) for text in self.output.values())
+
+    def cap(self) -> dict[str, str]:
+        """
+        This method will trim the context to the maximum size if it exceeds it.
+        It will remove text from the most recent entries first, until the size is below the limit.
+        """
+        if self.max_size is None:
+            return self.output
+
+        if self.size <= self.max_size:
+            return self.output
+
+        logger.info("Removing text from context to fit within the max size limit")
+        # Iterate the dictionary in reverse order of insertion
+        for key in reversed(list(self.output.keys())):
+            current_size = self.size
+            if current_size <= self.max_size:
+                break
+            # Remove text from the value
+            text = self.output[key]
+            # If removing the whole text still keeps the total size above the limit, remove it
+            if current_size - len(text) >= self.max_size:
+                del self.output[key]
+            else:
+                # Otherwise, trim the text to fit within the limit
+                excess_size = current_size - self.max_size
+                if excess_size > 0:
+                    trimmed_text = text[:-excess_size]
+                    self.output[key] = trimmed_text
+        return self.output
 
 
 async def get_next_conversation_messages(
@@ -661,7 +686,7 @@ async def neighbouring_paragraphs_prompt_context(
         ]
         try:
             index = field_pids.index(pid)
-        except IndexError:
+        except ValueError:
             continue
 
         for neighbour_index in get_neighbouring_indices(
@@ -1001,12 +1026,11 @@ class PromptContextBuilder:
         self,
     ) -> tuple[PromptContext, PromptContextOrder, PromptContextImages, AugmentedContext]:
         ccontext = CappedPromptContext(max_size=self.max_context_characters)
-        print(".......................")
         self.prepend_user_context(ccontext)
         await self._build_context(ccontext)
         if self.visual_llm:
             await self._build_context_images(ccontext)
-        context = ccontext.output
+        context = ccontext.cap()
         context_images = ccontext.images
         context_order = {text_block_id: order for order, text_block_id in enumerate(context.keys())}
         return context, context_order, context_images, self.augmented_context

@@ -88,7 +88,8 @@ def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
         pass
 
 
-def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb):
+@pytest.mark.parametrize("method", ["add_conversation_message", "add_conversation_message_by_slug"])
+def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb, method: str):
     kbid = kb.uuid
     resource = sdk.create_resource(kbid=kbid, title="Resource", slug="myslug")
     rid = resource.uuid
@@ -101,7 +102,12 @@ def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb):
         )
     ]
     fid = "conv"
-    sdk.add_conversation_message(kbid=kbid, rid=rid, field_id=fid, content=messages)
+
+    if method == "add_conversation_message":
+        sdk.add_conversation_message(kbid=kbid, rid=rid, field_id=fid, content=messages)
+    elif method == "add_conversation_message_by_slug":
+        sdk.add_conversation_message_by_slug(kbid=kbid, slug="myslug", field_id=fid, content=messages)
+
     field = sdk.get_resource_field(
         kbid=kbid, rid=rid, field_type="conversation", field_id=fid, query_params={"page": 1}
     )

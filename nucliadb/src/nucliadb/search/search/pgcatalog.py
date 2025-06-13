@@ -19,6 +19,7 @@
 #
 
 import logging
+import re
 from collections import defaultdict
 from typing import Any, Literal, Union, cast
 
@@ -37,6 +38,8 @@ from .filters import translate_label
 
 observer = metrics.Observer("pg_catalog_search", labels={"op": ""})
 logger = logging.getLogger(__name__)
+
+SPLIT_REGEX = re.compile(r"\W")
 
 
 def _filter_operands(operands: list[CatalogExpression]) -> tuple[list[str], list[CatalogExpression]]:
@@ -163,10 +166,10 @@ def _prepare_query_search(query: search_models.CatalogQuery, params: dict[str, A
         # This is doing tokenization inside the SQL server (to keep the index updated). We could move it to
         # the python code at update/query time if it ever becomes a problem but for now, a single regex
         # executed per query is not a problem.
-        params["query"] = query.query
-        return sql.SQL(
-            "regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W')"
-        )
+
+        # Remove zero-length words from the split
+        params["query"] = [word for word in SPLIT_REGEX.split(query.query) if word]
+        return sql.SQL("regexp_split_to_array(lower(title), '\\W') @> %(query)s")
     elif query.match == search_models.CatalogQueryMatch.Fuzzy:
         params["query"] = query.query
         # Note: the operator is %>, We use %%> for psycopg escaping
