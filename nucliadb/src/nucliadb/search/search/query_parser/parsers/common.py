@@ -109,7 +109,6 @@ async def parse_semantic_query(
 ) -> SemanticQuery:
     vectorset = await fetcher.get_vectorset()
     query = await fetcher.get_query_vector()
-
     min_score = await parse_semantic_min_score(item.min_score, fetcher=fetcher)
 
     return SemanticQuery(query=query, vectorset=vectorset, min_score=min_score)
