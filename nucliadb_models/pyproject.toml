@@ -19,7 +19,8 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 requires-python = ">=3.9, <4"
-dependencies = ["pydantic>=2.6"]
+# https://github.com/pydantic/pydantic/issues/11978
+dependencies = ["pydantic>=2.6,<2.11.5"]
 
 [project.urls]
 Homepage = "https://nuclia.com"
