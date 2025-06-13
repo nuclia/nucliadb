@@ -107,6 +107,9 @@ class CappedPromptContext:
     def __getitem__(self, key: str) -> str:
         return self.output.__getitem__(key)
 
+    def __contains__(self, key: str) -> bool:
+        return key in self.output
+
     def __delitem__(self, key: str) -> None:
         try:
             self.output.__delitem__(key)
@@ -395,7 +398,10 @@ def parse_text_block_id(text_block_id: str) -> TextBlockId:
 
 
 async def extend_prompt_context_with_origin_metadata(
-    context, kbid, text_block_ids: list[TextBlockId], augmented_context: AugmentedContext
+    context: CappedPromptContext,
+    kbid,
+    text_block_ids: list[TextBlockId],
+    augmented_context: AugmentedContext,
 ):
     async def _get_origin(kbid: str, rid: str) -> tuple[str, Optional[Origin]]:
         origin = None
@@ -411,7 +417,7 @@ async def extend_prompt_context_with_origin_metadata(
     rid_to_origin = {rid: origin for rid, origin in origins if origin is not None}
     for tb_id in text_block_ids:
         origin = rid_to_origin.get(tb_id.rid)
-        if origin is not None and tb_id.full() in context.output:
+        if origin is not None and tb_id.full() in context:
             text = context.output.pop(tb_id.full())
             extended_text = text + f"\n\nDOCUMENT METADATA AT ORIGIN:\n{to_yaml(origin)}"
             context[tb_id.full()] = extended_text
@@ -424,7 +430,10 @@ async def extend_prompt_context_with_origin_metadata(
 
 
 async def extend_prompt_context_with_classification_labels(
-    context, kbid, text_block_ids: list[TextBlockId], augmented_context: AugmentedContext
+    context: CappedPromptContext,
+    kbid: str,
+    text_block_ids: list[TextBlockId],
+    augmented_context: AugmentedContext,
 ):
     async def _get_labels(kbid: str, _id: TextBlockId) -> tuple[TextBlockId, list[tuple[str, str]]]:
         fid = _id if isinstance(_id, FieldId) else _id.field_id
@@ -449,7 +458,7 @@ async def extend_prompt_context_with_classification_labels(
     tb_id_to_labels = {tb_id: labels for tb_id, labels in classif_labels if len(labels) > 0}
     for tb_id in text_block_ids:
         labels = tb_id_to_labels.get(tb_id)
-        if labels is not None and tb_id.full() in context.output:
+        if labels is not None and tb_id.full() in context:
             text = context.output.pop(tb_id.full())
 
             labels_text = "DOCUMENT CLASSIFICATION LABELS:"
@@ -467,7 +476,10 @@ async def extend_prompt_context_with_classification_labels(
 
 
 async def extend_prompt_context_with_ner(
-    context, kbid, text_block_ids: list[TextBlockId], augmented_context: AugmentedContext
+    context: CappedPromptContext,
+    kbid: str,
+    text_block_ids: list[TextBlockId],
+    augmented_context: AugmentedContext,
 ):
     async def _get_ners(kbid: str, _id: TextBlockId) -> tuple[TextBlockId, dict[str, set[str]]]:
         fid = _id if isinstance(_id, FieldId) else _id.field_id
@@ -494,7 +506,7 @@ async def extend_prompt_context_with_ner(
     tb_id_to_ners = {tb_id: ners for tb_id, ners in nerss if len(ners) > 0}
     for tb_id in text_block_ids:
         ners = tb_id_to_ners.get(tb_id)
-        if ners is not None and tb_id.full() in context.output:
+        if ners is not None and tb_id.full() in context:
             text = context.output.pop(tb_id.full())
 
             ners_text = "DOCUMENT NAMED ENTITIES (NERs):"
@@ -515,7 +527,10 @@ async def extend_prompt_context_with_ner(
 
 
 async def extend_prompt_context_with_extra_metadata(
-    context, kbid, text_block_ids: list[TextBlockId], augmented_context: AugmentedContext
+    context: CappedPromptContext,
+    kbid: str,
+    text_block_ids: list[TextBlockId],
+    augmented_context: AugmentedContext,
 ):
     async def _get_extra(kbid: str, rid: str) -> tuple[str, Optional[Extra]]:
         extra = None
@@ -531,7 +546,7 @@ async def extend_prompt_context_with_extra_metadata(
     rid_to_extra = {rid: extra for rid, extra in extras if extra is not None}
     for tb_id in text_block_ids:
         extra = rid_to_extra.get(tb_id.rid)
-        if extra is not None and tb_id.full() in context.output:
+        if extra is not None and tb_id.full() in context:
             text = context.output.pop(tb_id.full())
             extended_text = text + f"\n\nDOCUMENT EXTRA METADATA:\n{to_yaml(extra)}"
             context[tb_id.full()] = extended_text
@@ -600,7 +615,7 @@ async def field_extension_prompt_context(
             if tb_id.startswith(field.full()):
                 del context[tb_id]
         # Add the extracted text of each field to the beginning of the context.
-        if field.full() not in context.output:
+        if field.full() not in context:
             context[field.full()] = extracted_text
             augmented_context.fields[field.full()] = AugmentedTextBlock(
                 id=field.full(),
@@ -610,7 +625,7 @@ async def field_extension_prompt_context(
 
     # Add the extracted text of each paragraph to the end of the context.
     for paragraph in ordered_paragraphs:
-        if paragraph.id not in context.output:
+        if paragraph.id not in context:
             context[paragraph.id] = _clean_paragraph_text(paragraph)
 
 
@@ -668,7 +683,7 @@ async def neighbouring_paragraphs_prompt_context(
         if field_extracted_text is None:
             continue
         ptext = _get_paragraph_text(field_extracted_text, pid)
-        if ptext:
+        if ptext and pid.full() not in context:
             context[pid.full()] = ptext
 
         # Now add the neighbouring paragraphs
@@ -702,8 +717,8 @@ async def neighbouring_paragraphs_prompt_context(
                 npid = field_pids[neighbour_index]
             except IndexError:
                 continue
-            if npid in retrieved_paragraphs_ids or npid.full() in context.output:
-                # Already added above
+            if npid in retrieved_paragraphs_ids or npid.full() in context:
+                # Already added
                 continue
             ptext = _get_paragraph_text(field_extracted_text, npid)
             if not ptext:
@@ -742,7 +757,8 @@ async def conversation_prompt_context(
         storage = await get_storage()
         kb = KnowledgeBoxORM(txn, storage, kbid)
         for paragraph in ordered_paragraphs:
-            context[paragraph.id] = _clean_paragraph_text(paragraph)
+            if paragraph.id not in context:
+                context[paragraph.id] = _clean_paragraph_text(paragraph)
 
             # If the paragraph is a conversation and it matches semantically, we assume we
             # have matched with the question, therefore try to include the answer to the
@@ -780,7 +796,7 @@ async def conversation_prompt_context(
                                 text = message.content.text.strip()
                             pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
                             attachments.extend(message.content.attachments_fields)
-                            if pid in context.output:
+                            if pid in context:
                                 continue
                             context[pid] = text
                             augmented_context.paragraphs[pid] = AugmentedTextBlock(
@@ -802,7 +818,7 @@ async def conversation_prompt_context(
                             text = message.content.text.strip()
                         attachments.extend(message.content.attachments_fields)
                         pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
-                        if pid in context.output:
+                        if pid in context:
                             continue
                         context[pid] = text
                         augmented_context.paragraphs[pid] = AugmentedTextBlock(
@@ -834,7 +850,7 @@ async def conversation_prompt_context(
                         text = message.content.text.strip()
                         attachments.extend(message.content.attachments_fields)
                         pid = f"{rid}/{field_type}/{field_id}/{message.ident}/0-{len(message.content.text) + 1}"
-                        if pid in context.output:
+                        if pid in context:
                             continue
                         context[pid] = text
                         augmented_context.paragraphs[pid] = AugmentedTextBlock(
@@ -854,7 +870,7 @@ async def conversation_prompt_context(
                         extracted_text = await field.get_extracted_text()
                         if extracted_text is not None:
                             pid = f"{rid}/{field_type}/{attachment.field_id}/0-{len(extracted_text.text) + 1}"
-                            if pid in context.output:
+                            if pid in context:
                                 continue
                             text = f"Attachment {attachment.field_id}: {extracted_text.text}\n\n"
                             context[pid] = text
@@ -977,9 +993,9 @@ async def hierarchy_prompt_context(
         paragraph_text = _clean_paragraph_text(paragraph)
         context[paragraph.id] = paragraph_text
         if paragraph.id in augmented_paragraphs:
-            field_id = ParagraphId.from_string(paragraph.id).field_id.full()
-            augmented_context.fields[field_id] = AugmentedTextBlock(
-                id=field_id, text=paragraph_text, augmentation_type=TextBlockAugmentationType.HIERARCHY
+            pid = ParagraphId.from_string(paragraph.id)
+            augmented_context.paragraphs[pid.full()] = AugmentedTextBlock(
+                id=pid.full(), text=paragraph_text, augmentation_type=TextBlockAugmentationType.HIERARCHY
             )
     return
 
