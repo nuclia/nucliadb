@@ -21,6 +21,15 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb_models.graph import responses as graph_responses
+from nucliadb_models.graph.requests import (
+    And,
+    GraphNode,
+    GraphPath,
+    GraphRelation,
+    GraphSearchRequest,
+    Not,
+    Or,
+)
 from nucliadb_models.graph.responses import GraphSearchResponse
 from nucliadb_models.metadata import RelationType
 from nucliadb_protos.resources_pb2 import FieldComputedMetadataWrapper, FieldType, Relations
@@ -438,6 +447,31 @@ async def test_graph_search__directed_path_queries(
             },
             "top_k": 100,
         },
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 3
+    assert ("Erin", "LOVE", "Climbing") in paths
+    assert ("Dimitri", "LOVE", "Anastasia") in paths
+    assert ("Peter", "LIVE_IN", "New York") in paths
+
+    # try the same but build it using pydantic models
+    req = GraphSearchRequest(
+        query=And(
+            operands=[
+                Not(operand=GraphPath(source=GraphNode(value="Anna"))),
+                Or(
+                    operands=[
+                        GraphPath(relation=GraphRelation(label="LIVE_IN")),
+                        GraphPath(relation=GraphRelation(label="LOVE")),
+                    ]
+                ),
+            ]
+        )
+    )
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json=req.model_dump(),
     )
     assert resp.status_code == 200
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
