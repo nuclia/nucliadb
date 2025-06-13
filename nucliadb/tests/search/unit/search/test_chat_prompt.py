@@ -376,9 +376,9 @@ async def test_hierarchy_promp_context(kb):
         assert ordered_paragraphs[0].text == "First Paragraph text"
         assert ordered_paragraphs[1].text == "Second paragraph text"
 
-        assert augmented_context.fields["r1/f/f1"].id == "r1/f/f1"
-        assert augmented_context.fields["r1/f/f1"].text.startswith("DOCUMENT: Title")
-        assert augmented_context.fields["r1/f/f1"].augmentation_type == "hierarchy"
+        assert augmented_context.paragraphs["r1/f/f1/0-10"].id == "r1/f/f1/0-10"
+        assert augmented_context.paragraphs["r1/f/f1/0-10"].text.startswith("DOCUMENT: Title")
+        assert augmented_context.paragraphs["r1/f/f1/0-10"].augmentation_type == "hierarchy"
 
 
 async def test_extend_prompt_context_with_metadata():
