@@ -465,7 +465,6 @@ _IN_MEMORY_CONFIGS: dict[str, LearningConfiguration] = {}
 class InMemoryLearningConfig(LearningConfigService):
     def __init__(self):
         self.in_memory_configs = {}
-        # NOTE: This is just a copy from the learning repo that is only used for testing purposes.
         self.model_configs = {
             "en-2024-04-24": SemanticConfig(
                 similarity=SimilarityFunction.DOT,
