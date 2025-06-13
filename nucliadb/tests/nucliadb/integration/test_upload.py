@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+import hashlib
 
 import pytest
 from httpx import AsyncClient
@@ -92,3 +93,80 @@ async def test_upload_guesses_content_type(
     body = resp.json()
     assert body["value"]["file"]["filename"] == filename
     assert body["value"]["file"]["content_type"] == content_type
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_upload_checks_duplicates(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox,
+):
+    content = b"Test for /upload endpoint"
+    filename = "testfile.txt"
+    encoded_filename = base64.b64encode(filename.encode()).decode("utf-8")
+    content_type = "text/plain"
+    content_length = str(len(content))
+    md5 = hashlib.md5(content).hexdigest()
+
+    # Upload the file for the first time
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/{UPLOAD}",
+        headers={
+            "X-Filename": encoded_filename,
+            "X-MD5": md5,
+            "Content-Type": content_type,
+            "Content-Length": content_length,
+        },
+        content=content,
+    )
+    assert resp.status_code == 201
+
+    # Uploading the file twice should return 409 Conflict
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/{UPLOAD}",
+        headers={
+            "X-Filename": encoded_filename,
+            "X-MD5": md5,
+            "Content-Type": content_type,
+            "Content-Length": content_length,
+        },
+        content=content,
+    )
+    assert resp.status_code == 409
+
+    # Check now the field upload endpoint
+    # Create an empty resource first
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": "Test Resource",
+        },
+    )
+    resp.raise_for_status()
+    rid = resp.json()["uuid"]
+
+    # Upload the file to the resource
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resource/{rid}/file/file/upload",
+        headers={
+            "X-Filename": encoded_filename,
+            "X-MD5": md5,
+            "Content-Type": content_type,
+            "Content-Length": content_length,
+        },
+        content=content,
+    )
+    resp.raise_for_status()
+
+    # Uploading the file to the same field again should not return 409 Conflict, as we're overwriting the field
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resource/{rid}/file/file/upload",
+        headers={
+            "X-Filename": encoded_filename,
+            "X-MD5": md5,
+            "Content-Type": content_type,
+            "Content-Length": content_length,
+        },
+        content=content,
+    )
+    resp.raise_for_status()
