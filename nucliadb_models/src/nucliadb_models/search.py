@@ -2203,6 +2203,14 @@ class SyncAskResponse(BaseModel):
         title="Metadata",
         description="Metadata of the query execution. This includes the number of tokens used in the LLM context and answer, and the timings of the generative model.",  # noqa: E501
     )
+    consumption: Optional[Consumption] = Field(
+        default=None,
+        title="Consumption",
+        description=(
+            "The consumption of the query execution. Return only if"
+            " 'X-show-consumption' header is set to true in the request."
+        ),
+    )
     error_details: Optional[str] = Field(
         default=None,
         title="Error details",

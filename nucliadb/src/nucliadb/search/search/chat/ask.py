@@ -22,6 +22,7 @@ import functools
 import json
 from typing import AsyncGenerator, Optional, cast
 
+from nuclia_models.common.consumption import Consumption
 from nuclia_models.predict.generative_responses import (
     CitationsGenerativeResponse,
     GenerativeChunk,
@@ -169,6 +170,7 @@ class AskResult:
         self._citations: Optional[CitationsGenerativeResponse] = None
         self._metadata: Optional[MetaGenerativeResponse] = None
         self._relations: Optional[Relations] = None
+        self._consumption: Optional[Consumption] = None
 
     @property
     def status_code(self) -> AnswerStatusCode:
@@ -299,6 +301,9 @@ class AskResult:
                 ),
             )
 
+        if self._consumption is not None:
+            yield self._consumption
+
         # Stream out the relations results
         should_query_relations = (
             self.ask_request_with_relations and self.status_code == AnswerStatusCode.SUCCESS
@@ -341,6 +346,7 @@ class AskResult:
                     generative_total=self._metadata.timings.get("generative"),
                 ),
             )
+
         citations = {}
         if self._citations is not None:
             citations = self._citations.citations
@@ -373,6 +379,7 @@ class AskResult:
             prequeries=prequeries_results,
             citations=citations,
             metadata=metadata,
+            consumption=self._consumption,
             learning_id=self.nuclia_learning_id or "",
             augmented_context=self.augmented_context,
         )
@@ -424,6 +431,8 @@ class AskResult:
                 self._citations = item
             elif isinstance(item, MetaGenerativeResponse):
                 self._metadata = item
+            elif isinstance(item, Consumption):
+                self._consumption = item
             else:
                 logger.warning(
                     f"Unexpected item in predict answer stream: {item}",
