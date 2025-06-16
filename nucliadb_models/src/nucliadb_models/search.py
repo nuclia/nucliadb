@@ -2258,6 +2258,18 @@ class MetadataAskResponseItem(BaseModel):
     timings: AskTimings
 
 
+class TokensDetail(BaseModel):
+    input: float
+    output: float
+    image: float
+
+
+class ConsumptionResponseItem(BaseModel):
+    type: Literal["consumption"] = "consumption"
+    normalized_tokens: TokensDetail
+    customer_key_tokens: TokensDetail
+
+
 class AugmentedContextResponseItem(BaseModel):
     type: Literal["augmented_context"] = "augmented_context"
     augmented: AugmentedContext = Field(
@@ -2308,6 +2320,7 @@ AskResponseItemType = Union[
     RelationsAskResponseItem,
     DebugAskResponseItem,
     PrequeriesAskResponseItem,
+    ConsumptionResponseItem,
 ]
 
 

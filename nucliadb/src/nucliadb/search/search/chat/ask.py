@@ -84,6 +84,7 @@ from nucliadb_models.search import (
     ChatModel,
     ChatOptions,
     CitationsAskResponseItem,
+    ConsumptionResponseItem,
     DebugAskResponseItem,
     ErrorAskResponseItem,
     FindOptions,
@@ -107,6 +108,7 @@ from nucliadb_models.search import (
     StatusAskResponseItem,
     SyncAskMetadata,
     SyncAskResponse,
+    TokensDetail,
     UserPrompt,
     parse_custom_prompt,
     parse_rephrase_prompt,
@@ -302,7 +304,18 @@ class AskResult:
             )
 
         if self._consumption is not None:
-            yield self._consumption
+            yield ConsumptionResponseItem(
+                normalized_tokens=TokensDetail(
+                    input=self._consumption.normalized_tokens.input,
+                    output=self._consumption.normalized_tokens.output,
+                    image=self._consumption.normalized_tokens.image,
+                ),
+                customer_key_tokens=TokensDetail(
+                    input=self._consumption.customer_key_tokens.input,
+                    output=self._consumption.customer_key_tokens.output,
+                    image=self._consumption.customer_key_tokens.image,
+                ),
+            )
 
         # Stream out the relations results
         should_query_relations = (
