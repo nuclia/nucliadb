@@ -708,9 +708,11 @@ class CatalogQueryMatch(str, Enum):
 
 
 class CatalogQuery(BaseModel):
-    field: CatalogQueryField = CatalogQueryField.Title
-    match: CatalogQueryMatch = CatalogQueryMatch.Exact
-    query: str = Field(min_length=1)
+    field: CatalogQueryField = Field(default=CatalogQueryField.Title, description="Field to search in")
+    match: CatalogQueryMatch = Field(
+        default=CatalogQueryMatch.Exact, description="Operator to use for matching results"
+    )
+    query: str = Field(min_length=1, description="Text to search for")
 
     @model_validator(mode="after")
     def check_match_field(self) -> Self:
@@ -1034,6 +1036,10 @@ class ChatModel(BaseModel):
     format_prompt: bool = Field(
         default=True,
         description="If set to false, the prompt given as `user_prompt` will be used as is, without any formatting for question or context. If set to true, the prompt must contain the placeholders {question} and {context} to be replaced by the question and context respectively",  # noqa: E501
+    )
+    seed: Optional[int] = Field(
+        default=None,
+        description="Seed use for the generative model for a deterministic output.",
     )
 
 
@@ -1625,6 +1631,11 @@ If empty, the default strategy is used, which simply adds the text of the matchi
         title="Generative model",
         description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
     )
+    generative_model_seed: Optional[int] = Field(
+        default=None,
+        title="Seed for the generative model",
+        description="The seed to use for the generative model for deterministic generation. Only supported by some models.",
+    )
 
     max_tokens: Optional[Union[int, MaxTokens]] = Field(
         default=None,
@@ -1673,7 +1684,8 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
     )
 
     search_configuration: Optional[str] = Field(
-        default=None, description="Load ask parameters from this configuration"
+        default=None,
+        description="Load ask parameters from this configuration. Parameters in the request override parameters from the configuration.",
     )
 
     @field_validator("rag_strategies", mode="before")
@@ -1849,7 +1861,8 @@ class FindRequest(BaseSearchRequest):
     )
 
     search_configuration: Optional[str] = Field(
-        default=None, description="Load find parameters from this configuration"
+        default=None,
+        description="Load find parameters from this configuration. Parameters in the request override parameters from the configuration.",
     )
     generative_model: Optional[str] = Field(
         default=None,
@@ -2318,7 +2331,11 @@ FindRequest.model_rebuild()
 
 class CatalogFacetsPrefix(BaseModel):
     prefix: str = Field(pattern="^((/[^/]+)*)$")
-    depth: Optional[int] = Field(default=None, ge=0)
+    depth: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Only include facets up to this depth from the prefix, leave empty to include all depths",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -2329,4 +2346,10 @@ class CatalogFacetsPrefix(BaseModel):
 
 
 class CatalogFacetsRequest(BaseModel):
-    prefixes: list[CatalogFacetsPrefix] = Field(default=[])
+    prefixes: list[CatalogFacetsPrefix] = Field(
+        default=[], description="List of facets prefixes to include (empty to includ everything)"
+    )
+
+
+class CatalogFacetsResponse(BaseModel):
+    facets: dict[str, int]

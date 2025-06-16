@@ -172,14 +172,13 @@ async def chat_streaming_generator(
     user_query: str,
     is_json: bool,
 ):
-    stream = predict_response.content.iter_any()
     first = True
     status_code = AnswerStatusCode.ERROR.value
     text_answer = ""
     json_object = None
     metrics = AskMetrics()
     with metrics.time(PREDICT_ANSWER_METRIC):
-        async for chunk in stream:
+        async for chunk in predict_response.content:
             if first:
                 metrics.record_first_chunk_yielded()
                 first = False
@@ -205,13 +204,11 @@ async def chat_streaming_generator(
 
     if is_json is False and chunk:  # Ensure chunk is not empty before decoding
         # If response is text the status_code comes at the last chunk of data
-        try:
-            status_code = AnswerStatusCode(chunk.decode()).value
-        except ValueError:
-            logger.warning(
-                f"Unexpected status code in predict answer text stream: {chunk.decode()}",
-                extra={"kbid": kbid},
-            )
+        last_chunk = chunk.decode()
+        if last_chunk[-1] == "0":
+            status_code = "0"
+        else:
+            status_code = last_chunk[-2:]
 
     audit_predict_proxy_endpoint(
         headers=predict_response.headers,

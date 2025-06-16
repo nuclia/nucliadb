@@ -79,6 +79,8 @@ from nucliadb_models.search import (
     AskResponseItem,
     AugmentedContext,
     AugmentedContextResponseItem,
+    CatalogFacetsRequest,
+    CatalogFacetsResponse,
     CatalogRequest,
     CatalogResponse,
     CitationsAskResponseItem,
@@ -209,6 +211,11 @@ SDK_DEFINITION = {
         method="POST",
         path_params=("kbid",),
     ),
+    "catalog_facets": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/catalog/facets",
+        method="POST",
+        path_params=("kbid",),
+    ),
     # reindex/reprocess
     "reindex_resource": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}/reindex",
@@ -241,6 +248,11 @@ SDK_DEFINITION = {
         path_template="/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages",
         method="PUT",
         path_params=("kbid", "rid", "field_id"),
+    ),
+    "add_conversation_message_by_slug": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/slug/{slug}/conversation/{field_id}/messages",
+        method="PUT",
+        path_params=("kbid", "slug", "field_id"),
     ),
     "get_resource_field": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}/{field_type}/{field_id}",
@@ -982,6 +994,7 @@ class NucliaDB(_NucliaDBBase):
     get_resource_by_id = _request_sync_builder("get_resource_by_id", type(None), Resource)
     list_resources = _request_sync_builder("list_resources", type(None), ResourceList)
     catalog = _request_sync_builder("catalog", CatalogRequest, CatalogResponse)
+    catalog_facets = _request_sync_builder("catalog_facets", CatalogFacetsRequest, CatalogFacetsResponse)
     # reindex/reprocess
     reindex_resource = _request_sync_builder("reindex_resource", type(None), type(None))
     reindex_resource_by_slug = _request_sync_builder("reindex_resource_by_slug", type(None), type(None))
@@ -994,6 +1007,9 @@ class NucliaDB(_NucliaDBBase):
     # Conversation endpoints
     add_conversation_message = _request_sync_builder(
         "add_conversation_message", List[InputMessage], ResourceFieldAdded
+    )
+    add_conversation_message_by_slug = _request_sync_builder(
+        "add_conversation_message_by_slug", List[InputMessage], ResourceFieldAdded
     )
     get_resource_field = _request_sync_builder("get_resource_field", type(None), ResourceField)
     get_resource_field_by_slug = _request_sync_builder(
@@ -1176,6 +1192,9 @@ class NucliaDBAsync(_NucliaDBBase):
     get_resource_by_id = _request_async_builder("get_resource_by_id", type(None), Resource)
     list_resources = _request_async_builder("list_resources", type(None), ResourceList)
     catalog = _request_async_builder("catalog", CatalogRequest, CatalogResponse)
+    catalog_facets = _request_async_builder(
+        "catalog_facets", CatalogFacetsRequest, CatalogFacetsResponse
+    )
     # reindex/reprocess
     reindex_resource = _request_async_builder("reindex_resource", type(None), type(None))
     reindex_resource_by_slug = _request_async_builder("reindex_resource_by_slug", type(None), type(None))
@@ -1188,6 +1207,9 @@ class NucliaDBAsync(_NucliaDBBase):
     # Conversation endpoints
     add_conversation_message = _request_async_builder(
         "add_conversation_message", List[InputMessage], ResourceFieldAdded
+    )
+    add_conversation_message_by_slug = _request_async_builder(
+        "add_conversation_message_by_slug", List[InputMessage], ResourceFieldAdded
     )
     get_resource_field = _request_async_builder("get_resource_field", type(None), ResourceField)
     get_resource_field_by_slug = _request_async_builder(

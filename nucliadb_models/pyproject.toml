@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb_models"
-version = "6.5.0"
+version = "6.6.1"
 license = "Apache-2.0"
 readme = "README.md"
 authors = [{ name = "Nuclia", email = "nucliadb@nuclia.com" }]
@@ -19,7 +19,8 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 requires-python = ">=3.9, <4"
-dependencies = ["pydantic>=2.6"]
+# https://github.com/pydantic/pydantic/issues/11978
+dependencies = ["pydantic>=2.6,!=2.11.5,!=2.11.6"]
 
 [project.urls]
 Homepage = "https://nuclia.com"

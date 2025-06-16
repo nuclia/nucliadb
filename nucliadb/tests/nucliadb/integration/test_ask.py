@@ -1666,6 +1666,43 @@ async def test_ask_neighbouring_paragraphs_rag_strategy(
     assert augmented[0].text == paragraphs[0]
     assert augmented[1].text == paragraphs[2]
 
+    # Check that combined with hierarchy rag strategy works well
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/ask",
+        json={
+            "query": "Nuria",  # To match the middle paragraph
+            "features": ["keyword"],
+            "top_k": 1,
+            "debug": True,
+            "rag_strategies": [
+                {
+                    "name": "hierarchy",
+                },
+                {
+                    "name": "neighbouring_paragraphs",
+                    "before": 1,
+                    "after": 1,
+                },
+            ],
+        },
+        headers={"x-synchronous": "true"},
+    )
+    resp.raise_for_status()
+    ask = SyncAskResponse.model_validate(resp.json())
+    prompt_context = ask.prompt_context
+    assert prompt_context is not None
+    assert len(prompt_context) == 3
+    # The retrieved paragraph is the one with the hierarchy information
+    assert (
+        prompt_context[0]
+        == "DOCUMENT: My resource \n SUMMARY:  \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n Nuria used be friends with Mario."
+    )
+    assert prompt_context[1] == "Mario is my older brother."
+    assert prompt_context[2] == "We all know each other now."
+    _, augmented = _fetch_paragraphs(ask)
+    assert len(augmented) == 3
+    assert augmented[0].augmentation_type.value == "hierarchy"
+
 
 def _fetch_paragraphs(
     ask_response: SyncAskResponse,

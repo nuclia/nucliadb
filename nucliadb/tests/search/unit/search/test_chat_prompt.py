@@ -217,7 +217,7 @@ async def test_default_prompt_context(kb):
             "kbid",
             get_ordered_paragraphs(find_results),
         )
-        prompt_result = context.output
+        prompt_result = context.cap()
         # Check that the results are sorted by increasing order and that the extra
         # context is added at the beginning, indicating that it has the most priority
         paragraph_ids = [pid for pid in prompt_result.keys()]
@@ -288,11 +288,20 @@ def test_capped_prompt_context():
     # Check that output is trimmed
     context["key1"] = "123"
 
-    assert context.output == {"key1": "12"}
+    context.cap()
+    context.output == {"key1": "12"}
     assert context.size == 2
+
+    # Check that is trimmed from the last added key
+    context = chat_prompt.CappedPromptContext(max_size=2)
+    context["key1"] = "12"
+    context["key2"] = "34"
+    context.cap()
+    assert context.output == {"key1": "12"}
 
     # Update existing value
     context["key1"] = "foobar"
+    context.cap()
     assert context.output == {"key1": "fo"}
     assert context.size == 2
 
@@ -303,6 +312,7 @@ def test_capped_prompt_context():
     context = chat_prompt.CappedPromptContext(max_size=None)
     context["key1"] = "foo" * int(1e6)
 
+    context.cap()
     assert context.output == {"key1": "foo" * int(1e6)}
     assert context.size == int(3e6)
 
@@ -366,9 +376,9 @@ async def test_hierarchy_promp_context(kb):
         assert ordered_paragraphs[0].text == "First Paragraph text"
         assert ordered_paragraphs[1].text == "Second paragraph text"
 
-        assert augmented_context.fields["r1/f/f1"].id == "r1/f/f1"
-        assert augmented_context.fields["r1/f/f1"].text.startswith("DOCUMENT: Title")
-        assert augmented_context.fields["r1/f/f1"].augmentation_type == "hierarchy"
+        assert augmented_context.paragraphs["r1/f/f1/0-10"].id == "r1/f/f1/0-10"
+        assert augmented_context.paragraphs["r1/f/f1/0-10"].text.startswith("DOCUMENT: Title")
+        assert augmented_context.paragraphs["r1/f/f1/0-10"].augmentation_type == "hierarchy"
 
 
 async def test_extend_prompt_context_with_metadata():

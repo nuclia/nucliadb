@@ -1782,12 +1782,12 @@ nkeys = [
 
 [[package]]
 name = "nidx-binding"
-version = "6.5.0"
+version = "6.6.1"
 source = { editable = "nidx/nidx_binding" }
 
 [[package]]
 name = "nidx-protos"
-version = "6.5.0"
+version = "6.6.1"
 source = { editable = "nidx/nidx_protos" }
 
 [[package]]
@@ -1822,7 +1822,7 @@ wheels = [
 
 [[package]]
 name = "nucliadb"
-version = "6.5.0"
+version = "6.6.1"
 source = { editable = "nucliadb" }
 dependencies = [
     { name = "aiobotocore" },
@@ -1929,7 +1929,7 @@ requires-dist = [
     { name = "nucliadb-utils", extras = ["storages", "fastapi", "cache"], editable = "nucliadb_utils" },
     { name = "oauth2client" },
     { name = "orjson", specifier = ">=3.6.7" },
-    { name = "protobuf", specifier = ">=5" },
+    { name = "protobuf", specifier = ">=5,<6" },
     { name = "psutil", specifier = ">=5.9.7" },
     { name = "psycopg", extras = ["binary", "pool"] },
     { name = "pydantic", specifier = ">=2.6" },
@@ -1942,7 +1942,7 @@ requires-dist = [
     { name = "types-aiofiles", specifier = ">=0.8.3" },
     { name = "types-cachetools", specifier = ">=5.3.0.5" },
     { name = "types-orjson" },
-    { name = "types-protobuf", specifier = ">=5" },
+    { name = "types-protobuf", specifier = ">=5,<6" },
     { name = "types-psutil", specifier = ">=5.9.5.17" },
     { name = "types-setuptools" },
     { name = "uvicorn", extras = ["standard"] },
@@ -1959,7 +1959,7 @@ wheels = [
 
 [[package]]
 name = "nucliadb-dataset"
-version = "6.5.0"
+version = "6.6.1"
 source = { editable = "nucliadb_dataset" }
 dependencies = [
     { name = "aiohttp" },
@@ -1992,18 +1992,18 @@ requires-dist = [
 
 [[package]]
 name = "nucliadb-models"
-version = "6.5.0"
+version = "6.6.1"
 source = { editable = "nucliadb_models" }
 dependencies = [
     { name = "pydantic" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.6" }]
+requires-dist = [{ name = "pydantic", specifier = ">=2.6,!=2.11.5,!=2.11.6" }]
 
 [[package]]
 name = "nucliadb-protos"
-version = "6.5.0"
+version = "6.6.1"
 source = { editable = "nucliadb_protos" }
 dependencies = [
     { name = "mypy-protobuf" },
@@ -2020,7 +2020,7 @@ requires-dist = [
 
 [[package]]
 name = "nucliadb-sdk"
-version = "6.5.0"
+version = "6.6.1"
 source = { editable = "nucliadb_sdk" }
 dependencies = [
     { name = "httpx" },
@@ -2041,7 +2041,7 @@ requires-dist = [
 
 [[package]]
 name = "nucliadb-telemetry"
-version = "6.5.0"
+version = "6.6.1"
 source = { editable = "nucliadb_telemetry" }
 dependencies = [
     { name = "orjson" },
@@ -2205,7 +2205,7 @@ provides-extras = ["otel", "grpc", "nats", "fastapi", "all"]
 
 [[package]]
 name = "nucliadb-utils"
-version = "6.5.0"
+version = "6.6.1"
 source = { editable = "nucliadb_utils" }
 dependencies = [
     { name = "aiohttp" },
@@ -2280,7 +2280,7 @@ provides-extras = ["cache", "fastapi", "storages"]
 
 [[package]]
 name = "nucliadb-workspace"
-version = "6.5.0"
+version = "6.6.1"
 source = { virtual = "." }
 dependencies = [
     { name = "nucliadb" },
@@ -3154,7 +3154,7 @@ wheels = [
 
 [[package]]
 name = "pydantic"
-version = "2.11.4"
+version = "2.11.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-types" },
@@ -3162,9 +3162,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "typing-inspection" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/77/ab/5250d56ad03884ab5efd07f734203943c8a8ab40d551e208af81d0257bf2/pydantic-2.11.4.tar.gz", hash = "sha256:32738d19d63a226a52eed76645a98ee07c1f410ee41d93b4afbfa85ed8111c2d", size = 786540, upload-time = "2025-04-29T20:38:55.02Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/dd/4325abf92c39ba8623b5af936ddb36ffcfe0beae70405d456ab1fb2f5b8c/pydantic-2.11.7.tar.gz", hash = "sha256:d989c3c6cb79469287b1569f7447a17848c998458d49ebe294e975b9baf0f0db", size = 788350, upload-time = "2025-06-14T08:33:17.137Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e7/12/46b65f3534d099349e38ef6ec98b1a5a81f42536d17e0ba382c28c67ba67/pydantic-2.11.4-py3-none-any.whl", hash = "sha256:d9615eaa9ac5a063471da949c8fc16376a84afb5024688b3ff885693506764eb", size = 443900, upload-time = "2025-04-29T20:38:52.724Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/c0/ec2b1c8712ca690e5d61979dee872603e92b8a32f94cc1b72d53beab008a/pydantic-2.11.7-py3-none-any.whl", hash = "sha256:dde5df002701f6de26248661f6835bbe296a47bf73990135c7d07ce741b9623b", size = 444782, upload-time = "2025-06-14T08:33:14.905Z" },
 ]
 
 [package.optional-dependencies]
@@ -4006,11 +4006,11 @@ wheels = [
 
 [[package]]
 name = "typing-extensions"
-version = "4.12.2"
+version = "4.14.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/df/db/f35a00659bc03fec321ba8bce9420de607a1d37f8342eee1863174c69557/typing_extensions-4.12.2.tar.gz", hash = "sha256:1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8", size = 85321, upload-time = "2024-06-07T18:52:15.995Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d1/bc/51647cd02527e87d05cb083ccc402f93e441606ff1f01739a62c8ad09ba5/typing_extensions-4.14.0.tar.gz", hash = "sha256:8676b788e32f02ab42d9e7c61324048ae4c6d844a399eebace3d4979d75ceef4", size = 107423, upload-time = "2025-06-02T14:52:11.399Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/26/9f/ad63fc0248c5379346306f8668cda6e2e2e9c95e01216d2b8ffd9ff037d0/typing_extensions-4.12.2-py3-none-any.whl", hash = "sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d", size = 37438, upload-time = "2024-06-07T18:52:13.582Z" },
+    { url = "https://files.pythonhosted.org/packages/69/e0/552843e0d356fbb5256d21449fa957fa4eff3bbc135a74a691ee70c7c5da/typing_extensions-4.14.0-py3-none-any.whl", hash = "sha256:a1514509136dd0b477638fc68d6a91497af5076466ad0fa6c338e44e359944af", size = 43839, upload-time = "2025-06-02T14:52:10.026Z" },
 ]
 
 [[package]]

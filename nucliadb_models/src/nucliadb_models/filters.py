@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 
+from collections.abc import Sequence
 from enum import Enum
 from typing import Any, Generic, Literal, Optional, TypeVar, Union
 from uuid import UUID
@@ -31,7 +32,7 @@ F = TypeVar("F", bound=BaseModel)
 class And(BaseModel, Generic[F], extra="forbid"):
     """AND of other expressions"""
 
-    operands: list[F] = pydantic.Field(
+    operands: Sequence[F] = pydantic.Field(
         serialization_alias="and", validation_alias=AliasChoices("operands", "and"), min_length=1
     )
 
@@ -43,7 +44,7 @@ class And(BaseModel, Generic[F], extra="forbid"):
 class Or(BaseModel, Generic[F], extra="forbid"):
     """OR of other expressions"""
 
-    operands: list[F] = pydantic.Field(
+    operands: Sequence[F] = pydantic.Field(
         serialization_alias="or", validation_alias=AliasChoices("operands", "or"), min_length=1
     )
 
