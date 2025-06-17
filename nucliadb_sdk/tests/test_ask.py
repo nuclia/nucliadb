@@ -77,6 +77,8 @@ def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
 
 
 def test_ask_on_kb_pydantic(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
+    """This test intends to check that the serialization of the AskRequest
+    is correctly done and compatible with discriminator fields."""
     result: SyncAskResponse = sdk.ask(
         kbid=docs_dataset,
         content=AskRequest(

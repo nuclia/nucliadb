@@ -548,7 +548,7 @@ def _parse_list_of_pydantic(
     output = []
     for item in data:
         if isinstance(item, BaseModel):
-            output.append(item.model_dump(by_alias=True, exclude_unset=True))
+            output.append(item.model_dump(by_alias=True))
         else:
             output.append(item)
     return orjson.dumps(output).decode("utf-8")
@@ -597,7 +597,7 @@ def prepare_request(
             elif not isinstance(content, request_type):
                 raise TypeError(f"Expected {request_type}, got {type(content)}")
             elif isinstance(content, BaseModel):
-                data = content.model_dump_json(by_alias=True, exclude_unset=True)
+                data = content.model_dump_json(by_alias=True)
             else:
                 raise TypeError(f"Unknown type {type(content)}")
         else:
@@ -607,9 +607,7 @@ def prepare_request(
                 for key in list(kwargs.keys()):
                     if key in request_type.model_fields:
                         content_data[key] = kwargs.pop(key)
-                data = request_type.model_validate(content_data).model_dump_json(
-                    by_alias=True, exclude_unset=True
-                )
+                data = request_type.model_validate(content_data).model_dump_json(by_alias=True)
     elif (
         isinstance(content, str)
         or isinstance(content, dict)
