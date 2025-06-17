@@ -37,8 +37,8 @@ class And(BaseModel, Generic[F], extra="forbid"):
     )
 
     @pydantic.model_serializer
-    def serialize_boolean(self) -> dict[str, Any]:
-        return {"and": [op.model_dump() for op in self.operands]}
+    def serialize_boolean(self, info: pydantic.SerializationInfo) -> dict[str, Any]:
+        return {"and": [op.model_dump(exclude_unset=info.exclude_unset) for op in self.operands]}
 
 
 class Or(BaseModel, Generic[F], extra="forbid"):
@@ -49,8 +49,8 @@ class Or(BaseModel, Generic[F], extra="forbid"):
     )
 
     @pydantic.model_serializer
-    def serialize_boolean(self) -> dict[str, Any]:
-        return {"or": [op.model_dump() for op in self.operands]}
+    def serialize_boolean(self, info: pydantic.SerializationInfo) -> dict[str, Any]:
+        return {"or": [op.model_dump(exclude_unset=info.exclude_unset) for op in self.operands]}
 
 
 class Not(BaseModel, Generic[F], extra="forbid"):
@@ -61,11 +61,21 @@ class Not(BaseModel, Generic[F], extra="forbid"):
     )
 
     @pydantic.model_serializer
-    def serialize_boolean(self) -> dict[str, Any]:
-        return {"not": self.operand.model_dump()}
+    def serialize_boolean(self, info: pydantic.SerializationInfo) -> dict[str, Any]:
+        return {"not": self.operand.model_dump(exclude_unset=info.exclude_unset)}
 
 
-class Resource(BaseModel, extra="forbid"):
+class FilterProp(BaseModel):
+    prop: str
+
+    @model_validator(mode="after")
+    def set_discriminator(self) -> Self:
+        # Ensure discriminator is explicitly set so it's always serialized
+        self.prop = self.prop
+        return self
+
+
+class Resource(FilterProp, extra="forbid"):
     """Matches all fields of a resource given its id or slug"""
 
     prop: Literal["resource"] = "resource"
@@ -92,7 +102,7 @@ class Resource(BaseModel, extra="forbid"):
         return self
 
 
-class Field(BaseModel, extra="forbid"):
+class Field(FilterProp, extra="forbid"):
     """Matches a field or set of fields"""
 
     prop: Literal["field"] = "field"
@@ -103,14 +113,14 @@ class Field(BaseModel, extra="forbid"):
     )
 
 
-class Keyword(BaseModel, extra="forbid"):
+class Keyword(FilterProp, extra="forbid"):
     """Matches all fields that contain a keyword"""
 
     prop: Literal["keyword"] = "keyword"
     word: str = pydantic.Field(description="Keyword to find")
 
 
-class DateCreated(BaseModel, extra="forbid"):
+class DateCreated(FilterProp, extra="forbid"):
     """Matches all fields created in a date range"""
 
     prop: Literal["created"] = "created"
@@ -128,7 +138,7 @@ class DateCreated(BaseModel, extra="forbid"):
         return self
 
 
-class DateModified(BaseModel, extra="forbid"):
+class DateModified(FilterProp, extra="forbid"):
     """Matches all fields modified in a date range"""
 
     prop: Literal["modified"] = "modified"
@@ -146,7 +156,7 @@ class DateModified(BaseModel, extra="forbid"):
         return self
 
 
-class Label(BaseModel, extra="forbid"):
+class Label(FilterProp, extra="forbid"):
     """Matches fields/paragraphs with a label (or labelset)"""
 
     prop: Literal["label"] = "label"
@@ -157,7 +167,7 @@ class Label(BaseModel, extra="forbid"):
     )
 
 
-class ResourceMimetype(BaseModel, extra="forbid"):
+class ResourceMimetype(FilterProp, extra="forbid"):
     """Matches resources with a mimetype.
 
     The mimetype of a resource can be assigned independently of the mimetype of its fields.
@@ -176,7 +186,7 @@ class ResourceMimetype(BaseModel, extra="forbid"):
     )
 
 
-class FieldMimetype(BaseModel, extra="forbid"):
+class FieldMimetype(FilterProp, extra="forbid"):
     """Matches fields with a mimetype"""
 
     prop: Literal["field_mimetype"] = "field_mimetype"
@@ -192,7 +202,7 @@ class FieldMimetype(BaseModel, extra="forbid"):
     )
 
 
-class Entity(BaseModel, extra="forbid"):
+class Entity(FilterProp, extra="forbid"):
     """Matches fields that contains a detected entity"""
 
     prop: Literal["entity"] = "entity"
@@ -203,7 +213,7 @@ class Entity(BaseModel, extra="forbid"):
     )
 
 
-class Language(BaseModel, extra="forbid"):
+class Language(FilterProp, extra="forbid"):
     """Matches the language of the field"""
 
     prop: Literal["language"] = "language"
@@ -214,14 +224,14 @@ class Language(BaseModel, extra="forbid"):
     language: str = pydantic.Field(description="The code of the language to match, e.g: en")
 
 
-class OriginTag(BaseModel, extra="forbid"):
+class OriginTag(FilterProp, extra="forbid"):
     """Matches all fields with a given origin tag"""
 
     prop: Literal["origin_tag"] = "origin_tag"
     tag: str = pydantic.Field(description="The tag to match")
 
 
-class OriginMetadata(BaseModel, extra="forbid"):
+class OriginMetadata(FilterProp, extra="forbid"):
     """Matches metadata from the origin"""
 
     prop: Literal["origin_metadata"] = "origin_metadata"
@@ -232,7 +242,7 @@ class OriginMetadata(BaseModel, extra="forbid"):
     )
 
 
-class OriginPath(BaseModel, extra="forbid"):
+class OriginPath(FilterProp, extra="forbid"):
     """Matches the origin path"""
 
     prop: Literal["origin_path"] = "origin_path"
@@ -245,21 +255,21 @@ class OriginPath(BaseModel, extra="forbid"):
     )
 
 
-class OriginSource(BaseModel, extra="forbid"):
+class OriginSource(FilterProp, extra="forbid"):
     """Matches the origin source id"""
 
     prop: Literal["origin_source"] = "origin_source"
     id: Optional[str] = pydantic.Field(default=None, description=("Source ID"))
 
 
-class OriginCollaborator(BaseModel, extra="forbid"):
+class OriginCollaborator(FilterProp, extra="forbid"):
     """Matches the origin collaborators"""
 
     prop: Literal["origin_collaborator"] = "origin_collaborator"
     collaborator: str = pydantic.Field(description=("Collaborator"))
 
 
-class Generated(BaseModel, extra="forbid"):
+class Generated(FilterProp, extra="forbid"):
     """Matches if the field was generated by the given source"""
 
     prop: Literal["generated"] = "generated"
@@ -271,14 +281,14 @@ class Generated(BaseModel, extra="forbid"):
     )
 
 
-class Kind(BaseModel, extra="forbid"):
+class Kind(FilterProp, extra="forbid"):
     """Matches paragraphs of a certain kind"""
 
     prop: Literal["kind"] = "kind"
     kind: Paragraph.TypeParagraph = pydantic.Field(description="The kind of paragraph to match")
 
 
-class Status(BaseModel, extra="forbid"):
+class Status(FilterProp, extra="forbid"):
     """Matches resource in a certain processing status"""
 
     prop: Literal["status"] = "status"
