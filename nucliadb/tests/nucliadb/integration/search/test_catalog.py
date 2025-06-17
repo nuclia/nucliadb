@@ -24,6 +24,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb_protos import resources_pb2 as rpb
+from nucliadb_protos import writer_pb2
 from nucliadb_protos import writer_pb2 as wpb
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
@@ -741,4 +742,77 @@ async def test_catalog_facets(
         "/n/i/application/generic": 2,
         "/p/very/deep/path": 1,
         "/p/very/deep/path/to": 1,
+    }
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_catalog_data_augmentation_labels(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
+):
+    # Create resource
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": f"Resource",
+            "texts": {
+                "text": {
+                    "body": f"Text for resource",
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Process resource
+    bm = broker_resource(
+        standalone_knowledgebox, rid=rid, source=wpb.BrokerMessage.MessageSource.PROCESSOR
+    )
+
+    fcmw = writer_pb2.FieldComputedMetadataWrapper()
+    fcmw.field.field = "body"
+    fcmw.field.field_type = rpb.FieldType.TEXT
+    fcmw.metadata.metadata.classifications.add(labelset="vegetables", label="potato")
+    bm.field_metadata.append(fcmw)
+
+    etw = writer_pb2.ExtractedTextWrapper()
+    etw.field.field = "body"
+    etw.field.field_type = rpb.FieldType.TEXT
+    etw.body.text = "Eat your veggies!"
+    bm.extracted_text.append(etw)
+
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    # Check it returns it without filter
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["resources"][rid]["computedmetadata"]["field_classifications"][0]["classifications"] == [
+        {"labelset": "vegetables", "label": "potato"}
+    ]
+
+    # Check it returns it with filter
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={"filters": ["/classification.labels/vegetables"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert list(body["resources"].keys()) == [rid]
+
+    # Check facets are returned
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={"faceted": ["/classification.labels/vegetables"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["fulltext"]["facets"] == {
+        "/classification.labels/vegetables": {"/classification.labels/vegetables/potato": 1}
     }

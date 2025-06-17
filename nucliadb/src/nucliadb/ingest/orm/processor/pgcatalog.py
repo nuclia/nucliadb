@@ -65,6 +65,11 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource, inde
         modified_at = created_at
 
     async with _pg_transaction(txn).connection.cursor() as cur:
+        # Labels from the resource and classification labels from each field
+        labels = [label for label in index_message.labels]
+        for field in index_message.texts.values():
+            labels += [label for label in field.labels if label.startswith("/l/")]
+
         await cur.execute(
             """
             INSERT INTO catalog
@@ -83,7 +88,7 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource, inde
                 "title": resource.basic.title,
                 "created_at": created_at,
                 "modified_at": modified_at,
-                "labels": list(index_message.labels),
+                "labels": labels,
                 "slug": resource.basic.slug,
             },
         )
@@ -99,7 +104,7 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource, inde
             {
                 "kbid": resource.kb.kbid,
                 "rid": resource.uuid,
-                "facets": list(extract_facets(index_message.labels)),
+                "facets": list(extract_facets(labels)),
             },
         )
 
