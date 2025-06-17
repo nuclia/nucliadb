@@ -752,22 +752,63 @@ async def test_catalog_data_augmentation_labels(
     nucliadb_ingest_grpc: WriterStub,
     standalone_knowledgebox,
 ):
+    async def check_labels():
+        # Check it returns it without filter
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/catalog",
+            json={},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert sorted(
+            body["resources"][rid]["computedmetadata"]["field_classifications"],
+            key=lambda x: x["field"]["field"],
+        ) == [
+            {
+                "field": {"field_type": "text", "field": "body"},
+                "classifications": [{"labelset": "vegetables", "label": "potato"}],
+            },
+            {
+                "field": {"field_type": "generic", "field": "title"},
+                "classifications": [{"labelset": "vegetables", "label": "carrot"}],
+            },
+        ]
+
+        # Check it returns it with filter
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/catalog",
+            json={"filters": ["/classification.labels/vegetables"]},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert list(body["resources"].keys()) == [rid]
+
+        # Check facets are returned
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/catalog",
+            json={"faceted": ["/classification.labels/vegetables"]},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["fulltext"]["facets"] == {
+            "/classification.labels/vegetables": {
+                "/classification.labels/vegetables/potato": 1,
+                "/classification.labels/vegetables/carrot": 1,
+            }
+        }
+
     # Create resource
     resp = await nucliadb_writer.post(
         f"/kb/{standalone_knowledgebox}/resources",
         json={
             "title": f"Resource",
-            "texts": {
-                "text": {
-                    "body": f"Text for resource",
-                }
-            },
+            "texts": {"text": {"body": "Text for resource"}},
         },
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    # Process resource
+    # Process resource (two fields)
     bm = broker_resource(
         standalone_knowledgebox, rid=rid, source=wpb.BrokerMessage.MessageSource.PROCESSOR
     )
@@ -778,6 +819,12 @@ async def test_catalog_data_augmentation_labels(
     fcmw.metadata.metadata.classifications.add(labelset="vegetables", label="potato")
     bm.field_metadata.append(fcmw)
 
+    fcmw = writer_pb2.FieldComputedMetadataWrapper()
+    fcmw.field.field = "title"
+    fcmw.field.field_type = rpb.FieldType.GENERIC
+    fcmw.metadata.metadata.classifications.add(labelset="vegetables", label="carrot")
+    bm.field_metadata.append(fcmw)
+
     etw = writer_pb2.ExtractedTextWrapper()
     etw.field.field = "body"
     etw.field.field_type = rpb.FieldType.TEXT
@@ -786,33 +833,28 @@ async def test_catalog_data_augmentation_labels(
 
     await inject_message(nucliadb_ingest_grpc, bm)
 
-    # Check it returns it without filter
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/catalog",
-        json={},
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["resources"][rid]["computedmetadata"]["field_classifications"][0]["classifications"] == [
-        {"labelset": "vegetables", "label": "potato"}
-    ]
+    # Check all labels present
+    await check_labels()
 
-    # Check it returns it with filter
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/catalog",
-        json={"filters": ["/classification.labels/vegetables"]},
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert list(body["resources"].keys()) == [rid]
+    # Reprocess a single field
+    bm = wpb.BrokerMessage()
+    bm.source = wpb.BrokerMessage.MessageSource.PROCESSOR
+    bm.uuid = rid
+    bm.kbid = standalone_knowledgebox
 
-    # Check facets are returned
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/catalog",
-        json={"faceted": ["/classification.labels/vegetables"]},
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["fulltext"]["facets"] == {
-        "/classification.labels/vegetables": {"/classification.labels/vegetables/potato": 1}
-    }
+    fcmw = writer_pb2.FieldComputedMetadataWrapper()
+    fcmw.field.field = "body"
+    fcmw.field.field_type = rpb.FieldType.TEXT
+    fcmw.metadata.metadata.classifications.add(labelset="vegetables", label="potato")
+    bm.field_metadata.append(fcmw)
+
+    etw = writer_pb2.ExtractedTextWrapper()
+    etw.field.field = "body"
+    etw.field.field_type = rpb.FieldType.TEXT
+    etw.body.text = "Eat your potatoes!"
+    bm.extracted_text.append(etw)
+
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    # Check all labels present
+    await check_labels()
