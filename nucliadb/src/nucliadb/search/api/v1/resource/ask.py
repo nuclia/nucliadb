@@ -48,6 +48,7 @@ async def resource_ask_endpoint_by_uuid(
     kbid: str,
     rid: str,
     item: AskRequest,
+    x_show_consumption: bool = Header(default=False),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -58,13 +59,14 @@ async def resource_ask_endpoint_by_uuid(
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
     return await create_ask_response(
-        kbid,
-        item,
-        x_nucliadb_user,
-        x_ndb_client,
-        x_forwarded_for,
-        x_synchronous,
+        kbid=kbid,
+        ask_request=item,
+        user_id=x_nucliadb_user,
+        client_type=x_ndb_client,
+        origin=x_forwarded_for,
+        x_synchronous=x_synchronous,
         resource=rid,
+        extra_predict_headers={"X-Show-Consumption": str(x_show_consumption).lower()},
     )
 
 
@@ -83,6 +85,7 @@ async def resource_ask_endpoint_by_slug(
     kbid: str,
     slug: str,
     item: AskRequest,
+    x_show_consumption: bool = Header(default=False),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -96,11 +99,12 @@ async def resource_ask_endpoint_by_slug(
     if resource_id is None:
         return HTTPClientError(status_code=404, detail="Resource not found")
     return await create_ask_response(
-        kbid,
-        item,
-        x_nucliadb_user,
-        x_ndb_client,
-        x_forwarded_for,
-        x_synchronous,
+        kbid=kbid,
+        ask_request=item,
+        user_id=x_nucliadb_user,
+        client_type=x_ndb_client,
+        origin=x_forwarded_for,
+        x_synchronous=x_synchronous,
         resource=resource_id,
+        extra_predict_headers={"X-Show-Consumption": str(x_show_consumption).lower()},
     )

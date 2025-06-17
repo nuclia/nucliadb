@@ -63,6 +63,7 @@ class PredictProxiedEndpoints(str, Enum):
 
 ALLOWED_HEADERS = [
     "Accept",  # To allow 'application/x-ndjson' on the /chat endpoint
+    "X-show-consumption",  # To show token consumption in the response
 ]
 
 PREDICT_ANSWER_METRIC = "predict_answer_proxy_metric"

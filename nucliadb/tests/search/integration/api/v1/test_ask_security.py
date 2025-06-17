@@ -25,7 +25,9 @@ from nucliadb.search.api.v1.router import KB_PREFIX
 
 
 async def test_ask_receives_injected_security_groups(
-    cluster_nucliadb_search: AsyncClient, test_search_resource: str, mocker: MockerFixture
+    cluster_nucliadb_search: AsyncClient,
+    test_search_resource: str,
+    mocker: MockerFixture,
 ) -> None:
     from nucliadb.search.api.v1 import ask
     from nucliadb_models.search import AskRequest
@@ -42,7 +44,7 @@ async def test_ask_receives_injected_security_groups(
     )
     assert resp.status_code == 200
     spy.assert_called_once()
-    ask_request = spy.call_args[0][1]
+    ask_request = spy.call_args[1]["ask_request"]
     assert isinstance(ask_request, AskRequest)
     assert ask_request.security is not None
     assert set(ask_request.security.groups) == {"group1", "group2"}
@@ -55,7 +57,7 @@ async def test_ask_receives_injected_security_groups(
     )
     assert resp.status_code == 200
     spy.assert_called_once()
-    ask_request = spy.call_args[0][1]
+    ask_request = spy.call_args[1]["ask_request"]
     assert isinstance(ask_request, AskRequest)
     assert ask_request.security is not None
     assert set(ask_request.security.groups) == {"group1", "group2"}
@@ -69,7 +71,7 @@ async def test_ask_receives_injected_security_groups(
     )
     assert resp.status_code == 200
     spy.assert_called_once()
-    ask_request = spy.call_args[0][1]
+    ask_request = spy.call_args[1]["ask_request"]
     assert isinstance(ask_request, AskRequest)
     assert ask_request.security is not None
     assert set(ask_request.security.groups) == {"group1", "group2"}
@@ -82,7 +84,7 @@ async def test_ask_receives_injected_security_groups(
     )
     assert resp.status_code == 200
     spy.assert_called_once()
-    ask_request = spy.call_args[0][1]
+    ask_request = spy.call_args[1]["ask_request"]
     assert isinstance(ask_request, AskRequest)
     assert ask_request.security is None
     spy.reset_mock()

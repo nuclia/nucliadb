@@ -19,7 +19,7 @@
 #
 from typing import Union
 
-from fastapi import Request
+from fastapi import Header, Request
 from fastapi_versioning import version
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
@@ -47,9 +47,14 @@ async def summarize_endpoint(
     request: Request,
     kbid: str,
     item: SummarizeRequest,
+    x_show_consumption: bool = Header(default=False),
 ) -> Union[SummarizedResponse, HTTPClientError]:
     try:
-        return await summarize(kbid, item)
+        return await summarize(
+            kbid=kbid,
+            request=item,
+            extra_predict_headers={"X-Show-Consumption": str(x_show_consumption).lower()},
+        )
     except KnowledgeBoxNotFound:
         return HTTPClientError(status_code=404, detail="Knowledge box not found")
     except NoResourcesToSummarize:

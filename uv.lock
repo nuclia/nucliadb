@@ -1810,14 +1810,14 @@ wheels = [
 
 [[package]]
 name = "nuclia-models"
-version = "0.41.0"
+version = "0.43.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic", extra = ["email"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/6f/0e0a0ccc37e49bc4c6d9f6f6e5aaa2b7daaa6a889858a1180276a12b2050/nuclia_models-0.41.0.tar.gz", hash = "sha256:8f51d997e6f97aaece75e32fbc49ef78f85807883a42aee8fec4a82e1d8dbead", size = 20975, upload-time = "2025-05-20T08:22:07.55Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a0/ea/dc2236e29d0b0474f5901d1bdef40529604b0b096cb1c0d8a26d7874d899/nuclia_models-0.43.0.tar.gz", hash = "sha256:bdaea4832093f5a1eafc36191e483598998b99267fe8674d485c3831ac691963", size = 21819, upload-time = "2025-06-06T08:17:34.987Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/95/89/881f925cff01393a122d41f4139ea5f1c05031fb5694640652bb8f9ffa11/nuclia_models-0.41.0-py3-none-any.whl", hash = "sha256:36f738864e29077384dbdfd6d9ef067cad3b6319d4c7caeb661d00413b8b534d", size = 25387, upload-time = "2025-05-20T08:22:06.284Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/90/be73487c8a2ac0221d278ac8a0192cd2a4188f1ae28f842283da7660f7d7/nuclia_models-0.43.0-py3-none-any.whl", hash = "sha256:75e72d0958fe592608c67181f674604e2a61a186d2602f96cfe773104a5f5d4e", size = 26068, upload-time = "2025-06-06T08:17:33.741Z" },
 ]
 
 [[package]]
@@ -1921,7 +1921,7 @@ requires-dist = [
     { name = "mmh3", specifier = ">=3.0.0" },
     { name = "multidict", specifier = ">=6.0.4" },
     { name = "nidx-protos", editable = "nidx/nidx_protos" },
-    { name = "nuclia-models", specifier = ">=0.24.2" },
+    { name = "nuclia-models", specifier = ">=0.43.0" },
     { name = "nucliadb-admin-assets", specifier = ">=1.0.0.post1224" },
     { name = "nucliadb-models", editable = "nucliadb_models" },
     { name = "nucliadb-protos", editable = "nucliadb_protos" },
@@ -2033,7 +2033,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "httpx" },
-    { name = "nuclia-models", specifier = ">=0.24.2" },
+    { name = "nuclia-models", specifier = ">=0.43.0" },
     { name = "nucliadb-models", editable = "nucliadb_models" },
     { name = "orjson" },
     { name = "pydantic", specifier = ">=2.6" },

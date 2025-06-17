@@ -42,6 +42,8 @@ from nucliadb_models.internal.shards import (  # noqa isort: skip
     ShardReplica,
     KnowledgeboxShards,
 )
+from nuclia_models.common.consumption import Consumption
+
 from nucliadb_models.filters import CatalogFilterExpression, FilterExpression
 
 ANSWER_JSON_SCHEMA_EXAMPLE = {
@@ -1815,6 +1817,7 @@ class SummarizedResponse(BaseModel):
         title="Summary",
         description="Global summary of all resources combined.",
     )
+    consumption: Optional[Consumption] = None
 
 
 class KnowledgeGraphEntity(BaseModel):
@@ -2200,6 +2203,14 @@ class SyncAskResponse(BaseModel):
         title="Metadata",
         description="Metadata of the query execution. This includes the number of tokens used in the LLM context and answer, and the timings of the generative model.",  # noqa: E501
     )
+    consumption: Optional[Consumption] = Field(
+        default=None,
+        title="Consumption",
+        description=(
+            "The consumption of the query execution. Return only if"
+            " 'X-show-consumption' header is set to true in the request."
+        ),
+    )
     error_details: Optional[str] = Field(
         default=None,
         title="Error details",
@@ -2245,6 +2256,18 @@ class MetadataAskResponseItem(BaseModel):
     type: Literal["metadata"] = "metadata"
     tokens: AskTokens
     timings: AskTimings
+
+
+class TokensDetail(BaseModel):
+    input: float
+    output: float
+    image: float
+
+
+class ConsumptionResponseItem(BaseModel):
+    type: Literal["consumption"] = "consumption"
+    normalized_tokens: TokensDetail
+    customer_key_tokens: TokensDetail
 
 
 class AugmentedContextResponseItem(BaseModel):
@@ -2297,6 +2320,7 @@ AskResponseItemType = Union[
     RelationsAskResponseItem,
     DebugAskResponseItem,
     PrequeriesAskResponseItem,
+    ConsumptionResponseItem,
 ]
 
 
