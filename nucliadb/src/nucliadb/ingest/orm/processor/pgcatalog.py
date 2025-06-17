@@ -65,12 +65,20 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource, inde
         modified_at = created_at
 
     async with _pg_transaction(txn).connection.cursor() as cur:
+        # Do not index canceled labels
+        cancelled_labels = {
+            f"/l/{clf.labelset}/{clf.label}"
+            for clf in resource.basic.usermetadata.classifications
+            if clf.cancelled_by_user
+        }
+
         # Labels from the resource and classification labels from each field
         labels = [label for label in index_message.labels]
-        for field in (await resource.get_fields()).values():
-            meta = await field.get_field_metadata()
-            if meta:
-                labels += [f"/l/{c.labelset}/{c.label}" for c in meta.metadata.classifications]
+        for classification in resource.basic.computedmetadata.field_classifications:
+            for clf in classification.classifications:
+                label = f"/l/{clf.labelset}/{clf.label}"
+                if label not in cancelled_labels:
+                    labels.append(label)
 
         await cur.execute(
             """
