@@ -837,9 +837,10 @@ async def test_catalog_data_augmentation_labels(
     await check_labels()
 
     # Reprocess a single field
-    bm = broker_resource(
-        standalone_knowledgebox, rid=rid, source=wpb.BrokerMessage.MessageSource.PROCESSOR
-    )
+    bm = wpb.BrokerMessage()
+    bm.source = wpb.BrokerMessage.MessageSource.PROCESSOR
+    bm.uuid = rid
+    bm.kbid = standalone_knowledgebox
 
     fcmw = writer_pb2.FieldComputedMetadataWrapper()
     fcmw.field.field = "body"

@@ -67,8 +67,10 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource, inde
     async with _pg_transaction(txn).connection.cursor() as cur:
         # Labels from the resource and classification labels from each field
         labels = [label for label in index_message.labels]
-        for field in index_message.texts.values():
-            labels += [label for label in field.labels if label.startswith("/l/")]
+        for field in (await resource.get_fields()).values():
+            meta = await field.get_field_metadata()
+            if meta:
+                labels += [f"/l/{c.labelset}/{c.label}" for c in meta.metadata.classifications]
 
         await cur.execute(
             """
