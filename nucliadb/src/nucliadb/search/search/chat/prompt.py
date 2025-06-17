@@ -724,6 +724,7 @@ async def neighbouring_paragraphs_prompt_context(
             if not ptext:
                 continue
             context[npid.full()] = ptext
+            breakpoint()
             augmented_context.paragraphs[npid.full()] = AugmentedTextBlock(
                 id=npid.full(),
                 text=ptext,
