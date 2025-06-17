@@ -858,3 +858,27 @@ async def test_catalog_data_augmentation_labels(
 
     # Check all labels present
     await check_labels()
+
+    # Cancel a label, it should disappear
+    await nucliadb_writer.patch(
+        f"/kb/{standalone_knowledgebox}/resource/{rid}",
+        json={
+            "usermetadata": {
+                "classifications": [
+                    {"labelset": "vegetables", "label": "carrot", "cancelled_by_user": True}
+                ]
+            }
+        },
+    )
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={"faceted": ["/classification.labels/vegetables"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["fulltext"]["facets"] == {
+        "/classification.labels/vegetables": {
+            "/classification.labels/vegetables/potato": 1,
+        }
+    }
