@@ -39,6 +39,7 @@ from nucliadb_models.search import (
     RelationDirection,
     Relations,
     RelationsAskResponseItem,
+    RerankerName,
     RetrievalAskResponseItem,
     StatusAskResponseItem,
     SyncAskResponse,
@@ -95,11 +96,12 @@ def test_ask_on_kb_pydantic(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
                 boosting=ReciprocalRankFusionWeights(keyword=0.5, semantic=0.5)
             ),
             rag_strategies=[HierarchyResourceStrategy(count=0)],
+            reranker=RerankerName.NOOP,
         ),
     )
     assert result.learning_id == "00"
     assert result.answer == "valid answer to"
-    assert len(result.retrieval_results.resources) == 7
+    assert len(result.retrieval_results.resources) == 8
     assert result.relations
 
 
