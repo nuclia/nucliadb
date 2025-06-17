@@ -2067,6 +2067,10 @@ class AugmentedTextBlock(BaseModel):
     text: str = Field(
         description="The text of the augmented text block. It may include additional metadata to enrich the context"
     )
+    position: Optional[TextPosition] = Field(
+        default=None,
+        description="Metadata about the position of the text block in the original resource.",
+    )
     parent: Optional[str] = Field(
         default=None, description="The parent text block that was augmented for."
     )

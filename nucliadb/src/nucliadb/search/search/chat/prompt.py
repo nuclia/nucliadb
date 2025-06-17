@@ -69,6 +69,7 @@ from nucliadb_models.search import (
     RagStrategyName,
     TableImageStrategy,
     TextBlockAugmentationType,
+    TextPosition,
 )
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import ExtractedText, FieldComputedMetadata
@@ -724,15 +725,39 @@ async def neighbouring_paragraphs_prompt_context(
             if not ptext:
                 continue
             context[npid.full()] = ptext
-            breakpoint()
             augmented_context.paragraphs[npid.full()] = AugmentedTextBlock(
                 id=npid.full(),
                 text=ptext,
+                position=get_text_position(npid, neighbour_index, field_extracted_metadata),
                 parent=pid.full(),
                 augmentation_type=TextBlockAugmentationType.NEIGHBOURING_PARAGRAPHS,
             )
 
     metrics.set("neighbouring_paragraphs_ops", len(augmented_context.paragraphs))
+
+
+def get_text_position(
+    paragraph_id: ParagraphId, index: int, field_metadata: FieldComputedMetadata
+) -> Optional[TextPosition]:
+    if paragraph_id.field_id.subfield_id:
+        metadata = field_metadata.split_metadata[paragraph_id.field_id.subfield_id]
+    else:
+        metadata = field_metadata.metadata
+    try:
+        pmetadata = metadata.paragraphs[index]
+    except IndexError:
+        return None
+    page_number = None
+    if pmetadata.HasField("page"):
+        page_number = pmetadata.page.page
+    return TextPosition(
+        page_number=page_number,
+        index=index,
+        start=pmetadata.start,
+        end=pmetadata.end,
+        start_seconds=list(pmetadata.start_seconds),
+        end_seconds=list(pmetadata.end_seconds),
+    )
 
 
 def get_neighbouring_indices(

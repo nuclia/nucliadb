@@ -1664,7 +1664,11 @@ async def test_ask_neighbouring_paragraphs_rag_strategy(
     assert len(augmented) == 2
     augmented.sort(key=lambda p: p.id)
     assert augmented[0].text == paragraphs[0]
+    assert augmented[0].position
+    assert augmented[0].position.index == 0
     assert augmented[1].text == paragraphs[2]
+    assert augmented[1].position
+    assert augmented[1].position.index == 2
 
     # Check that combined with hierarchy rag strategy works well
     resp = await nucliadb_reader.post(
