@@ -101,7 +101,7 @@ def test_ask_on_kb_pydantic(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     )
     assert result.learning_id == "00"
     assert result.answer == "valid answer to"
-    assert len(result.retrieval_results.resources) == 8
+    assert len(result.retrieval_results.resources) == 7
     assert result.relations
 
 
