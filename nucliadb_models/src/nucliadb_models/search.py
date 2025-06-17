@@ -355,6 +355,12 @@ class RankFusionName(str, Enum):
 class _BaseRankFusion(BaseModel):
     name: str
 
+    @model_validator(mode="after")
+    def set_discriminator(self) -> Self:
+        # Ensure discriminator is explicitly set so it's always serialized
+        self.name = self.name
+        return self
+
 
 class ReciprocalRankFusionWeights(BaseModel):
     keyword: float = 1.0
@@ -414,6 +420,12 @@ class RerankerName(str, Enum):
 
 class _BaseReranker(BaseModel):
     name: str
+
+    @model_validator(mode="after")
+    def set_discriminator(self) -> Self:
+        # Ensure discriminator is explicitly set so it's always serialized
+        self.name = self.name
+        return self
 
 
 class PredictReranker(_BaseReranker):
@@ -1090,9 +1102,21 @@ class ImageRagStrategyName:
 class RagStrategy(BaseModel):
     name: str
 
+    @model_validator(mode="after")
+    def set_discriminator(self) -> Self:
+        # Ensure discriminator is explicitly set so it's always serialized
+        self.name = self.name
+        return self
+
 
 class ImageRagStrategy(BaseModel):
     name: str
+
+    @model_validator(mode="after")
+    def set_discriminator(self) -> Self:
+        # Ensure discriminator is explicitly set so it's always serialized
+        self.name = self.name
+        return self
 
 
 ALLOWED_FIELD_TYPES: dict[str, str] = {
@@ -1697,8 +1721,6 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
                 obj = strategy
             elif isinstance(strategy, BaseModel):
                 obj = strategy.model_dump()
-                # Explicitly mark the name field as set, so it's always included (even with exclude_unset=True)
-                strategy.name = strategy.name
             else:
                 raise ValueError(
                     "RAG strategies must be defined using a valid RagStrategy object or a dictionary"
