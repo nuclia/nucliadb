@@ -176,7 +176,7 @@ class CloudLink(BaseModel):
         return DOWNLOAD_URI.format(**url_params).rstrip("/")
 
     @field_serializer("uri")
-    def serialize_uri(uri):
+    def serialize_uri(self, uri: str):
         return CloudLink.format_reader_download_uri(uri)
 
 
