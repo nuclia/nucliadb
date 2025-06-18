@@ -64,6 +64,7 @@ def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
         top_k=20,
         rank_fusion="rrf",
         reranker="noop",
+        headers={"any-header": "any-value"},
     )
     assert result.learning_id == "00"
     assert result.answer == "valid answer to"
