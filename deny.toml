@@ -101,6 +101,7 @@ allow = [
     "BSD-2-Clause",
     "Zlib",
     "COIL-1.0",
+    "CDLA-Permissive-2.0",
 ]
 # The confidence threshold for detecting a license from license text.
 # The higher the value, the more closely the license text must be to the
@@ -146,16 +147,12 @@ exceptions = [
 [[licenses.clarify]]
 crate = "ring"
 expression = "MIT AND ISC AND OpenSSL"
-license-files = [
-    { path = "LICENSE", hash = 0xbd0eed23 }
-]
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
 [[licenses.clarify]]
 crate = "stream-vbyte"
 expression = " 	COIL-1.0"
-license-files = [
-    { path = "LICENSE.txt", hash = 0x508d93ea }
-]
+license-files = [{ path = "LICENSE.txt", hash = 0x508d93ea }]
 
 [licenses.private]
 # If true, ignores workspace crates that aren't published, or are only
