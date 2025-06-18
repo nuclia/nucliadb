@@ -17,7 +17,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from nucliadb_models import CloudLink, File
+from nucliadb_models.common import CloudLink, File
 
 # Shared classes
 # - Nothing to see here

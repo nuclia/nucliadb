@@ -1100,7 +1100,7 @@ class ImageRagStrategyName:
 
 
 class RagStrategy(BaseModel):
-    name: str
+    name: Any
 
     @model_validator(mode="after")
     def set_discriminator(self) -> Self:
@@ -1110,7 +1110,7 @@ class RagStrategy(BaseModel):
 
 
 class ImageRagStrategy(BaseModel):
-    name: str
+    name: Any
 
     @model_validator(mode="after")
     def set_discriminator(self) -> Self:

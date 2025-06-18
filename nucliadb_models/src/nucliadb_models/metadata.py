@@ -73,7 +73,7 @@ class Relation(BaseModel):
     label: Optional[str] = None
     metadata: Optional[RelationMetadata] = None
 
-    from_: Optional[RelationEntity] = Field(None, alias="from")
+    from_: Optional[RelationEntity] = Field(default=None, alias="from")
     to: RelationEntity
 
     @model_validator(mode="after")

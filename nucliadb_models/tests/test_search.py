@@ -30,40 +30,40 @@ def test_filter_model_validator():
 def test_field_extension_strategy_fields_field_validator():
     search.FieldExtensionStrategy(
         name="field_extension",
-        fields={"f/myfield"},
+        fields=["f/myfield"],
     )
 
     # not a set of fields
     with pytest.raises(ValidationError):
         search.FieldExtensionStrategy(
             name="field_extension",
-            fields=0,
+            fields=0,  # type: ignore
         )
 
     # fields must be in the format {field_type}/{field_name}
     with pytest.raises(ValidationError):
         search.FieldExtensionStrategy(
             name="field_extension",
-            fields={"myfield"},
+            fields=["myfield"],
         )
 
     # not an allowed field
     with pytest.raises(ValidationError):
         search.FieldExtensionStrategy(
             name="field_extension",
-            fields={"z/myfield"},
+            fields=["z/myfield"],
         )
 
 
 def test_find_request_fulltext_feature_not_allowed():
     with pytest.raises(ValidationError):
-        search.FindRequest(features=[search.SearchOptions.FULLTEXT])
+        search.FindRequest(features=[search.SearchOptions.FULLTEXT])  # type: ignore
 
 
 def test_find_supports_search_options():
-    search.FindRequest(features=[search.SearchOptions.KEYWORD])
-    search.FindRequest(features=[search.SearchOptions.SEMANTIC])
-    search.FindRequest(features=[search.SearchOptions.RELATIONS])
+    search.FindRequest(features=[search.SearchOptions.KEYWORD])  # type: ignore
+    search.FindRequest(features=[search.SearchOptions.SEMANTIC])  # type: ignore
+    search.FindRequest(features=[search.SearchOptions.RELATIONS])  # type: ignore
 
 
 # Rank fusion
@@ -86,13 +86,13 @@ def test_rank_fusion(rank_fusion, expected):
 
 def test_rank_fusion_errors():
     with pytest.raises(ValueError):
-        search.FindRequest(rank_fusion="unknown")
+        search.FindRequest(rank_fusion="unknown")  # type: ignore
     with pytest.raises(ValueError):
-        search.AskRequest(query="q", rank_fusion="unknown")
+        search.AskRequest(query="q", rank_fusion="unknown")  # type: ignore
 
 
 def test_legacy_rank_fusion_fix():
-    req = search.FindRequest(rank_fusion="legacy")
+    req = search.FindRequest(rank_fusion="legacy")  # type: ignore
     assert req.rank_fusion == "rrf"
 
     req = search.FindRequest.model_validate({"rank_fusion": "legacy"})

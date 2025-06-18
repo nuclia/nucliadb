@@ -66,7 +66,7 @@ class Not(BaseModel, Generic[F], extra="forbid"):
 
 
 class FilterProp(BaseModel):
-    prop: str
+    prop: Any
 
     @model_validator(mode="after")
     def set_discriminator(self) -> Self:

@@ -65,7 +65,6 @@ dependencies = [
     "pyyaml>=5.1",
 
     "fastapi-versioning>=0.10.0",
-    # At some point FastAPI will drop support for pydantic v1"
     "fastapi>=0.95.2",
     "sentry-sdk>=2.8.0",
     "pyjwt>=2.4.0",

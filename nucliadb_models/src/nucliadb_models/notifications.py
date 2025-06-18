@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -29,7 +30,7 @@ class Notification(BaseModel):
         title="Notification Type",
         description="Type of notification.",
     )
-    data: BaseModel = Field(
+    data: Any = Field(
         ...,
         title="Notification Data",
         description="Notification data.",

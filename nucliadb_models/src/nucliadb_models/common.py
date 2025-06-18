@@ -88,7 +88,7 @@ class FieldID(BaseModel):
 class File(BaseModel):
     filename: Optional[str] = None
     content_type: str = "application/octet-stream"
-    payload: Optional[str] = Field(None, description="Base64 encoded file content")
+    payload: Optional[str] = Field(default=None, description="Base64 encoded file content")
     md5: Optional[str] = None
     # These are to be used for external files
     uri: Optional[str] = None
@@ -176,7 +176,7 @@ class CloudLink(BaseModel):
         return DOWNLOAD_URI.format(**url_params).rstrip("/")
 
     @field_serializer("uri")
-    def serialize_uri(uri):
+    def serialize_uri(self, uri: str):
         return CloudLink.format_reader_download_uri(uri)
 
 

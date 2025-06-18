@@ -14,7 +14,7 @@
 #
 
 import warnings
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, create_model
 
@@ -38,16 +38,14 @@ class KBConfiguration(BaseModel):
 #
 # Search configurations
 #
+def _model_fields(model: type[BaseModel], skip: list[str]) -> dict[str, Any]:
+    return {
+        name: (field.annotation, field) for name, field in model.model_fields.items() if name not in skip
+    }
+
 
 # FindConfig is a FindConfig without `search_configuration`
-FindConfig = create_model(
-    "FindConfig",
-    **{
-        name: (field.annotation, field)
-        for name, field in FindRequest.model_fields.items()
-        if name not in ("search_configuration")
-    },
-)  # type: ignore[call-overload]
+FindConfig = create_model("FindConfig", **_model_fields(FindRequest, skip=["search_configuration"]))
 
 
 class FindSearchConfiguration(BaseModel):
@@ -58,13 +56,9 @@ class FindSearchConfiguration(BaseModel):
 # AskConfig is an AskRequest where `query` is not mandatory and without `search_configuration`
 AskConfig = create_model(
     "AskConfig",
-    **{
-        name: (field.annotation, field)
-        for name, field in AskRequest.model_fields.items()
-        if name not in ("query", "search_configuration")
-    },
+    **_model_fields(AskRequest, skip=["query", "search_configuration"]),
     query=(Optional[str], None),
-)  # type: ignore[call-overload]
+)
 
 
 class AskSearchConfiguration(BaseModel):
