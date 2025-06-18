@@ -640,7 +640,12 @@ def _request_sync_builder(
     path_template = sdk_def.path_template
     path_params = sdk_def.path_params
 
-    def _func(self: NucliaDB, content: Optional[INPUT_TYPE] = None, **kwargs) -> OUTPUT_TYPE:
+    def _func(
+        self: NucliaDB,
+        content: Optional[INPUT_TYPE] = None,
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs,
+    ) -> OUTPUT_TYPE:
         path, data, query_params = prepare_request(
             path_template=path_template,
             path_params=path_params,
@@ -648,7 +653,9 @@ def _request_sync_builder(
             content=content,
             **kwargs,
         )
-        resp = self._request(path, method, content=data, query_params=query_params)
+        resp = self._request(
+            path, method, content=data, query_params=query_params, extra_headers=headers
+        )
         if response_type is not None:
             if issubclass(response_type, SyncAskResponse):
                 return ask_response_parser(response_type, resp)  # type: ignore
@@ -726,7 +733,12 @@ def _request_async_builder(
     path_template = sdk_def.path_template
     path_params = sdk_def.path_params
 
-    async def _func(self: NucliaDBAsync, content: Optional[INPUT_TYPE] = None, **kwargs) -> OUTPUT_TYPE:
+    async def _func(
+        self: NucliaDBAsync,
+        content: Optional[INPUT_TYPE] = None,
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs,
+    ) -> OUTPUT_TYPE:
         path, data, query_params = prepare_request(
             path_template=path_template,
             path_params=path_params,
@@ -734,7 +746,9 @@ def _request_async_builder(
             content=content,
             **kwargs,
         )
-        resp = await self._request(path, method, content=data, query_params=query_params)
+        resp = await self._request(
+            path, method, content=data, query_params=query_params, extra_headers=headers
+        )
         if response_type is not None:
             if isinstance(response_type, type) and issubclass(response_type, SyncAskResponse):
                 return ask_response_parser(response_type, resp)  # type: ignore
@@ -841,6 +855,7 @@ class _NucliaDBBase:
         method: str,
         query_params: Optional[Dict[str, str]] = None,
         content: Optional[RawRequestContent] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
     ):
         raise NotImplementedError
 
@@ -939,6 +954,7 @@ class NucliaDB(_NucliaDBBase):
         method: str,
         query_params: Optional[Dict[str, str]] = None,
         content: Optional[RawRequestContent] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
     ):
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
@@ -948,6 +964,8 @@ class NucliaDB(_NucliaDBBase):
             opts["content"] = content
         if query_params is not None:
             opts["params"] = query_params
+        if extra_headers is not None:
+            opts["headers"] = extra_headers
         response: httpx.Response = getattr(self.session, method.lower())(url, **opts)
         return self._check_response(response)
 
@@ -1137,6 +1155,7 @@ class NucliaDBAsync(_NucliaDBBase):
         method: str,
         query_params: Optional[Dict[str, str]] = None,
         content: Optional[RawRequestContent] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
     ):
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
@@ -1146,6 +1165,8 @@ class NucliaDBAsync(_NucliaDBBase):
             opts["content"] = content
         if query_params is not None:
             opts["params"] = query_params
+        if extra_headers is not None:
+            opts["headers"] = extra_headers
         response: httpx.Response = await getattr(self.session, method.lower())(url, **opts)
         return self._check_response(response)
 
