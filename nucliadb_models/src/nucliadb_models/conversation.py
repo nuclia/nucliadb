@@ -18,7 +18,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from nucliadb_models import CloudLink, FieldRef, FileB64
+from nucliadb_models.common import CloudLink, FieldRef, FileB64
 from nucliadb_models.utils import DateTime
 
 # Shared classes
