@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 from enum import Enum
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
 from typing_extensions import Self
@@ -26,7 +26,7 @@ from nucliadb_models.security import RequestSecurity
 
 
 class GraphProp(BaseModel):
-    prop: str
+    prop: Any
 
     @model_validator(mode="after")
     def set_discriminator(self) -> Self:
