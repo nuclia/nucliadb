@@ -223,7 +223,7 @@ jobs:
               "components": [
                 {
                   "chart-version": "${{ steps.version_step.outputs.helm_version }}",
-                  "component": "nucliadb_standalone",
+                  "component": "nucliadb-standalone",
                   "component-type": "regional"
                 }
               ],
