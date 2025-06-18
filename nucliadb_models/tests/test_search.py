@@ -61,9 +61,9 @@ def test_find_request_fulltext_feature_not_allowed():
 
 
 def test_find_supports_search_options():
-    search.FindRequest(features=[search.FindOptions.KEYWORD])
-    search.FindRequest(features=[search.FindOptions.SEMANTIC])
-    search.FindRequest(features=[search.FindOptions.RELATIONS])
+    search.FindRequest(features=[search.SearchOptions.KEYWORD])  # type: ignore
+    search.FindRequest(features=[search.SearchOptions.SEMANTIC])  # type: ignore
+    search.FindRequest(features=[search.SearchOptions.RELATIONS])  # type: ignore
 
 
 # Rank fusion
