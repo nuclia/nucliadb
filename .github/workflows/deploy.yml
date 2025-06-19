@@ -299,32 +299,32 @@ jobs:
                 },
                 {
                   "chart-version": "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
-                  "component": "nucliadb_shared",
+                  "component": "nucliadb-shared",
                   "component-type": "regional"
                 },
                 {
                   "chart-version": "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
-                  "component": "nucliadb_ingest",
+                  "component": "nucliadb-ingest",
                   "component-type": "regional"
                 },
                 {
                   "chart-version": "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
-                  "component": "nucliadb_reader",
+                  "component": "nucliadb-reader",
                   "component-type": "regional"
                 },
                 {
                   "chart-version": "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
-                  "component": "nucliadb_search",
+                  "component": "nucliadb-search",
                   "component-type": "regional"
                 },
                 {
                   "chart-version": "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
-                  "component": "nucliadb_train",
+                  "component": "nucliadb-train",
                   "component-type": "regional"
                 },
                 {
                   "chart-version": "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
-                  "component": "nucliadb_writer",
+                  "component": "nucliadb-writer",
                   "component-type": "regional"
                 }
               ],
