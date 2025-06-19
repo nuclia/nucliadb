@@ -168,7 +168,7 @@ def _prepare_query_search(query: search_models.CatalogQuery, params: dict[str, A
         # executed per query is not a problem.
 
         # Remove zero-length words from the split
-        params["query"] = [word for word in SPLIT_REGEX.split(query.query) if word]
+        params["query"] = [word.lower() for word in SPLIT_REGEX.split(query.query) if word]
         return sql.SQL("regexp_split_to_array(lower(title), '\\W') @> %(query)s")
     elif query.match == search_models.CatalogQueryMatch.Fuzzy:
         params["query"] = query.query
