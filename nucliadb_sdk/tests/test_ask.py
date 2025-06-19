@@ -21,19 +21,25 @@ import nucliadb_sdk
 from nucliadb_models.metadata import RelationType
 from nucliadb_models.search import (
     AnswerAskResponseItem,
+    AskRequest,
     AskResponseItem,
     AskTimings,
     AskTokens,
+    ChatOptions,
     CitationsAskResponseItem,
     DirectionalRelation,
     EntitySubgraph,
     EntityType,
+    HierarchyResourceStrategy,
     KnowledgeboxFindResults,
     MaxTokens,
     MetadataAskResponseItem,
+    ReciprocalRankFusion,
+    ReciprocalRankFusionWeights,
     RelationDirection,
     Relations,
     RelationsAskResponseItem,
+    RerankerName,
     RetrievalAskResponseItem,
     StatusAskResponseItem,
     SyncAskResponse,
@@ -65,6 +71,34 @@ def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
         rank_fusion="rrf",
         reranker="noop",
         headers={"any-header": "any-value"},
+    )
+    assert result.learning_id == "00"
+    assert result.answer == "valid answer to"
+    assert len(result.retrieval_results.resources) == 7
+    assert result.relations
+
+
+def test_ask_on_kb_pydantic(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
+    """This test intends to check that the serialization of the AskRequest
+    is correctly done and compatible with discriminator fields."""
+    result: SyncAskResponse = sdk.ask(
+        kbid=docs_dataset,
+        content=AskRequest(
+            query="Nuclia loves Semantic Search",
+            features=[ChatOptions.KEYWORD, ChatOptions.SEMANTIC, ChatOptions.RELATIONS],
+            generative_model="everest",
+            prompt="Given this context: {context}. Answer this {question} in a concise way using the provided context",
+            extra_context=[
+                "Nuclia is a powerful AI search platform",
+                "AI Search involves semantic search",
+            ],
+            top_k=20,
+            rank_fusion=ReciprocalRankFusion(
+                boosting=ReciprocalRankFusionWeights(keyword=0.5, semantic=0.5)
+            ),
+            rag_strategies=[HierarchyResourceStrategy(count=0)],
+            reranker=RerankerName.NOOP,
+        ),
     )
     assert result.learning_id == "00"
     assert result.answer == "valid answer to"
