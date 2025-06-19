@@ -181,7 +181,7 @@ async def test_prepare_query_fulltext():
     parsed = await parse_catalog(kbid, request)
     query, params = _prepare_query(parsed)
     assert "regexp_split_to_array(lower(title), '\\W') @> %(query)s" in query.as_string()
-    assert params["query"] == ["This", "is", "my", "query"]
+    assert params["query"] == ["this", "is", "my", "query"]
 
 
 async def test_old_filters():
@@ -247,7 +247,7 @@ async def test_filter_expression():
         "param2": ["/l/topic/boats", "/p/folder"],
         "param3": datetime(2019, 1, 1, 11, 0),
         "param4": ["00112233445566778899aabbccddeeff"],
-        "query": ["This", "is", "my", "query"],
+        "query": ["this", "is", "my", "query"],
         "page_size": 25,
         "offset": 0,
     }

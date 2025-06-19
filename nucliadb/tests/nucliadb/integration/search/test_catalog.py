@@ -590,6 +590,7 @@ async def test_catalog_query(
 
     # Old style search (by words)
     await assert_query_results("law", {resource1})
+    await assert_query_results("LAW", {resource1})
     await assert_query_results("law ", {resource1})
 
     # Same with new style
