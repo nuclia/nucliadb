@@ -83,12 +83,12 @@ async def clean_dm():
 
 
 @pytest.fixture(scope="function")
-async def redis_dm(redis):
+async def redis_dm(valkey):
     prev = settings.dm_enabled
 
     settings.dm_enabled = True
-    settings.dm_redis_host = redis[0]
-    settings.dm_redis_port = redis[1]
+    settings.dm_redis_host = valkey[0]
+    settings.dm_redis_port = valkey[1]
 
     dm = get_dm()
 

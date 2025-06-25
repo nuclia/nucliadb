@@ -111,12 +111,12 @@ def disabled_back_pressure():
 
 
 @pytest.fixture(scope="function")
-async def tus_manager(redis):
+async def tus_manager(valkey):
     with (
-        patch.object(settings, "dm_redis_host", redis[0]),
-        patch.object(settings, "dm_redis_port", redis[1]),
+        patch.object(settings, "dm_redis_host", valkey[0]),
+        patch.object(settings, "dm_redis_port", valkey[1]),
     ):
-        driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
+        driver = aioredis.from_url(f"redis://{valkey[0]}:{valkey[1]}")
         await driver.flushall()
 
         yield
