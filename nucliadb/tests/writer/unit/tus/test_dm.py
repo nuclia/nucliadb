@@ -41,9 +41,7 @@ async def test_file_data_manager_factory(valkey):
     inst = factory()
 
     assert isinstance(inst, RedisFileDataManager)
-    print(inst.redis)
-    print(redis)
-    assert inst.redis == redis
+    assert inst.redis == valkey
 
     await factory.finalize()
 
