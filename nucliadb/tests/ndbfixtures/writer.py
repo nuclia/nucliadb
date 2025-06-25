@@ -81,7 +81,7 @@ async def nucliadb_writer_manager(
 @pytest.fixture(scope="function")
 async def writer_api_server(
     disabled_back_pressure,
-    redis,
+    valkey,
     storage: Storage,
     ingest_grpc_server,  # component fixture, shouldn't be used in other modes
     ingest_consumers,
