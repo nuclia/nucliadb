@@ -268,10 +268,8 @@ class QueueType(str, Enum):
     SHARED = "shared"
 
 
-class Resource(BaseModel):
+class ResourceBasic(BaseModel):
     id: str
-
-    # This first block of attributes correspond to Basic fields
     slug: Optional[str] = None
     title: Optional[str] = None
     summary: Optional[str] = None
@@ -288,6 +286,8 @@ class Resource(BaseModel):
     queue: Optional[QueueType] = None
     hidden: Optional[bool] = None
 
+
+class Resource(ResourceBasic):
     origin: Optional[Origin] = None
     extra: Optional[Extra] = None
     relations: Optional[List[Relation]] = None
@@ -308,7 +308,7 @@ class ResourcePagination(BaseModel):
 
 
 class ResourceList(BaseModel):
-    resources: List[Resource]
+    resources: List[ResourceBasic]
     pagination: ResourcePagination
 
 
