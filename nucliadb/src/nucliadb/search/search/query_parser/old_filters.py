@@ -212,7 +212,7 @@ def split_labels(
     else:
         paragraph_expr = FilterExpression()
         filter_list = getattr(paragraph_expr, combinator)
-        filter_list.extend(paragraph)
+        filter_list.operands.extend(paragraph)
 
     return field_expr, paragraph_expr
 
