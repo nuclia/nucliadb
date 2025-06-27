@@ -32,10 +32,10 @@ from nucliadb_utils.storages.storage import Storage
 
 
 @pytest.fixture(scope="function")
-def configure_redis_dm(redis):
+def configure_redis_dm(valkey):
     writer_settings.dm_enabled = True
-    writer_settings.dm_redis_host = redis[0]
-    writer_settings.dm_redis_port = redis[1]
+    writer_settings.dm_redis_host = valkey[0]
+    writer_settings.dm_redis_port = valkey[1]
     yield
 
 
