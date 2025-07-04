@@ -112,6 +112,19 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
 
     let shutdown = CancellationToken::new();
 
+    let needs_nats = components
+        .iter()
+        .any(|c| matches!(c, Component::Indexer | Component::Scheduler));
+    let nats_client = if needs_nats {
+        if let Some(indexer_settings) = settings.indexer.as_ref() {
+            Some(async_nats::connect(&indexer_settings.nats_server.as_ref().unwrap()).await?)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     let mut task_ids = HashMap::new();
     let mut tasks = JoinSet::new();
     let mut has_searcher = false;
@@ -119,7 +132,7 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
         let task = match component {
             Component::Indexer => {
                 metrics::indexer::register(&mut metrics);
-                tasks.spawn(indexer::run(settings.clone(), shutdown.clone()))
+                tasks.spawn(indexer::run(settings.clone(), shutdown.clone(), nats_client.clone()))
             }
             Component::Worker => {
                 metrics::worker::register(&mut metrics);
@@ -127,7 +140,7 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
             }
             Component::Scheduler => {
                 metrics::scheduler::register(&mut metrics);
-                tasks.spawn(scheduler::run(settings.clone(), shutdown.clone()))
+                tasks.spawn(scheduler::run(settings.clone(), shutdown.clone(), nats_client.clone()))
             }
             Component::Searcher => {
                 has_searcher = true;
@@ -144,7 +157,7 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
     tokio::spawn(metrics_server(metrics));
     if let Some(control_socket) = &settings.control_socket {
         let control_socket = control_socket.clone();
-        let mut control = ControlServer::new(settings.metadata.clone(), has_searcher);
+        let mut control = ControlServer::new(settings.metadata.clone(), has_searcher, nats_client);
         tokio::spawn(async move { control.run(&control_socket).await });
     }
 

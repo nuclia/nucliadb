@@ -43,14 +43,16 @@ use tokio::{task::JoinSet, time::sleep};
 use tokio_util::sync::CancellationToken;
 use tracing::*;
 
-pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
-    let indexer_settings = settings.indexer.as_ref().unwrap();
+pub async fn run(
+    settings: Settings,
+    shutdown: CancellationToken,
+    nats_client: Option<async_nats::Client>,
+) -> anyhow::Result<()> {
     let storage_settings = settings.storage.as_ref().unwrap();
     let meta = settings.metadata.clone();
 
-    if let Some(nats_server) = &indexer_settings.nats_server {
-        let client = async_nats::connect(nats_server).await?;
-        let jetstream = async_nats::jetstream::new(client);
+    if let Some(nats_client) = nats_client {
+        let jetstream = async_nats::jetstream::new(nats_client);
         let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
         tokio::select! {
             _ = run_tasks(meta, storage_settings.object_store.clone(), settings, NatsAckFloor(consumer)) => {},

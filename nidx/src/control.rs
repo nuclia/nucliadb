@@ -62,6 +62,7 @@ enum ControlResponse {
         alive: Alive,
         searcher_sync_delay: Option<f64>,
         searcher_initally_synced: Option<bool>,
+        nats_connected: Option<bool>,
     },
 }
 
@@ -75,15 +76,17 @@ impl From<anyhow::Result<()>> for ControlResponse {
 }
 
 pub struct ControlServer {
-    pub meta: NidxMetadata,
-    pub searcher_synced: Option<bool>,
+    meta: NidxMetadata,
+    searcher_synced: Option<bool>,
+    nats_client: Option<async_nats::Client>,
 }
 
 impl ControlServer {
-    pub fn new(meta: NidxMetadata, has_searcher: bool) -> Self {
+    pub fn new(meta: NidxMetadata, has_searcher: bool, nats_client: Option<async_nats::Client>) -> Self {
         Self {
             meta,
             searcher_synced: has_searcher.then_some(false),
+            nats_client,
         }
     }
 
@@ -141,6 +144,10 @@ impl ControlServer {
             alive: self.alive().await,
             searcher_sync_delay,
             searcher_initally_synced: self.searcher_synced,
+            nats_connected: self
+                .nats_client
+                .as_ref()
+                .map(|c| c.connection_state() == async_nats::connection::State::Connected),
         }
     }
 }
@@ -162,11 +169,12 @@ pub fn control_client(settings: &EnvSettings, request: ControlRequest) -> anyhow
         }
     } else if let ControlResponse::Ready {
         alive,
-        searcher_sync_delay: _,
         searcher_initally_synced,
+        nats_connected,
+        ..
     } = response
     {
-        if !(alive.all_ok() && searcher_initally_synced.unwrap_or(true)) {
+        if !(alive.all_ok() && searcher_initally_synced.unwrap_or(true) && nats_connected.unwrap_or(true)) {
             return Err(anyhow!("Not ready"));
         }
     }
