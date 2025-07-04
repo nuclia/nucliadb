@@ -165,6 +165,11 @@ async def _delete_vectorset(kbid: str, vectorset_id: str) -> None:
         if vectorset_id in semantic_models:
             semantic_models.remove(vectorset_id)
             await learning_proxy.update_configuration(kbid, {"semantic_models": semantic_models})
+    else:
+        logger.info(
+            f"Learning configuration for KB {kbid} not found, skipping vectorset deletion",
+        )
+        return
 
     storage = await get_storage()
     try:
