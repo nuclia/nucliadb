@@ -602,7 +602,7 @@ class Resource:
             FieldType.LINK,
             load=False,
         )
-        maybe_update_basic_thumbnail(self.basic, link_extracted_data.link_thumbnail)
+        maybe_update_basic_thumbnail(self.basic, link_extracted_data.link_thumbnail, self.kb.kbid)
 
         await field_link.set_link_extracted_data(link_extracted_data)
 
@@ -661,7 +661,7 @@ class Resource:
         # uri can change after extraction
         await field_file.set_file_extracted_data(file_extracted_data)
         maybe_update_basic_icon(self.basic, file_extracted_data.icon)
-        maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail)
+        maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail, self.kb.kbid)
         self.modified = True
 
     async def _should_update_resource_title_from_file_metadata(self) -> bool:
@@ -722,7 +722,9 @@ class Resource:
         )
         await field_obj.set_field_metadata(field_metadata)
 
-        maybe_update_basic_thumbnail(self.basic, field_metadata.metadata.metadata.thumbnail)
+        maybe_update_basic_thumbnail(
+            self.basic, field_metadata.metadata.metadata.thumbnail, self.kb.kbid
+        )
 
         update_basic_computedmetadata_classifications(self.basic, field_metadata)
         self.modified = True
@@ -879,11 +881,21 @@ def maybe_update_basic_icon(basic: PBBasic, mimetype: Optional[str]) -> bool:
     return True
 
 
-def maybe_update_basic_thumbnail(basic: PBBasic, thumbnail: Optional[CloudFile]) -> bool:
+def maybe_update_basic_thumbnail(basic: PBBasic, thumbnail: Optional[CloudFile], kbid: str) -> bool:
     if basic.thumbnail or thumbnail is None:
         return False
     basic.thumbnail = CloudLink.format_reader_download_uri(thumbnail.uri)
+    fix_kbid_in_thumbnail(basic, kbid)
     return True
+
+
+def fix_kbid_in_thumbnail(basic: PBBasic, kbid: str):
+    if basic.thumbnail.startswith("/kb/") and not basic.thumbnail.startswith(f"/kb/{kbid}/"):
+        # Replace the kbid in the thumbnail if it doesn't match the current kbid. This is necessary for
+        # resources that have been backed up and we are restoring them to a different kbid.
+        parts = basic.thumbnail.split("/", 3)
+        parts[2] = kbid
+        basic.thumbnail = "/".join(parts)
 
 
 def update_basic_languages(basic: Basic, languages: list[str]) -> bool:
