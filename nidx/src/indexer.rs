@@ -50,10 +50,14 @@ use crate::{Settings, metadata::*};
 #[cfg(feature = "telemetry")]
 use crate::telemetry;
 
-pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
-    let indexer_settings = settings.indexer.as_ref().ok_or(anyhow!("Indexer settings required"))?;
-    if indexer_settings.nats_server.is_some() {
-        run_nats(settings, shutdown).await
+pub async fn run(
+    settings: Settings,
+    shutdown: CancellationToken,
+    nats_client: Option<async_nats::Client>,
+) -> anyhow::Result<()> {
+    settings.indexer.as_ref().ok_or(anyhow!("Indexer settings required"))?;
+    if let Some(nats_client) = nats_client {
+        run_nats(settings, shutdown, nats_client).await
     } else {
         let service = IndexerServer::new(settings)?.into_service();
         let server = GrpcServer::new("0.0.0.0:10002").await?;
@@ -118,7 +122,11 @@ impl NidxIndexer for IndexerServer {
     }
 }
 
-pub async fn run_nats(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
+pub async fn run_nats(
+    settings: Settings,
+    shutdown: CancellationToken,
+    nats_client: async_nats::Client,
+) -> anyhow::Result<()> {
     let meta = settings.metadata.clone();
 
     let indexer_settings = settings.indexer.as_ref().ok_or(anyhow!("Indexer settings required"))?;
@@ -127,7 +135,6 @@ pub async fn run_nats(settings: Settings, shutdown: CancellationToken) -> anyhow
     let storage_settings = settings.storage.as_ref().ok_or(anyhow!("Storage settings required"))?;
     let segment_storage = &storage_settings.object_store;
 
-    let nats_client = async_nats::connect(&indexer_settings.nats_server.as_ref().unwrap()).await?;
     let jetstream = async_nats::jetstream::new(nats_client);
     let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
     let message_ttl = consumer.cached_info().config.ack_wait;
