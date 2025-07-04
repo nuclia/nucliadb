@@ -114,6 +114,14 @@ def test_maybe_update_basic_thumbnail(basic, thumbnail, updated):
         assert basic.thumbnail == "old_thumbnail_url"
 
 
+def test_maybe_update_basic_thumbnail_replaces_kbid():
+    basic = Basic()
+    thumbnail = CloudFile(uri="/kb/old_kbid/thumbnail.png")
+    kbid = "new_kbid"
+    maybe_update_basic_thumbnail(basic, thumbnail, kbid)
+    assert basic.thumbnail == "/kb/new_kbid/thumbnail.png"
+
+
 @pytest.mark.parametrize(
     "text_format,mimetype",
     [

@@ -31,6 +31,7 @@ from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
+from nucliadb.ingest.orm.resource import fix_kbid_in_thumbnail
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import (
     ConversationFieldData,
@@ -200,6 +201,7 @@ async def managed_serialize(
             resource.summary = orm_resource.basic.summary
             resource.icon = orm_resource.basic.icon
             resource.thumbnail = orm_resource.basic.thumbnail
+            fix_kbid_in_thumbnail(orm_resource.basic, kbid)
             resource.hidden = orm_resource.basic.hidden
             resource.created = (
                 orm_resource.basic.created.ToDatetime()
