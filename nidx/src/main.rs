@@ -23,7 +23,7 @@ use nidx::{
     Settings, api,
     control::{ControlRequest, ControlServer, control_client},
     indexer, metrics, scheduler, searcher,
-    settings::EnvSettings,
+    settings::{EnvSettings, IndexerSettings},
     telemetry,
     tool::{ToolCommand, run_tool},
     worker,
@@ -116,8 +116,12 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
         .iter()
         .any(|c| matches!(c, Component::Indexer | Component::Scheduler));
     let nats_client = if needs_nats {
-        if let Some(indexer_settings) = settings.indexer.as_ref() {
-            Some(async_nats::connect(&indexer_settings.nats_server.as_ref().unwrap()).await?)
+        if let Some(IndexerSettings {
+            nats_server: Some(nats_server),
+            ..
+        }) = settings.indexer.as_ref()
+        {
+            Some(async_nats::connect(&nats_server).await?)
         } else {
             None
         }
