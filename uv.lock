@@ -3415,14 +3415,17 @@ wheels = [
 
 [[package]]
 name = "pytest-docker-fixtures"
-version = "1.3.19"
+version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "docker" },
     { name = "pytest" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/66/6e/cc5395a86f5ef3b71f5bcfcc35cfce734d6010bcc7ea57fcfa704ee94df5/pytest-docker-fixtures-1.3.19.tar.gz", hash = "sha256:016578a1b6a4dfc81e5a09286230cb56e323bdfe3f4dda20a1e7bc2c74492f4a", size = 10518, upload-time = "2024-04-03T14:39:10.925Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bc/57/d2c8d853a51c7d1937e5126d542f23ea6c5c530fe0a6395dc901b68ac82e/pytest_docker_fixtures-1.4.0.tar.gz", hash = "sha256:9d0ac14dbd8ba6e3bd238ef0862093236d83605061147f28292ce1f959bca276", size = 10973, upload-time = "2025-06-25T08:21:38.382Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f6/1b/bf7b9635ad7009a820b59a16caede7bf72004614a386b98dd86095116199/pytest_docker_fixtures-1.4.0-py3-none-any.whl", hash = "sha256:5bc31ca1e247a5602c06a3b7c155d941cc1ba12d725a88f4d7c44171cb2db5d0", size = 14210, upload-time = "2025-06-25T08:21:37.418Z" },
+]
 
 [package.optional-dependencies]
 pg = [

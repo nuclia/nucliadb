@@ -30,22 +30,22 @@ from nucliadb.writer.tus.dm import (
 
 
 @pytest.fixture()
-def redis():
+def valkey():
     mock = AsyncMock()
     with patch("nucliadb.writer.tus.dm.aioredis.from_url", return_value=mock):
         yield mock
 
 
-async def test_file_data_manager_factory(redis):
+async def test_file_data_manager_factory(valkey):
     factory = RedisFileDataManagerFactory("redis://localhost:6379")
     inst = factory()
 
     assert isinstance(inst, RedisFileDataManager)
-    assert inst.redis == redis
+    assert inst.redis == valkey
 
     await factory.finalize()
 
-    redis.aclose.assert_called_once_with(close_connection_pool=True)
+    valkey.aclose.assert_called_once_with(close_connection_pool=True)
 
 
 async def test_get_file_data_manager():
@@ -55,7 +55,7 @@ async def test_get_file_data_manager():
         assert isinstance(tus.get_dm(), FileDataManager)
 
 
-async def test_get_file_data_manager_redis(redis):
+async def test_get_file_data_manager_redis(valkey):
     await tus.finalize()  # make sure to clear
 
     with patch.object(tus.writer_settings, "dm_enabled", True):
