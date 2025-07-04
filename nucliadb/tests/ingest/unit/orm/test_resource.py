@@ -107,7 +107,7 @@ def test_update_basic_languages():
     ],
 )
 def test_maybe_update_basic_thumbnail(basic, thumbnail, updated):
-    assert maybe_update_basic_thumbnail(basic, thumbnail) == updated
+    assert maybe_update_basic_thumbnail(basic, thumbnail, "kbid") == updated
     if updated:
         assert basic.thumbnail == thumbnail.uri
     else:
