@@ -252,7 +252,7 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct Address(usize);
+pub struct Address(pub usize);
 
 pub struct Retriever<'a> {
     similarity_function: fn(&[u8], &[u8]) -> f32,
@@ -393,7 +393,7 @@ impl PartialEq for Neighbour {
 }
 
 impl Neighbour {
-    fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
+    pub fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
         let node = data_store::get_value(data, addr);
         let (exact, _) = Node.read_exact(node);
         Neighbour {
@@ -421,9 +421,9 @@ impl Neighbour {
 
 pub struct OpenDataPoint {
     metadata: VectorSegmentMetadata,
-    nodes: Mmap,
+    pub nodes: Mmap,
     index: Mmap,
-    inverted_indexes: InvertedIndexes,
+    pub inverted_indexes: InvertedIndexes,
     alive_bitset: BitSet,
 }
 

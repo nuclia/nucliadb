@@ -28,7 +28,7 @@ mod inverted_index;
 mod query_io;
 mod request_types;
 mod utils;
-mod vector_types;
+pub mod vector_types;
 
 use config::VectorConfig;
 use data_point::OpenDataPoint;
