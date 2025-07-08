@@ -25,7 +25,7 @@ import uuid
 from collections import defaultdict
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import Any, Optional, TypeVar
+from typing import Any, Optional
 
 import aiohttp
 import backoff
@@ -49,10 +49,14 @@ from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_ut
 
 logger = logging.getLogger(__name__)
 
-_T = TypeVar("_T")
+
+class ProcessingAPIUnavailableError(SendToProcessError): ...
 
 
-RETRIABLE_EXCEPTIONS = (aiohttp.client_exceptions.ClientConnectorError,)
+RETRIABLE_EXCEPTIONS = (
+    aiohttp.client_exceptions.ClientConnectorError,
+    ProcessingAPIUnavailableError,
+)
 MAX_TRIES = 4
 
 
@@ -409,6 +413,9 @@ class ProcessingEngine:
                 raise LimitsExceededError(resp.status, data["detail"])
             elif resp.status == 429:
                 raise LimitsExceededError(resp.status, "Rate limited")
+            elif resp.status in (502, 503):
+                logger.warning(f"Processing engine is not available, retrying. Status: {resp.status}")
+                raise ProcessingAPIUnavailableError()
             else:
                 error_text = await resp.text()
                 logger.warning(f"Error sending to process: {resp.status} {error_text}")
