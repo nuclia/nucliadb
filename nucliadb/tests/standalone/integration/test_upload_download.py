@@ -436,6 +436,7 @@ async def test_content_type_validation(
         "text/x-java-source",
         "text/x-log",
         "text/x-python",
+        "text/x-ruby-script",
         "text/xml",
         "text/yaml",
         "video/mp4",
