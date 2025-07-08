@@ -60,6 +60,7 @@ EXTRA_VALID_CONTENT_TYPES = {
     "text/x-java-source",
     "text/x-log",
     "text/x-python-script",
+    "text/x-ruby-script",
     "text/yaml",
     "video/x-m4v",
     "video/YouTube",
