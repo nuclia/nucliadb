@@ -211,8 +211,8 @@ class FieldRef(BaseModel):
 
 
 class Classification(BaseModel):
-    labelset: str
-    label: str
+    labelset: str = Field(min_length=1, max_length=255)
+    label: str = Field(min_length=1, max_length=255)
 
 
 class UserClassification(Classification):

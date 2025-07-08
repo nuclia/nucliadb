@@ -16,7 +16,7 @@
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
 BASE_LABELS: dict[str, set[str]] = {
@@ -96,7 +96,7 @@ class LabelSetKind(str, Enum):
 
 
 class Label(BaseModel):
-    title: str
+    title: str = Field(min_length=1, max_length=255)
     related: Optional[str] = None
     text: Optional[str] = None
     uri: Optional[str] = None
@@ -107,7 +107,7 @@ class LabelSet(BaseModel):
     color: Optional[str] = "blue"
     multiple: bool = True
     kind: List[LabelSetKind] = []
-    labels: List[Label] = []
+    labels: List[Label] = Field(default_factory=list, max_length=1000)
 
     @model_validator(mode="after")
     def check_unique_labels(self) -> Self:
