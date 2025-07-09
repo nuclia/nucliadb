@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use crate::config::VectorConfig;
+use crate::config::{VectorCardinality, VectorConfig};
 use crate::data_point::{self, Elem, LabelDictionary};
 use crate::{VectorSegmentMetadata, utils};
 use nidx_protos::{noderesources, prost::*};
@@ -127,7 +127,19 @@ pub fn index_resource(
                     sentence.vector.clone()
                 };
                 let metadata = sentence.metadata.as_ref().map(|m| m.encode_to_vec());
-                elems.push(Elem::new(key, vector, labels, metadata));
+                if matches!(config.vector_cardinality, VectorCardinality::Single) {
+                    elems.push(Elem::new(key, vector, labels, metadata));
+                } else {
+                    // TODO: Please no
+                    for idx in 0..vector.len() / 128 {
+                        elems.push(Elem::new(
+                            key.clone(),
+                            (&vector[idx * 128..(idx + 1) * 128]).to_vec(),
+                            labels.clone(),
+                            metadata.clone(),
+                        ));
+                    }
+                }
             }
         }
     }

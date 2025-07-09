@@ -71,6 +71,13 @@ impl VectorType {
     }
 }
 
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+pub enum VectorCardinality {
+    #[default]
+    Single,
+    Multi,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VectorConfig {
     #[serde(default)]
@@ -78,6 +85,8 @@ pub struct VectorConfig {
     #[serde(default)]
     pub normalize_vectors: bool,
     pub vector_type: VectorType,
+    #[serde(default)]
+    pub vector_cardinality: VectorCardinality,
 }
 
 impl VectorConfig {
@@ -117,6 +126,7 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
             similarity: proto.similarity().into(),
             normalize_vectors: proto.normalize_vectors,
             vector_type,
+            vector_cardinality: VectorCardinality::Single,
         })
     }
 }

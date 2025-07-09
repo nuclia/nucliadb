@@ -18,12 +18,16 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use crate::config::VectorCardinality;
+use crate::data_point::Address;
 pub use crate::data_point::Neighbour;
 use crate::data_point::OpenDataPoint;
+use crate::data_point::node::Node;
 use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
 use crate::request_types::VectorSearchRequest;
 use crate::utils;
+use crate::vector_types::dense_f32;
 use crate::{VectorErr, VectorR};
 use crate::{formula::*, query_io};
 use nidx_protos::prost::*;
@@ -239,17 +243,75 @@ impl Reader {
             formula.operator = BooleanOperator::Or;
         }
 
-        let search_request = (total_to_get, request, formula);
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: starts at {v} ms");
 
-        let result = self._search(&search_request, &request.segment_filtering_formula)?;
+        let results = if matches!(self.config.vector_cardinality, VectorCardinality::Multi) {
+            // Search for each query vector
+            // TODO: You didn't see this
+            let r: Vec<_> = (0..32)
+                .map(|i| {
+                    let mut subreq = request.clone();
+                    subreq.vector = (&request.vector[i * 128..(i + 1) * 128]).to_vec();
+                    let search_request = (total_to_get, &subreq, formula.clone());
+                    self._search(&search_request, &request.segment_filtering_formula)
+                        .unwrap()
+                })
+                .collect();
+
+            // Grab unique paragraph ids
+            let mut results_keys: Vec<_> = r.iter().flatten().map(|n| n.id()).collect();
+            results_keys.sort();
+            results_keys.dedup();
+            println!("{} unique keys", results_keys.len());
+
+            // Retrieve all vectors for the paragraphs
+            // TODO: Use a new index, hacking it using field index
+            // TODO: Track datapoints to avoid need to scan
+            let mut new_results = vec![];
+            for key in results_keys {
+                for dp in &self.open_data_points {
+                    let vecs: Vec<_> = dp
+                        .inverted_indexes
+                        .ids_for_deletion_key(std::str::from_utf8(&key).unwrap())
+                        .unwrap()
+                        .collect();
+                    println!("Got {} vecs", vecs.len());
+                    if vecs.is_empty() {
+                        continue;
+                    }
+
+                    let mut summaxsim = 0.0;
+                    for iq in 0..32 {
+                        let q = &request.vector[iq * 128..(iq + 1) * 128];
+                        let mut maxsim = 0.0;
+                        for vec in &vecs {
+                            let node = crate::data_types::data_store::get_value(&dp.nodes, *vec as usize);
+                            let doc_vec = Node::vector(node);
+                            let sim = dense_f32::dot_similarity(&doc_vec, &dense_f32::encode_vector(q));
+                            if sim > maxsim {
+                                maxsim = sim
+                            }
+                        }
+                        summaxsim += maxsim;
+                    }
+                    println!("sim is {summaxsim}");
+
+                    new_results.push(Neighbour::new(Address(vecs[0] as usize), &dp.nodes, summaxsim));
+                }
+            }
+
+            new_results
+        } else {
+            let search_request = (total_to_get, request, formula);
+            self._search(&search_request, &request.segment_filtering_formula)?
+        };
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: ends at {v} ms");
         debug!("{id:?} - Creating results: starts at {v} ms");
 
-        let documents = result
+        let documents = results
             .into_iter()
             .enumerate()
             .filter(|(idx, _)| *idx >= offset)
