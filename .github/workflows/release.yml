@@ -89,14 +89,17 @@ jobs:
 
   push-docker:
     name: Build public docker image
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - image: nucliadb
+        runner:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+        image:
+          - name: nucliadb
             dockerfile: Dockerfile.withbinding
-          - image: nidx
+          - name: nidx
             dockerfile: Dockerfile.nidx
 
     steps:
@@ -130,12 +133,12 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
+          file: ${{ matrix.image.dockerfile }}
           push: true
           tags: |
-            nuclia/${{ matrix.image }}:latest
-            nuclia/${{ matrix.image }}:${{ steps.version_step.outputs.version_number }}
-            nuclia/${{ matrix.image }}:${{ steps.version_step.outputs.hash }}
+            nuclia/${{ matrix.image.name }}:latest
+            nuclia/${{ matrix.image.name }}:${{ steps.version_step.outputs.version_number }}
+            nuclia/${{ matrix.image.name }}:${{ steps.version_step.outputs.hash }}
           cache-from: type=gha
           cache-to: type=gha,mode=min
 
