@@ -2,7 +2,6 @@ name: PyPI and Helm Releases
 
 on:
   workflow_call:
-  pull_request:
 
 env:
   GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
@@ -135,7 +134,7 @@ jobs:
         with:
           context: .
           file: ${{ matrix.image.dockerfile }}
-          push: false
+          push: true
           tags: |
             nuclia/${{ matrix.image.name }}:latest
             nuclia/${{ matrix.image.name }}:${{ steps.version_step.outputs.version_number }}
