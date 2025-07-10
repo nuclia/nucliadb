@@ -73,7 +73,7 @@ pub fn stored_elements(x: &[u8]) -> usize {
 // O(1)
 pub fn get_value(src: &[u8], id: usize) -> &[u8] {
     let pointer = get_pointer(src, id);
-    Node.read_exact(&src[pointer..]).0
+    Node.read_exact(&src[pointer..])
 }
 
 use lazy_static::lazy_static;
@@ -185,7 +185,7 @@ pub fn merge(
             let element_pointer = get_pointer(store, element_cursor);
             let element_slice = &store[element_pointer..];
             // Moving to the end of the file to write the current element.
-            let (exact_element, _) = Node.read_exact(element_slice);
+            let exact_element = Node.read_exact(element_slice);
             let mut element_pointer = recipient_buffer.seek(SeekFrom::End(0))?;
             if element_pointer as usize % alignment > 0 {
                 let pad = alignment - (element_pointer as usize % alignment);
@@ -233,9 +233,8 @@ mod tests {
         assert_eq!(no_values, expected.len());
         for (id, expected_value) in expected.iter().enumerate() {
             let actual_value = get_value(&buf_map, id);
-            let (head, tail) = Node.read_exact(actual_value);
+            let head = Node.read_exact(actual_value);
             assert_eq!(actual_value, head);
-            assert_eq!(tail, &[] as &[u8]);
             assert_eq!(Node::key(actual_value), expected_value.key);
         }
     }

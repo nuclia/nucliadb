@@ -395,7 +395,7 @@ impl PartialEq for Neighbour {
 impl Neighbour {
     fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
         let node = data_store::get_value(data, addr);
-        let (exact, _) = Node.read_exact(node);
+        let exact = Node.read_exact(node);
         Neighbour {
             score,
             node: exact.to_vec(),

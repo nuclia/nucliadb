@@ -136,9 +136,9 @@ impl Node {
         let xvec_start = xvec_ptr + 2 * U32_LEN + xvec_pad as usize;
         &x[xvec_start..(xvec_start + xvec_len)]
     }
-    pub fn read_exact<'a>(&self, x: &'a [u8]) -> (/* head */ &'a [u8], /* tail */ &'a [u8]) {
+    pub fn read_exact<'a>(&self, x: &'a [u8]) -> &'a [u8] {
         let len = usize_from_slice_le(&x[LEN.0..LEN.1]);
-        (&x[0..len], &x[len..])
+        &x[0..len]
     }
 }
 
@@ -224,7 +224,7 @@ mod tests {
         assert_eq!(Node::vector(&buf[node2..]), vector2);
         assert_eq!(Node::metadata(&buf[node1..]), metadata1);
         assert_eq!(Node::metadata(&buf[node2..]), metadata2);
-        assert_eq!(Node.read_exact(&buf[node1..]), (&buf[node1..node2], &buf[node2..]));
-        assert_eq!(Node.read_exact(&buf[node2..]), (&buf[node2..], [].as_slice()));
+        assert_eq!(Node.read_exact(&buf[node1..]), &buf[node1..node2]);
+        assert_eq!(Node.read_exact(&buf[node2..]), &buf[node2..]);
     }
 }
