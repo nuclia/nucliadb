@@ -135,8 +135,8 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
     }
 
     // Creating the hnsw for the new node store.
-    let tracker = Retriever::new(&[], &nodes, config, -1.0);
-    let mut ops = HnswOps::new(&tracker, false);
+    let retriever = Retriever::new(&[], &nodes, config, -1.0);
+    let mut ops = HnswOps::new(&retriever, false);
     for id in start_node_index..no_nodes {
         ops.insert(Address(id), &mut index);
     }
@@ -208,8 +208,8 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
 
     // Creating the HNSW using the mmaped nodes
     let mut index = RAMHnsw::new();
-    let tracker = Retriever::new(&[], &nodes, config, -1.0);
-    let mut ops = HnswOps::new(&tracker, false);
+    let retriever = Retriever::new(&[], &nodes, config, -1.0);
+    let mut ops = HnswOps::new(&retriever, false);
     for id in 0..no_nodes {
         ops.insert(Address(id), &mut index)
     }
@@ -455,7 +455,7 @@ impl OpenDataPoint {
         min_score: f32,
     ) -> Box<dyn Iterator<Item = Neighbour> + '_> {
         let encoded_query = config.vector_type.encode(query);
-        let tracker = Retriever::new(&encoded_query, &self.nodes, config, min_score);
+        let retriever = Retriever::new(&encoded_query, &self.nodes, config, min_score);
         let query_address = Address(self.metadata.records);
 
         let mut filter_bitset = self.inverted_indexes.filter(filter);
@@ -475,7 +475,7 @@ impl OpenDataPoint {
             let mut scored_results = Vec::new();
             for address in bitset.iter() {
                 let address = Address(address);
-                let score = tracker.similarity(query_address, address);
+                let score = retriever.similarity(query_address, address);
                 if score >= min_score {
                     scored_results.push(Reverse(Cnx(address, score)));
                 }
@@ -489,7 +489,7 @@ impl OpenDataPoint {
             );
         }
 
-        let ops = HnswOps::new(&tracker, true);
+        let ops = HnswOps::new(&retriever, true);
         let neighbours = ops.search(query_address, self.index.as_ref(), results, bitset, with_duplicates);
         Box::new(
             neighbours
