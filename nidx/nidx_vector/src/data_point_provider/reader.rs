@@ -36,24 +36,24 @@ use std::time::Instant;
 use tracing::*;
 
 // Fixed-sized sorted collection
-struct Fssc {
+struct Fssc<'a> {
     size: usize,
     with_duplicates: bool,
     seen: HashSet<Vec<u8>>,
-    buff: HashMap<Neighbour, f32>,
+    buff: HashMap<Neighbour<'a>, f32>,
 }
-impl From<Fssc> for Vec<Neighbour> {
-    fn from(fssv: Fssc) -> Self {
+impl<'a> From<Fssc<'a>> for Vec<Neighbour<'a>> {
+    fn from(fssv: Fssc<'a>) -> Self {
         let mut result: Vec<_> = fssv.buff.into_keys().collect();
         result.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap_or(Ordering::Less));
         result
     }
 }
-impl Fssc {
+impl<'a> Fssc<'a> {
     fn is_full(&self) -> bool {
         self.buff.len() == self.size
     }
-    fn new(size: usize, with_duplicates: bool) -> Fssc {
+    fn new(size: usize, with_duplicates: bool) -> Fssc<'a> {
         Fssc {
             size,
             with_duplicates,
@@ -61,7 +61,7 @@ impl Fssc {
             buff: HashMap::with_capacity(size),
         }
     }
-    fn add(&mut self, candidate: Neighbour) {
+    fn add(&mut self, candidate: Neighbour<'a>) {
         if !self.with_duplicates && self.seen.contains(candidate.vector()) {
             return;
         } else if !self.with_duplicates {
@@ -126,7 +126,7 @@ impl SearchRequest for (usize, &VectorSearchRequest, Formula) {
     }
 }
 
-impl TryFrom<Neighbour> for DocumentScored {
+impl<'a> TryFrom<Neighbour<'a>> for DocumentScored {
     type Error = String;
     fn try_from(neighbour: Neighbour) -> Result<Self, Self::Error> {
         let id = std::str::from_utf8(neighbour.id());

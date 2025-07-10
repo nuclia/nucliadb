@@ -366,39 +366,38 @@ impl data_store::IntoBuffer for Elem {
 }
 
 #[derive(Debug, Clone)]
-pub struct Neighbour {
+pub struct Neighbour<'a> {
     score: f32,
-    node: Vec<u8>,
+    node: &'a [u8],
 }
-impl Eq for Neighbour {}
-impl std::hash::Hash for Neighbour {
+impl<'a> Eq for Neighbour<'a> {}
+impl<'a> std::hash::Hash for Neighbour<'a> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id().hash(state)
     }
 }
-impl Ord for Neighbour {
+impl<'a> Ord for Neighbour<'a> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.node.cmp(&other.node)
     }
 }
-impl PartialOrd for Neighbour {
+impl<'a> PartialOrd for Neighbour<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
-impl PartialEq for Neighbour {
+impl<'a> PartialEq for Neighbour<'a> {
     fn eq(&self, other: &Self) -> bool {
         self.node == other.node
     }
 }
 
-impl Neighbour {
+impl<'a> Neighbour<'a> {
     fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
         let node = data_store::get_value(data, addr);
-        let exact = Node.read_exact(node);
         Neighbour {
             score,
-            node: exact.to_vec(),
+            node: Node.read_exact(node),
         }
     }
     pub fn score(&self) -> f32 {
