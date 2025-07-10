@@ -22,7 +22,6 @@ use std::fs::File;
 use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 
 use crate::config::{VectorConfig, VectorType};
-use crate::data_point::node::Node;
 use crate::data_types::usize_utils::*;
 
 // A data store schema.
@@ -77,6 +76,8 @@ pub fn get_value(src: &[u8], id: usize) -> Node {
 
 use lazy_static::lazy_static;
 use libc;
+
+use super::node::Node;
 
 #[cfg(not(target_os = "windows"))]
 pub fn will_need(src: &[u8], id: usize, vector_len: usize) {

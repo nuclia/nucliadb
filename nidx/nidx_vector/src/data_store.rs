@@ -21,12 +21,14 @@
 use std::{fs::File, path::Path};
 
 use memmap2::Mmap;
+pub use node::Node;
 
 use crate::{
     config::{VectorConfig, VectorType},
-    data_point::{Elem, node::Node},
+    data_point::Elem,
 };
 
+mod node;
 mod store;
 
 const NODES: &str = "nodes.kv";

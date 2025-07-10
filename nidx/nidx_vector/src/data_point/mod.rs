@@ -19,7 +19,6 @@
 //
 
 pub mod disk_hnsw;
-pub mod node;
 pub mod ops_hnsw;
 pub mod ram_hnsw;
 
@@ -28,7 +27,7 @@ mod params;
 mod tests;
 
 use crate::config::VectorConfig;
-use crate::data_store::DataStore;
+use crate::data_store::{DataStore, Node};
 use crate::data_types::{trie, trie_ram};
 use crate::formula::Formula;
 use crate::inverted_index::{InvertedIndexes, build_indexes};
@@ -38,7 +37,6 @@ use bit_vec::BitVec;
 use disk_hnsw::DiskHnsw;
 use io::{BufWriter, Write};
 use memmap2::Mmap;
-use node::Node;
 use ops_hnsw::{Cnx, HnswOps};
 use ram_hnsw::RAMHnsw;
 use std::cmp::Reverse;
