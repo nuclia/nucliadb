@@ -209,7 +209,7 @@ pub fn merge(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data_point::{Elem, LabelDictionary};
+    use crate::data_point::Elem;
 
     const VECTOR_CONFIG: VectorConfig = VectorConfig {
         vector_type: VectorType::DenseF32 { dimension: 3 },
@@ -234,12 +234,7 @@ mod tests {
     }
 
     fn create_elem(num: &usize) -> Elem {
-        Elem::new(
-            num.to_string(),
-            [*num as f32; 16].to_vec(),
-            LabelDictionary::default(),
-            None,
-        )
+        Elem::new(num.to_string(), [*num as f32; 16].to_vec(), vec![], None)
     }
 
     #[test]

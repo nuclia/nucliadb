@@ -18,9 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod trie;
-pub mod trie_ram;
-
 pub mod usize_utils {
     pub const USIZE_LEN: usize = (usize::BITS / 8) as usize;
     pub fn usize_from_slice_le(v: &[u8]) -> usize {

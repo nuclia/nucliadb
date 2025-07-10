@@ -18,10 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::io;
-
-use crate::data_types::trie;
+use super::trie;
 use crate::data_types::usize_utils::*;
+use std::io;
 
 // Nodes are the main element of the system. The following data is stored inside them:
 // -> vector: Vec<u8> used for building a hnsw index with them (is a serialized Vec<f32>).
@@ -150,7 +149,7 @@ impl<'a> Node<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{data_types::trie_ram, vector_types::dense_f32};
+    use crate::{data_store::v1::trie_ram, vector_types::dense_f32};
     lazy_static::lazy_static! {
         static ref NO_LABELS_TRIE: Vec<u8> = trie::serialize(trie_ram::create_trie(&NO_LABELS));
         static ref LABELS_TRIE: Vec<u8> = trie::serialize(trie_ram::create_trie(&LABELS));

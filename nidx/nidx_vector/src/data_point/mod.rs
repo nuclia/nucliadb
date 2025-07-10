@@ -28,7 +28,6 @@ mod tests;
 
 use crate::config::VectorConfig;
 use crate::data_store::{DataStore, Node};
-use crate::data_types::{trie, trie_ram};
 use crate::formula::Formula;
 use crate::inverted_index::{InvertedIndexes, build_indexes};
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
@@ -293,28 +292,14 @@ impl DataRetriever for Retriever<'_> {
 }
 
 #[derive(Clone, Debug)]
-pub struct LabelDictionary(pub Vec<u8>);
-impl Default for LabelDictionary {
-    fn default() -> Self {
-        LabelDictionary::new(vec![])
-    }
-}
-impl LabelDictionary {
-    pub fn new(mut labels: Vec<String>) -> LabelDictionary {
-        labels.sort();
-        let ram_trie = trie_ram::create_trie(&labels);
-        LabelDictionary(trie::serialize(ram_trie))
-    }
-}
-#[derive(Clone, Debug)]
 pub struct Elem {
     pub key: Vec<u8>,
     pub vector: Vec<f32>,
     pub metadata: Option<Vec<u8>>,
-    pub labels: LabelDictionary,
+    pub labels: Vec<String>,
 }
 impl Elem {
-    pub fn new(key: String, vector: Vec<f32>, labels: LabelDictionary, metadata: Option<Vec<u8>>) -> Elem {
+    pub fn new(key: String, vector: Vec<f32>, labels: Vec<String>, metadata: Option<Vec<u8>>) -> Elem {
         Elem {
             labels,
             metadata,
@@ -491,7 +476,7 @@ mod test {
         vector_types::dense_f32::{dot_similarity, encode_vector},
     };
 
-    use super::{Elem, LabelDictionary, create, merge};
+    use super::{Elem, create, merge};
     use nidx_protos::prost::*;
 
     const DIMENSION: usize = 128;
@@ -556,7 +541,7 @@ mod test {
             Elem::new(
                 random_key(rng),
                 random_vector(rng),
-                LabelDictionary::new(labels.clone()),
+                labels.clone(),
                 Some(metadata.encode_to_vec()),
             ),
             labels,

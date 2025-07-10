@@ -25,7 +25,7 @@ use tempfile::tempdir;
 
 use crate::VectorR;
 use crate::config::{Similarity, VectorConfig};
-use crate::data_point::{self, Elem, LabelDictionary};
+use crate::data_point::{self, Elem};
 use crate::formula::{AtomClause, Clause, Formula};
 
 const CONFIG: VectorConfig = VectorConfig {
@@ -56,12 +56,10 @@ fn simple_flow() {
         queries.push(AtomClause::label(format!("LABEL_{}", i)));
     }
     let mut expected_keys = vec![];
-    let label_dictionary = LabelDictionary::new(labels.clone());
     for i in 0..50 {
         let key = format!("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-{i}");
         let vector = vec![rand::random::<f32>(); 178];
-        let labels = label_dictionary.clone();
-        elems.push(Elem::new(key.clone(), vector, labels, None));
+        elems.push(Elem::new(key.clone(), vector, labels.clone(), None));
         expected_keys.push(key);
     }
     let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
@@ -84,13 +82,11 @@ fn accuracy_test() {
         labels.push(format!("LABEL_{}", i));
         queries.push(AtomClause::label(format!("LABEL_{}", i)));
     }
-    let labels_dictionary = LabelDictionary::new(labels.clone());
     let mut elems = Vec::new();
     for i in 0..100 {
         let key = format!("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-{i}");
         let vector = create_query();
-        let labels = labels_dictionary.clone();
-        elems.push(Elem::new(key, vector, labels, None));
+        elems.push(Elem::new(key, vector, labels.clone(), None));
     }
     let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
     let query = create_query();
@@ -118,7 +114,7 @@ fn single_graph() {
     let key = "9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string();
     let vector = create_query();
 
-    let elems = vec![Elem::new(key.clone(), vector.clone(), LabelDictionary::default(), None)];
+    let elems = vec![Elem::new(key.clone(), vector.clone(), vec![], None)];
     let mut reader = data_point::create(temp_dir.path(), elems.clone(), &CONFIG, HashSet::new()).unwrap();
     let formula = Formula::new();
     reader.apply_deletion(&key);
@@ -139,20 +135,10 @@ fn single_graph() {
 fn data_merge() -> anyhow::Result<()> {
     let key0 = "9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string();
     let vector0 = create_query();
-    let elems0 = vec![Elem::new(
-        key0.clone(),
-        vector0.clone(),
-        LabelDictionary::default(),
-        None,
-    )];
+    let elems0 = vec![Elem::new(key0.clone(), vector0.clone(), vec![], None)];
     let key1 = "29ee1f6e4585423585f31ded0202ee3a/f/field/0-100".to_string();
     let vector1 = create_query();
-    let elems1 = vec![Elem::new(
-        key1.clone(),
-        vector1.clone(),
-        LabelDictionary::default(),
-        None,
-    )];
+    let elems1 = vec![Elem::new(key1.clone(), vector1.clone(), vec![], None)];
 
     let dp0_path = tempdir()?;
     let dp0 = data_point::create(dp0_path.path(), elems0, &CONFIG, HashSet::new()).unwrap();
@@ -202,7 +188,7 @@ fn label_filtering_test() {
         let key = format!("6e5a546a9a5c480f8579472016b1ee14/f/field/{}-{}", i, i + 1);
         let vector = create_query();
 
-        let labels = LabelDictionary::new(vec![format!("LABEL_{}", i)]);
+        let labels = vec![format!("LABEL_{}", i)];
         elems.push(Elem::new(key, vector, labels, None));
     }
 
@@ -242,7 +228,7 @@ fn label_prefix_search_test() {
         let key = format!("6e5a546a9a5c480f8579472016b1ee14/f/field/{}-{}", i, i + 1);
         let vector = create_query();
 
-        let labels = LabelDictionary::new(vec![format!("/l/labelset/LABEL_{}", i)]);
+        let labels = vec![format!("/l/labelset/LABEL_{}", i)];
         elems.push(Elem::new(key, vector, labels, None));
     }
 
@@ -284,7 +270,7 @@ fn fast_data_merge() -> VectorR<()> {
             Elem::new(
                 format!("75a6eed3f94e456daa3f2d578a2254b7/t/trash/0-{k}"),
                 create_query(),
-                LabelDictionary::default(),
+                vec![],
                 None,
             )
         })
@@ -292,13 +278,13 @@ fn fast_data_merge() -> VectorR<()> {
     elems.push(Elem::new(
         "00000000000000000000000000000000/f/file/0-100".into(),
         search_vectors[0].clone(),
-        LabelDictionary::default(),
+        vec![],
         None,
     ));
     elems.push(Elem::new(
         "00000000000000000000000000000001/f/file/0-100".into(),
         search_vectors[1].clone(),
-        LabelDictionary::default(),
+        vec![],
         None,
     ));
     let mut big_segment = data_point::create(big_segment_dir.path(), elems, &CONFIG, HashSet::new())?;
@@ -310,13 +296,13 @@ fn fast_data_merge() -> VectorR<()> {
             Elem::new(
                 "00000000000000000000000000000002/f/file/0-100".into(),
                 search_vectors[2].clone(),
-                LabelDictionary::default(),
+                vec![],
                 None,
             ),
             Elem::new(
                 "00000000000000000000000000000003/f/file/0-100".into(),
                 search_vectors[3].clone(),
-                LabelDictionary::default(),
+                vec![],
                 None,
             ),
         ],

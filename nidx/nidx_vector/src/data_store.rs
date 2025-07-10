@@ -18,18 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{fs::File, path::Path};
+mod v1;
 
-use memmap2::Mmap;
-pub use node::Node;
+pub use v1::node::Node;
 
 use crate::{
     config::{VectorConfig, VectorType},
     data_point::Elem,
 };
-
-mod node;
-mod store;
+use memmap2::Mmap;
+use std::{fs::File, path::Path};
+use v1::store;
 
 const NODES: &str = "nodes.kv";
 
@@ -95,19 +94,6 @@ impl DataStore {
                 .collect::<Vec<_>>()
                 .as_mut_slice(),
             config,
-        )
-    }
-}
-
-impl store::IntoBuffer for Elem {
-    fn serialize_into<W: std::io::Write>(self, w: W, vector_type: &VectorType) -> std::io::Result<()> {
-        Node::serialize_into(
-            w,
-            self.key,
-            vector_type.encode(&self.vector),
-            vector_type.vector_alignment(),
-            self.labels.0,
-            self.metadata.as_ref(),
         )
     }
 }
