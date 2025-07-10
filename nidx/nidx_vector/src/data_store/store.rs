@@ -75,7 +75,6 @@ pub fn get_value(src: &[u8], id: usize) -> Node {
 }
 
 use lazy_static::lazy_static;
-use libc;
 
 use super::node::Node;
 

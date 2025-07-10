@@ -261,7 +261,7 @@ impl<'a> Retriever<'a> {
     }
 }
 
-impl<'a> DataRetriever for Retriever<'a> {
+impl DataRetriever for Retriever<'_> {
     fn will_need(&self, Address(x): Address) {
         self.data_store.will_need(x, self.vector_len_bytes);
     }
@@ -329,29 +329,38 @@ pub struct Neighbour<'a> {
     score: f32,
     node: Node<'a>,
 }
-impl<'a> Eq for Neighbour<'a> {}
-impl<'a> std::hash::Hash for Neighbour<'a> {
+impl Eq for Neighbour<'_> {}
+impl std::hash::Hash for Neighbour<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id().hash(state)
     }
+
+    fn hash_slice<H: std::hash::Hasher>(data: &[Self], state: &mut H)
+    where
+        Self: Sized,
+    {
+        for piece in data {
+            piece.hash(state)
+        }
+    }
 }
-impl<'a> Ord for Neighbour<'a> {
+impl Ord for Neighbour<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.node.cmp(&other.node)
     }
 }
-impl<'a> PartialOrd for Neighbour<'a> {
+impl PartialOrd for Neighbour<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
-impl<'a> PartialEq for Neighbour<'a> {
+impl PartialEq for Neighbour<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.node == other.node
     }
 }
 
-impl<'a> Neighbour<'a> {
+impl Neighbour<'_> {
     fn new(Address(addr): Address, data_store: &DataStore, score: f32) -> Neighbour {
         let node = data_store.get_value(addr);
         Neighbour { score, node }

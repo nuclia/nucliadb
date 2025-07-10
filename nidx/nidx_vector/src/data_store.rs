@@ -90,7 +90,7 @@ impl DataStore {
         store::merge(
             &mut nodes_file,
             segments
-                .into_iter()
+                .iter_mut()
                 .map(|(deletions, store)| (deletions, &store.nodes[..]))
                 .collect::<Vec<_>>()
                 .as_mut_slice(),

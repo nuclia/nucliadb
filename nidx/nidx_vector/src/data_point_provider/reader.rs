@@ -126,7 +126,7 @@ impl SearchRequest for (usize, &VectorSearchRequest, Formula) {
     }
 }
 
-impl<'a> TryFrom<Neighbour<'a>> for DocumentScored {
+impl TryFrom<Neighbour<'_>> for DocumentScored {
     type Error = String;
     fn try_from(neighbour: Neighbour) -> Result<Self, Self::Error> {
         let id = std::str::from_utf8(neighbour.id());
