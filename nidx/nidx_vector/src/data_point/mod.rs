@@ -275,16 +275,12 @@ impl<'a> Retriever<'a> {
             vector_len_bytes,
         }
     }
-    fn find_node(&self, Address(x): Address) -> &[u8] {
-        if x == self.no_nodes {
-            self.temp
-        } else {
-            data_store::get_value(self.nodes, x)
-        }
+    fn find_node(&'a self, Address(x): Address) -> Node<'a> {
+        data_store::get_value(self.nodes, x)
     }
 }
 
-impl DataRetriever for Retriever<'_> {
+impl<'a> DataRetriever for Retriever<'a> {
     fn will_need(&self, Address(x): Address) {
         data_store::will_need(self.nodes, x, self.vector_len_bytes);
     }
@@ -293,24 +289,19 @@ impl DataRetriever for Retriever<'_> {
         if addr == self.no_nodes {
             self.temp
         } else {
-            let x = self.find_node(x);
-            Node::vector(x)
+            self.find_node(x).vector()
         }
     }
     fn similarity(&self, x @ Address(a0): Address, y @ Address(a1): Address) -> f32 {
         if a0 == self.no_nodes {
-            let y = self.find_node(y);
-            let y = Node::vector(y);
+            let y = self.find_node(y).vector();
             (self.similarity_function)(self.temp, y)
         } else if a1 == self.no_nodes {
-            let x = self.find_node(x);
-            let x = Node::vector(x);
+            let x = self.find_node(x).vector();
             (self.similarity_function)(self.temp, x)
         } else {
-            let x = self.find_node(x);
-            let y = self.find_node(y);
-            let x = Node::vector(x);
-            let y = Node::vector(y);
+            let x = self.find_node(x).vector();
+            let y = self.find_node(y).vector();
             (self.similarity_function)(x, y)
         }
     }
@@ -368,7 +359,7 @@ impl data_store::IntoBuffer for Elem {
 #[derive(Debug, Clone)]
 pub struct Neighbour<'a> {
     score: f32,
-    node: &'a [u8],
+    node: Node<'a>,
 }
 impl<'a> Eq for Neighbour<'a> {}
 impl<'a> std::hash::Hash for Neighbour<'a> {
@@ -395,10 +386,7 @@ impl<'a> PartialEq for Neighbour<'a> {
 impl<'a> Neighbour<'a> {
     fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
         let node = data_store::get_value(data, addr);
-        Neighbour {
-            score,
-            node: Node.read_exact(node),
-        }
+        Neighbour { score, node }
     }
     pub fn score(&self) -> f32 {
         self.score
@@ -527,7 +515,7 @@ mod test {
         vector_types::dense_f32::{dot_similarity, encode_vector},
     };
 
-    use super::{Elem, LabelDictionary, create, merge, node::Node};
+    use super::{Elem, LabelDictionary, create, merge};
     use nidx_protos::prost::*;
 
     const DIMENSION: usize = 128;
@@ -622,19 +610,19 @@ mod test {
 
         for (i, (elem, mut labels)) in elems.into_iter().enumerate() {
             let node = data_store::get_value(&nodes, i);
-            assert_eq!(elem.key, Node::key(node));
-            assert_eq!(config.vector_type.encode(&elem.vector), Node::vector(node));
+            assert_eq!(elem.key, node.key());
+            assert_eq!(config.vector_type.encode(&elem.vector), node.vector());
 
             // Compare metadata as the decoded protobug. Tthe absolute stored value may have trailing padding
             // from vectors, but the decoding step should ignore it
             assert_eq!(
                 SentenceMetadata::decode(elem.metadata.as_ref().unwrap().as_slice()),
-                SentenceMetadata::decode(Node::metadata(node))
+                SentenceMetadata::decode(node.metadata())
             );
 
             // Compare labels
             labels.sort();
-            let mut node_labels = Node::labels(node);
+            let mut node_labels = node.labels();
             node_labels.sort();
             assert_eq!(labels, node_labels);
         }
@@ -676,19 +664,19 @@ mod test {
 
         for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2.into_iter()).enumerate() {
             let node = data_store::get_value(&nodes, i);
-            assert_eq!(elem.key, Node::key(node));
-            assert_eq!(config.vector_type.encode(&elem.vector), Node::vector(node));
+            assert_eq!(elem.key, node.key());
+            assert_eq!(config.vector_type.encode(&elem.vector), node.vector());
 
             // Compare metadata as the decoded protobug. Tthe absolute stored value may have trailing padding
             // from vectors, but the decoding step should ignore it
             assert_eq!(
                 SentenceMetadata::decode(elem.metadata.as_ref().unwrap().as_slice()),
-                SentenceMetadata::decode(Node::metadata(node))
+                SentenceMetadata::decode(node.metadata())
             );
 
             // Compare labels
             labels.sort();
-            let mut node_labels = Node::labels(node);
+            let mut node_labels = node.labels();
             node_labels.sort();
             assert_eq!(labels, node_labels);
         }

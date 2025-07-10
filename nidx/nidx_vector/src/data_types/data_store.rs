@@ -71,9 +71,9 @@ pub fn stored_elements(x: &[u8]) -> usize {
 }
 
 // O(1)
-pub fn get_value(src: &[u8], id: usize) -> &[u8] {
+pub fn get_value(src: &[u8], id: usize) -> Node {
     let pointer = get_pointer(src, id);
-    Node.read_exact(&src[pointer..])
+    Node::new(&src[pointer..])
 }
 
 use lazy_static::lazy_static;
@@ -185,14 +185,14 @@ pub fn merge(
             let element_pointer = get_pointer(store, element_cursor);
             let element_slice = &store[element_pointer..];
             // Moving to the end of the file to write the current element.
-            let exact_element = Node.read_exact(element_slice);
+            let exact_element = Node::new(element_slice);
             let mut element_pointer = recipient_buffer.seek(SeekFrom::End(0))?;
             if element_pointer as usize % alignment > 0 {
                 let pad = alignment - (element_pointer as usize % alignment);
                 recipient_buffer.seek(SeekFrom::Current(pad as i64))?;
                 element_pointer += pad as u64;
             }
-            recipient_buffer.write_all(exact_element)?;
+            recipient_buffer.write_all(exact_element.bytes())?;
             // Moving to the next free slot in the section id to write
             // the offset where the element was written.
             recipient_buffer.seek(SeekFrom::Start(id_section_cursor as u64))?;
@@ -233,9 +233,7 @@ mod tests {
         assert_eq!(no_values, expected.len());
         for (id, expected_value) in expected.iter().enumerate() {
             let actual_value = get_value(&buf_map, id);
-            let head = Node.read_exact(actual_value);
-            assert_eq!(actual_value, head);
-            assert_eq!(Node::key(actual_value), expected_value.key);
+            assert_eq!(actual_value.key(), expected_value.key);
         }
     }
 
@@ -279,7 +277,7 @@ mod tests {
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(&merge_map, i))
-            .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
+            .map(|s| std::str::from_utf8(s.key()).unwrap().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -321,7 +319,7 @@ mod tests {
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(&merge_map, i))
-            .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
+            .map(|s| std::str::from_utf8(s.key()).unwrap().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -362,7 +360,7 @@ mod tests {
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(&merge_map, i))
-            .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
+            .map(|s| std::str::from_utf8(s.key()).unwrap().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -403,7 +401,7 @@ mod tests {
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(&merge_map, i))
-            .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
+            .map(|s| std::str::from_utf8(s.key()).unwrap().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -444,7 +442,7 @@ mod tests {
         let number_of_elements = stored_elements(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(&merge_store, i))
-            .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
+            .map(|s| std::str::from_utf8(s.key()).unwrap().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -486,7 +484,7 @@ mod tests {
         let number_of_elements = stored_elements(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(&merge_store, i))
-            .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
+            .map(|s| std::str::from_utf8(s.key()).unwrap().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());

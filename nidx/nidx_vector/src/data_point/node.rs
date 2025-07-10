@@ -48,9 +48,18 @@ const KEY_START: (usize, usize) = (VECTOR_START.1, VECTOR_START.1 + USIZE_LEN);
 const LABEL_START: (usize, usize) = (KEY_START.1, KEY_START.1 + USIZE_LEN);
 const HEADER_LEN: usize = 4 * USIZE_LEN;
 
-#[derive(Clone, Copy)]
-pub struct Node;
-impl Node {
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
+pub struct Node<'a>(&'a [u8]);
+impl<'a> Node<'a> {
+    pub fn new(start: &'a [u8]) -> Node<'a> {
+        let len = usize_from_slice_le(&start[LEN.0..LEN.1]);
+        Self(&start[0..len])
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        self.0
+    }
+
     // labels must be sorted.
     pub fn serialize_into<W, S, V, T, M>(
         mut w: W,
@@ -107,38 +116,34 @@ impl Node {
         w.flush()
     }
     // x must be serialized using Node, may have trailing bytes.
-    pub fn metadata(x: &[u8]) -> &[u8] {
+    pub fn metadata(&self) -> &[u8] {
         // The metadata starts just after the header ends.
         let metadata_start = LABEL_START.1;
         // The metadata ends when the vector segment starts.
-        let metadata_end = usize_from_slice_le(&x[VECTOR_START.0..VECTOR_START.1]);
-        &x[metadata_start..metadata_end]
+        let metadata_end = usize_from_slice_le(&self.0[VECTOR_START.0..VECTOR_START.1]);
+        &self.0[metadata_start..metadata_end]
     }
     // x must be serialized using Node, may have trailing bytes.
     // This function will decompress the trie data structure that contains the
     // labels. Use only if you need all the labels.
-    pub fn labels(x: &[u8]) -> Vec<String> {
-        let xlabel_ptr = usize_from_slice_le(&x[LABEL_START.0..LABEL_START.1]);
-        trie::decompress(&x[xlabel_ptr..])
+    pub fn labels(&self) -> Vec<String> {
+        let xlabel_ptr = usize_from_slice_le(&self.0[LABEL_START.0..LABEL_START.1]);
+        trie::decompress(&self.0[xlabel_ptr..])
     }
     // x must be serialized using Node, may have trailing bytes.
-    pub fn key(x: &[u8]) -> &[u8] {
-        let xkey_ptr = usize_from_slice_le(&x[KEY_START.0..KEY_START.1]);
-        let xkey_len = usize_from_slice_le(&x[xkey_ptr..(xkey_ptr + USIZE_LEN)]);
+    pub fn key(&self) -> &[u8] {
+        let xkey_ptr = usize_from_slice_le(&self.0[KEY_START.0..KEY_START.1]);
+        let xkey_len = usize_from_slice_le(&self.0[xkey_ptr..(xkey_ptr + USIZE_LEN)]);
         let xkey_start = xkey_ptr + USIZE_LEN;
-        &x[xkey_start..(xkey_start + xkey_len)]
+        &self.0[xkey_start..(xkey_start + xkey_len)]
     }
     // x must be serialized using Node, may have trailing bytes.
-    pub fn vector(x: &[u8]) -> &[u8] {
-        let xvec_ptr = usize_from_slice_le(&x[VECTOR_START.0..VECTOR_START.1]);
-        let xvec_len = u32_from_slice_le(&x[xvec_ptr..(xvec_ptr + U32_LEN)]) as usize;
-        let xvec_pad = u32_from_slice_le(&x[(xvec_ptr + U32_LEN)..(xvec_ptr + 2 * U32_LEN)]);
+    pub fn vector(&self) -> &'a [u8] {
+        let xvec_ptr = usize_from_slice_le(&self.0[VECTOR_START.0..VECTOR_START.1]);
+        let xvec_len = u32_from_slice_le(&self.0[xvec_ptr..(xvec_ptr + U32_LEN)]) as usize;
+        let xvec_pad = u32_from_slice_le(&self.0[(xvec_ptr + U32_LEN)..(xvec_ptr + 2 * U32_LEN)]);
         let xvec_start = xvec_ptr + 2 * U32_LEN + xvec_pad as usize;
-        &x[xvec_start..(xvec_start + xvec_len)]
-    }
-    pub fn read_exact<'a>(&self, x: &'a [u8]) -> &'a [u8] {
-        let len = usize_from_slice_le(&x[LEN.0..LEN.1]);
-        &x[0..len]
+        &self.0[xvec_start..(xvec_start + xvec_len)]
     }
 }
 
@@ -167,15 +172,17 @@ mod tests {
         let key_len = usize_from_slice_le(&buf[key_start..(key_start + USIZE_LEN)]);
         let svector = (vector_start + USIZE_LEN)..(vector_start + USIZE_LEN + vector_len);
         let skey = (key_start + USIZE_LEN)..(key_start + USIZE_LEN + key_len);
-        let metadata = Node::metadata(&buf);
+
+        let node = Node::new(&buf);
+        let metadata = node.metadata();
         assert_eq!(metadata.len(), 0);
         assert_eq!(len, buf.len());
         assert_eq!(vector_len, vector.len());
         assert_eq!(key_len, key.len());
         assert_eq!(&buf[svector], &vector);
         assert_eq!(&buf[skey], key.as_slice());
-        assert_eq!(Node::vector(&buf), &vector);
-        assert_eq!(Node::key(&buf), key);
+        assert_eq!(node.vector(), &vector);
+        assert_eq!(node.key(), key);
 
         let key = b"NODE2";
         let metadata = b"THIS ARE THE METADATA CONTENTS";
@@ -189,19 +196,21 @@ mod tests {
         let key_len = usize_from_slice_le(&buf[key_start..(key_start + USIZE_LEN)]);
         let svector = (vector_start + USIZE_LEN)..(vector_start + USIZE_LEN + vector_len);
         let skey = (key_start + USIZE_LEN)..(key_start + USIZE_LEN + key_len);
-        let smetadata = Node::metadata(&buf);
+
+        let node = Node::new(&buf);
+        let smetadata = node.metadata();
         assert_eq!(smetadata, metadata.as_slice());
         assert_eq!(len, buf.len());
         assert_eq!(vector_len, vector.len());
         assert_eq!(key_len, key.len());
         assert_eq!(&buf[svector], &vector);
         assert_eq!(&buf[skey], key.as_slice());
-        assert_eq!(Node::vector(&buf), &vector);
-        assert_eq!(Node::key(&buf), key);
+        assert_eq!(node.vector(), &vector);
+        assert_eq!(node.key(), key);
         assert!(
             LABELS
                 .iter()
-                .all(|l| Node::labels(&buf).contains(&String::from_utf8_lossy(l).to_string()))
+                .all(|l| node.labels().contains(&String::from_utf8_lossy(l).to_string()))
         );
     }
 
@@ -218,13 +227,11 @@ mod tests {
         let vector2 = dense_f32::encode_vector(&[15.; 1000]);
         let node2 = buf.len();
         Node::serialize_into(&mut buf, key2, &vector2, 1, NO_LABELS_TRIE.clone(), Some(&metadata2)).unwrap();
-        assert_eq!(Node::key(&buf[node1..]), key1);
-        assert_eq!(Node::key(&buf[node2..]), key2);
-        assert_eq!(Node::vector(&buf[node1..]), vector1);
-        assert_eq!(Node::vector(&buf[node2..]), vector2);
-        assert_eq!(Node::metadata(&buf[node1..]), metadata1);
-        assert_eq!(Node::metadata(&buf[node2..]), metadata2);
-        assert_eq!(Node.read_exact(&buf[node1..]), &buf[node1..node2]);
-        assert_eq!(Node.read_exact(&buf[node2..]), &buf[node2..]);
+        assert_eq!(Node::new(&buf[node1..]).key(), key1);
+        assert_eq!(Node::new(&buf[node2..]).key(), key2);
+        assert_eq!(Node::new(&buf[node1..]).vector(), vector1);
+        assert_eq!(Node::new(&buf[node2..]).vector(), vector2);
+        assert_eq!(Node::new(&buf[node1..]).metadata(), metadata1);
+        assert_eq!(Node::new(&buf[node2..]).metadata(), metadata2);
     }
 }

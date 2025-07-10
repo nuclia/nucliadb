@@ -27,7 +27,6 @@ use tracing::warn;
 
 use crate::{
     VectorR,
-    data_point::node::Node,
     data_types::data_store::{self},
     formula::{BooleanOperator, Clause, Formula},
 };
@@ -103,8 +102,8 @@ pub fn build_indexes(work_path: &Path, nodes: &[u8]) -> VectorR<()> {
 
     for id in 0..data_store::stored_elements(nodes) {
         let node = data_store::get_value(nodes, id);
-        let key = Node::key(node);
-        let labels = Node::labels(node);
+        let key = node.key();
+        let labels = node.labels();
 
         let id = id as u32;
         if let Some(key) = field_id_key(std::str::from_utf8(key).unwrap()) {
