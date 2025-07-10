@@ -18,11 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::fs::File;
-use std::io::{self, BufWriter, Seek, SeekFrom, Write};
-
+use super::node::Node;
 use crate::config::{VectorConfig, VectorType};
 use crate::data_types::usize_utils::*;
+use lazy_static::lazy_static;
+use std::fs::File;
+use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 
 // A data store schema.
 // The data is arrange in a way such that the following operations can be performed:
@@ -73,10 +74,6 @@ pub fn get_value(src: &[u8], id: usize) -> Node {
     let pointer = get_pointer(src, id);
     Node::new(&src[pointer..])
 }
-
-use lazy_static::lazy_static;
-
-use super::node::Node;
 
 #[cfg(not(target_os = "windows"))]
 pub fn will_need(src: &[u8], id: usize, vector_len: usize) {
