@@ -27,7 +27,7 @@ use tracing::warn;
 
 use crate::{
     VectorR,
-    data_types::data_store::{self},
+    data_store::DataStore,
     formula::{BooleanOperator, Clause, Formula},
 };
 
@@ -96,12 +96,12 @@ impl IndexBuilder {
 }
 
 /// Build indexes from a nodes.kv file.
-pub fn build_indexes(work_path: &Path, nodes: &[u8]) -> VectorR<()> {
+pub fn build_indexes(work_path: &Path, data_store: &DataStore) -> VectorR<()> {
     let mut field_builder = IndexBuilder::new();
     let mut label_builder = IndexBuilder::new();
 
-    for id in 0..data_store::stored_elements(nodes) {
-        let node = data_store::get_value(nodes, id);
+    for id in 0..data_store.stored_elements() {
+        let node = data_store.get_value(id);
         let key = node.key();
         let labels = node.labels();
 

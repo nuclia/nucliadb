@@ -23,8 +23,7 @@ use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 
 use crate::config::{VectorConfig, VectorType};
 use crate::data_point::node::Node;
-
-use super::usize_utils::*;
+use crate::data_types::usize_utils::*;
 
 // A data store schema.
 // The data is arrange in a way such that the following operations can be performed:
