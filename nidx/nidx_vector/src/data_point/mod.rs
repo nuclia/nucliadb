@@ -405,7 +405,7 @@ impl Neighbour {
         self.score
     }
     pub fn id(&self) -> &[u8] {
-        Node.get_key(&self.node)
+        Node::key(&self.node)
     }
     pub fn vector(&self) -> &[u8] {
         Node::vector(&self.node)
