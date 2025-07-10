@@ -21,6 +21,7 @@
 pub mod config;
 mod data_point;
 mod data_point_provider;
+mod data_store;
 mod data_types;
 mod formula;
 mod indexer;

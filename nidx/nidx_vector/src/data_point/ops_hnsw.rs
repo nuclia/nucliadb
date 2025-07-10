@@ -79,7 +79,7 @@ pub type Neighbours = Vec<(Address, f32)>;
 
 /// Guides an algorithm to the valid nodes.
 struct NodeFilter<'a, DR> {
-    tracker: &'a DR,
+    retriever: &'a DR,
     filter: &'a BitSet,
     blocked_addresses: &'a FxHashSet<Address>,
     vec_counter: RepCounter<'a>,
@@ -95,14 +95,14 @@ impl<DR: DataRetriever> NodeFilter<'_, DR> {
         // The vector is blocked, meaning that its key is part of the current version of the solution
         && !self.blocked_addresses.contains(&n)
         // The number of times this vector appears is 0
-        && self.vec_counter.get(self.tracker.get_vector(n)) == 0
+        && self.vec_counter.get(self.retriever.get_vector(n)) == 0
     }
 }
 
 pub struct HnswOps<'a, DR> {
     distribution: Uniform<f64>,
     layer_rng: SmallRng,
-    tracker: &'a DR,
+    retriever: &'a DR,
     preload_nodes: bool,
 }
 
@@ -153,7 +153,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         results
     }
     fn similarity(&self, x: Address, y: Address) -> f32 {
-        self.tracker.similarity(x, y)
+        self.retriever.similarity(x, y)
     }
     fn get_random_layer(&mut self) -> usize {
         let sample: f64 = self.layer_rng.sample(self.distribution);
@@ -187,12 +187,12 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
 
             let candidate_similarity = self.similarity(query, candidate);
 
-            if candidate_similarity < self.tracker.min_score() {
+            if candidate_similarity < self.retriever.min_score() {
                 break;
             }
 
             if filter.is_valid(candidate, candidate_similarity) && filter.passes_formula(candidate) {
-                let candidate_vector = self.tracker.get_vector(candidate);
+                let candidate_vector = self.retriever.get_vector(candidate);
                 filter.vec_counter.add(candidate_vector);
                 results.push((candidate, candidate_similarity));
             }
@@ -209,7 +209,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                     candidates.push_back(new_candidate);
 
                     if self.preload_nodes && preloaded < MAX_VECTORS_TO_PRELOAD {
-                        self.tracker.will_need(new_candidate);
+                        self.retriever.will_need(new_candidate);
                         preloaded += 1;
                     }
                 }
@@ -241,7 +241,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 (Some(Cnx(cn, _)), Some(Reverse(Cnx(_, mut ws)))) => {
                     for (y, _) in layer.get_out_edges(cn) {
                         if self.preload_nodes && !visited.contains(&y) {
-                            self.tracker.will_need(y);
+                            self.retriever.will_need(y);
                         }
                     }
                     for (y, _) in layer.get_out_edges(cn) {
@@ -351,7 +351,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
 
         let filter = NodeFilter {
             filter: with_filter,
-            tracker: self.tracker,
+            retriever: self.retriever,
             blocked_addresses: &Default::default(),
             vec_counter: RepCounter::new(!with_duplicates),
         };
@@ -364,9 +364,9 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         filtered_result
     }
 
-    pub fn new(tracker: &DR, preload_nodes: bool) -> HnswOps<'_, DR> {
+    pub fn new(retriever: &DR, preload_nodes: bool) -> HnswOps<'_, DR> {
         HnswOps {
-            tracker,
+            retriever,
             distribution: Uniform::new(0.0, 1.0),
             layer_rng: SmallRng::seed_from_u64(2),
             preload_nodes,

@@ -19,7 +19,6 @@
 //
 
 pub mod disk_hnsw;
-pub mod node;
 pub mod ops_hnsw;
 pub mod ram_hnsw;
 
@@ -27,8 +26,9 @@ mod params;
 #[cfg(test)]
 mod tests;
 
-use crate::config::{VectorConfig, VectorType};
-use crate::data_types::{data_store, trie, trie_ram};
+use crate::config::VectorConfig;
+use crate::data_store::{DataStore, Node};
+use crate::data_types::{trie, trie_ram};
 use crate::formula::Formula;
 use crate::inverted_index::{InvertedIndexes, build_indexes};
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
@@ -37,7 +37,6 @@ use bit_vec::BitVec;
 use disk_hnsw::DiskHnsw;
 use io::{BufWriter, Write};
 use memmap2::Mmap;
-use node::Node;
 use ops_hnsw::{Cnx, HnswOps};
 use ram_hnsw::RAMHnsw;
 use std::cmp::Reverse;
@@ -53,36 +52,33 @@ pub use ops_hnsw::DataRetriever;
 const HNSW_COST_FACTOR: usize = 200;
 
 mod file_names {
-    pub const NODES: &str = "nodes.kv";
     pub const HNSW: &str = "index.hnsw";
 }
 
 pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
     let path = &metadata.path;
-    let nodes_file = File::open(path.join(file_names::NODES))?;
+    let data_store = DataStore::open(path)?;
     let hnsw_file = File::open(path.join(file_names::HNSW))?;
 
-    let nodes = unsafe { Mmap::map(&nodes_file)? };
     let index = unsafe { Mmap::map(&hnsw_file)? };
 
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
     {
-        nodes.advise(memmap2::Advice::WillNeed)?;
         index.advise(memmap2::Advice::Sequential)?;
     }
 
     // Build the index at runtime if they do not exist. This can
     // be removed once we have migrated all existing indexes
     if !InvertedIndexes::exists(path) {
-        build_indexes(path, &nodes)?;
+        build_indexes(path, &data_store)?;
     }
     let inverted_indexes = InvertedIndexes::open(path, metadata.records)?;
     let alive_bitset = BitSet::from_bit_vec(BitVec::from_elem(metadata.records, true));
 
     Ok(OpenDataPoint {
         metadata,
-        nodes,
+        data_store,
         index,
         inverted_indexes,
         alive_bitset,
@@ -90,13 +86,6 @@ pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
 }
 
 pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &VectorConfig) -> VectorR<OpenDataPoint> {
-    let nodes_path = data_point_path.join(file_names::NODES);
-    let mut nodes_file = File::options()
-        .read(true)
-        .write(true)
-        .create_new(true)
-        .open(nodes_path)?;
-
     let hnsw_path = data_point_path.join(file_names::HNSW);
     let mut hnsw_file = File::options()
         .read(true)
@@ -117,10 +106,10 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
     }
 
     // Creating the node store
-    let mut node_producers: Vec<_> = operants.iter().map(|dp| (dp.alive_nodes(), &dp.nodes[..])).collect();
-    let has_deletions = data_store::merge(&mut nodes_file, node_producers.as_mut_slice(), config)?;
-    let nodes = unsafe { Mmap::map(&nodes_file)? };
-    let no_nodes = data_store::stored_elements(&nodes);
+    let mut node_producers: Vec<_> = operants.iter().map(|dp| (dp.alive_nodes(), &dp.data_store)).collect();
+    let has_deletions = DataStore::merge(data_point_path, node_producers.as_mut_slice(), config)?;
+    let data_store = DataStore::open(data_point_path)?;
+    let no_nodes = data_store.stored_elements();
 
     let mut index;
     let start_node_index;
@@ -131,12 +120,12 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
         // If there are no deletions, we can reuse the first segment
         // HNSW since its indexes will match the the ones in data_store
         index = DiskHnsw::deserialize(&operants[0].index);
-        start_node_index = data_store::stored_elements(&operants[0].nodes);
+        start_node_index = operants[0].data_store.stored_elements();
     }
 
     // Creating the hnsw for the new node store.
-    let tracker = Retriever::new(&[], &nodes, config, -1.0);
-    let mut ops = HnswOps::new(&tracker, false);
+    let retriever = Retriever::new(&[], &data_store, config, -1.0);
+    let mut ops = HnswOps::new(&retriever, false);
     for id in start_node_index..no_nodes {
         ops.insert(Address(id), &mut index);
     }
@@ -152,11 +141,10 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
     {
-        nodes.advise(memmap2::Advice::WillNeed)?;
         index.advise(memmap2::Advice::Sequential)?;
     }
 
-    build_indexes(data_point_path, &nodes)?;
+    build_indexes(data_point_path, &data_store)?;
 
     let metadata = VectorSegmentMetadata {
         path: data_point_path.to_path_buf(),
@@ -164,13 +152,13 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
         index_metadata: VectorSegmentMeta { tags: tags.clone() },
     };
 
-    build_indexes(data_point_path, &nodes)?;
+    build_indexes(data_point_path, &data_store)?;
     let inverted_indexes = InvertedIndexes::open(data_point_path, no_nodes)?;
     let alive_bitset = BitSet::from_bit_vec(BitVec::from_elem(metadata.records, true));
 
     Ok(OpenDataPoint {
         metadata,
-        nodes,
+        data_store,
         index,
         inverted_indexes,
         alive_bitset,
@@ -188,12 +176,6 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         }
     }
 
-    let mut nodes_file = File::options()
-        .read(true)
-        .write(true)
-        .create_new(true)
-        .open(path.join(file_names::NODES))?;
-
     let mut hnsw_file = File::options()
         .read(true)
         .write(true)
@@ -202,14 +184,14 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
 
     // Serializing nodes on disk
     // Nodes are stored on disk and mmaped.
-    data_store::create_key_value(&mut nodes_file, elems, &config.vector_type)?;
-    let nodes = unsafe { Mmap::map(&nodes_file)? };
-    let no_nodes = data_store::stored_elements(&nodes);
+    DataStore::create(path, elems, &config.vector_type)?;
+    let data_store = DataStore::open(path)?;
+    let no_nodes = data_store.stored_elements();
 
     // Creating the HNSW using the mmaped nodes
     let mut index = RAMHnsw::new();
-    let tracker = Retriever::new(&[], &nodes, config, -1.0);
-    let mut ops = HnswOps::new(&tracker, false);
+    let retriever = Retriever::new(&[], &data_store, config, -1.0);
+    let mut ops = HnswOps::new(&retriever, false);
     for id in 0..no_nodes {
         ops.insert(Address(id), &mut index)
     }
@@ -226,11 +208,10 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
     {
-        nodes.advise(memmap2::Advice::WillNeed)?;
         index.advise(memmap2::Advice::Sequential)?;
     }
 
-    build_indexes(path, &nodes)?;
+    build_indexes(path, &data_store)?;
 
     let metadata = VectorSegmentMetadata {
         path: path.to_path_buf(),
@@ -238,13 +219,13 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         index_metadata: VectorSegmentMeta { tags },
     };
 
-    build_indexes(path, &nodes)?;
+    build_indexes(path, &data_store)?;
     let inverted_indexes = InvertedIndexes::open(path, no_nodes)?;
     let alive_bitset = BitSet::from_bit_vec(BitVec::from_elem(metadata.records, true));
 
     Ok(OpenDataPoint {
         metadata,
-        nodes,
+        data_store,
         index,
         inverted_indexes,
         alive_bitset,
@@ -258,59 +239,50 @@ pub struct Retriever<'a> {
     similarity_function: fn(&[u8], &[u8]) -> f32,
     no_nodes: usize,
     temp: &'a [u8],
-    nodes: &'a Mmap,
+    data_store: &'a DataStore,
     min_score: f32,
     vector_len_bytes: usize,
 }
 impl<'a> Retriever<'a> {
-    pub fn new(temp: &'a [u8], nodes: &'a Mmap, config: &VectorConfig, min_score: f32) -> Retriever<'a> {
-        let no_nodes = data_store::stored_elements(nodes);
+    pub fn new(temp: &'a [u8], data_store: &'a DataStore, config: &VectorConfig, min_score: f32) -> Retriever<'a> {
+        let no_nodes = data_store.stored_elements();
         let vector_len_bytes = config.vector_len_bytes();
         Retriever {
             temp,
-            nodes,
+            data_store,
             similarity_function: config.similarity_function(),
             no_nodes,
             min_score,
             vector_len_bytes,
         }
     }
-    fn find_node(&self, Address(x): Address) -> &[u8] {
-        if x == self.no_nodes {
-            self.temp
-        } else {
-            data_store::get_value(self.nodes, x)
-        }
+    fn find_node(&'a self, Address(x): Address) -> Node<'a> {
+        self.data_store.get_value(x)
     }
 }
 
 impl DataRetriever for Retriever<'_> {
     fn will_need(&self, Address(x): Address) {
-        data_store::will_need(self.nodes, x, self.vector_len_bytes);
+        self.data_store.will_need(x, self.vector_len_bytes);
     }
 
     fn get_vector(&self, x @ Address(addr): Address) -> &[u8] {
         if addr == self.no_nodes {
             self.temp
         } else {
-            let x = self.find_node(x);
-            Node::vector(x)
+            self.find_node(x).vector()
         }
     }
     fn similarity(&self, x @ Address(a0): Address, y @ Address(a1): Address) -> f32 {
         if a0 == self.no_nodes {
-            let y = self.find_node(y);
-            let y = Node::vector(y);
+            let y = self.find_node(y).vector();
             (self.similarity_function)(self.temp, y)
         } else if a1 == self.no_nodes {
-            let x = self.find_node(x);
-            let x = Node::vector(x);
+            let x = self.find_node(x).vector();
             (self.similarity_function)(self.temp, x)
         } else {
-            let x = self.find_node(x);
-            let y = self.find_node(y);
-            let x = Node::vector(x);
-            let y = Node::vector(y);
+            let x = self.find_node(x).vector();
+            let y = self.find_node(y).vector();
             (self.similarity_function)(x, y)
         }
     }
@@ -321,7 +293,7 @@ impl DataRetriever for Retriever<'_> {
 }
 
 #[derive(Clone, Debug)]
-pub struct LabelDictionary(Vec<u8>);
+pub struct LabelDictionary(pub Vec<u8>);
 impl Default for LabelDictionary {
     fn default() -> Self {
         LabelDictionary::new(vec![])
@@ -352,60 +324,52 @@ impl Elem {
     }
 }
 
-impl data_store::IntoBuffer for Elem {
-    fn serialize_into<W: io::Write>(self, w: W, vector_type: &VectorType) -> io::Result<()> {
-        Node::serialize_into(
-            w,
-            self.key,
-            vector_type.encode(&self.vector),
-            vector_type.vector_alignment(),
-            self.labels.0,
-            self.metadata.as_ref(),
-        )
-    }
-}
-
 #[derive(Debug, Clone)]
-pub struct Neighbour {
+pub struct Neighbour<'a> {
     score: f32,
-    node: Vec<u8>,
+    node: Node<'a>,
 }
-impl Eq for Neighbour {}
-impl std::hash::Hash for Neighbour {
+impl Eq for Neighbour<'_> {}
+impl std::hash::Hash for Neighbour<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id().hash(state)
     }
+
+    fn hash_slice<H: std::hash::Hasher>(data: &[Self], state: &mut H)
+    where
+        Self: Sized,
+    {
+        for piece in data {
+            piece.hash(state)
+        }
+    }
 }
-impl Ord for Neighbour {
+impl Ord for Neighbour<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.node.cmp(&other.node)
     }
 }
-impl PartialOrd for Neighbour {
+impl PartialOrd for Neighbour<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
-impl PartialEq for Neighbour {
+impl PartialEq for Neighbour<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.node == other.node
     }
 }
 
-impl Neighbour {
-    fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
-        let node = data_store::get_value(data, addr);
-        let (exact, _) = Node.read_exact(node);
-        Neighbour {
-            score,
-            node: exact.to_vec(),
-        }
+impl Neighbour<'_> {
+    fn new(Address(addr): Address, data_store: &DataStore, score: f32) -> Neighbour {
+        let node = data_store.get_value(addr);
+        Neighbour { score, node }
     }
     pub fn score(&self) -> f32 {
         self.score
     }
     pub fn id(&self) -> &[u8] {
-        Node.get_key(&self.node)
+        Node::key(&self.node)
     }
     pub fn vector(&self) -> &[u8] {
         Node::vector(&self.node)
@@ -421,7 +385,7 @@ impl Neighbour {
 
 pub struct OpenDataPoint {
     metadata: VectorSegmentMetadata,
-    nodes: Mmap,
+    data_store: DataStore,
     index: Mmap,
     inverted_indexes: InvertedIndexes,
     alive_bitset: BitSet,
@@ -455,7 +419,7 @@ impl OpenDataPoint {
     }
 
     pub fn space_usage(&self) -> usize {
-        self.nodes.len() + self.index.len() + self.inverted_indexes.space_usage()
+        self.data_store.size_bytes() + self.index.len() + self.inverted_indexes.space_usage()
     }
 
     pub fn search(
@@ -468,7 +432,7 @@ impl OpenDataPoint {
         min_score: f32,
     ) -> Box<dyn Iterator<Item = Neighbour> + '_> {
         let encoded_query = config.vector_type.encode(query);
-        let tracker = Retriever::new(&encoded_query, &self.nodes, config, min_score);
+        let retriever = Retriever::new(&encoded_query, &self.data_store, config, min_score);
         let query_address = Address(self.metadata.records);
 
         let mut filter_bitset = self.inverted_indexes.filter(filter);
@@ -488,7 +452,7 @@ impl OpenDataPoint {
             let mut scored_results = Vec::new();
             for address in bitset.iter() {
                 let address = Address(address);
-                let score = tracker.similarity(query_address, address);
+                let score = retriever.similarity(query_address, address);
                 if score >= min_score {
                     scored_results.push(Reverse(Cnx(address, score)));
                 }
@@ -497,17 +461,17 @@ impl OpenDataPoint {
             return Box::new(
                 scored_results
                     .into_iter()
-                    .map(|Reverse(a)| Neighbour::new(a.0, &self.nodes, a.1))
+                    .map(|Reverse(a)| Neighbour::new(a.0, &self.data_store, a.1))
                     .take(results),
             );
         }
 
-        let ops = HnswOps::new(&tracker, true);
+        let ops = HnswOps::new(&retriever, true);
         let neighbours = ops.search(query_address, self.index.as_ref(), results, bitset, with_duplicates);
         Box::new(
             neighbours
                 .into_iter()
-                .map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist)))
+                .map(|(address, dist)| (Neighbour::new(address, &self.data_store, dist)))
                 .take(results),
         )
     }
@@ -523,12 +487,11 @@ mod test {
 
     use crate::{
         config::{Similarity, VectorConfig},
-        data_types::data_store,
         formula::Formula,
         vector_types::dense_f32::{dot_similarity, encode_vector},
     };
 
-    use super::{Elem, LabelDictionary, create, merge, node::Node};
+    use super::{Elem, LabelDictionary, create, merge};
     use nidx_protos::prost::*;
 
     const DIMENSION: usize = 128;
@@ -619,23 +582,22 @@ mod test {
             &config,
             HashSet::new(),
         )?;
-        let nodes = dp.nodes;
 
         for (i, (elem, mut labels)) in elems.into_iter().enumerate() {
-            let node = data_store::get_value(&nodes, i);
-            assert_eq!(elem.key, Node::key(node));
-            assert_eq!(config.vector_type.encode(&elem.vector), Node::vector(node));
+            let node = dp.data_store.get_value(i);
+            assert_eq!(elem.key, node.key());
+            assert_eq!(config.vector_type.encode(&elem.vector), node.vector());
 
             // Compare metadata as the decoded protobug. Tthe absolute stored value may have trailing padding
             // from vectors, but the decoding step should ignore it
             assert_eq!(
                 SentenceMetadata::decode(elem.metadata.as_ref().unwrap().as_slice()),
-                SentenceMetadata::decode(Node::metadata(node))
+                SentenceMetadata::decode(node.metadata())
             );
 
             // Compare labels
             labels.sort();
-            let mut node_labels = Node::labels(node);
+            let mut node_labels = node.labels();
             node_labels.sort();
             assert_eq!(labels, node_labels);
         }
@@ -673,23 +635,22 @@ mod test {
 
         let path_merged = tempdir()?;
         let merged_dp = merge(path_merged.path(), &[&dp1, &dp2], &config)?;
-        let nodes = merged_dp.nodes;
 
         for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2.into_iter()).enumerate() {
-            let node = data_store::get_value(&nodes, i);
-            assert_eq!(elem.key, Node::key(node));
-            assert_eq!(config.vector_type.encode(&elem.vector), Node::vector(node));
+            let node = merged_dp.data_store.get_value(i);
+            assert_eq!(elem.key, node.key());
+            assert_eq!(config.vector_type.encode(&elem.vector), node.vector());
 
             // Compare metadata as the decoded protobug. Tthe absolute stored value may have trailing padding
             // from vectors, but the decoding step should ignore it
             assert_eq!(
                 SentenceMetadata::decode(elem.metadata.as_ref().unwrap().as_slice()),
-                SentenceMetadata::decode(Node::metadata(node))
+                SentenceMetadata::decode(node.metadata())
             );
 
             // Compare labels
             labels.sort();
-            let mut node_labels = Node::labels(node);
+            let mut node_labels = node.labels();
             node_labels.sort();
             assert_eq!(labels, node_labels);
         }
