@@ -18,25 +18,4 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod v1;
-mod v2;
-
-use std::any::Any;
-
-pub use v1::DataStoreV1;
-pub use v1::node::Node;
-
-pub trait DataStore: Sync + Send {
-    fn size_bytes(&self) -> usize;
-    fn stored_elements(&self) -> usize;
-    fn get_value(&self, id: usize) -> Node;
-    fn will_need(&self, id: usize, vector_len: usize);
-    fn as_any(&self) -> &dyn Any;
-    // fn open(path: &Path) -> std::io::Result<Self>;
-    // fn create(path: &Path, slots: Vec<Elem>, vector_type: &VectorType) -> std::io::Result<()>;
-    // fn merge(
-    //     path: &Path,
-    //     segments: &mut [(impl Iterator<Item = usize>, &Self)],
-    //     config: &VectorConfig,
-    // ) -> std::io::Result<bool>;
-}
+mod vector_store;

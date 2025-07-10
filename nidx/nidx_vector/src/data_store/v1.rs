@@ -18,15 +18,94 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use crate::{
+    config::{VectorConfig, VectorType},
+    data_point::Elem,
+};
+use memmap2::Mmap;
 use node::Node;
+use std::{any::Any, fs::File, path::Path};
 
-use crate::{config::VectorType, data_point::Elem};
+use super::DataStore;
 
 pub mod node;
 pub mod store;
 
 mod trie;
 mod trie_ram;
+
+const NODES: &str = "nodes.kv";
+
+pub struct DataStoreV1 {
+    nodes: Mmap,
+}
+
+impl DataStore for DataStoreV1 {
+    fn size_bytes(&self) -> usize {
+        self.nodes.len()
+    }
+
+    fn stored_elements(&self) -> usize {
+        store::stored_elements(&self.nodes)
+    }
+
+    fn get_value(&self, id: usize) -> Node {
+        store::get_value(&self.nodes, id)
+    }
+
+    fn will_need(&self, id: usize, vector_len: usize) {
+        store::will_need(&self.nodes, id, vector_len);
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl DataStoreV1 {
+    pub fn open(path: &Path) -> std::io::Result<Self> {
+        let nodes_file = File::open(path.join(NODES))?;
+        let nodes = unsafe { Mmap::map(&nodes_file)? };
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            nodes.advise(memmap2::Advice::WillNeed)?;
+        }
+
+        Ok(Self { nodes })
+    }
+
+    pub fn create(path: &Path, slots: Vec<Elem>, vector_type: &VectorType) -> std::io::Result<()> {
+        let mut nodes_file = File::options()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(path.join(NODES))?;
+        store::create_key_value(&mut nodes_file, slots, vector_type)?;
+
+        Ok(())
+    }
+
+    pub fn merge(
+        path: &Path,
+        segments: &mut [(impl Iterator<Item = usize>, &DataStoreV1)],
+        config: &VectorConfig,
+    ) -> std::io::Result<bool> {
+        let mut nodes_file = File::options()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(path.join(NODES))?;
+        store::merge(
+            &mut nodes_file,
+            segments
+                .iter_mut()
+                .map(|(deletions, store)| (deletions, &store.nodes[..]))
+                .collect::<Vec<_>>()
+                .as_mut_slice(),
+            config,
+        )
+    }
+}
 
 impl store::IntoBuffer for Elem {
     fn serialize_into<W: std::io::Write>(mut self, w: W, vector_type: &VectorType) -> std::io::Result<()> {

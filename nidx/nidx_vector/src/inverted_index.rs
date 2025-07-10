@@ -96,7 +96,7 @@ impl IndexBuilder {
 }
 
 /// Build indexes from a nodes.kv file.
-pub fn build_indexes(work_path: &Path, data_store: &DataStore) -> VectorR<()> {
+pub fn build_indexes(work_path: &Path, data_store: &impl DataStore) -> VectorR<()> {
     let mut field_builder = IndexBuilder::new();
     let mut label_builder = IndexBuilder::new();
 

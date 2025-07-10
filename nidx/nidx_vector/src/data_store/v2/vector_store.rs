@@ -18,25 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod v1;
-mod v2;
+use memmap2::Mmap;
 
-use std::any::Any;
-
-pub use v1::DataStoreV1;
-pub use v1::node::Node;
-
-pub trait DataStore: Sync + Send {
-    fn size_bytes(&self) -> usize;
-    fn stored_elements(&self) -> usize;
-    fn get_value(&self, id: usize) -> Node;
-    fn will_need(&self, id: usize, vector_len: usize);
-    fn as_any(&self) -> &dyn Any;
-    // fn open(path: &Path) -> std::io::Result<Self>;
-    // fn create(path: &Path, slots: Vec<Elem>, vector_type: &VectorType) -> std::io::Result<()>;
-    // fn merge(
-    //     path: &Path,
-    //     segments: &mut [(impl Iterator<Item = usize>, &Self)],
-    //     config: &VectorConfig,
-    // ) -> std::io::Result<bool>;
+/// Storage for vectors of fixed size
+/// For each vector, we store the vector and a pointer to the paragraph it appears on
+/// so we can retrieve the rest of the metadata (paragraph_id, labels, etc.)
+/// (encoded_vector: [u8], paragraph_addr: u32)
+struct VectorStore {
+    data: Mmap,
 }

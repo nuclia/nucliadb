@@ -27,7 +27,7 @@ mod params;
 mod tests;
 
 use crate::config::VectorConfig;
-use crate::data_store::{DataStore, Node};
+use crate::data_store::{DataStore, DataStoreV1, Node};
 use crate::formula::Formula;
 use crate::inverted_index::{InvertedIndexes, build_indexes};
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
@@ -56,7 +56,7 @@ mod file_names {
 
 pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
     let path = &metadata.path;
-    let data_store = DataStore::open(path)?;
+    let data_store = DataStoreV1::open(path)?;
     let hnsw_file = File::open(path.join(file_names::HNSW))?;
 
     let index = unsafe { Mmap::map(&hnsw_file)? };
@@ -77,7 +77,7 @@ pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
 
     Ok(OpenDataPoint {
         metadata,
-        data_store,
+        data_store: Box::new(data_store),
         index,
         inverted_indexes,
         alive_bitset,
@@ -106,8 +106,9 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
 
     // Creating the node store
     let mut node_producers: Vec<_> = operants.iter().map(|dp| (dp.alive_nodes(), &dp.data_store)).collect();
-    let has_deletions = DataStore::merge(data_point_path, node_producers.as_mut_slice(), config)?;
-    let data_store = DataStore::open(data_point_path)?;
+    // let has_deletions = DataStoreV1::merge(data_point_path, node_producers.as_mut_slice(), config)?;
+    let has_deletions = true;
+    let data_store = DataStoreV1::open(data_point_path)?;
     let no_nodes = data_store.stored_elements();
 
     let mut index;
@@ -157,7 +158,7 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
 
     Ok(OpenDataPoint {
         metadata,
-        data_store,
+        data_store: Box::new(data_store),
         index,
         inverted_indexes,
         alive_bitset,
@@ -183,8 +184,8 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
 
     // Serializing nodes on disk
     // Nodes are stored on disk and mmaped.
-    DataStore::create(path, elems, &config.vector_type)?;
-    let data_store = DataStore::open(path)?;
+    DataStoreV1::create(path, elems, &config.vector_type)?;
+    let data_store = DataStoreV1::open(path)?;
     let no_nodes = data_store.stored_elements();
 
     // Creating the HNSW using the mmaped nodes
@@ -224,7 +225,7 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
 
     Ok(OpenDataPoint {
         metadata,
-        data_store,
+        data_store: Box::new(data_store),
         index,
         inverted_indexes,
         alive_bitset,
@@ -234,16 +235,16 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Address(usize);
 
-pub struct Retriever<'a> {
+pub struct Retriever<'a, DS: DataStore> {
     similarity_function: fn(&[u8], &[u8]) -> f32,
     no_nodes: usize,
     temp: &'a [u8],
-    data_store: &'a DataStore,
+    data_store: &'a DS,
     min_score: f32,
     vector_len_bytes: usize,
 }
-impl<'a> Retriever<'a> {
-    pub fn new(temp: &'a [u8], data_store: &'a DataStore, config: &VectorConfig, min_score: f32) -> Retriever<'a> {
+impl<'a, DS: DataStore> Retriever<'a, DS> {
+    pub fn new(temp: &'a [u8], data_store: &'a DS, config: &VectorConfig, min_score: f32) -> Retriever<'a, DS> {
         let no_nodes = data_store.stored_elements();
         let vector_len_bytes = config.vector_len_bytes();
         Retriever {
@@ -260,7 +261,7 @@ impl<'a> Retriever<'a> {
     }
 }
 
-impl DataRetriever for Retriever<'_> {
+impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
     fn will_need(&self, Address(x): Address) {
         self.data_store.will_need(x, self.vector_len_bytes);
     }
@@ -346,7 +347,7 @@ impl PartialEq for Neighbour<'_> {
 }
 
 impl Neighbour<'_> {
-    fn new(Address(addr): Address, data_store: &DataStore, score: f32) -> Neighbour {
+    fn new(Address(addr): Address, data_store: &dyn DataStore, score: f32) -> Neighbour {
         let node = data_store.get_value(addr);
         Neighbour { score, node }
     }
@@ -370,7 +371,7 @@ impl Neighbour<'_> {
 
 pub struct OpenDataPoint {
     metadata: VectorSegmentMetadata,
-    data_store: DataStore,
+    data_store: Box<dyn DataStore>,
     index: Mmap,
     inverted_indexes: InvertedIndexes,
     alive_bitset: BitSet,
@@ -417,7 +418,11 @@ impl OpenDataPoint {
         min_score: f32,
     ) -> Box<dyn Iterator<Item = Neighbour> + '_> {
         let encoded_query = config.vector_type.encode(query);
-        let retriever = Retriever::new(&encoded_query, &self.data_store, config, min_score);
+        let retriever = if let Some(v1) = self.data_store.as_any().downcast_ref::<DataStoreV1>() {
+            Retriever::new(&encoded_query, v1, config, min_score)
+        } else {
+            unreachable!()
+        };
         let query_address = Address(self.metadata.records);
 
         let mut filter_bitset = self.inverted_indexes.filter(filter);
@@ -446,7 +451,7 @@ impl OpenDataPoint {
             return Box::new(
                 scored_results
                     .into_iter()
-                    .map(|Reverse(a)| Neighbour::new(a.0, &self.data_store, a.1))
+                    .map(|Reverse(a)| Neighbour::new(a.0, self.data_store.as_ref(), a.1))
                     .take(results),
             );
         }
@@ -456,7 +461,7 @@ impl OpenDataPoint {
         Box::new(
             neighbours
                 .into_iter()
-                .map(|(address, dist)| (Neighbour::new(address, &self.data_store, dist)))
+                .map(|(address, dist)| (Neighbour::new(address, self.data_store.as_ref(), dist)))
                 .take(results),
         )
     }
