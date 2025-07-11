@@ -101,9 +101,9 @@ pub fn build_indexes(work_path: &Path, data_store: &impl DataStore) -> VectorR<(
     let mut label_builder = IndexBuilder::new();
 
     for id in 0..data_store.stored_elements() {
-        let node = data_store.get_value(id);
-        let key = node.key();
-        let labels = node.labels();
+        let paragraph = data_store.get_paragraph(id);
+        let key = paragraph.id();
+        let labels = paragraph.labels();
 
         let id = id as u32;
         if let Some(key) = field_id_key(key) {

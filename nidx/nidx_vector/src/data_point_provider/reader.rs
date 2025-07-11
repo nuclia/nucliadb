@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub use crate::data_point::Neighbour;
 use crate::data_point::OpenDataPoint;
+use crate::data_point::ScoredParagraph;
 use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
 use crate::request_types::VectorSearchRequest;
@@ -40,9 +40,9 @@ struct Fssc<'a> {
     size: usize,
     with_duplicates: bool,
     seen: HashSet<Vec<u8>>,
-    buff: HashMap<Neighbour<'a>, f32>,
+    buff: HashMap<ScoredParagraph<'a>, f32>,
 }
-impl<'a> From<Fssc<'a>> for Vec<Neighbour<'a>> {
+impl<'a> From<Fssc<'a>> for Vec<ScoredParagraph<'a>> {
     fn from(fssv: Fssc<'a>) -> Self {
         let mut result: Vec<_> = fssv.buff.into_keys().collect();
         result.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap_or(Ordering::Less));
@@ -61,11 +61,11 @@ impl<'a> Fssc<'a> {
             buff: HashMap::with_capacity(size),
         }
     }
-    fn add(&mut self, candidate: Neighbour<'a>) {
-        if !self.with_duplicates && self.seen.contains(candidate.vector()) {
+    fn add(&mut self, candidate: ScoredParagraph<'a>, vector: &[u8]) {
+        if !self.with_duplicates && self.seen.contains(vector) {
             return;
         } else if !self.with_duplicates {
-            let vector = candidate.vector().to_vec();
+            let vector = vector.to_vec();
             self.seen.insert(vector);
         }
 
@@ -74,10 +74,10 @@ impl<'a> Fssc<'a> {
             let smallest_bigger = self
                 .buff
                 .iter()
-                .map(|(key, score)| (key.clone(), *score))
+                .map(|(key, score)| (key, *score))
                 .filter(|(_, v)| score > *v)
                 .min_by(|(_, v0), (_, v1)| v0.partial_cmp(v1).unwrap())
-                .map(|(key, _)| key);
+                .map(|(key, _)| *key);
             if let Some(key) = smallest_bigger {
                 self.buff.remove_entry(&key);
                 self.buff.insert(candidate, score);
@@ -126,12 +126,12 @@ impl SearchRequest for (usize, &VectorSearchRequest, Formula) {
     }
 }
 
-impl TryFrom<Neighbour<'_>> for DocumentScored {
+impl TryFrom<ScoredParagraph<'_>> for DocumentScored {
     type Error = String;
-    fn try_from(neighbour: Neighbour) -> Result<Self, Self::Error> {
-        let id = neighbour.id().to_string();
-        let metadata = neighbour.metadata().map(SentenceMetadata::decode);
-        let labels = neighbour.labels();
+    fn try_from(paragraph: ScoredParagraph) -> Result<Self, Self::Error> {
+        let id = paragraph.id().to_string();
+        let metadata = paragraph.metadata().map(SentenceMetadata::decode);
+        let labels = paragraph.labels();
         let Ok(metadata) = metadata.transpose() else {
             return Err("The metadata could not be decoded".to_string());
         };
@@ -139,7 +139,7 @@ impl TryFrom<Neighbour<'_>> for DocumentScored {
             labels,
             metadata,
             doc_id: Some(DocumentVectorIdentifier { id }),
-            score: neighbour.score(),
+            score: paragraph.score(),
         })
     }
 }
@@ -160,7 +160,7 @@ impl Reader {
         &self,
         request: &dyn SearchRequest,
         segment_filter: &Option<BooleanExpression<String>>,
-    ) -> VectorR<Vec<Neighbour>> {
+    ) -> VectorR<Vec<ScoredParagraph>> {
         let normalized_query;
         let query = if self.config.normalize_vectors {
             normalized_query = utils::normalize_vector(request.get_query());
@@ -195,8 +195,11 @@ impl Reader {
             }
             let partial_solution =
                 open_data_point.search(query, filter, with_duplicates, no_results, &self.config, min_score);
+
             for candidate in partial_solution {
-                ffsv.add(candidate);
+                let paragraph = open_data_point.get_paragraph(candidate.paragraph());
+                let scored_paragraph = ScoredParagraph::new(paragraph, candidate.score());
+                ffsv.add(scored_paragraph, candidate.vector());
             }
         }
 
