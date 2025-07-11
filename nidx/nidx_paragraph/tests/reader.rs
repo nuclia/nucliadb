@@ -465,3 +465,46 @@ fn test_new_paragraph() -> anyhow::Result<()> {
     assert_eq!(count, 4);
     Ok(())
 }
+
+#[test]
+fn test_query_parsing() -> anyhow::Result<()> {
+    // This test validates we are properly removing single quotes from queries
+    // to avoid issues with tantivy + our own parsing.
+    //
+    // For further context, see:
+    // https://github.com/nuclia/nucliadb/pull/3216
+    //
+    const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
+
+    let seconds = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|t| t.as_secs() as i64)
+        .unwrap();
+    let timestamp = Timestamp { seconds, nanos: 0 };
+
+    let resource1 = create_resource("shard1".to_string(), timestamp);
+    let paragraph_reader_service = test_reader(&resource1);
+
+    // Only one paragraph  matches
+    let mut search = ParagraphSearchRequest {
+        id: "shard1".to_string(),
+        uuid: UUID.to_string(),
+        body: "".to_string(),
+        faceted: None,
+        order: None,
+        page_number: 0,
+        result_per_page: 20,
+        only_faceted: false,
+        ..Default::default()
+    };
+
+    search.body = "some document".to_string();
+    let result = paragraph_reader_service.search(&search, &PrefilterResult::All).unwrap();
+    assert_eq!(result.total, 1);
+
+    search.body = "some ' document".to_string();
+    let result = paragraph_reader_service.search(&search, &PrefilterResult::All).unwrap();
+    assert_eq!(result.total, 1);
+
+    Ok(())
+}
