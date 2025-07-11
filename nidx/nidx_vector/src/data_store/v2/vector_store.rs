@@ -21,7 +21,7 @@
 use memmap2::Mmap;
 use std::{fs::File, io::Write as _, path::Path};
 
-use crate::{config::VectorType, data_store::DataStore, data_types::usize_utils::U32_LEN};
+use crate::{config::VectorType, data_types::usize_utils::U32_LEN};
 
 const FILENAME: &str = "vectors.bin";
 

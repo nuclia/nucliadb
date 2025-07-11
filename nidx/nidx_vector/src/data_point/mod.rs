@@ -27,7 +27,7 @@ mod params;
 mod tests;
 
 use crate::config::VectorConfig;
-use crate::data_store::{DataStore, DataStoreV1, Node};
+use crate::data_store::{DataStore, DataStoreV1, ParagraphRef, VectorRef};
 use crate::formula::Formula;
 use crate::inverted_index::{InvertedIndexes, build_indexes};
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
@@ -263,8 +263,8 @@ impl<'a, DS: DataStore> Retriever<'a, DS> {
             vector_len_bytes,
         }
     }
-    fn find_node(&'a self, Address(x): Address) -> Node<'a> {
-        self.data_store.get_value(x)
+    fn find_node(&'a self, Address(x): Address) -> VectorRef<'a> {
+        self.data_store.get_vector(x)
     }
 }
 
@@ -318,12 +318,64 @@ impl Elem {
 }
 
 #[derive(Debug, Clone)]
-pub struct Neighbour<'a> {
+pub struct ScoredVector<'a> {
     score: f32,
-    node: Node<'a>,
+    vector: VectorRef<'a>,
 }
-impl Eq for Neighbour<'_> {}
-impl std::hash::Hash for Neighbour<'_> {
+impl Eq for ScoredVector<'_> {}
+impl std::hash::Hash for ScoredVector<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.vector().hash(state)
+    }
+
+    fn hash_slice<H: std::hash::Hasher>(data: &[Self], state: &mut H)
+    where
+        Self: Sized,
+    {
+        for piece in data {
+            piece.hash(state)
+        }
+    }
+}
+impl Ord for ScoredVector<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.vector.cmp(&other.vector)
+    }
+}
+impl PartialOrd for ScoredVector<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl PartialEq for ScoredVector<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.vector == other.vector
+    }
+}
+
+impl ScoredVector<'_> {
+    fn new(Address(addr): Address, data_store: &dyn DataStore, score: f32) -> ScoredVector {
+        let node = data_store.get_vector(addr);
+        ScoredVector { score, vector: node }
+    }
+    pub fn score(&self) -> f32 {
+        self.score
+    }
+    pub fn vector(&self) -> &[u8] {
+        self.vector.vector()
+    }
+    pub fn paragraph(&self) -> u32 {
+        self.vector.paragraph()
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct ScoredParagraph<'a> {
+    score: f32,
+    paragraph: ParagraphRef<'a>,
+}
+impl Eq for ScoredParagraph<'_> {}
+impl std::hash::Hash for ScoredParagraph<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id().hash(state)
     }
@@ -337,41 +389,37 @@ impl std::hash::Hash for Neighbour<'_> {
         }
     }
 }
-impl Ord for Neighbour<'_> {
+impl Ord for ScoredParagraph<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.node.cmp(&other.node)
+        self.paragraph.id().cmp(other.paragraph.id())
     }
 }
-impl PartialOrd for Neighbour<'_> {
+impl PartialOrd for ScoredParagraph<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
-impl PartialEq for Neighbour<'_> {
+impl PartialEq for ScoredParagraph<'_> {
     fn eq(&self, other: &Self) -> bool {
-        self.node == other.node
+        self.paragraph.id() == other.paragraph.id()
     }
 }
 
-impl Neighbour<'_> {
-    fn new(Address(addr): Address, data_store: &dyn DataStore, score: f32) -> Neighbour {
-        let node = data_store.get_value(addr);
-        Neighbour { score, node }
+impl<'a> ScoredParagraph<'a> {
+    pub fn new(paragraph: ParagraphRef<'a>, score: f32) -> Self {
+        Self { paragraph, score }
     }
     pub fn score(&self) -> f32 {
         self.score
     }
     pub fn id(&self) -> &str {
-        Node::key(&self.node)
-    }
-    pub fn vector(&self) -> &[u8] {
-        Node::vector(&self.node)
+        self.paragraph.id()
     }
     pub fn labels(&self) -> Vec<String> {
-        Node::labels(&self.node)
+        self.paragraph.labels()
     }
     pub fn metadata(&self) -> Option<&[u8]> {
-        let metadata = Node::metadata(&self.node);
+        let metadata = self.paragraph.metadata();
         (!metadata.is_empty()).then_some(metadata)
     }
 }
@@ -415,6 +463,10 @@ impl OpenDataPoint {
         self.data_store.size_bytes() + self.index.len() + self.inverted_indexes.space_usage()
     }
 
+    pub fn get_paragraph(&self, id: u32) -> ParagraphRef {
+        self.data_store.get_paragraph(id as usize)
+    }
+
     pub fn search(
         &self,
         query: &[f32],
@@ -423,7 +475,7 @@ impl OpenDataPoint {
         results: usize,
         config: &VectorConfig,
         min_score: f32,
-    ) -> Box<dyn Iterator<Item = Neighbour> + '_> {
+    ) -> Box<dyn Iterator<Item = ScoredVector> + '_> {
         let encoded_query = config.vector_type.encode(query);
         let retriever = if let Some(v1) = self.data_store.as_any().downcast_ref::<DataStoreV1>() {
             Retriever::new(&encoded_query, v1, config, min_score)
@@ -458,7 +510,7 @@ impl OpenDataPoint {
             return Box::new(
                 scored_results
                     .into_iter()
-                    .map(|Reverse(a)| Neighbour::new(a.0, self.data_store.as_ref(), a.1))
+                    .map(|Reverse(a)| ScoredVector::new(a.0, self.data_store.as_ref(), a.1))
                     .take(results),
             );
         }
@@ -468,7 +520,7 @@ impl OpenDataPoint {
         Box::new(
             neighbours
                 .into_iter()
-                .map(|(address, dist)| (Neighbour::new(address, self.data_store.as_ref(), dist)))
+                .map(|(address, dist)| (ScoredVector::new(address, self.data_store.as_ref(), dist)))
                 .take(results),
         )
     }
@@ -581,22 +633,24 @@ mod test {
         )?;
 
         for (i, (elem, mut labels)) in elems.into_iter().enumerate() {
-            let node = dp.data_store.get_value(i);
-            assert_eq!(elem.key, node.key());
-            assert_eq!(config.vector_type.encode(&elem.vector), node.vector());
+            let vector = dp.data_store.get_vector(i);
+            assert_eq!(config.vector_type.encode(&elem.vector), vector.vector());
+
+            let paragraph = dp.data_store.get_paragraph(i);
+            assert_eq!(elem.key, paragraph.id());
 
             // Compare metadata as the decoded protobug. Tthe absolute stored value may have trailing padding
             // from vectors, but the decoding step should ignore it
             assert_eq!(
                 SentenceMetadata::decode(elem.metadata.as_ref().unwrap().as_slice()),
-                SentenceMetadata::decode(node.metadata())
+                SentenceMetadata::decode(paragraph.metadata())
             );
 
             // Compare labels
             labels.sort();
-            let mut node_labels = node.labels();
-            node_labels.sort();
-            assert_eq!(labels, node_labels);
+            let mut paragraph_labels = paragraph.labels();
+            paragraph_labels.sort();
+            assert_eq!(labels, paragraph_labels);
         }
 
         Ok(())
@@ -634,22 +688,24 @@ mod test {
         let merged_dp = merge(path_merged.path(), &[&dp1, &dp2], &config)?;
 
         for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2.into_iter()).enumerate() {
-            let node = merged_dp.data_store.get_value(i);
-            assert_eq!(elem.key, node.key());
-            assert_eq!(config.vector_type.encode(&elem.vector), node.vector());
+            let vector = merged_dp.data_store.get_vector(i);
+            assert_eq!(config.vector_type.encode(&elem.vector), vector.vector());
+
+            let paragraph = merged_dp.data_store.get_paragraph(i);
+            assert_eq!(elem.key, paragraph.id());
 
             // Compare metadata as the decoded protobug. Tthe absolute stored value may have trailing padding
             // from vectors, but the decoding step should ignore it
             assert_eq!(
                 SentenceMetadata::decode(elem.metadata.as_ref().unwrap().as_slice()),
-                SentenceMetadata::decode(node.metadata())
+                SentenceMetadata::decode(paragraph.metadata())
             );
 
             // Compare labels
             labels.sort();
-            let mut node_labels = node.labels();
-            node_labels.sort();
-            assert_eq!(labels, node_labels);
+            let mut paragraph_labels = paragraph.labels();
+            paragraph_labels.sort();
+            assert_eq!(labels, paragraph_labels);
         }
 
         Ok(())
@@ -708,7 +764,10 @@ mod test {
 
                 let results: Vec<_> = dp.search(&query, &Formula::new(), false, 5, &config, 0.0).collect();
 
-                let search: Vec<_> = results.iter().map(|r| r.id()).collect();
+                let search: Vec<_> = results
+                    .iter()
+                    .map(|r| dp.data_store.get_paragraph(r.paragraph() as usize).id().to_string())
+                    .collect();
                 let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();
                 search == brute_force
             })

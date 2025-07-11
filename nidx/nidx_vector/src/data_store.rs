@@ -26,10 +26,52 @@ use std::any::Any;
 pub use v1::DataStoreV1;
 pub use v1::node::Node;
 
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
+pub struct VectorRef<'a> {
+    vector: &'a [u8],
+    paragraph_addr: u32,
+}
+
+impl<'a> VectorRef<'a> {
+    pub fn vector(&self) -> &'a [u8] {
+        self.vector
+    }
+
+    pub fn paragraph(&self) -> u32 {
+        self.paragraph_addr
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum ParagraphRef<'a> {
+    V1(Node<'a>),
+}
+
+impl ParagraphRef<'_> {
+    pub fn id(&self) -> &str {
+        match self {
+            ParagraphRef::V1(n) => n.key(),
+        }
+    }
+
+    pub fn labels(&self) -> Vec<String> {
+        match self {
+            ParagraphRef::V1(n) => n.labels(),
+        }
+    }
+
+    pub fn metadata(&self) -> &[u8] {
+        match self {
+            ParagraphRef::V1(n) => n.metadata(),
+        }
+    }
+}
+
 pub trait DataStore: Sync + Send {
     fn size_bytes(&self) -> usize;
     fn stored_elements(&self) -> usize;
-    fn get_value(&self, id: usize) -> Node;
+    fn get_paragraph(&self, id: usize) -> ParagraphRef;
+    fn get_vector(&self, id: usize) -> VectorRef;
     fn will_need(&self, id: usize, vector_len: usize);
     fn as_any(&self) -> &dyn Any;
     // fn open(path: &Path) -> std::io::Result<Self>;

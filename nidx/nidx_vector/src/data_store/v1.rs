@@ -26,7 +26,7 @@ use memmap2::Mmap;
 use node::Node;
 use std::{any::Any, fs::File, path::Path};
 
-use super::DataStore;
+use super::{DataStore, ParagraphRef, VectorRef};
 
 pub mod node;
 pub mod store;
@@ -49,8 +49,11 @@ impl DataStore for DataStoreV1 {
         store::stored_elements(&self.nodes)
     }
 
-    fn get_value(&self, id: usize) -> Node {
-        store::get_value(&self.nodes, id)
+    fn get_vector(&self, id: usize) -> VectorRef {
+        VectorRef {
+            vector: store::get_value(&self.nodes, id).vector(),
+            paragraph_addr: id as u32,
+        }
     }
 
     fn will_need(&self, id: usize, vector_len: usize) {
@@ -58,6 +61,10 @@ impl DataStore for DataStoreV1 {
     }
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn get_paragraph(&self, id: usize) -> ParagraphRef {
+        ParagraphRef::V1(store::get_value(&self.nodes, id))
     }
 }
 

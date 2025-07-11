@@ -98,13 +98,13 @@ fn accuracy_test() {
     let mut result_0 = reader
         .search(&query, &formula, true, no_results, &CONFIG, -1.0)
         .collect::<Vec<_>>();
-    result_0.sort_by(|i, j| i.id().cmp(j.id()));
+    result_0.sort_by_key(|i| i.paragraph());
     let query: Vec<_> = query.into_iter().map(|v| v + 1.0).collect();
     let no_results = 10;
     let mut result_1 = reader
         .search(&query, &formula, true, no_results, &CONFIG, -1.0)
         .collect::<Vec<_>>();
-    result_1.sort_by(|i, j| i.id().cmp(j.id()));
+    result_1.sort_by_key(|i| i.paragraph());
     assert_ne!(result_0, result_1)
 }
 
@@ -128,7 +128,7 @@ fn single_graph() {
         .collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
-    assert!(result[0].id() == key);
+    assert!(reader.get_paragraph(result[0].paragraph()).id() == key);
 }
 
 #[test]
@@ -155,11 +155,11 @@ fn data_merge() -> anyhow::Result<()> {
     let result: Vec<_> = dp.search(&vector1, &formula, true, 1, &CONFIG, -1.0).collect();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
-    assert!(result[0].id() == key1);
+    assert!(dp.get_paragraph(result[0].paragraph()).id() == key1);
     let result: Vec<_> = dp.search(&vector0, &formula, true, 1, &CONFIG, -1.0).collect();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
-    assert!(result[0].id() == key0);
+    assert!(dp.get_paragraph(result[0].paragraph()).id() == key0);
     let mut dp0 = data_point::open(dp0.metadata).unwrap();
     let mut dp1 = data_point::open(dp1.metadata).unwrap();
     dp0.apply_deletion(&key0);
@@ -322,7 +322,9 @@ fn fast_data_merge() -> VectorR<()> {
         let result: Vec<_> = dp.search(v, &formula, true, 1, &CONFIG, 0.999).collect();
         assert_eq!(result.len(), 1);
         assert!(result[0].score() >= 0.999);
-        assert!(result[0].id() == format!("0000000000000000000000000000000{i}/f/file/0-100"));
+        assert!(
+            dp.get_paragraph(result[0].paragraph()).id() == format!("0000000000000000000000000000000{i}/f/file/0-100")
+        );
     }
 
     // Merge with deletions
@@ -343,7 +345,10 @@ fn fast_data_merge() -> VectorR<()> {
         } else {
             assert_eq!(result.len(), 1);
             assert!(result[0].score() >= 0.999);
-            assert!(result[0].id() == format!("0000000000000000000000000000000{i}/f/file/0-100"));
+            assert!(
+                dp.get_paragraph(result[0].paragraph()).id()
+                    == format!("0000000000000000000000000000000{i}/f/file/0-100")
+            );
         }
     }
 
