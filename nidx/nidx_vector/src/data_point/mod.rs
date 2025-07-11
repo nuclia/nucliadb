@@ -105,9 +105,16 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
     }
 
     // Creating the node store
-    let mut node_producers: Vec<_> = operants.iter().map(|dp| (dp.alive_nodes(), &dp.data_store)).collect();
-    // let has_deletions = DataStoreV1::merge(data_point_path, node_producers.as_mut_slice(), config)?;
-    let has_deletions = true;
+    let mut node_producers: Vec<_> = operants
+        .iter()
+        .map(|dp| {
+            (
+                dp.alive_nodes(),
+                dp.data_store.as_any().downcast_ref::<DataStoreV1>().unwrap(),
+            )
+        })
+        .collect();
+    let has_deletions = DataStoreV1::merge(data_point_path, node_producers.as_mut_slice(), config)?;
     let data_store = DataStoreV1::open(data_point_path)?;
     let no_nodes = data_store.stored_elements();
 
