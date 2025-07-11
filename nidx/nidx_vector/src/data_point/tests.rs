@@ -105,7 +105,14 @@ fn accuracy_test() {
         .search(&query, &formula, true, no_results, &CONFIG, -1.0)
         .collect::<Vec<_>>();
     result_1.sort_by_key(|i| i.paragraph());
-    assert_ne!(result_0, result_1)
+
+    let mut equal = true;
+    for (r0, r1) in result_0.iter().zip(result_1.iter()) {
+        if r0.vector() != r1.vector() {
+            equal = false;
+        }
+    }
+    assert!(!equal);
 }
 
 #[test]

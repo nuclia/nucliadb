@@ -322,36 +322,6 @@ pub struct ScoredVector<'a> {
     score: f32,
     vector: VectorRef<'a>,
 }
-impl Eq for ScoredVector<'_> {}
-impl std::hash::Hash for ScoredVector<'_> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.vector().hash(state)
-    }
-
-    fn hash_slice<H: std::hash::Hasher>(data: &[Self], state: &mut H)
-    where
-        Self: Sized,
-    {
-        for piece in data {
-            piece.hash(state)
-        }
-    }
-}
-impl Ord for ScoredVector<'_> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.vector.cmp(&other.vector)
-    }
-}
-impl PartialOrd for ScoredVector<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-impl PartialEq for ScoredVector<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.vector == other.vector
-    }
-}
 
 impl ScoredVector<'_> {
     fn new(Address(addr): Address, data_store: &dyn DataStore, score: f32) -> ScoredVector {
@@ -366,61 +336,6 @@ impl ScoredVector<'_> {
     }
     pub fn paragraph(&self) -> u32 {
         self.vector.paragraph()
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct ScoredParagraph<'a> {
-    score: f32,
-    paragraph: ParagraphRef<'a>,
-}
-impl Eq for ScoredParagraph<'_> {}
-impl std::hash::Hash for ScoredParagraph<'_> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id().hash(state)
-    }
-
-    fn hash_slice<H: std::hash::Hasher>(data: &[Self], state: &mut H)
-    where
-        Self: Sized,
-    {
-        for piece in data {
-            piece.hash(state)
-        }
-    }
-}
-impl Ord for ScoredParagraph<'_> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.paragraph.id().cmp(other.paragraph.id())
-    }
-}
-impl PartialOrd for ScoredParagraph<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-impl PartialEq for ScoredParagraph<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.paragraph.id() == other.paragraph.id()
-    }
-}
-
-impl<'a> ScoredParagraph<'a> {
-    pub fn new(paragraph: ParagraphRef<'a>, score: f32) -> Self {
-        Self { paragraph, score }
-    }
-    pub fn score(&self) -> f32 {
-        self.score
-    }
-    pub fn id(&self) -> &str {
-        self.paragraph.id()
-    }
-    pub fn labels(&self) -> Vec<String> {
-        self.paragraph.labels()
-    }
-    pub fn metadata(&self) -> Option<&[u8]> {
-        let metadata = self.paragraph.metadata();
-        (!metadata.is_empty()).then_some(metadata)
     }
 }
 
