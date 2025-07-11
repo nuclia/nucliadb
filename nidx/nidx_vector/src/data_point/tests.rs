@@ -128,7 +128,7 @@ fn single_graph() {
         .collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
-    assert!(result[0].id() == key.as_bytes());
+    assert!(result[0].id() == key);
 }
 
 #[test]
@@ -155,11 +155,11 @@ fn data_merge() -> anyhow::Result<()> {
     let result: Vec<_> = dp.search(&vector1, &formula, true, 1, &CONFIG, -1.0).collect();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
-    assert!(result[0].id() == key1.as_bytes());
+    assert!(result[0].id() == key1);
     let result: Vec<_> = dp.search(&vector0, &formula, true, 1, &CONFIG, -1.0).collect();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
-    assert!(result[0].id() == key0.as_bytes());
+    assert!(result[0].id() == key0);
     let mut dp0 = data_point::open(dp0.metadata).unwrap();
     let mut dp1 = data_point::open(dp1.metadata).unwrap();
     dp0.apply_deletion(&key0);
@@ -322,7 +322,7 @@ fn fast_data_merge() -> VectorR<()> {
         let result: Vec<_> = dp.search(v, &formula, true, 1, &CONFIG, 0.999).collect();
         assert_eq!(result.len(), 1);
         assert!(result[0].score() >= 0.999);
-        assert!(result[0].id() == format!("0000000000000000000000000000000{i}/f/file/0-100").as_bytes());
+        assert!(result[0].id() == format!("0000000000000000000000000000000{i}/f/file/0-100"));
     }
 
     // Merge with deletions
@@ -343,7 +343,7 @@ fn fast_data_merge() -> VectorR<()> {
         } else {
             assert_eq!(result.len(), 1);
             assert!(result[0].score() >= 0.999);
-            assert!(result[0].id() == format!("0000000000000000000000000000000{i}/f/file/0-100").as_bytes());
+            assert!(result[0].id() == format!("0000000000000000000000000000000{i}/f/file/0-100"));
         }
     }
 

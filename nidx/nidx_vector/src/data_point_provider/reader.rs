@@ -129,12 +129,9 @@ impl SearchRequest for (usize, &VectorSearchRequest, Formula) {
 impl TryFrom<Neighbour<'_>> for DocumentScored {
     type Error = String;
     fn try_from(neighbour: Neighbour) -> Result<Self, Self::Error> {
-        let id = std::str::from_utf8(neighbour.id());
+        let id = neighbour.id().to_string();
         let metadata = neighbour.metadata().map(SentenceMetadata::decode);
         let labels = neighbour.labels();
-        let Ok(id) = id.map(|i| i.to_string()) else {
-            return Err("Id could not be decoded".to_string());
-        };
         let Ok(metadata) = metadata.transpose() else {
             return Err("The metadata could not be decoded".to_string());
         };

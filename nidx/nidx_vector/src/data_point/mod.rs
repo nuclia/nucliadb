@@ -294,7 +294,7 @@ impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
 
 #[derive(Clone, Debug)]
 pub struct Elem {
-    pub key: Vec<u8>,
+    pub key: String,
     pub vector: Vec<f32>,
     pub metadata: Option<Vec<u8>>,
     pub labels: Vec<String>,
@@ -304,7 +304,7 @@ impl Elem {
         Elem {
             labels,
             metadata,
-            key: key.as_bytes().to_vec(),
+            key,
             vector,
         }
     }
@@ -354,7 +354,7 @@ impl Neighbour<'_> {
     pub fn score(&self) -> f32 {
         self.score
     }
-    pub fn id(&self) -> &[u8] {
+    pub fn id(&self) -> &str {
         Node::key(&self.node)
     }
     pub fn vector(&self) -> &[u8] {
@@ -701,10 +701,7 @@ mod test {
 
                 let results: Vec<_> = dp.search(&query, &Formula::new(), false, 5, &config, 0.0).collect();
 
-                let search: Vec<_> = results
-                    .iter()
-                    .map(|r| String::from_utf8(r.id().to_vec()).unwrap())
-                    .collect();
+                let search: Vec<_> = results.iter().map(|r| r.id()).collect();
                 let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();
                 search == brute_force
             })

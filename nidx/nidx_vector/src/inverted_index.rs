@@ -106,7 +106,7 @@ pub fn build_indexes(work_path: &Path, data_store: &impl DataStore) -> VectorR<(
         let labels = node.labels();
 
         let id = id as u32;
-        if let Some(key) = field_id_key(std::str::from_utf8(key).unwrap()) {
+        if let Some(key) = field_id_key(key) {
             field_builder.insert(key, id);
         }
         for l in labels {
