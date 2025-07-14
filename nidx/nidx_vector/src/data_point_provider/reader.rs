@@ -35,7 +35,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use tracing::*;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct ScoredParagraph<'a> {
     score: f32,
     paragraph: ParagraphRef<'a>,
@@ -95,11 +95,11 @@ struct Fssc<'a> {
     size: usize,
     with_duplicates: bool,
     seen: HashSet<Vec<u8>>,
-    buff: HashMap<ScoredParagraph<'a>, f32>,
+    buff: HashSet<ScoredParagraph<'a>>,
 }
 impl<'a> From<Fssc<'a>> for Vec<ScoredParagraph<'a>> {
     fn from(fssv: Fssc<'a>) -> Self {
-        let mut result: Vec<_> = fssv.buff.into_keys().collect();
+        let mut result: Vec<_> = fssv.buff.into_iter().collect();
         result.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap_or(Ordering::Less));
         result
     }
@@ -113,7 +113,7 @@ impl<'a> Fssc<'a> {
             size,
             with_duplicates,
             seen: HashSet::new(),
-            buff: HashMap::with_capacity(size),
+            buff: HashSet::with_capacity(size),
         }
     }
     fn add(&mut self, candidate: ScoredParagraph<'a>, vector: &[u8]) {
@@ -129,16 +129,15 @@ impl<'a> Fssc<'a> {
             let smallest_bigger = self
                 .buff
                 .iter()
-                .map(|(key, score)| (key, *score))
-                .filter(|(_, v)| score > *v)
-                .min_by(|(_, v0), (_, v1)| v0.partial_cmp(v1).unwrap())
-                .map(|(key, _)| *key);
+                .filter(|sp| score > sp.score())
+                .min_by(|sp0, sp1| sp0.score().partial_cmp(&sp1.score()).unwrap())
+                .cloned();
             if let Some(key) = smallest_bigger {
-                self.buff.remove_entry(&key);
-                self.buff.insert(candidate, score);
+                self.buff.remove(&key);
+                self.buff.insert(candidate);
             }
         } else {
-            self.buff.insert(candidate, score);
+            self.buff.insert(candidate);
         }
     }
 }
