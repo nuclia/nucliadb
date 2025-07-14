@@ -78,7 +78,7 @@ pub trait DataStore: Sync + Send {
     fn stored_elements(&self) -> usize;
     fn get_paragraph(&self, id: usize) -> ParagraphRef;
     fn get_vector(&self, id: usize) -> VectorRef;
-    fn will_need(&self, id: usize, vector_len: usize);
+    fn will_need(&self, id: usize);
     fn as_any(&self) -> &dyn Any;
     // fn open(path: &Path) -> std::io::Result<Self>;
     // fn create(path: &Path, slots: Vec<Elem>, vector_type: &VectorType) -> std::io::Result<()>;

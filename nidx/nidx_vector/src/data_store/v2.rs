@@ -75,7 +75,7 @@ impl DataStore for DataStoreV2 {
         self.vectors.get_vector(id as u32)
     }
 
-    fn will_need(&self, id: usize, _vector_len: usize) {
+    fn will_need(&self, id: usize) {
         self.vectors.will_need(id);
     }
 

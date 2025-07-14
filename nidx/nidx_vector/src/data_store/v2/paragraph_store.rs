@@ -52,7 +52,7 @@ impl<'a> StoredParagraph<'a> {
         StoredParagraph {
             key: &elem.key,
             labels: elem.labels.iter().map(String::as_str).collect(),
-            metadata: elem.metadata.as_ref().map_or(&[], |x| &x),
+            metadata: elem.metadata.as_ref().map_or(&[], |x| x),
             first_vector_add: first_vector,
             num_vectors: 1,
         }

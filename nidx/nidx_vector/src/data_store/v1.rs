@@ -38,6 +38,7 @@ const NODES: &str = "nodes.kv";
 
 pub struct DataStoreV1 {
     nodes: Mmap,
+    vector_len_bytes: usize,
 }
 
 impl DataStore for DataStoreV1 {
@@ -56,8 +57,8 @@ impl DataStore for DataStoreV1 {
         }
     }
 
-    fn will_need(&self, id: usize, vector_len: usize) {
-        store::will_need(&self.nodes, id, vector_len);
+    fn will_need(&self, id: usize) {
+        store::will_need(&self.nodes, id, self.vector_len_bytes);
     }
     fn as_any(&self) -> &dyn Any {
         self
@@ -73,7 +74,7 @@ impl DataStoreV1 {
         std::fs::exists(path.join(NODES))
     }
 
-    pub fn open(path: &Path) -> std::io::Result<Self> {
+    pub fn open(path: &Path, vector_type: &VectorType) -> std::io::Result<Self> {
         let nodes_file = File::open(path.join(NODES))?;
         let nodes = unsafe { Mmap::map(&nodes_file)? };
 
@@ -82,7 +83,10 @@ impl DataStoreV1 {
             nodes.advise(memmap2::Advice::WillNeed)?;
         }
 
-        Ok(Self { nodes })
+        Ok(Self {
+            nodes,
+            vector_len_bytes: vector_type.len_bytes(),
+        })
     }
 
     pub fn create(path: &Path, slots: Vec<Elem>, vector_type: &VectorType) -> std::io::Result<()> {

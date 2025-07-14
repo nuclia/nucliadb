@@ -57,7 +57,7 @@ mod file_names {
 pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<OpenDataPoint> {
     let path = &metadata.path;
     let data_store: Box<dyn DataStore> = if DataStoreV1::exists(path)? {
-        let data_store = DataStoreV1::open(path)?;
+        let data_store = DataStoreV1::open(path, &config.vector_type)?;
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
         if !InvertedIndexes::exists(path) {
@@ -126,7 +126,7 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
         })
         .collect();
     let has_deletions = DataStoreV1::merge(data_point_path, node_producers.as_mut_slice(), config)?;
-    let data_store = DataStoreV1::open(data_point_path)?;
+    let data_store = DataStoreV1::open(data_point_path, &config.vector_type)?;
     let no_nodes = data_store.stored_elements();
 
     let mut index;
@@ -259,19 +259,16 @@ pub struct Retriever<'a, DS: DataStore> {
     temp: &'a [u8],
     data_store: &'a DS,
     min_score: f32,
-    vector_len_bytes: usize,
 }
 impl<'a, DS: DataStore> Retriever<'a, DS> {
     pub fn new(temp: &'a [u8], data_store: &'a DS, config: &VectorConfig, min_score: f32) -> Retriever<'a, DS> {
         let no_nodes = data_store.stored_elements();
-        let vector_len_bytes = config.vector_len_bytes();
         Retriever {
             temp,
             data_store,
             similarity_function: config.similarity_function(),
             no_nodes,
             min_score,
-            vector_len_bytes,
         }
     }
     fn find_node(&'a self, Address(x): Address) -> VectorRef<'a> {
@@ -281,7 +278,7 @@ impl<'a, DS: DataStore> Retriever<'a, DS> {
 
 impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
     fn will_need(&self, Address(x): Address) {
-        self.data_store.will_need(x, self.vector_len_bytes);
+        self.data_store.will_need(x);
     }
 
     fn get_vector(&self, x @ Address(addr): Address) -> &[u8] {

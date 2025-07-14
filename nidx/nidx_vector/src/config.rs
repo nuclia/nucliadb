@@ -51,22 +51,26 @@ pub enum VectorType {
 impl VectorType {
     pub fn encode(&self, vector: &[f32]) -> Vec<u8> {
         match self {
-            #[rustfmt::skip]
             VectorType::DenseF32 { .. } => dense_f32::encode_vector(vector),
         }
     }
 
     pub fn vector_alignment(&self) -> usize {
         match self {
-            #[rustfmt::skip]
             VectorType::DenseF32 { .. } => size_of::<f32>(),
         }
     }
 
     pub fn dimension(&self) -> Option<usize> {
         match self {
-            #[rustfmt::skip]
             VectorType::DenseF32 { dimension } => Some(*dimension),
+        }
+    }
+
+    /// The length of bytes of each vector
+    pub fn len_bytes(&self) -> usize {
+        match self {
+            VectorType::DenseF32 { dimension } => dimension * size_of::<f32>(),
         }
     }
 }
@@ -81,18 +85,9 @@ pub struct VectorConfig {
 }
 
 impl VectorConfig {
-    /// The length of bytes of each vector
-    pub fn vector_len_bytes(&self) -> usize {
-        match self.vector_type {
-            VectorType::DenseF32 { dimension } => dimension * size_of::<f32>(),
-        }
-    }
-
     pub fn similarity_function(&self) -> fn(&[u8], &[u8]) -> f32 {
         match (&self.similarity, &self.vector_type) {
-            #[rustfmt::skip]
             (Similarity::Dot, VectorType::DenseF32 { .. }) => dense_f32::dot_similarity,
-            #[rustfmt::skip]
             (Similarity::Cosine, VectorType::DenseF32 { .. }) => dense_f32::cosine_similarity,
         }
     }

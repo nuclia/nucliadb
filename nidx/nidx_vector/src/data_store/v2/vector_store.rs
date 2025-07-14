@@ -32,7 +32,7 @@ const FILENAME: &str = "vectors.bin";
 /// (encoded_vector: [u8], paragraph_addr: u32)
 pub struct VectorStore {
     data: Mmap,
-    vector_len: usize,
+    vector_len_bytes: usize,
 }
 
 impl VectorStore {
@@ -47,14 +47,14 @@ impl VectorStore {
 
         Ok(Self {
             data,
-            vector_len: vector_type.dimension().unwrap() * 4,
+            vector_len_bytes: vector_type.len_bytes(),
         })
     }
 
     pub fn get_vector(&self, vector_addr: u32) -> VectorRef {
-        let start = vector_addr as usize * (self.vector_len + U32_LEN);
-        let vector = &self.data[start..start + self.vector_len];
-        let paragraph_bytes = &self.data[start + self.vector_len..start + self.vector_len + U32_LEN];
+        let start = vector_addr as usize * (self.vector_len_bytes + U32_LEN);
+        let vector = &self.data[start..start + self.vector_len_bytes];
+        let paragraph_bytes = &self.data[start + self.vector_len_bytes..start + self.vector_len_bytes + U32_LEN];
         let paragraph_addr = u32::from_le_bytes((paragraph_bytes).try_into().unwrap());
         VectorRef { vector, paragraph_addr }
     }
@@ -70,8 +70,8 @@ impl VectorStore {
         };
 
         // Align node pointer to the start page, as required by madvise
-        let entry_size = self.vector_len + U32_LEN;
-        let start = self.data.as_ptr().wrapping_add(id * (self.vector_len + U32_LEN));
+        let entry_size = self.vector_len_bytes + U32_LEN;
+        let start = self.data.as_ptr().wrapping_add(id * (self.vector_len_bytes + U32_LEN));
         let offset = start.align_offset(*PAGE_SIZE);
         let (start_page, advise_size) = if offset > 0 {
             (
