@@ -27,7 +27,7 @@ mod params;
 mod tests;
 
 use crate::config::VectorConfig;
-use crate::data_store::{DataStore, DataStoreV1, ParagraphRef, VectorRef};
+use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, ParagraphRef, VectorRef};
 use crate::formula::Formula;
 use crate::inverted_index::{InvertedIndexes, build_indexes};
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
@@ -54,9 +54,25 @@ mod file_names {
     pub const HNSW: &str = "index.hnsw";
 }
 
-pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
+pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<OpenDataPoint> {
     let path = &metadata.path;
-    let data_store = DataStoreV1::open(path)?;
+    let data_store: Box<dyn DataStore> = if DataStoreV1::exists(path)? {
+        let data_store = DataStoreV1::open(path)?;
+        // Build the index at runtime if they do not exist. This can
+        // be removed once we have migrated all existing indexes
+        if !InvertedIndexes::exists(path) {
+            build_indexes(path, &data_store)?;
+        }
+        Box::new(data_store)
+    } else {
+        let data_store = DataStoreV2::open(path, &config.vector_type)?;
+        // Build the index at runtime if they do not exist. This can
+        // be removed once we have migrated all existing indexes
+        if !InvertedIndexes::exists(path) {
+            build_indexes(path, &data_store)?;
+        }
+        Box::new(data_store)
+    };
     let hnsw_file = File::open(path.join(file_names::HNSW))?;
 
     let index = unsafe { Mmap::map(&hnsw_file)? };
@@ -67,17 +83,12 @@ pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
         index.advise(memmap2::Advice::Sequential)?;
     }
 
-    // Build the index at runtime if they do not exist. This can
-    // be removed once we have migrated all existing indexes
-    if !InvertedIndexes::exists(path) {
-        build_indexes(path, &data_store)?;
-    }
     let inverted_indexes = InvertedIndexes::open(path, metadata.records)?;
     let alive_bitset = BitSet::from_bit_vec(BitVec::from_elem(metadata.records, true));
 
     Ok(OpenDataPoint {
         metadata,
-        data_store: Box::new(data_store),
+        data_store,
         index,
         inverted_indexes,
         alive_bitset,
@@ -191,8 +202,8 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
 
     // Serializing nodes on disk
     // Nodes are stored on disk and mmaped.
-    DataStoreV1::create(path, elems, &config.vector_type)?;
-    let data_store = DataStoreV1::open(path)?;
+    DataStoreV2::create(path, elems, &config.vector_type)?;
+    let data_store = DataStoreV2::open(path, &config.vector_type)?;
     let no_nodes = data_store.stored_elements();
 
     // Creating the HNSW using the mmaped nodes
@@ -391,12 +402,28 @@ impl OpenDataPoint {
         config: &VectorConfig,
         min_score: f32,
     ) -> Box<dyn Iterator<Item = ScoredVector> + '_> {
-        let encoded_query = config.vector_type.encode(query);
-        let retriever = if let Some(v1) = self.data_store.as_any().downcast_ref::<DataStoreV1>() {
-            Retriever::new(&encoded_query, v1, config, min_score)
+        if let Some(v1) = self.data_store.as_any().downcast_ref::<DataStoreV1>() {
+            self._search(v1, query, filter, with_duplicates, results, config, min_score)
+        } else if let Some(v2) = self.data_store.as_any().downcast_ref::<DataStoreV2>() {
+            self._search(v2, query, filter, with_duplicates, results, config, min_score)
         } else {
             unreachable!()
-        };
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn _search<DS: DataStore>(
+        &self,
+        data_store: &DS,
+        query: &[f32],
+        filter: &Formula,
+        with_duplicates: bool,
+        results: usize,
+        config: &VectorConfig,
+        min_score: f32,
+    ) -> Box<dyn Iterator<Item = ScoredVector> + '_> {
+        let encoded_query = config.vector_type.encode(query);
+        let retriever = Retriever::new(&encoded_query, data_store, config, min_score);
         let query_address = Address(self.metadata.records);
 
         let mut filter_bitset = self.inverted_indexes.filter(filter);

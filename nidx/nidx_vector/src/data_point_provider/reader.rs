@@ -406,7 +406,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![data_point::open(segment)?], vsc).unwrap();
+        let reader = Reader::open(vec![data_point::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -501,7 +501,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![data_point::open(segment)?], vsc).unwrap();
+        let reader = Reader::open(vec![data_point::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -613,7 +613,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![data_point::open(segment)?], vsc).unwrap();
+        let reader = Reader::open(vec![data_point::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),

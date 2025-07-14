@@ -69,6 +69,10 @@ impl DataStore for DataStoreV1 {
 }
 
 impl DataStoreV1 {
+    pub fn exists(path: &Path) -> std::io::Result<bool> {
+        std::fs::exists(path.join(NODES))
+    }
+
     pub fn open(path: &Path) -> std::io::Result<Self> {
         let nodes_file = File::open(path.join(NODES))?;
         let nodes = unsafe { Mmap::map(&nodes_file)? };

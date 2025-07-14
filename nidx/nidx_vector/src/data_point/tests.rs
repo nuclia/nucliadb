@@ -167,8 +167,8 @@ fn data_merge() -> anyhow::Result<()> {
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(dp.get_paragraph(result[0].paragraph()).id() == key0);
-    let mut dp0 = data_point::open(dp0.metadata).unwrap();
-    let mut dp1 = data_point::open(dp1.metadata).unwrap();
+    let mut dp0 = data_point::open(dp0.metadata, &CONFIG).unwrap();
+    let mut dp1 = data_point::open(dp1.metadata, &CONFIG).unwrap();
     dp0.apply_deletion(&key0);
     dp0.apply_deletion(&key1);
     dp1.apply_deletion(&key0);

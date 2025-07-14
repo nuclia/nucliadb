@@ -87,7 +87,7 @@ impl VectorIndexer {
         config: VectorConfig,
         open_index: impl OpenIndexMetadata<VectorSegmentMeta>,
     ) -> anyhow::Result<VectorSegmentMetadata> {
-        let open_data_points = open_segments(open_index)?;
+        let open_data_points = open_segments(open_index, &config)?;
         let open_data_points_ref = open_data_points.iter().collect::<Vec<_>>();
 
         // Do the merge
@@ -105,7 +105,7 @@ impl VectorSearcher {
     #[instrument(name = "vector::open", skip_all)]
     pub fn open(config: VectorConfig, open_index: impl OpenIndexMetadata<VectorSegmentMeta>) -> anyhow::Result<Self> {
         Ok(VectorSearcher {
-            reader: Reader::open(open_segments(open_index)?, config)?,
+            reader: Reader::open(open_segments(open_index, &config)?, config)?,
         })
     }
 
@@ -123,11 +123,14 @@ impl VectorSearcher {
     }
 }
 
-fn open_segments(open_index: impl OpenIndexMetadata<VectorSegmentMeta>) -> VectorR<Vec<OpenDataPoint>> {
+fn open_segments(
+    open_index: impl OpenIndexMetadata<VectorSegmentMeta>,
+    config: &VectorConfig,
+) -> VectorR<Vec<OpenDataPoint>> {
     let mut open_data_points = Vec::new();
 
     for (metadata, seq) in open_index.segments() {
-        let open_data_point = data_point::open(metadata)?;
+        let open_data_point = data_point::open(metadata, config)?;
 
         open_data_points.push((open_data_point, seq));
     }
