@@ -21,7 +21,12 @@
 use memmap2::Mmap;
 use std::{fs::File, io::Write as _, path::Path};
 
-use crate::{VectorR, data_point::Elem, data_store::ParagraphRef, data_types::usize_utils::U32_LEN};
+use crate::{
+    VectorR,
+    data_point::Elem,
+    data_store::{ParagraphAddr, ParagraphRef},
+    data_types::usize_utils::U32_LEN,
+};
 
 const FILENAME_DATA: &str = "paragraphs.bin";
 const FILENAME_POS: &str = "paragraphs.pos";
@@ -31,7 +36,7 @@ pub struct StoredParagraph<'a> {
     key: &'a str,
     labels: Vec<&'a str>,
     metadata: &'a [u8],
-    first_vector_add: u32,
+    first_vector: u32,
     num_vectors: u32,
 }
 
@@ -53,9 +58,13 @@ impl<'a> StoredParagraph<'a> {
             key: &elem.key,
             labels: elem.labels.iter().map(String::as_str).collect(),
             metadata: elem.metadata.as_ref().map_or(&[], |x| x),
-            first_vector_add: first_vector,
+            first_vector,
             num_vectors: 1,
         }
+    }
+
+    pub fn vector_first_and_len(&self) -> (u32, u32) {
+        (self.first_vector, self.num_vectors)
     }
 }
 
@@ -82,8 +91,8 @@ impl ParagraphStore {
         Ok(Self { pos, data })
     }
 
-    pub fn get_paragraph(&self, vector_addr: u32) -> ParagraphRef {
-        let start_bytes = &self.pos[vector_addr as usize * U32_LEN..vector_addr as usize * U32_LEN + U32_LEN];
+    pub fn get_paragraph(&self, ParagraphAddr(addr): ParagraphAddr) -> ParagraphRef {
+        let start_bytes = &self.pos[addr as usize * U32_LEN..addr as usize * U32_LEN + U32_LEN];
         let start = u32::from_le_bytes(start_bytes.try_into().unwrap()) as usize;
         let (paragraph, _) =
             bincode::borrow_decode_from_slice(&self.data[start..], bincode::config::standard()).unwrap();

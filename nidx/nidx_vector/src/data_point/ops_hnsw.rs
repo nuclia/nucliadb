@@ -33,6 +33,7 @@ use crate::data_point::params;
 /// Implementors of this trait can guide the hnsw search
 pub trait DataRetriever: std::marker::Sync {
     fn similarity(&self, x: Address, y: Address) -> f32;
+    fn paragraph(&self, x: Address) -> ParagraphAddr;
     fn get_vector(&self, x: Address) -> &[u8];
     /// Embeddings with smaller similarity should not be considered.
     fn min_score(&self) -> f32;
@@ -80,14 +81,14 @@ pub type Neighbours = Vec<(Address, f32)>;
 /// Guides an algorithm to the valid nodes.
 struct NodeFilter<'a, DR> {
     retriever: &'a DR,
-    filter: &'a BitSet,
+    filter: &'a FilterBitSet,
     blocked_addresses: &'a FxHashSet<Address>,
     vec_counter: RepCounter<'a>,
 }
 
 impl<DR: DataRetriever> NodeFilter<'_, DR> {
-    pub fn passes_formula(&self, n: Address) -> bool {
-        self.filter.contains(n.0)
+    pub fn passes_formula(&self, n: ParagraphAddr) -> bool {
+        self.filter.contains(n)
     }
 
     pub fn is_valid(&self, n: Address, score: f32) -> bool {
@@ -191,7 +192,8 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 break;
             }
 
-            if filter.is_valid(candidate, candidate_similarity) && filter.passes_formula(candidate) {
+            let paragraph_addr = self.retriever.paragraph(candidate);
+            if filter.is_valid(candidate, candidate_similarity) && filter.passes_formula(paragraph_addr) {
                 let candidate_vector = self.retriever.get_vector(candidate);
                 filter.vec_counter.add(candidate_vector);
                 results.push((candidate, candidate_similarity));
@@ -323,7 +325,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         query: Address,
         hnsw: H,
         k_neighbours: usize,
-        with_filter: &BitSet,
+        with_filter: &FilterBitSet,
         with_duplicates: bool,
     ) -> Neighbours {
         if k_neighbours == 0 {

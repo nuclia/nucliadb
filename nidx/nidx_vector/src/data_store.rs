@@ -28,10 +28,12 @@ pub use v1::node::Node;
 pub use v2::DataStoreV2;
 use v2::StoredParagraph;
 
+use crate::{ParagraphAddr, VectorAddr};
+
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub struct VectorRef<'a> {
     vector: &'a [u8],
-    paragraph_addr: u32,
+    paragraph_addr: ParagraphAddr,
 }
 
 impl<'a> VectorRef<'a> {
@@ -39,7 +41,7 @@ impl<'a> VectorRef<'a> {
         self.vector
     }
 
-    pub fn paragraph(&self) -> u32 {
+    pub fn paragraph(&self) -> ParagraphAddr {
         self.paragraph_addr
     }
 }
@@ -71,14 +73,23 @@ impl ParagraphRef<'_> {
             ParagraphRef::V2(p) => p.metadata(),
         }
     }
+
+    pub fn vectors(&self, addr: &ParagraphAddr) -> impl Iterator<Item = VectorAddr> {
+        let (start, len) = match self {
+            ParagraphRef::V1(_) => (addr.0, 1),
+            ParagraphRef::V2(sp) => sp.vector_first_and_len(),
+        };
+        (start..start + len).map(VectorAddr)
+    }
 }
 
 pub trait DataStore: Sync + Send {
     fn size_bytes(&self) -> usize;
-    fn stored_elements(&self) -> usize;
-    fn get_paragraph(&self, id: usize) -> ParagraphRef;
-    fn get_vector(&self, id: usize) -> VectorRef;
-    fn will_need(&self, id: usize);
+    fn stored_paragraph_count(&self) -> usize;
+    fn stored_vector_count(&self) -> usize;
+    fn get_paragraph(&self, id: ParagraphAddr) -> ParagraphRef;
+    fn get_vector(&self, id: VectorAddr) -> VectorRef;
+    fn will_need(&self, id: VectorAddr);
     fn as_any(&self) -> &dyn Any;
     // fn open(path: &Path) -> std::io::Result<Self>;
     // fn create(path: &Path, slots: Vec<Elem>, vector_type: &VectorType) -> std::io::Result<()>;
@@ -87,4 +98,8 @@ pub trait DataStore: Sync + Send {
     //     segments: &mut [(impl Iterator<Item = usize>, &Self)],
     //     config: &VectorConfig,
     // ) -> std::io::Result<bool>;
+}
+
+pub fn iter_paragraphs(data_store: &impl DataStore) -> impl Iterator<Item = ParagraphAddr> {
+    (0..data_store.stored_paragraph_count() as u32).map(ParagraphAddr)
 }

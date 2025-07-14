@@ -20,7 +20,7 @@
 
 use crate::{VectorR, config::VectorType, data_point::Elem};
 
-use super::DataStore;
+use super::{DataStore, ParagraphAddr, VectorAddr};
 pub use paragraph_store::StoredParagraph;
 use paragraph_store::{ParagraphStore, ParagraphStoreWriter};
 use std::path::Path;
@@ -63,19 +63,23 @@ impl DataStore for DataStoreV2 {
         self.vectors.size_bytes() + self.paragraphs.size_bytes()
     }
 
-    fn stored_elements(&self) -> usize {
+    fn stored_paragraph_count(&self) -> usize {
         self.paragraphs.stored_elements()
     }
 
-    fn get_paragraph(&self, id: usize) -> super::ParagraphRef {
-        self.paragraphs.get_paragraph(id as u32)
+    fn stored_vector_count(&self) -> usize {
+        self.vectors.stored_elements()
     }
 
-    fn get_vector(&self, id: usize) -> super::VectorRef {
-        self.vectors.get_vector(id as u32)
+    fn get_paragraph(&self, id: ParagraphAddr) -> super::ParagraphRef {
+        self.paragraphs.get_paragraph(id)
     }
 
-    fn will_need(&self, id: usize) {
+    fn get_vector(&self, id: VectorAddr) -> super::VectorRef {
+        self.vectors.get_vector(id)
+    }
+
+    fn will_need(&self, id: VectorAddr) {
         self.vectors.will_need(id);
     }
 

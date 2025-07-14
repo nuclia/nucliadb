@@ -22,7 +22,11 @@ use lazy_static::lazy_static;
 use memmap2::Mmap;
 use std::{fs::File, io::Write as _, path::Path};
 
-use crate::{config::VectorType, data_store::VectorRef, data_types::usize_utils::U32_LEN};
+use crate::{
+    config::VectorType,
+    data_store::{ParagraphAddr, VectorAddr, VectorRef},
+    data_types::usize_utils::U32_LEN,
+};
 
 const FILENAME: &str = "vectors.bin";
 
@@ -33,6 +37,7 @@ const FILENAME: &str = "vectors.bin";
 pub struct VectorStore {
     data: Mmap,
     vector_len_bytes: usize,
+    record_len_bytes: usize,
 }
 
 impl VectorStore {
@@ -48,14 +53,15 @@ impl VectorStore {
         Ok(Self {
             data,
             vector_len_bytes: vector_type.len_bytes(),
+            record_len_bytes: vector_type.len_bytes() + U32_LEN,
         })
     }
 
-    pub fn get_vector(&self, vector_addr: u32) -> VectorRef {
-        let start = vector_addr as usize * (self.vector_len_bytes + U32_LEN);
+    pub fn get_vector(&self, addr: VectorAddr) -> VectorRef {
+        let start = self.record_start(addr);
         let vector = &self.data[start..start + self.vector_len_bytes];
-        let paragraph_bytes = &self.data[start + self.vector_len_bytes..start + self.vector_len_bytes + U32_LEN];
-        let paragraph_addr = u32::from_le_bytes((paragraph_bytes).try_into().unwrap());
+        let paragraph_bytes = &self.data[start + self.vector_len_bytes..start + self.record_len_bytes];
+        let paragraph_addr = ParagraphAddr(u32::from_le_bytes((paragraph_bytes).try_into().unwrap()));
         VectorRef { vector, paragraph_addr }
     }
 
@@ -63,23 +69,30 @@ impl VectorStore {
         self.data.len()
     }
 
+    pub fn stored_elements(&self) -> usize {
+        self.data.len() / (self.record_len_bytes)
+    }
+
+    fn record_start(&self, VectorAddr(addr): VectorAddr) -> usize {
+        addr as usize * self.record_len_bytes
+    }
+
     #[cfg(not(target_os = "windows"))]
-    pub fn will_need(&self, id: usize) {
+    pub fn will_need(&self, addr: VectorAddr) {
         lazy_static! {
             static ref PAGE_SIZE: usize = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as usize;
         };
 
         // Align node pointer to the start page, as required by madvise
-        let entry_size = self.vector_len_bytes + U32_LEN;
-        let start = self.data.as_ptr().wrapping_add(id * (self.vector_len_bytes + U32_LEN));
+        let start = self.data.as_ptr().wrapping_add(self.record_start(addr));
         let offset = start.align_offset(*PAGE_SIZE);
         let (start_page, advise_size) = if offset > 0 {
             (
                 start.wrapping_add(offset).wrapping_sub(*PAGE_SIZE),
-                entry_size + *PAGE_SIZE - offset,
+                self.record_len_bytes + *PAGE_SIZE - offset,
             )
         } else {
-            (start, entry_size)
+            (start, self.record_len_bytes)
         };
 
         unsafe { libc::madvise(start_page as *mut libc::c_void, advise_size, libc::MADV_WILLNEED) };

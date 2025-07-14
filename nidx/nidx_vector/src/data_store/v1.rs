@@ -26,7 +26,7 @@ use memmap2::Mmap;
 use node::Node;
 use std::{any::Any, fs::File, path::Path};
 
-use super::{DataStore, ParagraphRef, VectorRef};
+use super::{DataStore, ParagraphAddr, ParagraphRef, VectorAddr, VectorRef};
 
 pub mod node;
 pub mod store;
@@ -46,26 +46,30 @@ impl DataStore for DataStoreV1 {
         self.nodes.len()
     }
 
-    fn stored_elements(&self) -> usize {
+    fn stored_paragraph_count(&self) -> usize {
         store::stored_elements(&self.nodes)
     }
 
-    fn get_vector(&self, id: usize) -> VectorRef {
+    fn stored_vector_count(&self) -> usize {
+        self.stored_paragraph_count()
+    }
+
+    fn get_vector(&self, VectorAddr(id): VectorAddr) -> VectorRef {
         VectorRef {
-            vector: store::get_value(&self.nodes, id).vector(),
-            paragraph_addr: id as u32,
+            vector: store::get_value(&self.nodes, id as usize).vector(),
+            paragraph_addr: ParagraphAddr(id),
         }
     }
 
-    fn will_need(&self, id: usize) {
-        store::will_need(&self.nodes, id, self.vector_len_bytes);
+    fn will_need(&self, id: VectorAddr) {
+        store::will_need(&self.nodes, id.0 as usize, self.vector_len_bytes);
     }
     fn as_any(&self) -> &dyn Any {
         self
     }
 
-    fn get_paragraph(&self, id: usize) -> ParagraphRef {
-        ParagraphRef::V1(store::get_value(&self.nodes, id))
+    fn get_paragraph(&self, ParagraphAddr(id): ParagraphAddr) -> ParagraphRef {
+        ParagraphRef::V1(store::get_value(&self.nodes, id as usize))
     }
 }
 
@@ -102,7 +106,7 @@ impl DataStoreV1 {
 
     pub fn merge(
         path: &Path,
-        segments: &mut [(impl Iterator<Item = usize>, &DataStoreV1)],
+        segments: &mut [(impl Iterator<Item = ParagraphAddr>, &DataStoreV1)],
         config: &VectorConfig,
     ) -> std::io::Result<bool> {
         let mut nodes_file = File::options()

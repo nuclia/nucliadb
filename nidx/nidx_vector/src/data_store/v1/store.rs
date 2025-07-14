@@ -20,6 +20,7 @@
 
 use super::node::Node;
 use crate::config::{VectorConfig, VectorType};
+use crate::data_store::ParagraphAddr;
 use crate::data_types::usize_utils::*;
 use lazy_static::lazy_static;
 use std::fs::File;
@@ -149,7 +150,7 @@ pub fn create_key_value<D: IntoBuffer>(
 // Merge algorithm. Returns the number of elements merged into the file.
 pub fn merge(
     recipient: &mut File,
-    segments: &mut [(impl Iterator<Item = usize>, &[u8])],
+    segments: &mut [(impl Iterator<Item = ParagraphAddr>, &[u8])],
     config: &VectorConfig,
 ) -> io::Result<bool> {
     // Number of elements, deleted or alive.
@@ -178,6 +179,7 @@ pub fn merge(
     let alignment = config.vector_type.vector_alignment();
     for (alive_ids, store) in segments {
         for element_cursor in alive_ids {
+            let element_cursor = element_cursor.0 as usize;
             let element_pointer = get_pointer(store, element_cursor);
             let element_slice = &store[element_pointer..];
             // Moving to the end of the file to write the current element.
@@ -258,9 +260,9 @@ mod tests {
 
         let mut merge_store = tempfile::tempfile().unwrap();
         let mut elems = vec![
-            (0..3, v0_map.as_ref()),
-            (0..3, v1_map.as_ref()),
-            (0..4, v2_map.as_ref()),
+            ((0..3).map(ParagraphAddr), v0_map.as_ref()),
+            ((0..3).map(ParagraphAddr), v1_map.as_ref()),
+            ((0..4).map(ParagraphAddr), v2_map.as_ref()),
         ];
 
         merge(&mut merge_store, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
@@ -297,11 +299,11 @@ mod tests {
         let mut merge_store = tempfile::tempfile().unwrap();
         let mut elems = vec![
             // zero and 1 will be removed
-            (2..3, v0_map.as_ref()),
+            ((2..3).map(ParagraphAddr), v0_map.as_ref()),
             // no element is removed
-            (0..4, v1_map.as_ref()),
+            ((0..4).map(ParagraphAddr), v1_map.as_ref()),
             // no element is removed
-            (0..5, v2_map.as_ref()),
+            ((0..5).map(ParagraphAddr), v2_map.as_ref()),
         ];
 
         merge(&mut merge_store, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
@@ -338,11 +340,11 @@ mod tests {
         let mut merge_store = tempfile::tempfile().unwrap();
         let mut elems = vec![
             // zero and 1 will be removed
-            (2..3, v0_map.as_ref()),
+            ((2..3).map(ParagraphAddr), v0_map.as_ref()),
             // no element is removed
-            (0..3, v1_map.as_ref()),
+            ((0..3).map(ParagraphAddr), v1_map.as_ref()),
             // no element is removed
-            (0..3, v2_map.as_ref()),
+            ((0..3).map(ParagraphAddr), v2_map.as_ref()),
         ];
 
         merge(&mut merge_store, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
@@ -379,11 +381,11 @@ mod tests {
         let mut merge_store = tempfile::tempfile().unwrap();
         let mut elems = vec![
             // The first element is deleted
-            (1..3, v0_map.as_ref()),
+            ((1..3).map(ParagraphAddr), v0_map.as_ref()),
             // The first element is deleted
-            (1..3, v1_map.as_ref()),
+            ((1..3).map(ParagraphAddr), v1_map.as_ref()),
             // The first element is deleted
-            (1..3, v2_map.as_ref()),
+            ((1..3).map(ParagraphAddr), v2_map.as_ref()),
         ];
 
         merge(&mut merge_store, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
@@ -420,11 +422,11 @@ mod tests {
         let mut merge_storage = tempfile::tempfile().unwrap();
         let mut elems = vec![
             // all the elements are deleted
-            (0..0, v0_map.as_ref()),
+            ((0..0).map(ParagraphAddr), v0_map.as_ref()),
             // no element is removed
-            (0..3, v1_map.as_ref()),
+            ((0..3).map(ParagraphAddr), v1_map.as_ref()),
             // no element is removed
-            (0..3, v2_map.as_ref()),
+            ((0..3).map(ParagraphAddr), v2_map.as_ref()),
         ];
 
         merge(&mut merge_storage, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
@@ -462,11 +464,11 @@ mod tests {
 
         let mut elems = vec![
             // all the elements are removed
-            (0..0, v0_map.as_ref()),
+            ((0..0).map(ParagraphAddr), v0_map.as_ref()),
             // all the elements are removed
-            (0..0, v1_map.as_ref()),
+            ((0..0).map(ParagraphAddr), v1_map.as_ref()),
             // all the elements are removed
-            (0..0, v2_map.as_ref()),
+            ((0..0).map(ParagraphAddr), v2_map.as_ref()),
         ];
 
         merge(&mut file, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
