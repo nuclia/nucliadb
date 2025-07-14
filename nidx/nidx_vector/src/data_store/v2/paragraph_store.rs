@@ -73,44 +73,51 @@ impl ParagraphStore {
     }
 
     pub fn get_paragraph(&self, vector_addr: u32) -> ParagraphRef {
-        let start_bytes = &self.pos[vector_addr as usize * 4..vector_addr as usize * 4 + 4];
+        let start_bytes = &self.pos[vector_addr as usize * U32_LEN..vector_addr as usize * U32_LEN + U32_LEN];
         let start = u32::from_be_bytes(start_bytes.try_into().unwrap()) as usize;
-        let (paragraph, _): (StoredParagraph, _) =
+        let (paragraph, _) =
             bincode::borrow_decode_from_slice(&self.data[start..], bincode::config::standard()).unwrap();
         ParagraphRef::V2(paragraph)
     }
 
     pub fn size_bytes(&self) -> usize {
-        self.data.len()
+        self.data.len() + self.pos.len()
+    }
+
+    pub fn stored_elements(&self) -> usize {
+        self.pos.len() / U32_LEN
     }
 }
 
 pub struct ParagraphStoreWriter {
-    output: File,
+    data: File,
+    pos: File,
+    data_pos: usize,
     addr: u32,
 }
 
 impl ParagraphStoreWriter {
     pub fn new(path: &Path) -> std::io::Result<Self> {
         Ok(Self {
-            output: File::create(path.join(FILENAME_DATA))?,
+            pos: File::create(path.join(FILENAME_POS))?,
+            data: File::create(path.join(FILENAME_DATA))?,
+            data_pos: 0,
             addr: 0,
         })
     }
 
-    pub fn write(&mut self, paragraph_id: u32, vectors: &[&[u8]]) -> std::io::Result<(u32, u32)> {
-        let first_addr = self.addr;
-        for v in vectors {
-            self.output.write_all(v)?;
-            self.output.write_all(paragraph_id.to_le_bytes().as_slice())?;
-            // TODO: Alignment
-        }
-        self.addr += vectors.len() as u32;
-        let last_addr = self.addr - 1;
-        Ok((first_addr, last_addr))
+    pub fn write(&mut self, paragraph: StoredParagraph) -> anyhow::Result<u32> {
+        let written = bincode::encode_into_std_write(paragraph, &mut self.data, bincode::config::standard())?;
+        self.pos.write_all(&self.data_pos.to_le_bytes())?;
+        self.data_pos += written;
+        self.addr += 1;
+
+        Ok(self.addr)
     }
 
     pub fn close(self) -> std::io::Result<()> {
-        self.output.sync_all()
+        self.data.sync_all()?;
+        self.pos.sync_all()?;
+        Ok(())
     }
 }

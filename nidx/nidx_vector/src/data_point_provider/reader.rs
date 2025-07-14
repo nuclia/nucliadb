@@ -31,7 +31,7 @@ use nidx_protos::{DocumentScored, DocumentVectorIdentifier, SentenceMetadata, Ve
 use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::time::Instant;
 use tracing::*;
 

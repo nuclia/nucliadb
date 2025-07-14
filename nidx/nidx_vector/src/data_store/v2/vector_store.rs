@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use lazy_static::lazy_static;
 use memmap2::Mmap;
 use std::{fs::File, io::Write as _, path::Path};
 
@@ -51,7 +52,7 @@ impl VectorStore {
     }
 
     pub fn get_vector(&self, vector_addr: u32) -> VectorRef {
-        let start = vector_addr as usize * self.vector_len;
+        let start = vector_addr as usize * (self.vector_len + U32_LEN);
         let vector = &self.data[start..start + self.vector_len];
         let paragraph_bytes = &self.data[start + self.vector_len..start + self.vector_len + U32_LEN];
         let paragraph_addr = u32::from_le_bytes((paragraph_bytes).try_into().unwrap());
@@ -61,6 +62,31 @@ impl VectorStore {
     pub fn size_bytes(&self) -> usize {
         self.data.len()
     }
+
+    #[cfg(not(target_os = "windows"))]
+    pub fn will_need(&self, id: usize) {
+        lazy_static! {
+            static ref PAGE_SIZE: usize = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as usize;
+        };
+
+        // Align node pointer to the start page, as required by madvise
+        let entry_size = self.vector_len + U32_LEN;
+        let start = self.data.as_ptr().wrapping_add(id * (self.vector_len + U32_LEN));
+        let offset = start.align_offset(*PAGE_SIZE);
+        let (start_page, advise_size) = if offset > 0 {
+            (
+                start.wrapping_add(offset).wrapping_sub(*PAGE_SIZE),
+                entry_size + *PAGE_SIZE - offset,
+            )
+        } else {
+            (start, entry_size)
+        };
+
+        unsafe { libc::madvise(start_page as *mut libc::c_void, advise_size, libc::MADV_WILLNEED) };
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn will_need(src: &[u8], id: usize, vector_len: usize) {}
 }
 
 pub struct VectorStoreWriter {

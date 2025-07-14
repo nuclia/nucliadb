@@ -49,22 +49,22 @@ impl DataStore for DataStoreV2 {
     }
 
     fn stored_elements(&self) -> usize {
-        todo!()
+        self.paragraphs.stored_elements()
     }
 
     fn get_paragraph(&self, id: usize) -> super::ParagraphRef {
-        todo!()
+        self.paragraphs.get_paragraph(id as u32)
     }
 
     fn get_vector(&self, id: usize) -> super::VectorRef {
-        todo!()
+        self.vectors.get_vector(id as u32)
     }
 
-    fn will_need(&self, id: usize, vector_len: usize) {
-        todo!()
+    fn will_need(&self, id: usize, _vector_len: usize) {
+        self.vectors.will_need(id);
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
-        todo!()
+        self
     }
 }
