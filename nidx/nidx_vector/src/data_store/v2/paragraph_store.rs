@@ -21,41 +21,63 @@
 use memmap2::Mmap;
 use std::{fs::File, io::Write as _, path::Path};
 
-use crate::{config::VectorType, data_store::VectorRef, data_types::usize_utils::U32_LEN};
+use crate::{data_store::ParagraphRef, data_types::usize_utils::U32_LEN};
 
-const FILENAME: &str = "vectors.bin";
+const FILENAME_DATA: &str = "paragraphs.bin";
+const FILENAME_POS: &str = "paragraphs.pos";
 
-/// Storage for vectors of fixed size
-/// For each vector, we store the vector and a pointer to the paragraph it appears on
-/// so we can retrieve the rest of the metadata (paragraph_id, labels, etc.)
-/// (encoded_vector: [u8], paragraph_addr: u32)
-pub struct VectorStore {
-    data: Mmap,
-    vector_len: usize,
+#[derive(bincode::Encode, bincode::BorrowDecode, Clone)]
+pub struct StoredParagraph<'a> {
+    key: &'a str,
+    labels: Vec<&'a str>,
+    metadata: &'a [u8],
+    first_vector_add: u32,
+    num_vectors: u32,
 }
 
-impl VectorStore {
-    pub fn open(path: &Path, vector_type: &VectorType) -> std::io::Result<Self> {
-        let data = unsafe { Mmap::map(&File::open(path.join(FILENAME))?)? };
+impl<'a> StoredParagraph<'a> {
+    pub fn key(&self) -> &str {
+        self.key
+    }
+
+    pub fn metadata(&self) -> &[u8] {
+        self.metadata
+    }
+
+    pub fn labels(&self) -> Vec<String> {
+        self.labels.iter().copied().map(str::to_string).collect()
+    }
+}
+
+/// Storage for paragraphs metadata
+/// Since the data is of variable size, we store pointers to the data start in a different file
+/// for quick indexing.
+pub struct ParagraphStore {
+    pos: Mmap,
+    data: Mmap,
+}
+
+impl ParagraphStore {
+    pub fn open(path: &Path) -> std::io::Result<Self> {
+        let pos = unsafe { Mmap::map(&File::open(path.join(FILENAME_POS))?)? };
+        let data = unsafe { Mmap::map(&File::open(path.join(FILENAME_DATA))?)? };
 
         // TODO: Maybe different flags for read (random) and merge (sequential / willneed)
         #[cfg(not(target_os = "windows"))]
         {
+            pos.advise(memmap2::Advice::WillNeed)?;
             data.advise(memmap2::Advice::Random)?;
         }
 
-        Ok(Self {
-            data,
-            vector_len: vector_type.dimension().unwrap(),
-        })
+        Ok(Self { pos, data })
     }
 
-    pub fn get_vector(&self, vector_addr: u32) -> VectorRef {
-        let start = vector_addr as usize * self.vector_len;
-        let vector = &self.data[start..start + self.vector_len];
-        let paragraph_bytes = &self.data[start + self.vector_len..start + self.vector_len + U32_LEN];
-        let paragraph_addr = u32::from_le_bytes((paragraph_bytes).try_into().unwrap());
-        VectorRef { vector, paragraph_addr }
+    pub fn get_paragraph(&self, vector_addr: u32) -> ParagraphRef {
+        let start_bytes = &self.pos[vector_addr as usize * 4..vector_addr as usize * 4 + 4];
+        let start = u32::from_be_bytes(start_bytes.try_into().unwrap()) as usize;
+        let (paragraph, _): (StoredParagraph, _) =
+            bincode::borrow_decode_from_slice(&self.data[start..], bincode::config::standard()).unwrap();
+        ParagraphRef::V2(paragraph)
     }
 
     pub fn size_bytes(&self) -> usize {
@@ -63,15 +85,15 @@ impl VectorStore {
     }
 }
 
-pub struct VectorStoreWriter {
+pub struct ParagraphStoreWriter {
     output: File,
     addr: u32,
 }
 
-impl VectorStoreWriter {
+impl ParagraphStoreWriter {
     pub fn new(path: &Path) -> std::io::Result<Self> {
         Ok(Self {
-            output: File::create(path.join(FILENAME))?,
+            output: File::create(path.join(FILENAME_DATA))?,
             addr: 0,
         })
     }

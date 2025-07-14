@@ -25,6 +25,7 @@ use std::any::Any;
 
 pub use v1::DataStoreV1;
 pub use v1::node::Node;
+use v2::StoredParagraph;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub struct VectorRef<'a> {
@@ -42,27 +43,31 @@ impl<'a> VectorRef<'a> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum ParagraphRef<'a> {
     V1(Node<'a>),
+    V2(StoredParagraph<'a>),
 }
 
 impl ParagraphRef<'_> {
     pub fn id(&self) -> &str {
         match self {
             ParagraphRef::V1(n) => n.key(),
+            ParagraphRef::V2(p) => p.key(),
         }
     }
 
     pub fn labels(&self) -> Vec<String> {
         match self {
             ParagraphRef::V1(n) => n.labels(),
+            ParagraphRef::V2(p) => p.labels(),
         }
     }
 
     pub fn metadata(&self) -> &[u8] {
         match self {
             ParagraphRef::V1(n) => n.metadata(),
+            ParagraphRef::V2(p) => p.metadata(),
         }
     }
 }

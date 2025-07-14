@@ -18,4 +18,53 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use crate::config::VectorType;
+
+use super::DataStore;
+use paragraph_store::ParagraphStore;
+pub use paragraph_store::StoredParagraph;
+use std::path::Path;
+use vector_store::VectorStore;
+
+mod paragraph_store;
 mod vector_store;
+
+pub struct DataStoreV2 {
+    paragraphs: ParagraphStore,
+    vectors: VectorStore,
+}
+
+impl DataStoreV2 {
+    pub fn open(path: &Path, vector_type: VectorType) -> std::io::Result<Self> {
+        Ok(Self {
+            vectors: VectorStore::open(path, &vector_type)?,
+            paragraphs: ParagraphStore::open(path)?,
+        })
+    }
+}
+
+impl DataStore for DataStoreV2 {
+    fn size_bytes(&self) -> usize {
+        self.vectors.size_bytes() + self.paragraphs.size_bytes()
+    }
+
+    fn stored_elements(&self) -> usize {
+        todo!()
+    }
+
+    fn get_paragraph(&self, id: usize) -> super::ParagraphRef {
+        todo!()
+    }
+
+    fn get_vector(&self, id: usize) -> super::VectorRef {
+        todo!()
+    }
+
+    fn will_need(&self, id: usize, vector_len: usize) {
+        todo!()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        todo!()
+    }
+}
