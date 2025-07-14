@@ -47,7 +47,7 @@ impl VectorStore {
 
         Ok(Self {
             data,
-            vector_len: vector_type.dimension().unwrap(),
+            vector_len: vector_type.dimension().unwrap() * 4,
         })
     }
 

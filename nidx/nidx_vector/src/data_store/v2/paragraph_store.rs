@@ -21,7 +21,7 @@
 use memmap2::Mmap;
 use std::{fs::File, io::Write as _, path::Path};
 
-use crate::{data_store::ParagraphRef, data_types::usize_utils::U32_LEN};
+use crate::{VectorR, data_point::Elem, data_store::ParagraphRef, data_types::usize_utils::U32_LEN};
 
 const FILENAME_DATA: &str = "paragraphs.bin";
 const FILENAME_POS: &str = "paragraphs.pos";
@@ -46,6 +46,16 @@ impl<'a> StoredParagraph<'a> {
 
     pub fn labels(&self) -> Vec<String> {
         self.labels.iter().copied().map(str::to_string).collect()
+    }
+
+    pub fn from_elem(elem: &'a Elem, first_vector: u32) -> Self {
+        StoredParagraph {
+            key: &elem.key,
+            labels: elem.labels.iter().map(String::as_str).collect(),
+            metadata: elem.metadata.as_ref().map_or(&[], |x| &x),
+            first_vector_add: first_vector,
+            num_vectors: 1,
+        }
     }
 }
 
@@ -74,7 +84,7 @@ impl ParagraphStore {
 
     pub fn get_paragraph(&self, vector_addr: u32) -> ParagraphRef {
         let start_bytes = &self.pos[vector_addr as usize * U32_LEN..vector_addr as usize * U32_LEN + U32_LEN];
-        let start = u32::from_be_bytes(start_bytes.try_into().unwrap()) as usize;
+        let start = u32::from_le_bytes(start_bytes.try_into().unwrap()) as usize;
         let (paragraph, _) =
             bincode::borrow_decode_from_slice(&self.data[start..], bincode::config::standard()).unwrap();
         ParagraphRef::V2(paragraph)
@@ -92,7 +102,7 @@ impl ParagraphStore {
 pub struct ParagraphStoreWriter {
     data: File,
     pos: File,
-    data_pos: usize,
+    data_pos: u32,
     addr: u32,
 }
 
@@ -106,10 +116,10 @@ impl ParagraphStoreWriter {
         })
     }
 
-    pub fn write(&mut self, paragraph: StoredParagraph) -> anyhow::Result<u32> {
+    pub fn write(&mut self, paragraph: StoredParagraph) -> VectorR<u32> {
         let written = bincode::encode_into_std_write(paragraph, &mut self.data, bincode::config::standard())?;
         self.pos.write_all(&self.data_pos.to_le_bytes())?;
-        self.data_pos += written;
+        self.data_pos += written as u32;
         self.addr += 1;
 
         Ok(self.addr)

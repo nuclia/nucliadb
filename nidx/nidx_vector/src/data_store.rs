@@ -25,6 +25,7 @@ use std::any::Any;
 
 pub use v1::DataStoreV1;
 pub use v1::node::Node;
+pub use v2::DataStoreV2;
 use v2::StoredParagraph;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]

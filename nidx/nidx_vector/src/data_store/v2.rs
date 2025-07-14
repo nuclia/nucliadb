@@ -18,13 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::config::VectorType;
+use crate::{VectorR, config::VectorType, data_point::Elem};
 
 use super::DataStore;
-use paragraph_store::ParagraphStore;
 pub use paragraph_store::StoredParagraph;
+use paragraph_store::{ParagraphStore, ParagraphStoreWriter};
 use std::path::Path;
-use vector_store::VectorStore;
+use vector_store::{VectorStore, VectorStoreWriter};
 
 mod paragraph_store;
 mod vector_store;
@@ -35,11 +35,26 @@ pub struct DataStoreV2 {
 }
 
 impl DataStoreV2 {
-    pub fn open(path: &Path, vector_type: VectorType) -> std::io::Result<Self> {
+    pub fn open(path: &Path, vector_type: &VectorType) -> std::io::Result<Self> {
         Ok(Self {
-            vectors: VectorStore::open(path, &vector_type)?,
+            vectors: VectorStore::open(path, vector_type)?,
             paragraphs: ParagraphStore::open(path)?,
         })
+    }
+
+    pub fn create(path: &Path, entries: Vec<Elem>, vector_type: &VectorType) -> VectorR<()> {
+        let mut paragraphs = ParagraphStoreWriter::new(path)?;
+        let mut vectors = VectorStoreWriter::new(path)?;
+
+        for (idx, elem) in (0..).zip(entries.into_iter()) {
+            let (first_vector, _) = vectors.write(idx, &[&vector_type.encode(&elem.vector)])?;
+            paragraphs.write(StoredParagraph::from_elem(&elem, first_vector))?;
+        }
+
+        paragraphs.close()?;
+        vectors.close()?;
+
+        Ok(())
     }
 }
 
