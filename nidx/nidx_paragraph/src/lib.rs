@@ -20,6 +20,7 @@
 
 mod fuzzy_query;
 mod query_io;
+mod query_parser;
 mod reader;
 mod request_types;
 mod resource_indexer;
