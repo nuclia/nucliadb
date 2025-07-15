@@ -112,7 +112,7 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
             .iter()
             .map(|dp| (dp.alive_paragraphs(), dp.data_store.as_ref()))
             .collect();
-        DataStoreV2::merge(data_point_path, node_producers, config)?;
+        DataStoreV2::merge(data_point_path, node_producers, &config.vector_type)?;
         let data_store = DataStoreV2::open(data_point_path, &config.vector_type)?;
         merge_indexes(data_point_path, data_store, operants, config)
     } else {

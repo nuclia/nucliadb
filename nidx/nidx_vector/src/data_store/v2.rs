@@ -18,11 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::{
-    VectorR,
-    config::{VectorConfig, VectorType},
-    data_point::Elem,
-};
+use crate::{VectorR, config::VectorType, data_point::Elem};
 
 use super::{DataStore, ParagraphAddr, VectorAddr};
 pub use paragraph_store::StoredParagraph;
@@ -48,7 +44,7 @@ impl DataStoreV2 {
 
     pub fn create(path: &Path, entries: Vec<Elem>, vector_type: &VectorType) -> VectorR<()> {
         let mut paragraphs = ParagraphStoreWriter::new(path)?;
-        let mut vectors = VectorStoreWriter::new(path)?;
+        let mut vectors = VectorStoreWriter::new(path, vector_type)?;
 
         for (idx, elem) in (0..).zip(entries.into_iter()) {
             let (first_vector, _) = vectors.write(idx, &[&vector_type.encode(&elem.vector)])?;
@@ -64,10 +60,10 @@ impl DataStoreV2 {
     pub fn merge(
         path: &Path,
         producers: Vec<(impl Iterator<Item = ParagraphAddr>, &dyn DataStore)>,
-        vector_config: &VectorConfig,
+        vector_type: &VectorType,
     ) -> VectorR<()> {
         let mut paragraphs = ParagraphStoreWriter::new(path)?;
-        let mut vectors = VectorStoreWriter::new(path)?;
+        let mut vectors = VectorStoreWriter::new(path, vector_type)?;
 
         let mut p_idx = 0;
         for (alive, store) in producers {

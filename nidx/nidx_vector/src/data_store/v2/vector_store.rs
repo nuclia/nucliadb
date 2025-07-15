@@ -20,7 +20,11 @@
 
 use lazy_static::lazy_static;
 use memmap2::Mmap;
-use std::{fs::File, io::Write as _, path::Path};
+use std::{
+    fs::File,
+    io::{Seek, SeekFrom, Write as _},
+    path::Path,
+};
 
 use crate::{
     config::VectorType,
@@ -40,6 +44,14 @@ pub struct VectorStore {
     record_len_bytes: usize,
 }
 
+fn padding_bytes(vector_type: &VectorType) -> usize {
+    if vector_type.vector_alignment() > U32_LEN {
+        vector_type.vector_alignment() - U32_LEN
+    } else {
+        0
+    }
+}
+
 impl VectorStore {
     pub fn open(path: &Path, vector_type: &VectorType) -> std::io::Result<Self> {
         let data = unsafe { Mmap::map(&File::open(path.join(FILENAME))?)? };
@@ -50,17 +62,18 @@ impl VectorStore {
             data.advise(memmap2::Advice::Random)?;
         }
 
+        let padding_bytes = padding_bytes(vector_type);
         Ok(Self {
             data,
             vector_len_bytes: vector_type.len_bytes(),
-            record_len_bytes: vector_type.len_bytes() + U32_LEN,
+            record_len_bytes: vector_type.len_bytes() + U32_LEN + padding_bytes,
         })
     }
 
     pub fn get_vector(&self, addr: VectorAddr) -> VectorRef {
         let start = self.record_start(addr);
         let vector = &self.data[start..start + self.vector_len_bytes];
-        let paragraph_bytes = &self.data[start + self.vector_len_bytes..start + self.record_len_bytes];
+        let paragraph_bytes = &self.data[start + self.vector_len_bytes..start + self.vector_len_bytes + U32_LEN];
         let paragraph_addr = ParagraphAddr(u32::from_le_bytes((paragraph_bytes).try_into().unwrap()));
         VectorRef { vector, paragraph_addr }
     }
@@ -105,13 +118,15 @@ impl VectorStore {
 pub struct VectorStoreWriter {
     output: File,
     addr: u32,
+    padding_bytes: usize,
 }
 
 impl VectorStoreWriter {
-    pub fn new(path: &Path) -> std::io::Result<Self> {
+    pub fn new(path: &Path, vector_type: &VectorType) -> std::io::Result<Self> {
         Ok(Self {
             output: File::create(path.join(FILENAME))?,
             addr: 0,
+            padding_bytes: padding_bytes(vector_type),
         })
     }
 
@@ -120,7 +135,9 @@ impl VectorStoreWriter {
         for v in vectors {
             self.output.write_all(v)?;
             self.output.write_all(paragraph_id.to_le_bytes().as_slice())?;
-            // TODO: Alignment
+            if self.padding_bytes > 0 {
+                self.output.seek(SeekFrom::Current(self.padding_bytes as i64))?;
+            }
         }
         self.addr += vectors.len() as u32;
         let last_addr = self.addr - 1;
