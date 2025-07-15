@@ -50,6 +50,12 @@ message Error {
     }
     ErrorCode code = 4;
     Generator generated_by = 5;
+    enum Severity{
+        ERROR = 0;
+        WARNING = 1;
+
+    }
+    Severity severity = 6;
 }
 
 
