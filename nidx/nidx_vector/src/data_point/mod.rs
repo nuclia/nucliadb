@@ -108,10 +108,13 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
 
     // Creating the node store
     if config.flags.contains(&flags::DATA_STORE_V2.to_string()) {
-        unreachable!();
-        // let has_deletions = DataStoreV2::merge(data_point_path, node_producers.as_mut_slice(), &config)?;
-        // let data_store = DataStoreV2::open(data_point_path, &config.vector_type)?;
-        // merge_indexes(data_point_path, data_store, has_deletions, operants, config)
+        let node_producers = operants
+            .iter()
+            .map(|dp| (dp.alive_paragraphs(), dp.data_store.as_ref()))
+            .collect();
+        DataStoreV2::merge(data_point_path, node_producers, config)?;
+        let data_store = DataStoreV2::open(data_point_path, &config.vector_type)?;
+        merge_indexes(data_point_path, data_store, operants, config)
     } else {
         // V1 can only merge from V1
         let mut node_producers = Vec::new();

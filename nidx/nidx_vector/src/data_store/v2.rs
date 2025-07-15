@@ -18,7 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::{VectorR, config::VectorType, data_point::Elem};
+use crate::{
+    VectorR,
+    config::{VectorConfig, VectorType},
+    data_point::Elem,
+};
 
 use super::{DataStore, ParagraphAddr, VectorAddr};
 pub use paragraph_store::StoredParagraph;
@@ -49,6 +53,37 @@ impl DataStoreV2 {
         for (idx, elem) in (0..).zip(entries.into_iter()) {
             let (first_vector, _) = vectors.write(idx, &[&vector_type.encode(&elem.vector)])?;
             paragraphs.write(StoredParagraph::from_elem(&elem, first_vector))?;
+        }
+
+        paragraphs.close()?;
+        vectors.close()?;
+
+        Ok(())
+    }
+
+    pub fn merge(
+        path: &Path,
+        producers: Vec<(impl Iterator<Item = ParagraphAddr>, &dyn DataStore)>,
+        vector_config: &VectorConfig,
+    ) -> VectorR<()> {
+        let mut paragraphs = ParagraphStoreWriter::new(path)?;
+        let mut vectors = VectorStoreWriter::new(path)?;
+
+        let mut p_idx = 0;
+        for (alive, store) in producers {
+            for paragraph_addr in alive {
+                // Retrieve paragraph and vectors
+                let paragraph = store.get_paragraph(paragraph_addr);
+                let p_vectors: Vec<_> = paragraph
+                    .vectors(&paragraph_addr)
+                    .map(|v| store.get_vector(v).vector())
+                    .collect();
+
+                // Write to new store
+                let (first_vector, last_vector) = vectors.write(p_idx, p_vectors.as_slice())?;
+                paragraphs.write_paragraph_ref(paragraph, first_vector, last_vector - first_vector + 1)?;
+                p_idx += 1;
+            }
         }
 
         paragraphs.close()?;

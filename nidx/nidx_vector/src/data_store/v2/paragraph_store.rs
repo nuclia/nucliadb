@@ -134,6 +134,28 @@ impl ParagraphStoreWriter {
         Ok(self.addr)
     }
 
+    pub fn write_paragraph_ref(
+        &mut self,
+        paragraph: ParagraphRef,
+        first_vector: u32,
+        num_vectors: u32,
+    ) -> VectorR<u32> {
+        let labels = paragraph.labels();
+        let paragraph = StoredParagraph {
+            key: paragraph.id(),
+            labels: labels.iter().map(|x| x.as_str()).collect(),
+            metadata: paragraph.metadata(),
+            first_vector,
+            num_vectors,
+        };
+        let written = bincode::encode_into_std_write(paragraph, &mut self.data, bincode::config::standard())?;
+        self.pos.write_all(&self.data_pos.to_le_bytes())?;
+        self.data_pos += written as u32;
+        self.addr += 1;
+
+        Ok(self.addr)
+    }
+
     pub fn close(self) -> std::io::Result<()> {
         self.data.sync_all()?;
         self.pos.sync_all()?;
