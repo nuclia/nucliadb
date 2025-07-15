@@ -185,6 +185,8 @@ pub enum VectorErr {
     MissingMergedSegments,
     #[error("Not all of the merged segments have the same tags")]
     InconsistentMergeSegmentTags,
+    #[error("Not all of the merged segments have the same data store version")]
+    InconsistentMergeDataStore,
     #[error("Invalid configuration: {0}")]
     InvalidConfiguration(&'static str),
     #[error("FST error: {0}")]

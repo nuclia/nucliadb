@@ -30,7 +30,7 @@ use crate::config::{VectorConfig, flags};
 use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, ParagraphRef, VectorRef};
 use crate::formula::Formula;
 use crate::inverted_index::{FilterBitSet, InvertedIndexes, build_indexes};
-use crate::{ParagraphAddr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
+use crate::{ParagraphAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use disk_hnsw::DiskHnsw;
 use io::{BufWriter, Write};
 use memmap2::Mmap;
@@ -95,7 +95,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
 
 pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &VectorConfig) -> VectorR<OpenDataPoint> {
     // Sort largest operant first so we reuse as much of the HNSW as possible
-    let mut operants = operants.iter().collect::<Vec<_>>();
+    let mut operants = operants.to_vec();
     operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.metadata.records));
 
     // Tags for all segments are the same (this should not happen, prepare_merge ensures it)
@@ -107,35 +107,39 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
     }
 
     // Creating the node store
-    let mut node_producers: Vec<_> = operants
-        .iter()
-        .map(|dp| {
-            (
-                dp.alive_nodes(),
-                dp.data_store.as_any().downcast_ref::<DataStoreV1>().unwrap(),
-            )
-        })
-        .collect();
-
     if config.flags.contains(&flags::DATA_STORE_V2.to_string()) {
         unreachable!();
         // let has_deletions = DataStoreV2::merge(data_point_path, node_producers.as_mut_slice(), &config)?;
         // let data_store = DataStoreV2::open(data_point_path, &config.vector_type)?;
         // merge_indexes(data_point_path, data_store, has_deletions, operants, config)
     } else {
-        let has_deletions = DataStoreV1::merge(data_point_path, node_producers.as_mut_slice(), config)?;
+        // V1 can only merge from V1
+        let mut node_producers = Vec::new();
+        for dp in &operants {
+            node_producers.push((
+                dp.alive_paragraphs(),
+                dp.data_store
+                    .as_any()
+                    .downcast_ref::<DataStoreV1>()
+                    .ok_or(VectorErr::InconsistentMergeDataStore)?,
+            ));
+        }
+
+        DataStoreV1::merge(data_point_path, node_producers.as_mut_slice(), config)?;
         let data_store = DataStoreV1::open(data_point_path, &config.vector_type)?;
-        merge_indexes(data_point_path, data_store, has_deletions, operants, config)
+        merge_indexes(data_point_path, data_store, operants, config)
     }
 }
 
 fn merge_indexes<DS: DataStore + 'static>(
     data_point_path: &Path,
     data_store: DS,
-    has_deletions: bool,
-    operants: Vec<&&OpenDataPoint>,
+    operants: Vec<&OpenDataPoint>,
     config: &VectorConfig,
 ) -> VectorR<OpenDataPoint> {
+    // Check if the first segment has deletions. If it doesn't, we can reuse its HNSW index
+    let has_deletions = operants[0].alive_paragraphs().count() < operants[0].data_store.stored_paragraph_count();
+
     let mut index;
     let start_vector_index;
     if has_deletions {
@@ -411,7 +415,7 @@ impl OpenDataPoint {
         &self.metadata.index_metadata.tags
     }
 
-    pub fn alive_nodes(&self) -> impl Iterator<Item = ParagraphAddr> + '_ {
+    pub fn alive_paragraphs(&self) -> impl Iterator<Item = ParagraphAddr> + '_ {
         self.alive_bitset.iter()
     }
 
