@@ -53,6 +53,7 @@ fn test_basic_search(
         similarity,
         vector_type,
         normalize_vectors: false,
+        flags: vec![],
     };
 
     // Creates a resource with some orthogonal vectors, to test search
@@ -152,6 +153,7 @@ fn test_deletions() -> anyhow::Result<()> {
         similarity: Similarity::Dot,
         vector_type: VectorType::DenseF32 { dimension: 4 },
         normalize_vectors: false,
+        flags: vec![],
     };
 
     // Creates a couple of resources
@@ -227,6 +229,7 @@ fn test_filtered_search() -> anyhow::Result<()> {
         similarity: Similarity::Dot,
         vector_type: VectorType::DenseF32 { dimension: 4 },
         normalize_vectors: false,
+        flags: vec![],
     };
 
     // Create 4 resources

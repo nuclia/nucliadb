@@ -26,6 +26,10 @@ use serde::{Deserialize, Serialize};
 use crate::VectorErr;
 use crate::vector_types::*;
 
+pub mod flags {
+    pub const DATA_STORE_V2: &str = "data_store_v2";
+}
+
 #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Similarity {
     Dot,
@@ -82,6 +86,8 @@ pub struct VectorConfig {
     #[serde(default)]
     pub normalize_vectors: bool,
     pub vector_type: VectorType,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub flags: Vec<String>,
 }
 
 impl VectorConfig {
@@ -112,6 +118,7 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
             similarity: proto.similarity().into(),
             normalize_vectors: proto.normalize_vectors,
             vector_type,
+            flags: vec![],
         })
     }
 }

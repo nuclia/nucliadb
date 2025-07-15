@@ -347,6 +347,7 @@ mod tests {
             similarity: Similarity::Cosine,
             normalize_vectors: false,
             vector_type: VectorType::DenseF32 { dimension: 3 },
+            flags: vec![],
         };
         let raw_sentences = [
             (
@@ -442,6 +443,7 @@ mod tests {
             similarity: Similarity::Cosine,
             normalize_vectors: false,
             vector_type: VectorType::DenseF32 { dimension: 3 },
+            flags: vec![],
         };
         let raw_sentences = [
             (
@@ -562,6 +564,7 @@ mod tests {
             similarity: Similarity::Cosine,
             normalize_vectors: false,
             vector_type: VectorType::DenseF32 { dimension: 3 },
+            flags: vec![],
         };
         let raw_sentences = [
             (

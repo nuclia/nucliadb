@@ -217,6 +217,7 @@ mod tests {
         vector_type: VectorType::DenseF32 { dimension: 3 },
         similarity: crate::config::Similarity::Dot,
         normalize_vectors: false,
+        flags: vec![],
     };
 
     #[test]

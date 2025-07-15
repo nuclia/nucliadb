@@ -32,6 +32,7 @@ const CONFIG: VectorConfig = VectorConfig {
     similarity: Similarity::Cosine,
     normalize_vectors: false,
     vector_type: crate::config::VectorType::DenseF32 { dimension: 178 },
+    flags: vec![],
 };
 
 fn create_query() -> Vec<f32> {

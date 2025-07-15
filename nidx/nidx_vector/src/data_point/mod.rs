@@ -26,7 +26,7 @@ mod params;
 #[cfg(test)]
 mod tests;
 
-use crate::config::VectorConfig;
+use crate::config::{VectorConfig, flags};
 use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, ParagraphRef, VectorRef};
 use crate::formula::Formula;
 use crate::inverted_index::{FilterBitSet, InvertedIndexes, build_indexes};
@@ -94,13 +94,6 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
 }
 
 pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &VectorConfig) -> VectorR<OpenDataPoint> {
-    let hnsw_path = data_point_path.join(file_names::HNSW);
-    let mut hnsw_file = File::options()
-        .read(true)
-        .write(true)
-        .create_new(true)
-        .open(hnsw_path)?;
-
     // Sort largest operant first so we reuse as much of the HNSW as possible
     let mut operants = operants.iter().collect::<Vec<_>>();
     operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.metadata.records));
@@ -123,10 +116,26 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
             )
         })
         .collect();
-    let has_deletions = DataStoreV1::merge(data_point_path, node_producers.as_mut_slice(), config)?;
-    let data_store = DataStoreV1::open(data_point_path, &config.vector_type)?;
-    let merged_vectors_count = data_store.stored_vector_count();
 
+    if config.flags.contains(&flags::DATA_STORE_V2.to_string()) {
+        unreachable!();
+        // let has_deletions = DataStoreV2::merge(data_point_path, node_producers.as_mut_slice(), &config)?;
+        // let data_store = DataStoreV2::open(data_point_path, &config.vector_type)?;
+        // merge_indexes(data_point_path, data_store, has_deletions, operants, config)
+    } else {
+        let has_deletions = DataStoreV1::merge(data_point_path, node_producers.as_mut_slice(), config)?;
+        let data_store = DataStoreV1::open(data_point_path, &config.vector_type)?;
+        merge_indexes(data_point_path, data_store, has_deletions, operants, config)
+    }
+}
+
+fn merge_indexes<DS: DataStore + 'static>(
+    data_point_path: &Path,
+    data_store: DS,
+    has_deletions: bool,
+    operants: Vec<&&OpenDataPoint>,
+    config: &VectorConfig,
+) -> VectorR<OpenDataPoint> {
     let mut index;
     let start_vector_index;
     if has_deletions {
@@ -138,6 +147,7 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
         index = DiskHnsw::deserialize(&operants[0].index);
         start_vector_index = operants[0].data_store.stored_vector_count();
     }
+    let merged_vectors_count = data_store.stored_vector_count();
 
     // Creating the hnsw for the new node store.
     let retriever = Retriever::new(&[], &data_store, config, -1.0);
@@ -146,6 +156,12 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
         ops.insert(Address(id), &mut index);
     }
 
+    let hnsw_path = data_point_path.join(file_names::HNSW);
+    let mut hnsw_file = File::options()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(hnsw_path)?;
     {
         let mut hnswf_buffer = BufWriter::new(&mut hnsw_file);
         DiskHnsw::serialize_into(&mut hnswf_buffer, merged_vectors_count, index)?;
@@ -165,7 +181,9 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
     let metadata = VectorSegmentMetadata {
         path: data_point_path.to_path_buf(),
         records: merged_vectors_count,
-        index_metadata: VectorSegmentMeta { tags: tags.clone() },
+        index_metadata: VectorSegmentMeta {
+            tags: operants[0].metadata.index_metadata.tags.clone(),
+        },
     };
 
     build_indexes(data_point_path, &data_store)?;
@@ -192,16 +210,30 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         }
     }
 
+    // Serializing nodes on disk
+    // Nodes are stored on disk and mmaped.
+    // Then trigger the rest of the creation (indexes)
+    if config.flags.contains(&flags::DATA_STORE_V2.to_string()) {
+        DataStoreV2::create(path, elems, &config.vector_type)?;
+        create_indexes(path, DataStoreV2::open(path, &config.vector_type)?, config, tags)
+    } else {
+        DataStoreV1::create(path, elems, &config.vector_type)?;
+        create_indexes(path, DataStoreV1::open(path, &config.vector_type)?, config, tags)
+    }
+}
+
+fn create_indexes<DS: DataStore + 'static>(
+    path: &Path,
+    data_store: DS,
+    config: &VectorConfig,
+    tags: HashSet<String>,
+) -> VectorR<OpenDataPoint> {
     let mut hnsw_file = File::options()
         .read(true)
         .write(true)
         .create_new(true)
         .open(path.join(file_names::HNSW))?;
 
-    // Serializing nodes on disk
-    // Nodes are stored on disk and mmaped.
-    DataStoreV2::create(path, elems, &config.vector_type)?;
-    let data_store = DataStoreV2::open(path, &config.vector_type)?;
     let vector_count = data_store.stored_vector_count();
 
     // Creating the HNSW using the mmaped nodes
@@ -562,6 +594,7 @@ mod test {
             similarity: Similarity::Dot,
             vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
             normalize_vectors: false,
+            flags: vec![],
         };
         let mut rng = SmallRng::seed_from_u64(1234567890);
         let temp_dir = tempdir()?;
@@ -606,6 +639,7 @@ mod test {
             similarity: Similarity::Dot,
             vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
             normalize_vectors: false,
+            flags: vec![],
         };
         let mut rng = SmallRng::seed_from_u64(1234567890);
 
@@ -682,6 +716,7 @@ mod test {
             similarity: Similarity::Dot,
             vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
             normalize_vectors: false,
+            flags: vec![],
         };
 
         // Create a data point
