@@ -27,7 +27,7 @@ mod params;
 mod tests;
 
 use crate::config::{VectorConfig, flags};
-use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, ParagraphRef, VectorRef};
+use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, ParagraphRef, VectorRef};
 use crate::formula::Formula;
 use crate::inverted_index::{FilterBitSet, InvertedIndexes, build_indexes};
 use crate::{ParagraphAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
@@ -55,7 +55,7 @@ mod file_names {
 pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<OpenDataPoint> {
     let path = &metadata.path;
     let data_store: Box<dyn DataStore> = if DataStoreV1::exists(path)? {
-        let data_store = DataStoreV1::open(path, &config.vector_type)?;
+        let data_store = DataStoreV1::open(path, &config.vector_type, OpenReason::Search)?;
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
         if !InvertedIndexes::exists(path) {
@@ -63,7 +63,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         }
         Box::new(data_store)
     } else {
-        let data_store = DataStoreV2::open(path, &config.vector_type)?;
+        let data_store = DataStoreV2::open(path, &config.vector_type, OpenReason::Search)?;
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
         if !InvertedIndexes::exists(path) {
@@ -78,7 +78,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
     {
-        index.advise(memmap2::Advice::Sequential)?;
+        index.advise(memmap2::Advice::Random)?;
     }
 
     let inverted_indexes = InvertedIndexes::open(path, metadata.records)?;
@@ -113,7 +113,7 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
             .map(|dp| (dp.alive_paragraphs(), dp.data_store.as_ref()))
             .collect();
         DataStoreV2::merge(data_point_path, node_producers, &config.vector_type)?;
-        let data_store = DataStoreV2::open(data_point_path, &config.vector_type)?;
+        let data_store = DataStoreV2::open(data_point_path, &config.vector_type, OpenReason::Create)?;
         merge_indexes(data_point_path, data_store, operants, config)
     } else {
         // V1 can only merge from V1
@@ -129,7 +129,7 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
         }
 
         DataStoreV1::merge(data_point_path, node_producers.as_mut_slice(), config)?;
-        let data_store = DataStoreV1::open(data_point_path, &config.vector_type)?;
+        let data_store = DataStoreV1::open(data_point_path, &config.vector_type, OpenReason::Create)?;
         merge_indexes(data_point_path, data_store, operants, config)
     }
 }
@@ -180,7 +180,7 @@ fn merge_indexes<DS: DataStore + 'static>(
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
     {
-        index.advise(memmap2::Advice::Sequential)?;
+        index.advise(memmap2::Advice::Random)?;
     }
 
     build_indexes(data_point_path, &data_store)?;
@@ -222,10 +222,20 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
     // Then trigger the rest of the creation (indexes)
     if config.flags.contains(&flags::DATA_STORE_V2.to_string()) {
         DataStoreV2::create(path, elems, &config.vector_type)?;
-        create_indexes(path, DataStoreV2::open(path, &config.vector_type)?, config, tags)
+        create_indexes(
+            path,
+            DataStoreV2::open(path, &config.vector_type, OpenReason::Create)?,
+            config,
+            tags,
+        )
     } else {
         DataStoreV1::create(path, elems, &config.vector_type)?;
-        create_indexes(path, DataStoreV1::open(path, &config.vector_type)?, config, tags)
+        create_indexes(
+            path,
+            DataStoreV1::open(path, &config.vector_type, OpenReason::Create)?,
+            config,
+            tags,
+        )
     }
 }
 
@@ -263,7 +273,7 @@ fn create_indexes<DS: DataStore + 'static>(
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
     {
-        index.advise(memmap2::Advice::Sequential)?;
+        index.advise(memmap2::Advice::Random)?;
     }
 
     build_indexes(path, &data_store)?;

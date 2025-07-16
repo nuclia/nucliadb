@@ -26,7 +26,7 @@ use memmap2::Mmap;
 use node::Node;
 use std::{any::Any, fs::File, path::Path};
 
-use super::{DataStore, ParagraphAddr, ParagraphRef, VectorAddr, VectorRef};
+use super::{DataStore, OpenReason, ParagraphAddr, ParagraphRef, VectorAddr, VectorRef};
 
 pub mod node;
 pub mod store;
@@ -78,13 +78,17 @@ impl DataStoreV1 {
         std::fs::exists(path.join(NODES))
     }
 
-    pub fn open(path: &Path, vector_type: &VectorType) -> std::io::Result<Self> {
+    pub fn open(path: &Path, vector_type: &VectorType, reason: OpenReason) -> std::io::Result<Self> {
         let nodes_file = File::open(path.join(NODES))?;
         let nodes = unsafe { Mmap::map(&nodes_file)? };
 
         #[cfg(not(target_os = "windows"))]
         {
-            nodes.advise(memmap2::Advice::WillNeed)?;
+            let advice = match reason {
+                OpenReason::Create => memmap2::Advice::Sequential,
+                OpenReason::Search => memmap2::Advice::Random,
+            };
+            nodes.advise(advice)?;
         }
 
         Ok(Self {

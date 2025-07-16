@@ -30,6 +30,11 @@ use v2::StoredParagraph;
 
 use crate::{ParagraphAddr, VectorAddr};
 
+pub enum OpenReason {
+    Search,
+    Create,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub struct VectorRef<'a> {
     vector: &'a [u8],

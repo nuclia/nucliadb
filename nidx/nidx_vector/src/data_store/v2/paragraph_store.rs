@@ -24,7 +24,7 @@ use std::{fs::File, io::Write as _, path::Path};
 use crate::{
     VectorR,
     data_point::Elem,
-    data_store::{ParagraphAddr, ParagraphRef},
+    data_store::{OpenReason, ParagraphAddr, ParagraphRef},
     data_types::usize_utils::U32_LEN,
 };
 
@@ -77,15 +77,18 @@ pub struct ParagraphStore {
 }
 
 impl ParagraphStore {
-    pub fn open(path: &Path) -> std::io::Result<Self> {
+    pub fn open(path: &Path, reason: &OpenReason) -> std::io::Result<Self> {
         let pos = unsafe { Mmap::map(&File::open(path.join(FILENAME_POS))?)? };
         let data = unsafe { Mmap::map(&File::open(path.join(FILENAME_DATA))?)? };
 
-        // TODO: Maybe different flags for read (random) and merge (sequential / willneed)
         #[cfg(not(target_os = "windows"))]
         {
             pos.advise(memmap2::Advice::WillNeed)?;
-            data.advise(memmap2::Advice::Random)?;
+            let advice = match reason {
+                OpenReason::Create => memmap2::Advice::Sequential,
+                OpenReason::Search => memmap2::Advice::Random,
+            };
+            data.advise(advice)?;
         }
 
         Ok(Self { pos, data })
