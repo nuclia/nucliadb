@@ -86,7 +86,7 @@ pub struct VectorConfig {
     #[serde(default)]
     pub normalize_vectors: bool,
     pub vector_type: VectorType,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub flags: Vec<String>,
 }
 
