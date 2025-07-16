@@ -61,6 +61,7 @@ fn test_basic_search(
         vector_type,
         normalize_vectors: false,
         flags,
+        vector_cardinality: VectorCardinality::Single,
     };
 
     // Creates a resource with some orthogonal vectors, to test search
@@ -161,6 +162,7 @@ fn test_deletions() -> anyhow::Result<()> {
         vector_type: VectorType::DenseF32 { dimension: 4 },
         normalize_vectors: false,
         flags: vec![],
+        vector_cardinality: VectorCardinality::Single,
     };
 
     // Creates a couple of resources
@@ -237,6 +239,7 @@ fn test_filtered_search() -> anyhow::Result<()> {
         vector_type: VectorType::DenseF32 { dimension: 4 },
         normalize_vectors: false,
         flags: vec![],
+        vector_cardinality: VectorCardinality::Single,
     };
 
     // Create 4 resources

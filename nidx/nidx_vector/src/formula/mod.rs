@@ -96,3 +96,9 @@ impl Formula {
         self.clauses.push(clause.into())
     }
 }
+
+impl Default for Formula {
+    fn default() -> Self {
+        Self::new()
+    }
+}

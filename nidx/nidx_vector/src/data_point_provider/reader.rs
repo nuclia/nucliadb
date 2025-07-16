@@ -18,18 +18,22 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use crate::ParagraphAddr;
+use crate::config::VectorCardinality;
 use crate::data_point::OpenDataPoint;
 use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
 use crate::data_store::ParagraphRef;
 use crate::request_types::VectorSearchRequest;
 use crate::utils;
+use crate::vector_types::dense_f32;
 use crate::{VectorErr, VectorR};
 use crate::{formula::*, query_io};
 use nidx_protos::prost::*;
 use nidx_protos::{DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchResponse};
 use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
+use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::time::Instant;
@@ -39,6 +43,8 @@ use tracing::*;
 pub struct ScoredParagraph<'a> {
     score: f32,
     paragraph: ParagraphRef<'a>,
+    address: ParagraphAddr,
+    data_point: &'a OpenDataPoint,
 }
 impl Eq for ScoredParagraph<'_> {}
 impl std::hash::Hash for ScoredParagraph<'_> {
@@ -72,8 +78,13 @@ impl PartialEq for ScoredParagraph<'_> {
 }
 
 impl<'a> ScoredParagraph<'a> {
-    pub fn new(paragraph: ParagraphRef<'a>, score: f32) -> Self {
-        Self { paragraph, score }
+    pub fn new(data_point: &'a OpenDataPoint, address: ParagraphAddr, paragraph: ParagraphRef<'a>, score: f32) -> Self {
+        Self {
+            data_point,
+            paragraph,
+            score,
+            address,
+        }
     }
     pub fn score(&self) -> f32 {
         self.score
@@ -87,6 +98,12 @@ impl<'a> ScoredParagraph<'a> {
     pub fn metadata(&self) -> Option<&[u8]> {
         let metadata = self.paragraph.metadata();
         (!metadata.is_empty()).then_some(metadata)
+    }
+    pub fn vectors(&self) -> Vec<&[u8]> {
+        self.paragraph
+            .vectors(&self.address)
+            .map(|va| self.data_point.get_vector(va).vector())
+            .collect()
     }
 }
 
@@ -251,8 +268,9 @@ impl Reader {
                 open_data_point.search(query, filter, with_duplicates, no_results, &self.config, min_score);
 
             for candidate in partial_solution {
-                let paragraph = open_data_point.get_paragraph(candidate.paragraph());
-                let scored_paragraph = ScoredParagraph::new(paragraph, candidate.score());
+                let addr = candidate.paragraph();
+                let paragraph = open_data_point.get_paragraph(addr);
+                let scored_paragraph = ScoredParagraph::new(open_data_point, addr, paragraph, candidate.score());
                 ffsv.add(scored_paragraph, candidate.vector());
             }
         }
@@ -293,14 +311,70 @@ impl Reader {
             formula.operator = BooleanOperator::Or;
         }
 
-        let search_request = (total_to_get, request, formula);
         let v = time.elapsed().as_millis();
-        debug!("{id:?} - Searching: starts at {v} ms");
+        let result = match self.config.vector_cardinality {
+            VectorCardinality::Single => {
+                let search_request = (total_to_get, request, formula);
+                debug!("{id:?} - Searching: starts at {v} ms");
+                self._search(&search_request, &request.segment_filtering_formula)?
+            }
+            VectorCardinality::Multi => {
+                let search_vectors: Vec<_> = (0..32)
+                    .map(|i| request.vector[i * 128..(i + 1) * 128].to_vec())
+                    .collect();
+                debug!(
+                    "{id:?} - Multi-vector searching: starts at {v} ms with {} requests",
+                    search_vectors.len()
+                );
+                let results = search_vectors
+                    .into_par_iter()
+                    .map(|v| {
+                        let mut subreq = request.clone();
+                        subreq.vector = v;
+                        let search_request = (total_to_get, &subreq, formula.clone());
+                        self._search(&search_request, &request.segment_filtering_formula)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let v = time.elapsed().as_millis();
 
-        let result = self._search(&search_request, &request.segment_filtering_formula)?;
+                debug!("{id:?} - Multi-vector reranking: starts at {v} ms");
+                let mut results = results
+                    .into_par_iter()
+                    .flatten()
+                    .map(|mut sp| {
+                        let mut summaxsim = 0.0;
+                        for iq in 0..32 {
+                            let q = &request.vector[iq * 128..(iq + 1) * 128];
+                            let encoded_q = &dense_f32::encode_vector(q);
+                            let mut maxsim = 0.0;
+                            for vec in sp.vectors() {
+                                let sim = dense_f32::dot_similarity(vec, encoded_q);
+                                if sim > maxsim {
+                                    maxsim = sim
+                                }
+                            }
+                            summaxsim += maxsim;
+                        }
+                        sp.score = summaxsim;
+                        sp
+                    })
+                    .collect::<Vec<_>>();
+                results.sort_by(|a, b| a.score().partial_cmp(&b.score()).unwrap());
+                println!(
+                    "{:?}",
+                    results
+                        .iter()
+                        .map(|x| (x.score(), x.address, x.id()))
+                        .collect::<Vec<_>>()
+                );
+
+                results
+            }
+        };
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: ends at {v} ms");
+
         debug!("{id:?} - Creating results: starts at {v} ms");
 
         let documents = result
@@ -335,7 +409,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::config::{Similarity, VectorConfig, VectorType};
+    use crate::config::{Similarity, VectorCardinality, VectorConfig, VectorType};
     use crate::data_point;
     use crate::indexer::{ResourceWrapper, index_resource};
 
@@ -348,6 +422,7 @@ mod tests {
             normalize_vectors: false,
             vector_type: VectorType::DenseF32 { dimension: 3 },
             flags: vec![],
+            vector_cardinality: VectorCardinality::Single,
         };
         let raw_sentences = [
             (
@@ -444,6 +519,7 @@ mod tests {
             normalize_vectors: false,
             vector_type: VectorType::DenseF32 { dimension: 3 },
             flags: vec![],
+            vector_cardinality: VectorCardinality::Single,
         };
         let raw_sentences = [
             (
@@ -565,6 +641,7 @@ mod tests {
             normalize_vectors: false,
             vector_type: VectorType::DenseF32 { dimension: 3 },
             flags: vec![],
+            vector_cardinality: VectorCardinality::Single,
         };
         let raw_sentences = [
             (

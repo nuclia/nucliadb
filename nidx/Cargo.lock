@@ -2292,6 +2292,7 @@ dependencies = [
  "nidx_protos",
  "nidx_types",
  "rand 0.8.5",
+ "rayon",
  "rstest",
  "serde",
  "simsimd",
