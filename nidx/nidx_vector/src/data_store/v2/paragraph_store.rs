@@ -50,7 +50,7 @@ impl<'a> StoredParagraph<'a> {
     }
 
     pub fn labels(&self) -> Vec<String> {
-        self.labels.iter().copied().map(str::to_string).collect()
+        self.labels.iter().map(|s| s.to_string()).collect()
     }
 
     pub fn from_elem(elem: &'a Elem, first_vector: u32) -> Self {

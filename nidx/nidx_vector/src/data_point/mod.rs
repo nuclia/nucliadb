@@ -302,7 +302,7 @@ pub struct Address(pub(super) usize);
 
 pub struct Retriever<'a, DS: DataStore> {
     similarity_function: fn(&[u8], &[u8]) -> f32,
-    no_vectors: usize,
+    vector_count: usize,
     temp: &'a [u8],
     data_store: &'a DS,
     min_score: f32,
@@ -313,7 +313,7 @@ impl<'a, DS: DataStore> Retriever<'a, DS> {
             temp,
             data_store,
             similarity_function: config.similarity_function(),
-            no_vectors: data_store.stored_vector_count(),
+            vector_count: data_store.stored_vector_count(),
             min_score,
         }
     }
@@ -328,17 +328,17 @@ impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
     }
 
     fn get_vector(&self, x @ Address(addr): Address) -> &[u8] {
-        if addr == self.no_vectors {
+        if addr == self.vector_count {
             self.temp
         } else {
             self.find_vector(x).vector()
         }
     }
     fn similarity(&self, x @ Address(a0): Address, y @ Address(a1): Address) -> f32 {
-        if a0 == self.no_vectors {
+        if a0 == self.vector_count {
             let y = self.find_vector(y).vector();
             (self.similarity_function)(self.temp, y)
-        } else if a1 == self.no_vectors {
+        } else if a1 == self.vector_count {
             let x = self.find_vector(x).vector();
             (self.similarity_function)(self.temp, x)
         } else {
