@@ -69,7 +69,6 @@ pub struct SearchResponse<'a, S> {
     pub facets_count: FacetCounts,
     pub facets: Vec<String>,
     pub top_docs: Vec<(S, DocAddress)>,
-    pub page_number: i32,
     pub results_per_page: i32,
     pub total: usize,
 }
@@ -236,31 +235,24 @@ impl TextReaderService {
 }
 
 impl TextReaderService {
-    fn custom_order_collector(
-        &self,
-        order: OrderBy,
-        limit: usize,
-        offset: usize,
-    ) -> impl Collector<Fruit = Vec<(i64, DocAddress)>> {
+    fn custom_order_collector(&self, order: OrderBy, limit: usize) -> impl Collector<Fruit = Vec<(i64, DocAddress)>> {
         use tantivy::{DocId, SegmentReader};
         let sorter = match order.r#type() {
             OrderType::Desc => |t: i64| t,
             OrderType::Asc => |t: i64| -t,
         };
-        TopDocs::with_limit(limit)
-            .and_offset(offset)
-            .custom_score(move |segment_reader: &SegmentReader| {
-                let reader = match order.sort_by() {
-                    OrderField::Created => segment_reader.fast_fields().date("created").unwrap(),
-                    OrderField::Modified => segment_reader.fast_fields().date("modified").unwrap(),
-                };
-                move |doc: DocId| sorter(reader.values_for_doc(doc).next().unwrap().into_timestamp_secs())
-            })
+        TopDocs::with_limit(limit).custom_score(move |segment_reader: &SegmentReader| {
+            let reader = match order.sort_by() {
+                OrderField::Created => segment_reader.fast_fields().date("created").unwrap(),
+                OrderField::Modified => segment_reader.fast_fields().date("modified").unwrap(),
+            };
+            move |doc: DocId| sorter(reader.values_for_doc(doc).next().unwrap().into_timestamp_secs())
+        })
     }
 
     fn convert_int_order(&self, response: SearchResponse<i64>, searcher: &Searcher) -> DocumentSearchResponse {
         let total = response.total as i32;
-        let retrieved_results = (response.page_number + 1) * response.results_per_page;
+        let retrieved_results = response.results_per_page;
         let next_page = total > retrieved_results;
         let results_per_page = response.results_per_page as usize;
         let result_stream = response.top_docs.into_iter().take(results_per_page).enumerate();
@@ -313,7 +305,6 @@ impl TextReaderService {
             total,
             results,
             facets,
-            page_number: response.page_number,
             result_per_page: response.results_per_page,
             query: response.query.to_string(),
             next_page,
@@ -328,7 +319,7 @@ impl TextReaderService {
         min_score: f32,
     ) -> DocumentSearchResponse {
         let total = response.total as i32;
-        let retrieved_results = (response.page_number + 1) * response.results_per_page;
+        let retrieved_results = response.results_per_page;
         let next_page = total > retrieved_results;
         let results_per_page = response.results_per_page as usize;
         let result_stream = response.top_docs.into_iter().take(results_per_page).enumerate();
@@ -383,7 +374,6 @@ impl TextReaderService {
             results,
             facets,
             total: response.total as i32,
-            page_number: response.page_number,
             result_per_page: response.results_per_page,
             query: response.query.to_string(),
             next_page,
@@ -424,7 +414,6 @@ impl TextReaderService {
 
         // Offset to search from
         let results = request.result_per_page as usize;
-        let offset = results * request.page_number as usize;
         let extra_result = results + 1;
         let maybe_order = request.order.clone();
         let valid_facet_iter = request
@@ -458,7 +447,7 @@ impl TextReaderService {
                 })
             }
             Some(order_by) => {
-                let topdocs_collector = self.custom_order_collector(order_by, extra_result, offset);
+                let topdocs_collector = self.custom_order_collector(order_by, extra_result);
                 let multicollector = &(facet_collector, topdocs_collector, Count);
                 let (facets_count, top_docs, total) = searcher.search(&query, multicollector)?;
                 let result = self.convert_int_order(
@@ -468,7 +457,6 @@ impl TextReaderService {
                         top_docs,
                         total,
                         query: &text,
-                        page_number: request.page_number,
                         results_per_page: results as i32,
                     },
                     &searcher,
@@ -476,7 +464,7 @@ impl TextReaderService {
                 Ok(result)
             }
             None => {
-                let topdocs_collector = TopDocs::with_limit(extra_result).and_offset(offset);
+                let topdocs_collector = TopDocs::with_limit(extra_result);
                 let multicollector = &(facet_collector, topdocs_collector, Count);
                 let (facets_count, top_docs, total) = searcher.search(&query, multicollector)?;
                 let result = self.convert_bm25_order(
@@ -486,7 +474,6 @@ impl TextReaderService {
                         top_docs,
                         total,
                         query: &text,
-                        page_number: request.page_number,
                         results_per_page: results as i32,
                     },
                     &searcher,

@@ -60,13 +60,14 @@ message DocumentResult {
 }
 
 message DocumentSearchResponse {
+    reserved 4;
+
     int32 total = 1;
 
     repeated DocumentResult results = 2;
 
     map<string, FacetResults> facets = 3;
 
-    int32 page_number = 4;
     int32 result_per_page = 5;
 
     // The text that lead to this results
@@ -95,15 +96,14 @@ message ParagraphResult {
 }
 
 message ParagraphSearchResponse {
+    reserved 4;
+
     int32 fuzzy_distance = 10;
     int32 total = 1;
     repeated ParagraphResult results = 2;
 
     // For each field what facets are.
     map<string, FacetResults> facets = 3;
-
-    // What page is the answer.
-    int32 page_number = 4;
 
     // How many results are in this page.
     int32 result_per_page = 5;
@@ -129,11 +129,10 @@ message DocumentScored {
 }
 
 message VectorSearchResponse {
+    reserved 4;
+
     // List of docs closer to the asked one.
     repeated DocumentScored documents = 1;
-
-    // What page is the answer.
-    int32 page_number = 4;
 
     // How many results are in this page.
     int32 result_per_page = 5;
@@ -304,7 +303,7 @@ enum FilterOperator {
 }
 
 message SearchRequest {
-    reserved 20, 21;
+    reserved 7, 20, 21;
 
     string shard = 1;
 
@@ -315,7 +314,6 @@ message SearchRequest {
 
     Faceted faceted = 6;
 
-    int32 page_number = 7;
     int32 result_per_page = 8;
 
     repeated float vector = 10; // Embedded vector search.

@@ -40,7 +40,6 @@ fn test_search_queries() {
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
             body: query.clone(),
-            page_number: 0,
             result_per_page: 20,
             ..Default::default()
         };
@@ -195,7 +194,6 @@ fn test_filtered_search() {
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
             body: query.clone(),
-            page_number: 0,
             result_per_page: 20,
             filter_expression: Some(expression),
             ..Default::default()
@@ -249,7 +247,6 @@ fn test_search_by_field() {
     let request = DocumentSearchRequest {
         id: "shard".to_string(),
         body: "".to_string(),
-        page_number: 0,
         result_per_page: 20,
         filter_expression: Some(FilterExpression {
             expr: Some(nidx_protos::filter_expression::Expr::Field(FieldFilter {
@@ -273,7 +270,6 @@ fn test_faceted_search() {
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
             body: "".to_string(),
-            page_number: 0,
             result_per_page: 20,
             faceted: Some(facets.clone()),
             ..Default::default()
@@ -308,7 +304,6 @@ fn test_quote_fixing() {
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
             body: query.into(),
-            page_number: 0,
             result_per_page: 20,
             ..Default::default()
         };
@@ -331,7 +326,6 @@ fn test_search_with_min_score() {
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
             body: query.clone(),
-            page_number: 0,
             result_per_page: 20,
             min_score,
             ..Default::default()
@@ -356,7 +350,6 @@ fn test_int_order_pagination() {
     let request = DocumentSearchRequest {
         id: "shard".to_string(),
         body: "".to_string(),
-        page_number: 0,
         result_per_page: 1,
         order: Some(OrderBy {
             r#type: OrderType::Desc.into(),
@@ -390,7 +383,6 @@ fn test_timestamp_filtering() {
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
             body: "".to_string(),
-            page_number: 0,
             result_per_page: 10,
             min_score: f32::MIN,
             filter_expression: Some(FilterExpression {
@@ -430,7 +422,6 @@ fn test_key_filtering() {
     let request = DocumentSearchRequest {
         id: "shard".to_string(),
         body: "".to_string(),
-        page_number: 0,
         result_per_page: 1,
         min_score: f32::MIN,
         ..Default::default()
@@ -442,7 +433,6 @@ fn test_key_filtering() {
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
             body: "".to_string(),
-            page_number: 0,
             result_per_page: 10,
             min_score: f32::MIN,
             filter_expression: Some(FilterExpression {

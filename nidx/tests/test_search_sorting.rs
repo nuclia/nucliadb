@@ -105,7 +105,6 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
         page_size: i32,
     ) -> Vec<String> {
         let mut fields = Vec::new();
-        let mut page = 0;
         let mut next_page = true;
 
         while next_page {
@@ -116,7 +115,6 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
                     order: order.clone(),
                     document: true,
                     vectorset: "english".to_string(),
-                    page_number: page,
                     result_per_page: page_size,
                     ..Default::default()
                 })
@@ -127,7 +125,6 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
             fields.extend(document_response.results.iter().cloned().map(|r| r.field));
 
             next_page = document_response.next_page;
-            page += 1;
         }
 
         fields

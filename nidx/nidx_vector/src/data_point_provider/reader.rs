@@ -180,21 +180,21 @@ fn segment_matches(expression: &BooleanExpression<String>, labels: &HashSet<Stri
     }
 }
 
-impl SearchRequest for (usize, &VectorSearchRequest, Formula) {
+impl SearchRequest for (&VectorSearchRequest, Formula) {
     fn with_duplicates(&self) -> bool {
-        self.1.with_duplicates
+        self.0.with_duplicates
     }
     fn get_filter(&self) -> &Formula {
-        &self.2
+        &self.1
     }
     fn get_query(&self) -> &[f32] {
-        &self.1.vector
+        &self.0.vector
     }
     fn no_results(&self) -> usize {
-        self.0
+        self.0.result_per_page as usize
     }
     fn min_score(&self) -> f32 {
-        self.1.min_score
+        self.0.min_score
     }
 }
 
@@ -287,10 +287,6 @@ impl Reader {
         let time = Instant::now();
 
         let id = Some(&request.id);
-        let offset = request.result_per_page * request.page_number;
-        let total_to_get = offset + request.result_per_page;
-        let offset = offset as usize;
-        let total_to_get = total_to_get as usize;
 
         let mut formula = Formula::new();
 
@@ -313,66 +309,10 @@ impl Reader {
         }
 
         let v = time.elapsed().as_millis();
+        debug!("{id:?} - Searching: starts at {v} ms");
         let result = match self.config.vector_cardinality {
-            VectorCardinality::Single => {
-                let search_request = (total_to_get, request, formula);
-                debug!("{id:?} - Searching: starts at {v} ms");
-                self._search(&search_request, &request.segment_filtering_formula)?
-            }
-            VectorCardinality::Multi => {
-                let search_vectors = extract_multi_vectors(&request.vector, &self.config.vector_type)?;
-                debug!(
-                    "{id:?} - Multi-vector searching: starts at {v} ms with {} requests",
-                    search_vectors.len()
-                );
-                let encoded_query = search_vectors
-                    .iter()
-                    .map(|v| self.config.vector_type.encode(v))
-                    .collect::<Vec<_>>();
-
-                // Search for each vector in the query
-                let results = search_vectors
-                    .into_par_iter()
-                    .map(|v| {
-                        let mut subreq = request.clone();
-
-                        subreq.vector = v;
-                        // We are OK with duplicate individual vectors. We always deduplicate by paragraphs anyway (NodeFilter.paragraphs)
-                        subreq.with_duplicates = true;
-                        // We don't care about min_score in this first pass, we apply min_score on top of maxsim similarity
-                        subreq.min_score = f32::MIN;
-                        // Request at least a few vectors, since the rerank may offer different results later
-                        let total_to_get = total_to_get.max(10);
-
-                        let search_request = (total_to_get, &subreq, formula.clone());
-                        self._search(&search_request, &request.segment_filtering_formula)
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-
-                let v = time.elapsed().as_millis();
-                debug!("{id:?} - Multi-vector reranking: starts at {v} ms");
-
-                // Remove duplicates, we only want each paragraph once
-                let mut result_paragraphs = results.into_iter().flatten().collect::<Vec<_>>();
-                result_paragraphs.sort_unstable_by_key(|rp| rp.address);
-                result_paragraphs.dedup_by_key(|rp| rp.address);
-
-                // Score each paragraph using maxsim
-                let similarity_function = self.config.similarity_function();
-                let mut results = result_paragraphs
-                    .into_par_iter()
-                    .filter_map(|mut sp| {
-                        sp.score = maxsim_similarity(similarity_function, &encoded_query, &sp.vectors());
-                        (sp.score() > request.min_score).then_some(sp)
-                    })
-                    .collect::<Vec<_>>();
-
-                // Select top_k
-                results.sort_unstable_by(|a, b| b.score().partial_cmp(&a.score()).unwrap());
-                results.truncate(total_to_get);
-
-                results
-            }
+            VectorCardinality::Single => self.search_single_vector(request, formula)?,
+            VectorCardinality::Multi => self.search_multi_vector(request, formula)?,
         };
 
         let v = time.elapsed().as_millis();
@@ -382,9 +322,6 @@ impl Reader {
 
         let documents = result
             .into_iter()
-            .enumerate()
-            .filter(|(idx, _)| *idx >= offset)
-            .map(|(_, v)| v)
             .flat_map(DocumentScored::try_from)
             .collect::<Vec<_>>();
         let v = time.elapsed().as_millis();
@@ -396,9 +333,61 @@ impl Reader {
 
         Ok(VectorSearchResponse {
             documents,
-            page_number: request.page_number,
             result_per_page: request.result_per_page,
         })
+    }
+
+    fn search_single_vector(&self, request: &VectorSearchRequest, formula: Formula) -> VectorR<Vec<ScoredParagraph>> {
+        let search_request = (request, formula);
+        self._search(&search_request, &request.segment_filtering_formula)
+    }
+
+    fn search_multi_vector(&self, request: &VectorSearchRequest, formula: Formula) -> VectorR<Vec<ScoredParagraph>> {
+        let search_vectors = extract_multi_vectors(&request.vector, &self.config.vector_type)?;
+        let encoded_query = search_vectors
+            .iter()
+            .map(|v| self.config.vector_type.encode(v))
+            .collect::<Vec<_>>();
+
+        // Search for each vector in the query
+        let results = search_vectors
+            .into_par_iter()
+            .map(|v| {
+                let mut subreq = request.clone();
+
+                subreq.vector = v;
+                // We are OK with duplicate individual vectors. We always deduplicate by paragraphs anyway (NodeFilter.paragraphs)
+                subreq.with_duplicates = true;
+                // We don't care about min_score in this first pass, we apply min_score on top of maxsim similarity
+                subreq.min_score = f32::MIN;
+                // Request at least a few vectors, since the rerank may offer different results later
+                subreq.result_per_page = request.result_per_page.max(10);
+
+                let search_request = (&subreq, formula.clone());
+                self._search(&search_request, &request.segment_filtering_formula)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Remove duplicates, we only want each paragraph once
+        let mut result_paragraphs = results.into_iter().flatten().collect::<Vec<_>>();
+        result_paragraphs.sort_unstable_by_key(|rp| rp.address);
+        result_paragraphs.dedup_by_key(|rp| rp.address);
+
+        // Score each paragraph using maxsim
+        let similarity_function = self.config.similarity_function();
+        let mut results = result_paragraphs
+            .into_par_iter()
+            .filter_map(|mut sp| {
+                sp.score = maxsim_similarity(similarity_function, &encoded_query, &sp.vectors());
+                (sp.score() > request.min_score).then_some(sp)
+            })
+            .collect::<Vec<_>>();
+
+        // Select top_k
+        results.sort_unstable_by(|a, b| b.score().partial_cmp(&a.score()).unwrap());
+        results.truncate(request.result_per_page as usize);
+
+        Ok(results)
     }
 }
 
@@ -490,7 +479,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            page_number: 0,
             result_per_page: 20,
             with_duplicates: true,
             ..Default::default()
@@ -587,7 +575,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            page_number: 0,
             result_per_page: 20,
             with_duplicates: true,
             ..Default::default()
@@ -599,7 +586,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
             ..Default::default()
@@ -612,7 +598,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
             min_score: 900.0,
@@ -625,7 +610,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0],
-            page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
             ..Default::default()
@@ -701,7 +685,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            page_number: 0,
             result_per_page: 20,
             with_duplicates: true,
             ..Default::default()
@@ -713,7 +696,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
             ..Default::default()

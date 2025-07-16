@@ -183,7 +183,6 @@ fn test_total_number_of_results() -> anyhow::Result<()> {
         body: "".to_string(),
         faceted: None,
         order: None,
-        page_number: 0,
         result_per_page: 20,
         only_faceted: false,
         ..Default::default()
@@ -198,7 +197,6 @@ fn test_total_number_of_results() -> anyhow::Result<()> {
         body: "".to_string(),
         faceted: None,
         order: None,
-        page_number: 0,
         result_per_page: 0,
         only_faceted: false,
         ..Default::default()
@@ -230,7 +228,6 @@ fn test_filtered_search() -> anyhow::Result<()> {
         body: "".to_string(),
         faceted: None,
         order: None,
-        page_number: 0,
         result_per_page: 20,
         only_faceted: false,
         ..Default::default()
@@ -295,7 +292,6 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         body: "".to_string(),
         faceted: None,
         order: None,
-        page_number: 0,
         result_per_page: 20,
         only_faceted: false,
         ..Default::default()
@@ -310,7 +306,6 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         body: "".to_string(),
         faceted: None,
         order: None,
-        page_number: 0,
         result_per_page: 20,
         only_faceted: false,
         ..Default::default()
@@ -325,7 +320,6 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         body: "should enough".to_string(),
         faceted: None,
         order: None,
-        page_number: 0,
         result_per_page: 20,
         only_faceted: false,
         min_score: 30.0,
@@ -341,7 +335,6 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         body: "shoupd enaugh".to_string(),
         faceted: None,
         order: None,
-        page_number: 0,
         result_per_page: 20,
         only_faceted: false,
         ..Default::default()
@@ -356,7 +349,6 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         body: "\"should\" enaugh".to_string(),
         faceted: None,
         order: None,
-        page_number: 0,
         result_per_page: 20,
         only_faceted: false,
         ..Default::default()
@@ -371,7 +363,6 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         body: "shoupd enaugh".to_string(),
         faceted: None,
         order: None,
-        page_number: 0,
         result_per_page: 20,
         only_faceted: false,
         ..Default::default()
@@ -386,7 +377,6 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         body: "shoupd + enaugh\"".to_string(),
         faceted: None,
         order: None,
-        page_number: 0,
         result_per_page: 20,
         only_faceted: false,
         ..Default::default()
@@ -402,7 +392,6 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         body: "shoupd + enaugh".to_string(),
         faceted: None,
         order: None,
-        page_number: 0,
         result_per_page: 20,
         only_faceted: false,
         ..Default::default()
@@ -418,7 +407,6 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         body: "".to_string(),
         faceted: None,
         order: None,
-        page_number: 0,
         result_per_page: 20,
         only_faceted: false,
         ..Default::default()
@@ -433,7 +421,6 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         body: "this is the".to_string(),
         faceted: Some(faceted.clone()),
         order: Some(order),
-        page_number: 0,
         result_per_page: 20,
         only_faceted: false,
         ..Default::default()
@@ -448,7 +435,6 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         body: "\"shoupd\"".to_string(),
         faceted: None,
         order: None,
-        page_number: 0,
         result_per_page: 20,
         only_faceted: false,
         ..Default::default()

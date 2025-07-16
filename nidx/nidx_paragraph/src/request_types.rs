@@ -27,7 +27,6 @@ pub struct ParagraphSearchRequest {
     pub body: String,
     pub order: Option<nidx_protos::OrderBy>,
     pub faceted: Option<nidx_protos::Faceted>,
-    pub page_number: i32,
     pub result_per_page: i32,
     pub with_duplicates: bool,
     pub only_faceted: bool,
