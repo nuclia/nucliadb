@@ -17,9 +17,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use crate::config::VectorConfig;
+use crate::config::{VectorCardinality, VectorConfig};
 use crate::data_point::{self, Elem};
-use crate::{VectorSegmentMetadata, utils};
+use crate::{VectorErr, VectorSegmentMetadata, utils};
 use nidx_protos::{noderesources, prost::*};
 use std::collections::HashMap;
 use std::path::Path;
@@ -114,6 +114,7 @@ pub fn index_resource(
 
     let mut elems = Vec::new();
     let normalize_vectors = config.normalize_vectors;
+    let vector_dimension = config.vector_type.dimension();
     for (_, field_paragraphs) in resource.fields() {
         for paragraph in field_paragraphs {
             for (key, sentence) in paragraph.vectors.iter().clone() {
@@ -124,7 +125,29 @@ pub fn index_resource(
                     sentence.vector.clone()
                 };
                 let metadata = sentence.metadata.as_ref().map(|m| m.encode_to_vec());
-                elems.push(Elem::new(key, vector, paragraph.labels.clone(), metadata));
+
+                match config.vector_cardinality {
+                    VectorCardinality::Single => elems.push(Elem::new(key, vector, paragraph.labels.clone(), metadata)),
+                    VectorCardinality::Multi => {
+                        if vector.len() % vector_dimension != 0 {
+                            return Err(VectorErr::InconsistentDimensions {
+                                index_config: vector_dimension,
+                                vector: vector.len(),
+                            }
+                            .into());
+                        }
+                        let mut vectors = vec![];
+                        for idx in 0..vector.len() / vector_dimension {
+                            vectors.push(vector[idx * vector_dimension..(idx + 1) * vector_dimension].to_vec());
+                        }
+                        elems.push(Elem::new_multivector(
+                            key.clone(),
+                            vectors,
+                            paragraph.labels.clone(),
+                            metadata.clone(),
+                        ));
+                    }
+                };
             }
         }
     }

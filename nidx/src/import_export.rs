@@ -257,6 +257,7 @@ mod tests {
 
     use nidx_tests::little_prince;
     use nidx_vector::config::Similarity;
+    use nidx_vector::config::VectorCardinality;
     use nidx_vector::config::VectorConfig;
     use nidx_vector::config::VectorType;
     use object_store::ObjectStore;
@@ -280,6 +281,7 @@ mod tests {
         normalize_vectors: false,
         vector_type: VectorType::DenseF32 { dimension: 3 },
         flags: vec![],
+        vector_cardinality: VectorCardinality::Single,
     };
 
     #[sqlx::test]

@@ -22,7 +22,10 @@ mod common;
 
 use common::{TestOpener, resource};
 use nidx_types::{prefilter::PrefilterResult, query_language::BooleanExpression};
-use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher, config::VectorConfig};
+use nidx_vector::{
+    VectorIndexer, VectorSearchRequest, VectorSearcher,
+    config::{VectorCardinality, VectorConfig},
+};
 use std::collections::HashSet;
 use tempfile::tempdir;
 
@@ -33,6 +36,7 @@ fn test_hidden_search() -> anyhow::Result<()> {
         similarity: nidx_vector::config::Similarity::Dot,
         vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 4 },
         flags: vec![],
+        vector_cardinality: VectorCardinality::Single,
     };
 
     // Create two resources, one hidden and one not
