@@ -329,28 +329,47 @@ impl Reader {
                     .iter()
                     .map(|v| self.config.vector_type.encode(v))
                     .collect::<Vec<_>>();
+
+                // Search for each vector in the query
                 let results = search_vectors
                     .into_par_iter()
                     .map(|v| {
                         let mut subreq = request.clone();
+
                         subreq.vector = v;
+                        // We are OK with duplicate individual vectors. We always deduplicate by paragraphs anyway (NodeFilter.paragraphs)
+                        subreq.with_duplicates = true;
+                        // We don't care about min_score in this first pass, we apply min_score on top of maxsim similarity
+                        subreq.min_score = f32::MIN;
+                        // Request at least a few vectors, since the rerank may offer different results later
+                        let total_to_get = total_to_get.max(10);
+
                         let search_request = (total_to_get, &subreq, formula.clone());
                         self._search(&search_request, &request.segment_filtering_formula)
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                let v = time.elapsed().as_millis();
 
+                let v = time.elapsed().as_millis();
                 debug!("{id:?} - Multi-vector reranking: starts at {v} ms");
+
+                // Remove duplicates, we only want each paragraph once
+                let mut result_paragraphs = results.into_iter().flatten().collect::<Vec<_>>();
+                result_paragraphs.sort_unstable_by_key(|rp| rp.address);
+                result_paragraphs.dedup_by_key(|rp| rp.address);
+
+                // Score each paragraph using maxsim
                 let similarity_function = self.config.similarity_function();
-                let mut results = results
+                let mut results = result_paragraphs
                     .into_par_iter()
-                    .flatten()
-                    .map(|mut sp| {
+                    .filter_map(|mut sp| {
                         sp.score = maxsim_similarity(similarity_function, &encoded_query, &sp.vectors());
-                        sp
+                        (sp.score() > request.min_score).then_some(sp)
                     })
                     .collect::<Vec<_>>();
-                results.sort_by(|a, b| a.score().partial_cmp(&b.score()).unwrap());
+
+                // Select top_k
+                results.sort_unstable_by(|a, b| b.score().partial_cmp(&a.score()).unwrap());
+                results.truncate(total_to_get);
 
                 results
             }

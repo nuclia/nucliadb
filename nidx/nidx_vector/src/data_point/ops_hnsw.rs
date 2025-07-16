@@ -82,7 +82,7 @@ pub type Neighbours = Vec<(Address, f32)>;
 struct NodeFilter<'a, DR> {
     retriever: &'a DR,
     filter: &'a FilterBitSet,
-    blocked_addresses: &'a FxHashSet<Address>,
+    paragraphs: FxHashSet<ParagraphAddr>,
     vec_counter: RepCounter<'a>,
 }
 
@@ -93,10 +93,17 @@ impl<DR: DataRetriever> NodeFilter<'_, DR> {
 
     pub fn is_valid(&self, n: Address, score: f32) -> bool {
         !score.is_nan()
-        // The vector is blocked, meaning that its key is part of the current version of the solution
-        && !self.blocked_addresses.contains(&n)
-        // The number of times this vector appears is 0
+        // Reject the candidate if we already have a result for the same paragraph
+        && !self.paragraphs.contains(&self.retriever.paragraph(n))
+        // Reject the candidate if we already have a result with an identical vector
         && self.vec_counter.get(self.retriever.get_vector(n)) == 0
+    }
+
+    /// Adds a result so that further candidates with the same vector
+    /// or paragraph will get rejected.
+    pub fn add_result(&mut self, n: Address) {
+        self.paragraphs.insert(self.retriever.paragraph(n));
+        self.vec_counter.add(self.retriever.get_vector(n));
     }
 }
 
@@ -194,8 +201,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
 
             let paragraph_addr = self.retriever.paragraph(candidate);
             if filter.is_valid(candidate, candidate_similarity) && filter.passes_formula(paragraph_addr) {
-                let candidate_vector = self.retriever.get_vector(candidate);
-                filter.vec_counter.add(candidate_vector);
+                filter.add_result(candidate);
                 results.push((candidate, candidate_similarity));
             }
 
@@ -354,7 +360,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let filter = NodeFilter {
             filter: with_filter,
             retriever: self.retriever,
-            blocked_addresses: &Default::default(),
+            paragraphs: Default::default(),
             vec_counter: RepCounter::new(!with_duplicates),
         };
         let layer_zero = hnsw.get_layer(0);

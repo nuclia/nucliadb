@@ -31,6 +31,7 @@ use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, ParagraphRef, Vecto
 use crate::formula::Formula;
 use crate::inverted_index::{FilterBitSet, InvertedIndexes, build_indexes};
 use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
+use core::f32;
 use disk_hnsw::DiskHnsw;
 use io::{BufWriter, Write};
 use memmap2::Mmap;
@@ -507,12 +508,20 @@ impl OpenDataPoint {
             let mut scored_results = Vec::new();
             for paragraph_addr in bitset.iter() {
                 let paragraph = data_store.get_paragraph(paragraph_addr);
-                for vector_addr in paragraph.vectors(&paragraph_addr) {
-                    let address = vector_addr.into();
-                    let score = retriever.similarity(query_address, address);
-                    if score >= min_score {
-                        scored_results.push(Reverse(Cnx(address, score)));
-                    }
+
+                // Only return the best vector match per paragraph
+                let best_vector_score = paragraph
+                    .vectors(&paragraph_addr)
+                    .map(|va| {
+                        let address = va.into();
+                        let score = retriever.similarity(query_address, address);
+                        Cnx(address, score)
+                    })
+                    .max_by(|v, w| v.1.total_cmp(&w.1))
+                    .unwrap();
+
+                if best_vector_score.1 >= min_score {
+                    scored_results.push(Reverse(best_vector_score));
                 }
             }
             scored_results.sort();
