@@ -24,9 +24,10 @@ use crate::data_point::OpenDataPoint;
 use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
 use crate::data_store::ParagraphRef;
+use crate::multivector::extract_multi_vectors;
+use crate::multivector::maxsim_similarity;
 use crate::request_types::VectorSearchRequest;
 use crate::utils;
-use crate::vector_types::dense_f32;
 use crate::{VectorErr, VectorR};
 use crate::{formula::*, query_io};
 use nidx_protos::prost::*;
@@ -319,13 +320,15 @@ impl Reader {
                 self._search(&search_request, &request.segment_filtering_formula)?
             }
             VectorCardinality::Multi => {
-                let search_vectors: Vec<_> = (0..32)
-                    .map(|i| request.vector[i * 128..(i + 1) * 128].to_vec())
-                    .collect();
+                let search_vectors = extract_multi_vectors(&request.vector, &self.config.vector_type)?;
                 debug!(
                     "{id:?} - Multi-vector searching: starts at {v} ms with {} requests",
                     search_vectors.len()
                 );
+                let encoded_query = search_vectors
+                    .iter()
+                    .map(|v| self.config.vector_type.encode(v))
+                    .collect::<Vec<_>>();
                 let results = search_vectors
                     .into_par_iter()
                     .map(|v| {
@@ -338,35 +341,16 @@ impl Reader {
                 let v = time.elapsed().as_millis();
 
                 debug!("{id:?} - Multi-vector reranking: starts at {v} ms");
+                let similarity_function = self.config.similarity_function();
                 let mut results = results
                     .into_par_iter()
                     .flatten()
                     .map(|mut sp| {
-                        let mut summaxsim = 0.0;
-                        for iq in 0..32 {
-                            let q = &request.vector[iq * 128..(iq + 1) * 128];
-                            let encoded_q = &dense_f32::encode_vector(q);
-                            let mut maxsim = 0.0;
-                            for vec in sp.vectors() {
-                                let sim = dense_f32::dot_similarity(vec, encoded_q);
-                                if sim > maxsim {
-                                    maxsim = sim
-                                }
-                            }
-                            summaxsim += maxsim;
-                        }
-                        sp.score = summaxsim;
+                        sp.score = maxsim_similarity(similarity_function, &encoded_query, &sp.vectors());
                         sp
                     })
                     .collect::<Vec<_>>();
                 results.sort_by(|a, b| a.score().partial_cmp(&b.score()).unwrap());
-                println!(
-                    "{:?}",
-                    results
-                        .iter()
-                        .map(|x| (x.score(), x.address, x.id()))
-                        .collect::<Vec<_>>()
-                );
 
                 results
             }

@@ -123,6 +123,7 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
                 dimension: dim as usize,
             },
         };
+        // TODO: Add support for multivectors. It is incompatible with vector normalization for now
         Ok(VectorConfig {
             similarity: proto.similarity().into(),
             normalize_vectors: proto.normalize_vectors,
