@@ -91,13 +91,6 @@ pub trait DataStore: Sync + Send {
     fn get_vector(&self, id: VectorAddr) -> VectorRef;
     fn will_need(&self, id: VectorAddr);
     fn as_any(&self) -> &dyn Any;
-    // fn open(path: &Path) -> std::io::Result<Self>;
-    // fn create(path: &Path, slots: Vec<Elem>, vector_type: &VectorType) -> std::io::Result<()>;
-    // fn merge(
-    //     path: &Path,
-    //     segments: &mut [(impl Iterator<Item = usize>, &Self)],
-    //     config: &VectorConfig,
-    // ) -> std::io::Result<bool>;
 }
 
 pub fn iter_paragraphs(data_store: &impl DataStore) -> impl Iterator<Item = ParagraphAddr> {
