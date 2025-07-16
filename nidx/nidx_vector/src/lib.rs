@@ -26,6 +26,7 @@ mod data_types;
 mod formula;
 mod indexer;
 mod inverted_index;
+mod multivector;
 mod query_io;
 mod request_types;
 mod utils;
