@@ -24,8 +24,9 @@ use std::time::Instant;
 use tempfile::tempdir;
 
 use crate::VectorR;
-use crate::config::{Similarity, VectorConfig};
+use crate::config::{Similarity, VectorConfig, flags};
 use crate::data_point::{self, Elem};
+use crate::data_store::{DataStoreV1, DataStoreV2};
 use crate::formula::{AtomClause, Clause, Formula};
 
 const CONFIG: VectorConfig = VectorConfig {
@@ -150,14 +151,17 @@ fn data_merge() -> anyhow::Result<()> {
 
     let dp0_path = tempdir()?;
     let dp0 = data_point::create(dp0_path.path(), elems0, &CONFIG, HashSet::new()).unwrap();
+    assert!(dp0.data_store.as_any().downcast_ref::<DataStoreV1>().is_some());
 
     let dp1_path = tempdir()?;
     let dp1 = data_point::create(dp1_path.path(), elems1, &CONFIG, HashSet::new()).unwrap();
+    assert!(dp1.data_store.as_any().downcast_ref::<DataStoreV1>().is_some());
 
     let work = &[&dp1, &dp0];
 
     let dp_path = tempdir()?;
     let dp = data_point::merge(dp_path.path(), work, &CONFIG).unwrap();
+    assert!(dp.data_store.as_any().downcast_ref::<DataStoreV1>().is_some());
 
     let formula = Formula::new();
     let result: Vec<_> = dp.search(&vector1, &formula, true, 1, &CONFIG, -1.0).collect();
@@ -178,6 +182,108 @@ fn data_merge() -> anyhow::Result<()> {
 
     let dp_path = tempdir()?;
     let dp = data_point::merge(dp_path.path(), work, &CONFIG).unwrap();
+
+    assert_eq!(dp.metadata.records, 0);
+
+    Ok(())
+}
+
+#[test]
+fn data_merge_v2() -> anyhow::Result<()> {
+    let key0 = "9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string();
+    let vector0 = create_query();
+    let elems0 = vec![Elem::new(key0.clone(), vector0.clone(), vec![], None)];
+    let key1 = "29ee1f6e4585423585f31ded0202ee3a/f/field/0-100".to_string();
+    let vector1 = create_query();
+    let elems1 = vec![Elem::new(key1.clone(), vector1.clone(), vec![], None)];
+
+    let mut v2_config = CONFIG.clone();
+    v2_config.flags.push(flags::DATA_STORE_V2.to_string());
+
+    let dp0_path = tempdir()?;
+    let dp0 = data_point::create(dp0_path.path(), elems0, &v2_config, HashSet::new()).unwrap();
+    assert!(dp0.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
+
+    let dp1_path = tempdir()?;
+    let dp1 = data_point::create(dp1_path.path(), elems1, &v2_config, HashSet::new()).unwrap();
+    assert!(dp1.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
+
+    let work = &[&dp1, &dp0];
+
+    let dp_path = tempdir()?;
+    let dp = data_point::merge(dp_path.path(), work, &v2_config).unwrap();
+    assert!(dp.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
+
+    let formula = Formula::new();
+    let result: Vec<_> = dp.search(&vector1, &formula, true, 1, &v2_config, -1.0).collect();
+    assert_eq!(result.len(), 1);
+    assert!(result[0].score() >= 0.9);
+    assert!(dp.get_paragraph(result[0].paragraph()).id() == key1);
+    let result: Vec<_> = dp.search(&vector0, &formula, true, 1, &v2_config, -1.0).collect();
+    assert_eq!(result.len(), 1);
+    assert!(result[0].score() >= 0.9);
+    assert!(dp.get_paragraph(result[0].paragraph()).id() == key0);
+    let mut dp0 = data_point::open(dp0.metadata, &v2_config).unwrap();
+    let mut dp1 = data_point::open(dp1.metadata, &v2_config).unwrap();
+    dp0.apply_deletion(&key0);
+    dp0.apply_deletion(&key1);
+    dp1.apply_deletion(&key0);
+    dp1.apply_deletion(&key1);
+    let work = &[&dp1, &dp0];
+
+    let dp_path = tempdir()?;
+    let dp = data_point::merge(dp_path.path(), work, &v2_config).unwrap();
+
+    assert_eq!(dp.metadata.records, 0);
+
+    Ok(())
+}
+
+#[test]
+fn data_merge_mixed() -> anyhow::Result<()> {
+    let key0 = "9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string();
+    let vector0 = create_query();
+    let elems0 = vec![Elem::new(key0.clone(), vector0.clone(), vec![], None)];
+    let key1 = "29ee1f6e4585423585f31ded0202ee3a/f/field/0-100".to_string();
+    let vector1 = create_query();
+    let elems1 = vec![Elem::new(key1.clone(), vector1.clone(), vec![], None)];
+
+    let mut v2_config = CONFIG.clone();
+    v2_config.flags.push(flags::DATA_STORE_V2.to_string());
+
+    let dp0_path = tempdir()?;
+    let dp0 = data_point::create(dp0_path.path(), elems0, &CONFIG, HashSet::new()).unwrap();
+    assert!(dp0.data_store.as_any().downcast_ref::<DataStoreV1>().is_some());
+
+    let dp1_path = tempdir()?;
+    let dp1 = data_point::create(dp1_path.path(), elems1, &v2_config, HashSet::new()).unwrap();
+    assert!(dp1.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
+
+    let work = &[&dp1, &dp0];
+
+    let dp_path = tempdir()?;
+    let dp = data_point::merge(dp_path.path(), work, &v2_config).unwrap();
+    assert!(dp.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
+
+    let formula = Formula::new();
+    let result: Vec<_> = dp.search(&vector1, &formula, true, 1, &v2_config, -1.0).collect();
+    assert_eq!(result.len(), 1);
+    assert!(result[0].score() >= 0.9);
+    assert!(dp.get_paragraph(result[0].paragraph()).id() == key1);
+    let result: Vec<_> = dp.search(&vector0, &formula, true, 1, &v2_config, -1.0).collect();
+    assert_eq!(result.len(), 1);
+    assert!(result[0].score() >= 0.9);
+    assert!(dp.get_paragraph(result[0].paragraph()).id() == key0);
+    let mut dp0 = data_point::open(dp0.metadata, &v2_config).unwrap();
+    let mut dp1 = data_point::open(dp1.metadata, &v2_config).unwrap();
+    dp0.apply_deletion(&key0);
+    dp0.apply_deletion(&key1);
+    dp1.apply_deletion(&key0);
+    dp1.apply_deletion(&key1);
+    let work = &[&dp1, &dp0];
+
+    let dp_path = tempdir()?;
+    let dp = data_point::merge(dp_path.path(), work, &v2_config).unwrap();
 
     assert_eq!(dp.metadata.records, 0);
 
