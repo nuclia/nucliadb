@@ -21,7 +21,7 @@
 use std::io;
 
 use super::trie_ram::*;
-use super::usize_utils::*;
+use crate::data_types::usize_utils::*;
 
 const ADJ_HEADER: usize = 1 + USIZE_LEN;
 const EDGE_LEN: usize = 1 + USIZE_LEN;

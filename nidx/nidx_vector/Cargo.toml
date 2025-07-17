@@ -22,6 +22,7 @@ fxhash = "0.2.1"
 stream-vbyte = "0.4.1"
 fst = "0.4.7"
 bit-vec = "0.8.0"
+bincode = "2.0.1"
 
 [target.'cfg(not(all(target_os="linux",target_arch="aarch64")))'.dependencies]
 simsimd = "4.3.1"

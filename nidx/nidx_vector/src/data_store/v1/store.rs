@@ -20,6 +20,7 @@
 
 use super::node::Node;
 use crate::config::{VectorConfig, VectorType};
+use crate::data_store::ParagraphAddr;
 use crate::data_types::usize_utils::*;
 use lazy_static::lazy_static;
 use std::fs::File;
@@ -149,7 +150,7 @@ pub fn create_key_value<D: IntoBuffer>(
 // Merge algorithm. Returns the number of elements merged into the file.
 pub fn merge(
     recipient: &mut File,
-    segments: &mut [(impl Iterator<Item = usize>, &[u8])],
+    segments: &mut [(impl Iterator<Item = ParagraphAddr>, &[u8])],
     config: &VectorConfig,
 ) -> io::Result<bool> {
     // Number of elements, deleted or alive.
@@ -178,6 +179,7 @@ pub fn merge(
     let alignment = config.vector_type.vector_alignment();
     for (alive_ids, store) in segments {
         for element_cursor in alive_ids {
+            let element_cursor = element_cursor.0 as usize;
             let element_pointer = get_pointer(store, element_cursor);
             let element_slice = &store[element_pointer..];
             // Moving to the end of the file to write the current element.
@@ -209,12 +211,13 @@ pub fn merge(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data_point::{Elem, LabelDictionary};
+    use crate::data_point::Elem;
 
     const VECTOR_CONFIG: VectorConfig = VectorConfig {
         vector_type: VectorType::DenseF32 { dimension: 3 },
         similarity: crate::config::Similarity::Dot,
         normalize_vectors: false,
+        flags: vec![],
     };
 
     #[test]
@@ -234,12 +237,7 @@ mod tests {
     }
 
     fn create_elem(num: &usize) -> Elem {
-        Elem::new(
-            num.to_string(),
-            [*num as f32; 16].to_vec(),
-            LabelDictionary::default(),
-            None,
-        )
+        Elem::new(num.to_string(), [*num as f32; 16].to_vec(), vec![], None)
     }
 
     #[test]
@@ -263,9 +261,9 @@ mod tests {
 
         let mut merge_store = tempfile::tempfile().unwrap();
         let mut elems = vec![
-            (0..3, v0_map.as_ref()),
-            (0..3, v1_map.as_ref()),
-            (0..4, v2_map.as_ref()),
+            ((0..3).map(ParagraphAddr), v0_map.as_ref()),
+            ((0..3).map(ParagraphAddr), v1_map.as_ref()),
+            ((0..4).map(ParagraphAddr), v2_map.as_ref()),
         ];
 
         merge(&mut merge_store, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
@@ -273,7 +271,7 @@ mod tests {
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(&merge_map, i))
-            .map(|s| std::str::from_utf8(s.key()).unwrap().parse().unwrap())
+            .map(|s| s.key().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -302,11 +300,11 @@ mod tests {
         let mut merge_store = tempfile::tempfile().unwrap();
         let mut elems = vec![
             // zero and 1 will be removed
-            (2..3, v0_map.as_ref()),
+            ((2..3).map(ParagraphAddr), v0_map.as_ref()),
             // no element is removed
-            (0..4, v1_map.as_ref()),
+            ((0..4).map(ParagraphAddr), v1_map.as_ref()),
             // no element is removed
-            (0..5, v2_map.as_ref()),
+            ((0..5).map(ParagraphAddr), v2_map.as_ref()),
         ];
 
         merge(&mut merge_store, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
@@ -315,7 +313,7 @@ mod tests {
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(&merge_map, i))
-            .map(|s| std::str::from_utf8(s.key()).unwrap().parse().unwrap())
+            .map(|s| s.key().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -343,11 +341,11 @@ mod tests {
         let mut merge_store = tempfile::tempfile().unwrap();
         let mut elems = vec![
             // zero and 1 will be removed
-            (2..3, v0_map.as_ref()),
+            ((2..3).map(ParagraphAddr), v0_map.as_ref()),
             // no element is removed
-            (0..3, v1_map.as_ref()),
+            ((0..3).map(ParagraphAddr), v1_map.as_ref()),
             // no element is removed
-            (0..3, v2_map.as_ref()),
+            ((0..3).map(ParagraphAddr), v2_map.as_ref()),
         ];
 
         merge(&mut merge_store, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
@@ -356,7 +354,7 @@ mod tests {
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(&merge_map, i))
-            .map(|s| std::str::from_utf8(s.key()).unwrap().parse().unwrap())
+            .map(|s| s.key().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -384,11 +382,11 @@ mod tests {
         let mut merge_store = tempfile::tempfile().unwrap();
         let mut elems = vec![
             // The first element is deleted
-            (1..3, v0_map.as_ref()),
+            ((1..3).map(ParagraphAddr), v0_map.as_ref()),
             // The first element is deleted
-            (1..3, v1_map.as_ref()),
+            ((1..3).map(ParagraphAddr), v1_map.as_ref()),
             // The first element is deleted
-            (1..3, v2_map.as_ref()),
+            ((1..3).map(ParagraphAddr), v2_map.as_ref()),
         ];
 
         merge(&mut merge_store, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
@@ -397,7 +395,7 @@ mod tests {
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(&merge_map, i))
-            .map(|s| std::str::from_utf8(s.key()).unwrap().parse().unwrap())
+            .map(|s| s.key().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -425,11 +423,11 @@ mod tests {
         let mut merge_storage = tempfile::tempfile().unwrap();
         let mut elems = vec![
             // all the elements are deleted
-            (0..0, v0_map.as_ref()),
+            ((0..0).map(ParagraphAddr), v0_map.as_ref()),
             // no element is removed
-            (0..3, v1_map.as_ref()),
+            ((0..3).map(ParagraphAddr), v1_map.as_ref()),
             // no element is removed
-            (0..3, v2_map.as_ref()),
+            ((0..3).map(ParagraphAddr), v2_map.as_ref()),
         ];
 
         merge(&mut merge_storage, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
@@ -438,7 +436,7 @@ mod tests {
         let number_of_elements = stored_elements(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(&merge_store, i))
-            .map(|s| std::str::from_utf8(s.key()).unwrap().parse().unwrap())
+            .map(|s| s.key().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -467,11 +465,11 @@ mod tests {
 
         let mut elems = vec![
             // all the elements are removed
-            (0..0, v0_map.as_ref()),
+            ((0..0).map(ParagraphAddr), v0_map.as_ref()),
             // all the elements are removed
-            (0..0, v1_map.as_ref()),
+            ((0..0).map(ParagraphAddr), v1_map.as_ref()),
             // all the elements are removed
-            (0..0, v2_map.as_ref()),
+            ((0..0).map(ParagraphAddr), v2_map.as_ref()),
         ];
 
         merge(&mut file, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
@@ -480,7 +478,7 @@ mod tests {
         let number_of_elements = stored_elements(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(&merge_store, i))
-            .map(|s| std::str::from_utf8(s.key()).unwrap().parse().unwrap())
+            .map(|s| s.key().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());

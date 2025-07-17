@@ -44,15 +44,23 @@ const DIMENSION: usize = 64;
 fn test_basic_search(
     #[values(Similarity::Dot, Similarity::Cosine)] similarity: Similarity,
     #[values(VectorType::DenseF32 { dimension: DIMENSION })] vector_type: VectorType,
+    #[values(false, true)] data_store_v2: bool,
 ) -> anyhow::Result<()> {
     use common::{TestOpener, resource};
     use nidx_types::prefilter::PrefilterResult;
     use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher};
 
+    let flags = if data_store_v2 {
+        vec![flags::DATA_STORE_V2.to_string()]
+    } else {
+        vec![]
+    };
+
     let config = VectorConfig {
         similarity,
         vector_type,
         normalize_vectors: false,
+        flags,
     };
 
     // Creates a resource with some orthogonal vectors, to test search
@@ -152,6 +160,7 @@ fn test_deletions() -> anyhow::Result<()> {
         similarity: Similarity::Dot,
         vector_type: VectorType::DenseF32 { dimension: 4 },
         normalize_vectors: false,
+        flags: vec![],
     };
 
     // Creates a couple of resources
@@ -227,6 +236,7 @@ fn test_filtered_search() -> anyhow::Result<()> {
         similarity: Similarity::Dot,
         vector_type: VectorType::DenseF32 { dimension: 4 },
         normalize_vectors: false,
+        flags: vec![],
     };
 
     // Create 4 resources
