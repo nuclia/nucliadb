@@ -28,7 +28,7 @@ use std::{
 
 use crate::{
     config::VectorType,
-    data_store::{ParagraphAddr, VectorAddr, VectorRef},
+    data_store::{OpenReason, ParagraphAddr, VectorAddr, VectorRef},
     data_types::usize_utils::U32_LEN,
 };
 
@@ -53,13 +53,16 @@ fn padding_bytes(vector_type: &VectorType) -> usize {
 }
 
 impl VectorStore {
-    pub fn open(path: &Path, vector_type: &VectorType) -> std::io::Result<Self> {
+    pub fn open(path: &Path, vector_type: &VectorType, reason: &OpenReason) -> std::io::Result<Self> {
         let data = unsafe { Mmap::map(&File::open(path.join(FILENAME))?)? };
 
-        // TODO: Maybe different flags for read (random) and merge (sequential / willneed)
         #[cfg(not(target_os = "windows"))]
         {
-            data.advise(memmap2::Advice::Random)?;
+            let advice = match reason {
+                OpenReason::Create => memmap2::Advice::Sequential,
+                OpenReason::Search => memmap2::Advice::Random,
+            };
+            data.advise(advice)?;
         }
 
         let padding_bytes = padding_bytes(vector_type);

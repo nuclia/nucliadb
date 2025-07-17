@@ -209,6 +209,11 @@ impl ParagraphReaderService {
         Ok(response)
     }
     fn adapt_text(&self, parser: &QueryParser, text: &str) -> String {
+        // FIXME: after migrating from tantivy 0.22 -> 0.24, the query grammar
+        // now includes single quotes as special character. Queries having a
+        // single single quote now fail to parse. As a quick fix, we remove them
+        // all and replace them by a space.
+        let text = text.replace('\'', " ");
         match text.trim() {
             "" => text.to_string(),
             text => parser

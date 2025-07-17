@@ -153,6 +153,7 @@ message Message {
 message Conversation {
     repeated Message messages = 1;
     string extract_strategy = 2;
+    string split_strategy = 3;
 }
 
 message FieldConversation {
@@ -163,6 +164,7 @@ message FieldConversation {
     // Total number of messages
     int32 total = 3;
     string extract_strategy = 4;
+    string split_strategy = 5;
 }
 
 message NestedPosition {
@@ -422,6 +424,7 @@ message FieldText {
 
     FieldAuthor generated_by = 4;
     string extract_strategy = 5;
+    string split_strategy = 6;
 }
 
 message Block {
@@ -492,6 +495,7 @@ message FieldLink {
     string css_selector = 7;
     string xpath = 8;
     string extract_strategy = 9;
+    string split_strategy = 10;
 
 }
 
@@ -505,6 +509,7 @@ message FieldFile {
     string url = 5;
     map<string, string> headers = 6;
     string extract_strategy = 7;
+    string split_strategy = 10;
 }
 
 

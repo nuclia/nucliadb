@@ -20,7 +20,7 @@
 
 use crate::{VectorR, config::VectorType, data_point::Elem};
 
-use super::{DataStore, ParagraphAddr, VectorAddr};
+use super::{DataStore, OpenReason, ParagraphAddr, VectorAddr};
 pub use paragraph_store::StoredParagraph;
 use paragraph_store::{ParagraphStore, ParagraphStoreWriter};
 use std::path::Path;
@@ -35,10 +35,10 @@ pub struct DataStoreV2 {
 }
 
 impl DataStoreV2 {
-    pub fn open(path: &Path, vector_type: &VectorType) -> std::io::Result<Self> {
+    pub fn open(path: &Path, vector_type: &VectorType, reason: OpenReason) -> std::io::Result<Self> {
         Ok(Self {
-            vectors: VectorStore::open(path, vector_type)?,
-            paragraphs: ParagraphStore::open(path)?,
+            vectors: VectorStore::open(path, vector_type, &reason)?,
+            paragraphs: ParagraphStore::open(path, &reason)?,
         })
     }
 
