@@ -1102,6 +1102,97 @@ async def test_file_computed_titles_are_set_on_resource_title(
 
 
 @pytest.mark.deploy_modes("standalone")
+async def test_link_computed_titles_are_automatically_set_to_resource_title(
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox,
+):
+    # Create a resource with a link field (no title set)
+    kbid = standalone_knowledgebox
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "link": {
+                "mylink": {
+                    "uri": "https://wikipedia.org/Lionel_Messi",
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    # Simulate processing link extracted data with a computed title
+    extracted_title = "Lionel Messi - Wikipedia (computed)"
+    bm = BrokerMessage()
+    bm.type = BrokerMessage.MessageType.AUTOCOMMIT
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    bm.uuid = rid
+    bm.kbid = kbid
+    bm.link_extracted_data.append(LinkExtractedData(field="mylink", title=extracted_title))
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    # Check that the resource title changed
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
+    assert resp.status_code == 200
+    assert resp.json()["title"] == extracted_title
+
+    # Now test that if the title is changed on creation, it is not overwritten
+    kbid = standalone_knowledgebox
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Luis Suarez - Wikipedia",
+            "link": {
+                "mylink": {
+                    "uri": "https://wikipedia.org/Luis_Suarez",
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    rid2 = resp.json()["uuid"]
+
+    # Simulate processing link extracted data with a computed title
+    extracted_title = "Luis Suarez - Wikipedia (computed)"
+    bm = BrokerMessage()
+    bm.type = BrokerMessage.MessageType.AUTOCOMMIT
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    bm.uuid = rid2
+    bm.kbid = kbid
+    bm.link_extracted_data.append(
+        LinkExtractedData(
+            field="mylink",
+            title=extracted_title,
+        )
+    )
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    # Check that the resource title changed
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid2}")
+    assert resp.status_code == 200
+    title = resp.json()["title"]
+    assert title != extracted_title
+    assert title == "Luis Suarez - Wikipedia"
+
+    # Now check that if the override_title flag is set on reprocess endpoint, the title is changed
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resource/{rid2}/reprocess",
+        params={"override_title": True},
+    )
+    assert resp.status_code == 202, resp.text
+
+    # Simulate processing link extracted data with a computed title
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    # Check that the resource title changed
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid2}")
+    assert resp.status_code == 200
+    assert resp.json()["title"] == extracted_title
+
+
+@pytest.mark.deploy_modes("standalone")
 async def test_jsonl_text_field(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,

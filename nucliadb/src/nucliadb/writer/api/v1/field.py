@@ -28,6 +28,7 @@ import nucliadb_models as models
 from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.utils import CLEAR_TITLE_FLAG
 from nucliadb.models.internal.processing import PushPayload, Source
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.constants import (
@@ -541,6 +542,7 @@ async def reprocess_file_field(
     field_id: FieldIdString,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
     x_file_password: Annotated[Optional[str], X_FILE_PASSWORD] = None,
+    override_title: bool = False,
 ) -> ResourceUpdated:
     await maybe_back_pressure(kbid, resource_uuid=rid)
 
@@ -590,6 +592,8 @@ async def reprocess_file_field(
     writer.kbid = kbid
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
+    if override_title:
+        writer.basic.title = CLEAR_TITLE_FLAG
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
     writer.field_statuses.append(

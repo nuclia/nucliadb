@@ -64,7 +64,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess: PushPayload):
     bm.basic.modified.FromDatetime(datetime.now())
-    if item.title:
+    if item.title is not None:
         set_title(bm, toprocess, item.title)
     if item.summary:
         bm.basic.summary = item.summary

@@ -37,6 +37,7 @@ from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.brain_v2 import FilePagePositions
 from nucliadb.ingest.orm.metrics import processor_observer
+from nucliadb.ingest.orm.utils import CLEAR_TITLE_FLAG
 from nucliadb_models import content_types
 from nucliadb_models.common import CloudLink
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
@@ -165,6 +166,10 @@ class Resource:
                     payload.ClearField(field)  # type: ignore
 
             self.basic.MergeFrom(payload)
+
+            # Make sure title is cleared
+            if self.basic.title == CLEAR_TITLE_FLAG:
+                self.basic.title = ""
 
             # Prevent duplicated languages
             unique_languages = set(self.basic.metadata.languages)
@@ -620,7 +625,11 @@ class Resource:
         assert self.basic is not None
         if not link_extracted_data.title:
             return
-        if not (self.basic.title.startswith("http") or self.basic.title == ""):
+        if not (
+            self.basic.title.startswith("http")
+            or self.basic.title == ""
+            or self.basic.title == self.uuid
+        ):
             return
         title = link_extracted_data.title
         await self.update_resource_title(title)
