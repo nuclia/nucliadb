@@ -23,9 +23,9 @@ use std::{fs::File, io::Write as _, path::Path};
 
 use crate::{
     VectorR,
-    segment::Elem,
     data_store::{OpenReason, ParagraphAddr, ParagraphRef},
     data_types::usize_utils::U32_LEN,
+    segment::Elem,
 };
 
 const FILENAME_DATA: &str = "paragraphs.bin";
