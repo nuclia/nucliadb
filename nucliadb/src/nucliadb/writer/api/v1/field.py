@@ -20,7 +20,7 @@
 from inspect import iscoroutinefunction
 from typing import TYPE_CHECKING, Annotated, Callable, Optional, Type, Union
 
-from fastapi import HTTPException, Response
+from fastapi import HTTPException, Query, Response
 from fastapi_versioning import version
 from starlette.requests import Request
 
@@ -542,7 +542,10 @@ async def reprocess_file_field(
     field_id: FieldIdString,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
     x_file_password: Annotated[Optional[str], X_FILE_PASSWORD] = None,
-    override_title: bool = False,
+    override_title: bool = Query(
+        default=False,
+        description="Override the title of the resource with the file computed title, if any.",
+    ),
 ) -> ResourceUpdated:
     await maybe_back_pressure(kbid, resource_uuid=rid)
 

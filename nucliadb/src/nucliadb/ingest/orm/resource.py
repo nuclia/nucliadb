@@ -167,9 +167,12 @@ class Resource:
 
             self.basic.MergeFrom(payload)
 
-            # Make sure title is cleared
+            # Make sure title is cleared if the flag is set
             if self.basic.title == CLEAR_TITLE_FLAG:
-                self.basic.title = ""
+                # We set the title to the resource UUID so that it is not empty.
+                # If there is a computed title in the link or file extracted metadata
+                # by processing, it will be updated later.
+                self.basic.title = self.uuid
 
             # Prevent duplicated languages
             unique_languages = set(self.basic.metadata.languages)

@@ -395,7 +395,10 @@ async def reprocess_resource_rslug_prefix(
     kbid: str,
     rslug: str,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
-    override_title: bool = False,
+    override_title: bool = Query(
+        default=False,
+        description="Override the title of the resource with the file or link computed titles, if any.",
+    ),
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _reprocess_resource(
@@ -417,7 +420,10 @@ async def reprocess_resource_rid_prefix(
     kbid: str,
     rid: str,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
-    override_title: bool = False,
+    override_title: bool = Query(
+        default=False,
+        description="Override the title of the resource with the file or link computed titles, if any.",
+    ),
 ):
     return await _reprocess_resource(
         request, kbid, rid, x_nucliadb_user=x_nucliadb_user, override_title=override_title
@@ -429,7 +435,10 @@ async def _reprocess_resource(
     kbid: str,
     rid: str,
     x_nucliadb_user: str,
-    override_title: bool = False,
+    override_title: bool = Query(
+        default=False,
+        description="Override the title of the resource with the file or link computed titles, if any.",
+    ),
 ):
     await validate_rid_exists_or_raise_error(kbid, rid)
     await maybe_back_pressure(kbid, resource_uuid=rid)

@@ -1100,6 +1100,21 @@ async def test_file_computed_titles_are_set_on_resource_title(
     assert title != extracted_title
     assert title == "Something else"
 
+    # Now check that if the override_title flag is set on reprocess endpoint, the title is changed
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resource/{rid2}/reprocess",
+        params={"override_title": True},
+    )
+    assert resp.status_code == 202, resp.text
+
+    bm.file_extracted_data[0].title = "Foobar (computed)"
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    # Check that the resource title changed
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid2}")
+    assert resp.status_code == 200
+    assert resp.json()["title"] == "Foobar (computed)"
+
 
 @pytest.mark.deploy_modes("standalone")
 async def test_link_computed_titles_are_automatically_set_to_resource_title(
