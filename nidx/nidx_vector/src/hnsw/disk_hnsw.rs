@@ -260,7 +260,7 @@ impl DiskHnsw {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data_point::ram_hnsw::RAMLayer;
+    use crate::hnsw::ram_hnsw::RAMLayer;
     fn layer_check<L: Layer>(buf: L, no_nodes: usize, cnx: &[Vec<(Address, Edge)>]) {
         let no_cnx = vec![];
         for i in 0..no_nodes {

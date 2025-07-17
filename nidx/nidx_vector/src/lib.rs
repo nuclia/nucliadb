@@ -24,6 +24,7 @@ mod data_point_provider;
 mod data_store;
 mod data_types;
 mod formula;
+mod hnsw;
 mod indexer;
 mod inverted_index;
 mod multivector;
@@ -33,7 +34,7 @@ mod utils;
 mod vector_types;
 
 use config::VectorConfig;
-use data_point::{Address, OpenDataPoint};
+use data_point::OpenDataPoint;
 use data_point_provider::reader::Reader;
 use indexer::{ResourceWrapper, index_resource};
 use nidx_protos::{Resource, VectorSearchResponse};
@@ -51,19 +52,6 @@ pub use request_types::VectorSearchRequest;
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct ParagraphAddr(u32);
 pub struct VectorAddr(u32);
-
-// VectorAddr and HNSW Address are the same thing with a different data type for serialization purposes
-impl From<Address> for VectorAddr {
-    fn from(value: Address) -> Self {
-        Self(value.0 as u32)
-    }
-}
-
-impl From<VectorAddr> for Address {
-    fn from(value: VectorAddr) -> Self {
-        Self(value.0 as usize)
-    }
-}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct VectorSegmentMeta {

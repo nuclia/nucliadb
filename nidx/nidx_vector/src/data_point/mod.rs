@@ -18,33 +18,24 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod disk_hnsw;
-pub mod ops_hnsw;
-pub mod ram_hnsw;
-
-mod params;
 #[cfg(test)]
 mod tests;
 
 use crate::config::{VectorConfig, flags};
 use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, ParagraphRef, VectorRef};
 use crate::formula::Formula;
+use crate::hnsw::*;
 use crate::inverted_index::{FilterBitSet, InvertedIndexes, build_indexes};
 use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use core::f32;
-use disk_hnsw::DiskHnsw;
 use io::{BufWriter, Write};
 use memmap2::Mmap;
-use ops_hnsw::{Cnx, HnswOps};
-use ram_hnsw::RAMHnsw;
 use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io;
 use std::iter::empty;
 use std::path::Path;
-
-pub use ops_hnsw::DataRetriever;
 
 /// How much expensive is to find a node via HNSW compared to a simple brute force scan
 const HNSW_COST_FACTOR: usize = 200;
@@ -306,9 +297,6 @@ fn create_indexes<DS: DataStore + 'static>(
         alive_bitset,
     })
 }
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct Address(pub(super) usize);
 
 pub struct Retriever<'a, DS: DataStore> {
     similarity_function: fn(&[u8], &[u8]) -> f32,
