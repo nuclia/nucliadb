@@ -20,7 +20,7 @@
 
 use crate::{
     config::{VectorConfig, VectorType},
-    data_point::Elem,
+    segment::Elem,
 };
 use memmap2::Mmap;
 use node::Node;

@@ -20,13 +20,12 @@
 
 use crate::ParagraphAddr;
 use crate::config::VectorCardinality;
-use crate::data_point::OpenDataPoint;
-use crate::data_point_provider::SearchRequest;
-use crate::data_point_provider::VectorConfig;
+use crate::config::VectorConfig;
 use crate::data_store::ParagraphRef;
 use crate::multivector::extract_multi_vectors;
 use crate::multivector::maxsim_similarity;
 use crate::request_types::VectorSearchRequest;
+use crate::segment::OpenSegment;
 use crate::utils;
 use crate::{VectorErr, VectorR};
 use crate::{formula::*, query_io};
@@ -40,12 +39,20 @@ use std::collections::HashSet;
 use std::time::Instant;
 use tracing::*;
 
+pub trait SearchRequest {
+    fn get_query(&self) -> &[f32];
+    fn get_filter(&self) -> &Formula;
+    fn no_results(&self) -> usize;
+    fn with_duplicates(&self) -> bool;
+    fn min_score(&self) -> f32;
+}
+
 #[derive(Clone)]
 pub struct ScoredParagraph<'a> {
     score: f32,
     paragraph: ParagraphRef<'a>,
     address: ParagraphAddr,
-    data_point: &'a OpenDataPoint,
+    segment: &'a OpenSegment,
 }
 impl Eq for ScoredParagraph<'_> {}
 impl std::hash::Hash for ScoredParagraph<'_> {
@@ -79,9 +86,9 @@ impl PartialEq for ScoredParagraph<'_> {
 }
 
 impl<'a> ScoredParagraph<'a> {
-    pub fn new(data_point: &'a OpenDataPoint, address: ParagraphAddr, paragraph: ParagraphRef<'a>, score: f32) -> Self {
+    pub fn new(segment: &'a OpenSegment, address: ParagraphAddr, paragraph: ParagraphRef<'a>, score: f32) -> Self {
         Self {
-            data_point,
+            segment,
             paragraph,
             score,
             address,
@@ -103,7 +110,7 @@ impl<'a> ScoredParagraph<'a> {
     pub fn vectors(&self) -> Vec<&[u8]> {
         self.paragraph
             .vectors(&self.address)
-            .map(|va| self.data_point.get_vector(va).vector())
+            .map(|va| self.segment.get_vector(va).vector())
             .collect()
     }
 }
@@ -160,9 +167,9 @@ impl<'a> Fssc<'a> {
     }
 }
 
-pub struct Reader {
+pub struct Searcher {
     config: VectorConfig,
-    open_data_points: Vec<OpenDataPoint>,
+    open_segments: Vec<OpenSegment>,
 }
 
 fn segment_matches(expression: &BooleanExpression<String>, labels: &HashSet<String>) -> bool {
@@ -216,16 +223,16 @@ impl TryFrom<ScoredParagraph<'_>> for DocumentScored {
     }
 }
 
-impl Reader {
-    pub fn open(open_data_points: Vec<OpenDataPoint>, config: VectorConfig) -> VectorR<Reader> {
-        Ok(Reader {
+impl Searcher {
+    pub fn open(open_data_points: Vec<OpenSegment>, config: VectorConfig) -> VectorR<Searcher> {
+        Ok(Searcher {
             config,
-            open_data_points,
+            open_segments: open_data_points,
         })
     }
 
     pub fn space_usage(&self) -> usize {
-        self.open_data_points.iter().map(|dp| dp.space_usage()).sum()
+        self.open_segments.iter().map(|dp| dp.space_usage()).sum()
     }
 
     pub fn _search(
@@ -257,21 +264,21 @@ impl Reader {
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
 
-        for open_data_point in &self.open_data_points {
+        for open_segment in &self.open_segments {
             // Skip this segment if it doesn't match the segment filter
             if !segment_filter
                 .as_ref()
-                .is_none_or(|f| segment_matches(f, open_data_point.tags()))
+                .is_none_or(|f| segment_matches(f, open_segment.tags()))
             {
                 continue;
             }
             let partial_solution =
-                open_data_point.search(query, filter, with_duplicates, no_results, &self.config, min_score);
+                open_segment.search(query, filter, with_duplicates, no_results, &self.config, min_score);
 
             for candidate in partial_solution {
                 let addr = candidate.paragraph();
-                let paragraph = open_data_point.get_paragraph(addr);
-                let scored_paragraph = ScoredParagraph::new(open_data_point, addr, paragraph, candidate.score());
+                let paragraph = open_segment.get_paragraph(addr);
+                let scored_paragraph = ScoredParagraph::new(open_segment, addr, paragraph, candidate.score());
                 ffsv.add(scored_paragraph, candidate.vector());
             }
         }
@@ -402,8 +409,8 @@ mod tests {
 
     use super::*;
     use crate::config::{Similarity, VectorCardinality, VectorConfig, VectorType};
-    use crate::data_point;
     use crate::indexer::{ResourceWrapper, index_resource};
+    use crate::segment;
 
     #[test]
     fn test_key_prefix_search() -> anyhow::Result<()> {
@@ -474,7 +481,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![data_point::open(segment, &vsc)?], vsc).unwrap();
+        let searcher = Searcher::open(vec![segment::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -487,13 +494,13 @@ mod tests {
             resource_id: uuid::Uuid::parse_str("6c5fc1f7a69042d4b24b7f18ea354b4a").unwrap(),
             field_id: "/f/field1".to_string(),
         };
-        let result = reader
+        let result = searcher
             .search(&request, &PrefilterResult::Some(vec![field_filter.clone()]))
             .unwrap();
         assert_eq!(result.documents.len(), 4);
 
         field_filter.field_id = "/f/field2".to_string();
-        let result = reader
+        let result = searcher
             .search(&request, &PrefilterResult::Some(vec![field_filter]))
             .unwrap();
         assert_eq!(result.documents.len(), 0);
@@ -570,7 +577,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![data_point::open(segment, &vsc)?], vsc).unwrap();
+        let searcher = Searcher::open(vec![segment::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -579,7 +586,7 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request, &PrefilterResult::All).unwrap();
+        let result = searcher.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 4);
 
         let request = VectorSearchRequest {
@@ -590,7 +597,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request, &PrefilterResult::All).unwrap();
+        let result = searcher.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 3);
 
         // Check that min_score works
@@ -603,7 +610,7 @@ mod tests {
             min_score: 900.0,
             ..Default::default()
         };
-        let result = reader.search(&request, &PrefilterResult::All).unwrap();
+        let result = searcher.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 0);
 
         let bad_request = VectorSearchRequest {
@@ -614,7 +621,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        assert!(reader.search(&bad_request, &PrefilterResult::All).is_err());
+        assert!(searcher.search(&bad_request, &PrefilterResult::All).is_err());
 
         Ok(())
     }
@@ -680,7 +687,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![data_point::open(segment, &vsc)?], vsc).unwrap();
+        let searcher = Searcher::open(vec![segment::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -689,7 +696,7 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request, &PrefilterResult::All).unwrap();
+        let result = searcher.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 2);
 
         let request = VectorSearchRequest {
@@ -700,7 +707,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request, &PrefilterResult::All).unwrap();
+        let result = searcher.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 1);
 
         Ok(())

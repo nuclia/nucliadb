@@ -23,7 +23,7 @@ use std::{fs::File, io::Write as _, path::Path};
 
 use crate::{
     VectorR,
-    data_point::Elem,
+    segment::Elem,
     data_store::{OpenReason, ParagraphAddr, ParagraphRef},
     data_types::usize_utils::U32_LEN,
 };

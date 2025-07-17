@@ -97,12 +97,12 @@ fn test_maxsim() -> anyhow::Result<()> {
         .unwrap();
 
     // Get best match
-    let reader = VectorSearcher::open(
+    let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]),
     )?;
     let search_for = query.as_flattened().to_vec();
-    let results = reader.search(
+    let results = searcher.search(
         &VectorSearchRequest {
             vector: search_for.clone(),
             result_per_page: 1,
@@ -119,7 +119,7 @@ fn test_maxsim() -> anyhow::Result<()> {
     assert_eq!(results.documents[0].score, 2.0);
 
     // Get best match by min_score (this makes sure min_score is not applied to individual vectors)
-    let results = reader.search(
+    let results = searcher.search(
         &VectorSearchRequest {
             vector: search_for.clone(),
             result_per_page: 10,
@@ -136,7 +136,7 @@ fn test_maxsim() -> anyhow::Result<()> {
     assert_eq!(results.documents[0].score, 2.0);
 
     // Get top matches
-    let results = reader.search(
+    let results = searcher.search(
         &VectorSearchRequest {
             vector: search_for.clone(),
             result_per_page: 2,

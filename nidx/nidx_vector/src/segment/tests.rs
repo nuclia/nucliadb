@@ -25,9 +25,9 @@ use tempfile::tempdir;
 
 use crate::VectorR;
 use crate::config::{Similarity, VectorCardinality, VectorConfig, flags};
-use crate::data_point::{self, Elem};
 use crate::data_store::{DataStoreV1, DataStoreV2};
 use crate::formula::{AtomClause, Clause, Formula};
+use crate::segment::{self, Elem};
 
 const CONFIG: VectorConfig = VectorConfig {
     similarity: Similarity::Cosine,
@@ -65,14 +65,14 @@ fn simple_flow() {
         elems.push(Elem::new(key.clone(), vector, labels.clone(), None));
         expected_keys.push(key);
     }
-    let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
+    let segment = segment::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
     let query = vec![rand::random::<f32>(); 178];
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
         acc.extend(i.clone());
         acc
     });
-    let result = reader.search(&query, &formula, true, no_results, &CONFIG, -1.0);
+    let result = segment.search(&query, &formula, true, no_results, &CONFIG, -1.0);
     assert_eq!(result.count(), no_results);
 }
 
@@ -91,20 +91,20 @@ fn accuracy_test() {
         let vector = create_query();
         elems.push(Elem::new(key, vector, labels.clone(), None));
     }
-    let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
+    let segment = segment::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
     let query = create_query();
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
         acc.extend(i.clone());
         acc
     });
-    let mut result_0 = reader
+    let mut result_0 = segment
         .search(&query, &formula, true, no_results, &CONFIG, -1.0)
         .collect::<Vec<_>>();
     result_0.sort_by_key(|i| i.paragraph());
     let query: Vec<_> = query.into_iter().map(|v| v + 1.0).collect();
     let no_results = 10;
-    let mut result_1 = reader
+    let mut result_1 = segment
         .search(&query, &formula, true, no_results, &CONFIG, -1.0)
         .collect::<Vec<_>>();
     result_1.sort_by_key(|i| i.paragraph());
@@ -125,20 +125,20 @@ fn single_graph() {
     let vector = create_query();
 
     let elems = vec![Elem::new(key.clone(), vector.clone(), vec![], None)];
-    let mut reader = data_point::create(temp_dir.path(), elems.clone(), &CONFIG, HashSet::new()).unwrap();
+    let mut segment = segment::create(temp_dir.path(), elems.clone(), &CONFIG, HashSet::new()).unwrap();
     let formula = Formula::new();
-    reader.apply_deletion(&key);
-    let result = reader.search(&vector, &formula, true, 5, &CONFIG, -1.0);
+    segment.apply_deletion(&key);
+    let result = segment.search(&vector, &formula, true, 5, &CONFIG, -1.0);
     assert_eq!(result.count(), 0);
 
     let temp_dir = tempfile::tempdir().unwrap();
-    let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
-    let result = reader
+    let segment = segment::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
+    let result = segment
         .search(&vector, &formula, true, 5, &CONFIG, -1.0)
         .collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
-    assert!(reader.get_paragraph(result[0].paragraph()).id() == key);
+    assert!(segment.get_paragraph(result[0].paragraph()).id() == key);
 }
 
 #[test]
@@ -151,17 +151,17 @@ fn data_merge() -> anyhow::Result<()> {
     let elems1 = vec![Elem::new(key1.clone(), vector1.clone(), vec![], None)];
 
     let dp0_path = tempdir()?;
-    let dp0 = data_point::create(dp0_path.path(), elems0, &CONFIG, HashSet::new()).unwrap();
+    let dp0 = segment::create(dp0_path.path(), elems0, &CONFIG, HashSet::new()).unwrap();
     assert!(dp0.data_store.as_any().downcast_ref::<DataStoreV1>().is_some());
 
     let dp1_path = tempdir()?;
-    let dp1 = data_point::create(dp1_path.path(), elems1, &CONFIG, HashSet::new()).unwrap();
+    let dp1 = segment::create(dp1_path.path(), elems1, &CONFIG, HashSet::new()).unwrap();
     assert!(dp1.data_store.as_any().downcast_ref::<DataStoreV1>().is_some());
 
     let work = &[&dp1, &dp0];
 
     let dp_path = tempdir()?;
-    let dp = data_point::merge(dp_path.path(), work, &CONFIG).unwrap();
+    let dp = segment::merge(dp_path.path(), work, &CONFIG).unwrap();
     assert!(dp.data_store.as_any().downcast_ref::<DataStoreV1>().is_some());
 
     let formula = Formula::new();
@@ -173,8 +173,8 @@ fn data_merge() -> anyhow::Result<()> {
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(dp.get_paragraph(result[0].paragraph()).id() == key0);
-    let mut dp0 = data_point::open(dp0.metadata, &CONFIG).unwrap();
-    let mut dp1 = data_point::open(dp1.metadata, &CONFIG).unwrap();
+    let mut dp0 = segment::open(dp0.metadata, &CONFIG).unwrap();
+    let mut dp1 = segment::open(dp1.metadata, &CONFIG).unwrap();
     dp0.apply_deletion(&key0);
     dp0.apply_deletion(&key1);
     dp1.apply_deletion(&key0);
@@ -182,7 +182,7 @@ fn data_merge() -> anyhow::Result<()> {
     let work = &[&dp1, &dp0];
 
     let dp_path = tempdir()?;
-    let dp = data_point::merge(dp_path.path(), work, &CONFIG).unwrap();
+    let dp = segment::merge(dp_path.path(), work, &CONFIG).unwrap();
 
     assert_eq!(dp.metadata.records, 0);
 
@@ -202,17 +202,17 @@ fn data_merge_v2() -> anyhow::Result<()> {
     v2_config.flags.push(flags::DATA_STORE_V2.to_string());
 
     let dp0_path = tempdir()?;
-    let dp0 = data_point::create(dp0_path.path(), elems0, &v2_config, HashSet::new()).unwrap();
+    let dp0 = segment::create(dp0_path.path(), elems0, &v2_config, HashSet::new()).unwrap();
     assert!(dp0.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
 
     let dp1_path = tempdir()?;
-    let dp1 = data_point::create(dp1_path.path(), elems1, &v2_config, HashSet::new()).unwrap();
+    let dp1 = segment::create(dp1_path.path(), elems1, &v2_config, HashSet::new()).unwrap();
     assert!(dp1.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
 
     let work = &[&dp1, &dp0];
 
     let dp_path = tempdir()?;
-    let dp = data_point::merge(dp_path.path(), work, &v2_config).unwrap();
+    let dp = segment::merge(dp_path.path(), work, &v2_config).unwrap();
     assert!(dp.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
 
     let formula = Formula::new();
@@ -224,8 +224,8 @@ fn data_merge_v2() -> anyhow::Result<()> {
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(dp.get_paragraph(result[0].paragraph()).id() == key0);
-    let mut dp0 = data_point::open(dp0.metadata, &v2_config).unwrap();
-    let mut dp1 = data_point::open(dp1.metadata, &v2_config).unwrap();
+    let mut dp0 = segment::open(dp0.metadata, &v2_config).unwrap();
+    let mut dp1 = segment::open(dp1.metadata, &v2_config).unwrap();
     dp0.apply_deletion(&key0);
     dp0.apply_deletion(&key1);
     dp1.apply_deletion(&key0);
@@ -233,7 +233,7 @@ fn data_merge_v2() -> anyhow::Result<()> {
     let work = &[&dp1, &dp0];
 
     let dp_path = tempdir()?;
-    let dp = data_point::merge(dp_path.path(), work, &v2_config).unwrap();
+    let dp = segment::merge(dp_path.path(), work, &v2_config).unwrap();
 
     assert_eq!(dp.metadata.records, 0);
 
@@ -253,17 +253,17 @@ fn data_merge_mixed() -> anyhow::Result<()> {
     v2_config.flags.push(flags::DATA_STORE_V2.to_string());
 
     let dp0_path = tempdir()?;
-    let dp0 = data_point::create(dp0_path.path(), elems0, &CONFIG, HashSet::new()).unwrap();
+    let dp0 = segment::create(dp0_path.path(), elems0, &CONFIG, HashSet::new()).unwrap();
     assert!(dp0.data_store.as_any().downcast_ref::<DataStoreV1>().is_some());
 
     let dp1_path = tempdir()?;
-    let dp1 = data_point::create(dp1_path.path(), elems1, &v2_config, HashSet::new()).unwrap();
+    let dp1 = segment::create(dp1_path.path(), elems1, &v2_config, HashSet::new()).unwrap();
     assert!(dp1.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
 
     let work = &[&dp1, &dp0];
 
     let dp_path = tempdir()?;
-    let dp = data_point::merge(dp_path.path(), work, &v2_config).unwrap();
+    let dp = segment::merge(dp_path.path(), work, &v2_config).unwrap();
     assert!(dp.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
 
     let formula = Formula::new();
@@ -275,8 +275,8 @@ fn data_merge_mixed() -> anyhow::Result<()> {
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(dp.get_paragraph(result[0].paragraph()).id() == key0);
-    let mut dp0 = data_point::open(dp0.metadata, &v2_config).unwrap();
-    let mut dp1 = data_point::open(dp1.metadata, &v2_config).unwrap();
+    let mut dp0 = segment::open(dp0.metadata, &v2_config).unwrap();
+    let mut dp1 = segment::open(dp1.metadata, &v2_config).unwrap();
     dp0.apply_deletion(&key0);
     dp0.apply_deletion(&key1);
     dp1.apply_deletion(&key0);
@@ -284,7 +284,7 @@ fn data_merge_mixed() -> anyhow::Result<()> {
     let work = &[&dp1, &dp0];
 
     let dp_path = tempdir()?;
-    let dp = data_point::merge(dp_path.path(), work, &v2_config).unwrap();
+    let dp = segment::merge(dp_path.path(), work, &v2_config).unwrap();
 
     assert_eq!(dp.metadata.records, 0);
 
@@ -307,7 +307,7 @@ fn label_filtering_test() {
         elems.push(Elem::new(key, vector, labels, None));
     }
 
-    let mut reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
+    let mut segment = segment::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
     let query = create_query();
     let no_results = 10;
 
@@ -316,19 +316,19 @@ fn label_filtering_test() {
             acc.extend(i.clone());
             acc
         });
-        let result_0 = reader
+        let result_0 = segment
             .search(&query, &formula, true, no_results, &CONFIG, -1.0)
             .collect::<Vec<_>>();
         assert_eq!(result_0.len(), 1);
     }
 
-    reader.apply_deletion("6e5a546a9a5c480f8579472016b1ee14/f/field");
+    segment.apply_deletion("6e5a546a9a5c480f8579472016b1ee14/f/field");
     for i in 0..5 {
         let formula = queries[i..i + 1].iter().fold(Formula::new(), |mut acc, i| {
             acc.extend(i.clone());
             acc
         });
-        let result_0 = reader
+        let result_0 = segment
             .search(&query, &formula, true, no_results, &CONFIG, -1.0)
             .collect::<Vec<_>>();
         assert_eq!(result_0.len(), 0);
@@ -347,13 +347,13 @@ fn label_prefix_search_test() {
         elems.push(Elem::new(key, vector, labels, None));
     }
 
-    let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
+    let segment = segment::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
     let query = create_query();
 
     // Searching for the labelset, returns all results
     let mut formula = Formula::new();
     formula.extend(Clause::Atom(AtomClause::Label("/l/labelset".into())));
-    let result = reader
+    let result = segment
         .search(&query, &formula, true, 10, &CONFIG, -1.0)
         .collect::<Vec<_>>();
     assert_eq!(result.len(), 5);
@@ -361,7 +361,7 @@ fn label_prefix_search_test() {
     // Searching for a label, returns one results
     let mut formula = Formula::new();
     formula.extend(Clause::Atom(AtomClause::Label("/l/labelset/LABEL_0".into())));
-    let result = reader
+    let result = segment
         .search(&query, &formula, true, 10, &CONFIG, -1.0)
         .collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
@@ -369,7 +369,7 @@ fn label_prefix_search_test() {
     // Searching for a label prefix, returns no results
     let mut formula = Formula::new();
     formula.extend(Clause::Atom(AtomClause::Label("/l/labelset/LABEL".into())));
-    let result = reader
+    let result = segment
         .search(&query, &formula, true, 10, &CONFIG, -1.0)
         .collect::<Vec<_>>();
     assert_eq!(result.len(), 0);
@@ -402,10 +402,10 @@ fn fast_data_merge() -> VectorR<()> {
         vec![],
         None,
     ));
-    let mut big_segment = data_point::create(big_segment_dir.path(), elems, &CONFIG, HashSet::new())?;
+    let mut big_segment = segment::create(big_segment_dir.path(), elems, &CONFIG, HashSet::new())?;
 
     let small_segment_dir = tempfile::tempdir()?;
-    let mut small_segment = data_point::create(
+    let mut small_segment = segment::create(
         small_segment_dir.path(),
         vec![
             Elem::new(
@@ -429,7 +429,7 @@ fn fast_data_merge() -> VectorR<()> {
     let work = [&big_segment, &small_segment];
     let output_dir = tempfile::tempdir()?;
     let t = Instant::now();
-    let dp = data_point::merge(output_dir.path(), &work, &CONFIG)?;
+    let dp = segment::merge(output_dir.path(), &work, &CONFIG)?;
     let fast_merge_time = t.elapsed();
 
     for (i, v) in search_vectors.iter().enumerate() {
@@ -448,7 +448,7 @@ fn fast_data_merge() -> VectorR<()> {
     let work = [&big_segment, &small_segment];
     let output_dir = tempfile::tempdir()?;
     let t = Instant::now();
-    let dp = data_point::merge(output_dir.path(), &work, &CONFIG)?;
+    let dp = segment::merge(output_dir.path(), &work, &CONFIG)?;
     let slow_merge_time = t.elapsed();
 
     for (i, v) in search_vectors.iter().enumerate() {

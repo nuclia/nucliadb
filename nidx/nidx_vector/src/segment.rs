@@ -44,7 +44,7 @@ mod file_names {
     pub const HNSW: &str = "index.hnsw";
 }
 
-pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<OpenDataPoint> {
+pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<OpenSegment> {
     let path = &metadata.path;
     let data_store: Box<dyn DataStore> = if DataStoreV1::exists(path)? {
         let data_store = DataStoreV1::open(path, &config.vector_type, OpenReason::Search)?;
@@ -76,7 +76,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
     let inverted_indexes = InvertedIndexes::open(path, metadata.records)?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
-    Ok(OpenDataPoint {
+    Ok(OpenSegment {
         metadata,
         data_store,
         index,
@@ -85,7 +85,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
     })
 }
 
-pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &VectorConfig) -> VectorR<OpenDataPoint> {
+pub fn merge(segment_path: &Path, operants: &[&OpenSegment], config: &VectorConfig) -> VectorR<OpenSegment> {
     // Sort largest operant first so we reuse as much of the HNSW as possible
     let mut operants = operants.to_vec();
     operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.metadata.records));
@@ -104,9 +104,9 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
             .iter()
             .map(|dp| (dp.alive_paragraphs(), dp.data_store.as_ref()))
             .collect();
-        DataStoreV2::merge(data_point_path, node_producers, &config.vector_type)?;
-        let data_store = DataStoreV2::open(data_point_path, &config.vector_type, OpenReason::Create)?;
-        merge_indexes(data_point_path, data_store, operants, config)
+        DataStoreV2::merge(segment_path, node_producers, &config.vector_type)?;
+        let data_store = DataStoreV2::open(segment_path, &config.vector_type, OpenReason::Create)?;
+        merge_indexes(segment_path, data_store, operants, config)
     } else {
         // V1 can only merge from V1
         let mut node_producers = Vec::new();
@@ -120,18 +120,18 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
             ));
         }
 
-        DataStoreV1::merge(data_point_path, node_producers.as_mut_slice(), config)?;
-        let data_store = DataStoreV1::open(data_point_path, &config.vector_type, OpenReason::Create)?;
-        merge_indexes(data_point_path, data_store, operants, config)
+        DataStoreV1::merge(segment_path, node_producers.as_mut_slice(), config)?;
+        let data_store = DataStoreV1::open(segment_path, &config.vector_type, OpenReason::Create)?;
+        merge_indexes(segment_path, data_store, operants, config)
     }
 }
 
 fn merge_indexes<DS: DataStore + 'static>(
-    data_point_path: &Path,
+    segment_path: &Path,
     data_store: DS,
-    operants: Vec<&OpenDataPoint>,
+    operants: Vec<&OpenSegment>,
     config: &VectorConfig,
-) -> VectorR<OpenDataPoint> {
+) -> VectorR<OpenSegment> {
     // Check if the first segment has deletions. If it doesn't, we can reuse its HNSW index
     let has_deletions = operants[0].alive_paragraphs().count() < operants[0].data_store.stored_paragraph_count();
 
@@ -155,7 +155,7 @@ fn merge_indexes<DS: DataStore + 'static>(
         ops.insert(Address(id), &mut index);
     }
 
-    let hnsw_path = data_point_path.join(file_names::HNSW);
+    let hnsw_path = segment_path.join(file_names::HNSW);
     let mut hnsw_file = File::options()
         .read(true)
         .write(true)
@@ -175,21 +175,21 @@ fn merge_indexes<DS: DataStore + 'static>(
         index.advise(memmap2::Advice::Random)?;
     }
 
-    build_indexes(data_point_path, &data_store)?;
+    build_indexes(segment_path, &data_store)?;
 
     let metadata = VectorSegmentMetadata {
-        path: data_point_path.to_path_buf(),
+        path: segment_path.to_path_buf(),
         records: data_store.stored_paragraph_count(),
         index_metadata: VectorSegmentMeta {
             tags: operants[0].metadata.index_metadata.tags.clone(),
         },
     };
 
-    build_indexes(data_point_path, &data_store)?;
-    let inverted_indexes = InvertedIndexes::open(data_point_path, merged_vectors_count)?;
+    build_indexes(segment_path, &data_store)?;
+    let inverted_indexes = InvertedIndexes::open(segment_path, merged_vectors_count)?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
-    Ok(OpenDataPoint {
+    Ok(OpenSegment {
         metadata,
         data_store: Box::new(data_store),
         index,
@@ -198,7 +198,7 @@ fn merge_indexes<DS: DataStore + 'static>(
     })
 }
 
-pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSet<String>) -> VectorR<OpenDataPoint> {
+pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSet<String>) -> VectorR<OpenSegment> {
     // Check dimensions
     let dim = config.vector_type.dimension();
     for e in &elems {
@@ -245,7 +245,7 @@ fn create_indexes<DS: DataStore + 'static>(
     data_store: DS,
     config: &VectorConfig,
     tags: HashSet<String>,
-) -> VectorR<OpenDataPoint> {
+) -> VectorR<OpenSegment> {
     let mut hnsw_file = File::options()
         .read(true)
         .write(true)
@@ -289,7 +289,7 @@ fn create_indexes<DS: DataStore + 'static>(
     let inverted_indexes = InvertedIndexes::open(path, vector_count)?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
-    Ok(OpenDataPoint {
+    Ok(OpenSegment {
         metadata,
         data_store: Box::new(data_store),
         index,
@@ -409,7 +409,7 @@ impl ScoredVector<'_> {
     }
 }
 
-pub struct OpenDataPoint {
+pub struct OpenSegment {
     metadata: VectorSegmentMetadata,
     data_store: Box<dyn DataStore>,
     index: Mmap,
@@ -417,13 +417,13 @@ pub struct OpenDataPoint {
     alive_bitset: FilterBitSet,
 }
 
-impl AsRef<OpenDataPoint> for OpenDataPoint {
-    fn as_ref(&self) -> &OpenDataPoint {
+impl AsRef<OpenSegment> for OpenSegment {
+    fn as_ref(&self) -> &OpenSegment {
         self
     }
 }
 
-impl OpenDataPoint {
+impl OpenSegment {
     pub fn apply_deletion(&mut self, key: &str) {
         if let Some(deleted_ids) = self.inverted_indexes.ids_for_deletion_key(key) {
             for id in deleted_ids {
@@ -641,7 +641,7 @@ mod test {
         let mut rng = SmallRng::seed_from_u64(1234567890);
         let temp_dir = tempdir()?;
 
-        // Create a data point with random data of different length
+        // Create a segment with random data of different length
         let path = temp_dir.path();
         let elems = (0..100).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
         let dp = create(
@@ -686,7 +686,7 @@ mod test {
         };
         let mut rng = SmallRng::seed_from_u64(1234567890);
 
-        // Create two data points with random data of different length
+        // Create two segments with random data of different length
         let path1 = tempdir()?;
         let elems1 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
         let dp1 = create(
@@ -763,7 +763,7 @@ mod test {
             vector_cardinality: VectorCardinality::Single,
         };
 
-        // Create a data point
+        // Create a segment
         let temp_dir = tempdir()?;
         let dp = create(
             temp_dir.path(),
@@ -778,7 +778,7 @@ mod test {
         // Search a few times
         let correct = (0..100)
             .map(|_| {
-                // Search near an existing datapoint (simulates that the query is related to the data)
+                // Search near an existing segment (simulates that the query is related to the data)
                 let base_v = elems.values().nth(rng.gen_range(0..elems.len())).unwrap();
                 let query = random_nearby_vector(&mut rng, base_v, 0.05);
 
