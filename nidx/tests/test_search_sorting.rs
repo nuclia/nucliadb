@@ -98,34 +98,29 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
     create_dummy_resources(20, &mut fixture, shard_id.clone()).await;
     fixture.wait_sync().await;
 
-    async fn paginated_search(
+    async fn do_search(
         fixture: &mut NidxFixture,
         shard_id: String,
         order: Option<nidx_protos::OrderBy>,
         page_size: i32,
     ) -> Vec<String> {
         let mut fields = Vec::new();
-        let mut next_page = true;
 
-        while next_page {
-            let response = fixture
-                .searcher_client
-                .search(SearchRequest {
-                    shard: shard_id.clone(),
-                    order: order.clone(),
-                    document: true,
-                    vectorset: "english".to_string(),
-                    result_per_page: page_size,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+        let response = fixture
+            .searcher_client
+            .search(SearchRequest {
+                shard: shard_id.clone(),
+                order: order.clone(),
+                document: true,
+                vectorset: "english".to_string(),
+                result_per_page: page_size,
+                ..Default::default()
+            })
+            .await
+            .unwrap();
 
-            let document_response = response.get_ref().document.as_ref().unwrap();
-            fields.extend(document_response.results.iter().cloned().map(|r| r.field));
-
-            next_page = document_response.next_page;
-        }
+        let document_response = response.get_ref().document.as_ref().unwrap();
+        fields.extend(document_response.results.iter().cloned().map(|r| r.field));
 
         fields
     }
@@ -139,7 +134,7 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
         r#type: nidx_protos::order_by::OrderType::Asc.into(),
         ..Default::default()
     });
-    let fields = paginated_search(&mut fixture, shard_id.clone(), order, 5).await;
+    let fields = do_search(&mut fixture, shard_id.clone(), order, 5).await;
     let mut sorted_fields = fields.clone();
     sorted_fields.sort();
     assert_eq!(fields, sorted_fields);
@@ -153,7 +148,7 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
         r#type: nidx_protos::order_by::OrderType::Asc.into(),
         ..Default::default()
     });
-    let fields = paginated_search(&mut fixture, shard_id.clone(), order, 5).await;
+    let fields = do_search(&mut fixture, shard_id.clone(), order, 5).await;
 
     let mut sorted_fields = fields.clone();
     sorted_fields.sort();
@@ -168,7 +163,7 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
         r#type: nidx_protos::order_by::OrderType::Desc.into(),
         ..Default::default()
     });
-    let fields = paginated_search(&mut fixture, shard_id.clone(), order, 5).await;
+    let fields = do_search(&mut fixture, shard_id.clone(), order, 5).await;
 
     let mut sorted_fields = fields.clone();
     sorted_fields.sort();
@@ -184,7 +179,7 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
         r#type: nidx_protos::order_by::OrderType::Desc.into(),
         ..Default::default()
     });
-    let fields = paginated_search(&mut fixture, shard_id.clone(), order, 5).await;
+    let fields = do_search(&mut fixture, shard_id.clone(), order, 5).await;
 
     let mut sorted_fields = fields.clone();
     sorted_fields.sort();
