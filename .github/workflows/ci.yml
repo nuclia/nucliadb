@@ -184,7 +184,7 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install cargo-llvm-cov and nextest
-        run: cargo install cargo-llvm-cov cargo-nextest
+        run: cargo install cargo-llvm-cov@0.6.17 cargo-nextest@0.9.100
       - name: test
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost/postgres
