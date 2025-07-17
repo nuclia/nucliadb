@@ -26,6 +26,7 @@ mod data_types;
 mod formula;
 mod indexer;
 mod inverted_index;
+mod multivector;
 mod query_io;
 mod request_types;
 mod utils;
@@ -47,7 +48,7 @@ use tracing::instrument;
 pub use indexer::SEGMENT_TAGS;
 pub use request_types::VectorSearchRequest;
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct ParagraphAddr(u32);
 pub struct VectorAddr(u32);
 

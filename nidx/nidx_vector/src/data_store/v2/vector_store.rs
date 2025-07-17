@@ -133,16 +133,20 @@ impl VectorStoreWriter {
         })
     }
 
-    pub fn write(&mut self, paragraph_id: u32, vectors: &[&[u8]]) -> std::io::Result<(u32, u32)> {
+    pub fn write(
+        &mut self,
+        paragraph_id: u32,
+        vectors: impl Iterator<Item = impl AsRef<[u8]>>,
+    ) -> std::io::Result<(u32, u32)> {
         let first_addr = self.addr;
         for v in vectors {
-            self.output.write_all(v)?;
+            self.output.write_all(v.as_ref())?;
             self.output.write_all(paragraph_id.to_le_bytes().as_slice())?;
             if self.padding_bytes > 0 {
                 self.output.seek(SeekFrom::Current(self.padding_bytes as i64))?;
             }
+            self.addr += 1;
         }
-        self.addr += vectors.len() as u32;
         let last_addr = self.addr - 1;
         Ok((first_addr, last_addr))
     }

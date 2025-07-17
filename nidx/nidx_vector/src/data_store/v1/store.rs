@@ -211,13 +211,14 @@ pub fn merge(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data_point::Elem;
+    use crate::{config::VectorCardinality, data_point::Elem};
 
     const VECTOR_CONFIG: VectorConfig = VectorConfig {
         vector_type: VectorType::DenseF32 { dimension: 3 },
         similarity: crate::config::Similarity::Dot,
         normalize_vectors: false,
         flags: vec![],
+        vector_cardinality: VectorCardinality::Single,
     };
 
     #[test]

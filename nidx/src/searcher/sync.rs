@@ -598,7 +598,7 @@ impl GuardedIndexMetadata {
 mod tests {
     use std::{io::BufWriter, path::Path, sync::Arc};
 
-    use nidx_vector::config::VectorConfig;
+    use nidx_vector::config::{VectorCardinality, VectorConfig};
     use object_store::{ObjectStore, PutPayload};
     use tempfile::tempdir;
 
@@ -614,6 +614,7 @@ mod tests {
         normalize_vectors: false,
         vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 3 },
         flags: vec![],
+        vector_cardinality: VectorCardinality::Single,
     };
 
     #[sqlx::test]

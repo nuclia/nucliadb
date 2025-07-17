@@ -30,7 +30,8 @@ use crate::config::{VectorConfig, flags};
 use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, ParagraphRef, VectorRef};
 use crate::formula::Formula;
 use crate::inverted_index::{FilterBitSet, InvertedIndexes, build_indexes};
-use crate::{ParagraphAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
+use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
+use core::f32;
 use disk_hnsw::DiskHnsw;
 use io::{BufWriter, Write};
 use memmap2::Mmap;
@@ -187,7 +188,7 @@ fn merge_indexes<DS: DataStore + 'static>(
 
     let metadata = VectorSegmentMetadata {
         path: data_point_path.to_path_buf(),
-        records: merged_vectors_count,
+        records: data_store.stored_paragraph_count(),
         index_metadata: VectorSegmentMeta {
             tags: operants[0].metadata.index_metadata.tags.clone(),
         },
@@ -208,12 +209,15 @@ fn merge_indexes<DS: DataStore + 'static>(
 
 pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSet<String>) -> VectorR<OpenDataPoint> {
     // Check dimensions
-    if let Some(dim) = config.vector_type.dimension() {
-        if let Some(elem) = elems.iter().find(|elem| elem.vector.len() != dim) {
-            return Err(crate::VectorErr::InconsistentDimensions {
-                index_config: dim,
-                vector: elem.vector.len(),
-            });
+    let dim = config.vector_type.dimension();
+    for e in &elems {
+        for v in &e.vectors {
+            if v.len() != dim {
+                return Err(crate::VectorErr::InconsistentDimensions {
+                    index_config: dim,
+                    vector: v.len(),
+                });
+            }
         }
     }
 
@@ -229,6 +233,12 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
             tags,
         )
     } else {
+        // Double check vector cardinality
+        if elems.iter().any(|e| e.vectors.len() != 1) {
+            return Err(crate::VectorErr::InvalidConfiguration(
+                "DataStore v1 not supported with multi-vectors",
+            ));
+        }
         DataStoreV1::create(path, elems, &config.vector_type)?;
         create_indexes(
             path,
@@ -280,7 +290,7 @@ fn create_indexes<DS: DataStore + 'static>(
 
     let metadata = VectorSegmentMetadata {
         path: path.to_path_buf(),
-        records: vector_count,
+        records: data_store.stored_paragraph_count(),
         index_metadata: VectorSegmentMeta { tags },
     };
 
@@ -360,7 +370,7 @@ impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
 #[derive(Clone, Debug)]
 pub struct Elem {
     pub key: String,
-    pub vector: Vec<f32>,
+    pub vectors: Vec<Vec<f32>>,
     pub metadata: Option<Vec<u8>>,
     pub labels: Vec<String>,
 }
@@ -370,7 +380,21 @@ impl Elem {
             labels,
             metadata,
             key,
-            vector,
+            vectors: vec![vector],
+        }
+    }
+
+    pub fn new_multivector(
+        key: String,
+        vectors: Vec<Vec<f32>>,
+        labels: Vec<String>,
+        metadata: Option<Vec<u8>>,
+    ) -> Elem {
+        Elem {
+            labels,
+            metadata,
+            key,
+            vectors,
         }
     }
 }
@@ -440,6 +464,10 @@ impl OpenDataPoint {
         self.data_store.get_paragraph(id)
     }
 
+    pub fn get_vector(&self, id: VectorAddr) -> VectorRef {
+        self.data_store.get_vector(id)
+    }
+
     pub fn search(
         &self,
         query: &[f32],
@@ -490,12 +518,20 @@ impl OpenDataPoint {
             let mut scored_results = Vec::new();
             for paragraph_addr in bitset.iter() {
                 let paragraph = data_store.get_paragraph(paragraph_addr);
-                for vector_addr in paragraph.vectors(&paragraph_addr) {
-                    let address = vector_addr.into();
-                    let score = retriever.similarity(query_address, address);
-                    if score >= min_score {
-                        scored_results.push(Reverse(Cnx(address, score)));
-                    }
+
+                // Only return the best vector match per paragraph
+                let best_vector_score = paragraph
+                    .vectors(&paragraph_addr)
+                    .map(|va| {
+                        let address = va.into();
+                        let score = retriever.similarity(query_address, address);
+                        Cnx(address, score)
+                    })
+                    .max_by(|v, w| v.1.total_cmp(&w.1))
+                    .unwrap();
+
+                if best_vector_score.1 >= min_score {
+                    scored_results.push(Reverse(best_vector_score));
                 }
             }
             scored_results.sort();
@@ -528,7 +564,7 @@ mod test {
 
     use crate::{
         ParagraphAddr, VectorAddr,
-        config::{Similarity, VectorConfig},
+        config::{Similarity, VectorCardinality, VectorConfig},
         formula::Formula,
         vector_types::dense_f32::{dot_similarity, encode_vector},
     };
@@ -612,6 +648,7 @@ mod test {
             vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
             normalize_vectors: false,
             flags: vec![],
+            vector_cardinality: VectorCardinality::Single,
         };
         let mut rng = SmallRng::seed_from_u64(1234567890);
         let temp_dir = tempdir()?;
@@ -628,7 +665,7 @@ mod test {
 
         for (i, (elem, mut labels)) in elems.into_iter().enumerate() {
             let vector = dp.data_store.get_vector(VectorAddr(i as u32));
-            assert_eq!(config.vector_type.encode(&elem.vector), vector.vector());
+            assert_eq!(config.vector_type.encode(&elem.vectors[0]), vector.vector());
 
             let paragraph = dp.data_store.get_paragraph(ParagraphAddr(i as u32));
             assert_eq!(elem.key, paragraph.id());
@@ -657,6 +694,7 @@ mod test {
             vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
             normalize_vectors: false,
             flags: vec![],
+            vector_cardinality: VectorCardinality::Single,
         };
         let mut rng = SmallRng::seed_from_u64(1234567890);
 
@@ -684,7 +722,7 @@ mod test {
 
         for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2.into_iter()).enumerate() {
             let vector = merged_dp.data_store.get_vector(VectorAddr(i as u32));
-            assert_eq!(config.vector_type.encode(&elem.vector), vector.vector());
+            assert_eq!(config.vector_type.encode(&elem.vectors[0]), vector.vector());
 
             let paragraph = merged_dp.data_store.get_paragraph(ParagraphAddr(i as u32));
             assert_eq!(elem.key, paragraph.id());
@@ -734,6 +772,7 @@ mod test {
             vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
             normalize_vectors: false,
             flags: vec![],
+            vector_cardinality: VectorCardinality::Single,
         };
 
         // Create a data point

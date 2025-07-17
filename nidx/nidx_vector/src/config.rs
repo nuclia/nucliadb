@@ -65,9 +65,9 @@ impl VectorType {
         }
     }
 
-    pub fn dimension(&self) -> Option<usize> {
+    pub fn dimension(&self) -> usize {
         match self {
-            VectorType::DenseF32 { dimension } => Some(*dimension),
+            VectorType::DenseF32 { dimension } => *dimension,
         }
     }
 
@@ -79,6 +79,13 @@ impl VectorType {
     }
 }
 
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+pub enum VectorCardinality {
+    #[default]
+    Single,
+    Multi,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VectorConfig {
     #[serde(default)]
@@ -86,6 +93,8 @@ pub struct VectorConfig {
     #[serde(default)]
     pub normalize_vectors: bool,
     pub vector_type: VectorType,
+    #[serde(default)]
+    pub vector_cardinality: VectorCardinality,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub flags: Vec<String>,
 }
@@ -114,11 +123,13 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
                 dimension: dim as usize,
             },
         };
+        // TODO: Add support for multivectors. It is incompatible with vector normalization for now
         Ok(VectorConfig {
             similarity: proto.similarity().into(),
             normalize_vectors: proto.normalize_vectors,
             vector_type,
             flags: vec![],
+            vector_cardinality: VectorCardinality::Single,
         })
     }
 }

@@ -59,7 +59,7 @@ impl<'a> StoredParagraph<'a> {
             labels: elem.labels.iter().map(String::as_str).collect(),
             metadata: elem.metadata.as_ref().map_or(&[], |x| x),
             first_vector,
-            num_vectors: 1,
+            num_vectors: elem.vectors.len() as u32,
         }
     }
 

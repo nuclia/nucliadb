@@ -137,10 +137,12 @@ impl store::IntoBuffer for Elem {
         let ram_trie = trie_ram::create_trie(&self.labels);
         let trie_bytes = trie::serialize(ram_trie);
 
+        debug_assert!(self.vectors.len() == 1);
+
         Node::serialize_into(
             w,
             self.key,
-            vector_type.encode(&self.vector),
+            vector_type.encode(&self.vectors[0]),
             vector_type.vector_alignment(),
             trie_bytes,
             self.metadata.as_ref(),

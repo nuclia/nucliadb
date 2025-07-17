@@ -17,8 +17,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use crate::config::VectorConfig;
+use crate::config::{VectorCardinality, VectorConfig};
 use crate::data_point::{self, Elem};
+use crate::multivector::extract_multi_vectors;
 use crate::{VectorSegmentMetadata, utils};
 use nidx_protos::{noderesources, prost::*};
 use std::collections::HashMap;
@@ -124,7 +125,19 @@ pub fn index_resource(
                     sentence.vector.clone()
                 };
                 let metadata = sentence.metadata.as_ref().map(|m| m.encode_to_vec());
-                elems.push(Elem::new(key, vector, paragraph.labels.clone(), metadata));
+
+                match config.vector_cardinality {
+                    VectorCardinality::Single => elems.push(Elem::new(key, vector, paragraph.labels.clone(), metadata)),
+                    VectorCardinality::Multi => {
+                        let vectors = extract_multi_vectors(&vector, &config.vector_type)?;
+                        elems.push(Elem::new_multivector(
+                            key.clone(),
+                            vectors,
+                            paragraph.labels.clone(),
+                            metadata.clone(),
+                        ));
+                    }
+                };
             }
         }
     }

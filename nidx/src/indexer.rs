@@ -421,7 +421,7 @@ mod tests {
     use std::io::{Seek, Write};
 
     use nidx_protos::StringList;
-    use nidx_vector::config::{Similarity, VectorConfig, VectorType};
+    use nidx_vector::config::{Similarity, VectorCardinality, VectorConfig, VectorType};
     use tempfile::tempfile;
     use uuid::Uuid;
 
@@ -434,6 +434,7 @@ mod tests {
         normalize_vectors: false,
         vector_type: VectorType::DenseF32 { dimension: 3 },
         flags: vec![],
+        vector_cardinality: VectorCardinality::Single,
     };
 
     #[sqlx::test]

@@ -18,10 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use crate::ParagraphAddr;
+use crate::config::VectorCardinality;
 use crate::data_point::OpenDataPoint;
 use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
 use crate::data_store::ParagraphRef;
+use crate::multivector::extract_multi_vectors;
+use crate::multivector::maxsim_similarity;
 use crate::request_types::VectorSearchRequest;
 use crate::utils;
 use crate::{VectorErr, VectorR};
@@ -30,6 +34,7 @@ use nidx_protos::prost::*;
 use nidx_protos::{DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchResponse};
 use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
+use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::time::Instant;
@@ -39,6 +44,8 @@ use tracing::*;
 pub struct ScoredParagraph<'a> {
     score: f32,
     paragraph: ParagraphRef<'a>,
+    address: ParagraphAddr,
+    data_point: &'a OpenDataPoint,
 }
 impl Eq for ScoredParagraph<'_> {}
 impl std::hash::Hash for ScoredParagraph<'_> {
@@ -72,8 +79,13 @@ impl PartialEq for ScoredParagraph<'_> {
 }
 
 impl<'a> ScoredParagraph<'a> {
-    pub fn new(paragraph: ParagraphRef<'a>, score: f32) -> Self {
-        Self { paragraph, score }
+    pub fn new(data_point: &'a OpenDataPoint, address: ParagraphAddr, paragraph: ParagraphRef<'a>, score: f32) -> Self {
+        Self {
+            data_point,
+            paragraph,
+            score,
+            address,
+        }
     }
     pub fn score(&self) -> f32 {
         self.score
@@ -87,6 +99,12 @@ impl<'a> ScoredParagraph<'a> {
     pub fn metadata(&self) -> Option<&[u8]> {
         let metadata = self.paragraph.metadata();
         (!metadata.is_empty()).then_some(metadata)
+    }
+    pub fn vectors(&self) -> Vec<&[u8]> {
+        self.paragraph
+            .vectors(&self.address)
+            .map(|va| self.data_point.get_vector(va).vector())
+            .collect()
     }
 }
 
@@ -251,8 +269,9 @@ impl Reader {
                 open_data_point.search(query, filter, with_duplicates, no_results, &self.config, min_score);
 
             for candidate in partial_solution {
-                let paragraph = open_data_point.get_paragraph(candidate.paragraph());
-                let scored_paragraph = ScoredParagraph::new(paragraph, candidate.score());
+                let addr = candidate.paragraph();
+                let paragraph = open_data_point.get_paragraph(addr);
+                let scored_paragraph = ScoredParagraph::new(open_data_point, addr, paragraph, candidate.score());
                 ffsv.add(scored_paragraph, candidate.vector());
             }
         }
@@ -293,14 +312,72 @@ impl Reader {
             formula.operator = BooleanOperator::Or;
         }
 
-        let search_request = (total_to_get, request, formula);
         let v = time.elapsed().as_millis();
-        debug!("{id:?} - Searching: starts at {v} ms");
+        let result = match self.config.vector_cardinality {
+            VectorCardinality::Single => {
+                let search_request = (total_to_get, request, formula);
+                debug!("{id:?} - Searching: starts at {v} ms");
+                self._search(&search_request, &request.segment_filtering_formula)?
+            }
+            VectorCardinality::Multi => {
+                let search_vectors = extract_multi_vectors(&request.vector, &self.config.vector_type)?;
+                debug!(
+                    "{id:?} - Multi-vector searching: starts at {v} ms with {} requests",
+                    search_vectors.len()
+                );
+                let encoded_query = search_vectors
+                    .iter()
+                    .map(|v| self.config.vector_type.encode(v))
+                    .collect::<Vec<_>>();
 
-        let result = self._search(&search_request, &request.segment_filtering_formula)?;
+                // Search for each vector in the query
+                let results = search_vectors
+                    .into_par_iter()
+                    .map(|v| {
+                        let mut subreq = request.clone();
+
+                        subreq.vector = v;
+                        // We are OK with duplicate individual vectors. We always deduplicate by paragraphs anyway (NodeFilter.paragraphs)
+                        subreq.with_duplicates = true;
+                        // We don't care about min_score in this first pass, we apply min_score on top of maxsim similarity
+                        subreq.min_score = f32::MIN;
+                        // Request at least a few vectors, since the rerank may offer different results later
+                        let total_to_get = total_to_get.max(10);
+
+                        let search_request = (total_to_get, &subreq, formula.clone());
+                        self._search(&search_request, &request.segment_filtering_formula)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let v = time.elapsed().as_millis();
+                debug!("{id:?} - Multi-vector reranking: starts at {v} ms");
+
+                // Remove duplicates, we only want each paragraph once
+                let mut result_paragraphs = results.into_iter().flatten().collect::<Vec<_>>();
+                result_paragraphs.sort_unstable_by_key(|rp| rp.address);
+                result_paragraphs.dedup_by_key(|rp| rp.address);
+
+                // Score each paragraph using maxsim
+                let similarity_function = self.config.similarity_function();
+                let mut results = result_paragraphs
+                    .into_par_iter()
+                    .filter_map(|mut sp| {
+                        sp.score = maxsim_similarity(similarity_function, &encoded_query, &sp.vectors());
+                        (sp.score() > request.min_score).then_some(sp)
+                    })
+                    .collect::<Vec<_>>();
+
+                // Select top_k
+                results.sort_unstable_by(|a, b| b.score().partial_cmp(&a.score()).unwrap());
+                results.truncate(total_to_get);
+
+                results
+            }
+        };
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: ends at {v} ms");
+
         debug!("{id:?} - Creating results: starts at {v} ms");
 
         let documents = result
@@ -335,7 +412,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::config::{Similarity, VectorConfig, VectorType};
+    use crate::config::{Similarity, VectorCardinality, VectorConfig, VectorType};
     use crate::data_point;
     use crate::indexer::{ResourceWrapper, index_resource};
 
@@ -348,6 +425,7 @@ mod tests {
             normalize_vectors: false,
             vector_type: VectorType::DenseF32 { dimension: 3 },
             flags: vec![],
+            vector_cardinality: VectorCardinality::Single,
         };
         let raw_sentences = [
             (
@@ -444,6 +522,7 @@ mod tests {
             normalize_vectors: false,
             vector_type: VectorType::DenseF32 { dimension: 3 },
             flags: vec![],
+            vector_cardinality: VectorCardinality::Single,
         };
         let raw_sentences = [
             (
@@ -565,6 +644,7 @@ mod tests {
             normalize_vectors: false,
             vector_type: VectorType::DenseF32 { dimension: 3 },
             flags: vec![],
+            vector_cardinality: VectorCardinality::Single,
         };
         let raw_sentences = [
             (

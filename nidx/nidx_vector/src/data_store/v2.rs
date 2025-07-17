@@ -47,7 +47,7 @@ impl DataStoreV2 {
         let mut vectors = VectorStoreWriter::new(path, vector_type)?;
 
         for (idx, elem) in (0..).zip(entries.into_iter()) {
-            let (first_vector, _) = vectors.write(idx, &[&vector_type.encode(&elem.vector)])?;
+            let (first_vector, _) = vectors.write(idx, elem.vectors.iter().map(|v| vector_type.encode(v)))?;
             paragraphs.write(StoredParagraph::from_elem(&elem, first_vector))?;
         }
 
@@ -70,13 +70,10 @@ impl DataStoreV2 {
             for paragraph_addr in alive {
                 // Retrieve paragraph and vectors
                 let paragraph = store.get_paragraph(paragraph_addr);
-                let p_vectors: Vec<_> = paragraph
-                    .vectors(&paragraph_addr)
-                    .map(|v| store.get_vector(v).vector())
-                    .collect();
+                let p_vectors = paragraph.vectors(&paragraph_addr).map(|v| store.get_vector(v).vector());
 
                 // Write to new store
-                let (first_vector, last_vector) = vectors.write(p_idx, p_vectors.as_slice())?;
+                let (first_vector, last_vector) = vectors.write(p_idx, p_vectors)?;
                 paragraphs.write_paragraph_ref(paragraph, first_vector, last_vector - first_vector + 1)?;
                 p_idx += 1;
             }
