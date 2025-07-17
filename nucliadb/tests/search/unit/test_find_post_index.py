@@ -100,7 +100,6 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
                         ),
                     ),
                 ],
-                page_number=0,
                 result_per_page=20,
                 query=query,
                 next_page=False,
@@ -122,7 +121,6 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
                         score=0.89,
                     ),
                 ],
-                page_number=0,
                 result_per_page=20,
             ),
         )
