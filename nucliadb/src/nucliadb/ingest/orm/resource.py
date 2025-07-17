@@ -37,7 +37,6 @@ from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.brain_v2 import FilePagePositions
 from nucliadb.ingest.orm.metrics import processor_observer
-from nucliadb.ingest.orm.utils import CLEAR_TITLE_FLAG
 from nucliadb_models import content_types
 from nucliadb_models.common import CloudLink
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
@@ -166,13 +165,6 @@ class Resource:
                     payload.ClearField(field)  # type: ignore
 
             self.basic.MergeFrom(payload)
-
-            # Make sure title is cleared if the flag is set
-            if self.basic.title == CLEAR_TITLE_FLAG:
-                # We set the title to the resource UUID so that it is not empty.
-                # If there is a computed title in the link or file extracted metadata
-                # by processing, it will be updated later.
-                self.basic.title = self.uuid
 
             # Prevent duplicated languages
             unique_languages = set(self.basic.metadata.languages)

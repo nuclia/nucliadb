@@ -34,7 +34,6 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.utils import CLEAR_TITLE_FLAG
 from nucliadb.models.internal.processing import ProcessingInfo, PushPayload, Source
 from nucliadb.writer import SERVICE_NAME, logger
 from nucliadb.writer.api.constants import X_NUCLIADB_USER, X_SKIP_STORE
@@ -395,14 +394,14 @@ async def reprocess_resource_rslug_prefix(
     kbid: str,
     rslug: str,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
-    override_title: bool = Query(
+    reset_title: bool = Query(
         default=False,
-        description="Override the title of the resource with the file or link computed titles, if any.",
+        description="Reset the title of the resource so that the file or link computed titles are set after processing.",
     ),
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _reprocess_resource(
-        request, kbid, rid, x_nucliadb_user=x_nucliadb_user, override_title=override_title
+        request, kbid, rid, x_nucliadb_user=x_nucliadb_user, reset_title=reset_title
     )
 
 
@@ -420,13 +419,13 @@ async def reprocess_resource_rid_prefix(
     kbid: str,
     rid: str,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
-    override_title: bool = Query(
+    reset_title: bool = Query(
         default=False,
-        description="Override the title of the resource with the file or link computed titles, if any.",
+        description="Reset the title of the resource so that the file or link computed titles are set after processing.",
     ),
 ):
     return await _reprocess_resource(
-        request, kbid, rid, x_nucliadb_user=x_nucliadb_user, override_title=override_title
+        request, kbid, rid, x_nucliadb_user=x_nucliadb_user, reset_title=reset_title
     )
 
 
@@ -435,9 +434,9 @@ async def _reprocess_resource(
     kbid: str,
     rid: str,
     x_nucliadb_user: str,
-    override_title: bool = Query(
+    reset_title: bool = Query(
         default=False,
-        description="Override the title of the resource with the file or link computed titles, if any.",
+        description="Reset the title of the resource so that the file or link computed titles are set after processing.",
     ),
 ):
     await validate_rid_exists_or_raise_error(kbid, rid)
@@ -481,8 +480,10 @@ async def _reprocess_resource(
     writer.kbid = kbid
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
-    if override_title:
-        writer.basic.title = CLEAR_TITLE_FLAG
+    if reset_title:
+        # Setting the title to the resource uuid will ensure that the newly processed link or file
+        # computed titles will be used as the resource title after processing.
+        writer.basic.title = rid
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
     await transaction.commit(writer, partition, wait=False)

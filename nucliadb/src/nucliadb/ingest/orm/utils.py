@@ -51,9 +51,6 @@ def set_title(writer: BrokerMessage, toprocess: PushPayload, title: str):
     toprocess.genericfield["title"] = Text(body=title, format=PushTextFormat.PLAIN)
 
 
-CLEAR_TITLE_FLAG = "__NUCLIA_CLEAR_TITLE__"
-
-
 def compute_paragraph_key(rid: str, paragraph_key: str) -> str:
     return paragraph_key.replace("N_RID", rid)
 

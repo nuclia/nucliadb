@@ -1100,10 +1100,10 @@ async def test_file_computed_titles_are_set_on_resource_title(
     assert title != extracted_title
     assert title == "Something else"
 
-    # Now check that if the override_title flag is set on reprocess endpoint, the title is changed
+    # Now check that if the reset_title flag is set on reprocess endpoint, the title is changed
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resource/{rid2}/reprocess",
-        params={"override_title": True},
+        params={"reset_title": True},
     )
     assert resp.status_code == 202, resp.text
 
@@ -1191,10 +1191,10 @@ async def test_link_computed_titles_are_automatically_set_to_resource_title(
     assert title != extracted_title
     assert title == "Luis Suarez - Wikipedia"
 
-    # Now check that if the override_title flag is set on reprocess endpoint, the title is changed
+    # Now check that if the reset_title flag is set on reprocess endpoint, the title is changed
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resource/{rid2}/reprocess",
-        params={"override_title": True},
+        params={"reset_title": True},
     )
     assert resp.status_code == 202, resp.text
 
