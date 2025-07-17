@@ -64,7 +64,6 @@ async def paragraph_query_to_pb(
     request.paragraph = True
 
     # We need to ask for all and cut later
-    request.page_number = 0
     request.result_per_page = top_k
 
     request.body = query

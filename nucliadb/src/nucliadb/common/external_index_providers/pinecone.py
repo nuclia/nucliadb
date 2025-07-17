@@ -648,7 +648,7 @@ class PineconeIndexManager(ExternalIndexManager):
         index_host = self.get_index_host(vectorset_id=vectorset_id)
         data_plane = self.get_data_plane(index_host=index_host)
         filter = convert_to_pinecone_filter(request)
-        top_k = (request.page_number + 1) * request.result_per_page
+        top_k = request.result_per_page
         query_results = await data_plane.query(
             vector=list(request.vector),
             top_k=top_k,

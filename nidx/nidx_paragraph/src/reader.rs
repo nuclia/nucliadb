@@ -90,7 +90,6 @@ impl ParagraphReaderService {
             termc: termc.get_termc(),
             text_service: self,
             query: &text,
-            page_number: 1,
             results_per_page: 10,
             searcher,
             min_score: 0.0,
@@ -122,7 +121,6 @@ impl ParagraphReaderService {
 
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
-        let offset = results * request.page_number as usize;
 
         let facets: Vec<_> = request
             .faceted
@@ -156,7 +154,6 @@ impl ParagraphReaderService {
         let searcher = Searcher {
             request,
             results,
-            offset,
             facets: &facets,
             text: &text,
             only_faceted: request.only_faceted,
@@ -282,7 +279,6 @@ impl Iterator for BatchProducer {
 struct Searcher<'a> {
     request: &'a ParagraphSearchRequest,
     results: usize,
-    offset: usize,
     facets: &'a [String],
     text: &'a str,
     only_faceted: bool,
@@ -292,7 +288,6 @@ impl Searcher<'_> {
         &self,
         order: OrderBy,
         limit: usize,
-        offset: usize,
     ) -> impl Collector<Fruit = Vec<(DateTime, DocAddress)>> {
         let order_field = match order.sort_by() {
             OrderField::Created => "created",
@@ -302,9 +297,7 @@ impl Searcher<'_> {
             OrderType::Desc => Order::Desc,
             OrderType::Asc => Order::Asc,
         };
-        TopDocs::with_limit(limit)
-            .and_offset(offset)
-            .order_by_fast_field(order_field, order_direction)
+        TopDocs::with_limit(limit).order_by_fast_field(order_field, order_direction)
     }
     fn do_search(
         &self,
@@ -334,7 +327,7 @@ impl Searcher<'_> {
             let extra_result = self.results + 1;
             match self.request.order.clone() {
                 Some(order) => {
-                    let custom_collector = self.custom_order_collector(order, extra_result, self.offset);
+                    let custom_collector = self.custom_order_collector(order, extra_result);
                     let collector = &(Count, custom_collector);
                     let (total, top_docs) = searcher.search(&query, collector)?;
                     Ok(ParagraphSearchResponse::from(SearchIntResponse {
@@ -345,13 +338,12 @@ impl Searcher<'_> {
                         termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
-                        page_number: self.request.page_number,
                         results_per_page: self.results as i32,
                         searcher,
                     }))
                 }
                 None => {
-                    let topdocs_collector = TopDocs::with_limit(extra_result).and_offset(self.offset);
+                    let topdocs_collector = TopDocs::with_limit(extra_result);
                     let collector = &(Count, topdocs_collector);
                     let (total, top_docs) = searcher.search(&query, collector)?;
                     Ok(ParagraphSearchResponse::from(SearchBm25Response {
@@ -362,7 +354,6 @@ impl Searcher<'_> {
                         termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
-                        page_number: self.request.page_number,
                         results_per_page: self.results as i32,
                         searcher,
                         min_score,
@@ -374,7 +365,7 @@ impl Searcher<'_> {
 
             match self.request.order.clone() {
                 Some(order) => {
-                    let custom_collector = self.custom_order_collector(order, extra_result, self.offset);
+                    let custom_collector = self.custom_order_collector(order, extra_result);
                     let collector = &(Count, facet_collector, custom_collector);
                     let (total, facets_count, top_docs) = searcher.search(&query, collector)?;
                     Ok(ParagraphSearchResponse::from(SearchIntResponse {
@@ -385,13 +376,12 @@ impl Searcher<'_> {
                         termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
-                        page_number: self.request.page_number,
                         results_per_page: self.results as i32,
                         searcher,
                     }))
                 }
                 None => {
-                    let topdocs_collector = TopDocs::with_limit(extra_result).and_offset(self.offset);
+                    let topdocs_collector = TopDocs::with_limit(extra_result);
                     let collector = &(Count, facet_collector, topdocs_collector);
                     let (total, facets_count, top_docs) = searcher.search(&query, collector)?;
                     Ok(ParagraphSearchResponse::from(SearchBm25Response {
@@ -402,7 +392,6 @@ impl Searcher<'_> {
                         termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
-                        page_number: self.request.page_number,
                         results_per_page: self.results as i32,
                         searcher,
                         min_score,

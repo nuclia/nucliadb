@@ -83,7 +83,6 @@ async fn test_vector_normalization_shard(pool: PgPool) -> Result<(), Box<dyn std
         vector: query_vector,
         vectorset: "english".to_string(),
         with_duplicates: true,
-        page_number: 0,
         result_per_page: 30,
         min_score_semantic: 0.9,
         ..Default::default()

@@ -26,8 +26,6 @@ pub struct VectorSearchRequest {
     pub id: String,
     /// Embedded vector search.
     pub vector: Vec<f32>,
-    /// What page is the answer.
-    pub page_number: i32,
     /// How many results are in this page.
     pub result_per_page: i32,
     pub with_duplicates: bool,

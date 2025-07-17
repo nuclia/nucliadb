@@ -26,7 +26,6 @@ pub struct DocumentSearchRequest {
     pub body: String,
     pub order: Option<nidx_protos::OrderBy>,
     pub faceted: Option<nidx_protos::Faceted>,
-    pub page_number: i32,
     pub result_per_page: i32,
     pub only_faceted: bool,
     pub advanced_query: Option<String>,

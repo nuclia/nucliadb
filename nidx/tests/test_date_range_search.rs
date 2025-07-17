@@ -137,7 +137,6 @@ async fn test_date_range_search(pool: PgPool) -> Result<(), Box<dyn std::error::
         order: None,
         vectorset: "english".to_string(),
         vector: vec![4.0, 6.0, 7.0],
-        page_number: 0,
         result_per_page: 20,
         with_duplicates: true,
         ..Default::default()

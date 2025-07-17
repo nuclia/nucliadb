@@ -193,7 +193,6 @@ async def test_query(external_index_manager: PineconeIndexManager, data_plane):
     search_request = nodereader_pb2.SearchRequest()
     search_request.vector.extend([1, 2, 3])
     search_request.result_per_page = 20
-    search_request.page_number = 0
     query_results = await external_index_manager.query(search_request)
     data_plane.query.assert_awaited_once()
     top_k = data_plane.query.call_args[1]["top_k"]
