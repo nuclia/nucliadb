@@ -39,12 +39,27 @@ use std::collections::HashSet;
 use std::time::Instant;
 use tracing::*;
 
-pub trait SearchRequest {
-    fn get_query(&self) -> &[f32];
-    fn get_filter(&self) -> &Formula;
-    fn no_results(&self) -> usize;
-    fn with_duplicates(&self) -> bool;
-    fn min_score(&self) -> f32;
+struct SearchRequest<'a> {
+    request: &'a VectorSearchRequest,
+    formula: Formula,
+}
+
+impl SearchRequest<'_> {
+    fn with_duplicates(&self) -> bool {
+        self.request.with_duplicates
+    }
+    fn get_filter(&self) -> &Formula {
+        &self.formula
+    }
+    fn get_query(&self) -> &[f32] {
+        &self.request.vector
+    }
+    fn no_results(&self) -> usize {
+        self.request.result_per_page as usize
+    }
+    fn min_score(&self) -> f32 {
+        self.request.min_score
+    }
 }
 
 #[derive(Clone)]
@@ -187,24 +202,6 @@ fn segment_matches(expression: &BooleanExpression<String>, labels: &HashSet<Stri
     }
 }
 
-impl SearchRequest for (&VectorSearchRequest, Formula) {
-    fn with_duplicates(&self) -> bool {
-        self.0.with_duplicates
-    }
-    fn get_filter(&self) -> &Formula {
-        &self.1
-    }
-    fn get_query(&self) -> &[f32] {
-        &self.0.vector
-    }
-    fn no_results(&self) -> usize {
-        self.0.result_per_page as usize
-    }
-    fn min_score(&self) -> f32 {
-        self.0.min_score
-    }
-}
-
 impl TryFrom<ScoredParagraph<'_>> for DocumentScored {
     type Error = String;
     fn try_from(paragraph: ScoredParagraph) -> Result<Self, Self::Error> {
@@ -235,9 +232,9 @@ impl Searcher {
         self.open_segments.iter().map(|dp| dp.space_usage()).sum()
     }
 
-    pub fn _search(
+    fn _search(
         &self,
-        request: &dyn SearchRequest,
+        request: &SearchRequest,
         segment_filter: &Option<BooleanExpression<String>>,
     ) -> VectorR<Vec<ScoredParagraph>> {
         let normalized_query;
@@ -317,9 +314,10 @@ impl Searcher {
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: starts at {v} ms");
+        let search_request = &SearchRequest { request, formula };
         let result = match self.config.vector_cardinality {
-            VectorCardinality::Single => self.search_single_vector(request, formula)?,
-            VectorCardinality::Multi => self.search_multi_vector(request, formula)?,
+            VectorCardinality::Single => self._search(search_request, &request.segment_filtering_formula)?,
+            VectorCardinality::Multi => self.search_multi_vector(search_request)?,
         };
 
         let v = time.elapsed().as_millis();
@@ -344,13 +342,8 @@ impl Searcher {
         })
     }
 
-    fn search_single_vector(&self, request: &VectorSearchRequest, formula: Formula) -> VectorR<Vec<ScoredParagraph>> {
-        let search_request = (request, formula);
-        self._search(&search_request, &request.segment_filtering_formula)
-    }
-
-    fn search_multi_vector(&self, request: &VectorSearchRequest, formula: Formula) -> VectorR<Vec<ScoredParagraph>> {
-        let search_vectors = extract_multi_vectors(&request.vector, &self.config.vector_type)?;
+    fn search_multi_vector(&self, search: &SearchRequest) -> VectorR<Vec<ScoredParagraph>> {
+        let search_vectors = extract_multi_vectors(&search.request.vector, &self.config.vector_type)?;
         let encoded_query = search_vectors
             .iter()
             .map(|v| self.config.vector_type.encode(v))
@@ -360,18 +353,21 @@ impl Searcher {
         let results = search_vectors
             .into_par_iter()
             .map(|v| {
-                let mut subreq = request.clone();
+                let mut request = search.request.clone();
 
-                subreq.vector = v;
+                request.vector = v;
                 // We are OK with duplicate individual vectors. We always deduplicate by paragraphs anyway (NodeFilter.paragraphs)
-                subreq.with_duplicates = true;
+                request.with_duplicates = true;
                 // We don't care about min_score in this first pass, we apply min_score on top of maxsim similarity
-                subreq.min_score = f32::MIN;
+                request.min_score = f32::MIN;
                 // Request at least a few vectors, since the rerank may offer different results later
-                subreq.result_per_page = request.result_per_page.max(10);
+                request.result_per_page = search.request.result_per_page.max(10);
 
-                let search_request = (&subreq, formula.clone());
-                self._search(&search_request, &request.segment_filtering_formula)
+                let search_request = SearchRequest {
+                    request: &request,
+                    formula: search.formula.clone(),
+                };
+                self._search(&search_request, &search.request.segment_filtering_formula)
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -386,13 +382,13 @@ impl Searcher {
             .into_par_iter()
             .filter_map(|mut sp| {
                 sp.score = maxsim_similarity(similarity_function, &encoded_query, &sp.vectors());
-                (sp.score() > request.min_score).then_some(sp)
+                (sp.score() > search.request.min_score).then_some(sp)
             })
             .collect::<Vec<_>>();
 
         // Select top_k
         results.sort_unstable_by(|a, b| b.score().partial_cmp(&a.score()).unwrap());
-        results.truncate(request.result_per_page as usize);
+        results.truncate(search.request.result_per_page as usize);
 
         Ok(results)
     }
