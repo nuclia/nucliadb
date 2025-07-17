@@ -18,10 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub use crate::data_point::Neighbour;
 use crate::data_point::OpenDataPoint;
 use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
+use crate::data_store::ParagraphRef;
 use crate::request_types::VectorSearchRequest;
 use crate::utils;
 use crate::{VectorErr, VectorR};
@@ -31,20 +31,75 @@ use nidx_protos::{DocumentScored, DocumentVectorIdentifier, SentenceMetadata, Ve
 use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::time::Instant;
 use tracing::*;
+
+#[derive(Clone)]
+pub struct ScoredParagraph<'a> {
+    score: f32,
+    paragraph: ParagraphRef<'a>,
+}
+impl Eq for ScoredParagraph<'_> {}
+impl std::hash::Hash for ScoredParagraph<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id().hash(state)
+    }
+
+    fn hash_slice<H: std::hash::Hasher>(data: &[Self], state: &mut H)
+    where
+        Self: Sized,
+    {
+        for piece in data {
+            piece.hash(state)
+        }
+    }
+}
+impl Ord for ScoredParagraph<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.paragraph.id().cmp(other.paragraph.id())
+    }
+}
+impl PartialOrd for ScoredParagraph<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl PartialEq for ScoredParagraph<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.paragraph.id() == other.paragraph.id()
+    }
+}
+
+impl<'a> ScoredParagraph<'a> {
+    pub fn new(paragraph: ParagraphRef<'a>, score: f32) -> Self {
+        Self { paragraph, score }
+    }
+    pub fn score(&self) -> f32 {
+        self.score
+    }
+    pub fn id(&self) -> &str {
+        self.paragraph.id()
+    }
+    pub fn labels(&self) -> Vec<String> {
+        self.paragraph.labels()
+    }
+    pub fn metadata(&self) -> Option<&[u8]> {
+        let metadata = self.paragraph.metadata();
+        (!metadata.is_empty()).then_some(metadata)
+    }
+}
 
 // Fixed-sized sorted collection
 struct Fssc<'a> {
     size: usize,
     with_duplicates: bool,
     seen: HashSet<Vec<u8>>,
-    buff: HashMap<Neighbour<'a>, f32>,
+    buff: HashSet<ScoredParagraph<'a>>,
 }
-impl<'a> From<Fssc<'a>> for Vec<Neighbour<'a>> {
+impl<'a> From<Fssc<'a>> for Vec<ScoredParagraph<'a>> {
     fn from(fssv: Fssc<'a>) -> Self {
-        let mut result: Vec<_> = fssv.buff.into_keys().collect();
+        let mut result: Vec<_> = fssv.buff.into_iter().collect();
         result.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap_or(Ordering::Less));
         result
     }
@@ -58,14 +113,14 @@ impl<'a> Fssc<'a> {
             size,
             with_duplicates,
             seen: HashSet::new(),
-            buff: HashMap::with_capacity(size),
+            buff: HashSet::with_capacity(size),
         }
     }
-    fn add(&mut self, candidate: Neighbour<'a>) {
-        if !self.with_duplicates && self.seen.contains(candidate.vector()) {
+    fn add(&mut self, candidate: ScoredParagraph<'a>, vector: &[u8]) {
+        if !self.with_duplicates && self.seen.contains(vector) {
             return;
         } else if !self.with_duplicates {
-            let vector = candidate.vector().to_vec();
+            let vector = vector.to_vec();
             self.seen.insert(vector);
         }
 
@@ -74,16 +129,15 @@ impl<'a> Fssc<'a> {
             let smallest_bigger = self
                 .buff
                 .iter()
-                .map(|(key, score)| (key.clone(), *score))
-                .filter(|(_, v)| score > *v)
-                .min_by(|(_, v0), (_, v1)| v0.partial_cmp(v1).unwrap())
-                .map(|(key, _)| key);
+                .filter(|sp| score > sp.score())
+                .min_by(|sp0, sp1| sp0.score().partial_cmp(&sp1.score()).unwrap())
+                .cloned();
             if let Some(key) = smallest_bigger {
-                self.buff.remove_entry(&key);
-                self.buff.insert(candidate, score);
+                self.buff.remove(&key);
+                self.buff.insert(candidate);
             }
         } else {
-            self.buff.insert(candidate, score);
+            self.buff.insert(candidate);
         }
     }
 }
@@ -126,15 +180,12 @@ impl SearchRequest for (usize, &VectorSearchRequest, Formula) {
     }
 }
 
-impl TryFrom<Neighbour<'_>> for DocumentScored {
+impl TryFrom<ScoredParagraph<'_>> for DocumentScored {
     type Error = String;
-    fn try_from(neighbour: Neighbour) -> Result<Self, Self::Error> {
-        let id = std::str::from_utf8(neighbour.id());
-        let metadata = neighbour.metadata().map(SentenceMetadata::decode);
-        let labels = neighbour.labels();
-        let Ok(id) = id.map(|i| i.to_string()) else {
-            return Err("Id could not be decoded".to_string());
-        };
+    fn try_from(paragraph: ScoredParagraph) -> Result<Self, Self::Error> {
+        let id = paragraph.id().to_string();
+        let metadata = paragraph.metadata().map(SentenceMetadata::decode);
+        let labels = paragraph.labels();
         let Ok(metadata) = metadata.transpose() else {
             return Err("The metadata could not be decoded".to_string());
         };
@@ -142,7 +193,7 @@ impl TryFrom<Neighbour<'_>> for DocumentScored {
             labels,
             metadata,
             doc_id: Some(DocumentVectorIdentifier { id }),
-            score: neighbour.score(),
+            score: paragraph.score(),
         })
     }
 }
@@ -163,7 +214,7 @@ impl Reader {
         &self,
         request: &dyn SearchRequest,
         segment_filter: &Option<BooleanExpression<String>>,
-    ) -> VectorR<Vec<Neighbour>> {
+    ) -> VectorR<Vec<ScoredParagraph>> {
         let normalized_query;
         let query = if self.config.normalize_vectors {
             normalized_query = utils::normalize_vector(request.get_query());
@@ -198,8 +249,11 @@ impl Reader {
             }
             let partial_solution =
                 open_data_point.search(query, filter, with_duplicates, no_results, &self.config, min_score);
+
             for candidate in partial_solution {
-                ffsv.add(candidate);
+                let paragraph = open_data_point.get_paragraph(candidate.paragraph());
+                let scored_paragraph = ScoredParagraph::new(paragraph, candidate.score());
+                ffsv.add(scored_paragraph, candidate.vector());
             }
         }
 
@@ -293,6 +347,7 @@ mod tests {
             similarity: Similarity::Cosine,
             normalize_vectors: false,
             vector_type: VectorType::DenseF32 { dimension: 3 },
+            flags: vec![],
         };
         let raw_sentences = [
             (
@@ -352,7 +407,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![data_point::open(segment)?], vsc).unwrap();
+        let reader = Reader::open(vec![data_point::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -388,6 +443,7 @@ mod tests {
             similarity: Similarity::Cosine,
             normalize_vectors: false,
             vector_type: VectorType::DenseF32 { dimension: 3 },
+            flags: vec![],
         };
         let raw_sentences = [
             (
@@ -447,7 +503,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![data_point::open(segment)?], vsc).unwrap();
+        let reader = Reader::open(vec![data_point::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -508,6 +564,7 @@ mod tests {
             similarity: Similarity::Cosine,
             normalize_vectors: false,
             vector_type: VectorType::DenseF32 { dimension: 3 },
+            flags: vec![],
         };
         let raw_sentences = [
             (
@@ -559,7 +616,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![data_point::open(segment)?], vsc).unwrap();
+        let reader = Reader::open(vec![data_point::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),

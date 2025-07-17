@@ -18,96 +18,86 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{fs::File, path::Path};
+mod v1;
+mod v2;
 
-use memmap2::Mmap;
-pub use node::Node;
+use std::any::Any;
 
-use crate::{
-    config::{VectorConfig, VectorType},
-    data_point::Elem,
-};
+pub use v1::DataStoreV1;
+pub use v1::node::Node;
+pub use v2::DataStoreV2;
+use v2::StoredParagraph;
 
-mod node;
-mod store;
+use crate::{ParagraphAddr, VectorAddr};
 
-const NODES: &str = "nodes.kv";
-
-pub struct DataStore {
-    nodes: Mmap,
+pub enum OpenReason {
+    Search,
+    Create,
 }
 
-impl DataStore {
-    pub fn size_bytes(&self) -> usize {
-        self.nodes.len()
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
+pub struct VectorRef<'a> {
+    vector: &'a [u8],
+    paragraph_addr: ParagraphAddr,
+}
+
+impl<'a> VectorRef<'a> {
+    pub fn vector(&self) -> &'a [u8] {
+        self.vector
     }
 
-    pub fn stored_elements(&self) -> usize {
-        store::stored_elements(&self.nodes)
+    pub fn paragraph(&self) -> ParagraphAddr {
+        self.paragraph_addr
     }
+}
 
-    pub fn get_value(&self, id: usize) -> Node {
-        store::get_value(&self.nodes, id)
-    }
+#[derive(Clone)]
+pub enum ParagraphRef<'a> {
+    V1(Node<'a>),
+    V2(StoredParagraph<'a>),
+}
 
-    pub fn will_need(&self, id: usize, vector_len: usize) {
-        store::will_need(&self.nodes, id, vector_len);
-    }
-
-    pub fn open(path: &Path) -> std::io::Result<Self> {
-        let nodes_file = File::open(path.join(NODES))?;
-        let nodes = unsafe { Mmap::map(&nodes_file)? };
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            nodes.advise(memmap2::Advice::WillNeed)?;
+impl ParagraphRef<'_> {
+    pub fn id(&self) -> &str {
+        match self {
+            ParagraphRef::V1(n) => n.key(),
+            ParagraphRef::V2(p) => p.key(),
         }
-
-        Ok(Self { nodes })
     }
 
-    pub fn create(path: &Path, slots: Vec<Elem>, vector_type: &VectorType) -> std::io::Result<()> {
-        let mut nodes_file = File::options()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .open(path.join(NODES))?;
-        store::create_key_value(&mut nodes_file, slots, vector_type)?;
-
-        Ok(())
+    pub fn labels(&self) -> Vec<String> {
+        match self {
+            ParagraphRef::V1(n) => n.labels(),
+            ParagraphRef::V2(p) => p.labels(),
+        }
     }
 
-    pub fn merge(
-        path: &Path,
-        segments: &mut [(impl Iterator<Item = usize>, &DataStore)],
-        config: &VectorConfig,
-    ) -> std::io::Result<bool> {
-        let mut nodes_file = File::options()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .open(path.join(NODES))?;
-        store::merge(
-            &mut nodes_file,
-            segments
-                .iter_mut()
-                .map(|(deletions, store)| (deletions, &store.nodes[..]))
-                .collect::<Vec<_>>()
-                .as_mut_slice(),
-            config,
-        )
+    pub fn metadata(&self) -> &[u8] {
+        match self {
+            ParagraphRef::V1(n) => n.metadata(),
+            ParagraphRef::V2(p) => p.metadata(),
+        }
+    }
+
+    pub fn vectors(&self, addr: &ParagraphAddr) -> impl Iterator<Item = VectorAddr> {
+        let (start, len) = match self {
+            ParagraphRef::V1(_) => (addr.0, 1),
+            ParagraphRef::V2(sp) => sp.vector_first_and_len(),
+        };
+        (start..start + len).map(VectorAddr)
     }
 }
 
-impl store::IntoBuffer for Elem {
-    fn serialize_into<W: std::io::Write>(self, w: W, vector_type: &VectorType) -> std::io::Result<()> {
-        Node::serialize_into(
-            w,
-            self.key,
-            vector_type.encode(&self.vector),
-            vector_type.vector_alignment(),
-            self.labels.0,
-            self.metadata.as_ref(),
-        )
-    }
+pub trait DataStore: Sync + Send {
+    fn size_bytes(&self) -> usize;
+    fn stored_paragraph_count(&self) -> usize;
+    fn stored_vector_count(&self) -> usize;
+    fn get_paragraph(&self, id: ParagraphAddr) -> ParagraphRef;
+    fn get_vector(&self, id: VectorAddr) -> VectorRef;
+    fn will_need(&self, id: VectorAddr);
+    fn as_any(&self) -> &dyn Any;
+}
+
+pub fn iter_paragraphs(data_store: &impl DataStore) -> impl Iterator<Item = ParagraphAddr> {
+    (0..data_store.stored_paragraph_count() as u32).map(ParagraphAddr)
 }

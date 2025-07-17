@@ -32,6 +32,7 @@ fn test_hidden_search() -> anyhow::Result<()> {
         normalize_vectors: false,
         similarity: nidx_vector::config::Similarity::Dot,
         vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 4 },
+        flags: vec![],
     };
 
     // Create two resources, one hidden and one not

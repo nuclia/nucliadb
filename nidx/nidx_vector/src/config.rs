@@ -26,6 +26,10 @@ use serde::{Deserialize, Serialize};
 use crate::VectorErr;
 use crate::vector_types::*;
 
+pub mod flags {
+    pub const DATA_STORE_V2: &str = "data_store_v2";
+}
+
 #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Similarity {
     Dot,
@@ -51,22 +55,26 @@ pub enum VectorType {
 impl VectorType {
     pub fn encode(&self, vector: &[f32]) -> Vec<u8> {
         match self {
-            #[rustfmt::skip]
             VectorType::DenseF32 { .. } => dense_f32::encode_vector(vector),
         }
     }
 
     pub fn vector_alignment(&self) -> usize {
         match self {
-            #[rustfmt::skip]
             VectorType::DenseF32 { .. } => size_of::<f32>(),
         }
     }
 
     pub fn dimension(&self) -> Option<usize> {
         match self {
-            #[rustfmt::skip]
             VectorType::DenseF32 { dimension } => Some(*dimension),
+        }
+    }
+
+    /// The length of bytes of each vector
+    pub fn len_bytes(&self) -> usize {
+        match self {
+            VectorType::DenseF32 { dimension } => dimension * size_of::<f32>(),
         }
     }
 }
@@ -78,21 +86,14 @@ pub struct VectorConfig {
     #[serde(default)]
     pub normalize_vectors: bool,
     pub vector_type: VectorType,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub flags: Vec<String>,
 }
 
 impl VectorConfig {
-    /// The length of bytes of each vector
-    pub fn vector_len_bytes(&self) -> usize {
-        match self.vector_type {
-            VectorType::DenseF32 { dimension } => dimension * size_of::<f32>(),
-        }
-    }
-
     pub fn similarity_function(&self) -> fn(&[u8], &[u8]) -> f32 {
         match (&self.similarity, &self.vector_type) {
-            #[rustfmt::skip]
             (Similarity::Dot, VectorType::DenseF32 { .. }) => dense_f32::dot_similarity,
-            #[rustfmt::skip]
             (Similarity::Cosine, VectorType::DenseF32 { .. }) => dense_f32::cosine_similarity,
         }
     }
@@ -117,6 +118,7 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
             similarity: proto.similarity().into(),
             normalize_vectors: proto.normalize_vectors,
             vector_type,
+            flags: vec![],
         })
     }
 }

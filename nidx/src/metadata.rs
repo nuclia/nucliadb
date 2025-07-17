@@ -93,6 +93,7 @@ mod tests {
         similarity: Similarity::Cosine,
         normalize_vectors: false,
         vector_type: VectorType::DenseF32 { dimension: 3 },
+        flags: vec![],
     };
 
     #[sqlx::test(migrations = false)]

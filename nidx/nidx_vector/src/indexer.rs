@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::config::VectorConfig;
-use crate::data_point::{self, Elem, LabelDictionary};
+use crate::data_point::{self, Elem};
 use crate::{VectorSegmentMetadata, utils};
 use nidx_protos::{noderesources, prost::*};
 use std::collections::HashMap;
@@ -116,18 +116,15 @@ pub fn index_resource(
     let normalize_vectors = config.normalize_vectors;
     for (_, field_paragraphs) in resource.fields() {
         for paragraph in field_paragraphs {
-            let labels = LabelDictionary::new(paragraph.labels.clone());
-
             for (key, sentence) in paragraph.vectors.iter().clone() {
                 let key = key.to_string();
-                let labels = labels.clone();
                 let vector = if normalize_vectors {
                     utils::normalize_vector(&sentence.vector)
                 } else {
                     sentence.vector.clone()
                 };
                 let metadata = sentence.metadata.as_ref().map(|m| m.encode_to_vec());
-                elems.push(Elem::new(key, vector, labels, metadata));
+                elems.push(Elem::new(key, vector, paragraph.labels.clone(), metadata));
             }
         }
     }

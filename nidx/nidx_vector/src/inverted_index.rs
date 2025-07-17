@@ -26,8 +26,8 @@ use map::{InvertedMapReader, InvertedMapWriter};
 use tracing::warn;
 
 use crate::{
-    VectorR,
-    data_store::DataStore,
+    ParagraphAddr, VectorR,
+    data_store::{DataStore, iter_paragraphs},
     formula::{BooleanOperator, Clause, Formula},
 };
 
@@ -38,6 +38,30 @@ mod file {
     pub const INDEX_MAP: &str = "index.map";
     pub const FIELD_INDEX: &str = "field.fst";
     pub const LABEL_INDEX: &str = "label.fst";
+}
+
+pub struct FilterBitSet(BitSet);
+
+impl FilterBitSet {
+    pub fn new(len: usize, value: bool) -> Self {
+        Self(BitSet::from_bit_vec(BitVec::from_elem(len, value)))
+    }
+
+    pub fn remove(&mut self, id: ParagraphAddr) {
+        self.0.remove(id.0 as usize);
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = ParagraphAddr> {
+        self.0.iter().map(|v| ParagraphAddr(v as u32))
+    }
+
+    pub fn intersect_with(&mut self, other: &FilterBitSet) {
+        self.0.intersect_with(&other.0);
+    }
+
+    pub fn contains(&self, ParagraphAddr(id): ParagraphAddr) -> bool {
+        self.0.contains(id as usize)
+    }
 }
 
 /// The key for the field index. [uuid_as_bytes, field_type/field_name]
@@ -81,7 +105,7 @@ impl IndexBuilder {
         }
     }
 
-    pub fn insert(&mut self, key: Vec<u8>, id: u32) {
+    pub fn insert(&mut self, key: Vec<u8>, ParagraphAddr(id): ParagraphAddr) {
         self.ordered_keys.entry(key).or_default().push(id);
     }
 
@@ -96,21 +120,20 @@ impl IndexBuilder {
 }
 
 /// Build indexes from a nodes.kv file.
-pub fn build_indexes(work_path: &Path, data_store: &DataStore) -> VectorR<()> {
+pub fn build_indexes(work_path: &Path, data_store: &impl DataStore) -> VectorR<()> {
     let mut field_builder = IndexBuilder::new();
     let mut label_builder = IndexBuilder::new();
 
-    for id in 0..data_store.stored_elements() {
-        let node = data_store.get_value(id);
-        let key = node.key();
-        let labels = node.labels();
+    for paragraph_addr in iter_paragraphs(data_store) {
+        let paragraph = data_store.get_paragraph(paragraph_addr);
+        let key = paragraph.id();
+        let labels = paragraph.labels();
 
-        let id = id as u32;
-        if let Some(key) = field_id_key(std::str::from_utf8(key).unwrap()) {
-            field_builder.insert(key, id);
+        if let Some(key) = field_id_key(key) {
+            field_builder.insert(key, paragraph_addr);
         }
         for l in labels {
-            label_builder.insert(labels_key(&l), id);
+            label_builder.insert(labels_key(&l), paragraph_addr);
         }
     }
 
@@ -155,11 +178,11 @@ impl InvertedIndexes {
         })
     }
 
-    pub fn ids_for_deletion_key(&self, key: &str) -> Option<impl Iterator<Item = u32>> {
-        field_id_key(key).map(|key| self.field_index.get_prefix(&key).into_iter())
+    pub fn ids_for_deletion_key(&self, key: &str) -> Option<impl Iterator<Item = ParagraphAddr>> {
+        field_id_key(key).map(|key| self.field_index.get_prefix(&key).into_iter().map(ParagraphAddr))
     }
 
-    pub fn filter(&self, formula: &Formula) -> Option<BitSet> {
+    pub fn filter(&self, formula: &Formula) -> Option<FilterBitSet> {
         formula
             .clauses
             .iter()
@@ -172,6 +195,7 @@ impl InvertedIndexes {
                 }
                 a
             })
+            .map(FilterBitSet)
     }
 
     fn filter_clause(&self, clause: &Clause) -> BitSet {

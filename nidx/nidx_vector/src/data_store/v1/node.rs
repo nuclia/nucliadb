@@ -18,10 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::io;
-
-use crate::data_types::trie;
+use super::trie;
 use crate::data_types::usize_utils::*;
+use std::io;
 
 // Nodes are the main element of the system. The following data is stored inside them:
 // -> vector: Vec<u8> used for building a hnsw index with them (is a serialized Vec<f32>).
@@ -71,7 +70,7 @@ impl<'a> Node<'a> {
     ) -> io::Result<()>
     where
         W: io::Write,
-        S: AsRef<[u8]>,
+        S: AsRef<str>,
         V: AsRef<[u8]>,
         T: AsRef<[u8]>,
         M: AsRef<[u8]>,
@@ -111,7 +110,7 @@ impl<'a> Node<'a> {
         w.write_all(&[0].repeat(vector_pad))?;
         w.write_all(svector)?;
         w.write_all(&skey.len().to_le_bytes())?;
-        w.write_all(skey)?;
+        w.write_all(skey.as_bytes())?;
         w.write_all(strie)?;
         w.flush()
     }
@@ -131,11 +130,11 @@ impl<'a> Node<'a> {
         trie::decompress(&self.0[xlabel_ptr..])
     }
     // x must be serialized using Node, may have trailing bytes.
-    pub fn key(&self) -> &[u8] {
+    pub fn key(&self) -> &str {
         let xkey_ptr = usize_from_slice_le(&self.0[KEY_START.0..KEY_START.1]);
         let xkey_len = usize_from_slice_le(&self.0[xkey_ptr..(xkey_ptr + USIZE_LEN)]);
         let xkey_start = xkey_ptr + USIZE_LEN;
-        &self.0[xkey_start..(xkey_start + xkey_len)]
+        std::str::from_utf8(&self.0[xkey_start..(xkey_start + xkey_len)]).unwrap()
     }
     // x must be serialized using Node, may have trailing bytes.
     pub fn vector(&self) -> &'a [u8] {
@@ -150,7 +149,7 @@ impl<'a> Node<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{data_types::trie_ram, vector_types::dense_f32};
+    use crate::{data_store::v1::trie_ram, vector_types::dense_f32};
     lazy_static::lazy_static! {
         static ref NO_LABELS_TRIE: Vec<u8> = trie::serialize(trie_ram::create_trie(&NO_LABELS));
         static ref LABELS_TRIE: Vec<u8> = trie::serialize(trie_ram::create_trie(&LABELS));
@@ -161,7 +160,7 @@ mod tests {
 
     #[test]
     fn create_test() {
-        let key = b"NODE1";
+        let key = "NODE1";
         let vector = dense_f32::encode_vector(&[12.; 1000]);
         let mut buf = Vec::new();
         Node::serialize_into(&mut buf, key, &vector, 1, NO_LABELS_TRIE.clone(), NO_METADATA).unwrap();
@@ -180,11 +179,11 @@ mod tests {
         assert_eq!(vector_len, vector.len());
         assert_eq!(key_len, key.len());
         assert_eq!(&buf[svector], &vector);
-        assert_eq!(&buf[skey], key.as_slice());
+        assert_eq!(&buf[skey], key.as_bytes());
         assert_eq!(node.vector(), &vector);
         assert_eq!(node.key(), key);
 
-        let key = b"NODE2";
+        let key = "NODE2";
         let metadata = b"THIS ARE THE METADATA CONTENTS";
         let vector = dense_f32::encode_vector(&[13.; 1000]);
         let mut buf = Vec::new();
@@ -204,7 +203,7 @@ mod tests {
         assert_eq!(vector_len, vector.len());
         assert_eq!(key_len, key.len());
         assert_eq!(&buf[svector], &vector);
-        assert_eq!(&buf[skey], key.as_slice());
+        assert_eq!(&buf[skey], key.as_bytes());
         assert_eq!(node.vector(), &vector);
         assert_eq!(node.key(), key);
         assert!(
@@ -217,12 +216,12 @@ mod tests {
     #[test]
     fn look_up_test() {
         let mut buf = Vec::new();
-        let key1 = b"NODE1";
+        let key1 = "NODE1";
         let metadata1 = b"The node 1 has metadata";
         let vector1 = dense_f32::encode_vector(&[12.; 1000]);
         let node1 = buf.len();
         Node::serialize_into(&mut buf, key1, &vector1, 1, NO_LABELS_TRIE.clone(), Some(&metadata1)).unwrap();
-        let key2 = b"NODE2";
+        let key2 = "NODE2";
         let metadata2 = b"Tuns out node 2 also has metadata";
         let vector2 = dense_f32::encode_vector(&[15.; 1000]);
         let node2 = buf.len();

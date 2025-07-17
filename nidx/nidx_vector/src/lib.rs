@@ -32,7 +32,7 @@ mod utils;
 mod vector_types;
 
 use config::VectorConfig;
-use data_point::OpenDataPoint;
+use data_point::{Address, OpenDataPoint};
 use data_point_provider::reader::Reader;
 use indexer::{ResourceWrapper, index_resource};
 use nidx_protos::{Resource, VectorSearchResponse};
@@ -46,6 +46,23 @@ use tracing::instrument;
 
 pub use indexer::SEGMENT_TAGS;
 pub use request_types::VectorSearchRequest;
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
+pub struct ParagraphAddr(u32);
+pub struct VectorAddr(u32);
+
+// VectorAddr and HNSW Address are the same thing with a different data type for serialization purposes
+impl From<Address> for VectorAddr {
+    fn from(value: Address) -> Self {
+        Self(value.0 as u32)
+    }
+}
+
+impl From<VectorAddr> for Address {
+    fn from(value: VectorAddr) -> Self {
+        Self(value.0 as usize)
+    }
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct VectorSegmentMeta {
@@ -87,7 +104,7 @@ impl VectorIndexer {
         config: VectorConfig,
         open_index: impl OpenIndexMetadata<VectorSegmentMeta>,
     ) -> anyhow::Result<VectorSegmentMetadata> {
-        let open_data_points = open_segments(open_index)?;
+        let open_data_points = open_segments(open_index, &config)?;
         let open_data_points_ref = open_data_points.iter().collect::<Vec<_>>();
 
         // Do the merge
@@ -105,7 +122,7 @@ impl VectorSearcher {
     #[instrument(name = "vector::open", skip_all)]
     pub fn open(config: VectorConfig, open_index: impl OpenIndexMetadata<VectorSegmentMeta>) -> anyhow::Result<Self> {
         Ok(VectorSearcher {
-            reader: Reader::open(open_segments(open_index)?, config)?,
+            reader: Reader::open(open_segments(open_index, &config)?, config)?,
         })
     }
 
@@ -123,11 +140,14 @@ impl VectorSearcher {
     }
 }
 
-fn open_segments(open_index: impl OpenIndexMetadata<VectorSegmentMeta>) -> VectorR<Vec<OpenDataPoint>> {
+fn open_segments(
+    open_index: impl OpenIndexMetadata<VectorSegmentMeta>,
+    config: &VectorConfig,
+) -> VectorR<Vec<OpenDataPoint>> {
     let mut open_data_points = Vec::new();
 
     for (metadata, seq) in open_index.segments() {
-        let open_data_point = data_point::open(metadata)?;
+        let open_data_point = data_point::open(metadata, config)?;
 
         open_data_points.push((open_data_point, seq));
     }
@@ -165,10 +185,14 @@ pub enum VectorErr {
     MissingMergedSegments,
     #[error("Not all of the merged segments have the same tags")]
     InconsistentMergeSegmentTags,
+    #[error("Not all of the merged segments have the same data store version")]
+    InconsistentMergeDataStore,
     #[error("Invalid configuration: {0}")]
     InvalidConfiguration(&'static str),
     #[error("FST error: {0}")]
     FstError(#[from] fst::Error),
+    #[error("bincode error: {0}")]
+    SerializationError(#[from] bincode::error::EncodeError),
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;
