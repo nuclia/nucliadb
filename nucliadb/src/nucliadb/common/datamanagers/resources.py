@@ -175,25 +175,6 @@ async def set_extra(txn: Transaction, *, kbid: str, rid: str, extra: resources_p
     await txn.set(key, extra.SerializeToString())
 
 
-# Title reset mark
-
-
-async def get_title_reset_mark(txn: Transaction, *, kbid: str, rid: str) -> bool:
-    key = KB_RESOURCE_TITLE_RESET_MARK.format(kbid=kbid, uuid=rid)
-    raw_value = await txn.get(key, for_update=False)
-    if raw_value is None:
-        return False
-    return raw_value.decode() == "1"
-
-
-async def set_title_reset_mark(txn: Transaction, *, kbid: str, rid: str, reset: bool) -> None:
-    key = KB_RESOURCE_TITLE_RESET_MARK.format(kbid=kbid, uuid=rid)
-    if reset:
-        await txn.set(key, b"1")
-    else:
-        await txn.delete(key)
-
-
 # Security
 
 

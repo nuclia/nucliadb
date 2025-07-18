@@ -595,7 +595,7 @@ async def reprocess_file_field(
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
     if reset_title:
-        writer.reset_title = True
+        writer.basic.reset_title = True
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
     writer.field_statuses.append(

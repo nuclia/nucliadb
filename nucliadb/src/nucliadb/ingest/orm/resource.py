@@ -147,19 +147,15 @@ class Resource:
             current_basic.metadata.status = basic_in_payload.metadata.status
 
     async def title_marked_for_reset(self) -> bool:
-        return await datamanagers.resources.get_title_reset_mark(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid
-        )
-
-    async def mark_title_for_reset(self):
-        await datamanagers.resources.set_title_reset_mark(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid, reset=True
-        )
+        basic = await self.get_basic()
+        if basic is None:
+            return False
+        return basic.reset_title
 
     async def unmark_title_for_reset(self):
-        await datamanagers.resources.set_title_reset_mark(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid, reset=False
-        )
+        basic = await self.get_basic()
+        if basic:
+            basic.reset_title = False
 
     @processor_observer.wrap({"type": "set_basic"})
     async def set_basic(
