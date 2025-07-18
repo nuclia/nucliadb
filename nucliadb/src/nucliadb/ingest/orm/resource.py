@@ -148,7 +148,7 @@ class Resource:
 
     async def title_marked_for_reset(self) -> bool:
         basic = await self.get_basic()
-        return basic and basic.reset_title
+        return basic is not None and basic.reset_title
 
     async def unmark_title_for_reset(self):
         basic = await self.get_basic()
@@ -636,6 +636,10 @@ class Resource:
             or await self.title_marked_for_reset()
         ):
             return
+        logger.info(
+            "Updating resource title from link extracted data",
+            extra={"kbid": self.kb.kbid, "field": link_extracted_data.field, "rid": self.uuid},
+        )
         title = link_extracted_data.title
         await self.update_resource_title(title)
         await self.unmark_title_for_reset()
