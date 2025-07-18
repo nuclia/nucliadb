@@ -51,6 +51,7 @@ from nucliadb_models.resource import (
 )
 from nucliadb_models.search import ResourceProperties
 from nucliadb_models.security import ResourceSecurity
+from nucliadb_protos import writer_pb2
 from nucliadb_protos.writer_pb2 import FieldStatus
 from nucliadb_utils.utilities import get_storage
 
@@ -164,8 +165,9 @@ async def serialize_field_errors(
                 Error(
                     body=error.source_error.error,
                     code=error.source_error.code,
-                    code_str=error.source_error.ErrorCode.Name(error.source_error.code),
+                    code_str=writer_pb2.Error.ErrorCode.Name(error.source_error.code),
                     created=error.created.ToDatetime(),
+                    severity=writer_pb2.Error.Severity.Name(error.source_error.severity),
                 )
             )
         serialized.error = serialized.errors[-1]
