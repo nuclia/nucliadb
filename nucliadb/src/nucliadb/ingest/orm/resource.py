@@ -620,7 +620,11 @@ class Resource:
         assert self.basic is not None
         if not link_extracted_data.title:
             return
-        if not (self.basic.title.startswith("http") or self.basic.title == ""):
+        if not (
+            self.basic.title.startswith("http")
+            or self.basic.title == ""
+            or self.basic.title == self.uuid
+        ):
             return
         title = link_extracted_data.title
         await self.update_resource_title(title)

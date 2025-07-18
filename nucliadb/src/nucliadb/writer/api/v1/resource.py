@@ -394,9 +394,15 @@ async def reprocess_resource_rslug_prefix(
     kbid: str,
     rslug: str,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
+    reset_title: bool = Query(
+        default=False,
+        description="Reset the title of the resource so that the file or link computed titles are set after processing.",
+    ),
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
-    return await _reprocess_resource(request, kbid, rid, x_nucliadb_user=x_nucliadb_user)
+    return await _reprocess_resource(
+        request, kbid, rid, x_nucliadb_user=x_nucliadb_user, reset_title=reset_title
+    )
 
 
 @api.post(
@@ -413,8 +419,14 @@ async def reprocess_resource_rid_prefix(
     kbid: str,
     rid: str,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
+    reset_title: bool = Query(
+        default=False,
+        description="Reset the title of the resource so that the file or link computed titles are set after processing.",
+    ),
 ):
-    return await _reprocess_resource(request, kbid, rid, x_nucliadb_user=x_nucliadb_user)
+    return await _reprocess_resource(
+        request, kbid, rid, x_nucliadb_user=x_nucliadb_user, reset_title=reset_title
+    )
 
 
 async def _reprocess_resource(
@@ -422,6 +434,10 @@ async def _reprocess_resource(
     kbid: str,
     rid: str,
     x_nucliadb_user: str,
+    reset_title: bool = Query(
+        default=False,
+        description="Reset the title of the resource so that the file or link computed titles are set after processing.",
+    ),
 ):
     await validate_rid_exists_or_raise_error(kbid, rid)
     await maybe_back_pressure(kbid, resource_uuid=rid)
@@ -464,6 +480,10 @@ async def _reprocess_resource(
     writer.kbid = kbid
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
+    if reset_title:
+        # Setting the title to the resource uuid will ensure that the newly processed link or file
+        # computed titles will be used as the resource title after processing.
+        writer.basic.title = rid
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
     await transaction.commit(writer, partition, wait=False)

@@ -20,7 +20,7 @@
 from inspect import iscoroutinefunction
 from typing import TYPE_CHECKING, Annotated, Callable, Optional, Type, Union
 
-from fastapi import HTTPException, Response
+from fastapi import HTTPException, Query, Response
 from fastapi_versioning import version
 from starlette.requests import Request
 
@@ -541,6 +541,10 @@ async def reprocess_file_field(
     field_id: FieldIdString,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
     x_file_password: Annotated[Optional[str], X_FILE_PASSWORD] = None,
+    reset_title: bool = Query(
+        default=False,
+        description="Reset the title of the resource so that the file or link computed titles are set after processing.",
+    ),
 ) -> ResourceUpdated:
     await maybe_back_pressure(kbid, resource_uuid=rid)
 
@@ -590,6 +594,10 @@ async def reprocess_file_field(
     writer.kbid = kbid
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
+    if reset_title:
+        # Setting the title to the resource uuid will ensure that the newly processed link or file
+        # computed titles will be used as the resource title after processing.
+        writer.basic.title = rid
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
     writer.field_statuses.append(
