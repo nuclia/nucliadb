@@ -81,6 +81,8 @@ message Basic {
     QueueType queue = 36;
 
     optional bool hidden = 37;
+
+    bool reset_title = 38;
 }
 
 

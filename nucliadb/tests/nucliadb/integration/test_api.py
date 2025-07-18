@@ -1206,6 +1206,21 @@ async def test_link_computed_titles_are_automatically_set_to_resource_title(
     assert resp.status_code == 200
     assert resp.json()["title"] == extracted_title
 
+    # Make sure that a new reprocess without reset_title does not change the title
+    bm.link_extracted_data[0].title = "Luis Suarez - Wikipedia (computed again)"
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resource/{rid2}/reprocess",
+    )
+    assert resp.status_code == 202, resp.text
+
+    # Simulate processing link extracted data with a computed title
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    # Check that the resource title did not change
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid2}")
+    assert resp.status_code == 200
+    assert resp.json()["title"] == extracted_title
+
 
 @pytest.mark.deploy_modes("standalone")
 async def test_jsonl_text_field(

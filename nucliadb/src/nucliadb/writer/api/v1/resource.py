@@ -105,7 +105,6 @@ async def create_resource(
             status_code=422,
             detail="Cannot hide a resource: the KB does not have hidden resources enabled",
         )
-
     await maybe_back_pressure(kbid)
 
     partitioning = get_partitioning()
@@ -481,9 +480,7 @@ async def _reprocess_resource(
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
     if reset_title:
-        # Setting the title to the resource uuid will ensure that the newly processed link or file
-        # computed titles will be used as the resource title after processing.
-        writer.basic.title = rid
+        writer.basic.reset_title = True
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
     await transaction.commit(writer, partition, wait=False)
