@@ -584,6 +584,9 @@ class Processor:
         if message.HasField("user_relations"):
             await resource.set_user_relations(message.user_relations)
 
+        if message.reset_title:
+            await resource.mark_title_for_reset()
+
         await resource.apply_fields(message)
         await resource.apply_extracted(message)
 

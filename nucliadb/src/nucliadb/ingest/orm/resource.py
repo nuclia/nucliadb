@@ -146,6 +146,21 @@ class Resource:
         if basic_in_payload.HasField("metadata") and basic_in_payload.metadata.useful:
             current_basic.metadata.status = basic_in_payload.metadata.status
 
+    async def title_marked_for_reset(self) -> bool:
+        return await datamanagers.resources.get_title_reset_mark(
+            self.txn, kbid=self.kb.kbid, rid=self.uuid
+        )
+
+    async def mark_title_for_reset(self):
+        await datamanagers.resources.set_title_reset_mark(
+            self.txn, kbid=self.kb.kbid, rid=self.uuid, reset=True
+        )
+
+    async def unmark_title_for_reset(self):
+        await datamanagers.resources.set_title_reset_mark(
+            self.txn, kbid=self.kb.kbid, rid=self.uuid, reset=False
+        )
+
     @processor_observer.wrap({"type": "set_basic"})
     async def set_basic(
         self,
@@ -624,10 +639,12 @@ class Resource:
             self.basic.title.startswith("http")
             or self.basic.title == ""
             or self.basic.title == self.uuid
+            or await self.title_marked_for_reset()
         ):
             return
         title = link_extracted_data.title
         await self.update_resource_title(title)
+        await self.unmark_title_for_reset()
         self.modified = True
 
     async def update_resource_title(self, computed_title: str) -> None:
@@ -694,6 +711,9 @@ class Resource:
         if current_title in filenames:
             # If the title is equal to any of the file filenames, we should update it
             return True
+        if await self.title_marked_for_reset():
+            # If the title is marked for reset, we should update it
+            return True
         return False
 
     async def maybe_update_resource_title_from_file_extracted_data(self, message: BrokerMessage):
@@ -712,6 +732,7 @@ class Resource:
                 extra={"kbid": self.kb.kbid, "field": fid.full(), "new_title": fed.title},
             )
             await self.update_resource_title(fed.title)
+            await self.unmark_title_for_reset()
             # Break after the first file with a title is found
             break
 

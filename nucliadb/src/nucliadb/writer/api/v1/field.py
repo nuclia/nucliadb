@@ -595,9 +595,7 @@ async def reprocess_file_field(
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
     if reset_title:
-        # Setting the title to the resource uuid will ensure that the newly processed link or file
-        # computed titles will be used as the resource title after processing.
-        writer.basic.title = rid
+        writer.reset_title = True
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
     writer.field_statuses.append(

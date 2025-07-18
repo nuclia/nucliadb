@@ -148,6 +148,8 @@ message BrokerMessage {
     repeated FieldIDStatus field_statuses = 41;
 
     repeated resources.FieldID delete_question_answers = 42;
+
+    bool reset_title = 44;
 }
 
 message BrokerMessageBlobReference {

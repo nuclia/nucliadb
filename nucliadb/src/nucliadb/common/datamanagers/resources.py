@@ -41,6 +41,7 @@ KB_RESOURCE_BASIC_FS = "/kbs/{kbid}/r/{uuid}/basic"  # Only used on FS driver
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
 KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
 KB_RESOURCE_SECURITY = "/kbs/{kbid}/r/{uuid}/security"
+KB_RESOURCE_TITLE_RESET_MARK = "/kbs/{kbid}/r/{uuid}/title_reset_mark"
 
 KB_RESOURCE_SLUG_BASE = "/kbs/{kbid}/s/"
 KB_RESOURCE_SLUG = f"{KB_RESOURCE_SLUG_BASE}{{slug}}"
@@ -172,6 +173,25 @@ async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> Optional[resour
 async def set_extra(txn: Transaction, *, kbid: str, rid: str, extra: resources_pb2.Extra):
     key = KB_RESOURCE_EXTRA.format(kbid=kbid, uuid=rid)
     await txn.set(key, extra.SerializeToString())
+
+
+# Title reset mark
+
+
+async def get_title_reset_mark(txn: Transaction, *, kbid: str, rid: str) -> bool:
+    key = KB_RESOURCE_TITLE_RESET_MARK.format(kbid=kbid, uuid=rid)
+    raw_value = await txn.get(key, for_update=False)
+    if raw_value is None:
+        return False
+    return raw_value.decode() == "1"
+
+
+async def set_title_reset_mark(txn: Transaction, *, kbid: str, rid: str, reset: bool) -> None:
+    key = KB_RESOURCE_TITLE_RESET_MARK.format(kbid=kbid, uuid=rid)
+    if reset:
+        await txn.set(key, b"1")
+    else:
+        await txn.delete(key)
 
 
 # Security
