@@ -1066,8 +1066,9 @@ class PromptContextBuilder:
         # Add the query image as part of the image context
         if self.query_image is not None:
             context.images["QUERY_IMAGE"] = self.query_image
-        for i, image in enumerate(self.user_image_context or []):
-            context.images[f"USER_IMAGE_CONTEXT_{i}"] = image
+        else:
+            for i, image in enumerate(self.user_image_context or []):
+                context.images[f"USER_IMAGE_CONTEXT_{i}"] = image
 
     async def build(
         self,
@@ -1075,7 +1076,7 @@ class PromptContextBuilder:
         ccontext = CappedPromptContext(max_size=self.max_context_characters)
         self.prepend_user_context(ccontext)
         await self._build_context(ccontext)
-        if self.visual_llm:
+        if self.visual_llm and not self.query_image:
             await self._build_context_images(ccontext)
         context = ccontext.cap()
         context_images = ccontext.images
