@@ -470,7 +470,9 @@ class Resource:
 
             # We infer the status for processor messages
             if message.source == BrokerMessage.MessageSource.PROCESSOR:
-                if len(status.errors) > 0:
+                if any(
+                    (e.source_error.severity == writer_pb2.Error.Severity.ERROR for e in status.errors)
+                ):
                     status.status = writer_pb2.FieldStatus.Status.ERROR
                 else:
                     status.status = writer_pb2.FieldStatus.Status.PROCESSED
@@ -511,7 +513,8 @@ class Resource:
                 f.status == writer_pb2.FieldStatus.Status.ERROR
                 and any(
                     (
-                        e.source_error.code != writer_pb2.Error.ErrorCode.DATAAUGMENTATION
+                        e.source_error.severity == writer_pb2.Error.Severity.ERROR
+                        and e.source_error.code != writer_pb2.Error.ErrorCode.DATAAUGMENTATION
                         for e in f.errors
                     )
                 )
