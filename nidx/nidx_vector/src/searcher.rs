@@ -20,13 +20,12 @@
 
 use crate::ParagraphAddr;
 use crate::config::VectorCardinality;
-use crate::data_point::OpenDataPoint;
-use crate::data_point_provider::SearchRequest;
-use crate::data_point_provider::VectorConfig;
+use crate::config::VectorConfig;
 use crate::data_store::ParagraphRef;
 use crate::multivector::extract_multi_vectors;
 use crate::multivector::maxsim_similarity;
 use crate::request_types::VectorSearchRequest;
+use crate::segment::OpenSegment;
 use crate::utils;
 use crate::{VectorErr, VectorR};
 use crate::{formula::*, query_io};
@@ -40,12 +39,35 @@ use std::collections::HashSet;
 use std::time::Instant;
 use tracing::*;
 
+struct SearchRequest<'a> {
+    request: &'a VectorSearchRequest,
+    formula: Formula,
+}
+
+impl SearchRequest<'_> {
+    fn with_duplicates(&self) -> bool {
+        self.request.with_duplicates
+    }
+    fn get_filter(&self) -> &Formula {
+        &self.formula
+    }
+    fn get_query(&self) -> &[f32] {
+        &self.request.vector
+    }
+    fn no_results(&self) -> usize {
+        self.request.result_per_page as usize
+    }
+    fn min_score(&self) -> f32 {
+        self.request.min_score
+    }
+}
+
 #[derive(Clone)]
 pub struct ScoredParagraph<'a> {
     score: f32,
     paragraph: ParagraphRef<'a>,
     address: ParagraphAddr,
-    data_point: &'a OpenDataPoint,
+    segment: &'a OpenSegment,
 }
 impl Eq for ScoredParagraph<'_> {}
 impl std::hash::Hash for ScoredParagraph<'_> {
@@ -79,9 +101,9 @@ impl PartialEq for ScoredParagraph<'_> {
 }
 
 impl<'a> ScoredParagraph<'a> {
-    pub fn new(data_point: &'a OpenDataPoint, address: ParagraphAddr, paragraph: ParagraphRef<'a>, score: f32) -> Self {
+    pub fn new(segment: &'a OpenSegment, address: ParagraphAddr, paragraph: ParagraphRef<'a>, score: f32) -> Self {
         Self {
-            data_point,
+            segment,
             paragraph,
             score,
             address,
@@ -103,7 +125,7 @@ impl<'a> ScoredParagraph<'a> {
     pub fn vectors(&self) -> Vec<&[u8]> {
         self.paragraph
             .vectors(&self.address)
-            .map(|va| self.data_point.get_vector(va).vector())
+            .map(|va| self.segment.get_vector(va).vector())
             .collect()
     }
 }
@@ -160,9 +182,9 @@ impl<'a> Fssc<'a> {
     }
 }
 
-pub struct Reader {
+pub struct Searcher {
     config: VectorConfig,
-    open_data_points: Vec<OpenDataPoint>,
+    open_segments: Vec<OpenSegment>,
 }
 
 fn segment_matches(expression: &BooleanExpression<String>, labels: &HashSet<String>) -> bool {
@@ -177,24 +199,6 @@ fn segment_matches(expression: &BooleanExpression<String>, labels: &HashSet<Stri
             operator: Operator::Or,
             operands,
         }) => operands.iter().any(|op| segment_matches(op, labels)),
-    }
-}
-
-impl SearchRequest for (&VectorSearchRequest, Formula) {
-    fn with_duplicates(&self) -> bool {
-        self.0.with_duplicates
-    }
-    fn get_filter(&self) -> &Formula {
-        &self.1
-    }
-    fn get_query(&self) -> &[f32] {
-        &self.0.vector
-    }
-    fn no_results(&self) -> usize {
-        self.0.result_per_page as usize
-    }
-    fn min_score(&self) -> f32 {
-        self.0.min_score
     }
 }
 
@@ -216,21 +220,21 @@ impl TryFrom<ScoredParagraph<'_>> for DocumentScored {
     }
 }
 
-impl Reader {
-    pub fn open(open_data_points: Vec<OpenDataPoint>, config: VectorConfig) -> VectorR<Reader> {
-        Ok(Reader {
+impl Searcher {
+    pub fn open(open_data_points: Vec<OpenSegment>, config: VectorConfig) -> VectorR<Searcher> {
+        Ok(Searcher {
             config,
-            open_data_points,
+            open_segments: open_data_points,
         })
     }
 
     pub fn space_usage(&self) -> usize {
-        self.open_data_points.iter().map(|dp| dp.space_usage()).sum()
+        self.open_segments.iter().map(|dp| dp.space_usage()).sum()
     }
 
-    pub fn _search(
+    fn _search(
         &self,
-        request: &dyn SearchRequest,
+        request: &SearchRequest,
         segment_filter: &Option<BooleanExpression<String>>,
     ) -> VectorR<Vec<ScoredParagraph>> {
         let normalized_query;
@@ -257,21 +261,21 @@ impl Reader {
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
 
-        for open_data_point in &self.open_data_points {
+        for open_segment in &self.open_segments {
             // Skip this segment if it doesn't match the segment filter
             if !segment_filter
                 .as_ref()
-                .is_none_or(|f| segment_matches(f, open_data_point.tags()))
+                .is_none_or(|f| segment_matches(f, open_segment.tags()))
             {
                 continue;
             }
             let partial_solution =
-                open_data_point.search(query, filter, with_duplicates, no_results, &self.config, min_score);
+                open_segment.search(query, filter, with_duplicates, no_results, &self.config, min_score);
 
             for candidate in partial_solution {
                 let addr = candidate.paragraph();
-                let paragraph = open_data_point.get_paragraph(addr);
-                let scored_paragraph = ScoredParagraph::new(open_data_point, addr, paragraph, candidate.score());
+                let paragraph = open_segment.get_paragraph(addr);
+                let scored_paragraph = ScoredParagraph::new(open_segment, addr, paragraph, candidate.score());
                 ffsv.add(scored_paragraph, candidate.vector());
             }
         }
@@ -310,9 +314,10 @@ impl Reader {
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: starts at {v} ms");
+        let search_request = &SearchRequest { request, formula };
         let result = match self.config.vector_cardinality {
-            VectorCardinality::Single => self.search_single_vector(request, formula)?,
-            VectorCardinality::Multi => self.search_multi_vector(request, formula)?,
+            VectorCardinality::Single => self._search(search_request, &request.segment_filtering_formula)?,
+            VectorCardinality::Multi => self.search_multi_vector(search_request)?,
         };
 
         let v = time.elapsed().as_millis();
@@ -337,13 +342,8 @@ impl Reader {
         })
     }
 
-    fn search_single_vector(&self, request: &VectorSearchRequest, formula: Formula) -> VectorR<Vec<ScoredParagraph>> {
-        let search_request = (request, formula);
-        self._search(&search_request, &request.segment_filtering_formula)
-    }
-
-    fn search_multi_vector(&self, request: &VectorSearchRequest, formula: Formula) -> VectorR<Vec<ScoredParagraph>> {
-        let search_vectors = extract_multi_vectors(&request.vector, &self.config.vector_type)?;
+    fn search_multi_vector(&self, search: &SearchRequest) -> VectorR<Vec<ScoredParagraph>> {
+        let search_vectors = extract_multi_vectors(&search.request.vector, &self.config.vector_type)?;
         let encoded_query = search_vectors
             .iter()
             .map(|v| self.config.vector_type.encode(v))
@@ -353,18 +353,21 @@ impl Reader {
         let results = search_vectors
             .into_par_iter()
             .map(|v| {
-                let mut subreq = request.clone();
+                let mut request = search.request.clone();
 
-                subreq.vector = v;
+                request.vector = v;
                 // We are OK with duplicate individual vectors. We always deduplicate by paragraphs anyway (NodeFilter.paragraphs)
-                subreq.with_duplicates = true;
+                request.with_duplicates = true;
                 // We don't care about min_score in this first pass, we apply min_score on top of maxsim similarity
-                subreq.min_score = f32::MIN;
+                request.min_score = f32::MIN;
                 // Request at least a few vectors, since the rerank may offer different results later
-                subreq.result_per_page = request.result_per_page.max(10);
+                request.result_per_page = search.request.result_per_page.max(10);
 
-                let search_request = (&subreq, formula.clone());
-                self._search(&search_request, &request.segment_filtering_formula)
+                let search_request = SearchRequest {
+                    request: &request,
+                    formula: search.formula.clone(),
+                };
+                self._search(&search_request, &search.request.segment_filtering_formula)
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -379,13 +382,13 @@ impl Reader {
             .into_par_iter()
             .filter_map(|mut sp| {
                 sp.score = maxsim_similarity(similarity_function, &encoded_query, &sp.vectors());
-                (sp.score() > request.min_score).then_some(sp)
+                (sp.score() > search.request.min_score).then_some(sp)
             })
             .collect::<Vec<_>>();
 
         // Select top_k
         results.sort_unstable_by(|a, b| b.score().partial_cmp(&a.score()).unwrap());
-        results.truncate(request.result_per_page as usize);
+        results.truncate(search.request.result_per_page as usize);
 
         Ok(results)
     }
@@ -402,8 +405,8 @@ mod tests {
 
     use super::*;
     use crate::config::{Similarity, VectorCardinality, VectorConfig, VectorType};
-    use crate::data_point;
     use crate::indexer::{ResourceWrapper, index_resource};
+    use crate::segment;
 
     #[test]
     fn test_key_prefix_search() -> anyhow::Result<()> {
@@ -474,7 +477,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![data_point::open(segment, &vsc)?], vsc).unwrap();
+        let searcher = Searcher::open(vec![segment::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -487,13 +490,13 @@ mod tests {
             resource_id: uuid::Uuid::parse_str("6c5fc1f7a69042d4b24b7f18ea354b4a").unwrap(),
             field_id: "/f/field1".to_string(),
         };
-        let result = reader
+        let result = searcher
             .search(&request, &PrefilterResult::Some(vec![field_filter.clone()]))
             .unwrap();
         assert_eq!(result.documents.len(), 4);
 
         field_filter.field_id = "/f/field2".to_string();
-        let result = reader
+        let result = searcher
             .search(&request, &PrefilterResult::Some(vec![field_filter]))
             .unwrap();
         assert_eq!(result.documents.len(), 0);
@@ -570,7 +573,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![data_point::open(segment, &vsc)?], vsc).unwrap();
+        let searcher = Searcher::open(vec![segment::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -579,7 +582,7 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request, &PrefilterResult::All).unwrap();
+        let result = searcher.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 4);
 
         let request = VectorSearchRequest {
@@ -590,7 +593,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request, &PrefilterResult::All).unwrap();
+        let result = searcher.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 3);
 
         // Check that min_score works
@@ -603,7 +606,7 @@ mod tests {
             min_score: 900.0,
             ..Default::default()
         };
-        let result = reader.search(&request, &PrefilterResult::All).unwrap();
+        let result = searcher.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 0);
 
         let bad_request = VectorSearchRequest {
@@ -614,7 +617,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        assert!(reader.search(&bad_request, &PrefilterResult::All).is_err());
+        assert!(searcher.search(&bad_request, &PrefilterResult::All).is_err());
 
         Ok(())
     }
@@ -680,7 +683,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![data_point::open(segment, &vsc)?], vsc).unwrap();
+        let searcher = Searcher::open(vec![segment::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -689,7 +692,7 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request, &PrefilterResult::All).unwrap();
+        let result = searcher.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 2);
 
         let request = VectorSearchRequest {
@@ -700,7 +703,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request, &PrefilterResult::All).unwrap();
+        let result = searcher.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 1);
 
         Ok(())

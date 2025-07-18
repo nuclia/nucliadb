@@ -54,7 +54,7 @@ fn test_hidden_search() -> anyhow::Result<()> {
         .unwrap();
 
     // Find all resources
-    let reader = VectorSearcher::open(
+    let searcher = VectorSearcher::open(
         config,
         TestOpener::new(
             vec![(hidden_segment, 1i64.into()), (visible_segment, 2i64.into())],
@@ -69,7 +69,7 @@ fn test_hidden_search() -> anyhow::Result<()> {
         segment_filtering_formula: None,
         ..Default::default()
     };
-    let all = reader.search(&request, &PrefilterResult::All)?;
+    let all = searcher.search(&request, &PrefilterResult::All)?;
     assert_eq!(
         HashSet::from_iter(all.documents.into_iter().map(|d| d.doc_id.unwrap().id)),
         HashSet::from([
@@ -82,7 +82,7 @@ fn test_hidden_search() -> anyhow::Result<()> {
     request.segment_filtering_formula = Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal(
         "/q/h".to_string(),
     ))));
-    let visible = reader.search(&request, &PrefilterResult::All)?;
+    let visible = searcher.search(&request, &PrefilterResult::All)?;
     assert_eq!(visible.documents.len(), 1);
     assert_eq!(
         visible.documents[0].clone().doc_id.unwrap().id,

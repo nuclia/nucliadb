@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::{VectorR, config::VectorType, data_point::Elem};
+use crate::{VectorR, config::VectorType, segment::Elem};
 
 use super::{DataStore, OpenReason, ParagraphAddr, VectorAddr};
 pub use paragraph_store::StoredParagraph;

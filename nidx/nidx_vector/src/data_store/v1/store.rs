@@ -211,7 +211,7 @@ pub fn merge(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::VectorCardinality, data_point::Elem};
+    use crate::{config::VectorCardinality, segment::Elem};
 
     const VECTOR_CONFIG: VectorConfig = VectorConfig {
         vector_type: VectorType::DenseF32 { dimension: 3 },

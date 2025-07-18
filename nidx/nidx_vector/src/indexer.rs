@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::config::{VectorCardinality, VectorConfig};
-use crate::data_point::{self, Elem};
 use crate::multivector::extract_multi_vectors;
+use crate::segment::{self, Elem};
 use crate::{VectorSegmentMetadata, utils};
 use nidx_protos::{noderesources, prost::*};
 use std::collections::HashMap;
@@ -157,10 +157,10 @@ pub fn index_resource(
         .filter(|t| SEGMENT_TAGS.contains(&t.as_str()))
         .cloned()
         .collect();
-    let data_point = data_point::create(output_path, elems, config, tags)?;
+    let segment = segment::create(output_path, elems, config, tags)?;
 
     let v = time.elapsed().as_millis();
     debug!("{id:?} - Main index set resource: ends {v} ms");
 
-    Ok(Some(data_point.into_metadata()))
+    Ok(Some(segment.into_metadata()))
 }

@@ -18,15 +18,31 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod reader;
+mod disk_hnsw;
+mod ops_hnsw;
+mod params;
+mod ram_hnsw;
 
-use crate::config::VectorConfig;
-use crate::formula::Formula;
+pub use disk_hnsw::DiskHnsw;
+pub use ops_hnsw::Cnx;
+pub use ops_hnsw::DataRetriever;
+pub use ops_hnsw::HnswOps;
+pub use ram_hnsw::RAMHnsw;
 
-pub trait SearchRequest {
-    fn get_query(&self) -> &[f32];
-    fn get_filter(&self) -> &Formula;
-    fn no_results(&self) -> usize;
-    fn with_duplicates(&self) -> bool;
-    fn min_score(&self) -> f32;
+use crate::VectorAddr;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Address(pub(super) usize);
+
+// VectorAddr and HNSW Address are the same thing with a different data type for serialization purposes
+impl From<Address> for VectorAddr {
+    fn from(value: Address) -> Self {
+        Self(value.0 as u32)
+    }
+}
+
+impl From<VectorAddr> for Address {
+    fn from(value: VectorAddr) -> Self {
+        Self(value.0 as usize)
+    }
 }

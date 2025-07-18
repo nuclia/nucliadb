@@ -27,8 +27,11 @@ use rand::rngs::SmallRng;
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
+use crate::ParagraphAddr;
+use crate::inverted_index::FilterBitSet;
+
+use super::params;
 use super::*;
-use crate::data_point::params;
 
 /// Implementors of this trait can guide the hnsw search
 pub trait DataRetriever: std::marker::Sync {

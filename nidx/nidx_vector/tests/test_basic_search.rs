@@ -88,12 +88,12 @@ fn test_basic_search(
         .unwrap();
 
     // Search near one specific vector
-    let reader = VectorSearcher::open(
+    let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]),
     )?;
     let search_for = sentence(5);
-    let results = reader.search(
+    let results = searcher.search(
         &VectorSearchRequest {
             vector: search_for.vector,
             result_per_page: 10,
@@ -116,7 +116,7 @@ fn test_basic_search(
     vector[43] = 0.7;
     vector[44] = 0.5;
     vector[45] = 0.3;
-    let results = reader.search(
+    let results = searcher.search(
         &VectorSearchRequest {
             vector,
             result_per_page: 10,
@@ -181,14 +181,14 @@ fn test_deletions() -> anyhow::Result<()> {
     // Search initially returns both resources
     let segments = vec![(segment1, 1i64.into()), (segment2, 2i64.into())];
     let open_config = TestOpener::new(segments.clone(), vec![]);
-    let reader = VectorSearcher::open(config.clone(), open_config)?;
+    let searcher = VectorSearcher::open(config.clone(), open_config)?;
     let search_request = &VectorSearchRequest {
         vector: [0.0; 4].to_vec(),
         result_per_page: 10,
         min_score: -1.0,
         ..Default::default()
     };
-    let results = reader.search(search_request, &PrefilterResult::All)?;
+    let results = searcher.search(search_request, &PrefilterResult::All)?;
     assert_eq!(results.documents.len(), 2);
 
     // Delete a full resource, it does not appear in search
@@ -196,8 +196,8 @@ fn test_deletions() -> anyhow::Result<()> {
         segments.clone(),
         vec![(resource1.resource.clone().unwrap().uuid, 3i64.into())],
     );
-    let reader = VectorSearcher::open(config.clone(), open_config)?;
-    let results = reader.search(search_request, &PrefilterResult::All)?;
+    let searcher = VectorSearcher::open(config.clone(), open_config)?;
+    let results = searcher.search(search_request, &PrefilterResult::All)?;
     assert_eq!(results.documents.len(), 1);
     assert!(
         results.documents[0]
@@ -213,8 +213,8 @@ fn test_deletions() -> anyhow::Result<()> {
         segments,
         vec![(format!("{}/a/title", resource2.resource.unwrap().uuid), 3i64.into())],
     );
-    let reader = VectorSearcher::open(config.clone(), open_config)?;
-    let results = reader.search(search_request, &PrefilterResult::All)?;
+    let searcher = VectorSearcher::open(config.clone(), open_config)?;
+    let results = searcher.search(search_request, &PrefilterResult::All)?;
     assert_eq!(results.documents.len(), 1);
     assert!(
         results.documents[0]
@@ -276,7 +276,7 @@ fn test_filtered_search() -> anyhow::Result<()> {
         .collect();
 
     let open_config = TestOpener::new(segments, vec![]);
-    let reader = VectorSearcher::open(config, open_config)?;
+    let searcher = VectorSearcher::open(config, open_config)?;
 
     let search = |filtering_formula| -> HashSet<u32> {
         // Search initially returns both resources
@@ -287,7 +287,7 @@ fn test_filtered_search() -> anyhow::Result<()> {
             filtering_formula,
             ..Default::default()
         };
-        let results = reader.search(search_request, &PrefilterResult::All).unwrap();
+        let results = searcher.search(search_request, &PrefilterResult::All).unwrap();
         results
             .documents
             .iter()
@@ -370,7 +370,7 @@ fn test_filtered_search() -> anyhow::Result<()> {
             filter_or,
             ..Default::default()
         };
-        let results = reader.search(search_request, &prefilter).unwrap();
+        let results = searcher.search(search_request, &prefilter).unwrap();
         results
             .documents
             .iter()

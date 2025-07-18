@@ -19,26 +19,27 @@
 //
 
 pub mod config;
-mod data_point;
-mod data_point_provider;
 mod data_store;
 mod data_types;
 mod formula;
+mod hnsw;
 mod indexer;
 mod inverted_index;
 mod multivector;
 mod query_io;
 mod request_types;
+mod searcher;
+mod segment;
 mod utils;
 mod vector_types;
 
 use config::VectorConfig;
-use data_point::{Address, OpenDataPoint};
-use data_point_provider::reader::Reader;
 use indexer::{ResourceWrapper, index_resource};
 use nidx_protos::{Resource, VectorSearchResponse};
 use nidx_types::prefilter::PrefilterResult;
 use nidx_types::{OpenIndexMetadata, SegmentMetadata};
+use searcher::Searcher;
+use segment::OpenSegment;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
@@ -51,19 +52,6 @@ pub use request_types::VectorSearchRequest;
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct ParagraphAddr(u32);
 pub struct VectorAddr(u32);
-
-// VectorAddr and HNSW Address are the same thing with a different data type for serialization purposes
-impl From<Address> for VectorAddr {
-    fn from(value: Address) -> Self {
-        Self(value.0 as u32)
-    }
-}
-
-impl From<VectorAddr> for Address {
-    fn from(value: VectorAddr) -> Self {
-        Self(value.0 as usize)
-    }
-}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct VectorSegmentMeta {
@@ -105,25 +93,25 @@ impl VectorIndexer {
         config: VectorConfig,
         open_index: impl OpenIndexMetadata<VectorSegmentMeta>,
     ) -> anyhow::Result<VectorSegmentMetadata> {
-        let open_data_points = open_segments(open_index, &config)?;
-        let open_data_points_ref = open_data_points.iter().collect::<Vec<_>>();
+        let open_segments = open_segments(open_index, &config)?;
+        let open_segments_ref = open_segments.iter().collect::<Vec<_>>();
 
         // Do the merge
-        let open_destination = data_point::merge(work_dir, &open_data_points_ref, &config)?;
+        let open_destination = segment::merge(work_dir, &open_segments_ref, &config)?;
 
         Ok(open_destination.into_metadata())
     }
 }
 
 pub struct VectorSearcher {
-    reader: Reader,
+    searcher: Searcher,
 }
 
 impl VectorSearcher {
     #[instrument(name = "vector::open", skip_all)]
     pub fn open(config: VectorConfig, open_index: impl OpenIndexMetadata<VectorSegmentMeta>) -> anyhow::Result<Self> {
         Ok(VectorSearcher {
-            reader: Reader::open(open_segments(open_index, &config)?, config)?,
+            searcher: Searcher::open(open_segments(open_index, &config)?, config)?,
         })
     }
 
@@ -133,35 +121,35 @@ impl VectorSearcher {
         request: &VectorSearchRequest,
         prefilter: &PrefilterResult,
     ) -> anyhow::Result<VectorSearchResponse> {
-        self.reader.search(request, prefilter)
+        self.searcher.search(request, prefilter)
     }
 
     pub fn space_usage(&self) -> usize {
-        self.reader.space_usage()
+        self.searcher.space_usage()
     }
 }
 
 fn open_segments(
     open_index: impl OpenIndexMetadata<VectorSegmentMeta>,
     config: &VectorConfig,
-) -> VectorR<Vec<OpenDataPoint>> {
-    let mut open_data_points = Vec::new();
+) -> VectorR<Vec<OpenSegment>> {
+    let mut open_segments = Vec::new();
 
     for (metadata, seq) in open_index.segments() {
-        let open_data_point = data_point::open(metadata, config)?;
+        let open_segment = segment::open(metadata, config)?;
 
-        open_data_points.push((open_data_point, seq));
+        open_segments.push((open_segment, seq));
     }
 
     for (deletion, deletion_seq) in open_index.deletions() {
-        for (segment, segment_seq) in &mut open_data_points {
+        for (segment, segment_seq) in &mut open_segments {
             if deletion_seq > *segment_seq {
                 segment.apply_deletion(deletion.as_str());
             }
         }
     }
 
-    Ok(open_data_points.into_iter().map(|(dp, _)| dp).collect())
+    Ok(open_segments.into_iter().map(|(dp, _)| dp).collect())
 }
 
 #[derive(Debug, Error)]
@@ -176,7 +164,7 @@ pub enum VectorErr {
     UncommittedChangesError,
     #[error("Merger is already initialized")]
     MergerAlreadyInitialized,
-    #[error("Can not merge zero datapoints")]
+    #[error("Can not merge zero segments")]
     EmptyMerge,
     #[error("Inconsistent dimensions. Index={index_config} Vector={vector}")]
     InconsistentDimensions { index_config: usize, vector: usize },
