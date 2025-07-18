@@ -41,7 +41,6 @@ KB_RESOURCE_BASIC_FS = "/kbs/{kbid}/r/{uuid}/basic"  # Only used on FS driver
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
 KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
 KB_RESOURCE_SECURITY = "/kbs/{kbid}/r/{uuid}/security"
-KB_RESOURCE_TITLE_RESET_MARK = "/kbs/{kbid}/r/{uuid}/title_reset_mark"
 
 KB_RESOURCE_SLUG_BASE = "/kbs/{kbid}/s/"
 KB_RESOURCE_SLUG = f"{KB_RESOURCE_SLUG_BASE}{{slug}}"
