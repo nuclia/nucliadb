@@ -80,7 +80,7 @@ impl<'a, I: Iterator<Item = &'a FieldId>> Iterator for AddMetadataFieldIterator<
         }
         let next = self.iter.next()?;
 
-        let term = tantivy::Term::from_field_bytes(self.field, &encode_field_id(next.resource_id, &next.field_id));
+        let term = tantivy::Term::from_field_bytes(self.field, &encode_field_id(next.resource_id, &next.field_id[1..]));
         if self.prev != next.resource_id {
             // New resource, emit the metadata field (and save the actual field for next iteration)
             self.buffer = Some(term);

@@ -854,7 +854,7 @@ fn test_prefilter() -> anyhow::Result<()> {
         Query::Path(Path::default()),
         PrefilterResult::Some(vec![FieldId {
             resource_id: Uuid::nil(),
-            field_id: "f/fake".to_string(),
+            field_id: "/f/fake".to_string(),
         }]),
     )?;
     assert_eq!(result.graph.len(), 0);
@@ -865,7 +865,7 @@ fn test_prefilter() -> anyhow::Result<()> {
         Query::Path(Path::default()),
         PrefilterResult::Some(vec![FieldId {
             resource_id: Uuid::parse_str("0123456789abcdef0123456789abcdef").unwrap(),
-            field_id: "a/metadata".to_string(),
+            field_id: "/a/metadata".to_string(),
         }]),
     )?;
     assert_eq!(result.graph.len(), 17);
@@ -876,7 +876,45 @@ fn test_prefilter() -> anyhow::Result<()> {
         Query::Path(Path::default()),
         PrefilterResult::Some(vec![FieldId {
             resource_id: Uuid::parse_str("0123456789abcdef0123456789abcdef").unwrap(),
-            field_id: "f/fake".to_string(),
+            field_id: "/f/fake".to_string(),
+        }]),
+    )?;
+    assert_eq!(result.graph.len(), 17);
+
+    Ok(())
+}
+
+#[test]
+fn test_prefilter_file_field() -> anyhow::Result<()> {
+    // Basic prefilter tests, other tests are done at upper levels with access to the text index
+    let reader = create_reader_file_field()?;
+
+    // All
+    let result = search_with_prefilter(&reader, Query::Path(Path::default()), PrefilterResult::All)?;
+    assert_eq!(result.graph.len(), 17);
+
+    // None
+    let result = search_with_prefilter(&reader, Query::Path(Path::default()), PrefilterResult::None)?;
+    assert_eq!(result.graph.len(), 0);
+
+    // Some excludes our result
+    let result = search_with_prefilter(
+        &reader,
+        Query::Path(Path::default()),
+        PrefilterResult::Some(vec![FieldId {
+            resource_id: Uuid::parse_str("0123456789abcdef0123456789abcdef").unwrap(),
+            field_id: "/f/fake".to_string(),
+        }]),
+    )?;
+    assert_eq!(result.graph.len(), 0);
+
+    // Some includes our result
+    let result = search_with_prefilter(
+        &reader,
+        Query::Path(Path::default()),
+        PrefilterResult::Some(vec![FieldId {
+            resource_id: Uuid::parse_str("0123456789abcdef0123456789abcdef").unwrap(),
+            field_id: "/f/my_file".to_string(),
         }]),
     )?;
     assert_eq!(result.graph.len(), 17);
@@ -1030,6 +1068,30 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
 
     let relations = nidx_tests::graph::knowledge_graph_as_relations();
     let field_relations = HashMap::from([("a/metadata".to_string(), IndexRelations { relations })]);
+    let resource = Resource {
+        resource: Some(ResourceId {
+            uuid: "0123456789abcdef0123456789abcdef".to_string(),
+            shard_id: "shard_id".to_string(),
+        }),
+        field_relations,
+        ..Default::default()
+    };
+
+    let segment_meta = RelationIndexer
+        .index_resource(dir.path(), &RelationConfig::default(), &resource)
+        .unwrap()
+        .unwrap();
+    RelationSearcher::open(
+        RelationConfig::default(),
+        TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]),
+    )
+}
+
+fn create_reader_file_field() -> anyhow::Result<RelationSearcher> {
+    let dir = TempDir::new().unwrap();
+
+    let relations = nidx_tests::graph::knowledge_graph_as_relations();
+    let field_relations = HashMap::from([("f/my_file".to_string(), IndexRelations { relations })]);
     let resource = Resource {
         resource: Some(ResourceId {
             uuid: "0123456789abcdef0123456789abcdef".to_string(),
