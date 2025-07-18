@@ -538,6 +538,28 @@ async def test_prompt_context_builder_with_extra_image_context():
     assert context_image == user_image
 
 
+async def test_prompt_context_builder_with_query_image():
+    image_content = base64.b64encode(b"my-image").decode("utf-8")
+    query_image = Image(content_type="image/png", b64encoded=image_content)
+    user_image = Image(content_type="image/jpg", b64encoded=image_content)
+
+    builder = chat_prompt.PromptContextBuilder(
+        kbid="kbid",
+        ordered_paragraphs=[],
+        user_image_context=[user_image],
+        query_image=query_image,
+    )
+
+    with patch("nucliadb.search.search.chat.prompt.default_prompt_context"):
+        # context = chat_prompt.CappedPromptContext(max_size=int(1e6))
+        _, _, context_images, _ = await builder.build()
+
+    # User image should not be included in the context images if a query image is provided
+    assert len(context_images) == 1
+    _, context_image = context_images.popitem()
+    assert context_image == query_image
+
+
 def test_get_neighbouring_indices():
     field_pids = [ParagraphId.from_string(f"r1/f/f1/0-{i}") for i in range(10)]
     index = 5

@@ -41,6 +41,7 @@ def fetcher_for_ask(kbid: str, item: AskRequest) -> Fetcher:
         rephrase=item.rephrase,
         rephrase_prompt=None,
         generative_model=item.generative_model,
+        query_image=item.query_image,
     )
 
 

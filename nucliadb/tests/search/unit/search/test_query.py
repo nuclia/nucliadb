@@ -80,6 +80,7 @@ class TestApplySynonymsToRequest:
             rephrase=False,
             rephrase_prompt=None,
             generative_model=None,
+            query_image=None,
         )
         with patch("nucliadb.search.search.query_parser.fetcher.get_kb_synonyms", get_synonyms):
             yield fetcher
@@ -154,6 +155,7 @@ class TestVectorSetAndMatryoshkaParsing:
             rephrase=False,
             rephrase_prompt=None,
             generative_model=None,
+            query_image=None,
         )
 
         with (

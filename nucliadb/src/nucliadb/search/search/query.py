@@ -85,6 +85,7 @@ async def paragraph_query_to_pb(
         rephrase=False,
         rephrase_prompt=None,
         generative_model=None,
+        query_image=None,
     )
     field_expr, paragraph_expr = await parse_old_filters(old, fetcher)
     if field_expr is not None:
@@ -225,6 +226,7 @@ async def suggest_query_to_pb(
         rephrase=False,
         rephrase_prompt=None,
         generative_model=None,
+        query_image=None,
     )
     field_expr, _ = await parse_old_filters(old, fetcher)
     if field_expr is not None and filter_expression is not None:
