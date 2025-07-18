@@ -148,9 +148,7 @@ class Resource:
 
     async def title_marked_for_reset(self) -> bool:
         basic = await self.get_basic()
-        if basic is None:
-            return False
-        return basic.reset_title
+        return basic and basic.reset_title
 
     async def unmark_title_for_reset(self):
         basic = await self.get_basic()
