@@ -51,6 +51,7 @@ from nucliadb_models.internal.predict import (
 )
 from nucliadb_models.search import (
     ChatModel,
+    Image,
     RephraseModel,
     SummarizedResource,
     SummarizedResponse,
@@ -331,6 +332,7 @@ class PredictEngine:
         generative_model: Optional[str] = None,
         rephrase: bool = False,
         rephrase_prompt: Optional[str] = None,
+        query_image: Optional[Image] = None,
     ) -> QueryInfo:
         """
         Query endpoint: returns information to be used by NucliaDB at retrieval time, for instance:
@@ -364,11 +366,13 @@ class PredictEngine:
             params["semantic_models"] = [semantic_model]
         if generative_model is not None:
             params["generative_model"] = generative_model
+        if query_image is not None:
+            params["query_image"] = query_image.model_dump()
 
         resp = await self.make_request(
-            "GET",
+            "POST",
             url=self.get_predict_url(QUERY, kbid),
-            params=params,
+            json=params,
             headers=self.get_predict_headers(kbid),
         )
         await self.check_response(kbid, resp, expected_status=200)
@@ -509,6 +513,7 @@ class DummyPredictEngine(PredictEngine):
         generative_model: Optional[str] = None,
         rephrase: bool = False,
         rephrase_prompt: Optional[str] = None,
+        query_image: Optional[Image] = None,
     ) -> QueryInfo:
         self.calls.append(("query", sentence))
 

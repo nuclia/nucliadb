@@ -1565,6 +1565,11 @@ class AskRequest(AuditMetadataBase):
         description="""Additional images added to the retrieval context sent to the LLM."
         It allows extending the chat feature with content that may not be in the Knowledge Box.""",
     )
+    query_image: Optional[Image] = Field(
+        default=None,
+        title="Query image",
+        description="Image that will be used together with the query text for retrieval and then sent to the LLM as part of the context.",
+    )
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     resource_filters: list[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
@@ -1890,6 +1895,11 @@ class FindRequest(BaseSearchRequest):
         default=None,
         title="Generative model",
         description="The generative model used to rephrase the query. If not provided, the model configured for the Knowledge Box is used.",
+    )
+    query_image: Optional[Image] = Field(
+        default=None,
+        title="Query image",
+        description="Image that will be used together with the query text for retrieval.",
     )
 
     @model_validator(mode="before")

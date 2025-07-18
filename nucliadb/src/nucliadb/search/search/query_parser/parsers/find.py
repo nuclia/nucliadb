@@ -83,6 +83,7 @@ def fetcher_for_find(kbid: str, item: FindRequest) -> Fetcher:
         rephrase=item.rephrase,
         rephrase_prompt=item.rephrase_prompt,
         generative_model=item.generative_model,
+        query_image=item.query_image,
     )
 
 

@@ -1042,6 +1042,7 @@ class PromptContextBuilder:
         image_strategies: Optional[Sequence[ImageRagStrategy]] = None,
         max_context_characters: Optional[int] = None,
         visual_llm: bool = False,
+        query_image: Optional[Image] = None,
         metrics: Metrics = Metrics("prompt_context_builder"),
     ):
         self.kbid = kbid
@@ -1054,6 +1055,7 @@ class PromptContextBuilder:
         self.max_context_characters = max_context_characters
         self.visual_llm = visual_llm
         self.metrics = metrics
+        self.query_image = query_image
         self.augmented_context = AugmentedContext(paragraphs={}, fields={})
 
     def prepend_user_context(self, context: CappedPromptContext):
@@ -1061,6 +1063,9 @@ class PromptContextBuilder:
         # it is added first, followed by the found text blocks in order of relevance
         for i, text_block in enumerate(self.user_context or []):
             context[f"USER_CONTEXT_{i}"] = text_block
+        # Add the query image as part of the image context
+        if self.query_image is not None:
+            context.images["QUERY_IMAGE"] = self.query_image
         for i, image in enumerate(self.user_image_context or []):
             context.images[f"USER_IMAGE_CONTEXT_{i}"] = image
 
