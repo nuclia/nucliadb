@@ -51,9 +51,9 @@ fn test_basic_search(
     use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher};
 
     let flags = if data_store_v2 {
-        vec![flags::DATA_STORE_V2.to_string()]
-    } else {
         vec![]
+    } else {
+        vec![flags::FORCE_DATA_STORE_V1.to_string()]
     };
 
     let config = VectorConfig {
