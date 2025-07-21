@@ -97,3 +97,41 @@ async def delete_strategy(
     return await learning_config_proxy(
         request, "DELETE", f"/extract_strategies/{kbid}/strategies/{strategy_id}"
     )
+
+
+@api.post(
+    path=f"/{KB_PREFIX}/{{kbid}}/split_strategies",
+    status_code=200,
+    summary="Add a split strategy to a KB",
+    description="Add a split strategy to a KB",
+    response_model=str,
+    tags=["Split Strategies"],
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def add_split_strategy(
+    request: Request,
+    kbid: str,
+    item: ExtractConfig,
+):
+    return await learning_config_proxy(request, "POST", f"/split_strategies/{kbid}")
+
+
+@api.delete(
+    path=f"/{KB_PREFIX}/{{kbid}}/split_strategies/strategy/{{strategy_id}}",
+    status_code=204,
+    summary="Remove a split strategy from a KB",
+    description="Removes a split strategy from a KB",
+    response_model=None,
+    tags=["Split Strategies"],
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def delete_split_strategy(
+    request: Request,
+    kbid: str,
+    strategy_id: str,
+):
+    return await learning_config_proxy(
+        request, "DELETE", f"/split_strategies/{kbid}/strategies/{strategy_id}"
+    )
