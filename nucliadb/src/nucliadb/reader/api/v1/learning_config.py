@@ -21,7 +21,7 @@ from typing import Dict
 
 from fastapi import Request
 from fastapi_versioning import version
-from nuclia_models.config.proto import ExtractConfig
+from nuclia_models.config.proto import ExtractConfig, SplitConfiguration
 
 from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb.models.responses import HTTPClientError
@@ -190,7 +190,7 @@ async def get_extract_strategy_from_id(
     status_code=200,
     summary="Learning split strategies",
     description="Get available split strategies ",
-    response_model=Dict[str, ExtractConfig],
+    response_model=Dict[str, SplitConfiguration],
     tags=["Split Strategies"],
 )
 @requires(NucliaDBRoles.READER)
