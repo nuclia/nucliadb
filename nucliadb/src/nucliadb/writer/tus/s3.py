@@ -177,7 +177,9 @@ class S3BlobStore(BlobStore):
     async def create_bucket(self, bucket):
         exists = await self.check_exists(bucket)
         if not exists:
-            await create_bucket(self._s3aioclient, bucket, self.bucket_tags, self.region_name, self.kms_key_id)
+            await create_bucket(
+                self._s3aioclient, bucket, self.bucket_tags, self.region_name, self.kms_key_id
+            )
         return exists
 
     async def finalize(self):
