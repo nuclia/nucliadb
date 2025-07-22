@@ -1,3 +1,22 @@
+// Copyright (C) 2021 Bosutech XXI S.L.
+//
+// nucliadb is offered under the AGPL v3.0 and as commercial software.
+// For commercial licensing, contact us at info@nuclia.com.
+//
+// AGPL:
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+//
 use tantivy::Term;
 use tantivy::query::{AllQuery, BooleanQuery, Occur, PhraseQuery, Query, TermQuery};
 use tantivy::schema::IndexRecordOption;
@@ -6,11 +25,11 @@ use crate::ParagraphSchema;
 
 use super::tokenizer::Token;
 
-// Convert a list of tokens into a tantivy keyword query
-pub fn build_keyword_query(query: &[Token]) -> Box<dyn Query> {
+/// Convert a tokenized query into a tantivy keyword query
+///
+/// Empty queries will match everything.
+pub fn parse_keyword_query<'a>(query: &'a [Token<'a>], schema: &ParagraphSchema) -> Box<dyn Query> {
     let mut subqueries = vec![];
-    let schema = ParagraphSchema::new();
-
     for item in query {
         match item {
             Token::Literal(literal) => {
@@ -52,12 +71,34 @@ pub fn build_keyword_query(query: &[Token]) -> Box<dyn Query> {
         }
     }
 
-    Box::new(BooleanQuery::new(subqueries))
+    if subqueries.len() == 0 {
+        Box::new(AllQuery)
+    } else if subqueries.len() == 1 {
+        subqueries.pop().unwrap().1
+    } else {
+        Box::new(BooleanQuery::new(subqueries))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_empty_query_is_all_query() {
+        let schema = ParagraphSchema::new();
+        let query = parse_keyword_query(&[], &schema);
+        assert!(query.is::<AllQuery>());
+    }
+
+    #[test]
+    fn test_one_clause_simplification() {
+        let schema = ParagraphSchema::new();
+
+        let query = parse_keyword_query(&vec![Token::Literal("nucliadb".into())], &schema);
+        let term = extract_term_from(&query);
+        assert_eq!(*term, Term::from_field_text(schema.text, "nucliadb"));
+    }
 
     #[test]
     fn test_tantivy_query_conversion() {
@@ -72,7 +113,7 @@ mod tests {
             Token::Literal("with".into()),
             Token::Quoted("superpowers".into()),
         ];
-        let r = downcast_boolean_query(build_keyword_query(&query));
+        let r = downcast_boolean_query(parse_keyword_query(&query, &schema));
         let clauses = r.clauses();
         assert_eq!(clauses.len(), 6);
 
@@ -83,7 +124,10 @@ mod tests {
 
         // excluded term: is
         assert_eq!(clauses[1].0, Occur::Should);
-        let subquery = clauses[1].1.downcast_ref::<BooleanQuery>().expect("BooleanQuery expected");
+        let subquery = clauses[1]
+            .1
+            .downcast_ref::<BooleanQuery>()
+            .expect("BooleanQuery expected");
         let subclauses = subquery.clauses();
         assert_eq!(subclauses.len(), 2);
         assert_eq!(subclauses[0].0, Occur::Must);
@@ -100,10 +144,13 @@ mod tests {
         // exact: RAG database
         assert_eq!(clauses[3].0, Occur::Should);
         let terms = extract_phrase_terms_from(&clauses[3].1);
-        assert_eq!(*terms, vec![
-            Term::from_field_text(schema.text, "RAG"),
-            Term::from_field_text(schema.text, "database"),
-        ]);
+        assert_eq!(
+            *terms,
+            vec![
+                Term::from_field_text(schema.text, "RAG"),
+                Term::from_field_text(schema.text, "database"),
+            ]
+        );
 
         // term: with
         assert_eq!(clauses[4].0, Occur::Should);
@@ -138,3 +185,6 @@ mod tests {
         q.phrase_terms()
     }
 }
+
+// XXX: changed behavior:
+// - a query like: -came. Now will match AllQuery + MustNot(came). Before it was a parser error and matched "-came"

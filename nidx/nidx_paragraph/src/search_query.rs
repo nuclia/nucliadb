@@ -32,8 +32,8 @@ use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::{DocId, InvertedIndexReader, Term};
 
 use crate::fuzzy_query::FuzzyTermQuery;
+use crate::query_parser::is_stop_word;
 use crate::schema::ParagraphSchema;
-use crate::stop_words::is_stop_word;
 type QueryP = (Occur, Box<dyn Query>);
 
 // Used to identify the terms matched by tantivy
