@@ -130,7 +130,7 @@ impl ParagraphReaderService {
             .filter(|s| ParagraphReaderService::is_valid_facet(s))
             .cloned()
             .collect();
-        let text = self.adapt_text(&parser, &request.body);
+        let text = &request.body;
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Creating query: ends at {v} ms");
 
@@ -208,6 +208,7 @@ impl ParagraphReaderService {
 
         Ok(response)
     }
+
     fn adapt_text(&self, parser: &QueryParser, text: &str) -> String {
         // FIXME: after migrating from tantivy 0.22 -> 0.24, the query grammar
         // now includes single quotes as special character. Queries having a
@@ -222,6 +223,7 @@ impl ParagraphReaderService {
                 .unwrap_or_else(|_| format!("\"{}\"", text.replace('"', ""))),
         }
     }
+
     fn is_valid_facet(maybe_facet: &str) -> bool {
         Facet::from_text(maybe_facet).is_ok()
     }
