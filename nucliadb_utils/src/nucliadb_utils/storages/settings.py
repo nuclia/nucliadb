@@ -32,7 +32,6 @@ class Settings(BaseSettings):
 
     s3_deadletter_bucket: Optional[str] = None
     s3_indexing_bucket: Optional[str] = None
-    s3_kms_key_id: Optional[str] = None
 
     local_testing_files: str = os.path.dirname(__file__)
 

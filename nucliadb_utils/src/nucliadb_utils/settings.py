@@ -99,6 +99,7 @@ class StorageSettings(BaseSettings):
     s3_max_pool_connections: int = 30
     s3_endpoint: Optional[str] = None
     s3_region_name: Optional[str] = None
+    s3_kms_key_id: Optional[str] = None
     s3_bucket: Optional[str] = Field(default=None, description="KnowledgeBox S3 bucket name template")
     s3_bucket_tags: Dict[str, str] = Field(
         default={},
