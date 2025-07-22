@@ -284,7 +284,6 @@ mod tests {
             Literal("this".into()),
         ];
         let r = tokenize_query(query);
-        println!("Nom result: {r:?}");
         assert_eq!(r, Ok(("", expected)));
     }
 }
