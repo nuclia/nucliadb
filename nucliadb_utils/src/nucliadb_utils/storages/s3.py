@@ -367,7 +367,6 @@ class S3Storage(Storage):
         self._aws_access_key = aws_client_id
         self._aws_secret_key = aws_client_secret
         self._region_name = region_name
-        self._kms_key_id = kms_key_id
 
         self._bucket_tags = bucket_tags
 
@@ -382,6 +381,7 @@ class S3Storage(Storage):
         )
         self._exit_stack = AsyncExitStack()
         self.bucket = bucket
+        self._kms_key_id = kms_key_id
 
     def get_bucket_name(self, kbid: str):
         if self.bucket is None:
