@@ -184,7 +184,12 @@ pub struct FuzzyTermQuery {
 
 impl std::fmt::Debug for FuzzyTermQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Fuzzy")
+        f.write_fmt(format_args!(
+            "Fuzzy {{ term: {}, distance: {}, prefix: {} }}",
+            self.term.value().as_str().unwrap_or("<unknown>"),
+            self.distance,
+            self.prefix
+        ))
     }
 }
 impl FuzzyTermQuery {
