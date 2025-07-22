@@ -45,6 +45,7 @@ pub fn parse_keyword_query<'a>(query: &'a [Token<'a>], schema: &ParagraphSchema)
                     .map(|word| Term::from_field_text(schema.text, word))
                     .collect();
 
+                #[allow(clippy::comparison_chain)]
                 if terms.len() == 1 {
                     // phrase queries must have more than one term, so we use a term query
                     let term = terms.remove(0); // safe because terms.len() == 1
@@ -71,7 +72,7 @@ pub fn parse_keyword_query<'a>(query: &'a [Token<'a>], schema: &ParagraphSchema)
         }
     }
 
-    if subqueries.len() == 0 {
+    if subqueries.is_empty() {
         Box::new(AllQuery)
     } else if subqueries.len() == 1 {
         subqueries.pop().unwrap().1
@@ -95,7 +96,7 @@ mod tests {
     fn test_one_clause_simplification() {
         let schema = ParagraphSchema::new();
 
-        let query = parse_keyword_query(&vec![Token::Literal("nucliadb".into())], &schema);
+        let query = parse_keyword_query(&[Token::Literal("nucliadb".into())], &schema);
         let term = extract_term_from(&query);
         assert_eq!(*term, Term::from_field_text(schema.text, "nucliadb"));
     }
@@ -167,18 +168,17 @@ mod tests {
     fn downcast_boolean_query(q: Box<dyn Query>) -> Box<BooleanQuery> {
         let q = q.downcast::<BooleanQuery>();
         assert!(q.is_ok(), "BooleanQuery expected");
-        let q = q.unwrap();
-        q
+        q.unwrap()
     }
 
-    fn extract_term_from(query: &Box<dyn Query>) -> &Term {
+    fn extract_term_from(query: &dyn Query) -> &Term {
         let q = query.downcast_ref::<TermQuery>();
         assert!(q.is_some(), "TermQuery expected");
         let q = q.unwrap();
         q.term()
     }
 
-    fn extract_phrase_terms_from(query: &Box<dyn Query>) -> Vec<Term> {
+    fn extract_phrase_terms_from(query: &dyn Query) -> Vec<Term> {
         let q = query.downcast_ref::<PhraseQuery>();
         assert!(q.is_some(), "PhraseQuery expected");
         let q = q.unwrap();

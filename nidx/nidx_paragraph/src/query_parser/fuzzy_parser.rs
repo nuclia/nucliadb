@@ -66,7 +66,7 @@ pub fn parse_fuzzy_query(query: &[Token], term_collector: SharedTermC, last_lite
     let mut subqueries = vec![];
     let schema = ParagraphSchema::new();
 
-    for (i, item) in query.into_iter().enumerate() {
+    for (i, item) in query.iter().enumerate() {
         match item {
             Token::Literal(literal) => {
                 let term = Term::from_field_text(schema.text, literal);
@@ -100,6 +100,7 @@ pub fn parse_fuzzy_query(query: &[Token], term_collector: SharedTermC, last_lite
                     .map(|word| Term::from_field_text(schema.text, word))
                     .collect();
 
+                #[allow(clippy::comparison_chain)]
                 if terms.len() == 1 {
                     // phrase queries must have more than one term, so we use a term query
                     let term = terms.remove(0); // safe because terms.len() == 1
@@ -126,7 +127,7 @@ pub fn parse_fuzzy_query(query: &[Token], term_collector: SharedTermC, last_lite
         }
     }
 
-    if subqueries.len() == 0 {
+    if subqueries.is_empty() {
         Box::new(AllQuery)
     } else if subqueries.len() == 1 {
         subqueries.pop().unwrap().1

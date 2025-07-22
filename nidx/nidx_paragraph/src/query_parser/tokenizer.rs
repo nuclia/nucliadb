@@ -49,7 +49,7 @@ pub enum Token<'a> {
 /// Note this tokenization also applies the default tantivy tokenizer.
 /// Punctuation and other special characters will be removed from the query.
 ///
-pub fn tokenize_query<'a>(input: &'a str) -> Result<(&'a str, Vec<Token<'a>>), nom::error::Error<&'a str>> {
+pub fn tokenize_query(input: &str) -> Result<(&str, Vec<Token<'_>>), nom::error::Error<&str>> {
     let is_literal_char = |c: char| -> bool { c.is_ascii_graphic() && c != '"' };
 
     // detect alphanumeric words like: abc, 123, a1b2, a-b.3c, etc.
@@ -94,7 +94,7 @@ pub fn tokenize_query<'a>(input: &'a str) -> Result<(&'a str, Vec<Token<'a>>), n
         |t| {
             // Return an empty list of tokens if query is empty (or only contains spaces)
             // REVIEW: we may want to use a different default for empty query
-            let tokenized = t.unwrap_or_else(Vec::new);
+            let tokenized = t.unwrap_or_default();
 
             // After our grammar tokenization, we want to pass the tantivy
             // tokenizer to remove punctuation and apply the same process the
@@ -107,9 +107,9 @@ pub fn tokenize_query<'a>(input: &'a str) -> Result<(&'a str, Vec<Token<'a>>), n
                 .build();
             tokenized
                 .into_iter()
-                .flat_map(|token: Token<'a>| match token {
+                .flat_map(|token| match token {
                     Token::Literal(Cow::Borrowed(lit)) => {
-                        let mut stream = tantivy_tokenizer.token_stream(&lit);
+                        let mut stream = tantivy_tokenizer.token_stream(lit);
                         let mut tokens = vec![];
                         while stream.advance() {
                             let token = stream.token();
@@ -118,7 +118,7 @@ pub fn tokenize_query<'a>(input: &'a str) -> Result<(&'a str, Vec<Token<'a>>), n
                         tokens
                     }
                     Token::Quoted(Cow::Borrowed(quoted)) => {
-                        let mut stream = tantivy_tokenizer.token_stream(&quoted);
+                        let mut stream = tantivy_tokenizer.token_stream(quoted);
                         let mut tokens = vec![];
                         while stream.advance() {
                             let token = stream.token();
@@ -127,7 +127,7 @@ pub fn tokenize_query<'a>(input: &'a str) -> Result<(&'a str, Vec<Token<'a>>), n
                         vec![Token::Quoted(tokens.into_iter().join(" ").into())]
                     }
                     Token::Excluded(Cow::Borrowed(excluded)) => {
-                        let mut stream = tantivy_tokenizer.token_stream(&excluded);
+                        let mut stream = tantivy_tokenizer.token_stream(excluded);
                         let mut tokens = vec![];
                         while stream.advance() {
                             let token = stream.token();
@@ -141,7 +141,7 @@ pub fn tokenize_query<'a>(input: &'a str) -> Result<(&'a str, Vec<Token<'a>>), n
                         unreachable!("nom parser only returns borrowed strings")
                     }
                 })
-                .collect::<Vec<Token<'a>>>()
+                .collect::<Vec<Token>>()
         },
     )(input);
     r.finish()

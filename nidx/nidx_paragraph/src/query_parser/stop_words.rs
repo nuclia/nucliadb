@@ -113,8 +113,8 @@ pub fn remove_stop_words(mut query: Vec<Token>) -> Vec<Token> {
     query
         .into_iter()
         .take(query_len - 1)
-        .filter(|token| !is_stop_word_token(&token))
-        .chain([last].into_iter())
+        .filter(|token| !is_stop_word_token(token))
+        .chain([last])
         .collect()
 }
 

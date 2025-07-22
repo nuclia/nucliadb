@@ -70,11 +70,8 @@ pub fn parse_query<'a>(query: &'a str, config: ParserConfig) -> anyhow::Result<P
 
     let mut term_collector = TermCollector::new();
     for token in tokenized.iter() {
-        match token {
-            Token::Literal(literal) => {
-                term_collector.log_eterm(literal.to_string());
-            }
-            _ => {}
+        if let Token::Literal(literal) = token {
+            term_collector.log_eterm(literal.to_string());
         }
     }
     let shared_term_collector = SharedTermC::from(term_collector);
@@ -92,10 +89,10 @@ pub fn parse_query<'a>(query: &'a str, config: ParserConfig) -> anyhow::Result<P
     })
 }
 
-impl<'a> ParserConfig<'a> {
+impl ParserConfig<'_> {
     pub fn builder(schema: &ParagraphSchema) -> ParserConfigBuilder {
         ParserConfigBuilder {
-            schema: schema,
+            schema,
             fuzzy__last_literal_as_fuzzy_prefix: false,
         }
     }
