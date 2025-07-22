@@ -442,7 +442,9 @@ class S3Storage(Storage):
         return await bucket_exists(self._s3aioclient, bucket_name)
 
     async def create_bucket(self, bucket_name: str):
-        await create_bucket(self._s3aioclient, bucket_name, self._bucket_tags, self._region_name, self._kms_key_id)
+        await create_bucket(
+            self._s3aioclient, bucket_name, self._bucket_tags, self._region_name, self._kms_key_id
+        )
 
     async def schedule_delete_kb(self, kbid: str):
         bucket_name = self.get_bucket_name(kbid)
@@ -525,7 +527,7 @@ async def create_bucket(
     bucket_name: str,
     bucket_tags: Optional[dict[str, str]] = None,
     region_name: Optional[str] = None,
-    kms_key_id: Optional[str] = None
+    kms_key_id: Optional[str] = None,
 ):
     bucket_creation_options = {}
     if region_name is not None:
@@ -551,12 +553,12 @@ async def create_bucket(
                     {
                         "ApplyServerSideEncryptionByDefault": {
                             "SSEAlgorithm": "aws:kms",
-                            "KMSMasterKeyID": kms_key_id
+                            "KMSMasterKeyID": kms_key_id,
                         },
                         "BucketKeyEnabled": True,
                     }
                 ]
-            }
+            },
         )
 
 
