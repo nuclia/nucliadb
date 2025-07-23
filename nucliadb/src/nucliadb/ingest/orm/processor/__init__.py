@@ -18,4 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 # reexports
-from .processor import Processor, validate_indexable_resource  # noqa: F401
+from .processor import Processor
+
+__all__ = ["Processor"]
