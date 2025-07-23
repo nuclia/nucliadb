@@ -55,8 +55,11 @@ pub fn parse_query<'a>(query: &'a str, config: ParserConfig) -> anyhow::Result<P
 
     let mut term_collector = TermCollector::new();
     for token in tokenized.iter() {
-        if let Token::Literal(literal) = token {
-            term_collector.log_eterm(literal.to_string());
+        match token {
+            Token::Literal(value) | Token::Quoted(value) => {
+                term_collector.log_eterm(value.to_string());
+            }
+            Token::Excluded(_) => {}
         }
     }
     let shared_term_collector = SharedTermC::from(term_collector);
