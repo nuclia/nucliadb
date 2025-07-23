@@ -18,17 +18,21 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
+from unittest.mock import patch
+
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
+    FieldComputedMetadataWrapper,
     FieldID,
     FieldType,
 )
 from nucliadb_protos.utils_pb2 import Vector
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, Generator
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 
@@ -115,3 +119,110 @@ async def test_field_update_deletes_old_vectors(
     print(resp.text)
     body = resp.json()
     assert len(body["retrieval_results"]["resources"]) == 0
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_field_with_many_entities(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "slug": "myresource",
+            "title": "My Title",
+            "summary": "My summary",
+            "icon": "text/plain",
+            "texts": {"text1": {"body": "Hello my dear friend"}},
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    bm = BrokerMessage()
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    bm.kbid = standalone_knowledgebox
+    bm.uuid = rid
+
+    field = FieldID(field_type=FieldType.TEXT, field="text1")
+    etw = ExtractedTextWrapper()
+    etw.body.text = "Hello my dear friend"
+    etw.field.CopyFrom(field)
+    bm.extracted_text.append(etw)
+
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.field_type = FieldType.TEXT
+    fcmw.field.field = "text1"
+    fcmw.metadata.metadata.entities["processor"].entities.add(label="PERSON", text="Fry")
+    fcmw.metadata.metadata.entities["processor"].entities.add(label="PERSON", text="Leela")
+    fcmw.metadata.metadata.entities["processor"].entities.add(label="PERSON", text="Bender")
+    fcmw.metadata.metadata.paragraphs.add(start=0, end=20)
+    bm.field_metadata.append(fcmw)
+
+    g = Generator()
+    g.processor.SetInParent()
+    bm.generated_by.append(g)
+
+    with patch.object(cluster_settings, "max_entity_facets", 2):
+        await inject_message(nucliadb_ingest_grpc, bm)
+
+    # field is indexed
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/find",
+        json={"query": "Hello", "min_score": -1},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1
+
+    # two out of three entities are indexes
+    indexed = []
+    for entity in ["Fry", "Bender", "Leela"]:
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/find",
+            json={
+                "query": "Hello",
+                "min_score": -1,
+                "filter_expression": {"field": {"prop": "entity", "subtype": "PERSON", "value": entity}},
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        if len(body["resources"]) == 1:
+            indexed.append(entity)
+
+    assert len(indexed) == 2
+
+    # Check a warning has been added
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert len(body["resources"]) == 1
+    text = list(body["resources"].values())[0]["data"]["texts"]["text1"]
+    assert text["status"] == "PROCESSED"
+    assert len(text["errors"]) == 1
+    assert "Too many detected entities" in text["errors"][0]["body"]
+    assert text["errors"][0]["code_str"] == "INDEX"
+    assert text["errors"][0]["severity"] == "WARNING"
+
+    # Index again with unlimited entities
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    # Make sure     the warning has been removed
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert len(body["resources"]) == 1
+    text = list(body["resources"].values())[0]["data"]["texts"]["text1"]
+    assert text["status"] == "PROCESSED"
+    assert "errors" not in text

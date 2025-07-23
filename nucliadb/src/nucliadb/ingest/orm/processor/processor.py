@@ -32,6 +32,7 @@ from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
+from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
 from nucliadb.ingest.orm.exceptions import (
@@ -93,6 +94,36 @@ def validate_indexable_resource(resource: noderesources_pb2.Resource) -> None:
             "Resource has too many paragraphs. "
             f"Supported: {cluster_settings.max_resource_paragraphs} , Number: {num_paragraphs}"
         )
+
+
+def trim_entity_facets(index_message: PBBrainResource) -> list[tuple[str, str]]:
+    max_entities = cluster_settings.max_entity_facets
+    warnings = []
+    for field_id, text_info in index_message.texts.items():
+        if len(text_info.labels) > max_entities:
+            new_labels = []
+            entity_count = 0
+            truncated = False
+            for label in text_info.labels:
+                if label.startswith("/e/"):
+                    if entity_count < max_entities:
+                        new_labels.append(label)
+                    else:
+                        truncated = True
+                    entity_count += 1
+                else:
+                    new_labels.append(label)
+            if truncated:
+                warnings.append(
+                    (
+                        field_id,
+                        f"Too many detected entities. Only the first {max_entities} will be available as facets for filtering",
+                    )
+                )
+                text_info.ClearField("labels")
+                text_info.labels.extend(new_labels)
+
+    return warnings
 
 
 class Processor:
@@ -314,8 +345,7 @@ class Processor:
                 # index message
                 if resource and resource.modified:
                     index_message = await self.generate_index_message(resource, messages, created)
-                    await pgcatalog_update(txn, kbid, resource, index_message)
-                    await self.index_resource(  # noqa
+                    warnings = await self.index_resource(
                         index_message=index_message,
                         txn=txn,
                         uuid=uuid,
@@ -325,6 +355,28 @@ class Processor:
                         kb=kb,
                         source=messages_source(messages),
                     )
+                    # Save indexing warnings
+                    for field_id, warning in warnings:
+                        (field_type_str, field_name) = field_id.split("/")
+                        field_type = FIELD_TYPE_STR_TO_PB[field_type_str]
+                        field = await resource.get_field(field_name, field_type)
+                        status = await field.get_status()
+                        if status is not None:
+                            field_error = writer_pb2.FieldError(
+                                source_error=writer_pb2.Error(
+                                    field=field_name,
+                                    field_type=field_type,
+                                    error=warning,
+                                    code=writer_pb2.Error.ErrorCode.INDEX,
+                                    severity=writer_pb2.Error.Severity.WARNING,
+                                )
+                            )
+                            field_error.created.GetCurrentTime()
+                            status.errors.append(field_error)
+                            await field.set_status(status)
+
+                    await pgcatalog_update(txn, kbid, resource, index_message)
+
                     if transaction_check:
                         await sequence_manager.set_last_seqid(txn, partition, seqid)
                     await txn.commit()
@@ -445,8 +497,10 @@ class Processor:
         partition: str,
         kb: KnowledgeBox,
         source: nodewriter_pb2.IndexMessageSource.ValueType,
-    ) -> None:
+    ) -> list[tuple[str, str]]:
         validate_indexable_resource(index_message)
+        warnings = trim_entity_facets(index_message)
+
         shard = await self.get_or_assign_resource_shard(txn, kb, uuid)
         external_index_manager = await get_external_index_manager(kbid=kbid)
         if external_index_manager is not None:
@@ -460,6 +514,7 @@ class Processor:
                 kb=kbid,
                 source=source,
             )
+        return warnings
 
     @processor_observer.wrap({"type": "generate_index_message"})
     async def generate_index_message(
