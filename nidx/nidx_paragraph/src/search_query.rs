@@ -32,7 +32,7 @@ use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::{DocId, InvertedIndexReader, Term};
 
 use crate::fuzzy_query::FuzzyTermQuery;
-use crate::query_parser::is_stop_word;
+use crate::query_parser::{ParsedQuery, ParserConfig, is_stop_word};
 use crate::schema::ParagraphSchema;
 type QueryP = (Occur, Box<dyn Query>);
 
@@ -341,13 +341,16 @@ pub fn search_query(
     distance: u8,
     with_advance: Option<Box<dyn Query>>,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
-    let mut term_collector = TermCollector::default();
-    let processed = preprocess_raw_query(text, &mut term_collector);
-    let query = parse_query(parser, &processed.regular_query);
-    let fuzzy_query = parse_query(parser, &processed.fuzzy_query);
-    let termc = SharedTermC::from(term_collector);
-    let mut fuzzies = fuzzied_queries(fuzzy_query, false, distance, termc.clone());
+    let parser_config = ParserConfig::with_schema(schema);
+    let ParsedQuery {
+        keyword: query,
+        fuzzy: fuzzy_query,
+        term_collector: termc,
+    } = crate::query_parser::parse_query(text, parser_config).unwrap();
+
     let mut originals = vec![(Occur::Must, query)];
+    let mut fuzzies = vec![(Occur::Must, fuzzy_query)];
+
     if let Some(advance) = with_advance {
         originals.push((Occur::Must, advance.box_clone()));
         fuzzies.push((Occur::Must, advance));
@@ -371,9 +374,6 @@ pub fn search_query(
         let fuzzy = Box::new(BooleanQuery::new(vec![]));
         (original, termc, fuzzy)
     } else {
-        if processed.fuzzy_query.is_empty() {
-            fuzzies.clear();
-        }
         let original = Box::new(BooleanQuery::new(originals));
         let fuzzied = Box::new(BoostQuery::new(Box::new(BooleanQuery::new(fuzzies)), 0.5));
         (original, termc, fuzzied)
