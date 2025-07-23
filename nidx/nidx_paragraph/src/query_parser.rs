@@ -23,7 +23,7 @@ mod stop_words;
 mod tokenizer;
 
 use tantivy::query::Query;
-use tokenizer::{Token, tokenize_query};
+use tokenizer::{Token, tokenize_query_infallible};
 
 use crate::{
     schema::ParagraphSchema,
@@ -61,10 +61,7 @@ pub struct ParsedQuery {
 }
 
 pub fn parse_query<'a>(query: &'a str, config: ParserConfig) -> anyhow::Result<ParsedQuery> {
-    let (rest, tokenized): (&'a str, Vec<Token<'a>>) = tokenize_query(query).unwrap();
-    // TODO: we should think about parser errors, as they should never happen is
-    // our parser is correct (as we have a lenient implementation)
-    debug_assert!(rest.is_empty(), "we expect to parse the whole query");
+    let tokenized = tokenize_query_infallible(query);
 
     let tokenized = remove_stop_words(tokenized);
 

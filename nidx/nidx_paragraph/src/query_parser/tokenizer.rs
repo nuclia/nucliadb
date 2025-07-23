@@ -28,6 +28,7 @@ use nom::multi::fold_many0;
 use nom::sequence::{delimited, preceded};
 use nom::{Finish, IResult};
 use tantivy::tokenizer::{LowerCaser, SimpleTokenizer, TextAnalyzer};
+use tracing::warn;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Token<'a> {
@@ -49,7 +50,7 @@ pub enum Token<'a> {
 /// Note this tokenization also applies the default tantivy tokenizer.
 /// Punctuation and other special characters will be removed from the query.
 ///
-pub fn tokenize_query(input: &str) -> Result<(&str, Vec<Token<'_>>), nom::error::Error<&str>> {
+pub fn tokenize_query_infallible(input: &str) -> Vec<Token<'_>> {
     let is_literal_char = |c: char| -> bool { c.is_ascii_graphic() && c != '"' };
 
     // detect alphanumeric words like: abc, 123, a1b2, a-b.3c, etc.
@@ -71,7 +72,7 @@ pub fn tokenize_query(input: &str) -> Result<(&str, Vec<Token<'_>>), nom::error:
 
     let unclosed_quote = is_a(r#"""#);
 
-    let r: IResult<_, _> = map(
+    let r: IResult<&str, Vec<Token>, nom::error::Error<&str>> = map(
         delimited(
             multispace0,
             opt(fold_many0(
@@ -93,58 +94,77 @@ pub fn tokenize_query(input: &str) -> Result<(&str, Vec<Token<'_>>), nom::error:
         ),
         |t| {
             // Return an empty list of tokens if query is empty (or only contains spaces)
-            // REVIEW: we may want to use a different default for empty query
             let tokenized = t.unwrap_or_default();
-
-            // After our grammar tokenization, we want to pass the tantivy
-            // tokenizer to remove punctuation and apply the same process the
-            // index is applying.
-            //
-            // NOTE this depends on how the `text` field is being indexed and
-            // tokenized, any change there should be reflected here too
-            let mut tantivy_tokenizer = TextAnalyzer::builder(SimpleTokenizer::default())
-                .filter(LowerCaser)
-                .build();
-            tokenized
-                .into_iter()
-                .flat_map(|token| match token {
-                    Token::Literal(Cow::Borrowed(lit)) => {
-                        let mut stream = tantivy_tokenizer.token_stream(lit);
-                        let mut tokens = vec![];
-                        while stream.advance() {
-                            let token = stream.token();
-                            tokens.push(Token::Literal(Cow::Borrowed(&lit[token.offset_from..token.offset_to])));
-                        }
-                        tokens
-                    }
-                    Token::Quoted(Cow::Borrowed(quoted)) => {
-                        let mut stream = tantivy_tokenizer.token_stream(quoted);
-                        let mut tokens = vec![];
-                        while stream.advance() {
-                            let token = stream.token();
-                            tokens.push(token.text.clone())
-                        }
-                        vec![Token::Quoted(tokens.into_iter().join(" ").into())]
-                    }
-                    Token::Excluded(Cow::Borrowed(excluded)) => {
-                        let mut stream = tantivy_tokenizer.token_stream(excluded);
-                        let mut tokens = vec![];
-                        while stream.advance() {
-                            let token = stream.token();
-                            tokens.push(Token::Excluded(Cow::Borrowed(
-                                &excluded[token.offset_from..token.offset_to],
-                            )));
-                        }
-                        tokens
-                    }
-                    Token::Literal(Cow::Owned(_)) | Token::Quoted(Cow::Owned(_)) | Token::Excluded(Cow::Owned(_)) => {
-                        unreachable!("nom parser only returns borrowed strings")
-                    }
-                })
-                .collect::<Vec<Token>>()
+            tantivy_retokenize(tokenized)
         },
     )(input);
-    r.finish()
+
+    // safe to use finish. As we are using a complete parser, it'll never panic for Incomplete
+    match r.finish() {
+        Ok((rest, tokens)) => {
+            debug_assert!(rest.is_empty(), "parser should be complete and parse all input");
+            tokens
+        }
+        Err(error) => {
+            warn!("Parsing error for query '{}'. {:?}", input, error);
+            // Fallback to tantivy's tokenizer and parse the whole query as
+            // literals. This makes tokenization infallible at expenses of
+            // losing our grammar if the parser is incorrect.
+            tantivy_retokenize(vec![Token::Literal(Cow::Borrowed(input))])
+        }
+    }
+}
+
+/// Parse a stream of tokens and retokenize them using the tantivy tokenizer.
+///
+/// This is done after our own grammar tokenization. We want to pass tantivy's
+/// tokenizer to remove puntuation and apply the same process the index is
+/// applying to the `text` field.
+///
+/// NOTE this depends on how the `text` field is being indexed and tokenized.
+/// Any change there should be reflected here too.
+fn tantivy_retokenize(tokens: Vec<Token>) -> Vec<Token> {
+    let mut tantivy_tokenizer = TextAnalyzer::builder(SimpleTokenizer::default())
+        .filter(LowerCaser)
+        .build();
+
+    tokens
+        .into_iter()
+        .flat_map(|token| match token {
+            Token::Literal(Cow::Borrowed(lit)) => {
+                let mut stream = tantivy_tokenizer.token_stream(lit);
+                let mut tokens = vec![];
+                while stream.advance() {
+                    let token = stream.token();
+                    tokens.push(Token::Literal(Cow::Borrowed(&lit[token.offset_from..token.offset_to])));
+                }
+                tokens
+            }
+            Token::Quoted(Cow::Borrowed(quoted)) => {
+                let mut stream = tantivy_tokenizer.token_stream(quoted);
+                let mut tokens = vec![];
+                while stream.advance() {
+                    let token = stream.token();
+                    tokens.push(token.text.clone())
+                }
+                vec![Token::Quoted(tokens.into_iter().join(" ").into())]
+            }
+            Token::Excluded(Cow::Borrowed(excluded)) => {
+                let mut stream = tantivy_tokenizer.token_stream(excluded);
+                let mut tokens = vec![];
+                while stream.advance() {
+                    let token = stream.token();
+                    tokens.push(Token::Excluded(Cow::Borrowed(
+                        &excluded[token.offset_from..token.offset_to],
+                    )));
+                }
+                tokens
+            }
+            Token::Literal(Cow::Owned(_)) | Token::Quoted(Cow::Owned(_)) | Token::Excluded(Cow::Owned(_)) => {
+                unreachable!("nom parser only returns borrowed strings")
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -156,8 +176,8 @@ mod tests {
     fn test_empty_query() {
         let query = "";
         let expected = vec![];
-        let r = tokenize_query(query);
-        assert_eq!(r, Ok(("", expected)));
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
     }
 
     #[test]
@@ -170,8 +190,8 @@ mod tests {
             Literal(Cow::Borrowed("simple")),
             Literal(Cow::Borrowed("query")),
         ];
-        let r = tokenize_query(query);
-        assert_eq!(r, Ok(("", expected)));
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
     }
 
     #[test]
@@ -185,8 +205,8 @@ mod tests {
             Literal("simple".into()),
             Literal("query".into()),
         ];
-        let r = tokenize_query(query);
-        assert_eq!(r, Ok(("", expected)));
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
     }
 
     #[test]
@@ -199,8 +219,8 @@ mod tests {
             Excluded("excluded".into()),
             Literal("word".into()),
         ];
-        let r = tokenize_query(query);
-        assert_eq!(r, Ok(("", expected)));
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
 
         let query = "-Everything -is -excluded";
         let expected = vec![
@@ -208,16 +228,16 @@ mod tests {
             Excluded("is".into()),
             Excluded("excluded".into()),
         ];
-        let r = tokenize_query(query);
-        assert_eq!(r, Ok(("", expected)));
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
     }
 
     #[test]
     fn test_quoted_strings() {
         let query = r#""quoted""#;
         let expected = vec![Quoted("quoted".into())];
-        let r = tokenize_query(query);
-        assert_eq!(r, Ok(("", expected)));
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
 
         let query = r#"This is "really important""#;
         let expected = vec![
@@ -225,8 +245,8 @@ mod tests {
             Literal("is".into()),
             Quoted("really important".into()),
         ];
-        let r = tokenize_query(query);
-        assert_eq!(r, Ok(("", expected)));
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
 
         let query = r#"half "quoted string"#;
         let expected = vec![
@@ -234,8 +254,8 @@ mod tests {
             Literal("quoted".into()),
             Literal("string".into()),
         ];
-        let r = tokenize_query(query);
-        assert_eq!(r, Ok(("", expected)));
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
 
         let query = r#"half" quoted string"#;
         let expected = vec![
@@ -243,8 +263,8 @@ mod tests {
             Literal("quoted".into()),
             Literal("string".into()),
         ];
-        let r = tokenize_query(query);
-        assert_eq!(r, Ok(("", expected)));
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
 
         let query = r#"half q"uoted string"#;
         let expected = vec![
@@ -253,8 +273,8 @@ mod tests {
             Literal("uoted".into()),
             Literal("string".into()),
         ];
-        let r = tokenize_query(query);
-        assert_eq!(r, Ok(("", expected)));
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
     }
 
     #[test]
@@ -267,8 +287,8 @@ mod tests {
             // here we have removed the minus (-) due to tantivy tokenization
             Quoted("really important".into()),
         ];
-        let r = tokenize_query(query);
-        assert_eq!(r, Ok(("", expected)));
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
     }
 
     #[test]
@@ -283,7 +303,7 @@ mod tests {
             Literal("for".into()),
             Literal("this".into()),
         ];
-        let r = tokenize_query(query);
-        assert_eq!(r, Ok(("", expected)));
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
     }
 }
