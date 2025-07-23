@@ -51,6 +51,25 @@ pub enum Token<'a> {
 /// Punctuation and other special characters will be removed from the query.
 ///
 pub fn tokenize_query_infallible(input: &str) -> Vec<Token<'_>> {
+    let r = nidx_grammar_tokenize(input);
+
+    // safe to use finish. As we are using a complete parser, it'll never panic for Incomplete
+    match r.finish() {
+        Ok((rest, tokens)) => {
+            debug_assert!(rest.is_empty(), "parser should be complete and parse all input");
+            tokens
+        }
+        Err(error) => {
+            warn!("Parsing error for query '{}'. {:?}", input, error);
+            // Fallback to tantivy's tokenizer and parse the whole query as
+            // literals. This makes tokenization infallible at expenses of
+            // losing our grammar if the parser is incorrect.
+            tantivy_retokenize(vec![Token::Literal(Cow::Borrowed(input))])
+        }
+    }
+}
+
+fn nidx_grammar_tokenize(input: &str) -> IResult<&str, Vec<Token>, nom::error::Error<&str>> {
     let is_literal_char = |c: char| -> bool { c.is_ascii_graphic() && c != '"' };
 
     // detect alphanumeric words like: abc, 123, a1b2, a-b.3c, etc.
@@ -72,7 +91,7 @@ pub fn tokenize_query_infallible(input: &str) -> Vec<Token<'_>> {
 
     let unclosed_quote = is_a(r#"""#);
 
-    let r: IResult<&str, Vec<Token>, nom::error::Error<&str>> = map(
+    map(
         delimited(
             multispace0,
             opt(fold_many0(
@@ -97,22 +116,7 @@ pub fn tokenize_query_infallible(input: &str) -> Vec<Token<'_>> {
             let tokenized = t.unwrap_or_default();
             tantivy_retokenize(tokenized)
         },
-    )(input);
-
-    // safe to use finish. As we are using a complete parser, it'll never panic for Incomplete
-    match r.finish() {
-        Ok((rest, tokens)) => {
-            debug_assert!(rest.is_empty(), "parser should be complete and parse all input");
-            tokens
-        }
-        Err(error) => {
-            warn!("Parsing error for query '{}'. {:?}", input, error);
-            // Fallback to tantivy's tokenizer and parse the whole query as
-            // literals. This makes tokenization infallible at expenses of
-            // losing our grammar if the parser is incorrect.
-            tantivy_retokenize(vec![Token::Literal(Cow::Borrowed(input))])
-        }
-    }
+    )(input)
 }
 
 /// Parse a stream of tokens and retokenize them using the tantivy tokenizer.
@@ -136,7 +140,7 @@ fn tantivy_retokenize(tokens: Vec<Token>) -> Vec<Token> {
                 let mut tokens = vec![];
                 while stream.advance() {
                     let token = stream.token();
-                    tokens.push(Token::Literal(Cow::Borrowed(&lit[token.offset_from..token.offset_to])));
+                    tokens.push(Token::Literal(Cow::Owned(token.text.clone())));
                 }
                 tokens
             }
@@ -147,16 +151,14 @@ fn tantivy_retokenize(tokens: Vec<Token>) -> Vec<Token> {
                     let token = stream.token();
                     tokens.push(token.text.clone())
                 }
-                vec![Token::Quoted(tokens.into_iter().join(" ").into())]
+                vec![Token::Quoted(Cow::Owned(tokens.into_iter().join(" ")))]
             }
             Token::Excluded(Cow::Borrowed(excluded)) => {
                 let mut stream = tantivy_tokenizer.token_stream(excluded);
                 let mut tokens = vec![];
                 while stream.advance() {
                     let token = stream.token();
-                    tokens.push(Token::Excluded(Cow::Borrowed(
-                        &excluded[token.offset_from..token.offset_to],
-                    )));
+                    tokens.push(Token::Excluded(Cow::Owned(token.text.clone())));
                 }
                 tokens
             }
@@ -184,7 +186,7 @@ mod tests {
     fn test_simple_query() {
         let query = "This is a simple query";
         let expected = vec![
-            Literal(Cow::Borrowed("This")),
+            Literal(Cow::Borrowed("this")),
             Literal(Cow::Borrowed("is")),
             Literal(Cow::Borrowed("a")),
             Literal(Cow::Borrowed("simple")),
@@ -198,7 +200,7 @@ mod tests {
     fn test_special_characters() {
         let query = "This-is?a_less+simple*query";
         let expected = vec![
-            Literal("This".into()),
+            Literal("this".into()),
             Literal("is".into()),
             Literal("a".into()),
             Literal("less".into()),
@@ -213,7 +215,7 @@ mod tests {
     fn test_excluded_words() {
         let query = "This is an -excluded word";
         let expected = vec![
-            Literal("This".into()),
+            Literal("this".into()),
             Literal("is".into()),
             Literal("an".into()),
             Excluded("excluded".into()),
@@ -224,7 +226,7 @@ mod tests {
 
         let query = "-Everything -is -excluded";
         let expected = vec![
-            Excluded("Everything".into()),
+            Excluded("everything".into()),
             Excluded("is".into()),
             Excluded("excluded".into()),
         ];
@@ -241,7 +243,7 @@ mod tests {
 
         let query = r#"This is "really important""#;
         let expected = vec![
-            Literal("This".into()),
+            Literal("this".into()),
             Literal("is".into()),
             Quoted("really important".into()),
         ];
@@ -282,7 +284,7 @@ mod tests {
         // quotes take preference over excluding words
         let query = r#"This is "really -important""#;
         let expected = vec![
-            Literal("This".into()),
+            Literal("this".into()),
             Literal("is".into()),
             // here we have removed the minus (-) due to tantivy tokenization
             Quoted("really important".into()),
@@ -295,7 +297,7 @@ mod tests {
     fn test_complex_combinations() {
         let query = r#"This is "really" "important stuff" -except for this"#;
         let expected = vec![
-            Literal("This".into()),
+            Literal("this".into()),
             Literal("is".into()),
             Quoted("really".into()),
             Quoted("important stuff".into()),
@@ -305,5 +307,13 @@ mod tests {
         ];
         let tokens = tokenize_query_infallible(query);
         assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn test_tantivy_retokenization() {
+        let query = vec![Literal("Title".into()), Literal("No-DaShEs".into())];
+        let expected = vec![Literal("title".into()), Literal("no".into()), Literal("dashes".into())];
+        let retokenized = tantivy_retokenize(query);
+        assert_eq!(retokenized, expected)
     }
 }
