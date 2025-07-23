@@ -12,5 +12,37 @@ envFrom: {}
 indexer: {}
 scheduler: {}
 worker: {}
-searcher: {}
+searcher:
+  # -- Number of replicas for the searcher deployment
+  replicas: 2
+  # -- Node selector for the searcher pods
+  nodeSelector: {}
+  # -- Topology spread constraints for the searcher pods
+  topologySpreadConstraints: []
+  # -- Service account name for the searcher pods
+  serviceAccount: default
+  # -- Affinity settings for the searcher pods
+  affinity: {}
+  # -- Tolerations for the searcher pods
+  tolerations: []
+
+  pdb:
+    # -- Enable or disable the PodDisruptionBudget for the searcher
+    enabled: true
+    # -- Maximum number of unavailable searcher pods during disruptions
+    maxUnavailable: 1
+
+  rbac:
+    # -- Enable or disable RBAC for the searcher
+    enabled: true
+
+  service:
+    # -- Enable or disable the searcher service
+    enabled: true
+    # -- Service type for the searcher
+    type: ClusterIP
+    # -- Additional labels for the searcher service
+    labels: {}
+    # -- Annotations for the searcher service
+    annotations: {}
 api: {}
