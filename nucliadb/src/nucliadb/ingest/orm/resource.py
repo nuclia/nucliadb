@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence, Type
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FieldId
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
@@ -525,6 +525,34 @@ class Resource:
         # Otherwise (everything processed or we only have DA errors) -> PROCESSED
         else:
             self.basic.metadata.status = PBMetadata.Status.PROCESSED
+
+    async def add_field_error(
+        self, field_id: str, message: str, severity: writer_pb2.Error.Severity.ValueType
+    ):
+        (field_type_str, field_name) = field_id.split("/")
+        field_type = FIELD_TYPE_STR_TO_PB[field_type_str]
+        field = await self.get_field(field_name, field_type)
+        status = await field.get_status()
+        if status is not None:
+            field_error = writer_pb2.FieldError(
+                source_error=writer_pb2.Error(
+                    field=field_name,
+                    field_type=field_type,
+                    error=message,
+                    code=writer_pb2.Error.ErrorCode.INDEX,
+                    severity=severity,
+                )
+            )
+            field_error.created.GetCurrentTime()
+            status.errors.append(field_error)
+            if severity == writer_pb2.Error.Severity.ERROR:
+                status.status = writer_pb2.FieldStatus.Status.ERROR
+            await field.set_status(status)
+
+        # If it's an error, we may need to change the resource status
+        if severity == writer_pb2.Error.Severity.ERROR and self.basic:
+            await self.update_status()
+            await self.set_basic(self.basic)
 
     @processor_observer.wrap({"type": "apply_extracted"})
     async def apply_extracted(self, message: BrokerMessage):

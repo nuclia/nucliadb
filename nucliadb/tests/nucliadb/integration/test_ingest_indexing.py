@@ -177,7 +177,7 @@ async def test_field_with_many_entities(
     body = resp.json()
     assert len(body["resources"]) == 1
 
-    # two out of three entities are indexes
+    # two out of three entities are indexed
     indexed = []
     for entity in ["Fry", "Bender", "Leela"]:
         resp = await nucliadb_reader.post(
@@ -214,7 +214,7 @@ async def test_field_with_many_entities(
     # Index again with unlimited entities
     await inject_message(nucliadb_ingest_grpc, bm)
 
-    # Make sure     the warning has been removed
+    # Make sure the warning has been removed
     resp = await nucliadb_reader.post(
         f"/kb/{standalone_knowledgebox}/catalog",
         json={},
@@ -226,3 +226,103 @@ async def test_field_with_many_entities(
     text = list(body["resources"].values())[0]["data"]["texts"]["text1"]
     assert text["status"] == "PROCESSED"
     assert "errors" not in text
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_field_with_many_paragraphs(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "slug": "myresource",
+            "title": "My Title",
+            "summary": "My summary",
+            "icon": "text/plain",
+            "texts": {"text1": {"body": "Hello my dear friend"}},
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    bm = BrokerMessage()
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    bm.kbid = standalone_knowledgebox
+    bm.uuid = rid
+
+    field = FieldID(field_type=FieldType.TEXT, field="text1")
+    etw = ExtractedTextWrapper()
+    etw.body.text = "Hello my dear friend"
+    etw.field.CopyFrom(field)
+    bm.extracted_text.append(etw)
+
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.field_type = FieldType.TEXT
+    fcmw.field.field = "text1"
+    fcmw.metadata.metadata.paragraphs.add(start=0, end=5)
+    fcmw.metadata.metadata.paragraphs.add(start=5, end=10)
+    fcmw.metadata.metadata.paragraphs.add(start=10, end=15)
+    fcmw.metadata.metadata.paragraphs.add(start=15, end=20)
+    bm.field_metadata.append(fcmw)
+
+    g = Generator()
+    g.processor.SetInParent()
+    bm.generated_by.append(g)
+
+    with patch.object(cluster_settings, "max_resource_paragraphs", 2):
+        await inject_message(nucliadb_ingest_grpc, bm)
+
+    # field is in error
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1
+    resource = list(body["resources"].values())[0]
+    assert resource["metadata"]["status"] == "ERROR"
+    text = resource["data"]["texts"]["text1"]
+    assert text["status"] == "ERROR"
+    assert len(text["errors"]) == 1
+    assert "Resource has too many paragraphs" in text["errors"][0]["body"]
+    assert text["errors"][0]["code_str"] == "INDEX"
+    assert text["errors"][0]["severity"] == "ERROR"
+
+    # field is not indexed
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/find",
+        json={"query": "Hello", "min_score": -1},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 0
+
+    # Index again with unlimited paragraphs
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    # Make sure the error has been removed
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1
+    resource = list(body["resources"].values())[0]
+    assert resource["metadata"]["status"] == "PROCESSED"
+    text = resource["data"]["texts"]["text1"]
+    assert text["status"] == "PROCESSED"
+    assert "errors" not in text
+
+    # field is indexed
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/find",
+        json={"query": "Hello", "min_score": -1},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1

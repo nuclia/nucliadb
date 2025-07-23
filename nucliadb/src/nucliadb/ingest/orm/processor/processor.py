@@ -32,7 +32,6 @@ from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
 from nucliadb.ingest.orm.exceptions import (
@@ -84,15 +83,19 @@ def validate_indexable_resource(resource: noderesources_pb2.Resource) -> None:
     This is still an edge case.
     """
     num_paragraphs = 0
-    for _, fparagraph in resource.paragraphs.items():
+    first_exceeded = ""
+    for field_id, fparagraph in resource.paragraphs.items():
         # this count should not be very expensive to do since we don't have
         # a lot of different fields and we just do a count on a dict
         num_paragraphs += len(fparagraph.paragraphs)
+        if num_paragraphs > cluster_settings.max_resource_paragraphs:
+            first_exceeded = field_id
 
     if num_paragraphs > cluster_settings.max_resource_paragraphs:
         raise ResourceNotIndexable(
-            "Resource has too many paragraphs. "
-            f"Supported: {cluster_settings.max_resource_paragraphs} , Number: {num_paragraphs}"
+            first_exceeded,
+            f"Resource has too many paragraphs ({num_paragraphs}) and cannot be indexed. "
+            f"The maximum number of paragraphs per resource is {cluster_settings.max_resource_paragraphs}",
         )
 
 
@@ -345,35 +348,32 @@ class Processor:
                 # index message
                 if resource and resource.modified:
                     index_message = await self.generate_index_message(resource, messages, created)
-                    warnings = await self.index_resource(
-                        index_message=index_message,
-                        txn=txn,
-                        uuid=uuid,
-                        kbid=kbid,
-                        seqid=seqid,
-                        partition=partition,
-                        kb=kb,
-                        source=messages_source(messages),
-                    )
-                    # Save indexing warnings
-                    for field_id, warning in warnings:
-                        (field_type_str, field_name) = field_id.split("/")
-                        field_type = FIELD_TYPE_STR_TO_PB[field_type_str]
-                        field = await resource.get_field(field_name, field_type)
-                        status = await field.get_status()
-                        if status is not None:
-                            field_error = writer_pb2.FieldError(
-                                source_error=writer_pb2.Error(
-                                    field=field_name,
-                                    field_type=field_type,
-                                    error=warning,
-                                    code=writer_pb2.Error.ErrorCode.INDEX,
-                                    severity=writer_pb2.Error.Severity.WARNING,
-                                )
+
+                    try:
+                        warnings = await self.index_resource(
+                            index_message=index_message,
+                            txn=txn,
+                            uuid=uuid,
+                            kbid=kbid,
+                            seqid=seqid,
+                            partition=partition,
+                            kb=kb,
+                            source=messages_source(messages),
+                        )
+                        # Save indexing warnings
+                        for field_id, warning in warnings:
+                            await resource.add_field_error(
+                                field_id, warning, writer_pb2.Error.Severity.WARNING
                             )
-                            field_error.created.GetCurrentTime()
-                            status.errors.append(field_error)
-                            await field.set_status(status)
+                    except ResourceNotIndexable as e:
+                        await resource.add_field_error(
+                            e.field_id, e.message, writer_pb2.Error.Severity.ERROR
+                        )
+                        # Catalog takes status from index message labels, override it to error
+                        current_status = [x for x in index_message.labels if x.startswith("/n/s/")]
+                        if current_status:
+                            index_message.labels.remove(current_status[0])
+                            index_message.labels.append("/n/s/ERROR")
 
                     await pgcatalog_update(txn, kbid, resource, index_message)
 
