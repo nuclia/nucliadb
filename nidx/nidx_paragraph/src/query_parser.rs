@@ -36,21 +36,9 @@ pub use stop_words::is_stop_word;
 
 /// Parser configuration parameters. With this object, one can customize the
 /// parsing process.
-///
-/// It uses a builder pattern to build this struct
 pub struct ParserConfig<'a> {
     schema: &'a ParagraphSchema,
-    fuzzy: FuzzyConfig,
-}
-
-struct FuzzyConfig {
-    last_literal_as_fuzzy_prefix: bool,
-}
-
-#[allow(non_snake_case)]
-pub struct ParserConfigBuilder<'a> {
-    schema: &'a ParagraphSchema,
-    fuzzy__last_literal_as_fuzzy_prefix: bool,
+    last_fuzzy_query_literal_as_prefix: bool,
 }
 
 /// A parsed query containing an exact keyword query and a fallback fuzzy one.
@@ -77,7 +65,7 @@ pub fn parse_query<'a>(query: &'a str, config: ParserConfig) -> anyhow::Result<P
     let fuzzy = fuzzy_parser::parse_fuzzy_query(
         &tokenized,
         shared_term_collector.clone(),
-        config.fuzzy.last_literal_as_fuzzy_prefix,
+        config.last_fuzzy_query_literal_as_prefix,
     );
     Ok(ParsedQuery {
         keyword,
@@ -86,26 +74,16 @@ pub fn parse_query<'a>(query: &'a str, config: ParserConfig) -> anyhow::Result<P
     })
 }
 
-impl ParserConfig<'_> {
-    pub fn builder(schema: &ParagraphSchema) -> ParserConfigBuilder {
-        ParserConfigBuilder {
+impl<'a> ParserConfig<'a> {
+    pub fn with_schema(schema: &'a ParagraphSchema) -> Self {
+        Self {
             schema,
-            fuzzy__last_literal_as_fuzzy_prefix: false,
-        }
-    }
-}
-
-impl<'a> ParserConfigBuilder<'a> {
-    pub fn build(self) -> ParserConfig<'a> {
-        ParserConfig {
-            schema: self.schema,
-            fuzzy: FuzzyConfig {
-                last_literal_as_fuzzy_prefix: self.fuzzy__last_literal_as_fuzzy_prefix,
-            },
+            last_fuzzy_query_literal_as_prefix: false,
         }
     }
 
-    pub fn last_literal_as_fuzzy_prefix(&mut self) {
-        self.fuzzy__last_literal_as_fuzzy_prefix = true;
+    pub fn last_fuzzy_query_literal_as_prefix(mut self) -> Self {
+        self.last_fuzzy_query_literal_as_prefix = true;
+        self
     }
 }
