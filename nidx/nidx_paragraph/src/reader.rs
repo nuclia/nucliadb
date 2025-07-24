@@ -35,6 +35,7 @@ use crate::request_types::{ParagraphSearchRequest, ParagraphSuggestRequest};
 use crate::search_query::{SharedTermC, search_query, streaming_query, suggest_query};
 use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse, extract_labels};
 
+// TODO: this is now duplicated with the one in query_parser/fuzzy_parser.rs
 const FUZZY_DISTANCE: u8 = 1;
 const NUMBER_OF_RESULTS_SUGGEST: usize = 20;
 
@@ -119,7 +120,6 @@ impl ParagraphReaderService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Creating query: starts at {v} ms");
 
-        let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
 
         let facets: Vec<_> = request
@@ -137,20 +137,7 @@ impl ParagraphReaderService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: starts at {v} ms");
 
-        let advanced = request
-            .advanced_query
-            .as_ref()
-            .map(|query| parser.parse_query(query))
-            .transpose()?;
-        #[rustfmt::skip] let (original, termc, fuzzied) = search_query(
-            &parser,
-            text,
-            request,
-            prefilter,
-            &self.schema,
-            FUZZY_DISTANCE,
-            advanced
-        );
+        let (keyword_query, termc, fuzzy_query) = search_query(request, prefilter, &self.index, &self.schema);
         let searcher = Searcher {
             request,
             results,
@@ -158,7 +145,7 @@ impl ParagraphReaderService {
             text,
             only_faceted: request.only_faceted,
         };
-        let mut response = searcher.do_search(termc.clone(), original, self, request.min_score)?;
+        let mut response = searcher.do_search(termc.clone(), keyword_query, self, request.min_score)?;
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: ends at {v} ms");
 
@@ -166,7 +153,7 @@ impl ParagraphReaderService {
             let v = time.elapsed().as_millis();
             debug!("{id:?} - Applying fuzzy: starts at {v} ms");
 
-            let fuzzied = searcher.do_search(termc, fuzzied, self, request.min_score)?;
+            let fuzzied = searcher.do_search(termc, fuzzy_query, self, request.min_score)?;
             response = fuzzied;
             response.fuzzy_distance = FUZZY_DISTANCE as i32;
             let v = time.elapsed().as_millis();

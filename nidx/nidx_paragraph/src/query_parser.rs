@@ -48,7 +48,7 @@ pub struct ParsedQuery {
     pub term_collector: SharedTermC,
 }
 
-pub fn parse_query(query: &str, config: ParserConfig) -> anyhow::Result<ParsedQuery> {
+pub fn parse_query(query: &str, config: ParserConfig) -> ParsedQuery {
     let tokenized = tokenize_query_infallible(query);
 
     let tokenized = remove_stop_words(tokenized);
@@ -70,11 +70,11 @@ pub fn parse_query(query: &str, config: ParserConfig) -> anyhow::Result<ParsedQu
         shared_term_collector.clone(),
         config.last_fuzzy_query_literal_as_prefix,
     );
-    Ok(ParsedQuery {
+    ParsedQuery {
         keyword,
         fuzzy,
         term_collector: shared_term_collector,
-    })
+    }
 }
 
 impl<'a> ParserConfig<'a> {

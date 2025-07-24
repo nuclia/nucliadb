@@ -27,12 +27,13 @@ use nidx_types::query_language::BooleanExpression;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
+use tantivy::index::Index;
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::{DocId, InvertedIndexReader, Term};
 
 use crate::fuzzy_query::FuzzyTermQuery;
-use crate::query_parser::{ParsedQuery, ParserConfig, is_stop_word};
+use crate::query_parser::{self, ParsedQuery, ParserConfig, is_stop_word};
 use crate::schema::ParagraphSchema;
 type QueryP = (Occur, Box<dyn Query>);
 
@@ -333,50 +334,55 @@ pub fn suggest_query(
 }
 
 pub fn search_query(
-    parser: &QueryParser,
-    text: &str,
-    search: &ParagraphSearchRequest,
+    request: &ParagraphSearchRequest,
     prefilter: &PrefilterResult,
+    index: &Index,
     schema: &ParagraphSchema,
-    distance: u8,
-    with_advance: Option<Box<dyn Query>>,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
+    let query = &request.body;
     let parser_config = ParserConfig::with_schema(schema);
+    let parsed = query_parser::parse_query(query, parser_config);
     let ParsedQuery {
-        keyword: query,
-        fuzzy: fuzzy_query,
-        term_collector: termc,
-    } = crate::query_parser::parse_query(text, parser_config).unwrap();
+        keyword,
+        fuzzy,
+        term_collector,
+    } = parsed;
 
-    let mut originals = vec![(Occur::Must, query)];
-    let mut fuzzies = vec![(Occur::Must, fuzzy_query)];
+    // println!("Parsed query (keyword): {:#?}", query);
+    let mut keyword_subqueries = vec![(Occur::Must, keyword)];
+    let mut fuzzy_subqueries = vec![(Occur::Must, fuzzy)];
 
-    if let Some(advance) = with_advance {
-        originals.push((Occur::Must, advance.box_clone()));
-        fuzzies.push((Occur::Must, advance));
+    if let Some(advanced_query) = &request.advanced_query {
+        // The advanced query allow users to leverage tantivy grammar in our system. We are not
+        // interested in failing here, so we use the lenient parser and ignore errors
+        let parser = QueryParser::for_index(index, vec![schema.text]);
+        let (advanced_query, _errors) = parser.parse_query_lenient(advanced_query);
+
+        keyword_subqueries.push((Occur::Must, advanced_query.box_clone()));
+        fuzzy_subqueries.push((Occur::Must, advanced_query));
     }
 
-    let filter_query = filter_query(schema, prefilter, &search.filtering_formula, search.filter_or);
+    let filter_query = filter_query(schema, prefilter, &request.filtering_formula, request.filter_or);
     if let Some(query) = filter_query {
-        originals.push((Occur::Must, query.box_clone()));
-        fuzzies.push((Occur::Must, query));
+        keyword_subqueries.push((Occur::Must, query.box_clone()));
+        fuzzy_subqueries.push((Occur::Must, query));
     }
 
-    if !search.with_duplicates {
+    if !request.with_duplicates {
         let term = Term::from_field_u64(schema.repeated_in_field, 0);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-        fuzzies.push((Occur::Must, Box::new(term_query.clone())));
-        originals.push((Occur::Must, Box::new(term_query)))
+        fuzzy_subqueries.push((Occur::Must, Box::new(term_query.clone())));
+        keyword_subqueries.push((Occur::Must, Box::new(term_query)))
     }
 
-    if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
-        let original = originals.pop().unwrap().1;
+    if keyword_subqueries.len() == 1 && keyword_subqueries[0].1.is::<AllQuery>() {
+        let original = keyword_subqueries.pop().unwrap().1;
         let fuzzy = Box::new(BooleanQuery::new(vec![]));
-        (original, termc, fuzzy)
+        (original, term_collector, fuzzy)
     } else {
-        let original = Box::new(BooleanQuery::new(originals));
-        let fuzzied = Box::new(BoostQuery::new(Box::new(BooleanQuery::new(fuzzies)), 0.5));
-        (original, termc, fuzzied)
+        let original = Box::new(BooleanQuery::new(keyword_subqueries));
+        let fuzzied = Box::new(BoostQuery::new(Box::new(BooleanQuery::new(fuzzy_subqueries)), 0.5));
+        (original, term_collector, fuzzied)
     }
 }
 
