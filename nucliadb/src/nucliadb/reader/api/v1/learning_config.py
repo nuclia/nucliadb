@@ -21,7 +21,7 @@ from typing import Dict
 
 from fastapi import Request
 from fastapi_versioning import version
-from nuclia_models.config.proto import ExtractConfig
+from nuclia_models.config.proto import ExtractConfig, SplitConfiguration
 
 from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb.models.responses import HTTPClientError
@@ -182,4 +182,41 @@ async def get_extract_strategy_from_id(
 ):
     return await learning_config_proxy(
         request, "GET", f"/extract_strategies/{kbid}/strategies/{strategy_id}"
+    )
+
+
+@api.get(
+    path=f"/{KB_PREFIX}/{{kbid}}/split_strategies",
+    status_code=200,
+    summary="Learning split strategies",
+    description="Get available split strategies ",
+    response_model=Dict[str, SplitConfiguration],
+    tags=["Split Strategies"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def get_split_strategies(
+    request: Request,
+    kbid: str,
+):
+    return await learning_config_proxy(request, "GET", f"/split_strategies/{kbid}")
+
+
+@api.get(
+    path=f"/{KB_PREFIX}/{{kbid}}/split_strategies/strategy/{{strategy_id}}",
+    status_code=200,
+    summary="Extract split configuration",
+    description="Get split strategy for a given id",
+    response_model=None,
+    tags=["Split Strategies"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def get_split_strategy_from_id(
+    request: Request,
+    kbid: str,
+    strategy_id: str,
+):
+    return await learning_config_proxy(
+        request, "GET", f"/split_strategies/{kbid}/strategies/{strategy_id}"
     )
