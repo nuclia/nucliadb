@@ -1265,7 +1265,7 @@ async def test_jsonl_text_field(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_extract_strategy_on_fields(
+async def test_extract_and_split_strategy_on_fields(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     standalone_knowledgebox,
@@ -1449,8 +1449,9 @@ async def test_extract_strategy_on_fields(
     )
     assert resp.status_code == 200, resp.text
     data = resp.json()
-    assert data["data"]["files"].popitem()[1]["value"]["extract_strategy"] == "barbafoo"
-    assert data["data"]["files"].popitem()[1]["value"]["split_strategy"] == "barbafoo_split"
+    item_strategies = data["data"]["files"].popitem()
+    assert item_strategies[1]["value"]["extract_strategy"] == "barbafoo"
+    assert item_strategies[1]["value"]["split_strategy"] == "barbafoo_split"
 
     processing.calls.clear()
     processing.values.clear()
