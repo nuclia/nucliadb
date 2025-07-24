@@ -24,6 +24,10 @@ spec:
           method:
             regex: "GET|OPTIONS"
         - uri:
+            regex: '^/api/v\d+/kb/[^/]+/split_strategies.*'
+          method:
+            regex: "GET|OPTIONS"
+        - uri:
             regex: '^/api/v\d+/kb/[^/]+/vectorsets$'
           method:
             regex: "GET|OPTIONS"
