@@ -224,6 +224,7 @@ async def _tus_post(
     path_rid: Optional[str] = None,
     field_id: Optional[str] = None,
     extract_strategy: Optional[str] = None,
+    split_strategy: Optional[str] = None,
 ) -> Response:
     """
     An empty POST request is used to create a new upload resource.
@@ -322,6 +323,7 @@ async def _tus_post(
         offset=0,
         item=creation_payload,
         extract_strategy=extract_strategy,
+        split_strategy=split_strategy,
     )
 
     if size is not None:
@@ -607,6 +609,7 @@ async def _tus_patch(
                 bucket=storage_manager.storage.get_bucket_name(kbid),
                 item=creation_payload,
                 extract_strategy=dm.get("extract_strategy") or None,
+                split_strategy=dm.get("split_strategy") or None,
             )
         except LimitsExceededError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail)
@@ -895,6 +898,7 @@ async def store_file_on_nuclia_db(
     md5: Optional[str] = None,
     item: Optional[CreateResourcePayload] = None,
     extract_strategy: Optional[str] = None,
+    split_strategy: Optional[str] = None,
 ) -> Optional[int]:
     # File is on NucliaDB Storage at path
     partitioning = get_partitioning()
@@ -983,6 +987,8 @@ async def store_file_on_nuclia_db(
             file_field.password = password
         if extract_strategy is not None:
             file_field.extract_strategy = extract_strategy
+        if split_strategy is not None:
+            file_field.split_strategy = split_strategy
 
         writer.files[field].CopyFrom(file_field)
         # Do not store passwords on maindb
