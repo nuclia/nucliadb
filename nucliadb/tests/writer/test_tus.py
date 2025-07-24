@@ -44,6 +44,7 @@ async def s3_storage_tus(s3):
         region_name=None,
         bucket="test_{kbid}",
         bucket_tags={"testTag": "test"},
+        kms_key_id="test_kms_key_id",
     )
     yield storage
     await storage.finalize()

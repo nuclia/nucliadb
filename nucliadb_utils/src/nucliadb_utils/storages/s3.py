@@ -356,6 +356,7 @@ class S3Storage(Storage):
         verify_ssl: bool = True,
         use_ssl: bool = True,
         region_name: Optional[str] = None,
+        kms_key_id: Optional[str] = None,
         max_pool_connections: int = 30,
         bucket: Optional[str] = None,
         bucket_tags: Optional[dict[str, str]] = None,
@@ -380,6 +381,7 @@ class S3Storage(Storage):
         )
         self._exit_stack = AsyncExitStack()
         self.bucket = bucket
+        self._kms_key_id = kms_key_id
 
     def get_bucket_name(self, kbid: str):
         if self.bucket is None:
@@ -440,7 +442,9 @@ class S3Storage(Storage):
         return await bucket_exists(self._s3aioclient, bucket_name)
 
     async def create_bucket(self, bucket_name: str):
-        await create_bucket(self._s3aioclient, bucket_name, self._bucket_tags, self._region_name)
+        await create_bucket(
+            self._s3aioclient, bucket_name, self._bucket_tags, self._region_name, self._kms_key_id
+        )
 
     async def schedule_delete_kb(self, kbid: str):
         bucket_name = self.get_bucket_name(kbid)
@@ -523,6 +527,7 @@ async def create_bucket(
     bucket_name: str,
     bucket_tags: Optional[dict[str, str]] = None,
     region_name: Optional[str] = None,
+    kms_key_id: Optional[str] = None,
 ):
     bucket_creation_options = {}
     if region_name is not None:
@@ -537,6 +542,21 @@ async def create_bucket(
             Tagging={
                 "TagSet": [
                     {"Key": tag_key, "Value": tag_value} for tag_key, tag_value in bucket_tags.items()
+                ]
+            },
+        )
+    if kms_key_id is not None:
+        await client.put_bucket_encryption(
+            Bucket=bucket_name,
+            ServerSideEncryptionConfiguration={
+                "Rules": [
+                    {
+                        "ApplyServerSideEncryptionByDefault": {
+                            "SSEAlgorithm": "aws:kms",
+                            "KMSMasterKeyID": kms_key_id,
+                        },
+                        "BucketKeyEnabled": True,
+                    }
                 ]
             },
         )

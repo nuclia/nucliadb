@@ -177,7 +177,9 @@ class S3BlobStore(BlobStore):
     async def create_bucket(self, bucket):
         exists = await self.check_exists(bucket)
         if not exists:
-            await create_bucket(self._s3aioclient, bucket, self.bucket_tags, self.region_name)
+            await create_bucket(
+                self._s3aioclient, bucket, self.bucket_tags, self.region_name, self.kms_key_id
+            )
         return exists
 
     async def finalize(self):
@@ -194,11 +196,13 @@ class S3BlobStore(BlobStore):
         region_name,
         bucket,
         bucket_tags: Optional[dict[str, str]] = None,
+        kms_key_id: Optional[str] = None,
     ):
         self.bucket = bucket
         self.bucket_tags = bucket_tags
         self.source = CloudFile.Source.S3
         self.region_name = region_name
+        self.kms_key_id = kms_key_id
 
         self._exit_stack = AsyncExitStack()
 
