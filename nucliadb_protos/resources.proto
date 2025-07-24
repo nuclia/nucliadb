@@ -296,6 +296,11 @@ message Position {
     int64 end = 2;
 }
 
+message Positions {
+    repeated Position position = 1;
+    string entity = 2;
+}
+
 message FieldEntity {
     string text = 1; // The entity text
     string label = 2; // The entity type
