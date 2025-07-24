@@ -25,18 +25,17 @@ use nidx_protos::order_by::{OrderField, OrderType};
 use nidx_protos::{OrderBy, ParagraphItem, ParagraphSearchResponse, StreamRequest};
 use nidx_types::prefilter::PrefilterResult;
 use tantivy::collector::{Collector, Count, FacetCollector, TopDocs};
-use tantivy::query::{AllQuery, Query, QueryParser};
+use tantivy::query::{AllQuery, Query};
 use tantivy::{DateTime, Order, schema::*};
 use tantivy::{DocAddress, Index, IndexReader};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
+use crate::query_parser::FUZZY_DISTANCE;
 use crate::request_types::{ParagraphSearchRequest, ParagraphSuggestRequest};
 use crate::search_query::{SharedTermC, search_query, streaming_query, suggest_query};
 use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse, extract_labels};
 
-// TODO: this is now duplicated with the one in query_parser/fuzzy_parser.rs
-const FUZZY_DISTANCE: u8 = 1;
 const NUMBER_OF_RESULTS_SUGGEST: usize = 20;
 
 pub struct ParagraphReaderService {
@@ -66,19 +65,17 @@ impl ParagraphReaderService {
         request: &ParagraphSuggestRequest,
         prefilter: &PrefilterResult,
     ) -> anyhow::Result<ParagraphSearchResponse> {
-        let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
-        let text = self.adapt_text(&parser, &request.body);
-        let (original, termc, fuzzied) =
-            suggest_query(&parser, &text, request, prefilter, &self.schema, FUZZY_DISTANCE);
+        let query = &request.body;
+        let (keyword, term_collector, fuzzy) = suggest_query(request, prefilter, &self.schema);
 
         let searcher = self.reader.searcher();
         let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
-        let mut results = searcher.search(&original, &topdocs)?;
+        let mut results = searcher.search(&keyword, &topdocs)?;
 
         if results.is_empty() {
             let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
-            match searcher.search(&fuzzied, &topdocs) {
-                Ok(mut fuzzied) => results.append(&mut fuzzied),
+            match searcher.search(&fuzzy, &topdocs) {
+                Ok(mut fuzzy) => results.append(&mut fuzzy),
                 Err(err) => error!("{err:?} during suggest"),
             }
         }
@@ -88,9 +85,9 @@ impl ParagraphReaderService {
             top_docs: results,
             facets_count: None,
             facets: vec![],
-            termc: termc.get_termc(),
+            termc: term_collector.get_termc(),
             text_service: self,
-            query: &text,
+            query,
             results_per_page: 10,
             searcher,
             min_score: 0.0,
@@ -134,6 +131,7 @@ impl ParagraphReaderService {
             text,
             only_faceted: request.only_faceted,
         };
+        // println!("Regular search with query: {:#?}", keyword_query);
         let mut response = searcher.do_search(termc.clone(), keyword_query, self, request.min_score)?;
         trace!(
             shard_id,
@@ -142,6 +140,7 @@ impl ParagraphReaderService {
         );
 
         if response.results.is_empty() && request.result_per_page > 0 && request.min_score == 0 as f32 {
+            // println!("Fuzzy search with query: {:#?}", fuzzy_query);
             let fuzzied = searcher.do_search(termc, fuzzy_query, self, request.min_score)?;
             response = fuzzied;
             response.fuzzy_distance = FUZZY_DISTANCE as i32;
@@ -188,21 +187,6 @@ impl ParagraphReaderService {
         );
 
         Ok(response)
-    }
-
-    fn adapt_text(&self, parser: &QueryParser, text: &str) -> String {
-        // FIXME: after migrating from tantivy 0.22 -> 0.24, the query grammar
-        // now includes single quotes as special character. Queries having a
-        // single single quote now fail to parse. As a quick fix, we remove them
-        // all and replace them by a space.
-        let text = text.replace('\'', " ");
-        match text.trim() {
-            "" => text.to_string(),
-            text => parser
-                .parse_query(text)
-                .map(|_| text.to_string())
-                .unwrap_or_else(|_| format!("\"{}\"", text.replace('"', ""))),
-        }
     }
 }
 

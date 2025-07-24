@@ -43,7 +43,7 @@ const MIN_FUZZY_LEN: usize = 3;
 const MIN_FUZZY_PREFIX_LEN: usize = 4;
 
 /// Levenshtein distance used by all fuzzy terms.
-const FUZZY_DISTANCE: u8 = 1;
+pub const FUZZY_DISTANCE: u8 = 1;
 
 /// Convert a tokenized query into a tantivy fuzzy query
 ///

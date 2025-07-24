@@ -30,9 +30,8 @@ use crate::{
     search_query::{SharedTermC, TermCollector},
 };
 
+pub use fuzzy_parser::FUZZY_DISTANCE;
 use stop_words::remove_stop_words;
-
-pub use stop_words::is_stop_word;
 
 /// Parser configuration parameters. With this object, one can customize the
 /// parsing process.
@@ -50,7 +49,6 @@ pub struct ParsedQuery {
 
 pub fn parse_query(query: &str, config: ParserConfig) -> ParsedQuery {
     let tokenized = tokenize_query_infallible(query);
-
     let tokenized = remove_stop_words(tokenized);
 
     let mut term_collector = TermCollector::new();
@@ -88,5 +86,63 @@ impl<'a> ParserConfig<'a> {
     pub fn last_fuzzy_query_literal_as_prefix(mut self) -> Self {
         self.last_fuzzy_query_literal_as_prefix = true;
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use itertools::Itertools;
+
+    #[test]
+    fn test_stop_word_removal() {
+        let tests = [
+            (
+                "nuclia is a database for unstructured data",
+                "nuclia database unstructured data",
+            ),
+            (
+                "nuclia is a database for the",
+                // keeps last term even if is a stop word
+                "nuclia database the",
+            ),
+            ("is a for and", "and"),
+            ("what does stop is?", "stop is"),
+            ("", ""),
+            (
+                "comment s'appelle le train à grande vitesse",
+                "comment appelle train grande vitesse",
+            ),
+            (
+                "¿Qué significa la palabra sentence en español?",
+                "significa palabra sentence español",
+            ),
+            ("Per què les vaques no són de color rosa?", "vaques color rosa"),
+            ("How can I learn to make a flat white?", "learn make flat white"),
+            ("Qué es escalada en bloque?", "escalada bloque"),
+            (
+                "Wer hat gesagt: \"Kaffeetrinken ist integraler Bestandteil des Kletterns\"?",
+                "wer gesagt \"kaffeetrinken ist integraler bestandteil des kletterns\"",
+            ),
+            (
+                "i pistacchi siciliani sono i migliori al mondo",
+                "pistacchi siciliani migliori mondo",
+            ),
+        ];
+
+        for (query, expected) in tests {
+            let tokenized = tokenize_query_infallible(query);
+            let without_stop_words = remove_stop_words(tokenized);
+            let clean = without_stop_words
+                .into_iter()
+                .map(|token| match token {
+                    Token::Literal(lit) => lit,
+                    Token::Quoted(quoted) => format!("\"{quoted}\"").into(),
+                    Token::Excluded(excluded) => format!("-{excluded}").into(),
+                })
+                .join(" ");
+            assert_eq!(clean, expected);
+        }
     }
 }
