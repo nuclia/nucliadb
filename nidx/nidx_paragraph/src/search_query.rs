@@ -30,7 +30,7 @@ use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::BooleanExpression;
 
 use crate::query_io::translate_expression;
-use crate::query_parser::{self, ParsedQuery, ParserConfig};
+use crate::query_parser::{ParsedQuery, Parser};
 use crate::request_types::{ParagraphSearchRequest, ParagraphSuggestRequest};
 use crate::schema::ParagraphSchema;
 use crate::set_query::SetQuery;
@@ -128,13 +128,12 @@ pub fn suggest_query(
     schema: &ParagraphSchema,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
     let query = &request.body;
-    let parser_config = ParserConfig::with_schema(schema).last_fuzzy_query_literal_as_prefix();
-    let parsed = query_parser::parse_query(query, parser_config);
+    let parser = Parser::new_with_schema(schema).last_fuzzy_term_as_prefix();
     let ParsedQuery {
         keyword,
         fuzzy,
         term_collector,
-    } = parsed;
+    } = parser.parse(query);
 
     let mut originals = vec![(Occur::Must, keyword)];
     let mut fuzzies = vec![(Occur::Must, fuzzy)];
@@ -167,13 +166,12 @@ pub fn search_query(
     schema: &ParagraphSchema,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
     let query = &request.body;
-    let parser_config = ParserConfig::with_schema(schema);
-    let parsed = query_parser::parse_query(query, parser_config);
+    let parser = Parser::new_with_schema(schema).last_fuzzy_term_as_prefix();
     let ParsedQuery {
         keyword,
         fuzzy,
         term_collector,
-    } = parsed;
+    } = parser.parse(query);
 
     let mut keyword_subqueries = vec![(Occur::Must, keyword)];
     let mut fuzzy_subqueries = vec![(Occur::Must, fuzzy)];
