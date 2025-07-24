@@ -37,7 +37,14 @@ from nucliadb.ingest.orm.utils import set_title
 from nucliadb.models.internal.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import SERVICE_NAME
-from nucliadb.writer.api.constants import X_EXTRACT_STRATEGY, X_FILENAME, X_LANGUAGE, X_MD5, X_PASSWORD
+from nucliadb.writer.api.constants import (
+    X_EXTRACT_STRATEGY,
+    X_FILENAME,
+    X_LANGUAGE,
+    X_MD5,
+    X_PASSWORD,
+    X_SPLIT_STRATEGY,
+)
 from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.resource import (
     get_rid_from_slug_or_raise_error,
@@ -147,10 +154,17 @@ async def tus_post_rslug_prefix(
     field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
     x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
+    x_split_strategy: Annotated[Optional[str], X_SPLIT_STRATEGY] = None,
 ) -> Response:
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _tus_post(
-        request, kbid, item, path_rid=rid, field_id=field, extract_strategy=x_extract_strategy
+        request,
+        kbid,
+        item,
+        path_rid=rid,
+        field_id=field,
+        extract_strategy=x_extract_strategy,
+        split_strategy=x_split_strategy,
     )
 
 
@@ -169,9 +183,16 @@ async def tus_post_rid_prefix(
     field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
     x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
+    x_split_strategy: Annotated[Optional[str], X_SPLIT_STRATEGY] = None,
 ) -> Response:
     return await _tus_post(
-        request, kbid, item, path_rid=path_rid, field_id=field, extract_strategy=x_extract_strategy
+        request,
+        kbid,
+        item,
+        path_rid=path_rid,
+        field_id=field,
+        extract_strategy=x_extract_strategy,
+        split_strategy=x_split_strategy,
     )
 
 
@@ -188,8 +209,11 @@ async def tus_post(
     kbid: str,
     item: Optional[CreateResourcePayload] = None,
     x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
+    x_split_strategy: Annotated[Optional[str], X_SPLIT_STRATEGY] = None,
 ) -> Response:
-    return await _tus_post(request, kbid, item, extract_strategy=x_extract_strategy)
+    return await _tus_post(
+        request, kbid, item, extract_strategy=x_extract_strategy, split_strategy=x_split_strategy
+    )
 
 
 # called by one the three POST above - there are defined distinctly to produce clean API doc
@@ -621,6 +645,7 @@ async def upload_rslug_prefix(
     x_language: Annotated[Optional[str], X_LANGUAGE] = None,
     x_md5: Annotated[Optional[str], X_MD5] = None,
     x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
+    x_split_strategy: Annotated[Optional[str], X_SPLIT_STRATEGY] = None,
 ) -> ResourceFileUploaded:
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _upload(
@@ -633,6 +658,7 @@ async def upload_rslug_prefix(
         x_language=x_language,
         x_md5=x_md5,
         x_extract_strategy=x_extract_strategy,
+        x_split_strategy=x_split_strategy,
     )
 
 
@@ -655,6 +681,7 @@ async def upload_rid_prefix(
     x_language: Annotated[Optional[str], X_LANGUAGE] = None,
     x_md5: Annotated[Optional[str], X_MD5] = None,
     x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
+    x_split_strategy: Annotated[Optional[str], X_SPLIT_STRATEGY] = None,
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -666,6 +693,7 @@ async def upload_rid_prefix(
         x_language=x_language,
         x_md5=x_md5,
         x_extract_strategy=x_extract_strategy,
+        x_split_strategy=x_split_strategy,
     )
 
 
@@ -686,6 +714,7 @@ async def upload(
     x_language: Annotated[Optional[str], X_LANGUAGE] = None,
     x_md5: Annotated[Optional[str], X_MD5] = None,
     x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
+    x_split_strategy: Annotated[Optional[str], X_SPLIT_STRATEGY] = None,
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -695,6 +724,7 @@ async def upload(
         x_language=x_language,
         x_md5=x_md5,
         x_extract_strategy=x_extract_strategy,
+        x_split_strategy=x_split_strategy,
     )
 
 
@@ -709,6 +739,7 @@ async def _upload(
     x_language: Optional[str] = None,
     x_md5: Optional[str] = None,
     x_extract_strategy: Optional[str] = None,
+    x_split_strategy: Optional[str] = None,
 ) -> ResourceFileUploaded:
     if path_rid is not None:
         await validate_rid_exists_or_raise_error(kbid, path_rid)
@@ -803,6 +834,7 @@ async def _upload(
             request=request,
             bucket=storage_manager.storage.get_bucket_name(kbid),
             extract_strategy=x_extract_strategy,
+            split_strategy=x_split_strategy,
         )
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)

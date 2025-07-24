@@ -79,6 +79,7 @@ class FieldConversation(BaseModel):
     size: Optional[int] = None
     total: Optional[int] = None
     extract_strategy: Optional[str] = None
+    split_strategy: Optional[str] = None
 
 
 # Creation and update classes (Those used on writer endpoints)
@@ -114,4 +115,8 @@ class InputConversationField(BaseModel):
     extract_strategy: Optional[str] = Field(
         default=None,
         description="Id of the Nuclia extract strategy used at processing time. If not set, the default strategy was used. Extract strategies are defined at the learning configuration api.",
+    )
+    split_strategy: Optional[str] = Field(
+        default=None,
+        description="Id of the Nuclia split strategy used at processing time. If not set, the default strategy was used. Split strategies are defined at the learning configuration api.",
     )

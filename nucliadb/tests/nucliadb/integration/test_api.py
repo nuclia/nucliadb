@@ -1284,12 +1284,14 @@ async def test_extract_strategy_on_fields(
                 "text": {
                     "body": "My text",
                     "extract_strategy": "foo",
+                    "split_strategy": "foo_split",
                 }
             },
             "links": {
                 "link": {
                     "uri": "https://www.example.com",
                     "extract_strategy": "bar",
+                    "split_strategy": "bar_split",
                 }
             },
             "files": {
@@ -1301,6 +1303,7 @@ async def test_extract_strategy_on_fields(
                         "content_type": "application/pdf",
                     },
                     "extract_strategy": "baz",
+                    "split_strategy": "baz_split",
                 }
             },
         },
@@ -1319,14 +1322,22 @@ async def test_extract_strategy_on_fields(
     assert data["data"]["links"]["link"]["value"]["extract_strategy"] == "bar"
     assert data["data"]["files"]["file"]["value"]["extract_strategy"] == "baz"
 
+    assert data["data"]["texts"]["text"]["value"]["split_strategy"] == "foo_split"
+    assert data["data"]["links"]["link"]["value"]["split_strategy"] == "bar_split"
+    assert data["data"]["files"]["file"]["value"]["split_strategy"] == "baz_split"
+
     # Check that push payload has been sent to processing with the right extract strategies
     def validate_processing_call(processing: DummyProcessingEngine):
         assert len(processing.values["send_to_process"]) == 1
         send_to_process_call = processing.values["send_to_process"][0][0]
         assert send_to_process_call.textfield["text"].extract_strategy == "foo"
         assert send_to_process_call.linkfield["link"].extract_strategy == "bar"
+
+        assert send_to_process_call.textfield["text"].split_strategy == "foo_split"
+        assert send_to_process_call.linkfield["link"].split_strategy == "bar_split"
         assert len(send_to_process_call.filefield) == 1
         assert processing.values["convert_internal_filefield_to_str"][0][0].extract_strategy == "baz"
+        assert processing.values["convert_internal_filefield_to_str"][0][0].split_strategy == "baz_split"
 
     validate_processing_call(processing)
 
@@ -1349,12 +1360,14 @@ async def test_extract_strategy_on_fields(
                 "text": {
                     "body": "My text",
                     "extract_strategy": "foo1",
+                    "split_strategy": "foo1_split",
                 }
             },
             "links": {
                 "link": {
                     "uri": "https://www.example.com",
                     "extract_strategy": "bar1",
+                    "split_strategy": "bar1_split",
                 }
             },
             "files": {
@@ -1366,6 +1379,7 @@ async def test_extract_strategy_on_fields(
                         "content_type": "application/pdf",
                     },
                     "extract_strategy": "baz1",
+                    "split_strategy": "baz1_split",
                 }
             },
         },
@@ -1383,13 +1397,17 @@ async def test_extract_strategy_on_fields(
     assert data["data"]["links"]["link"]["value"]["extract_strategy"] == "bar1"
     assert data["data"]["files"]["file"]["value"]["extract_strategy"] == "baz1"
 
+    assert data["data"]["texts"]["text"]["value"]["split_strategy"] == "foo1_split"
+    assert data["data"]["links"]["link"]["value"]["split_strategy"] == "bar1_split"
+    assert data["data"]["files"]["file"]["value"]["split_strategy"] == "baz1_split"
+
     processing.calls.clear()
     processing.values.clear()
 
     # Upload a file with the upload endpoint, and set the extract strategy via a header
     resp = await nucliadb_writer.post(
         f"kb/{standalone_knowledgebox}/resource/{rid}/file/file2/upload",
-        headers={"x-extract-strategy": "barbafoo"},
+        headers={"x-extract-strategy": "barbafoo", "x-split-strategy": "barbafoo_split"},
         content=b"file content",
     )
     assert resp.status_code == 201, resp.text
@@ -1402,12 +1420,16 @@ async def test_extract_strategy_on_fields(
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["data"]["files"]["file2"]["value"]["extract_strategy"] == "barbafoo"
+    assert data["data"]["files"]["file2"]["value"]["split_strategy"] == "barbafoo_split"
 
     # Check processing
     assert len(processing.values["send_to_process"]) == 1
     send_to_process_call = processing.values["send_to_process"][0][0]
     assert len(send_to_process_call.filefield) == 1
     assert processing.values["convert_internal_filefield_to_str"][0][0].extract_strategy == "barbafoo"
+    assert (
+        processing.values["convert_internal_filefield_to_str"][0][0].split_strategy == "barbafoo_split"
+    )
 
     processing.calls.clear()
     processing.values.clear()
@@ -1415,7 +1437,7 @@ async def test_extract_strategy_on_fields(
     # Upload a file with the kb upload endpoint, and set the extract strategy via a header
     resp = await nucliadb_writer.post(
         f"kb/{standalone_knowledgebox}/upload",
-        headers={"x-extract-strategy": "barbafoo"},
+        headers={"x-extract-strategy": "barbafoo", "x-split-strategy": "barbafoo_split"},
         content=b"file content",
     )
     assert resp.status_code == 201, resp.text
@@ -1428,6 +1450,7 @@ async def test_extract_strategy_on_fields(
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["data"]["files"].popitem()[1]["value"]["extract_strategy"] == "barbafoo"
+    assert data["data"]["files"].popitem()[1]["value"]["split_strategy"] == "barbafoo_split"
 
     processing.calls.clear()
     processing.values.clear()
@@ -1449,6 +1472,7 @@ async def test_extract_strategy_on_fields(
         f"kb/{standalone_knowledgebox}/tusupload",
         headers={
             "x-extract-strategy": "barbafoo-tus",
+            "x-split-strategy": "barbafoo-tus_split",
             "tus-resumable": "1.0.0",
             "upload-metadata": upload_metadata,
             "content-type": "image/jpeg",
@@ -1477,6 +1501,7 @@ async def test_extract_strategy_on_fields(
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["data"]["files"][field_id]["value"]["extract_strategy"] == "barbafoo-tus"
+    assert data["data"]["files"][field_id]["value"]["split_strategy"] == "barbafoo-tus_split"
 
     # Check processing
     assert len(processing.values["send_to_process"]) == 1
@@ -1484,6 +1509,10 @@ async def test_extract_strategy_on_fields(
     assert len(send_to_process_call.filefield) == 1
     assert (
         processing.values["convert_internal_filefield_to_str"][0][0].extract_strategy == "barbafoo-tus"
+    )
+    assert (
+        processing.values["convert_internal_filefield_to_str"][0][0].split_strategy
+        == "barbafoo-tus_split"
     )
 
 

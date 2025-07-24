@@ -66,6 +66,7 @@ class Text(BaseModel):
     body: str
     format: PushTextFormat
     extract_strategy: Optional[str] = None
+    split_strategy: Optional[str] = None
     classification_labels: list[ClassificationLabel] = []
 
 
@@ -85,6 +86,7 @@ class LinkUpload(BaseModel):
         description="Xpath to parse the link",
     )
     extract_strategy: Optional[str] = None
+    split_strategy: Optional[str] = None
     classification_labels: list[ClassificationLabel] = []
 
 
@@ -113,6 +115,7 @@ class PushMessage(BaseModel):
 class PushConversation(BaseModel):
     messages: list[PushMessage] = []
     extract_strategy: Optional[str] = None
+    split_strategy: Optional[str] = None
     classification_labels: list[ClassificationLabel] = []
 
 

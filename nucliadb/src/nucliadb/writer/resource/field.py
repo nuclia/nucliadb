@@ -74,6 +74,7 @@ async def extract_file_field_from_pb(
             password=field_pb.password,
             file=models.File(payload=None, uri=field_pb.file.uri),
             extract_strategy=field_pb.extract_strategy,
+            split_strategy=field_pb.split_strategy,
         )
         return processing.convert_external_filefield_to_str(file_field, classif_labels)
     else:
@@ -239,6 +240,8 @@ def parse_text_field(
     classif_labels = resource_classifications.for_field(key, resources_pb2.FieldType.TEXT)
     if text_field.extract_strategy is not None:
         writer.texts[key].extract_strategy = text_field.extract_strategy
+    if text_field.split_strategy is not None:
+        writer.texts[key].split_strategy = text_field.split_strategy
     writer.texts[key].body = text_field.body
     writer.texts[key].format = resources_pb2.FieldText.Format.Value(text_field.format.value)
     etw = resources_pb2.ExtractedTextWrapper()
@@ -250,6 +253,7 @@ def parse_text_field(
         body=text_field.body,
         format=getattr(processing_models.PushTextFormat, text_field.format.value),
         extract_strategy=text_field.extract_strategy,
+        split_strategy=text_field.split_strategy,
         classification_labels=classif_labels,
     )
     writer.field_statuses.append(
@@ -308,6 +312,8 @@ async def parse_internal_file_field(
         writer.files[key].language = file_field.language
     if file_field.extract_strategy is not None:
         writer.files[key].extract_strategy = file_field.extract_strategy
+    if file_field.split_strategy is not None:
+        writer.files[key].split_strategy = file_field.split_strategy
 
     processing = get_processing()
     if skip_store:
@@ -346,6 +352,8 @@ def parse_external_file_field(
         writer.files[key].language = file_field.language
     if file_field.extract_strategy is not None:
         writer.files[key].extract_strategy = file_field.extract_strategy
+    if file_field.split_strategy is not None:
+        writer.files[key].split_strategy = file_field.split_strategy
     uri = file_field.file.uri
     writer.files[key].url = uri  # type: ignore
     writer.files[key].file.uri = uri  # type: ignore
@@ -392,6 +400,9 @@ def parse_link_field(
     if link_field.extract_strategy is not None:
         writer.links[key].extract_strategy = link_field.extract_strategy
 
+    if link_field.split_strategy is not None:
+        writer.links[key].split_strategy = link_field.split_strategy
+
     toprocess.linkfield[key] = processing_models.LinkUpload(
         link=link_field.uri,
         headers=link_field.headers or {},
@@ -400,6 +411,7 @@ def parse_link_field(
         css_selector=link_field.css_selector,
         xpath=link_field.xpath,
         extract_strategy=link_field.extract_strategy,
+        split_strategy=link_field.split_strategy,
         classification_labels=classif_labels,
     )
     writer.field_statuses.append(
@@ -486,6 +498,9 @@ async def parse_conversation_field(
     if conversation_field.extract_strategy:
         field_value.extract_strategy = conversation_field.extract_strategy
         convs.extract_strategy = conversation_field.extract_strategy
+    if conversation_field.split_strategy:
+        field_value.split_strategy = conversation_field.split_strategy
+        convs.split_strategy = conversation_field.split_strategy
     toprocess.conversationfield[key] = convs
     writer.conversations[key].CopyFrom(field_value)
     writer.field_statuses.append(
