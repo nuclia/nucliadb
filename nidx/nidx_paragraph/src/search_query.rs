@@ -302,12 +302,18 @@ pub fn suggest_query(
     distance: u8,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
     let mut term_collector = TermCollector::default();
-    let processed = preprocess_raw_query(text, &mut term_collector);
-    let query = parse_query(parser, &processed.regular_query);
-    let fuzzy_query = parse_query(parser, &processed.fuzzy_query);
-    let termc = SharedTermC::from(term_collector);
-    let mut fuzzies = fuzzied_queries(fuzzy_query, true, distance, termc.clone());
-    let mut originals = vec![(Occur::Must, query)];
+
+    let parser_config = ParserConfig::with_schema(schema).last_fuzzy_query_literal_as_prefix();
+    let parsed = query_parser::parse_query(text, parser_config);
+    let ParsedQuery {
+        keyword,
+        fuzzy,
+        term_collector,
+    } = parsed;
+    let termc = term_collector;
+
+    let mut originals = vec![(Occur::Must, keyword)];
+    let mut fuzzies = vec![(Occur::Must, fuzzy)];
     let term = Term::from_field_u64(schema.repeated_in_field, 0);
     let term_query = TermQuery::new(term, IndexRecordOption::Basic);
     fuzzies.push((Occur::Must, Box::new(term_query.clone())));
@@ -324,9 +330,6 @@ pub fn suggest_query(
         let fuzzy = Box::new(BooleanQuery::new(vec![]));
         (original, termc, fuzzy)
     } else {
-        if processed.fuzzy_query.is_empty() {
-            fuzzies.clear();
-        }
         let original = Box::new(BooleanQuery::new(originals));
         let fuzzied = Box::new(BoostQuery::new(Box::new(BooleanQuery::new(fuzzies)), 0.5));
         (original, termc, fuzzied)
