@@ -47,12 +47,10 @@ pub struct ParagraphSuggestRequest {
     pub filter_or: bool,
 }
 
-
 impl ParagraphSearchRequest {
     // Helper method to extract valid facets from the request
     pub fn facets(&self) -> Vec<String> {
-        self
-            .faceted
+        self.faceted
             .as_ref()
             .iter()
             .flat_map(|faceted| faceted.labels.iter())
