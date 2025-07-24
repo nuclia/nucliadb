@@ -46,6 +46,11 @@ class Settings(BaseSettings):
         title="Max paragraphs per resource",
         description="Maximum number of paragraphs allowed on a single resource",
     )
+    max_entity_facets: int = Field(
+        default=4_000,
+        title="Max entity labels per field",
+        description="Maximum number of entity labels (/e/) per field that are indexed (excess is not indexed)",
+    )
 
     nidx_api_address: Optional[str] = Field(default=None, description="NIDX gRPC API address")
     nidx_searcher_address: Optional[str] = Field(
