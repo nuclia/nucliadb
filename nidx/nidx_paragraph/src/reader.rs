@@ -127,7 +127,7 @@ impl ParagraphReaderService {
         let searcher = Searcher {
             request,
             results,
-            facets: &facets,
+            facets,
             text,
             only_faceted: request.only_faceted,
         };
@@ -271,7 +271,7 @@ impl Iterator for BatchProducer {
 struct Searcher<'a> {
     request: &'a ParagraphSearchRequest,
     results: usize,
-    facets: &'a [Facet],
+    facets: Vec<Facet>,
     text: &'a str,
     only_faceted: bool,
 }
@@ -312,7 +312,7 @@ impl Searcher<'_> {
             Ok(ParagraphSearchResponse::from(SearchFacetsResponse {
                 text_service: service,
                 facets_count: Some(facets_count),
-                facets: self.facets,
+                facets: &self.facets,
             }))
         } else if self.facets.is_empty() {
             // Only query no facets
@@ -325,7 +325,7 @@ impl Searcher<'_> {
                     Ok(ParagraphSearchResponse::from(SearchIntResponse {
                         total,
                         facets_count: None,
-                        facets: self.facets,
+                        facets: &self.facets,
                         top_docs,
                         termc: termc.get_termc(),
                         text_service: service,
@@ -341,7 +341,7 @@ impl Searcher<'_> {
                     Ok(ParagraphSearchResponse::from(SearchBm25Response {
                         total,
                         facets_count: None,
-                        facets: self.facets,
+                        facets: &self.facets,
                         top_docs,
                         termc: termc.get_termc(),
                         text_service: service,
@@ -364,7 +364,7 @@ impl Searcher<'_> {
                         total,
                         top_docs,
                         facets_count: Some(facets_count),
-                        facets: self.facets,
+                        facets: &self.facets,
                         termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
@@ -380,7 +380,7 @@ impl Searcher<'_> {
                         total,
                         top_docs,
                         facets_count: Some(facets_count),
-                        facets: self.facets,
+                        facets: &self.facets,
                         termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
