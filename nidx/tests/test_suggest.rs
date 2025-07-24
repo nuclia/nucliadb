@@ -56,7 +56,7 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
 
     // we won't match anything, as 'z' is too short to do fuzzy
     expect_paragraphs(&suggest_paragraphs(&mut fixture, &shard.id, "z").await, &[]);
-    // however, 'a' will match exactly one resource
+    // however, 'a' will match exactly and match one resource
     expect_paragraphs(
         &suggest_paragraphs(&mut fixture, &shard.id, "a").await,
         &[(&shard.resources["little prince"], "/a/summary")],
