@@ -19,7 +19,7 @@
 //
 
 use std::fmt::Debug;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use nidx_protos::order_by::{OrderField, OrderType};
 use nidx_protos::{OrderBy, ParagraphItem, ParagraphSearchResponse, StreamRequest};
@@ -114,23 +114,15 @@ impl ParagraphReaderService {
         request: &ParagraphSearchRequest,
         prefilter: &PrefilterResult,
     ) -> anyhow::Result<ParagraphSearchResponse> {
-        let time = Instant::now();
-        let id = Some(&request.id);
+        let mut time_tracker = TimeTracker::start();
 
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Creating query: starts at {v} ms");
-
-        let results = request.result_per_page as usize;
-
+        let shard_id = &request.id;
         let text = &request.body;
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Creating query: ends at {v} ms");
-
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Searching: starts at {v} ms");
-
+        let results = request.result_per_page as usize;
         let (keyword_query, termc, fuzzy_query) = search_query(request, prefilter, &self.index, &self.schema);
         let facets = request.facets();
+        trace!(shard_id, "Query parsing took {}µs", time_tracker.checkpoint().as_micros());
+
         let searcher = Searcher {
             request,
             results,
@@ -139,22 +131,14 @@ impl ParagraphReaderService {
             only_faceted: request.only_faceted,
         };
         let mut response = searcher.do_search(termc.clone(), keyword_query, self, request.min_score)?;
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Searching: ends at {v} ms");
+        trace!(shard_id, "Keyword search took {}µs", time_tracker.checkpoint().as_micros());
 
         if response.results.is_empty() && request.result_per_page > 0 && request.min_score == 0 as f32 {
-            let v = time.elapsed().as_millis();
-            debug!("{id:?} - Applying fuzzy: starts at {v} ms");
-
             let fuzzied = searcher.do_search(termc, fuzzy_query, self, request.min_score)?;
             response = fuzzied;
             response.fuzzy_distance = FUZZY_DISTANCE as i32;
-            let v = time.elapsed().as_millis();
-            debug!("{id:?} - Applying fuzzy: ends at {v} ms");
+            trace!(shard_id, "Fallback fuzzy query took {}µs", time_tracker.checkpoint().as_micros());
         }
-
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Producing results: starts at {v} ms");
 
         let total = response.results.len() as f32;
         let mut some_below_min_score: bool = false;
@@ -180,11 +164,8 @@ impl ParagraphReaderService {
             response.next_page = false;
         }
 
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Producing results: starts at {v} ms");
-
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Ending at: {v} ms");
+        trace!(shard_id, "Result processing took {}µs", time_tracker.checkpoint().as_micros());
+        trace!(shard_id, "Paragraph search took {}µs", time_tracker.elapsed().as_micros());
 
         Ok(response)
     }
@@ -203,7 +184,34 @@ impl ParagraphReaderService {
                 .unwrap_or_else(|_| format!("\"{}\"", text.replace('"', ""))),
         }
     }
+}
 
+/// Small utility struct to track time in checkpoints.
+struct TimeTracker {
+    init: Instant,
+    checkpoint: Duration,
+}
+
+impl TimeTracker {
+    pub fn start() -> Self {
+        Self {
+            init: Instant::now(),
+            checkpoint: Duration::default(),
+        }
+    }
+
+    /// Set a new checkpoint and return the duration since last one (or the
+    /// start if it's the first time).
+    pub fn checkpoint(&mut self) -> Duration {
+        let checkpoint = self.init.elapsed();
+        let elapsed = checkpoint - self.checkpoint;
+        self.checkpoint = checkpoint;
+        elapsed
+    }
+
+    /// Return the total elapsed duration since the start of the time tracking
+    pub fn elapsed(&self) -> Duration {
+        self.init.elapsed()
     }
 }
 
