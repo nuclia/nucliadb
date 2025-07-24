@@ -291,7 +291,7 @@ def file_extracted_data(message: resources_pb2.FileExtractedData) -> FileExtract
 def shorten_fieldmetadata(
     message: resources_pb2.FieldComputedMetadata,
 ) -> None:
-    large_fields = ["ner", "relations", "positions", "classifications", "entities"]
+    large_fields = ["relations", "classifications", "entities"]
     for field in large_fields:
         message.metadata.ClearField(field)  # type: ignore
     for metadata in message.split_metadata.values():
@@ -321,23 +321,6 @@ def field_computed_metadata(
 def field_metadata(
     message: resources_pb2.FieldMetadata,
 ) -> FieldMetadata:
-    # Backwards compatibility with old entities format
-    # TODO: Remove once deprecated fields are removed
-    # If we recieved processor entities in the new field and the old field is empty, we copy them to the old field
-    if "processor" in message.entities and len(message.positions) == 0 and len(message.ner) == 0:
-        message.ner.update({ent.text: ent.label for ent in message.entities["processor"].entities})
-        for ent in message.entities["processor"].entities:
-            message.positions[ent.label + "/" + ent.text].entity = ent.text
-            message.positions[ent.label + "/" + ent.text].position.extend(
-                [
-                    resources_pb2.Position(
-                        start=position.start,
-                        end=position.end,
-                    )
-                    for position in ent.positions
-                ]
-            )
-
     value = MessageToDict(
         message,
         preserving_proto_field_name=True,

@@ -141,28 +141,6 @@ async def get_field_text(
                                 (position.start, position.end)
                             )
 
-        # Legacy processor entities
-        # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-        for entity_key, positions in field_metadata.metadata.positions.items():
-            entities = entity_key.split("/")
-            entity_group = entities[0]
-            entity = "/".join(entities[1:])
-
-            if entity_group in valid_entity_groups:
-                split_ners[MAIN].setdefault(entity_group, {}).setdefault(entity, [])
-                for position in positions.position:
-                    split_ners[MAIN][entity_group][entity].append((position.start, position.end))
-
-        for split, split_metadata in field_metadata.split_metadata.items():
-            for entity_key, positions in split_metadata.positions.items():
-                entities = entity_key.split("/")
-                entity_group = entities[0]
-                entity = "/".join(entities[1:])
-                if entity_group in valid_entity_groups:
-                    split_ners.setdefault(split, {}).setdefault(entity_group, {}).setdefault(entity, [])
-                    for position in positions.position:
-                        split_ners[split][entity_group][entity].append((position.start, position.end))
-
     ordered_positions: dict[str, POSITION_DICT] = {}
     for split, ners in split_ners.items():
         split_positions: dict[tuple[int, int], tuple[str, str]] = {}

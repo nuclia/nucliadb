@@ -91,7 +91,6 @@ class FieldEntities(BaseModel):
 class FieldMetadata(BaseModel):
     links: List[str]
     paragraphs: List[Paragraph]
-    ner: Dict[str, str]  # TODO: Remove once processor doesn't use this anymore
     entities: Dict[str, FieldEntities]
     classifications: List[Classification]
     last_index: Optional[datetime] = None
@@ -102,7 +101,6 @@ class FieldMetadata(BaseModel):
     thumbnail: Optional[CloudLink] = None
     language: Optional[str] = None
     summary: Optional[str] = None
-    positions: Dict[str, Positions]  # TODO: Remove once processor doesn't use this anymore
     relations: Optional[List[Relation]] = None
     mime_type: Optional[str] = None
 

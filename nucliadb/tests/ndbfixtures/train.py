@@ -260,17 +260,6 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
             FieldEntity(text="Manresa", label="CITY"),
         ]
     )
-    # Legacy processor entities
-    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-    # Add a ner with positions
-    fcmw.metadata.metadata.ner.update(
-        {
-            "Barcelona": "CITY",
-            "Manresa": "CITY",
-        }
-    )
-    fcmw.metadata.metadata.positions["CITY/Barcelona"].entity = "Barcelona"
-    fcmw.metadata.metadata.positions["CITY/Barcelona"].position.append(Position(start=43, end=52))
 
     message2.field_metadata.append(fcmw)
 

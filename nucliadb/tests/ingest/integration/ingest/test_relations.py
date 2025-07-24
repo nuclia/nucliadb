@@ -147,10 +147,6 @@ async def test_ingest_field_metadata_relation_extraction(
             FieldEntity(text="value-4", label="subtype-4"),
         ]
     )
-    # Legacy processor entities
-    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-    fcmw.metadata.metadata.positions["subtype-1/value-1"].entity = "value-1"
-    fcmw.metadata.metadata.positions["subtype-1/value-2"].entity = "value-2"
 
     fcmw.metadata.metadata.classifications.extend(
         [
@@ -178,17 +174,6 @@ async def test_ingest_field_metadata_relation_extraction(
             relation=Relation.RelationType.ENTITY,
             source=RelationNode(value=rid, ntype=RelationNode.NodeType.RESOURCE),
             to=RelationNode(value="value-4", ntype=RelationNode.NodeType.ENTITY, subtype="subtype-4"),
-        ),
-        # From legacy ner metadata
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=RelationNode(value=rid, ntype=RelationNode.NodeType.RESOURCE),
-            to=RelationNode(value="value-1", ntype=RelationNode.NodeType.ENTITY, subtype="subtype-1"),
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=RelationNode(value=rid, ntype=RelationNode.NodeType.RESOURCE),
-            to=RelationNode(value="value-2", ntype=RelationNode.NodeType.ENTITY, subtype="subtype-1"),
         ),
         # From classification metadata
         Relation(

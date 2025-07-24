@@ -497,10 +497,6 @@ async def extend_prompt_context_with_ner(
                 ) in fcm.metadata.entities.items():
                     for entity in entities_wrapper.entities:
                         ners.setdefault(entity.label, set()).add(entity.text)
-                # Legacy processor entities
-                # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-                for token, family in fcm.metadata.ner.items():
-                    ners.setdefault(family, set()).add(token)
         return _id, ners
 
     nerss = await run_concurrently([_get_ners(kbid, tb_id) for tb_id in text_block_ids])

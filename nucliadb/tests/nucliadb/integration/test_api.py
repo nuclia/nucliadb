@@ -411,15 +411,14 @@ async def test_extracted_shortened_metadata(
 
     await inject_message(nucliadb_ingest_grpc, br)
 
-    # TODO: Remove ner and positions once fields are removed
-    cropped_fields = ["ner", "positions", "relations", "classifications"]
+    cropped_fields = ["relations", "classifications"]
 
     # Check that when 'shortened_metadata' in extracted param fields are cropped
     resp = await nucliadb_reader.get(
         f"/kb/{standalone_knowledgebox}/resource/{br.uuid}/text/text",
         params=dict(show=["extracted"], extracted=["shortened_metadata"]),
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     resp_json = resp.json()
     metadata = resp_json["extracted"]["metadata"]["metadata"]
     split_metadata = resp_json["extracted"]["metadata"]["split_metadata"]["split"]

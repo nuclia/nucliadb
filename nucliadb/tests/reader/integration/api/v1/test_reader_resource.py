@@ -312,9 +312,6 @@ async def test_get_resource_extracted_metadata(nucliadb_reader: AsyncClient, tes
     resource = resp.json()
     metadata = resource["data"]["texts"]["text1"]["extracted"]["metadata"]["metadata"]
 
-    # Check that the processor entity is in the legacy metadata
-    # TODO: Remove once deprecated fields are removed
-    assert metadata["positions"]["ENTITY/document"]["entity"] == "document"
     # Check that we recieved entities in the new fields
     assert metadata["entities"]["processor"]["entities"][0]["text"] == "document"
     assert metadata["entities"]["processor"]["entities"][0]["label"] == "ENTITY"

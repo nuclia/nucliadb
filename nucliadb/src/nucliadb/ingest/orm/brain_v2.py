@@ -171,12 +171,8 @@ class ResourceBrain:
                     label = f"{classification.labelset}/{classification.label}"
                     if label not in user_cancelled_labels:
                         labels["l"].add(label)
-                use_legacy_entities = True
+
                 for data_augmentation_task_id, entities in metadata.entities.items():
-                    # If we recieved the entities from the processor here, we don't want to use the legacy entities
-                    # TODO: Remove this when processor doesn't use this anymore
-                    if data_augmentation_task_id == "processor":
-                        use_legacy_entities = False
                     for ent in entities.entities:
                         entity_text = ent.text
                         entity_label = ent.label
@@ -185,10 +181,6 @@ class ResourceBrain:
                         labels["e"].add(
                             f"{entity_label}/{entity_text}"
                         )  # Add data_augmentation_task_id as a prefix?
-                # Legacy processor entities
-                if use_legacy_entities:
-                    for klass_entity in metadata.positions.keys():
-                        labels["e"].add(klass_entity)
 
         if field_author is not None and field_author.WhichOneof("author") == "data_augmentation":
             field_type, field_id = field_key.split("/")
@@ -426,13 +418,7 @@ class ResourceBrain:
                     source=relation_node_document,
                     to=RelationNode(ntype=RelationNode.NodeType.ENTITY),
                 )
-                use_legacy_entities = True
                 for data_augmentation_task_id, entities in field_metadata.entities.items():
-                    # If we recieved the entities from the processor here, we don't want to use the legacy entities
-                    # TODO: Remove this when processor doesn't use this anymore
-                    if data_augmentation_task_id == "processor":
-                        use_legacy_entities = False
-
                     for ent in entities.entities:
                         entity_text = ent.text
                         entity_label = ent.label
@@ -440,24 +426,6 @@ class ResourceBrain:
                         relation.CopyFrom(base_entity_relation)
                         relation.to.value = entity_text
                         relation.to.subtype = entity_label
-                        field_relations.append(IndexRelation(relation=relation))
-
-                # Legacy processor entities
-                # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-                def _parse_entity(klass_entity: str) -> tuple[str, str]:
-                    try:
-                        klass, entity = klass_entity.split("/", 1)
-                        return klass, entity
-                    except ValueError:
-                        raise AttributeError(f"Entity should be with type {klass_entity}")
-
-                if use_legacy_entities:
-                    for klass_entity in field_metadata.positions.keys():
-                        klass, entity = _parse_entity(klass_entity)
-                        relation = Relation()
-                        relation.CopyFrom(base_entity_relation)
-                        relation.to.value = entity
-                        relation.to.subtype = klass
                         field_relations.append(IndexRelation(relation=relation))
 
                 # Relations from field to classifications label

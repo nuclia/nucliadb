@@ -374,7 +374,3 @@ def _update_entities_dict(target_entites_dict: MutableMapping[str, str], field_m
         for entity in entities_wrapper.entities
     }
     target_entites_dict.update(entity_map)
-
-    # Legacy processor entities
-    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-    target_entites_dict.update(field_metadata.ner)
