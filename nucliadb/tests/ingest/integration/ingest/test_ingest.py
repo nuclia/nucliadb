@@ -177,10 +177,6 @@ async def test_ingest_messages_autocommit(kbid: str, processor, dummy_nidx_utili
         [FieldEntity(text="Ramon", label="PERSON")]
     )
 
-    # Legacy processor entities
-    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-    fcm.metadata.metadata.ner["Ramon"] = "PERSON"
-
     c1 = Classification()
     c1.label = "label1"
     c1.labelset = "labelset1"
