@@ -122,14 +122,6 @@ impl ParagraphReaderService {
 
         let results = request.result_per_page as usize;
 
-        let facets: Vec<_> = request
-            .faceted
-            .as_ref()
-            .iter()
-            .flat_map(|v| v.labels.iter())
-            .filter(|s| ParagraphReaderService::is_valid_facet(s))
-            .cloned()
-            .collect();
         let text = &request.body;
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Creating query: ends at {v} ms");
@@ -138,6 +130,7 @@ impl ParagraphReaderService {
         debug!("{id:?} - Searching: starts at {v} ms");
 
         let (keyword_query, termc, fuzzy_query) = search_query(request, prefilter, &self.index, &self.schema);
+        let facets = request.facets();
         let searcher = Searcher {
             request,
             results,
@@ -211,8 +204,6 @@ impl ParagraphReaderService {
         }
     }
 
-    fn is_valid_facet(maybe_facet: &str) -> bool {
-        Facet::from_text(maybe_facet).is_ok()
     }
 }
 
