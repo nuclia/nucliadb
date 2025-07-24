@@ -36,7 +36,11 @@ use super::tokenizer::Token;
 /// Minimum length required to be considered a fuzzy word. Words with smaller
 /// length than this are considered too short to be fuzzy. This is done to avoid
 /// too much noise from short terms.
-const MIN_FUZZY_LEN: usize = 4;
+const MIN_FUZZY_LEN: usize = 3;
+
+/// Minimum length required to be considered a fuzzy prefix. This is again don
+/// eto avoid too much noise from short term.
+const MIN_FUZZY_PREFIX_LEN: usize = 4;
 
 /// Levenshtein distance used by all fuzzy terms.
 const FUZZY_DISTANCE: u8 = 1;
@@ -77,7 +81,7 @@ pub fn parse_fuzzy_query(query: &[Token], term_collector: SharedTermC, last_lite
                 if literal.len() < MIN_FUZZY_LEN {
                     // to avoid noise, we don't want to match too short terms as fuzzy
                     q = Box::new(TermQuery::new(term, IndexRecordOption::Basic));
-                } else if last_literal_as_prefix && (i == last_literal_index) {
+                } else if last_literal_as_prefix && (i == last_literal_index) && literal.len() >= MIN_FUZZY_PREFIX_LEN {
                     q = Box::new(FuzzyTermQuery::new_prefix(
                         term,
                         distance,
