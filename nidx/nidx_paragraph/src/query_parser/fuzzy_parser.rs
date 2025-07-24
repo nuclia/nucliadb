@@ -57,12 +57,10 @@ pub fn parse_fuzzy_query(query: &[Token], term_collector: SharedTermC, last_lite
     // We use usize::MAX as a discriminant when we don't want/care about the
     // last index. This value won't match as there's no query that long.
     let last_literal_index = if last_literal_as_prefix {
-        query.iter().enumerate().fold(
-            usize::MAX,
-            |acc, (idx, token)| {
-                if matches!(token, &Token::Literal(_)) { idx } else { acc }
-            },
-        )
+        query
+            .iter()
+            .position(|token| matches!(token, &Token::Literal(_)))
+            .unwrap_or(usize::MAX)
     } else {
         usize::MAX
     };
