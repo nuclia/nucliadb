@@ -57,13 +57,24 @@ fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
         })
         .collect()
 }
-pub fn produce_facets(facets: Vec<String>, facets_count: FacetCounts) -> HashMap<String, FacetResults> {
+pub fn produce_facets(facets: &[Facet], facets_count: FacetCounts) -> HashMap<String, FacetResults> {
     facets
-        .into_iter()
-        .map(|facet| (&facets_count, facet))
-        .map(|(facets_count, facet)| (facet_count(&facet, facets_count), facet))
-        .filter(|(r, _)| !r.is_empty())
-        .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
+        .iter()
+        .map(|facet| facet.to_string())
+        .filter_map(|facet| {
+            let facet_counts = facet_count(&facet, &facets_count);
+
+            if !facet_counts.is_empty() {
+                Some((
+                    facet,
+                    FacetResults {
+                        facetresults: facet_counts,
+                    },
+                ))
+            } else {
+                None
+            }
+        })
         .collect()
 }
 
@@ -72,7 +83,7 @@ pub struct SearchBm25Response<'a> {
     pub text_service: &'a ParagraphReaderService,
     pub query: &'a str,
     pub facets_count: Option<FacetCounts>,
-    pub facets: Vec<String>,
+    pub facets: &'a [Facet],
     pub top_docs: Vec<(f32, DocAddress)>,
     pub results_per_page: i32,
     pub termc: TermCollector,
@@ -85,7 +96,7 @@ pub struct SearchIntResponse<'a> {
     pub text_service: &'a ParagraphReaderService,
     pub query: &'a str,
     pub facets_count: Option<FacetCounts>,
-    pub facets: Vec<String>,
+    pub facets: &'a [Facet],
     pub top_docs: Vec<(DateTime, DocAddress)>,
     pub results_per_page: i32,
     pub termc: TermCollector,
@@ -95,7 +106,7 @@ pub struct SearchIntResponse<'a> {
 pub struct SearchFacetsResponse<'a> {
     pub text_service: &'a ParagraphReaderService,
     pub facets_count: Option<FacetCounts>,
-    pub facets: Vec<String>,
+    pub facets: &'a [Facet],
 }
 
 impl From<SearchFacetsResponse<'_>> for ParagraphSearchResponse {

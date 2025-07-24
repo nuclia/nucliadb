@@ -49,17 +49,12 @@ pub struct ParagraphSuggestRequest {
 
 impl ParagraphSearchRequest {
     // Helper method to extract valid facets from the request
-    pub fn facets(&self) -> Vec<String> {
+    pub fn facets(&self) -> Vec<Facet> {
         self.faceted
             .as_ref()
             .iter()
             .flat_map(|faceted| faceted.labels.iter())
-            .filter(|label| self.is_valid_facet(label))
-            .cloned()
+            .filter_map(|facet| Facet::from_text(facet).ok())
             .collect()
-    }
-
-    fn is_valid_facet(&self, label: &str) -> bool {
-        Facet::from_text(label).is_ok()
     }
 }
