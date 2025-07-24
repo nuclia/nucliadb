@@ -364,7 +364,7 @@ fn test_faceted_search() -> anyhow::Result<()> {
 #[test]
 fn test_order_by() -> anyhow::Result<()> {
     let shard_id = "shard1".to_string();
-    let (rid, resource) = create_resource(shard_id.clone());
+    let (_, resource) = create_resource(shard_id.clone());
     let paragraph_reader_service = test_reader(&resource);
 
     let order = OrderBy {
@@ -396,7 +396,7 @@ fn test_order_by() -> anyhow::Result<()> {
 #[test]
 fn test_paragraph_streaming() {
     let shard_id = "shard1".to_string();
-    let (rid, resource) = create_resource(shard_id.clone());
+    let (_, resource) = create_resource(shard_id.clone());
     let paragraph_reader_service = test_reader(&resource);
 
     let request = StreamRequest {

@@ -48,7 +48,7 @@ pub struct ParsedQuery {
     pub term_collector: SharedTermC,
 }
 
-pub fn parse_query<'a>(query: &'a str, config: ParserConfig) -> anyhow::Result<ParsedQuery> {
+pub fn parse_query(query: &str, config: ParserConfig) -> anyhow::Result<ParsedQuery> {
     let tokenized = tokenize_query_infallible(query);
 
     let tokenized = remove_stop_words(tokenized);

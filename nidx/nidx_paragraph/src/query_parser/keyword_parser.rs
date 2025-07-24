@@ -171,6 +171,7 @@ mod tests {
         q.unwrap()
     }
 
+    #[allow(clippy::borrowed_box)]
     fn extract_term_from(query: &Box<dyn Query>) -> &Term {
         let q = query.downcast_ref::<TermQuery>();
         assert!(q.is_some(), "TermQuery expected");
@@ -178,6 +179,7 @@ mod tests {
         q.term()
     }
 
+    #[allow(clippy::borrowed_box)]
     fn extract_phrase_terms_from(query: &Box<dyn Query>) -> Vec<Term> {
         let q = query.downcast_ref::<PhraseQuery>();
         assert!(q.is_some(), "PhraseQuery expected");
@@ -185,6 +187,3 @@ mod tests {
         q.phrase_terms()
     }
 }
-
-// XXX: changed behavior:
-// - a query like: -came. Now will match AllQuery + MustNot(came). Before it was a parser error and matched "-came"

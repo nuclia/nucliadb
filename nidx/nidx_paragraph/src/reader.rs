@@ -144,7 +144,7 @@ impl ParagraphReaderService {
             .transpose()?;
         #[rustfmt::skip] let (original, termc, fuzzied) = search_query(
             &parser,
-            &text,
+            text,
             request,
             prefilter,
             &self.schema,
@@ -155,7 +155,7 @@ impl ParagraphReaderService {
             request,
             results,
             facets: &facets,
-            text: &text,
+            text,
             only_faceted: request.only_faceted,
         };
         let mut response = searcher.do_search(termc.clone(), original, self, request.min_score)?;
