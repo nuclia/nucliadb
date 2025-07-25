@@ -103,8 +103,6 @@ pub fn remove_stop_words(mut query: Vec<Token>) -> Vec<Token> {
     if query.is_empty() {
         return query;
     }
-    let query_len = query.len();
-
     // as we don't want to remove the last literal, we pop the last element and
     // always put it in the filtered query. We don't really care if the last
     // it's a literal or not.
@@ -112,7 +110,6 @@ pub fn remove_stop_words(mut query: Vec<Token>) -> Vec<Token> {
 
     query
         .into_iter()
-        .take(query_len - 1)
         .filter(|token| !is_stop_word_token(token))
         .chain([last])
         .collect()
@@ -221,5 +218,15 @@ mod tests {
                 Token::Literal("is".into()),
             ]
         );
+
+        // Everything is a stop word, but last is not removed
+        let tokens = vec![
+            Token::Literal("we".into()),
+            Token::Literal("shouldn't".into()),
+            Token::Literal("be".into()),
+            Token::Literal("here".into()),
+        ];
+        let filtered = remove_stop_words(tokens);
+        assert_eq!(filtered, vec![Token::Literal("here".into()),]);
     }
 }
