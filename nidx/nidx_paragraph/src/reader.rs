@@ -19,23 +19,23 @@
 //
 
 use std::fmt::Debug;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use nidx_protos::order_by::{OrderField, OrderType};
 use nidx_protos::{OrderBy, ParagraphItem, ParagraphSearchResponse, StreamRequest};
 use nidx_types::prefilter::PrefilterResult;
 use tantivy::collector::{Collector, Count, FacetCollector, TopDocs};
-use tantivy::query::{AllQuery, Query, QueryParser};
+use tantivy::query::{AllQuery, Query};
 use tantivy::{DateTime, Order, schema::*};
 use tantivy::{DocAddress, Index, IndexReader};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
+use crate::query_parser::FUZZY_DISTANCE;
 use crate::request_types::{ParagraphSearchRequest, ParagraphSuggestRequest};
 use crate::search_query::{SharedTermC, search_query, streaming_query, suggest_query};
 use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse, extract_labels};
 
-const FUZZY_DISTANCE: u8 = 1;
 const NUMBER_OF_RESULTS_SUGGEST: usize = 20;
 
 pub struct ParagraphReaderService {
@@ -65,19 +65,17 @@ impl ParagraphReaderService {
         request: &ParagraphSuggestRequest,
         prefilter: &PrefilterResult,
     ) -> anyhow::Result<ParagraphSearchResponse> {
-        let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
-        let text = self.adapt_text(&parser, &request.body);
-        let (original, termc, fuzzied) =
-            suggest_query(&parser, &text, request, prefilter, &self.schema, FUZZY_DISTANCE);
+        let query = &request.body;
+        let (keyword, term_collector, fuzzy) = suggest_query(request, prefilter, &self.schema);
 
         let searcher = self.reader.searcher();
         let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
-        let mut results = searcher.search(&original, &topdocs)?;
+        let mut results = searcher.search(&keyword, &topdocs)?;
 
         if results.is_empty() {
             let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
-            match searcher.search(&fuzzied, &topdocs) {
-                Ok(mut fuzzied) => results.append(&mut fuzzied),
+            match searcher.search(&fuzzy, &topdocs) {
+                Ok(mut fuzzy) => results.append(&mut fuzzy),
                 Err(err) => error!("{err:?} during suggest"),
             }
         }
@@ -86,10 +84,10 @@ impl ParagraphReaderService {
             total: results.len(),
             top_docs: results,
             facets_count: None,
-            facets: vec![],
-            termc: termc.get_termc(),
+            facets: &[],
+            termc: term_collector.get_termc(),
             text_service: self,
-            query: &text,
+            query,
             results_per_page: 10,
             searcher,
             min_score: 0.0,
@@ -113,68 +111,45 @@ impl ParagraphReaderService {
         request: &ParagraphSearchRequest,
         prefilter: &PrefilterResult,
     ) -> anyhow::Result<ParagraphSearchResponse> {
-        let time = Instant::now();
-        let id = Some(&request.id);
+        let mut time_tracker = TimeTracker::start();
 
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Creating query: starts at {v} ms");
-
-        let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
+        let shard_id = &request.id;
+        let text = &request.body;
         let results = request.result_per_page as usize;
-
-        let facets: Vec<_> = request
-            .faceted
-            .as_ref()
-            .iter()
-            .flat_map(|v| v.labels.iter())
-            .filter(|s| ParagraphReaderService::is_valid_facet(s))
-            .cloned()
-            .collect();
-        let text = self.adapt_text(&parser, &request.body);
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Creating query: ends at {v} ms");
-
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Searching: starts at {v} ms");
-
-        let advanced = request
-            .advanced_query
-            .as_ref()
-            .map(|query| parser.parse_query(query))
-            .transpose()?;
-        #[rustfmt::skip] let (original, termc, fuzzied) = search_query(
-            &parser,
-            &text,
-            request,
-            prefilter,
-            &self.schema,
-            FUZZY_DISTANCE,
-            advanced
+        let (keyword_query, termc, fuzzy_query) = search_query(request, prefilter, &self.index, &self.schema);
+        let facets = request.facets();
+        trace!(
+            shard_id,
+            "Query parsing took {}µs",
+            time_tracker.checkpoint().as_micros()
         );
+
         let searcher = Searcher {
             request,
             results,
-            facets: &facets,
-            text: &text,
+            facets,
+            text,
             only_faceted: request.only_faceted,
         };
-        let mut response = searcher.do_search(termc.clone(), original, self, request.min_score)?;
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Searching: ends at {v} ms");
+        // println!("Regular search with query: {:#?}", keyword_query);
+        let mut response = searcher.do_search(termc.clone(), keyword_query, self, request.min_score)?;
+        trace!(
+            shard_id,
+            "Keyword search took {}µs",
+            time_tracker.checkpoint().as_micros()
+        );
 
         if response.results.is_empty() && request.result_per_page > 0 && request.min_score == 0 as f32 {
-            let v = time.elapsed().as_millis();
-            debug!("{id:?} - Applying fuzzy: starts at {v} ms");
-
-            let fuzzied = searcher.do_search(termc, fuzzied, self, request.min_score)?;
+            // println!("Fuzzy search with query: {:#?}", fuzzy_query);
+            let fuzzied = searcher.do_search(termc, fuzzy_query, self, request.min_score)?;
             response = fuzzied;
             response.fuzzy_distance = FUZZY_DISTANCE as i32;
-            let v = time.elapsed().as_millis();
-            debug!("{id:?} - Applying fuzzy: ends at {v} ms");
+            trace!(
+                shard_id,
+                "Fallback fuzzy query took {}µs",
+                time_tracker.checkpoint().as_micros()
+            );
         }
-
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Producing results: starts at {v} ms");
 
         let total = response.results.len() as f32;
         let mut some_below_min_score: bool = false;
@@ -200,30 +175,47 @@ impl ParagraphReaderService {
             response.next_page = false;
         }
 
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Producing results: starts at {v} ms");
-
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Ending at: {v} ms");
+        trace!(
+            shard_id,
+            "Result processing took {}µs",
+            time_tracker.checkpoint().as_micros()
+        );
+        trace!(
+            shard_id,
+            "Paragraph search took {}µs",
+            time_tracker.elapsed().as_micros()
+        );
 
         Ok(response)
     }
-    fn adapt_text(&self, parser: &QueryParser, text: &str) -> String {
-        // FIXME: after migrating from tantivy 0.22 -> 0.24, the query grammar
-        // now includes single quotes as special character. Queries having a
-        // single single quote now fail to parse. As a quick fix, we remove them
-        // all and replace them by a space.
-        let text = text.replace('\'', " ");
-        match text.trim() {
-            "" => text.to_string(),
-            text => parser
-                .parse_query(text)
-                .map(|_| text.to_string())
-                .unwrap_or_else(|_| format!("\"{}\"", text.replace('"', ""))),
+}
+
+/// Small utility struct to track time in checkpoints.
+struct TimeTracker {
+    init: Instant,
+    checkpoint: Duration,
+}
+
+impl TimeTracker {
+    pub fn start() -> Self {
+        Self {
+            init: Instant::now(),
+            checkpoint: Duration::default(),
         }
     }
-    fn is_valid_facet(maybe_facet: &str) -> bool {
-        Facet::from_text(maybe_facet).is_ok()
+
+    /// Set a new checkpoint and return the duration since last one (or the
+    /// start if it's the first time).
+    pub fn checkpoint(&mut self) -> Duration {
+        let checkpoint = self.init.elapsed();
+        let elapsed = checkpoint - self.checkpoint;
+        self.checkpoint = checkpoint;
+        elapsed
+    }
+
+    /// Return the total elapsed duration since the start of the time tracking
+    pub fn elapsed(&self) -> Duration {
+        self.init.elapsed()
     }
 }
 
@@ -279,7 +271,7 @@ impl Iterator for BatchProducer {
 struct Searcher<'a> {
     request: &'a ParagraphSearchRequest,
     results: usize,
-    facets: &'a [String],
+    facets: Vec<Facet>,
     text: &'a str,
     only_faceted: bool,
 }
@@ -311,7 +303,7 @@ impl Searcher<'_> {
             .facets
             .iter()
             .fold(FacetCollector::for_field("facets"), |mut collector, facet| {
-                collector.add_facet(Facet::from(facet));
+                collector.add_facet(facet.clone());
                 collector
             });
         if self.only_faceted {
@@ -320,7 +312,7 @@ impl Searcher<'_> {
             Ok(ParagraphSearchResponse::from(SearchFacetsResponse {
                 text_service: service,
                 facets_count: Some(facets_count),
-                facets: self.facets.to_vec(),
+                facets: &self.facets,
             }))
         } else if self.facets.is_empty() {
             // Only query no facets
@@ -333,7 +325,7 @@ impl Searcher<'_> {
                     Ok(ParagraphSearchResponse::from(SearchIntResponse {
                         total,
                         facets_count: None,
-                        facets: self.facets.to_vec(),
+                        facets: &self.facets,
                         top_docs,
                         termc: termc.get_termc(),
                         text_service: service,
@@ -349,7 +341,7 @@ impl Searcher<'_> {
                     Ok(ParagraphSearchResponse::from(SearchBm25Response {
                         total,
                         facets_count: None,
-                        facets: self.facets.to_vec(),
+                        facets: &self.facets,
                         top_docs,
                         termc: termc.get_termc(),
                         text_service: service,
@@ -372,7 +364,7 @@ impl Searcher<'_> {
                         total,
                         top_docs,
                         facets_count: Some(facets_count),
-                        facets: self.facets.to_vec(),
+                        facets: &self.facets,
                         termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
@@ -388,7 +380,7 @@ impl Searcher<'_> {
                         total,
                         top_docs,
                         facets_count: Some(facets_count),
-                        facets: self.facets.to_vec(),
+                        facets: &self.facets,
                         termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
