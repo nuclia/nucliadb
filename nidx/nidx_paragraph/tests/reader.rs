@@ -53,10 +53,7 @@ fn create_resource(shard_id: String) -> (String, Resource) {
     let fields = vec![
         Field {
             field_id: "title",
-            paragraphs: vec![(
-                DOC1_TI,
-                vec!["/c/ool".to_string()],
-            )],
+            paragraphs: vec![(DOC1_TI, vec!["/c/ool".to_string()])],
             labels: vec!["/e/mylabel".to_string()],
         },
         Field {
@@ -70,6 +67,28 @@ fn create_resource(shard_id: String) -> (String, Resource) {
                 (DOC1_P3, vec!["/three".to_string(), "/label2".to_string()]),
             ],
             labels: vec!["/f/body".to_string(), "/l/mylabel2".to_string()],
+        },
+    ];
+
+    create_resource_with_fields(shard_id, rid, fields)
+}
+
+fn create_tricky_resource(shard_id: String) -> (String, Resource) {
+    let rid = "c0ab922f-d739-8a68-b49e-fad80278cbb0".to_string();
+    let fields = vec![
+        Field {
+            field_id: "title",
+            paragraphs: vec![("That's a too *tricky* resource", vec![])],
+            labels: vec![],
+        },
+        Field {
+            field_id: "mytext",
+            paragraphs: vec![
+                ("It's very important to do-stuff", vec![]),
+                ("It's not that important to do-stuff", vec![]),
+                ("W'h'a't a -w-e-i-r-d p\"ara\"gra\"ph", vec![]),
+            ],
+            labels: vec![],
         },
     ];
 
@@ -436,6 +455,51 @@ fn test_query_parsing() -> anyhow::Result<()> {
     assert_eq!(result.total, 1);
 
     search.body = "some ' document".to_string();
+    let result = paragraph_reader_service.search(&search, &PrefilterResult::All).unwrap();
+    assert_eq!(result.total, 1);
+
+    Ok(())
+}
+
+#[test]
+fn test_query_parsing_weird_stuff() -> anyhow::Result<()> {
+    let shard_id = "shard1".to_string();
+    let (rid, resource) = create_tricky_resource(shard_id.clone());
+    let paragraph_reader_service = test_reader(&resource);
+
+    let mut search = ParagraphSearchRequest {
+        id: shard_id,
+        uuid: rid,
+        body: "".to_string(),
+        faceted: None,
+        order: None,
+        result_per_page: 20,
+        only_faceted: false,
+        ..Default::default()
+    };
+
+    search.body = "important".to_string();
+    let result = paragraph_reader_service.search(&search, &PrefilterResult::All).unwrap();
+    assert_eq!(result.total, 2);
+
+    // removes all stop words except the last and matches "to" exactly (as it's too short for fuzzy)
+    search.body = "it's not that to".to_string();
+    let result = paragraph_reader_service.search(&search, &PrefilterResult::All).unwrap();
+    assert_eq!(result.ematches, vec!["to"]);
+    assert_eq!(result.total, 2);
+
+    search.body = "\"It's very important to do-stuff\"".to_string();
+    let result = paragraph_reader_service.search(&search, &PrefilterResult::All).unwrap();
+    assert_eq!(result.total, 1);
+
+    // the word p"ara"gra"ph has been splitted, so `paragraph` doesn't match but `ara` does.
+    search.body = "paragraph".to_string();
+    let result = paragraph_reader_service.search(&search, &PrefilterResult::All).unwrap();
+    assert_eq!(result.total, 0);
+    search.body = "ara".to_string();
+    let result = paragraph_reader_service.search(&search, &PrefilterResult::All).unwrap();
+    assert_eq!(result.total, 1);
+    search.body = "ph".to_string();
     let result = paragraph_reader_service.search(&search, &PrefilterResult::All).unwrap();
     assert_eq!(result.total, 1);
 

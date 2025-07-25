@@ -57,7 +57,10 @@ pub fn tokenize_query_infallible(input: &str) -> Vec<Token<'_>> {
     match r.finish() {
         Ok((rest, tokens)) => {
             debug_assert!(rest.is_empty(), "parser should be complete and parse all input");
-            tokens
+
+            // after our own grammar tokenization, we pass the tantivy one to apply the same changes
+            // to the query than the ones the index applies to the text
+            tantivy_retokenize(tokens)
         }
         Err(error) => {
             warn!("Parsing error for query '{}'. {:?}", input, error);
@@ -70,7 +73,13 @@ pub fn tokenize_query_infallible(input: &str) -> Vec<Token<'_>> {
 }
 
 fn nidx_grammar_tokenize(input: &str) -> IResult<&str, Vec<Token>, nom::error::Error<&str>> {
-    let is_literal_char = |c: char| -> bool { c.is_ascii_graphic() && c != '"' };
+    let is_literal_char = |c: char| -> bool {
+        c.is_alphanumeric()
+            || (
+                // a ~is_punctuation excluding quotes
+                !c.is_whitespace() && !c.is_control() && c != '"'
+            )
+    };
 
     // detect alphanumeric words like: abc, 123, a1b2, a-b.3c, etc.
     let literal = delimited(multispace0, take_while1(is_literal_char), multispace0);
@@ -113,8 +122,7 @@ fn nidx_grammar_tokenize(input: &str) -> IResult<&str, Vec<Token>, nom::error::E
         ),
         |t| {
             // Return an empty list of tokens if query is empty (or only contains spaces)
-            let tokenized = t.unwrap_or_default();
-            tantivy_retokenize(tokenized)
+            t.unwrap_or_default()
         },
     )(input)
 }
@@ -180,6 +188,24 @@ mod tests {
         let expected = vec![];
         let tokens = tokenize_query_infallible(query);
         assert_eq!(tokens, expected);
+
+        // whitespaces only
+        let query = "    ";
+        let expected = vec![];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
+
+        // dashes and whitespaces only
+        let query = "  - - -   - - -  ";
+        let expected = vec![];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
+
+        // only special characters (punctuation is removed)
+        let query = "!@#~&/()=?";
+        let expected = vec![];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
     }
 
     #[test]
@@ -230,6 +256,25 @@ mod tests {
             Excluded("is".into()),
             Excluded("excluded".into()),
         ];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
+
+        // We don't handle double exclude, it is considered as exclude `-Not` and the second dash is
+        // removed by the tantivy tokenizer
+        let query = "--Not ---everything -is -excluded";
+        let expected = vec![
+            Excluded("not".into()),
+            Excluded("everything".into()),
+            Excluded("is".into()),
+            Excluded("excluded".into()),
+        ];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
+
+        // hyphenated words. Due to tantivy tokenization, we remove the minus (-) and split the term
+        // in two literals
+        let query = "hyphenated-word";
+        let expected = vec![Literal("hyphenated".into()), Literal("word".into())];
         let tokens = tokenize_query_infallible(query);
         assert_eq!(tokens, expected);
     }
@@ -291,6 +336,42 @@ mod tests {
         ];
         let tokens = tokenize_query_infallible(query);
         assert_eq!(tokens, expected);
+
+        // without separation between excluded and quotes
+        let query = r#""quoted"-term"#;
+        let expected = vec![Quoted("quoted".into()), Excluded("term".into())];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
+
+        let query = r#"-term"quoted""#;
+        let expected = vec![Excluded("term".into()), Quoted("quoted".into())];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn test_unicode_characters_and_language_support() {
+        let query = r#"résumé "São Paulo" -tésting"#;
+        let expected = vec![
+            Literal("résumé".into()),
+            Quoted("são paulo".into()),
+            Excluded("tésting".into()),
+        ];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
+
+        // japanese chars are not splitted, this may lead to wrong results. We may want to support
+        // other tokenizers to consider different languages
+        let query = "クジラはすごい！";
+        let expected = vec![Literal("クジラはすごい".into())];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
+
+        // As arabic has spaces, at least we split them
+        let query = r#"الحيتان رائعة"#;
+        let expected = vec![Literal("الحيتان".into()), Literal("رائعة".into())];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
     }
 
     #[test]
@@ -307,6 +388,51 @@ mod tests {
         ];
         let tokens = tokenize_query_infallible(query);
         assert_eq!(tokens, expected);
+
+        // mixed whitespaces in different positions
+        let query = r#"   -first "second    part"   third -fourth   "#;
+        let expected = vec![
+            Excluded("first".into()),
+            Quoted("second part".into()),
+            Literal("third".into()),
+            Excluded("fourth".into()),
+        ];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
+
+        // The following are more (potentially) controversial combination that may lead to
+        // unexpected results. Any of these is subject to change in the future if we implement more
+        // complex parsing (e.g. escaping support)
+
+        // quoted string with escaped quotes
+        let query = r#"Text with "escaped \"quote\" inside""#;
+        let expected = vec![
+            Literal("text".into()),
+            Literal("with".into()),
+            // handling escaped quotes would quote these 3 terms together
+            Quoted("escaped".into()),
+            Literal("quote".into()),
+            Quoted("inside".into()),
+        ];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
+
+        // Mix punctuation with dashes and quotes. In this case, "WORLD"!-minus this is considered a
+        // literal because tantivy tokenization is done *after* our grammar tokenization. So we
+        // detect the `!-minus` and tantivy removed both punctuation chars
+        let query = r#"Hello, "WORLD"!-minus -this!"#;
+        let expected = vec![
+            Literal("hello".into()),
+            Quoted("world".into()),
+            Literal("minus".into()),
+            Excluded("this".into()),
+        ];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
+        assert_eq!(
+            nidx_grammar_tokenize(r#""WORLD"!-minus"#),
+            Ok(("", vec![Quoted("WORLD".into()), Literal("!-minus".into())]))
+        );
     }
 
     #[test]
