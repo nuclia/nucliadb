@@ -39,9 +39,44 @@ const DOC1_P1: &str = "This is the text of the second paragraph.";
 const DOC1_P2: &str = "This should be enough to test the tantivy.";
 const DOC1_P3: &str = "But I wanted to make it three anyway.";
 
+/// Helper struct to build fields with content
+struct Field<'a> {
+    field_id: &'a str,
+    // (text, labels)
+    paragraphs: Vec<(&'a str, Vec<String>)>,
+    // field labels
+    labels: Vec<String>,
+}
+
 fn create_resource(shard_id: String) -> (String, Resource) {
     let rid = "f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string();
+    let fields = vec![
+        Field {
+            field_id: "title",
+            paragraphs: vec![(
+                DOC1_TI,
+                vec!["/c/ool".to_string()],
+            )],
+            labels: vec!["/e/mylabel".to_string()],
+        },
+        Field {
+            field_id: "mytext",
+            paragraphs: vec![
+                (DOC1_P1, vec!["/e/myentity".to_string()]),
+                (
+                    DOC1_P2,
+                    vec!["/tantivy".to_string(), "/test".to_string(), "/label1".to_string()],
+                ),
+                (DOC1_P3, vec!["/three".to_string(), "/label2".to_string()]),
+            ],
+            labels: vec!["/f/body".to_string(), "/l/mylabel2".to_string()],
+        },
+    ];
 
+    create_resource_with_fields(shard_id, rid, fields)
+}
+
+fn create_resource_with_fields(shard_id: String, rid: String, fields: Vec<Field>) -> (String, Resource) {
     let resource_id = ResourceId {
         shard_id: shard_id.clone(),
         uuid: rid.clone(),
@@ -58,92 +93,56 @@ fn create_resource(shard_id: String) -> (String, Resource) {
         modified: Some(timestamp),
     };
 
-    let ti_title = TextInformation {
-        text: DOC1_TI.to_string(),
-        labels: vec!["/e/mylabel".to_string()],
-    };
-
-    let ti_body = TextInformation {
-        text: DOC1_P1.to_string() + DOC1_P2 + DOC1_P3,
-        labels: vec!["/f/body".to_string(), "/l/mylabel2".to_string()],
-    };
-
     let mut texts = HashMap::new();
-    texts.insert("title".to_string(), ti_title);
-    texts.insert("body".to_string(), ti_body);
+    let mut field_paragraphs = HashMap::new();
 
-    let p1 = IndexParagraph {
-        start: 0,
-        end: DOC1_P1.len() as i32,
-        field: "body".to_string(),
-        labels: vec!["/e/myentity".to_string()],
-        index: 0,
-        ..Default::default()
-    };
-    let p1_uuid = format!("{}/{}/{}-{}", rid, "body", 0, DOC1_P1.len());
+    for Field {
+        field_id,
+        paragraphs,
+        labels,
+    } in fields.into_iter()
+    {
+        let mut text = String::new();
+        let mut position = 0;
+        let mut index_paragraphs = HashMap::new();
 
-    let p2 = IndexParagraph {
-        start: DOC1_P1.len() as i32,
-        end: (DOC1_P1.len() + DOC1_P2.len()) as i32,
-        field: "body".to_string(),
-        labels: vec!["/tantivy".to_string(), "/test".to_string(), "/label1".to_string()],
-        index: 1,
-        ..Default::default()
-    };
-    let p2_uuid = format!("{}/{}/{}-{}", rid, "body", DOC1_P1.len(), DOC1_P1.len() + DOC1_P2.len());
+        for (index, (paragraph, paragraph_labels)) in paragraphs.into_iter().enumerate() {
+            // incrementaly build the whole text
+            text.push_str(paragraph);
 
-    let p3 = IndexParagraph {
-        start: (DOC1_P1.len() + DOC1_P2.len()) as i32,
-        end: (DOC1_P1.len() + DOC1_P2.len() + DOC1_P3.len()) as i32,
-        field: "body".to_string(),
-        labels: vec!["/three".to_string(), "/label2".to_string()],
-        index: 2,
-        ..Default::default()
-    };
-    let p3_uuid = format!(
-        "{}/{}/{}-{}",
-        rid,
-        "body",
-        DOC1_P1.len() + DOC1_P2.len(),
-        DOC1_P1.len() + DOC1_P2.len() + DOC1_P3.len()
-    );
+            let paragraph_pb = IndexParagraph {
+                field: field_id.to_string(),
+                start: position,
+                end: position + (paragraph.len() as i32),
+                index: index as u64,
+                labels: paragraph_labels,
+                ..Default::default()
+            };
+            let paragraph_id = format!("{rid}/{field_id}/{}-{}", paragraph_pb.start, paragraph_pb.end);
+            index_paragraphs.insert(paragraph_id, paragraph_pb);
 
-    let body_paragraphs = IndexParagraphs {
-        paragraphs: [(p1_uuid, p1), (p2_uuid, p2), (p3_uuid, p3)].into_iter().collect(),
-    };
+            // update position for the next iteration
+            position += paragraph.len() as i32;
+        }
 
-    let p4 = IndexParagraph {
-        start: 0,
-        end: DOC1_TI.len() as i32,
-        field: "title".to_string(),
-        labels: vec!["/c/ool".to_string()],
-        index: 3,
-        ..Default::default()
-    };
-    let p4_uuid = format!("{}/{}/{}-{}", rid, "body", 0, DOC1_TI.len());
+        let text_info = TextInformation { text, labels };
+        texts.insert(field_id.to_string(), text_info);
 
-    let title_paragraphs = IndexParagraphs {
-        paragraphs: [(p4_uuid, p4)].into_iter().collect(),
-    };
-
-    let paragraphs = [
-        ("body".to_string(), body_paragraphs),
-        ("title".to_string(), title_paragraphs),
-    ]
-    .into_iter()
-    .collect();
+        field_paragraphs.insert(
+            field_id.to_string(),
+            IndexParagraphs {
+                paragraphs: index_paragraphs,
+            },
+        );
+    }
 
     let resource = Resource {
+        shard_id,
         resource: Some(resource_id),
         metadata: Some(metadata),
         texts,
         status: ResourceStatus::Processed as i32,
-        labels: vec!["/l/mylabel_resource".to_string()],
-        paragraphs,
-        paragraphs_to_delete: vec![],
-        vectors: HashMap::default(),
-        vectors_to_delete: HashMap::default(),
-        shard_id,
+        paragraphs: field_paragraphs,
         ..Default::default()
     };
 
