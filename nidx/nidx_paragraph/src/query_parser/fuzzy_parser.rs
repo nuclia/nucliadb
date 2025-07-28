@@ -54,15 +54,16 @@ pub const FUZZY_DISTANCE: u8 = 1;
 /// fuzzy prefix if a suggest-like feature is desired.
 ///
 pub fn parse_fuzzy_query(query: &[Token], term_collector: SharedTermC, last_literal_as_prefix: bool) -> Box<dyn Query> {
-    // We use usize::MAX as a discriminant when we don't want/care about the
-    // last index. This value won't match as there's no query that long.
     let last_literal_index = if last_literal_as_prefix {
-        query
-            .iter()
-            .position(|token| matches!(token, &Token::Literal(_)))
-            .unwrap_or(usize::MAX)
+        let mut last_literal = None;
+        for (idx, token) in query.iter().enumerate() {
+            if let Token::Literal(_) = token {
+                last_literal.replace(idx);
+            }
+        }
+        last_literal
     } else {
-        usize::MAX
+        None
     };
 
     let mut subqueries = vec![];
@@ -79,7 +80,7 @@ pub fn parse_fuzzy_query(query: &[Token], term_collector: SharedTermC, last_lite
                 if literal.len() < MIN_FUZZY_LEN {
                     // to avoid noise, we don't want to match too short terms as fuzzy
                     q = Box::new(TermQuery::new(term, IndexRecordOption::Basic));
-                } else if last_literal_as_prefix && (i == last_literal_index) && literal.len() >= MIN_FUZZY_PREFIX_LEN {
+                } else if matches!(last_literal_index, Some(idx) if idx == i) && literal.len() >= MIN_FUZZY_PREFIX_LEN {
                     q = Box::new(FuzzyTermQuery::new_prefix(
                         term,
                         distance,
