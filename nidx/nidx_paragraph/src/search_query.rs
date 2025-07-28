@@ -199,15 +199,24 @@ pub fn search_query(
         keyword_subqueries.push((Occur::Must, Box::new(term_query)))
     }
 
-    if keyword_subqueries.len() == 1 && keyword_subqueries[0].1.is::<AllQuery>() {
-        let original = keyword_subqueries.pop().unwrap().1;
-        let fuzzy = Box::new(BooleanQuery::new(vec![]));
-        (original, term_collector, fuzzy)
+    let keyword = if keyword_subqueries.len() == 1 {
+        keyword_subqueries.pop().unwrap().1
     } else {
-        let original = Box::new(BooleanQuery::new(keyword_subqueries));
-        let fuzzied = Box::new(BoostQuery::new(Box::new(BooleanQuery::new(fuzzy_subqueries)), 0.5));
-        (original, term_collector, fuzzied)
-    }
+        // we don't check empty as there's always 1 element
+        Box::new(BooleanQuery::new(keyword_subqueries))
+    };
+    let fuzzy = if fuzzy_subqueries.len() == 1 {
+        fuzzy_subqueries.pop().unwrap().1
+    } else {
+        // we don't check empty as there's always 1 element
+        Box::new(BoostQuery::new(
+            Box::new(BooleanQuery::new(fuzzy_subqueries)),
+            // REVIEW: arbitrary fuzzy boost, why do we have this value?
+            0.5,
+        ))
+    };
+
+    (keyword, term_collector, fuzzy)
 }
 
 pub fn streaming_query(schema: &ParagraphSchema, request: &StreamRequest) -> Box<dyn Query> {
