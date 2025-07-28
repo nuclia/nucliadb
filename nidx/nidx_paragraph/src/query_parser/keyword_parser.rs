@@ -18,8 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use tantivy::Term;
-use tantivy::query::{AllQuery, BooleanQuery, Occur, PhraseQuery, Query, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, EmptyQuery, Occur, PhraseQuery, Query, TermQuery};
 use tantivy::schema::IndexRecordOption;
+use tracing::error;
 
 use crate::ParagraphSchema;
 
@@ -33,40 +34,15 @@ pub fn parse_keyword_query<'a>(query: &'a [Token<'a>], schema: &ParagraphSchema)
     for item in query {
         match item {
             Token::Literal(literal) => {
-                let q: Box<dyn Query> = Box::new(TermQuery::new(
-                    Term::from_field_text(schema.text, literal),
-                    IndexRecordOption::Basic,
-                ));
+                let q = parse_literal(schema, literal);
                 subqueries.push((Occur::Should, q));
             }
             Token::Quoted(quoted) => {
-                let mut terms: Vec<Term> = quoted
-                    .split_whitespace()
-                    .map(|word| Term::from_field_text(schema.text, word))
-                    .collect();
-
-                #[allow(clippy::comparison_chain)]
-                if terms.len() == 1 {
-                    // phrase queries must have more than one term, so we use a term query
-                    let term = terms.remove(0); // safe because terms.len() == 1
-                    let q: Box<dyn Query> = Box::new(TermQuery::new(term, IndexRecordOption::Basic));
-                    subqueries.push((Occur::Should, q));
-                } else if terms.len() > 1 {
-                    let q: Box<dyn Query> = Box::new(PhraseQuery::new(terms));
-                    subqueries.push((Occur::Should, q));
-                }
+                let q = parse_quoted(schema, quoted);
+                subqueries.push((Occur::Should, q));
             }
             Token::Excluded(excluded) => {
-                let q: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
-                    (Occur::Must, Box::new(AllQuery)),
-                    (
-                        Occur::MustNot,
-                        Box::new(TermQuery::new(
-                            Term::from_field_text(schema.text, excluded),
-                            IndexRecordOption::Basic,
-                        )),
-                    ),
-                ]));
+                let q = parse_excluded(schema, excluded);
                 subqueries.push((Occur::Should, q));
             }
         }
@@ -79,6 +55,53 @@ pub fn parse_keyword_query<'a>(query: &'a [Token<'a>], schema: &ParagraphSchema)
     } else {
         Box::new(BooleanQuery::new(subqueries))
     }
+}
+
+#[inline]
+pub fn parse_literal(schema: &ParagraphSchema, literal: &str) -> Box<dyn Query> {
+    Box::new(TermQuery::new(
+        Term::from_field_text(schema.text, literal),
+        IndexRecordOption::Basic,
+    ))
+}
+
+pub fn parse_quoted(schema: &ParagraphSchema, quoted: &str) -> Box<dyn Query> {
+    let mut terms: Vec<Term> = quoted
+        .split_whitespace()
+        .map(|word| Term::from_field_text(schema.text, word))
+        .collect();
+
+    #[allow(clippy::comparison_chain)]
+    if terms.len() == 1 {
+        // phrase queries must have more than one term, so we use a term query
+        let term = terms.remove(0); // safe because terms.len() == 1
+        Box::new(TermQuery::new(term, IndexRecordOption::Basic))
+    } else if terms.len() > 1 {
+        Box::new(PhraseQuery::new(terms))
+    } else {
+        debug_assert!(
+            false,
+            "Quoted content should have been validated to not only contain whitespaces"
+        );
+        // we return a fallback to protect us from tokenizer errors, but this branch should never
+        // happen
+        error!("Keyword tokenizer build a query with a only whitespaces Quoted token!");
+        Box::new(EmptyQuery)
+    }
+}
+
+#[inline]
+pub fn parse_excluded(schema: &ParagraphSchema, excluded: &str) -> Box<dyn Query> {
+    Box::new(BooleanQuery::new(vec![
+        (Occur::Must, Box::new(AllQuery)),
+        (
+            Occur::MustNot,
+            Box::new(TermQuery::new(
+                Term::from_field_text(schema.text, excluded),
+                IndexRecordOption::Basic,
+            )),
+        ),
+    ]))
 }
 
 #[cfg(test)]

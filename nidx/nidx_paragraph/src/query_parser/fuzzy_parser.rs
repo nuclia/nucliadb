@@ -22,7 +22,6 @@ use tantivy::Term;
 use tantivy::query::AllQuery;
 use tantivy::query::BooleanQuery;
 use tantivy::query::Occur;
-use tantivy::query::PhraseQuery;
 use tantivy::query::Query;
 use tantivy::query::TermQuery;
 use tantivy::schema::IndexRecordOption;
@@ -31,6 +30,7 @@ use crate::fuzzy_query::FuzzyTermQuery;
 use crate::schema::ParagraphSchema;
 use crate::search_query::SharedTermC;
 
+use super::keyword_parser;
 use super::tokenizer::Token;
 
 /// Minimum length required to be considered a fuzzy word. Words with smaller
@@ -97,33 +97,11 @@ pub fn parse_fuzzy_query(query: &[Token], term_collector: SharedTermC, last_lite
                 subqueries.push((Occur::Should, q));
             }
             Token::Quoted(quoted) => {
-                let mut terms: Vec<Term> = quoted
-                    .split_whitespace()
-                    .map(|word| Term::from_field_text(schema.text, word))
-                    .collect();
-
-                #[allow(clippy::comparison_chain)]
-                if terms.len() == 1 {
-                    // phrase queries must have more than one term, so we use a term query
-                    let term = terms.remove(0); // safe because terms.len() == 1
-                    let q: Box<dyn Query> = Box::new(TermQuery::new(term, IndexRecordOption::Basic));
-                    subqueries.push((Occur::Should, q));
-                } else if terms.len() > 1 {
-                    let q: Box<dyn Query> = Box::new(PhraseQuery::new(terms));
-                    subqueries.push((Occur::Should, q));
-                }
+                let q = keyword_parser::parse_quoted(&schema, quoted);
+                subqueries.push((Occur::Should, q));
             }
             Token::Excluded(excluded) => {
-                let q: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
-                    (Occur::Must, Box::new(AllQuery)),
-                    (
-                        Occur::MustNot,
-                        Box::new(TermQuery::new(
-                            Term::from_field_text(schema.text, excluded),
-                            IndexRecordOption::Basic,
-                        )),
-                    ),
-                ]));
+                let q = keyword_parser::parse_excluded(&schema, excluded);
                 subqueries.push((Occur::Should, q));
             }
         }
