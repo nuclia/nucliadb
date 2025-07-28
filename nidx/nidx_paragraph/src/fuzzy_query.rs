@@ -215,6 +215,11 @@ impl FuzzyTermQuery {
         }
     }
 
+    #[cfg(test)]
+    pub fn is_prefix(&self) -> bool {
+        self.prefix
+    }
+
     fn specialized_weight(&self) -> tantivy::Result<AutomatonWeight<DfaWrapper>> {
         // LEV_BUILDER is a HashMap, whose `get` method returns an Option
         match LEV_BUILDER.get(&(self.distance, self.transposition_cost_one)) {

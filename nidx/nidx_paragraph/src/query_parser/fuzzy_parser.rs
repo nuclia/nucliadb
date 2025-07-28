@@ -116,3 +116,83 @@ pub fn parse_fuzzy_query(query: &[Token], term_collector: SharedTermC, last_lite
         Box::new(BooleanQuery::new(subqueries))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::search_query::TermCollector;
+
+    use super::*;
+
+    #[test]
+    fn test_short_literals_do_not_fuzzy() {
+        let term_collector = SharedTermC::from(TermCollector::new());
+
+        // literal shorter than MIN_FUZZY_LEN will become a TermQuery
+        let literal = "ab";
+        assert!(literal.len() < MIN_FUZZY_LEN);
+        let query = [Token::Literal(literal.into())];
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), false);
+        assert!(fuzzy.is::<TermQuery>());
+        let q = fuzzy.downcast::<TermQuery>().unwrap();
+        assert_eq!(q.term().value().as_str(), Some(literal));
+    }
+
+    #[test]
+    fn test_fuzzy_literals() {
+        let term_collector = SharedTermC::from(TermCollector::new());
+
+        let literal = "abcd";
+        assert!(literal.len() >= MIN_FUZZY_LEN);
+        let query = [Token::Literal(literal.into())];
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), false);
+        assert!(fuzzy.is::<FuzzyTermQuery>());
+        assert!(!fuzzy.downcast::<FuzzyTermQuery>().unwrap().is_prefix());
+    }
+
+    #[test]
+    fn test_fuzzy_prefix() {
+        let term_collector = SharedTermC::from(TermCollector::new());
+
+        // literals longer than the min fuzzy prefix become prefix if they are
+        // last and the flag is enabled
+
+        let literal = "abcd";
+        assert!(literal.len() >= MIN_FUZZY_PREFIX_LEN);
+        let query = [Token::Literal(literal.into())];
+
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), false);
+        assert!(fuzzy.is::<FuzzyTermQuery>());
+        assert!(!fuzzy.downcast::<FuzzyTermQuery>().unwrap().is_prefix());
+
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), true);
+        assert!(fuzzy.is::<FuzzyTermQuery>());
+        assert!(fuzzy.downcast::<FuzzyTermQuery>().unwrap().is_prefix());
+
+        // only the last term is fuzzy prefix
+
+        let query = [Token::Literal(literal.into()), Token::Literal(literal.into())];
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), true);
+        assert!(fuzzy.is::<BooleanQuery>());
+        let q = fuzzy.downcast::<BooleanQuery>().unwrap();
+        let clauses = q.clauses();
+        assert_eq!(clauses.len(), 2);
+        assert!(clauses[0].1.is::<FuzzyTermQuery>());
+        assert!(!clauses[0].1.downcast_ref::<FuzzyTermQuery>().unwrap().is_prefix());
+        assert!(clauses[1].1.is::<FuzzyTermQuery>());
+        assert!(clauses[1].1.downcast_ref::<FuzzyTermQuery>().unwrap().is_prefix());
+
+        // however, shorter terms won't become prefix
+
+        let literal = "abc";
+        assert!(literal.len() < MIN_FUZZY_PREFIX_LEN);
+        let query = [Token::Literal(literal.into())];
+
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), false);
+        assert!(fuzzy.is::<FuzzyTermQuery>());
+        assert!(!fuzzy.downcast::<FuzzyTermQuery>().unwrap().is_prefix());
+
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), true);
+        assert!(fuzzy.is::<FuzzyTermQuery>());
+        assert!(!fuzzy.downcast::<FuzzyTermQuery>().unwrap().is_prefix());
+    }
+}
