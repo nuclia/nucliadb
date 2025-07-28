@@ -184,7 +184,12 @@ pub struct FuzzyTermQuery {
 
 impl std::fmt::Debug for FuzzyTermQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Fuzzy")
+        f.write_fmt(format_args!(
+            "Fuzzy {{ term: {}, distance: {}, prefix: {} }}",
+            self.term.value().as_str().unwrap_or("<unknown>"),
+            self.distance,
+            self.prefix
+        ))
     }
 }
 impl FuzzyTermQuery {
@@ -208,6 +213,11 @@ impl FuzzyTermQuery {
             transposition_cost_one,
             prefix: true,
         }
+    }
+
+    #[cfg(test)]
+    pub fn is_prefix(&self) -> bool {
+        self.prefix
     }
 
     fn specialized_weight(&self) -> tantivy::Result<AutomatonWeight<DfaWrapper>> {
