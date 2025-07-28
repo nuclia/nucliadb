@@ -105,7 +105,13 @@ fn nidx_grammar_tokenize(input: &str) -> IResult<&str, Vec<Token>, nom::error::E
             multispace0,
             opt(fold_many0(
                 alt((
-                    map(quoted, |t| Some(Token::Quoted(Cow::Borrowed(t)))),
+                    map(quoted, |t: &str| {
+                        // our parser rule can match empty quotes, we get rid of them
+                        if t.trim().is_empty() {
+                            return None;
+                        }
+                        Some(Token::Quoted(Cow::Borrowed(t)))
+                    }),
                     map(unclosed_quote, |_| None),
                     map(excluded, |t| Some(Token::Excluded(Cow::Borrowed(t)))),
                     map(literal, |t| Some(Token::Literal(Cow::Borrowed(t)))),
@@ -184,26 +190,29 @@ mod tests {
 
     #[test]
     fn test_empty_query() {
-        let query = "";
         let expected = vec![];
+
+        let query = "";
         let tokens = tokenize_query_infallible(query);
         assert_eq!(tokens, expected);
 
         // whitespaces only
         let query = "    ";
-        let expected = vec![];
         let tokens = tokenize_query_infallible(query);
         assert_eq!(tokens, expected);
 
         // dashes and whitespaces only
         let query = "  - - -   - - -  ";
-        let expected = vec![];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
+
+        // quoted whitespaces
+        let query = r#""  ""#;
         let tokens = tokenize_query_infallible(query);
         assert_eq!(tokens, expected);
 
         // only special characters (punctuation is removed)
         let query = "!@#~&/()=?";
-        let expected = vec![];
         let tokens = tokenize_query_infallible(query);
         assert_eq!(tokens, expected);
     }
