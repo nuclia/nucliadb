@@ -22,7 +22,6 @@ import functools
 import json
 from typing import AsyncGenerator, Optional, cast
 
-from fastapi import HTTPException
 from nuclia_models.common.consumption import Consumption
 from nuclia_models.predict.generative_responses import (
     CitationsGenerativeResponse,
@@ -583,13 +582,6 @@ async def ask(
     # parse ask request generation parameters reusing the same fetcher as
     # retrieval, to avoid multiple round trips to Predict API
     generation = await parse_ask(kbid, ask_request, fetcher=retrieval_results.fetcher)
-
-    # Error if LLM is not visual but the query image is set
-    if not generation.use_visual_llm and ask_request.query_image:
-        raise HTTPException(
-            status_code=400,
-            detail="Query image is only supported for generative models with visual capabilities.",
-        )
 
     # Now we build the prompt context
     with metrics.time("context_building"):
