@@ -30,6 +30,10 @@ from nuclia_models.predict.generative_responses import (
     JSONGenerativeResponse,
     StatusGenerativeResponse,
 )
+from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder
+from tests.utils.broker_messages.fields import FieldBuilder
+from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 from nucliadb.search.predict import AnswerStatusCode, DummyPredictEngine
 from nucliadb.search.utilities import get_predict
@@ -54,10 +58,6 @@ from nucliadb_protos import resources_pb2 as rpb2
 from nucliadb_protos import writer_pb2 as wpb2
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.broker_messages.fields import FieldBuilder
-from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -1754,4 +1754,4 @@ async def test_ask_query_image(nucliadb_reader: AsyncClient, standalone_knowledg
     assert len(predict.calls[1][1].query_context_images) == 1
     assert predict.calls[1][1].query_context_images["QUERY_IMAGE"].content_type == "image/png"
     assert predict.calls[1][1].query_context_images["QUERY_IMAGE"].b64encoded == "dummy_base64_image"
-    assert predict.calls[1][1].query == "title"
+    assert predict.calls[1][1].question == "title"
