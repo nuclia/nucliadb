@@ -128,5 +128,8 @@ ingest_subscriber_workers_autoscaling:
 #   what: "add annotations"
 #   where: "in the pods"
 
+extra_cronjob_pod_annotations:
+  sidecar.istio.io/inject: "false"
+
 tracing:
   enabled: false

@@ -14,8 +14,6 @@ spec:
   jobTemplate:
     metadata:
       name: "{{ .cronname }}"
-      annotations:
-        sidecar.istio.io/inject: "false"      
       labels:
         app: {{ .Chart.Name }}
         role: cronjobs
@@ -32,11 +30,15 @@ spec:
             role: cronjobs
             version: "{{ .Values.hash }}"
             release: "{{ .Release.Name }}"
+          {{- if or (hasKey .Values "extra_pod_annotations") (hasKey .Values "extra_cronjob_pod_annotations") }}
           annotations:
-            sidecar.istio.io/inject: "false"
             {{- if hasKey .Values "extra_pod_annotations" }}
 {{ toYaml .Values.extra_pod_annotations | indent 12 }}
             {{- end }}
+            {{- if hasKey .Values "extra_cronjob_pod_annotations" }}
+{{ toYaml .Values.extra_cronjob_pod_annotations | indent 12 }}
+            {{- end }}
+          {{- end }}
         spec:
           serviceAccountName: {{ ((.Values.purgeCron).serviceAccount) | default "default" }}
           nodeSelector:
