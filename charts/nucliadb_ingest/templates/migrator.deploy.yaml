@@ -22,8 +22,9 @@ spec:
     metadata:
       name: migrator
       annotations:
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.metricsPort }}"
-        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }}"
+        {{- if .Values.migrator.podAnnotations }}
+          {{- toYaml .Values.migrator.podAnnotations | trim | nindent 8 }}
+        {{- end }}
         # do not have access to dependency chart cm this component references
         checksum/cm: {{ include (print $.Template.BasePath "/ingest.cm.yaml") . | sha256sum }}
         {{- if hasKey .Values "extra_pod_annotations" }}

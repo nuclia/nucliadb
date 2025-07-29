@@ -30,10 +30,19 @@ envFrom:
 config:
   pull_time_error_backoff: 100
 
+serving:
+  grpc: 8030
+  metricsPort: &metricsPort '3030'
+serviceMonitor:
+  enabled: false
+
 affinity: {}
 nodeSelector: {}
 tolerations: []
 topologySpreadConstraints: []
+podAnnotations:
+  traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
+  traffic.sidecar.istio.io/excludeOutboundPorts: '5432,4222'
 replicaCount: 2
 revisionHistoryLimit: 2
 debug: False
@@ -42,12 +51,6 @@ resources: {}
 #    memory: "600Mi"
 #  requests:
 #    cpu: "300m"
-
-serving:
-  grpc: 8030
-  metricsPort: 3030
-serviceMonitor:
-  enabled: false
 
 # Value of ports to where this component connects to
 services:
@@ -89,6 +92,9 @@ ingest_orm_grpc_autoscaling:
         target:
           type: Utilization
           averageUtilization: 75
+ingest_orm_grpc_podAnnotations:
+  traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
+  traffic.sidecar.istio.io/excludeOutboundPorts: '5432,4222'
 
 # ingest-processed-consumer settings
 ingest_processed_consumer_resources:
@@ -106,6 +112,9 @@ ingest_processed_consumer_autoscaling:
         target:
           type: Utilization
           averageUtilization: 75
+ingest_processed_consumer_podAnnotations:
+  traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
+  traffic.sidecar.istio.io/excludeOutboundPorts: '5432,4222'
 
 # ingest-subscriber-workers settings
 ingest_subscriber_workers_resources:
@@ -123,6 +132,22 @@ ingest_subscriber_workers_autoscaling:
         target:
           type: Utilization
           averageUtilization: 75
+ingest_subscriber_workers_podAnnotations:
+  traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
+  traffic.sidecar.istio.io/excludeOutboundPorts: '5432,4222'
+
+exporter:
+  # serviceAccount: default
+  podAnnotations:
+    traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
+    traffic.sidecar.istio.io/excludeOutboundPorts: '5432,4222'
+
+# migrator settings
+migrator:
+  # serviceAccount: default
+  podAnnotations:
+    traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
+    traffic.sidecar.istio.io/excludeOutboundPorts: '5432,4222'
 
 # extra_pod_annotations:
 #   what: "add annotations"
