@@ -30,6 +30,10 @@ from nuclia_models.predict.generative_responses import (
     JSONGenerativeResponse,
     StatusGenerativeResponse,
 )
+from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder
+from tests.utils.broker_messages.fields import FieldBuilder
+from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 from nucliadb.search.predict import AnswerStatusCode, DummyPredictEngine
 from nucliadb.search.utilities import get_predict
@@ -54,10 +58,6 @@ from nucliadb_protos import resources_pb2 as rpb2
 from nucliadb_protos import writer_pb2 as wpb2
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.broker_messages.fields import FieldBuilder
-from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -1725,3 +1725,31 @@ def _fetch_paragraphs(
         return retrieval, []
     augmented = [text_block for text_block in ask_response.augmented_context.paragraphs.values()]
     return retrieval, augmented
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_query_image(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={
+            "query": "title",
+            "debug": True,
+            "query_image": {
+                "content_type": "image/png",
+                "b64encoded": "dummy_base64_image",
+            },
+        },
+    )
+    assert resp.status_code == 200
+    predict = get_predict()
+    assert isinstance(predict, DummyPredictEngine), "dummy is expected in this test"
+    assert len(predict.calls) == 1
+    assert predict.calls[0][0] == "query"
+    assert predict.calls[0][1]["query_image"].content_type == "image/png"
+    assert predict.calls[0][1]["query_image"].b64encoded == "dummy_base64_image"
+    assert predict.calls[0][1]["sentence"] == "title"

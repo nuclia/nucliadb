@@ -24,9 +24,11 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
+from tests.utils import inject_message
 
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
+from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import FindOptions
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
@@ -38,7 +40,6 @@ from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.exceptions import LimitsExceededError
-from tests.utils import inject_message
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -599,3 +600,29 @@ async def test_find_with_generative_model(
     assert resp.status_code == 200
 
     spy.assert_called_once_with(kbid, "whatever", None, "everest", False, None)
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_find_query_image(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/find",
+        json={
+            "query": "whatever",
+            "query_image": {
+                "content_type": "image/png",
+                "b64encoded": "dummy_base64_image",
+            },
+        },
+    )
+    assert resp.status_code == 200
+    predict = get_predict()
+    assert isinstance(predict, DummyPredictEngine), "dummy is expected in this test"
+    assert len(predict.calls) == 1
+    assert predict.calls[0][0] == "query"
+    assert predict.calls[0][1]["query_image"].content_type == "image/png"
+    assert predict.calls[0][1]["query_image"].b64encoded == "dummy_base64_image"
+    assert predict.calls[0][1]["sentence"] == "whatever"

@@ -515,7 +515,20 @@ class DummyPredictEngine(PredictEngine):
         rephrase_prompt: Optional[str] = None,
         query_image: Optional[Image] = None,
     ) -> QueryInfo:
-        self.calls.append(("query", sentence))
+        self.calls.append(
+            (
+                "query",
+                {
+                    "kbid": kbid,
+                    "sentence": sentence,
+                    "semantic_model": semantic_model,
+                    "generative_model": generative_model,
+                    "rephrase": rephrase,
+                    "rephrase_prompt": rephrase_prompt,
+                    "query_image": query_image,
+                },
+            )
+        )
 
         if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21":  # pragma: no cover
             base_vector = Qm2023
