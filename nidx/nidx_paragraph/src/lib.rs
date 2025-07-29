@@ -20,7 +20,6 @@
 
 mod fuzzy_query;
 mod query_io;
-mod query_parser;
 mod reader;
 mod request_types;
 mod resource_indexer;
@@ -28,6 +27,7 @@ mod schema;
 mod search_query;
 mod search_response;
 mod set_query;
+mod stop_words;
 
 use nidx_protos::{ParagraphItem, ParagraphSearchResponse, StreamRequest};
 use nidx_tantivy::{

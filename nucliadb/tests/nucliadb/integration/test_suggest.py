@@ -99,13 +99,8 @@ async def test_suggest_paragraphs(
     assert body["paragraphs"]["results"][1]["rid"] == rid2
     assert {"summary", "title"} == {result["field"] for result in body["paragraphs"]["results"]}
 
-    # we won't match anything, as 'z' is too short to do fuzzy
+    # fuzzy search with distance 1 will only match 'a' from resource 2
     resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/suggest?query=z")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["paragraphs"]["results"]) == 0
-    # however, 'a' will match exactly and match one resource
-    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/suggest?query=a")
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 1

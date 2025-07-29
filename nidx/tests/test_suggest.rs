@@ -54,11 +54,9 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
         ],
     );
 
-    // we won't match anything, as 'z' is too short to do fuzzy
-    expect_paragraphs(&suggest_paragraphs(&mut fixture, &shard.id, "z").await, &[]);
-    // however, 'a' will match exactly and match one resource
+    // fuzzy search with distance 1 will only match 'a' from resource 2
     expect_paragraphs(
-        &suggest_paragraphs(&mut fixture, &shard.id, "a").await,
+        &suggest_paragraphs(&mut fixture, &shard.id, "z").await,
         &[(&shard.resources["little prince"], "/a/summary")],
     );
 
@@ -240,7 +238,7 @@ async fn test_suggest_features(pool: PgPool) -> Result<(), Box<dyn std::error::E
     // Test: search for "ann" with paragraph and entities features and validate
     // we search only for what we request.
     //
-    // "ann" should match entities starting with this prefix and the "and" word
+    // "an" should match entities starting with this prefix and the "and" word
     // from the little prince text
 
     let (mut fixture, shard) = suggest_shard(pool).await?;

@@ -492,7 +492,7 @@ async def test_find_highlight(
     match = body["resources"].popitem()[1]["fields"]["/a/summary"]["paragraphs"].popitem()[1]
     assert match["order"] == 0
     assert match["score_type"] == "BM25"
-    assert "<mark>Marcus</mark> <mark>Aurelius</mark>" in match["text"]
+    assert "<mark>Marcus</mark> Aurelius" in match["text"]
 
 
 @pytest.mark.deploy_modes("standalone")

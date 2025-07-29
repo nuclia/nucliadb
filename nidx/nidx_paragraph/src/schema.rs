@@ -87,7 +87,6 @@ impl Default for ParagraphSchema {
         let uuid = sb.add_text_field("uuid", STRING | STORED);
         let field_uuid = sb.add_text_field("field_uuid", STRING);
         let paragraph = sb.add_text_field("paragraph", STRING | STORED);
-        // NOTE: review search query tokenization if we change how are we tokenizing this field
         let text = sb.add_text_field("text", TEXT);
         let start_pos = sb.add_u64_field("start_pos", num_options.clone());
         let end_pos = sb.add_u64_field("end_pos", num_options.clone());
