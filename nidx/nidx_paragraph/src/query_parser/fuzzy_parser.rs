@@ -55,7 +55,13 @@ pub const FUZZY_DISTANCE: u8 = 1;
 ///
 pub fn parse_fuzzy_query(query: &[Token], term_collector: SharedTermC, last_literal_as_prefix: bool) -> Box<dyn Query> {
     let last_literal_index = if last_literal_as_prefix {
-        query.iter().rposition(|token| matches!(token, Token::Literal(_)))
+        let mut last_literal = None;
+        for (idx, token) in query.iter().enumerate() {
+            if let Token::Literal(_) = token {
+                last_literal.replace(idx);
+            }
+        }
+        last_literal
     } else {
         None
     };
