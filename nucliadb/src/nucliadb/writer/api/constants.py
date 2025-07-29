@@ -29,6 +29,9 @@ X_FILE_PASSWORD = Header(
 X_EXTRACT_STRATEGY = Header(
     description="Extract strategy to use when uploading a file. If not provided, the default strategy will be used.",
 )
+X_SPLIT_STRATEGY = Header(
+    description="Split strategy to use when uploading a file. If not provided, the default strategy will be used.",
+)
 X_FILENAME = Header(min_length=1, description="Name of the file being uploaded.")
 X_MD5 = Header(
     min_length=32,

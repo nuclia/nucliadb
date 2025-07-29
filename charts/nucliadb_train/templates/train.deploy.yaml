@@ -19,8 +19,6 @@ spec:
     metadata:
       name: train
       annotations:
-        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }}"
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.serving.metricsPort }}"
         # do not have access to dependency chart cm this component references
         checksum/cm: {{ include (print $.Template.BasePath "/train.cm.yaml") . | sha256sum }}
         {{- if hasKey .Values "extra_pod_annotations" }}

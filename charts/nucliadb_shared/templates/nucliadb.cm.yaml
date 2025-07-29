@@ -36,6 +36,9 @@ data:
   S3_BUCKET_TAGS: {{ toJson .Values.storage.s3_bucket_tags | quote }}
   S3_DEADLETTER_BUCKET: {{ .Values.storage.s3_deadletter_bucket }}
   S3_INDEXING_BUCKET: {{ .Values.storage.s3_indexing_bucket }}
+{{- with .Values.storage.s3_kms_key_id }}
+  S3_KMS_KEY_ID: {{ . }}
+{{- end  }}
 {{- end }}
 {{- if .Values.nuclia.onprem }}
   NUCLIA_SERVICE_ACCOUNT: {{ .Values.nuclia.nuclia_service_account }}

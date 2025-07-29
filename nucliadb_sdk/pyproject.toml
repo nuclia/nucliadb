@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb_sdk"
-version = "6.6.1"
+version = "6.7.0"
 license = "Apache-2.0"
 description = "NucliaDB SDK"
 authors = [{ name = "Nuclia", email = "nucliadb@nuclia.com" }]
@@ -26,7 +26,7 @@ dependencies = [
     "httpx",
     "orjson",
     "pydantic>=2.6",
-    "nuclia-models>=0.43.0",
+    "nuclia-models>=0.46.0",
     # automatically bumped during release
     "nucliadb-models",
 ]

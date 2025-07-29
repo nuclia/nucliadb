@@ -99,15 +99,7 @@ pub fn merge(segment_path: &Path, operants: &[&OpenSegment], config: &VectorConf
     }
 
     // Creating the node store
-    if config.flags.contains(&flags::DATA_STORE_V2.to_string()) {
-        let node_producers = operants
-            .iter()
-            .map(|dp| (dp.alive_paragraphs(), dp.data_store.as_ref()))
-            .collect();
-        DataStoreV2::merge(segment_path, node_producers, &config.vector_type)?;
-        let data_store = DataStoreV2::open(segment_path, &config.vector_type, OpenReason::Create)?;
-        merge_indexes(segment_path, data_store, operants, config)
-    } else {
+    if config.flags.contains(&flags::FORCE_DATA_STORE_V1.to_string()) {
         // V1 can only merge from V1
         let mut node_producers = Vec::new();
         for dp in &operants {
@@ -122,6 +114,14 @@ pub fn merge(segment_path: &Path, operants: &[&OpenSegment], config: &VectorConf
 
         DataStoreV1::merge(segment_path, node_producers.as_mut_slice(), config)?;
         let data_store = DataStoreV1::open(segment_path, &config.vector_type, OpenReason::Create)?;
+        merge_indexes(segment_path, data_store, operants, config)
+    } else {
+        let node_producers = operants
+            .iter()
+            .map(|dp| (dp.alive_paragraphs(), dp.data_store.as_ref()))
+            .collect();
+        DataStoreV2::merge(segment_path, node_producers, &config.vector_type)?;
+        let data_store = DataStoreV2::open(segment_path, &config.vector_type, OpenReason::Create)?;
         merge_indexes(segment_path, data_store, operants, config)
     }
 }
@@ -215,15 +215,7 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
     // Serializing nodes on disk
     // Nodes are stored on disk and mmaped.
     // Then trigger the rest of the creation (indexes)
-    if config.flags.contains(&flags::DATA_STORE_V2.to_string()) {
-        DataStoreV2::create(path, elems, &config.vector_type)?;
-        create_indexes(
-            path,
-            DataStoreV2::open(path, &config.vector_type, OpenReason::Create)?,
-            config,
-            tags,
-        )
-    } else {
+    if config.flags.contains(&flags::FORCE_DATA_STORE_V1.to_string()) {
         // Double check vector cardinality
         if elems.iter().any(|e| e.vectors.len() != 1) {
             return Err(crate::VectorErr::InvalidConfiguration(
@@ -234,6 +226,14 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         create_indexes(
             path,
             DataStoreV1::open(path, &config.vector_type, OpenReason::Create)?,
+            config,
+            tags,
+        )
+    } else {
+        DataStoreV2::create(path, elems, &config.vector_type)?;
+        create_indexes(
+            path,
+            DataStoreV2::open(path, &config.vector_type, OpenReason::Create)?,
             config,
             tags,
         )

@@ -210,6 +210,7 @@ class Error(BaseModel):
     code: int
     code_str: str
     created: Optional[datetime]
+    severity: str
 
 
 class FieldData(BaseModel): ...

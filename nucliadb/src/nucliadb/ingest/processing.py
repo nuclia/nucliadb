@@ -221,6 +221,7 @@ class ProcessingEngine:
             "password": file.password,
             "language": file.language,
             "extract_strategy": file.extract_strategy,
+            "split_strategy": file.split_strategy,
         }
         if classif_labels:
             payload["classification_labels"] = self.encode_classif_labels(classif_labels)
@@ -244,6 +245,8 @@ class ProcessingEngine:
         headers["X-MD5"] = file.file.md5
         if file.extract_strategy is not None:
             headers["X-EXTRACT-STRATEGY"] = file.extract_strategy
+        if file.split_strategy is not None:
+            headers["X-SPLIT-STRATEGY"] = file.split_strategy
         if classif_labels:
             headers["X-CLASSIFICATION-LABELS"] = self.encode_classif_labels(classif_labels)
         headers["CONTENT_TYPE"] = file.file.content_type
@@ -293,6 +296,7 @@ class ProcessingEngine:
             "language": file_field.language,
             "password": file_field.password,
             "extract_strategy": file_field.extract_strategy,
+            "split_strategy": file_field.split_strategy,
         }
         if classif_labels:
             payload["classification_labels"] = self.encode_classif_labels(classif_labels)
@@ -326,6 +330,8 @@ class ProcessingEngine:
                 headers["CONTENT-LENGTH"] = str(file.file.size)
             if file.extract_strategy != "":
                 headers["X-EXTRACT-STRATEGY"] = file.extract_strategy
+            if file.split_strategy != "":
+                headers["X-SPLIT-STRATEGY"] = file.split_strategy
             if classif_labels:
                 headers["X-CLASSIFICATION-LABELS"] = self.encode_classif_labels(classif_labels)
             headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"

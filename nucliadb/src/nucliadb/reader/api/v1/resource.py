@@ -51,7 +51,7 @@ from nucliadb_models.resource import (
     ResourcePagination,
 )
 from nucliadb_models.search import ResourceProperties
-from nucliadb_protos import resources_pb2
+from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_protos.writer_pb2 import FieldStatus
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
@@ -400,8 +400,9 @@ async def _get_resource_field(
                         Error(
                             body=error.source_error.error,
                             code=error.source_error.code,
-                            code_str=error.source_error.ErrorCode.Name(error.source_error.code),
+                            code_str=writer_pb2.Error.ErrorCode.Name(error.source_error.code),
                             created=error.created.ToDatetime(),
+                            severity=writer_pb2.Error.Severity.Name(error.source_error.severity),
                         )
                     )
                 resource_field.error = resource_field.errors[-1]

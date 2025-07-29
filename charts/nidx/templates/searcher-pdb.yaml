@@ -1,3 +1,4 @@
+{{- if .Values.searcher.pdb.enabled }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -14,4 +15,5 @@ spec:
       app: nidx-searcher
       release: "{{ .Release.Name }}"
       heritage: "{{ .Release.Service }}"
-  maxUnavailable: 1
+  maxUnavailable: {{ .Values.searcher.pdb.maxUnavailable | default 1 }}
+{{- end }}

@@ -72,6 +72,7 @@ async def s3_storage_settings(s3) -> AsyncIterator[dict[str, Any]]:
         "s3_verify_ssl": False,
         "s3_region_name": None,
         "s3_bucket": "test-{kbid}",
+        "s3_kms_key_id": "fake-kms-key-id",
         "s3_bucket_tags": {
             "testTag": "test",
         },
@@ -104,6 +105,7 @@ async def s3_storage(s3, s3_storage_settings: dict[str, Any]):
         region_name=storage_settings.s3_region_name,
         bucket=storage_settings.s3_bucket,
         bucket_tags=storage_settings.s3_bucket_tags,
+        kms_key_id=storage_settings.s3_kms_key_id,
     )
     await storage.initialize()
     await storage.create_bucket("nidx")
