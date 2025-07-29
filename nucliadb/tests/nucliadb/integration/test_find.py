@@ -599,7 +599,7 @@ async def test_find_with_generative_model(
     )
     assert resp.status_code == 200
 
-    spy.assert_called_once_with(kbid, "whatever", None, "everest", False, None)
+    spy.assert_called_once_with(kbid, "whatever", None, "everest", False, None, None)
 
 
 @pytest.mark.deploy_modes("standalone")
