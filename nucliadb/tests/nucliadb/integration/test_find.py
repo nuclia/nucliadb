@@ -24,7 +24,6 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
-from tests.utils import inject_message
 
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
@@ -40,6 +39,7 @@ from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.exceptions import LimitsExceededError
+from tests.utils import inject_message
 
 
 @pytest.mark.deploy_modes("standalone")
