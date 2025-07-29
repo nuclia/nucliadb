@@ -22,8 +22,6 @@ use std::env;
 
 use lazy_static::lazy_static;
 
-use super::Token;
-
 lazy_static! {
     static ref STOP_WORDS: StopWords = build_stop_words();
 }
@@ -92,37 +90,6 @@ pub fn is_stop_word(word: &str) -> bool {
     STOP_WORDS.is_stop_word(word)
 }
 
-/// Consume a tokenized query and filter out any stop words from it.
-///
-/// A stop words is any literal matching the following criteria:
-/// - It is present in the given list of stop words
-/// - Is **not** the last term in the query
-///
-/// The last term of the query can be used as fuzzy prefix and must be preserved.
-pub fn remove_stop_words(mut query: Vec<Token>) -> Vec<Token> {
-    if query.is_empty() {
-        return query;
-    }
-    // as we don't want to remove the last literal, we pop the last element and
-    // always put it in the filtered query. We don't really care if the last
-    // it's a literal or not.
-    let last: Token<'_> = query.pop().unwrap(); // safe as query is not empty
-
-    query
-        .into_iter()
-        .filter(|token| !is_stop_word_token(token))
-        .chain([last])
-        .collect()
-}
-
-fn is_stop_word_token(token: &Token) -> bool {
-    if let Token::Literal(lit) = token {
-        is_stop_word(&lit.to_lowercase())
-    } else {
-        false
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
@@ -154,79 +121,5 @@ mod tests {
             // make sure we never spend more than 1 ms
             assert!(elapsed < 1000.0, "{}", elapsed);
         }
-    }
-
-    #[test]
-    fn test_stop_word_tokens() {
-        assert!(is_stop_word_token(&Token::Literal("is".into())));
-        assert!(!is_stop_word_token(&Token::Excluded("is".into())));
-        assert!(!is_stop_word_token(&Token::Quoted("is".into())));
-
-        assert!(!is_stop_word_token(&Token::Literal("music".into())));
-        assert!(!is_stop_word_token(&Token::Excluded("music".into())));
-        assert!(!is_stop_word_token(&Token::Quoted("music".into())));
-    }
-
-    #[test]
-    fn test_stop_words_detection_is_case_insensitive() {
-        assert!(is_stop_word_token(&Token::Literal("is".into())));
-        assert!(is_stop_word_token(&Token::Literal("IS".into())));
-    }
-
-    #[test]
-    fn test_token_with_stop_word_detection() {
-        // Stop word in the middle is removed
-        let tokens = vec![
-            Token::Literal("music".into()),
-            Token::Literal("is".into()),
-            Token::Literal("classical".into()),
-        ];
-        let filtered = remove_stop_words(tokens);
-        assert_eq!(
-            filtered,
-            vec![Token::Literal("music".into()), Token::Literal("classical".into()),]
-        );
-
-        // Only literals are stop words
-        let tokens = vec![
-            Token::Literal("music".into()),
-            Token::Quoted("is".into()),
-            Token::Literal("classical".into()),
-        ];
-        let filtered = remove_stop_words(tokens);
-        assert_eq!(
-            filtered,
-            vec![
-                Token::Literal("music".into()),
-                Token::Quoted("is".into()),
-                Token::Literal("classical".into()),
-            ]
-        );
-
-        // Stop words at the end are not removed
-        let tokens = vec![
-            Token::Literal("classical".into()),
-            Token::Literal("music".into()),
-            Token::Literal("is".into()),
-        ];
-        let filtered = remove_stop_words(tokens);
-        assert_eq!(
-            filtered,
-            vec![
-                Token::Literal("classical".into()),
-                Token::Literal("music".into()),
-                Token::Literal("is".into()),
-            ]
-        );
-
-        // Everything is a stop word, but last is not removed
-        let tokens = vec![
-            Token::Literal("we".into()),
-            Token::Literal("shouldn't".into()),
-            Token::Literal("be".into()),
-            Token::Literal("here".into()),
-        ];
-        let filtered = remove_stop_words(tokens);
-        assert_eq!(filtered, vec![Token::Literal("here".into()),]);
     }
 }

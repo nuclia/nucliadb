@@ -19,7 +19,6 @@
 //
 
 use nidx_types::query_language::BooleanExpression;
-use tantivy::schema::Facet;
 
 #[derive(Clone, Default)]
 pub struct ParagraphSearchRequest {
@@ -45,16 +44,4 @@ pub struct ParagraphSuggestRequest {
     pub filtering_formula: Option<BooleanExpression<String>>,
     /// Whether to do an OR/AND between prefilter results and filtering_formula
     pub filter_or: bool,
-}
-
-impl ParagraphSearchRequest {
-    // Helper method to extract valid facets from the request
-    pub fn facets(&self) -> Vec<Facet> {
-        self.faceted
-            .as_ref()
-            .iter()
-            .flat_map(|faceted| faceted.labels.iter())
-            .filter_map(|facet| Facet::from_text(facet).ok())
-            .collect()
-    }
 }
