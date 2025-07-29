@@ -1738,6 +1738,7 @@ async def test_ask_query_image(nucliadb_reader: AsyncClient, standalone_knowledg
                 "content_type": "image/png",
                 "b64encoded": "dummy_base64_image",
             },
+            "reranker": "noop",
         },
     )
     assert resp.status_code == 200
