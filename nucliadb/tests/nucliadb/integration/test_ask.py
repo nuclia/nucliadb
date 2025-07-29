@@ -1752,6 +1752,6 @@ async def test_ask_query_image(nucliadb_reader: AsyncClient, standalone_knowledg
 
     assert predict.calls[1][0] == "chat_query_ndjson"
     assert len(predict.calls[1][1].query_context_images) == 1
-    assert predict.calls[1][1].query_context_images[0].content_type == "image/png"
-    assert predict.calls[1][1].query_context_images[0].b64encoded == "dummy_base64_image"
+    assert predict.calls[1][1].query_context_images["QUERY_IMAGE"].content_type == "image/png"
+    assert predict.calls[1][1].query_context_images["QUERY_IMAGE"].b64encoded == "dummy_base64_image"
     assert predict.calls[1][1].query == "title"
