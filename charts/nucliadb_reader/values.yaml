@@ -41,7 +41,7 @@ jaeger_agent_resources: {}
 
 serving:
   port: 8080
-  metricsPort: 3030
+  metricsPort: &metricsPort '3030'
 
 services:
   # This must match the pg driver on nucliadb_shared
@@ -78,9 +78,9 @@ serviceMonitor:
 tracing:
   enabled: false
 
-# extra_pod_annotations:
-#   what: "add annotations"
-#   where: "in the pods"
+extra_pod_annotations:
+  traffic.sidecar.istio.io/excludeOutboundPorts: "5432,4222"
+  traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
 
 autoscaling:
   minReplicas: 2
