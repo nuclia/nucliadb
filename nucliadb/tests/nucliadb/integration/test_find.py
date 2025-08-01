@@ -598,8 +598,15 @@ async def test_find_with_generative_model(
         },
     )
     assert resp.status_code == 200
-
-    spy.assert_called_once_with(kbid, "whatever", None, "everest", False, None, None)
+    spy.assert_called_once()
+    assert kbid == spy.call_args[0][0]
+    item = spy.call_args[0][1]
+    assert item.text == "whatever"
+    assert item.semantic_models is None
+    assert item.generative_model == "everest"
+    assert item.rephrase is False
+    assert item.rephrase_prompt is None
+    assert item.query_image is None
 
 
 @pytest.mark.deploy_modes("standalone")
