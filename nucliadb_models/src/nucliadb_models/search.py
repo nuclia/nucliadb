@@ -1568,7 +1568,8 @@ class AskRequest(AuditMetadataBase):
     query_image: Optional[Image] = Field(
         default=None,
         title="Query image",
-        description="Image that will be used together with the query text for retrieval and then sent to the LLM as part of the context.",
+        description="Image that will be used together with the query text for retrieval and then sent to the LLM as part of the context. "
+        "If a query image is provided, the `extra_context_images` and `rag_images_strategies` will be disabled.",
     )
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()

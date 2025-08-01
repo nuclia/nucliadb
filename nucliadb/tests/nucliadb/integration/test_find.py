@@ -623,6 +623,6 @@ async def test_find_query_image(
     assert isinstance(predict, DummyPredictEngine), "dummy is expected in this test"
     assert len(predict.calls) == 1
     assert predict.calls[0][0] == "query"
-    assert predict.calls[0][1]["query_image"].content_type == "image/png"
-    assert predict.calls[0][1]["query_image"].b64encoded == "dummy_base64_image"
-    assert predict.calls[0][1]["sentence"] == "whatever"
+    assert predict.calls[0][1].query_image.content_type == "image/png"
+    assert predict.calls[0][1].query_image.b64encoded == "dummy_base64_image"
+    assert predict.calls[0][1].text == "whatever"
