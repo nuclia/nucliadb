@@ -25,6 +25,7 @@ from google.protobuf.message import DecodeError, Message
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing_extensions import TypedDict
 
+from nucliadb_models.search import Image
 from nucliadb_protos.resources_pb2 import FieldMetadata, FieldText, QuestionAnswers
 
 
@@ -162,4 +163,44 @@ class RunAgentsResponse(BaseModel):
     results: dict[str, AugmentedField] = Field(
         ...,
         title="Pairs of augmented FieldMetadata and Data Augmentation results by field id",
+    )
+
+
+class QueryModel(BaseModel):
+    """
+    Model to represent a query request
+    """
+
+    text: Optional[str] = Field(default=None, description="The query text to be processed")
+    query_image: Optional[Image] = Field(
+        default=None,
+        description="Image to be considered as part of the query.  Even if the `rephrase` parameter is set to `false`, the rephrasing process will occur, combining the provided text with the image's visual features in the rephrased query.",
+    )
+    rephrase: bool = Field(
+        default=False,
+        description="If true, the model will rephrase the input text before processing",
+    )
+    rephrase_prompt: Optional[str] = Field(
+        default=None,
+        description="Custom prompt for rephrasing the input text",
+        examples=[
+            """Rephrase this question so its better for retrieval, and keep the rephrased question in the same language as the original.
+QUESTION: {question}
+Please return ONLY the question without any explanation. Just the rephrased question.""",
+            """Rephrase this question so its better for retrieval, if in the image there are any machinery components with numeric identifiers, append them to the end of the question separated by a commas.
+QUESTION: {question}
+Please return ONLY the question without any explanation.""",
+        ],
+    )
+    generative_model: Optional[str] = Field(
+        default=None,
+        description="The generative model to use for rephrasing",
+    )
+    semantic_models: Optional[list[str]] = Field(
+        default=None,
+        description="Semantic models to compute the sentence vector for, if not provided, it will only compute the sentence vector for default semantic model in the Knowledge box's configuration.",
+    )
+    agentic_entities: bool = Field(
+        default=False,
+        description="If true, the model will return the entities detected in the sentence guided by an already defined Graph Extraction Agent in the Knowledge Box.",
     )

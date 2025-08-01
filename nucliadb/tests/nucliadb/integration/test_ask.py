@@ -1725,3 +1725,33 @@ def _fetch_paragraphs(
         return retrieval, []
     augmented = [text_block for text_block in ask_response.augmented_context.paragraphs.values()]
     return retrieval, augmented
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_query_image(nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource):
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={
+            "query": "title",
+            "debug": True,
+            "query_image": {
+                "content_type": "image/png",
+                "b64encoded": "dummy_base64_image",
+            },
+            "reranker": "noop",
+        },
+    )
+    assert resp.status_code == 200
+    predict = get_predict()
+    assert isinstance(predict, DummyPredictEngine), "dummy is expected in this test"
+    assert len(predict.calls) == 2
+    assert predict.calls[0][0] == "query"
+    assert predict.calls[0][1].query_image.content_type == "image/png"
+    assert predict.calls[0][1].query_image.b64encoded == "dummy_base64_image"
+    assert predict.calls[0][1].text == "title"
+
+    assert predict.calls[1][0] == "chat_query_ndjson"
+    assert len(predict.calls[1][1].query_context_images) == 1
+    assert predict.calls[1][1].query_context_images["QUERY_IMAGE"].content_type == "image/png"
+    assert predict.calls[1][1].query_context_images["QUERY_IMAGE"].b64encoded == "dummy_base64_image"
+    assert predict.calls[1][1].question == "title"

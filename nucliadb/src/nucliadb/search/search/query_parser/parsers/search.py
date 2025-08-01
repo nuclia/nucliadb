@@ -79,6 +79,7 @@ def fetcher_for_search(kbid: str, item: SearchRequest) -> Fetcher:
         rephrase=item.rephrase,
         rephrase_prompt=item.rephrase_prompt,
         generative_model=None,
+        query_image=None,
     )
 
 

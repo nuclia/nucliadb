@@ -206,6 +206,7 @@ def find_request_from_ask_request(item: AskRequest, query: str) -> FindRequest:
     find_request.debug = item.debug
     find_request.rephrase = item.rephrase
     find_request.rephrase_prompt = parse_rephrase_prompt(item)
+    find_request.query_image = item.query_image
     find_request.rank_fusion = item.rank_fusion
     find_request.reranker = item.reranker
     # We don't support pagination, we always get the top_k results.
