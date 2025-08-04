@@ -24,6 +24,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb.search.search.query_parser import models as parser_models
 from nucliadb.search.search.query_parser.parsers import parse_find
@@ -165,7 +166,7 @@ async def test_find_query_parsing__reranker_limits(dummy_predict: PredictEngine)
     )
 
 
-async def test_find_query_parsing__query_image(dummy_predict: PredictEngine):
+async def test_find_query_parsing__query_image(maindb_driver: Driver, dummy_predict: PredictEngine):
     """We want to check that the rephrased query is used for keyword search if an image is provided."""
     predict = get_predict()
     assert isinstance(predict, DummyPredictEngine)
