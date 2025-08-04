@@ -43,6 +43,7 @@ def disable_hidden_resources_check():
 
 
 async def test_find_query_parsing__top_k(
+    maindb_driver: Driver,
     dummy_predict: PredictEngine,
 ):
     find = FindRequest(
@@ -74,6 +75,7 @@ async def test_find_query_parsing__top_k(
 async def test_find_query_parsing__rank_fusion(
     rank_fusion: Union[search_models.RankFusionName, search_models.RankFusion],
     expected: parser_models.RankFusion,
+    maindb_driver: Driver,
     dummy_predict: PredictEngine,
 ):
     find = FindRequest(
@@ -88,7 +90,9 @@ async def test_find_query_parsing__rank_fusion(
 
 # ATENTION: if you're changing this test, make sure public models, private
 # models and parsing are change accordingly!
-async def test_find_query_parsing__rank_fusion_limits(dummy_predict: PredictEngine):
+async def test_find_query_parsing__rank_fusion_limits(
+    maindb_driver: Driver, dummy_predict: PredictEngine
+):
     FindRequest.model_validate(
         {
             "rank_fusion": {
@@ -127,6 +131,7 @@ async def test_find_query_parsing__rank_fusion_limits(dummy_predict: PredictEngi
     ],
 )
 async def test_find_query_parsing__reranker(
+    maindb_driver: Driver,
     dummy_predict: PredictEngine,
     reranker: Union[search_models.RerankerName, search_models.Reranker],
     expected: parser_models.Reranker,
@@ -142,7 +147,7 @@ async def test_find_query_parsing__reranker(
 
 # ATENTION: if you're changing this test, make sure public models, private
 # models and parsing are change accordingly!
-async def test_find_query_parsing__reranker_limits(dummy_predict: PredictEngine):
+async def test_find_query_parsing__reranker_limits(maindb_driver: Driver, dummy_predict: PredictEngine):
     FindRequest.model_validate(
         {
             "reranker": {
