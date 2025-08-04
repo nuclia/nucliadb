@@ -23,6 +23,7 @@ from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
+from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.conversation import Conversation
@@ -33,7 +34,7 @@ from nucliadb.ingest.serialize import (
     serialize,
     set_resource_field_extracted_data,
 )
-from nucliadb.reader import SERVICE_NAME
+from nucliadb.reader import SERVICE_NAME, logger
 from nucliadb.reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
 from nucliadb.reader.api.models import (
     FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP,
@@ -46,6 +47,7 @@ from nucliadb_models.resource import (
     ExtractedDataTypeName,
     NucliaDBRoles,
     Resource,
+    ResourceBasic,
     ResourceFieldProperties,
     ResourceList,
     ResourcePagination,
@@ -78,13 +80,8 @@ async def list_resources(
     # Get counters from maindb
     driver = get_driver()
     async with driver.transaction(read_only=True) as txn:
-        # Filter parameters for serializer
-        show: list[ResourceProperties] = [ResourceProperties.BASIC]
-        field_types: list[FieldTypeName] = []
-        extracted: list[ExtractedDataTypeName] = []
-
         try:
-            resources: list[Resource] = []
+            resources: list[ResourceBasic] = []
             max_items_to_iterate = (page + 1) * size
             first_wanted_item_index = (page * size) + 1  # 1-based index
             current_key_index = 0
@@ -107,19 +104,9 @@ async def list_resources(
                     break
 
                 # Fetch and Add wanted item
-                rid = await txn.get(key, for_update=False)
-                if rid:
-                    result = await managed_serialize(
-                        txn,
-                        kbid,
-                        rid.decode(),
-                        show,
-                        field_types,
-                        extracted,
-                        service_name=SERVICE_NAME,
-                    )
-                    if result is not None:
-                        resources.append(result)
+                rbasic = await _get_resource_basic(txn, kbid, key)
+                if rbasic is not None:
+                    resources.append(rbasic)
 
             is_last_page = current_key_index <= max_items_to_iterate
 
@@ -131,6 +118,34 @@ async def list_resources(
         resources=resources,
         pagination=ResourcePagination(page=page, size=size, last=is_last_page),
     )
+
+
+async def _get_resource_basic(txn: Transaction, kbid: str, slug_key: str) -> Optional[ResourceBasic]:
+    rid = await txn.get(slug_key, for_update=False)
+    if rid is None:  # pragma: no cover
+        logger.warning(
+            "Resource slug key exists but no resource id found",
+            extra={"kbid": kbid, "key": slug_key},
+        )
+        return None
+    result = await managed_serialize(
+        txn,
+        kbid,
+        rid.decode(),
+        # We only need basic info for the list of resources
+        show=[ResourceProperties.BASIC],
+        field_type_filter=[],
+        extracted=[],
+        service_name=SERVICE_NAME,
+    )
+    if result is None:  # pragma: no cover
+        logger.warning(
+            "Resource id exists but basic info couldn't be found",
+            extra={"kbid": kbid, "key": slug_key, "rid": rid},
+        )
+        return None
+    rbasic = ResourceBasic(**result.model_dump())
+    return rbasic
 
 
 @api.get(
