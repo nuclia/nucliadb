@@ -809,6 +809,11 @@ class MinScore(BaseModel):
     )
 
 
+class Image(BaseModel):
+    content_type: str
+    b64encoded: str
+
+
 AUDIT_METADATA_MAX_BYTES = 1024 * 10  # 10KB
 
 
@@ -902,6 +907,11 @@ Please return ONLY the question without any explanation. Just the rephrased ques
             Please return ONLY the question without any explanation.""",
         ],
     )
+    query_image: Optional[Image] = Field(
+        default=None,
+        title="Query image",
+        description="Image that will be used together with the query text for retrieval.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -951,11 +961,6 @@ Message = ChatContextMessage
 
 class UserPrompt(BaseModel):
     prompt: str
-
-
-class Image(BaseModel):
-    content_type: str
-    b64encoded: str
 
 
 class MaxTokens(BaseModel):
@@ -1896,11 +1901,6 @@ class FindRequest(BaseSearchRequest):
         default=None,
         title="Generative model",
         description="The generative model used to rephrase the query. If not provided, the model configured for the Knowledge Box is used.",
-    )
-    query_image: Optional[Image] = Field(
-        default=None,
-        title="Query image",
-        description="Image that will be used together with the query text for retrieval.",
     )
 
     @model_validator(mode="before")

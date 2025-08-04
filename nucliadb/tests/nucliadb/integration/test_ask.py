@@ -1729,29 +1729,39 @@ def _fetch_paragraphs(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_query_image(nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource):
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/ask",
-        json={
-            "query": "title",
-            "debug": True,
-            "query_image": {
-                "content_type": "image/png",
-                "b64encoded": "dummy_base64_image",
-            },
-            "reranker": "noop",
-        },
-    )
-    assert resp.status_code == 200
     predict = get_predict()
     assert isinstance(predict, DummyPredictEngine), "dummy is expected in this test"
+
+    # Monkey patch predict.query to modify the rephrased query, this way we get a query that matches the resource title
+    original_query = predict.query
+
+    async def mock_query(*args, **kwargs):
+        resp = await original_query(*args, **kwargs)
+        resp.rephrased_query = "title"
+        return resp
+
+    with patch.object(predict, "query", side_effect=mock_query):
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/ask",
+            json={
+                "query": "whatever",
+                "debug": True,
+                "query_image": {
+                    "content_type": "image/png",
+                    "b64encoded": "dummy_base64_image",
+                },
+                "reranker": "noop",
+            },
+        )
+    assert resp.status_code == 200
     assert len(predict.calls) == 2
     assert predict.calls[0][0] == "query"
     assert predict.calls[0][1].query_image.content_type == "image/png"
     assert predict.calls[0][1].query_image.b64encoded == "dummy_base64_image"
-    assert predict.calls[0][1].text == "title"
+    assert predict.calls[0][1].text == "whatever"
 
     assert predict.calls[1][0] == "chat_query_ndjson"
     assert len(predict.calls[1][1].query_context_images) == 1
     assert predict.calls[1][1].query_context_images["QUERY_IMAGE"].content_type == "image/png"
     assert predict.calls[1][1].query_context_images["QUERY_IMAGE"].b64encoded == "dummy_base64_image"
-    assert predict.calls[1][1].question == "title"
+    assert predict.calls[1][1].question == "whatever"
