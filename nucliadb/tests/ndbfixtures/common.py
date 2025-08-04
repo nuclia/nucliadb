@@ -99,7 +99,8 @@ def predict_mock() -> Mock:  # type: ignore
 
 
 @pytest.fixture(scope="function")
-async def dummy_predict(maindb_driver: Driver) -> AsyncIterable[DummyPredictEngine]:
+# async def dummy_predict(maindb_driver: Driver) -> AsyncIterable[DummyPredictEngine]:
+async def dummy_predict() -> AsyncIterable[DummyPredictEngine]:
     with (
         patch.object(nuclia_settings, "dummy_predict", True),
     ):

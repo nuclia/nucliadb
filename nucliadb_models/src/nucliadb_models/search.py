@@ -907,11 +907,11 @@ Please return ONLY the question without any explanation. Just the rephrased ques
             Please return ONLY the question without any explanation.""",
         ],
     )
-    query_image: Optional[Image] = Field(
-        default=None,
-        title="Query image",
-        description="Image that will be used together with the query text for retrieval.",
-    )
+    # query_image: Optional[Image] = Field(
+    #     default=None,
+    #     title="Query image",
+    #     description="Image that will be used together with the query text for retrieval.",
+    # )
 
     @model_validator(mode="before")
     @classmethod
@@ -1901,6 +1901,11 @@ class FindRequest(BaseSearchRequest):
         default=None,
         title="Generative model",
         description="The generative model used to rephrase the query. If not provided, the model configured for the Knowledge Box is used.",
+    )
+    query_image: Optional[Image] = Field(
+        default=None,
+        title="Query image",
+        description="Image that will be used together with the query text for retrieval.",
     )
 
     @model_validator(mode="before")
