@@ -71,9 +71,9 @@ async def test_find_query_parsing__top_k(
     ],
 )
 async def test_find_query_parsing__rank_fusion(
-    dummy_predict: PredictEngine,
     rank_fusion: Union[search_models.RankFusionName, search_models.RankFusion],
     expected: parser_models.RankFusion,
+    dummy_predict: PredictEngine,
 ):
     find = FindRequest(
         top_k=20,
@@ -114,7 +114,7 @@ async def test_find_query_parsing__rank_fusion_limits(dummy_predict: PredictEngi
     parsed = await parse_find(
         "kbid", FindRequest(rank_fusion=search_models.ReciprocalRankFusion.model_construct(window=501))
     )
-    assert parsed.retrieval.rank_fusion.window == 500
+    assert parsed.retrieval.rank_fusion is not None and parsed.retrieval.rank_fusion.window == 500
 
 
 @pytest.mark.parametrize(
@@ -159,7 +159,10 @@ async def test_find_query_parsing__reranker_limits(dummy_predict: PredictEngine)
     parsed = await parse_find(
         "kbid", FindRequest(reranker=search_models.PredictReranker.model_construct(window=201))
     )
-    assert parsed.retrieval.reranker.window == 200
+    assert (
+        isinstance(parsed.retrieval.reranker, parser_models.PredictReranker)
+        and parsed.retrieval.reranker.window == 200
+    )
 
 
 async def test_find_query_parsing__query_image(dummy_predict: PredictEngine):
