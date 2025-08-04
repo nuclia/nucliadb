@@ -30,6 +30,10 @@ from nuclia_models.predict.generative_responses import (
     JSONGenerativeResponse,
     StatusGenerativeResponse,
 )
+from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder
+from tests.utils.broker_messages.fields import FieldBuilder
+from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 from nucliadb.search.predict import AnswerStatusCode, DummyPredictEngine
 from nucliadb.search.utilities import get_predict
@@ -54,10 +58,6 @@ from nucliadb_protos import resources_pb2 as rpb2
 from nucliadb_protos import writer_pb2 as wpb2
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.broker_messages.fields import FieldBuilder
-from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -1729,21 +1729,31 @@ def _fetch_paragraphs(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_query_image(nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource):
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/ask",
-        json={
-            "query": "title",
-            "debug": True,
-            "query_image": {
-                "content_type": "image/png",
-                "b64encoded": "dummy_base64_image",
-            },
-            "reranker": "noop",
-        },
-    )
-    assert resp.status_code == 200
     predict = get_predict()
     assert isinstance(predict, DummyPredictEngine), "dummy is expected in this test"
+
+    # Monkey patch predict.query to modify the rephrased query, this way we get a query that matches the resource title
+    original_query = predict.query
+
+    async def mock_query(self, *args, **kwargs):
+        resp = await original_query(*args, **kwargs)
+        resp.rephrased_query = "title"
+        return resp
+
+    with patch.object(predict, "query", side_effect=mock_query):
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/ask",
+            json={
+                "query": "whatever",
+                "debug": True,
+                "query_image": {
+                    "content_type": "image/png",
+                    "b64encoded": "dummy_base64_image",
+                },
+                "reranker": "noop",
+            },
+        )
+    assert resp.status_code == 200
     assert len(predict.calls) == 2
     assert predict.calls[0][0] == "query"
     assert predict.calls[0][1].query_image.content_type == "image/png"
