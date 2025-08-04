@@ -534,6 +534,7 @@ class DummyPredictEngine(PredictEngine):
                 timings=timings,
             ),
             query=model,
+            rephrased_query="<REPHRASED-QUERY>" if item.rephrase or item.query_image else None,
         )
 
     async def detect_entities(self, kbid: str, sentence: str) -> list[RelationNode]:

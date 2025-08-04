@@ -24,8 +24,11 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
+from nucliadb.search.predict import DummyPredictEngine
 from nucliadb.search.search.query_parser import models as parser_models
 from nucliadb.search.search.query_parser.parsers import parse_find
+from nucliadb.search.search.query_parser.parsers.find import fetcher_for_find
+from nucliadb.search.utilities import PredictEngine, get_predict
 from nucliadb_models import search as search_models
 from nucliadb_models.search import FindRequest
 
@@ -152,3 +155,30 @@ async def test_find_query_parsing__reranker_limits():
         "kbid", FindRequest(reranker=search_models.PredictReranker.model_construct(window=201))
     )
     assert parsed.retrieval.reranker.window == 200
+
+
+async def test_find_query_parsing__query_image(dummy_predict: PredictEngine):
+    """We want to check that the rephrased query is used for keyword search if an image is provided."""
+    predict = get_predict()
+    assert isinstance(predict, DummyPredictEngine)
+
+    find = FindRequest(
+        query="whatever",
+        query_image=search_models.Image(
+            content_type="image/png",
+            b64encoded="mybase64encodedimage==",
+        ),
+    )
+
+    fetcher = fetcher_for_find("kbid", find)
+    parsed = await parse_find("kbid", find, fetcher=fetcher)
+    assert parsed.retrieval.query.keyword is not None
+    assert parsed.retrieval.query.keyword.query == "<REPHRASED-QUERY>"
+
+    # If rephrase is on but there is no query image, we should use the original query
+    find.rephrase = True
+    find.query_image = None
+    fetcher = fetcher_for_find("kbid", find)
+    parsed = await parse_find("kbid", find, fetcher=fetcher)
+    assert parsed.retrieval.query.keyword is not None
+    assert parsed.retrieval.query.keyword.query == find.query
