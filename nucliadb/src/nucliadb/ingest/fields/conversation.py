@@ -26,8 +26,9 @@ from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_utils.storages.storage import StorageField
 
 PAGE_SIZE = 200
-KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/{page}"
-KB_RESOURCE_FIELD_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
+
+CONVERSATION_PAGE_VALUE = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/{page}"
+CONVERSATION_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 
 
 class PageNotFound(Exception):
@@ -148,7 +149,7 @@ class Conversation(Field[PBConversation]):
     async def get_metadata(self) -> FieldConversation:
         if self.metadata is None:
             payload = await self.resource.txn.get(
-                KB_RESOURCE_FIELD_METADATA.format(
+                CONVERSATION_METADATA.format(
                     kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
                 )
             )
@@ -167,7 +168,7 @@ class Conversation(Field[PBConversation]):
             raise ValueError(f"Conversation pages start at index 1")
 
         if self.value.get(page) is None:
-            field_key = KB_RESOURCE_FIELD.format(
+            field_key = CONVERSATION_PAGE_VALUE.format(
                 kbid=self.kbid,
                 uuid=self.uuid,
                 type=self.type,
@@ -183,7 +184,7 @@ class Conversation(Field[PBConversation]):
         return self.value[page]
 
     async def db_set_value(self, payload: PBConversation, page: int = 0):
-        field_key = KB_RESOURCE_FIELD.format(
+        field_key = CONVERSATION_PAGE_VALUE.format(
             kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id, page=page
         )
         await self.resource.txn.set(
@@ -195,9 +196,7 @@ class Conversation(Field[PBConversation]):
 
     async def db_set_metadata(self, payload: FieldConversation):
         await self.resource.txn.set(
-            KB_RESOURCE_FIELD_METADATA.format(
-                kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
-            ),
+            CONVERSATION_METADATA.format(kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id),
             payload.SerializeToString(),
         )
         self.metadata = payload
