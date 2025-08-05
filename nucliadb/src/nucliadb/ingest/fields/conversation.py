@@ -54,54 +54,65 @@ class Conversation(Field[PBConversation]):
         self.metadata = None
 
     async def set_value(self, payload: PBConversation):
-        last_page: Optional[PBConversation] = None
         metadata = await self.get_metadata()
         metadata.extract_strategy = payload.extract_strategy
-        if self._created is False and metadata.pages > 0:
-            try:
-                last_page = await self.db_get_value(page=metadata.pages)
-            except PageNotFound:
-                pass
 
-        # Make sure message attachment files are on our region
+        # Make sure message attachment files are on our region. This is needed
+        # to support the hybrid-onprem deployment as the attachments must be stored
+        # at the storage services of the client's premises.
         for message in payload.messages:
             new_message_files = []
-            for count, file in enumerate(message.content.attachments):
+            for idx, file in enumerate(message.content.attachments):
                 if self.storage.needs_move(file, self.kbid):
                     if message.ident == "":
                         message_ident = uuid.uuid4().hex
                     else:
                         message_ident = message.ident
                     sf: StorageField = self.storage.conversation_field_attachment(
-                        self.kbid, self.uuid, self.id, message_ident, count
+                        self.kbid, self.uuid, self.id, message_ident, attachment_index=idx
                     )
                     cf: CloudFile = await self.storage.normalize_binary(file, sf)
                     new_message_files.append(cf)
                 else:
                     new_message_files.append(file)
 
-            # Can be cleaned a list of PB
+            # Replace the attachments in the message with the new ones
             message.content.ClearField("attachments")
             for message_file in new_message_files:
                 message.content.attachments.append(message_file)
+
+        # Get the last page if it exists
+        last_page: Optional[PBConversation] = None
+        if self._created is False and metadata.pages > 0:
+            try:
+                last_page = await self.db_get_value(page=metadata.pages)
+            except PageNotFound:
+                pass
 
         if last_page is None:
             last_page = PBConversation()
             metadata.pages += 1
 
-        # Merge on last page
+        # Increment the metadata total with the number of messages
         messages = list(payload.messages)
         metadata.total += len(messages)
+
+        # Store the messages in pages of PAGE_SIZE messages
         while len(messages) > 0:
-            count = metadata.size - len(last_page.messages)
-            last_page.messages.extend(messages[:count])
+            # Fit the messages in the last page
+            available_space = metadata.size - len(last_page.messages)
+            last_page.messages.extend(messages[:available_space])
+
+            # Save the last page
             await self.db_set_value(last_page, metadata.pages)
 
-            messages = messages[count:]
+            # If there are still messages, create a new page
+            messages = messages[available_space:]
             if len(messages) > 0:
                 metadata.pages += 1
                 last_page = PBConversation()
 
+        # Finally, set the metadata
         await self.db_set_metadata(metadata)
 
     async def get_value(self, page: Optional[int] = None) -> Optional[PBConversation]:
