@@ -174,7 +174,9 @@ async def download_field_conversation_rslug_prefix(
     message_id: str,
     file_num: int,
 ) -> Response:
-    return await _download_field_conversation(request, kbid, field_id, message_id, file_num, rslug=rslug)
+    return await _download_field_conversation_attachment(
+        request, kbid, field_id, message_id, file_num, rslug=rslug
+    )
 
 
 @api.get(
@@ -185,7 +187,7 @@ async def download_field_conversation_rslug_prefix(
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
-async def download_field_conversation_rid_prefix(
+async def download_field_conversation_attachment_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
@@ -193,10 +195,12 @@ async def download_field_conversation_rid_prefix(
     message_id: str,
     file_num: int,
 ) -> Response:
-    return await _download_field_conversation(request, kbid, field_id, message_id, file_num, rid=rid)
+    return await _download_field_conversation_attachment(
+        request, kbid, field_id, message_id, file_num, rid=rid
+    )
 
 
-async def _download_field_conversation(
+async def _download_field_conversation_attachment(
     request: Request,
     kbid: str,
     field_id: str,
@@ -209,7 +213,9 @@ async def _download_field_conversation(
 
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    sf = storage.conversation_field(kbid, rid, field_id, message_id, file_num)
+    sf = storage.conversation_field_attachment(
+        kbid, rid, field_id, message_id, attachment_index=file_num
+    )
 
     return await download_api(sf, request.headers)
 

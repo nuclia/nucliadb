@@ -72,7 +72,7 @@ class Conversation(Field[PBConversation]):
                         message_ident = uuid.uuid4().hex
                     else:
                         message_ident = message.ident
-                    sf: StorageField = self.storage.conversation_field(
+                    sf: StorageField = self.storage.conversation_field_attachment(
                         self.kbid, self.uuid, self.id, message_ident, count
                     )
                     cf: CloudFile = await self.storage.normalize_binary(file, sf)
