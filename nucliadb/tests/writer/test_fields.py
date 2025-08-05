@@ -19,7 +19,7 @@
 #
 
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from os.path import dirname
 
 import pytest
@@ -36,7 +36,7 @@ from tests.writer.utils import load_file_as_FileB64_payload
 TEST_FILE = {f"{dirname(__file__)}/orm/"}
 TEST_TEXT_PAYLOAD = {"body": "test1", "format": "PLAIN"}
 TEST_LINK_PAYLOAD = {
-    "added": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "added": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     "headers": {},
     "cookies": {},
     "uri": "http://some-link.com",
@@ -48,7 +48,7 @@ TEST_LINK_PAYLOAD = {
 TEST_CONVERSATION_PAYLOAD = {
     "messages": [
         {
-            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "who": "Bob",
             "to": ["Alice", "Charlie"],
             "content": {
@@ -77,7 +77,7 @@ TEST_EXTERNAL_FILE_PAYLOAD = {
 
 TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD = [
     {
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "who": "Bob",
         "to": ["Alice", "Charlie"],
         "content": {

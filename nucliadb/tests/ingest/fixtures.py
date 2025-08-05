@@ -21,7 +21,7 @@ import logging
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from os.path import dirname, getsize
 from typing import AsyncIterator, Iterable, Optional
 from unittest.mock import AsyncMock, patch
@@ -602,8 +602,8 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox_ingest:
             field=rpb.FieldID(field_type=rpb.FieldType.TEXT, field="text1"),
         )
         basic.fieldmetadata.append(ufm1)
-        basic.created.FromDatetime(datetime.utcnow())
-        basic.modified.FromDatetime(datetime.utcnow())
+        basic.created.FromDatetime(datetime.now(timezone.utc))
+        basic.modified.FromDatetime(datetime.now(timezone.utc))
 
         await test_resource.set_basic(basic)
 
