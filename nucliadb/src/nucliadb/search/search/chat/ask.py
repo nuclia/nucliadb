@@ -595,6 +595,7 @@ async def ask(
             image_strategies=ask_request.rag_images_strategies,
             max_context_characters=tokens_to_chars(generation.max_context_tokens),
             visual_llm=generation.use_visual_llm,
+            query_image=ask_request.query_image,
             metrics=metrics.child_span("context_building"),
         )
         (

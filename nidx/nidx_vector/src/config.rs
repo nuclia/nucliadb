@@ -27,7 +27,8 @@ use crate::VectorErr;
 use crate::vector_types::*;
 
 pub mod flags {
-    pub const DATA_STORE_V2: &str = "data_store_v2";
+    // pub const DATA_STORE_V2: &str = "data_store_v2";
+    pub const FORCE_DATA_STORE_V1: &str = "force_data_store_v1"; // For testing of v1+v2 merges
 }
 
 #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]

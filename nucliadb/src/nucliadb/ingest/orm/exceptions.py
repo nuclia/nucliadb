@@ -49,6 +49,10 @@ class ResourceNotIndexable(Exception):
     Unable to index resource
     """
 
+    def __init__(self, field_id: str, message: str):
+        self.field_id = field_id
+        self.message = message
+
 
 class EntityManagementException(Exception):
     pass

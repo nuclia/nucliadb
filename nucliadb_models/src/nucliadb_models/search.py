@@ -809,6 +809,11 @@ class MinScore(BaseModel):
     )
 
 
+class Image(BaseModel):
+    content_type: str
+    b64encoded: str
+
+
 AUDIT_METADATA_MAX_BYTES = 1024 * 10  # 10KB
 
 
@@ -902,6 +907,11 @@ Please return ONLY the question without any explanation. Just the rephrased ques
             Please return ONLY the question without any explanation.""",
         ],
     )
+    query_image: Optional[Image] = Field(
+        default=None,
+        title="Query image",
+        description="Image that will be used together with the query text for retrieval.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -951,11 +961,6 @@ Message = ChatContextMessage
 
 class UserPrompt(BaseModel):
     prompt: str
-
-
-class Image(BaseModel):
-    content_type: str
-    b64encoded: str
 
 
 class MaxTokens(BaseModel):
@@ -1564,6 +1569,12 @@ class AskRequest(AuditMetadataBase):
         title="Extra query context images",
         description="""Additional images added to the retrieval context sent to the LLM."
         It allows extending the chat feature with content that may not be in the Knowledge Box.""",
+    )
+    query_image: Optional[Image] = Field(
+        default=None,
+        title="Query image",
+        description="Image that will be used together with the query text for retrieval and then sent to the LLM as part of the context. "
+        "If a query image is provided, the `extra_context_images` and `rag_images_strategies` will be disabled.",
     )
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()

@@ -28,12 +28,14 @@ from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError, convert_relations
+from nucliadb.search.predict_models import QueryModel
 from nucliadb.search.search.metrics import (
     query_parse_dependency_observer,
 )
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.search import (
+    Image,
     MaxTokens,
 )
 from nucliadb_protos import knowledgebox_pb2, utils_pb2
@@ -93,6 +95,7 @@ class Fetcher:
         rephrase: bool,
         rephrase_prompt: Optional[str],
         generative_model: Optional[str],
+        query_image: Optional[Image],
     ):
         self.kbid = kbid
         self.query = query
@@ -102,6 +105,7 @@ class Fetcher:
         self.rephrase = rephrase
         self.rephrase_prompt = rephrase_prompt
         self.generative_model = generative_model
+        self.query_image = query_image
 
         self.cache = FetcherCache()
         self.locks: dict[str, asyncio.Lock] = {}
@@ -327,6 +331,7 @@ class Fetcher:
                     self.generative_model,
                     self.rephrase,
                     self.rephrase_prompt,
+                    self.query_image,
                 )
             except (SendToPredictError, TimeoutError):
                 query_info = None
@@ -360,9 +365,18 @@ async def query_information(
     generative_model: Optional[str] = None,
     rephrase: bool = False,
     rephrase_prompt: Optional[str] = None,
+    query_image: Optional[Image] = None,
 ) -> QueryInfo:
     predict = get_predict()
-    return await predict.query(kbid, query, semantic_model, generative_model, rephrase, rephrase_prompt)
+    item = QueryModel(
+        text=query,
+        semantic_models=[semantic_model] if semantic_model else None,
+        generative_model=generative_model,
+        rephrase=rephrase,
+        rephrase_prompt=rephrase_prompt,
+        query_image=query_image,
+    )
+    return await predict.query(kbid, item)
 
 
 @query_parse_dependency_observer.wrap({"type": "detect_entities"})

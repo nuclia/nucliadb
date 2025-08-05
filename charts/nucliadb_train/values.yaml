@@ -40,7 +40,7 @@ resources: {}
 
 serving:
   port: 8000
-  metricsPort: 3030
+  metricsPort: &metricsPort '3030'
   grpc_port: 8080
 
 services:
@@ -72,9 +72,9 @@ vs:
 
 zone:
 
-# extra_pod_annotations:
-#   what: "add annotations"
-#   where: "in the pods"
+extra_pod_annotations:
+  traffic.sidecar.istio.io/excludeOutboundPorts: "5432,4222"
+  traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
 
 autoscaling:
   minReplicas: 2

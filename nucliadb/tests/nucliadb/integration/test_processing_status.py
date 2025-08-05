@@ -167,6 +167,87 @@ async def test_field_status_errors_processor(
 
 
 @pytest.mark.deploy_modes("standalone")
+async def test_field_status_warnings_processor(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    # Create a resource, processing
+    br = broker_resource(standalone_knowledgebox)
+    br.texts["my_text"].CopyFrom(
+        rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
+    )
+    br.texts["other_text"].CopyFrom(
+        rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
+    )
+    await inject_message(nucliadb_ingest_grpc, br)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{br.uuid}?show=basic&show=errors"
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PENDING"
+    assert resp_json["data"]["texts"]["my_text"]["status"] == "PENDING"
+    assert resp_json["data"]["texts"]["other_text"]["status"] == "PENDING"
+
+    # Receive message from processor with errors
+    br.source = BrokerMessage.MessageSource.PROCESSOR
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Hello!"
+    etw.field.field = "my_text"
+    etw.field.field_type = rpb.FieldType.TEXT
+    br.extracted_text.append(etw)
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Bye!"
+    etw.field.field = "other_text"
+    etw.field.field_type = rpb.FieldType.TEXT
+    br.extracted_text.append(etw)
+
+    g = Generator()
+    g.processor.SetInParent()
+    br.generated_by.append(g)
+    br.errors.append(
+        Error(
+            field_type=rpb.FieldType.TEXT,
+            field="my_text",
+            error="Processor failed",
+            code=Error.ErrorCode.EXTRACT,
+            severity=Error.Severity.WARNING,
+        )
+    )
+    await inject_message(nucliadb_ingest_grpc, br)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{br.uuid}?show=basic&show=errors"
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PROCESSED"
+    assert resp_json["data"]["texts"]["my_text"]["status"] == "PROCESSED"
+    assert resp_json["data"]["texts"]["other_text"]["status"] == "PROCESSED"
+    assert len(resp_json["data"]["texts"]["my_text"]["errors"]) == 1
+    assert resp_json["data"]["texts"]["my_text"]["errors"][0]["severity"] == "WARNING"
+
+    # Receive message from processor without errors, previous warnings are cleared
+    br.errors.pop()
+    await inject_message(nucliadb_ingest_grpc, br)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{br.uuid}?show=basic&show=errors"
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PROCESSED"
+    assert resp_json["data"]["texts"]["my_text"]["status"] == "PROCESSED"
+    assert resp_json["data"]["texts"]["other_text"]["status"] == "PROCESSED"
+    assert "errors" not in resp_json["data"]["texts"]["my_text"]
+
+
+@pytest.mark.deploy_modes("standalone")
 async def test_field_status_errors_data_augmentation(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,

@@ -1,3 +1,4 @@
+{{- if .Values.searcher.service.enabled }}
 kind: Service
 apiVersion: v1
 metadata:
@@ -9,8 +10,15 @@ metadata:
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
+  {{- with .Values.searcher.service.labels }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.searcher.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  type: ClusterIP
+  type: {{ .Values.searcher.service.type | default "ClusterIP" }}
   selector:
     app: nidx-searcher
   ports:
@@ -18,3 +26,4 @@ spec:
       port: 10001
       protocol: TCP
       appProtocol: grpc
+{{- end }}

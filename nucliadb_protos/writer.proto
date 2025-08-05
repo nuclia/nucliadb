@@ -47,6 +47,7 @@ message Error {
         EXTRACT = 1;
         PROCESS = 2;
         DATAAUGMENTATION = 3;
+        INDEX = 4;
     }
     ErrorCode code = 4;
     Generator generated_by = 5;

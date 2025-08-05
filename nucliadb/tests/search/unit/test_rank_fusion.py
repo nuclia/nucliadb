@@ -34,6 +34,8 @@ from nidx_protos.nodereader_pb2 import DocumentScored, GraphSearchResponse, Para
 import nucliadb_models.search as search_models
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.search.predict import PredictEngine
 from nucliadb.search.search.find_merge import (
     FAKE_GRAPH_SCORE,
     graph_results_to_text_block_matches,
@@ -65,7 +67,9 @@ def disable_hidden_resources_check():
         (search_models.ReciprocalRankFusion(), ReciprocalRankFusion),
     ],
 )
-async def test_get_rank_fusion(rank_fusion, expected_type: Type):
+async def test_get_rank_fusion(
+    maindb_driver: Driver, dummy_predict: PredictEngine, rank_fusion, expected_type: Type
+):
     item = FindRequest(rank_fusion=rank_fusion)
     parsed = await parse_find("kbid", item)
     assert parsed.retrieval.rank_fusion is not None

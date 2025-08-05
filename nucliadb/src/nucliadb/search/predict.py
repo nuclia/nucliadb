@@ -24,7 +24,7 @@ import os
 import random
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional
 from unittest.mock import AsyncMock, Mock
 
 import aiohttp
@@ -37,6 +37,7 @@ from nucliadb.search import logger
 from nucliadb.search.predict_models import (
     AppliedDataAugmentation,
     AugmentedField,
+    QueryModel,
     RunAgentsRequest,
     RunAgentsResponse,
 )
@@ -326,11 +327,7 @@ class PredictEngine:
     async def query(
         self,
         kbid: str,
-        sentence: str,
-        semantic_model: Optional[str] = None,
-        generative_model: Optional[str] = None,
-        rephrase: bool = False,
-        rephrase_prompt: Optional[str] = None,
+        item: QueryModel,
     ) -> QueryInfo:
         """
         Query endpoint: returns information to be used by NucliaDB at retrieval time, for instance:
@@ -354,21 +351,10 @@ class PredictEngine:
             logger.warning(error)
             raise SendToPredictError(error)
 
-        params: dict[str, Any] = {
-            "text": sentence,
-            "rephrase": str(rephrase),
-        }
-        if rephrase_prompt is not None:
-            params["rephrase_prompt"] = rephrase_prompt
-        if semantic_model is not None:
-            params["semantic_models"] = [semantic_model]
-        if generative_model is not None:
-            params["generative_model"] = generative_model
-
         resp = await self.make_request(
-            "GET",
+            "POST",
             url=self.get_predict_url(QUERY, kbid),
-            params=params,
+            json=item.model_dump(),
             headers=self.get_predict_headers(kbid),
         )
         await self.check_response(kbid, resp, expected_status=200)
@@ -501,16 +487,13 @@ class DummyPredictEngine(PredictEngine):
 
         return (DUMMY_LEARNING_ID, DUMMY_LEARNING_MODEL, generate())
 
-    async def query(
-        self,
-        kbid: str,
-        sentence: str,
-        semantic_model: Optional[str] = None,
-        generative_model: Optional[str] = None,
-        rephrase: bool = False,
-        rephrase_prompt: Optional[str] = None,
-    ) -> QueryInfo:
-        self.calls.append(("query", sentence))
+    async def query(self, kbid: str, item: QueryModel) -> QueryInfo:
+        self.calls.append(
+            (
+                "query",
+                item,
+            )
+        )
 
         if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21":  # pragma: no cover
             base_vector = Qm2023
@@ -534,7 +517,7 @@ class DummyPredictEngine(PredictEngine):
                 timings[vectorset_id] = 0.010
 
         # and fake data with the passed one too
-        model = semantic_model or "<PREDICT-DEFAULT-SEMANTIC-MODEL>"
+        model = item.semantic_models[0] if item.semantic_models else "<PREDICT-DEFAULT-SEMANTIC-MODEL>"
         semantic_thresholds[model] = self.default_semantic_threshold
         vectors[model] = base_vector
         timings[model] = 0.0
@@ -550,7 +533,8 @@ class DummyPredictEngine(PredictEngine):
                 vectors=vectors,
                 timings=timings,
             ),
-            query=sentence,
+            query=model,
+            rephrased_query="<REPHRASED-QUERY>" if item.rephrase or item.query_image else None,
         )
 
     async def detect_entities(self, kbid: str, sentence: str) -> list[RelationNode]:

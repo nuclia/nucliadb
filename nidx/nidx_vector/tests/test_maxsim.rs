@@ -19,7 +19,7 @@
 //
 
 use nidx_protos::VectorSentence;
-use nidx_vector::config::{Similarity, VectorCardinality, VectorConfig, VectorType, flags};
+use nidx_vector::config::{Similarity, VectorCardinality, VectorConfig, VectorType};
 use tempfile::tempdir;
 
 mod common;
@@ -52,7 +52,7 @@ fn test_maxsim() -> anyhow::Result<()> {
         vector_type: VectorType::DenseF32 { dimension: 5 },
         normalize_vectors: false,
         vector_cardinality: VectorCardinality::Multi,
-        flags: vec![flags::DATA_STORE_V2.to_string()],
+        flags: vec![],
     };
 
     // Creates a resource with some orthogonal vectors, to test search

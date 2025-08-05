@@ -9,7 +9,7 @@ metadata:
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 spec:
-  replicas: 2
+  replicas: {{ .Values.searcher.replicas | default 2 }}
   selector:
     matchLabels:
       app: nidx-searcher

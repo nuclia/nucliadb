@@ -57,6 +57,13 @@ class Conversation(Field[PBConversation]):
     async def set_value(self, payload: PBConversation):
         metadata = await self.get_metadata()
         metadata.extract_strategy = payload.extract_strategy
+        metadata.split_strategy = payload.split_strategy
+
+        if self._created is False and metadata.pages > 0:
+            try:
+                last_page = await self.db_get_value(page=metadata.pages)
+            except PageNotFound:
+                pass
 
         # Make sure message attachment files are on our region. This is needed
         # to support the hybrid-onprem deployment as the attachments must be stored
