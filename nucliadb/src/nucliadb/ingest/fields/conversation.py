@@ -59,12 +59,6 @@ class Conversation(Field[PBConversation]):
         metadata.extract_strategy = payload.extract_strategy
         metadata.split_strategy = payload.split_strategy
 
-        if self._created is False and metadata.pages > 0:
-            try:
-                last_page = await self.db_get_value(page=metadata.pages)
-            except PageNotFound:
-                pass
-
         # Get the last page if it exists
         last_page: Optional[PBConversation] = None
         if self._created is False and metadata.pages > 0:
