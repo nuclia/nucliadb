@@ -17,7 +17,7 @@
 import logging
 import os
 from copy import copy
-from datetime import datetime
+from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from typing import Any, Dict, Optional
 
@@ -99,7 +99,7 @@ class JSONFormatter(logging.Formatter):
 
     def fill_log_data(self, data: Dict[str, Any], record: logging.LogRecord) -> None:
         if "time" not in data:
-            data["time"] = datetime.utcnow()
+            data["time"] = datetime.now(timezone.utc)
 
         if record.exc_info:
             data["exc_info"] = self.formatException(record.exc_info)

@@ -54,7 +54,7 @@ def extract_openapi(application, version, commit_id, app_name):
     document["x-metadata"] = {
         app_name: {
             "commit": commit_id,
-            "last_updated": datetime.datetime.utcnow().isoformat(),
+            "last_updated": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         }
     }
     return document

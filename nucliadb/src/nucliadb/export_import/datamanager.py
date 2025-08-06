@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import AsyncGenerator, Type, Union, cast
 
 from nucliadb.common.maindb.driver import Driver
@@ -86,7 +86,7 @@ class ExportImportDataManager:
     ):
         metadata.processed = metadata.processed or 0
         metadata.total = metadata.total or 0
-        metadata.modified = datetime.utcnow()
+        metadata.modified = datetime.now(timezone.utc)
         key = self._get_maindb_metadata_key(type, metadata.kbid, metadata.id)
         data = metadata.model_dump_json().encode("utf-8")
         async with self.driver.transaction() as txn:

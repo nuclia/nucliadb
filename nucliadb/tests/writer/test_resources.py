@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 from unittest.mock import AsyncMock
 
@@ -85,8 +85,8 @@ async def test_resource_crud(nucliadb_writer: AsyncClient, knowledgebox_writer: 
             "origin": {
                 "source_id": "source_id",
                 "url": "http://some_source",
-                "created": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "modified": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "created": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "modified": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "metadata": {"key1": "value1", "key2": "value2"},
                 "tags": ["tag1", "tag2"],
                 "collaborators": ["col1", "col2"],
@@ -169,8 +169,8 @@ async def test_resource_crud_sync(nucliadb_writer: AsyncClient, knowledgebox_wri
             "origin": {
                 "source_id": "source_id",
                 "url": "http://some_source",
-                "created": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "modified": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "created": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "modified": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "metadata": {"key1": "value1", "key2": "value2"},
                 "tags": ["tag1", "tag2"],
                 "collaborators": ["col1", "col2"],
