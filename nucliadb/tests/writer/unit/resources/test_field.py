@@ -168,7 +168,7 @@ async def test_parse_conversation_field(storage_mock, processing_mock):
     assert len(bmm2.content.attachments) == 0
 
     # Check storage calls
-    assert storage_mock.conversation_field.call_count == 1
+    assert storage_mock.conversation_field_attachment.call_count == 1
     assert storage_mock.upload_b64file_to_cloudfile.await_count == 1
 
     # Check processing calls
