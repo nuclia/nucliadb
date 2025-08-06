@@ -332,37 +332,54 @@ class Field(Generic[PbType]):
             self.question_answers = actual_payload
 
     async def set_extracted_text(self, payload: ExtractedTextWrapper) -> None:
+        actual_payload: Optional[ExtractedText] = None
         if self.type in SUBFIELDFIELDS:
+            # Try to get the previously extracted text protobuf if it exists so we can merge it with the new splits
+            # coming from the processing payload.
             try:
-                actual_payload: Optional[ExtractedText] = await self.get_extracted_text(force=True)
+                actual_payload = await self.get_extracted_text(force=True)
             except KeyError:
-                actual_payload = None
-        else:
-            actual_payload = None
-        sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
+                # No previous extracted text found
+                pass
 
+        sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
         if actual_payload is None:
-            # Its first extracted text
+            # No previous extracted text, this is the first time we set it so we can simply upload it to storage
             if payload.HasField("file"):
+                # Normalize the storage key if the payload is a reference to a file in storage.
+                # This is typically the case when the text is too large and we store it in a
+                # cloud file. Normalization is needed to ensure that the hybrid-onprem deployment stores
+                # the file in the correct bucket of its storage.
                 await self.storage.normalize_binary(payload.file, sf)
             else:
+                # Directly upload the ExtractedText protobuf to storage
                 await self.storage.upload_pb(sf, payload.body)
                 self.extracted_text = payload.body
         else:
             if payload.HasField("file"):
+                # The extracted text coming from processing has a reference to another storage key.
+                # Download it and copy it to its ExtractedText.body field. This is typically for cases
+                # when the text is too large.
                 raw_payload = await self.storage.downloadbytescf(payload.file)
                 pb = ExtractedText()
                 pb.ParseFromString(raw_payload.read())
                 raw_payload.flush()
                 payload.body.CopyFrom(pb)
-            # We know its payload.body
+
+            # Update or set the extracted text text for each split coming from the processing payload
             for key, value in payload.body.split_text.items():
                 actual_payload.split_text[key] = value
+
+            # Apply any split deletions that may come in the processing payload
             for key in payload.body.deleted_splits:
                 if key in actual_payload.split_text:
                     del actual_payload.split_text[key]
+
+            # Finally, handle the main text body (for the cases where the text is not split)
             if payload.body.text != "":
                 actual_payload.text = payload.body.text
+
+            # Upload the updated ExtractedText to storage
             await self.storage.upload_pb(sf, actual_payload)
             self.extracted_text = actual_payload
 

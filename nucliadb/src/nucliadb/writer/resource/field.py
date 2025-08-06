@@ -466,9 +466,9 @@ async def parse_conversation_field(
             ]
         )
 
-        for count, file in enumerate(message.content.attachments):
-            sf_conv_field: StorageField = storage.conversation_field(
-                kbid, uuid, field=key, ident=message.ident, count=count
+        for idx, file in enumerate(message.content.attachments):
+            sf_conv_field: StorageField = storage.conversation_field_attachment(
+                kbid, uuid, field=key, ident=message.ident, attachment_index=idx
             )
             cf_conv_field = await storage.upload_b64file_to_cloudfile(
                 sf_conv_field,

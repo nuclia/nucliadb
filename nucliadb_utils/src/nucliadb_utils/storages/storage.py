@@ -51,7 +51,7 @@ from nucliadb_utils.utilities import get_local_storage, get_nuclia_storage
 STORAGE_RESOURCE = "kbs/{kbid}/r/{uuid}"
 RESOURCE_USER_RELATIONS = "kbs/{kbid}/r/{uuid}/user-relations"
 KB_RESOURCE_FIELD = "kbs/{kbid}/r/{uuid}/f/f/{field}"
-KB_CONVERSATION_FIELD = "kbs/{kbid}/r/{uuid}/f/c/{field}/{ident}/{count}"
+KB_CONVERSATION_FIELD_ATTACHMENT = "kbs/{kbid}/r/{uuid}/f/c/{field}/{ident}/{attachment_index}"
 STORAGE_FILE_EXTRACTED = "kbs/{kbid}/r/{uuid}/e/{field_type}/{field}/{key}"
 
 DEADLETTER = "deadletter/{partition}/{seqid}/{seq}"
@@ -314,11 +314,13 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             raise InvalidCloudFile()
         return new_cf
 
-    def conversation_field(
-        self, kbid: str, uuid: str, field: str, ident: str, count: int
+    def conversation_field_attachment(
+        self, kbid: str, uuid: str, field: str, ident: str, attachment_index: int
     ) -> StorageField:
         bucket = self.get_bucket_name(kbid)
-        key = KB_CONVERSATION_FIELD.format(kbid=kbid, uuid=uuid, field=field, ident=ident, count=count)
+        key = KB_CONVERSATION_FIELD_ATTACHMENT.format(
+            kbid=kbid, uuid=uuid, field=field, ident=ident, attachment_index=attachment_index
+        )
         return self.field_klass(storage=self, bucket=bucket, fullkey=key)
 
     def file_field(

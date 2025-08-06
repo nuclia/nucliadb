@@ -26,8 +26,9 @@ from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_utils.storages.storage import StorageField
 
 PAGE_SIZE = 200
-KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/{page}"
-KB_RESOURCE_FIELD_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
+
+CONVERSATION_PAGE_VALUE = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/{page}"
+CONVERSATION_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 
 
 class PageNotFound(Exception):
@@ -54,56 +55,65 @@ class Conversation(Field[PBConversation]):
         self.metadata = None
 
     async def set_value(self, payload: PBConversation):
-        last_page: Optional[PBConversation] = None
         metadata = await self.get_metadata()
         metadata.extract_strategy = payload.extract_strategy
         metadata.split_strategy = payload.split_strategy
 
+        # Get the last page if it exists
+        last_page: Optional[PBConversation] = None
         if self._created is False and metadata.pages > 0:
             try:
                 last_page = await self.db_get_value(page=metadata.pages)
             except PageNotFound:
                 pass
+        if last_page is None:
+            last_page = PBConversation()
+            metadata.pages += 1
 
-        # Make sure message attachment files are on our region
+        # Make sure message attachment files are on our region. This is needed
+        # to support the hybrid-onprem deployment as the attachments must be stored
+        # at the storage services of the client's premises.
         for message in payload.messages:
             new_message_files = []
-            for count, file in enumerate(message.content.attachments):
+            for idx, file in enumerate(message.content.attachments):
                 if self.storage.needs_move(file, self.kbid):
                     if message.ident == "":
                         message_ident = uuid.uuid4().hex
                     else:
                         message_ident = message.ident
-                    sf: StorageField = self.storage.conversation_field(
-                        self.kbid, self.uuid, self.id, message_ident, count
+                    sf: StorageField = self.storage.conversation_field_attachment(
+                        self.kbid, self.uuid, self.id, message_ident, attachment_index=idx
                     )
                     cf: CloudFile = await self.storage.normalize_binary(file, sf)
                     new_message_files.append(cf)
                 else:
                     new_message_files.append(file)
 
-            # Can be cleaned a list of PB
+            # Replace the attachments in the message with the new ones
             message.content.ClearField("attachments")
             for message_file in new_message_files:
                 message.content.attachments.append(message_file)
 
-        if last_page is None:
-            last_page = PBConversation()
-            metadata.pages += 1
-
-        # Merge on last page
+        # Increment the metadata total with the number of messages
         messages = list(payload.messages)
         metadata.total += len(messages)
+
+        # Store the messages in pages of PAGE_SIZE messages
         while len(messages) > 0:
-            count = metadata.size - len(last_page.messages)
-            last_page.messages.extend(messages[:count])
+            # Fit the messages in the last page
+            available_space = metadata.size - len(last_page.messages)
+            last_page.messages.extend(messages[:available_space])
+
+            # Save the last page
             await self.db_set_value(last_page, metadata.pages)
 
-            messages = messages[count:]
+            # If there are still messages, create a new page
+            messages = messages[available_space:]
             if len(messages) > 0:
                 metadata.pages += 1
                 last_page = PBConversation()
 
+        # Finally, set the metadata
         await self.db_set_metadata(metadata)
 
     async def get_value(self, page: Optional[int] = None) -> Optional[PBConversation]:
@@ -139,7 +149,7 @@ class Conversation(Field[PBConversation]):
     async def get_metadata(self) -> FieldConversation:
         if self.metadata is None:
             payload = await self.resource.txn.get(
-                KB_RESOURCE_FIELD_METADATA.format(
+                CONVERSATION_METADATA.format(
                     kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
                 )
             )
@@ -158,7 +168,7 @@ class Conversation(Field[PBConversation]):
             raise ValueError(f"Conversation pages start at index 1")
 
         if self.value.get(page) is None:
-            field_key = KB_RESOURCE_FIELD.format(
+            field_key = CONVERSATION_PAGE_VALUE.format(
                 kbid=self.kbid,
                 uuid=self.uuid,
                 type=self.type,
@@ -174,7 +184,7 @@ class Conversation(Field[PBConversation]):
         return self.value[page]
 
     async def db_set_value(self, payload: PBConversation, page: int = 0):
-        field_key = KB_RESOURCE_FIELD.format(
+        field_key = CONVERSATION_PAGE_VALUE.format(
             kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id, page=page
         )
         await self.resource.txn.set(
@@ -186,9 +196,7 @@ class Conversation(Field[PBConversation]):
 
     async def db_set_metadata(self, payload: FieldConversation):
         await self.resource.txn.set(
-            KB_RESOURCE_FIELD_METADATA.format(
-                kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
-            ),
+            CONVERSATION_METADATA.format(kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id),
             payload.SerializeToString(),
         )
         self.metadata = payload
