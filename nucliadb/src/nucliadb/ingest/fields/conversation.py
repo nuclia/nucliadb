@@ -65,6 +65,17 @@ class Conversation(Field[PBConversation]):
             except PageNotFound:
                 pass
 
+        # Get the last page if it exists
+        last_page: Optional[PBConversation] = None
+        if self._created is False and metadata.pages > 0:
+            try:
+                last_page = await self.db_get_value(page=metadata.pages)
+            except PageNotFound:
+                pass
+        if last_page is None:
+            last_page = PBConversation()
+            metadata.pages += 1
+
         # Make sure message attachment files are on our region. This is needed
         # to support the hybrid-onprem deployment as the attachments must be stored
         # at the storage services of the client's premises.
@@ -88,18 +99,6 @@ class Conversation(Field[PBConversation]):
             message.content.ClearField("attachments")
             for message_file in new_message_files:
                 message.content.attachments.append(message_file)
-
-        # Get the last page if it exists
-        last_page: Optional[PBConversation] = None
-        if self._created is False and metadata.pages > 0:
-            try:
-                last_page = await self.db_get_value(page=metadata.pages)
-            except PageNotFound:
-                pass
-
-        if last_page is None:
-            last_page = PBConversation()
-            metadata.pages += 1
 
         # Increment the metadata total with the number of messages
         messages = list(payload.messages)
