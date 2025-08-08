@@ -313,12 +313,10 @@ message FieldEntities {
 }
 
 message FieldMetadata {
+    reserved 3, 12;
+
     repeated string links = 1;
     repeated Paragraph paragraphs = 2;
-    // Map of entity_text to entity_type (label) found in the text
-    map<string, string> ner = 3;
-    // Map of data_augmentation_task_id to list of entities found in the field
-    map<string, FieldEntities> entities = 15;
     repeated Classification classifications = 4;
     google.protobuf.Timestamp last_index = 5;
     google.protobuf.Timestamp last_understanding = 6;
@@ -328,10 +326,10 @@ message FieldMetadata {
     CloudFile thumbnail = 9;
     string language = 10;
     string summary = 11;
-    // Map with keys f"{entity_text}/{entity_type}" for every `entity_text` present in `ner` field, and positions as values to reflect the entity positions in the text
-    map<string, Positions> positions = 12;
     repeated Relations relations = 13;
     string mime_type = 14;
+    // Map of data_augmentation_task_id to list of entities found in the field
+    map<string, FieldEntities> entities = 15;
 }
 
 message Question {
