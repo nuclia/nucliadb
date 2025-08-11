@@ -20,6 +20,7 @@
 from inspect import iscoroutinefunction
 from typing import TYPE_CHECKING, Annotated, Callable, Optional, Type, Union
 
+import pydantic
 from fastapi import HTTPException, Query, Response
 from fastapi_versioning import version
 from starlette.requests import Request
@@ -461,8 +462,10 @@ async def append_messages_to_conversation_field_rslug_prefix(
     field_id: FieldIdString,
     messages: list[models.InputMessage],
 ) -> ResourceFieldAdded:
-    field = models.InputConversationField()
-    field.messages.extend(messages)
+    try:
+        field = models.InputConversationField(messages=messages)
+    except pydantic.ValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, field)
 
 
@@ -482,8 +485,10 @@ async def append_messages_to_conversation_field_rid_prefix(
     field_id: FieldIdString,
     messages: list[models.InputMessage],
 ) -> ResourceFieldAdded:
-    field = models.InputConversationField()
-    field.messages.extend(messages)
+    try:
+        field = models.InputConversationField(messages=messages)
+    except pydantic.ValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     return await add_field_to_resource(request, kbid, rid, field_id, field)
 
 
