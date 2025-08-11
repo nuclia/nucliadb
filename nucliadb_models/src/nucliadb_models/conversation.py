@@ -93,11 +93,20 @@ class InputMessageContent(BaseModel):
 
 
 class InputMessage(BaseModel):
-    timestamp: Optional[datetime] = None
-    who: Optional[str] = None
-    to: List[str] = []
+    timestamp: Optional[datetime] = Field(
+        default=None, description="Time at which the message was sent, in ISO 8601 format."
+    )
+    who: Optional[str] = Field(
+        default=None, description="Sender of the message, e.g. 'user' or 'assistant'"
+    )
+    to: List[str] = Field(
+        default_factory=list,
+        description="List of recipients of the message, e.g. ['assistant'] or ['user']",
+    )
     content: InputMessageContent
-    ident: str
+    ident: str = Field(
+        description="Unique identifier for the message. Must be unique within the conversation."
+    )
     type_: Optional[MessageType] = Field(None, alias="type")
 
     @field_validator("ident", mode="after")
@@ -111,7 +120,10 @@ class InputMessage(BaseModel):
 
 
 class InputConversationField(BaseModel):
-    messages: List[InputMessage] = []
+    messages: List[InputMessage] = Field(
+        default_factory=list,
+        description="List of messages in the conversation field. Each message must have a unique ident.",
+    )
     extract_strategy: Optional[str] = Field(
         default=None,
         description="Id of the Nuclia extract strategy used at processing time. If not set, the default strategy was used. Extract strategies are defined at the learning configuration api.",
@@ -120,3 +132,13 @@ class InputConversationField(BaseModel):
         default=None,
         description="Id of the Nuclia split strategy used at processing time. If not set, the default strategy was used. Split strategies are defined at the learning configuration api.",
     )
+
+    @field_validator("messages", mode="after")
+    @classmethod
+    def idents_are_unique(cls, value: List[InputMessage]) -> List[InputMessage]:
+        seen_idents = set()
+        for message in value:
+            if message.ident in seen_idents:
+                raise ValueError(f'Message ident "{message.ident}" is not unique')
+            seen_idents.add(message.ident)
+        return value
