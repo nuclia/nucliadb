@@ -243,3 +243,50 @@ async def test_cannot_create_message_ident_0(
 
     assert resp.status_code == 422
     assert 'cannot be "0"' in resp.json()["detail"][0]["msg"]
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_message_idents_are_unique(
+    nucliadb_ingest_grpc, nucliadb_writer: AsyncClient, standalone_knowledgebox
+):
+    message = {
+        "timestamp": datetime.now().isoformat(),
+        "who": "person",
+        "to": ["computer"],
+        "content": {"text": "What is the meaning of life?"},
+        "ident": "foo_ident",
+    }
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "slug": "myresource",
+            "conversations": {
+                "faq": {
+                    "messages": [message, message]  # Two messages with the same ident
+                },
+            },
+        },
+    )
+
+    assert resp.status_code == 422
+    assert "ident" in resp.text and "is not unique" in resp.text
+
+    # Create a resource first
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "slug": "myresource",
+            "title": "My Resource",
+        },
+    )
+    assert resp.status_code == 201
+
+    # Add a conversation field with messages with the same ident
+    resp = await nucliadb_writer.put(
+        f"/kb/{standalone_knowledgebox}/slug/myresource/conversation/faq",
+        json={
+            "messages": [message, message]  # Two messages with the same ident
+        },
+    )
+    assert resp.status_code == 422
+    assert "ident" in resp.text and "is not unique" in resp.text
