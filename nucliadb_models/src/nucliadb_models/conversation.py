@@ -111,11 +111,15 @@ class InputMessage(BaseModel):
 
     @field_validator("ident", mode="after")
     @classmethod
-    def ident_not_zero(cls, value: str) -> str:
+    def validate_ident(cls, value: str) -> str:
         # The split value "0" is reserved by learning
         # Used to mark questions to override in the QA agent
         if value == "0":
             raise ValueError('Message ident cannot be "0"')
+        # Ident cannot contain "/" as it is used in the text
+        # block match ids (paragraph ids)
+        if "/" in value:
+            raise ValueError('Message ident cannot contain "/"')
         return value
 
 
