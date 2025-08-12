@@ -290,3 +290,33 @@ async def test_message_idents_are_unique(
     )
     assert resp.status_code == 422
     assert "ident" in resp.text and "is not unique" in resp.text
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_cannot_create_message_with_slash(
+    nucliadb_ingest_grpc, nucliadb_writer: AsyncClient, standalone_knowledgebox: str
+):
+    messages = [
+        # model_construct skips validation, to test the API error
+        InputMessage.model_construct(
+            to=["computer"],
+            who=f"person",
+            timestamp=datetime.now(),
+            content=InputMessageContent(text="What is the meaning of life?"),
+            ident="hello/world",  # This should raise an error
+            type=MessageType.QUESTION,
+        )
+    ]
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        headers={"Content-Type": "application/json"},
+        content=CreateResourcePayload(
+            slug="myresource",
+            conversations={
+                "faq": InputConversationField(messages=messages),
+            },
+        ).model_dump_json(by_alias=True),
+    )
+
+    assert resp.status_code == 422
+    assert 'cannot contain "/"' in resp.json()["detail"][0]["msg"]
