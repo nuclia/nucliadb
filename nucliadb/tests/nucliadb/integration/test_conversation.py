@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
+from typing import Optional
 
 import pytest
 from httpx import AsyncClient
@@ -31,17 +32,24 @@ from nucliadb_models.conversation import (
 )
 from nucliadb_models.resource import ConversationFieldData, FieldConversation, Resource
 from nucliadb_models.resource import Resource as ResponseResponse
-from nucliadb_models.search import KnowledgeboxFindResults
+from nucliadb_models.search import (
+    KnowledgeboxCounters,
+    KnowledgeboxFindResults,
+    KnowledgeboxSearchResults,
+)
 from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
+    ExtractedVectorsWrapper,
     FieldComputedMetadataWrapper,
     FieldID,
     FieldType,
     Paragraph,
+    Vector,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from tests.utils import inject_message
+from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 
 @pytest.fixture(scope="function")
@@ -320,3 +328,222 @@ async def test_cannot_create_message_with_slash(
 
     assert resp.status_code == 422
     assert 'cannot contain "/"' in resp.json()["detail"][0]["msg"]
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_conversation_field_indexing(
+    nucliadb_ingest_grpc,
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    vectors = {}
+    kbid = standalone_knowledgebox
+
+    def _broker_message(split: str, text: str, vector: list[float]):
+        bm = BrokerMessage()
+        bm.source = BrokerMessage.MessageSource.PROCESSOR
+        bm.uuid = rid
+        bm.kbid = kbid
+        field = FieldID(field="faq", field_type=FieldType.CONVERSATION)
+
+        etw = ExtractedTextWrapper()
+        etw.field.MergeFrom(field)
+        etw.body.split_text[split] = text
+        bm.extracted_text.append(etw)
+
+        fmw = FieldComputedMetadataWrapper()
+        fmw.field.MergeFrom(field)
+        paragraph = Paragraph(
+            start=0,
+            end=len(text),
+            kind=Paragraph.TypeParagraph.TEXT,
+            key=f"{rid}/c/faq/{split}/0-{len(text)}",
+        )
+        fmw.metadata.split_metadata[split].paragraphs.append(paragraph)
+        bm.field_metadata.append(fmw)
+
+        evw = ExtractedVectorsWrapper()
+        evw.field.MergeFrom(field)
+        evw.vectors.split_vectors[split].vectors.append(
+            Vector(
+                start=0,
+                end=len(text),
+                start_paragraph=0,
+                end_paragraph=len(text),
+                vector=vector,
+            )
+        )
+        bm.field_vectors.append(evw)
+        return bm
+
+    async def search_message(
+        query: Optional[str] = None,
+        vector: Optional[list[float]] = None,
+        top_k: int = 5,
+        min_score: Optional[float] = None,
+    ) -> KnowledgeboxFindResults:
+        payload = {"top_k": top_k, "reranker": "noop"}
+        features = []
+        if min_score is not None:
+            payload["min_score"] = min_score
+        if query:
+            payload["query"] = query
+            features.append("keyword")
+        if vector is not None:
+            payload["vector"] = vector
+            features.append("semantic")
+        if not features:
+            raise ValueError("At least one of 'query' or 'vector' must be provided")
+        payload["features"] = features
+
+        resp = await nucliadb_reader.post(f"/kb/{kbid}/find", json=payload, timeout=None)
+        resp.raise_for_status()
+        return KnowledgeboxFindResults.model_validate(resp.json())
+
+    async def get_counters() -> KnowledgeboxCounters:
+        # We call counters endpoint to get the sentences count only
+        resp = await nucliadb_reader.get(f"/kb/{kbid}/counters")
+        assert resp.status_code == 200, resp.text
+        counters = KnowledgeboxCounters.model_validate(resp.json())
+        n_sentences = counters.sentences
+
+        # We don't call /counters endpoint purposefully, as deletions are not guaranteed to be merged yet.
+        # Instead, we do some searches.
+        resp = await nucliadb_reader.get(f"/kb/{kbid}/search", params={"show": ["basic", "values"]})
+        assert resp.status_code == 200, resp.text
+        search = KnowledgeboxSearchResults.model_validate(resp.json())
+        n_resources = len(search.resources)
+        n_paragraphs = search.paragraphs.total  # type: ignore
+        n_fields = sum(
+            [
+                len(resource.data.generics or {})
+                + len(resource.data.files or {})
+                + len(resource.data.links or {})
+                + len(resource.data.texts or {})
+                + len(resource.data.conversations or {})
+                for resource in search.resources.values()
+                if resource.data
+            ]
+        )
+        # Update the counters object
+        counters.resources = n_resources
+        counters.paragraphs = n_paragraphs
+        counters.sentences = n_sentences
+        counters.fields = n_fields
+        return counters
+
+    # Make sure counters are empty
+    counters = await get_counters()
+    assert counters.sentences == 0
+    assert counters.paragraphs == 0
+    assert counters.fields == 0
+    assert counters.resources == 0
+
+    # Add conversation field with messages
+    question = "What is the meaning of life?"
+    vectors[question] = [1.0] * 768
+
+    slug = "myresource"
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": slug,
+            "title": "My Resource",
+            "conversations": {
+                "faq": {
+                    "messages": [
+                        {
+                            "to": ["computer"],
+                            "who": "person",
+                            "timestamp": datetime.now().isoformat(),
+                            "content": {"text": question},
+                            "ident": "1",
+                            "type": MessageType.QUESTION.value,
+                        },
+                    ]
+                },
+            },
+        },
+    )
+    resp.raise_for_status()
+    rid = resp.json()["uuid"]
+
+    # Inject synthetic processed data for the conversation
+    await inject_message(
+        nucliadb_ingest_grpc, _broker_message(split="1", text=question, vector=vectors[question])
+    )
+    await mark_dirty()
+    await wait_for_sync()
+
+    # Check counters
+    counters = await get_counters()
+    assert counters.sentences == 1  # One for the question message
+    assert counters.paragraphs == 2  # One for the question message + title paragraph
+    assert counters.fields == 2  # conversation field + title field
+    assert counters.resources == 1
+
+    # Append a message
+    answer = "42"
+    vectors[answer] = [2.0] * 768
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/resource/{rid}/conversation/faq/messages",
+        json=[
+            {
+                "to": ["person"],
+                "who": "computer",
+                "timestamp": datetime.now().isoformat(),
+                "content": {"text": answer},
+                "ident": "2",
+                "type": MessageType.ANSWER.value,
+            }
+        ],
+    )
+
+    await inject_message(
+        nucliadb_ingest_grpc, _broker_message(split="2", text=answer, vector=vectors[answer])
+    )
+
+    await mark_dirty()
+    await wait_for_sync()
+
+    # Check counters after appending the message
+    counters = await get_counters()
+    assert (
+        counters.sentences == 2 + 1
+    )  # One for each message (the title does not have a vector) + the initial message that has been marked as deleted but not yet merged
+    assert counters.paragraphs == 3  # One for each message + the title paragraph
+    assert counters.fields == 2  # One conversation field + the title field
+    assert counters.resources == 1
+
+    # Make sure the messages are searchable
+    question_text_block_id = f"{rid}/c/faq/1/0-{len(question)}"
+    results = await search_message(query=question)
+    assert len(results.best_matches) == 1
+    assert question_text_block_id in results.best_matches
+
+    # TODO: Look into why both messages of the conversation get the same vector score!
+    results = await search_message(vector=vectors[question], top_k=3, min_score=-1)
+    assert len(results.best_matches) == 2
+    assert question_text_block_id in results.best_matches
+
+    # Remove the field
+    resp = await nucliadb_writer.delete(f"/kb/{kbid}/resource/{rid}/conversation/faq")
+    resp.raise_for_status()
+
+    await mark_dirty()
+    await wait_for_sync()
+
+    # Make sure the messages are not searchable anymore
+    counters = await get_counters()
+    assert (
+        counters.sentences == 3
+    )  # The messages are not indexed anymore, but deleted messages still count
+    assert counters.paragraphs == 1  # the title
+    assert counters.fields == 1  # the title
+    assert counters.resources == 1
+
+    results = await search_message(query=question)
+    assert len(results.best_matches) == 0
+    results = await search_message(vector=vectors[question], top_k=3, min_score=-1)
+    assert len(results.best_matches) == 0

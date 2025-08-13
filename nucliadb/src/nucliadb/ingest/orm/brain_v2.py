@@ -356,7 +356,6 @@ class ResourceBrain:
             paragraph_labels.update(set(user_paragraph_classifications.valid.get(key, [])))
             paragraph_labels.difference_update(denied_classifications)
             p.labels.extend(list(paragraph_labels))
-
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
         if replace_field:
