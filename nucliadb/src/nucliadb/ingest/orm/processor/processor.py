@@ -348,7 +348,6 @@ class Processor:
                 # index message
                 if resource and resource.modified:
                     index_message = await self.generate_index_message(resource, messages, created)
-
                     try:
                         warnings = await self.index_resource(
                             index_message=index_message,
