@@ -69,6 +69,7 @@ class IndexMessageBuilder:
         relations: bool = True,
         replace: bool = True,
         vectorset_configs: Optional[list[VectorSetConfig]] = None,
+        split_ids: Optional[list[str]] = None,
     ):
         field = await self.resource.get_field(fieldid.field, fieldid.field_type)
         extracted_text = await field.get_extracted_text()
@@ -120,6 +121,7 @@ class IndexMessageBuilder:
                     replace_field=replace_paragraphs,
                     skip_paragraphs_index=skip_paragraphs_index,
                     skip_texts_index=skip_texts_index,
+                    split_ids=split_ids,
                 )
         if vectors:
             assert vectorset_configs is not None
@@ -137,6 +139,7 @@ class IndexMessageBuilder:
                         vectorset=vectorset_config.vectorset_id,
                         replace_field=replace,
                         vector_dimension=dimension,
+                        split_ids=split_ids,
                     )
         if relations:
             await asyncio.to_thread(
@@ -194,6 +197,7 @@ class IndexMessageBuilder:
                 relations=False,  # Relations at the field level are not modified by the writer
                 vectors=False,  # Vectors are never added by the writer
                 replace=not resource_created,
+                split_ids=None,  # Splits are not indexed on writer messages
             )
         return self.brain.brain
 
@@ -226,6 +230,9 @@ class IndexMessageBuilder:
                 vectors=needs_vectors_update(fieldid, messages),
                 replace=True,
                 vectorset_configs=vectorsets_configs,
+                split_ids=get_bm_modified_splits(fieldid, messages)
+                if fieldid.field_type == FieldType.CONVERSATION
+                else None,
             )
         return self.brain.brain
 
@@ -405,3 +412,21 @@ async def get_resource_index_message(
     """
     im_builder = IndexMessageBuilder(resource)
     return await im_builder.full(reindex=reindex)
+
+
+def get_bm_modified_splits(
+    fieldid: FieldID,
+    broker_messages: list[BrokerMessage],
+) -> list[str]:
+    """
+    Get the split ids that are involved in the operation so we only reindex these and not the whole field.
+    """
+    if fieldid.field_type != FieldType.CONVERSATION:
+        return []
+    splits: list[str] = []
+    for bm in broker_messages:
+        for etw in bm.extracted_text:
+            if not (etw.field.field_type == FieldType.CONVERSATION and etw.field.field == fieldid.field):
+                continue
+            splits.extend(etw.body.split_text.keys())
+    return splits
