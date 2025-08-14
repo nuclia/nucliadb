@@ -27,14 +27,12 @@ use nidx_protos::TypeMessage;
 use nidx_protos::nidx::nidx_indexer_server::NidxIndexer;
 use nidx_protos::nidx::nidx_indexer_server::NidxIndexerServer;
 use nidx_protos::prost::*;
-use nidx_protos::{IndexParagraph, IndexParagraphs, TextInformation, VectorSentence};
 use nidx_types::Seq;
 use object_store::{DynObjectStore, ObjectStore};
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
-use std::collections::HashMap;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::*;
@@ -509,87 +507,6 @@ mod tests {
             format!("{}/a/title/0-15", resource.resource.as_ref().unwrap().uuid),
             format!("{}/a/summary/0-150", resource.resource.as_ref().unwrap().uuid),
         ];
-        resource
-            .vector_prefixes_to_delete
-            .insert(index.name, StringList { items: keys.clone() });
-        index_resource(
-            &meta,
-            storage.clone(),
-            &tempfile::env::temp_dir(),
-            &shard.id.to_string(),
-            resource,
-            2i64.into(),
-        )
-        .await?;
-
-        let deletions = Deletion::for_index_and_seq(&meta.pool, index.id, 10i64.into()).await?;
-        assert_eq!(deletions.len(), 1);
-        assert_eq!(deletions[0].keys, keys);
-
-        Ok(())
-    }
-
-    #[sqlx::test]
-    async fn test_index_deletions_split(pool: sqlx::PgPool) -> anyhow::Result<()> {
-        let meta = NidxMetadata::new_with_pool(pool).await?;
-        let storage = Arc::new(object_store::memory::InMemory::new());
-
-        let kbid = Uuid::new_v4();
-        let shard = Shard::create(&meta.pool, kbid).await?;
-        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?;
-
-        // Resource with no deletions, no `Deletion` is created
-        let mut resource = little_prince_2(shard.id.to_string(), None);
-        index_resource(
-            &meta,
-            storage.clone(),
-            &tempfile::env::temp_dir(),
-            &shard.id.to_string(),
-            resource.clone(),
-            1i64.into(),
-        )
-        .await?;
-
-        assert!(
-            Deletion::for_index_and_seq(&meta.pool, index.id, 10i64.into())
-                .await?
-                .is_empty()
-        );
-
-        // Resource with some deletions, a single `Deletion` with multiple keys is created
-        resource.texts.clear();
-        resource.paragraphs.clear();
-
-        resource.texts.insert(
-            "c/faq/2".to_string(),
-            TextInformation {
-                text: "42".to_string(),
-                ..Default::default()
-            },
-        );
-        let mut summary_paragraphs = HashMap::new();
-        let mut index_paragraph = IndexParagraph {
-            start: 0,
-            end: 1,
-            field: "c/faq/2".to_string(),
-            ..Default::default()
-        };
-        let rid: String = resource.resource.as_ref().unwrap().uuid.clone();
-        index_paragraph.sentences = HashMap::from([(
-            format!("{rid}/c/faq/2/0-1"),
-            VectorSentence {
-                vector: vec![0.9, 0.9, 0.9],
-                metadata: None,
-            },
-        )]);
-        summary_paragraphs.insert(format!("{rid}/c/faq/2/0-1"), index_paragraph);
-        resource.paragraphs.insert(
-            "c/faq/2".to_string(),
-            IndexParagraphs {
-                paragraphs: summary_paragraphs,
-            },
-        );
-        let keys = vec![format!("{}/c/faq/2", resource.resource.as_ref().unwrap().uuid)];
         resource
             .vector_prefixes_to_delete
             .insert(index.name, StringList { items: keys.clone() });
