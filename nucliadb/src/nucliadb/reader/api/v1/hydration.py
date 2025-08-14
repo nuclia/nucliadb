@@ -31,6 +31,7 @@ from nucliadb.ingest.fields.base import FieldTypes
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.resources_pb2 import ExtractedText
 from nucliadb_utils.authentication import requires_one
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
 from .router import KB_PREFIX, api
@@ -56,7 +57,7 @@ class HydrateError(BaseModel):
     message: Optional[str] = None
 
 
-class HydrateTextBlocksRespone(BaseModel):
+class HydrateTextBlocksResponse(BaseModel):
     text_blocks: dict[str, HydratedTextBlock]
     errors: dict[str, HydrateError]
 
@@ -73,16 +74,36 @@ async def hydrate_text_blocks(
     request: Request,
     kbid: str,
     item: HydrateTextBlocksRequest,
-) -> HydrateTextBlocksRespone:
+) -> HydrateTextBlocksResponse:
     """
     Hydrate text blocks in a resource.
     """
-    response = HydrateTextBlocksRespone(
+    response = HydrateTextBlocksResponse(
         text_blocks={},
         errors={},
     )
+    by_field = group_by_field(item, response)
+    await check_fields_exist(
+        kbid=kbid,
+        by_field=by_field,
+        response=response,
+    )
+    storage = await get_storage()
+    for field_id, paragraph_ids in by_field.items():
+        await hydrate_field(
+            storage=storage,
+            kbid=kbid,
+            field_id=field_id,
+            paragraph_ids=paragraph_ids,
+            response=response,
+        )
+    return response
 
-    # Validate the text block ids and group them by resource and field
+
+def group_by_field(
+    item: HydrateTextBlocksRequest,
+    response: HydrateTextBlocksResponse,
+) -> dict[FieldId, list[ParagraphId]]:
     by_field: dict[FieldId, list[ParagraphId]] = {}
     for text_block_id in item.text_blocks:
         try:
@@ -92,10 +113,14 @@ async def hydrate_text_blocks(
             response.errors[text_block_id] = HydrateError(
                 code=HydrateErrorCode.INVALID,
             )
+    return by_field
 
-    if len(by_field) == 0:
-        return response
 
+async def check_fields_exist(
+    kbid: str,
+    by_field: dict[FieldId, list[ParagraphId]],
+    response: HydrateTextBlocksResponse,
+):
     keys_to_check: dict[str, FieldId] = {}
     for field_id in by_field.keys():
         key = KB_RESOURCE_FIELD.format(
@@ -121,38 +146,43 @@ async def hydrate_text_blocks(
             )
         by_field.pop(field_id, None)
 
-    if len(by_field) == 0:
-        return response
 
-    # Now try to get the field objects, and discard those that are not found
-    storage = await get_storage()
-    for field_id, paragraph_ids in by_field.items():
-        sf = storage.file_extracted(
-            kbid, field_id.rid, field_id.type, field_id.key, FieldTypes.FIELD_TEXT
-        )
-        payload: Optional[ExtractedText] = await storage.download_pb(sf, ExtractedText)
-        if payload is None:
-            for pid in paragraph_ids:
-                response.errors[pid.full()] = HydrateError(
+async def hydrate_field(
+    storage: Storage,
+    kbid: str,
+    field_id: FieldId,
+    paragraph_ids: list[ParagraphId],
+    response: HydrateTextBlocksResponse,
+):
+    sf = storage.file_extracted(kbid, field_id.rid, field_id.type, field_id.key, FieldTypes.FIELD_TEXT)
+    payload: Optional[ExtractedText] = await storage.download_pb(sf, ExtractedText)
+    if payload is None:
+        for pid in paragraph_ids:
+            response.errors[pid.full()] = HydrateError(
+                code=HydrateErrorCode.NOT_FOUND,
+                message="Field text not found",
+            )
+        return
+    for pid in paragraph_ids:
+        subfield = pid.field_id.subfield_id
+        if subfield is not None:
+            if subfield not in payload.split_text:
+                response.errors[str(pid)] = HydrateError(
                     code=HydrateErrorCode.NOT_FOUND,
-                    message="Field text not found",
+                    message="Subfield text not found",
                 )
+                continue
+            text = payload.split_text[subfield]
         else:
-            for pid in paragraph_ids:
-                if pid.field_id.subfield_id is not None:
-                    text = payload.split_text.get(pid.field_id.subfield_id) or ""
-                else:
-                    text = payload.text
-                ptext = text[pid.paragraph_start : pid.paragraph_end]
-                if not ptext:
-                    response.errors[str(pid)] = HydrateError(
-                        code=HydrateErrorCode.NOT_FOUND,
-                        message="Subfield text not found",
-                    )
-                else:
-                    response.text_blocks[str(pid)] = HydratedTextBlock(
-                        id=str(pid),
-                        text=ptext,
-                    )
-
-    return response
+            text = payload.text
+        ptext = text[pid.paragraph_start : pid.paragraph_end]
+        if not ptext:
+            response.errors[str(pid)] = HydrateError(
+                code=HydrateErrorCode.NOT_FOUND,
+                message="Text block out of range",
+            )
+            continue
+        response.text_blocks[str(pid)] = HydratedTextBlock(
+            id=str(pid),
+            text=ptext,
+        )
