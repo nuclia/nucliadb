@@ -136,6 +136,89 @@ pub fn little_prince(shard_id: impl Into<String>, vectorsets: Option<&[&str]>) -
     resource
 }
 
+pub fn little_prince_2(shard_id: impl Into<String>, vectorsets: Option<&[&str]>) -> Resource {
+    let shard_id = shard_id.into();
+    let mut resource = minimal_resource(shard_id);
+    let rid = &resource.resource.as_ref().unwrap().uuid;
+
+    resource.labels.push("/s/p/en".to_string()); // language=en
+
+    resource.texts.insert(
+        "a/title".to_string(),
+        TextInformation {
+            text: "The little prince".to_string(),
+            ..Default::default()
+        },
+    );
+    let mut title_paragraphs = HashMap::new();
+    title_paragraphs.insert(
+        format!("{rid}/a/title/0-17"),
+        IndexParagraph {
+            start: 0,
+            end: 17,
+            field: "a/title".to_string(),
+            ..Default::default()
+        },
+    );
+    resource.paragraphs.insert(
+        "a/title".to_string(),
+        IndexParagraphs {
+            paragraphs: title_paragraphs,
+        },
+    );
+
+    resource.texts.insert(
+        "c/faq/1".to_string(),
+        TextInformation {
+            text: "The story follows a young prince who visits various planets in space, \
+                   including Earth, and addresses themes of loneliness, friendship, love, and \
+                   loss."
+                .to_string(),
+            ..Default::default()
+        },
+    );
+    let mut summary_paragraphs = HashMap::new();
+    let mut index_paragraph = IndexParagraph {
+        start: 0,
+        end: 150,
+        field: "c/faq/1".to_string(),
+        ..Default::default()
+    };
+    if let Some(vectorsets) = vectorsets {
+        for vs in vectorsets {
+            index_paragraph.vectorsets_sentences.insert(
+                vs.to_string(),
+                VectorsetSentences {
+                    sentences: HashMap::from([(
+                        format!("{rid}/c/faq/1/0-150"),
+                        VectorSentence {
+                            vector: vec![0.5, 0.5, 0.5],
+                            metadata: None,
+                        },
+                    )]),
+                },
+            );
+        }
+    } else {
+        index_paragraph.sentences = HashMap::from([(
+            format!("{rid}/c/faq/1/0-150"),
+            VectorSentence {
+                vector: vec![0.5, 0.5, 0.5],
+                metadata: None,
+            },
+        )]);
+    }
+    summary_paragraphs.insert(format!("{rid}/c/faq/1/0-150"), index_paragraph);
+    resource.paragraphs.insert(
+        "c/faq/1".to_string(),
+        IndexParagraphs {
+            paragraphs: summary_paragraphs,
+        },
+    );
+
+    resource
+}
+
 pub fn people_and_places(shard_id: impl Into<String>) -> Resource {
     let shard_id = shard_id.into();
 
