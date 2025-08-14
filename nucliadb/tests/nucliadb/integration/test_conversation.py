@@ -442,7 +442,7 @@ async def test_conversation_field_indexing(
 
     # Add conversation field with messages
     question = "What is the meaning of life?"
-    vectors[question] = [1.0] * 768
+    vectors[question] = [0.1] * 768
 
     slug = "myresource"
     resp = await nucliadb_writer.post(
@@ -484,8 +484,8 @@ async def test_conversation_field_indexing(
     assert counters.resources == 1
 
     # Append a message
-    answer = "42"
-    vectors[answer] = [2.0] * 768
+    answer = "42 is the answer to everything."
+    vectors[answer] = [0.2] * 768
     resp = await nucliadb_writer.put(
         f"/kb/{kbid}/resource/{rid}/conversation/faq/messages",
         json=[
@@ -515,15 +515,21 @@ async def test_conversation_field_indexing(
     assert counters.resources == 1
 
     # Make sure the messages are searchable
-    question_text_block_id = f"{rid}/c/faq/1/0-{len(question)}"
-    results = await search_message(query=question)
-    assert len(results.best_matches) == 1
-    assert question_text_block_id in results.best_matches
+    text_block_ids = {
+        answer: f"{rid}/c/faq/2/0-{len(answer)}",
+        question: f"{rid}/c/faq/1/0-{len(question)}",
+    }
+    for text, block_id in text_block_ids.items():
+        # Test paragraph keyword search
+        results = await search_message(query=text)
+        assert len(results.best_matches) == 1
+        assert block_id in results.best_matches
 
-    # TODO: Look into why both messages of the conversation get the same vector score!
-    results = await search_message(vector=vectors[question], top_k=3, min_score=-1)
-    assert len(results.best_matches) == 2
-    assert question_text_block_id in results.best_matches
+        # Test semantic search
+        # TODO: Look into why both messages of the conversation get the same vector score!
+        results = await search_message(vector=vectors[text], top_k=1, min_score=0.99)
+        assert len(results.best_matches) == 1
+        assert block_id in results.best_matches
 
     # Remove the field
     resp = await nucliadb_writer.delete(f"/kb/{kbid}/resource/{rid}/conversation/faq")
@@ -535,13 +541,15 @@ async def test_conversation_field_indexing(
     # Make sure the messages are not searchable anymore
     counters = await get_counters()
     assert (
-        counters.sentences == 3
+        counters.sentences == 2
     )  # The messages are not indexed anymore, but deleted messages still count
     assert counters.paragraphs == 1  # the title
     assert counters.fields == 1  # the title
     assert counters.resources == 1
 
-    results = await search_message(query=question)
-    assert len(results.best_matches) == 0
-    results = await search_message(vector=vectors[question], top_k=3, min_score=-1)
-    assert len(results.best_matches) == 0
+    # Check that the messages are not searchable anymore
+    for text in [question, answer]:
+        results = await search_message(query=text)
+        assert len(results.best_matches) == 0
+        results = await search_message(vector=vectors[text], top_k=3, min_score=-1)
+        assert len(results.best_matches) == 0

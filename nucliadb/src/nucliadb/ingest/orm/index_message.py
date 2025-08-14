@@ -230,9 +230,7 @@ class IndexMessageBuilder:
                 vectors=needs_vectors_update(fieldid, messages),
                 replace=True,
                 vectorset_configs=vectorsets_configs,
-                split_ids=get_bm_modified_splits(fieldid, messages)
-                if fieldid.field_type == FieldType.CONVERSATION
-                else None,
+                split_ids=get_bm_modified_splits(fieldid, messages),
             )
         return self.brain.brain
 
@@ -417,12 +415,12 @@ async def get_resource_index_message(
 def get_bm_modified_splits(
     fieldid: FieldID,
     broker_messages: list[BrokerMessage],
-) -> list[str]:
+) -> Optional[list[str]]:
     """
     Get the split ids that are involved in the operation so we only reindex these and not the whole field.
     """
     if fieldid.field_type != FieldType.CONVERSATION:
-        return []
+        return None
     splits: list[str] = []
     for bm in broker_messages:
         for etw in bm.extracted_text:
