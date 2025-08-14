@@ -75,9 +75,6 @@ async def hydrate_text_blocks(
     kbid: str,
     item: HydrateTextBlocksRequest,
 ) -> HydrateTextBlocksResponse:
-    """
-    Hydrate text blocks in a resource.
-    """
     response = HydrateTextBlocksResponse(
         text_blocks={},
         errors={},
