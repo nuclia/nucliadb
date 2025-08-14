@@ -157,6 +157,9 @@ class ParagraphId:
     paragraph_start: int
     paragraph_end: int
 
+    def __str__(self) -> str:
+        return self.full()
+
     def __repr__(self) -> str:
         return f"ParagraphId({self.full()})"
 
@@ -175,6 +178,8 @@ class ParagraphId:
         parts = value.split("/")
         paragraph_range = parts[-1]
         start, end = map(int, paragraph_range.split("-"))
+        if start >= end:
+            raise ValueError(f"Invalid ParagraphId: {value}, start must be less than end")
         field_id = FieldId.from_string("/".join(parts[:-1]))
         return cls(field_id=field_id, paragraph_start=start, paragraph_end=end)
 
@@ -216,6 +221,9 @@ class VectorId:
     index: int
     vector_start: int
     vector_end: int
+
+    def __str__(self) -> str:
+        return self.full()
 
     def __repr__(self) -> str:
         return f"VectorId({self.full()})"
