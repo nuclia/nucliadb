@@ -2193,6 +2193,7 @@ dependencies = [
  "nidx_protos",
  "nidx_tantivy",
  "nidx_types",
+ "nom",
  "once_cell",
  "regex",
  "serde_json",
