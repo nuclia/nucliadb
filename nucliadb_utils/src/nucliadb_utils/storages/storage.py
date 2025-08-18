@@ -449,7 +449,6 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         async for data in self.download(bucket, key):
             if data is not None:
                 result.write(data)
-
         result.seek(0)
         return result
 
