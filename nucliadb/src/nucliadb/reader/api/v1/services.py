@@ -328,7 +328,7 @@ async def processing_status(
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def get_search_configuration(request: Request, kbid: str, config_name: str) -> SearchConfiguration:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
@@ -349,7 +349,7 @@ async def get_search_configuration(request: Request, kbid: str, config_name: str
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def list_search_configurations(request: Request, kbid: str) -> dict[str, SearchConfiguration]:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 

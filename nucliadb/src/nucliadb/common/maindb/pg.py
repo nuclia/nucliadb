@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, Optional
 
@@ -31,6 +30,7 @@ import psycopg_pool
 
 from nucliadb.common.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError
+from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import metrics
 
 RETRIABLE_EXCEPTIONS = (
@@ -70,13 +70,13 @@ POOL_METRICS_GAUGES = {
 class DataLayer:
     def __init__(self, connection: psycopg.AsyncConnection):
         self.connection = connection
-        self.for_update_log = os.environ.get("PG_FOR_UPDATE_LOG", "false").lower() == "true"
+        self.log_on_select_for_update = settings.driver_pg_log_on_select_for_update
 
     async def get(self, key: str, select_for_update: bool = False) -> Optional[bytes]:
         with pg_observer({"type": "get"}):
             statement = "SELECT value FROM resources WHERE key = %s"
             if select_for_update:
-                if self.for_update_log:
+                if self.log_on_select_for_update:
                     logger.warning(f"SELECT FOR UPDATE on key={key}")
                 statement += " FOR UPDATE"
             async with self.connection.cursor() as cur:
@@ -121,7 +121,7 @@ class DataLayer:
             async with self.connection.cursor() as cur:
                 statement = "SELECT key, value FROM resources WHERE key = ANY(%s)"
                 if select_for_update:
-                    if self.for_update_log:
+                    if self.log_on_select_for_update:
                         logger.warning(f"SELECT FOR UPDATE on keys={keys}")
                     statement += " FOR UPDATE"
                 await cur.execute(statement, (keys,))
