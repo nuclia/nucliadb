@@ -217,6 +217,7 @@ class ResourceBrain:
         replace_field: bool,
         skip_paragraphs_index: Optional[bool],
         skip_texts_index: Optional[bool],
+        split_ids: Optional[list[str]] = None,
     ) -> None:
         # We need to add the extracted text to the texts section of the Resource so that
         # the paragraphs can be indexed
@@ -234,6 +235,7 @@ class ResourceBrain:
             user_field_metadata,
             replace_field=replace_field,
             skip_paragraphs=skip_paragraphs_index,
+            split_ids=split_ids,
         )
 
     @observer.wrap({"type": "apply_field_paragraphs"})
@@ -246,6 +248,7 @@ class ResourceBrain:
         user_field_metadata: Optional[UserFieldMetadata],
         replace_field: bool,
         skip_paragraphs: Optional[bool],
+        split_ids: Optional[list[str]] = None,
     ) -> None:
         if skip_paragraphs is not None:
             self.brain.skip_paragraphs = skip_paragraphs
@@ -254,6 +257,9 @@ class ResourceBrain:
         paragraph_pages = ParagraphPages(page_positions) if page_positions else None
         # Splits of the field
         for subfield, field_metadata in field_computed_metadata.split_metadata.items():
+            if split_ids and subfield not in split_ids:
+                # Only index the splits we're handling right now, if any
+                continue
             extracted_text_str = extracted_text.split_text[subfield] if extracted_text else None
             for idx, paragraph in enumerate(field_metadata.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
@@ -360,8 +366,20 @@ class ResourceBrain:
 
         if replace_field:
             field_type, field_name = field_key.split("/")
-            full_field_id = ids.FieldId(rid=self.rid, type=field_type, key=field_name).full()
-            self.brain.paragraphs_to_delete.append(full_field_id)
+            if not split_ids:
+                # If no split_ids are provided, we delete the whole field
+                full_field_id = ids.FieldId(rid=self.rid, type=field_type, key=field_name).full()
+                self.brain.paragraphs_to_delete.append(full_field_id)
+            else:
+                # If split_ids are provided, we delete only the specified splits
+                for split_id in split_ids:
+                    field_split_id = ids.FieldId(
+                        rid=self.rid,
+                        type=field_type,
+                        key=field_name,
+                        subfield_id=split_id,
+                    ).full()
+                    self.brain.paragraphs_to_delete.append(field_split_id)
 
     def _get_paragraph_user_classifications(
         self, basic_user_field_metadata: Optional[UserFieldMetadata]
@@ -496,9 +514,13 @@ class ResourceBrain:
         replace_field: bool = False,
         # cut to specific dimension if specified
         vector_dimension: Optional[int] = None,
+        split_ids: Optional[list[str]] = None,
     ):
         fid = ids.FieldId.from_string(f"{self.rid}/{field_id}")
         for subfield, vectors in vo.split_vectors.items():
+            if split_ids and subfield not in split_ids:
+                # Only index the splits we're handling right now, if any
+                continue
             _field_id = ids.FieldId(
                 rid=fid.rid,
                 type=fid.type,
@@ -554,8 +576,20 @@ class ResourceBrain:
             )
 
         if replace_field:
-            full_field_id = ids.FieldId(rid=self.rid, type=fid.type, key=fid.key).full()
-            self.brain.vector_prefixes_to_delete[vectorset].items.append(full_field_id)
+            if not split_ids:
+                # If no split_ids are provided, we delete the whole field
+                full_field_id = ids.FieldId(rid=self.rid, type=fid.type, key=fid.key).full()
+                self.brain.vector_prefixes_to_delete[vectorset].items.append(full_field_id)
+            else:
+                # If split_ids are provided, we delete only the specified splits
+                for split_id in split_ids:
+                    field_split_id = ids.FieldId(
+                        rid=self.rid,
+                        type=fid.type,
+                        key=fid.key,
+                        subfield_id=split_id,
+                    ).full()
+                    self.brain.vector_prefixes_to_delete[vectorset].items.append(field_split_id)
 
     @observer.wrap({"type": "apply_field_vector"})
     def _apply_field_vector(
