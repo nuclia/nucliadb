@@ -460,7 +460,7 @@ async def _reprocess_resource(
     driver = get_driver()
 
     writer = BrokerMessage()
-    async with driver.transaction() as txn:
+    async with driver.transaction(read_only=True) as txn:
         kb = KnowledgeBox(txn, storage, kbid)
 
         resource = await kb.get(rid)
