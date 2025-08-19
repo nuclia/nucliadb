@@ -596,3 +596,101 @@ class Field(Generic[PbType]):
 
     async def get_value(self) -> Any:
         raise NotImplementedError()
+
+
+class ExtractedTextIndex:
+    def __init__(self, et: ExtractedText):
+        self.et = et
+        self.step_size = 1024
+        self.index: dict[int, int] = self.create_index()
+
+    def create_index(self) -> dict[int, int]:
+        # We assume that the dictionary will preserve the order of insertion
+        # (Python 3.7+), so we can use it to create an index
+        # that maps the position of the text in the ExtractedText to the byte
+        # position in the serialized ExtractedText.
+        index: dict[int, int] = {}
+        encoded = self.et.SerializeToString()
+        # Initialize the index with the start position by searching for the first two characters.
+        # This is a trick to know where the protobuff header ends.
+        text_starts_at = encoded.index(self.et.text[:2].encode())
+        index[0] = text_starts_at
+
+        for i in range(self.step_size, len(self.et.text), self.step_size):
+            text_slice = self.et.text[0:i]
+            index[i] = len(text_slice.encode()) + text_starts_at
+
+        # Add the end position of the text to the index
+        last_pos = len(self.et.text) - 1
+        if last_pos not in index:
+            index[last_pos] = len(self.et.text.encode()) + text_starts_at
+
+        assert len(index) > 0, "Index is empty, cannot create ExtractedTextIndex."
+        return index
+
+    def get_start(self, position: int) -> tuple[int, int]:
+        buffered = None
+        for text, byte in self.index.items():
+            if text == position:
+                return text, byte
+            if text > position:
+                assert buffered is not None, "Buffered value should not be None."
+                return buffered
+            buffered = (text, byte)
+        # Return the first position if not found
+        return 0, self.index[0]
+
+    def get_end(self, position: int) -> tuple[int, int]:
+        for text, byte in self.index.items():
+            if text >= position:
+                return text, byte
+        # Return the last position if not found
+        return text, byte
+
+
+def get_paragraph_text(index: ExtractedTextIndex, encoded_et: bytes, start: int, end: int) -> str:
+    start_text, start_bytes = index.get_start(start)
+    end_text, end_bytes = index.get_end(end)
+
+    # PLACEHOLDER: here we would need to download the encoded extracted text from storage using the range download
+    # with the start_bytes and end_bytes as the range. However, for this example, we simply cut the bytes from the
+    # encoded_et that we have.
+    slice_bytes = encoded_et[start_bytes : end_bytes + 1]
+
+    # Decode the bytes to a string
+    slice_text = slice_bytes.decode()
+    # Adjust the offsets
+    if end_text > end:
+        slice_text = slice_text[: -(end_text - end)]
+    if start_text < start:
+        slice_text = slice_text[start - start_text :]
+    return slice_text
+
+
+if __name__ == "__main__":
+    paragraph_sets = [
+        ("À.", "Bé.", "No sé."),
+        ("Sóc en Ferran.", "Sóc en Joan.", "Sóc en Pau."),
+        ("Lorem ipsum dolor sit amet.", "Tenir discipline és important.", "Hola món."),
+    ]
+    for p1, p2, p3 in paragraph_sets:
+        # Example usage
+        et = ExtractedText()
+        et.text = "\n".join([p1, p2, p3])
+
+        # Index. This is what we will store in maindb
+        index = ExtractedTextIndex(et)
+
+        # Positions of the paragraphs in the text
+        p1_positions = (0, len(p1) - 1)
+        p2_positions = (p1_positions[1] + 2, p1_positions[1] + 2 + len(p2) - 1)
+        p3_positions = (p2_positions[1] + 2, p2_positions[1] + 2 + len(p3) - 1)
+        positions = {p1: p1_positions, p2: p2_positions, p3: p3_positions}
+
+        encoded_et = et.SerializeToString()
+
+        # Make sure the right text is returned for each paragraph
+        for p in (p1, p2, p3):
+            fetched = get_paragraph_text(index, encoded_et, *positions[p])
+            assert fetched == p, f"Expected '{p}', got '{fetched}'"
+            print(fetched)
