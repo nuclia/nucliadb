@@ -114,16 +114,16 @@ exceptions = [
     # Each entry is the crate and version constraint, and its specific allow
     # list
     #{ allow = ["Zlib"], crate = "adler32" },
-    { allow = ["AGPL-3.0"], crate = "nidx" },
-    # { allow = ["AGPL-3.0"], crate = "nidx_binding" },
-    { allow = ["AGPL-3.0"], crate = "nidx_paragraph" },
-    { allow = ["AGPL-3.0"], crate = "nidx_protos" },
-    { allow = ["AGPL-3.0"], crate = "nidx_relation" },
-    { allow = ["AGPL-3.0"], crate = "nidx_tantivy" },
-    { allow = ["AGPL-3.0"], crate = "nidx_tests" },
-    { allow = ["AGPL-3.0"], crate = "nidx_text" },
-    { allow = ["AGPL-3.0"], crate = "nidx_types" },
-    { allow = ["AGPL-3.0"], crate = "nidx_vector" },
+    { allow = ["AGPL-3.0-or-later"], crate = "nidx" },
+    # { allow = ["AGPL-3.0-or-later"], crate = "nidx_binding" },
+    { allow = ["AGPL-3.0-or-later"], crate = "nidx_paragraph" },
+    { allow = ["AGPL-3.0-or-later"], crate = "nidx_protos" },
+    { allow = ["AGPL-3.0-or-later"], crate = "nidx_relation" },
+    { allow = ["AGPL-3.0-or-later"], crate = "nidx_tantivy" },
+    { allow = ["AGPL-3.0-or-later"], crate = "nidx_tests" },
+    { allow = ["AGPL-3.0-or-later"], crate = "nidx_text" },
+    { allow = ["AGPL-3.0-or-later"], crate = "nidx_types" },
+    { allow = ["AGPL-3.0-or-later"], crate = "nidx_vector" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,
