@@ -61,6 +61,10 @@ class DriverSettings(BaseSettings):
         default=1000,
         description="PostgreSQL pool acquire timeout in ms. The maximum time to wait until a connection becomes available.",
     )
+    driver_pg_log_on_select_for_update: bool = Field(
+        default=False,
+        description="If true, log a warning when a SELECT FOR UPDATE is executed. This is useful to detect potential deadlocks.",
+    )
 
 
 # For use during migration from pull v1 to pull v2

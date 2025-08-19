@@ -335,7 +335,7 @@ async def _get_resource_field(
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
     pb_field_id = to_proto.field_type_name(field_type)
-    async with driver.transaction() as txn:
+    async with driver.transaction(read_only=True) as txn:
         kb = ORMKnowledgeBox(txn, storage, kbid)
 
         if rid is None:
