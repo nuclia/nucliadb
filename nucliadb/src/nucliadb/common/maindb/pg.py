@@ -30,7 +30,7 @@ import psycopg_pool
 
 from nucliadb.common.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError
-from nucliadb.ingest.settings import DriverSettings
+from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import metrics
 
 RETRIABLE_EXCEPTIONS = (
@@ -70,7 +70,7 @@ POOL_METRICS_GAUGES = {
 class DataLayer:
     def __init__(self, connection: psycopg.AsyncConnection):
         self.connection = connection
-        self.log_on_select_for_update = DriverSettings().driver_pg_log_on_select_for_update
+        self.log_on_select_for_update = settings.driver_pg_log_on_select_for_update
 
     async def get(self, key: str, select_for_update: bool = False) -> Optional[bytes]:
         with pg_observer({"type": "get"}):
