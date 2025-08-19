@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, Optional
 
@@ -69,11 +70,14 @@ POOL_METRICS_GAUGES = {
 class DataLayer:
     def __init__(self, connection: psycopg.AsyncConnection):
         self.connection = connection
+        self.for_update_log = os.environ.get("PG_FOR_UPDATE_LOG", "false").lower() == "true"
 
     async def get(self, key: str, select_for_update: bool = False) -> Optional[bytes]:
         with pg_observer({"type": "get"}):
             statement = "SELECT value FROM resources WHERE key = %s"
             if select_for_update:
+                if self.for_update_log:
+                    logger.warning(f"SELECT FOR UPDATE on key={key}")
                 statement += " FOR UPDATE"
             async with self.connection.cursor() as cur:
                 await cur.execute(statement, (key,))
@@ -117,6 +121,8 @@ class DataLayer:
             async with self.connection.cursor() as cur:
                 statement = "SELECT key, value FROM resources WHERE key = ANY(%s)"
                 if select_for_update:
+                    if self.for_update_log:
+                        logger.warning(f"SELECT FOR UPDATE on keys={keys}")
                     statement += " FOR UPDATE"
                 await cur.execute(statement, (keys,))
                 records = {record[0]: record[1] for record in await cur.fetchall()}
