@@ -572,7 +572,7 @@ async def reprocess_file_field(
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
 
-    async with driver.transaction() as txn:
+    async with driver.transaction(read_only=True) as txn:
         kb = KnowledgeBox(txn, storage, kbid)
 
         resource = await kb.get(rid)

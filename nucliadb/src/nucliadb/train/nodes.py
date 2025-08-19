@@ -81,7 +81,7 @@ class TrainShardManager(manager.KBShardManager):
         return manager
 
     async def kb_sentences(self, request: GetSentencesRequest) -> AsyncIterator[TrainSentence]:
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             if request.uuid != "":
                 # Filter by uuid
@@ -95,7 +95,7 @@ class TrainShardManager(manager.KBShardManager):
                         yield sentence
 
     async def kb_paragraphs(self, request: GetParagraphsRequest) -> AsyncIterator[TrainParagraph]:
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             if request.uuid != "":
                 # Filter by uuid
@@ -109,7 +109,7 @@ class TrainShardManager(manager.KBShardManager):
                         yield paragraph
 
     async def kb_fields(self, request: GetFieldsRequest) -> AsyncIterator[TrainField]:
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             if request.uuid != "":
                 # Filter by uuid
@@ -123,7 +123,7 @@ class TrainShardManager(manager.KBShardManager):
                         yield field
 
     async def kb_resources(self, request: GetResourcesRequest) -> AsyncIterator[TrainResource]:
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             base = KB_RESOURCE_SLUG_BASE.format(kbid=request.kb.uuid)
             async for key in txn.keys(match=base):
