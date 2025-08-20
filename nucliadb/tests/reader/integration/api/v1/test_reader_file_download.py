@@ -203,6 +203,8 @@ async def _get_message_with_file(test_resource):
         ("bytes=something", 10, None, None, None, ValueError),
         # Multi-part ranges not supported yet
         ("bytes=0-50, 100-150", 10, None, None, None, NotImplementedError),
+        # Only the first byte
+        ("bytes=0-0", 10, 0, 0, 1, None),
     ],
 )
 def test_parse_media_range(range_request, filesize, start, end, range_size, exception):
@@ -238,3 +240,24 @@ def test_safe_http_header_encode(text):
     safe_text = safe_http_header_encode(text)
     # This is how startette encodes the headers
     safe_text.lower().encode("latin-1")
+
+
+@pytest.mark.deploy_modes("component")
+async def test_resource_download_field_file_first_byte(
+    nucliadb_reader: AsyncClient,
+    test_resource: Resource,
+) -> None:
+    rsc = test_resource
+    kbid = rsc.kb.kbid
+    rid = rsc.uuid
+    field_id = "file1"
+
+    # Check that downloading of the first byte works
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
+        headers={"range": "bytes=0-0"},
+    )
+    assert resp.status_code == 206
+    assert resp.headers["Content-Disposition"].startswith("attachment; filename=")
+    assert resp.headers["Content-Length"] == "1"
+    assert len(resp.content) == 1

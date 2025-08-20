@@ -48,4 +48,4 @@ class Range:
         return self.start is not None or self.end is not None
 
     def to_header(self) -> str:
-        return f"bytes={self.start or 0}-{self.end or ''}"
+        return f"bytes={self.start or 0}-{self.end if self.end is not None else ''}"
