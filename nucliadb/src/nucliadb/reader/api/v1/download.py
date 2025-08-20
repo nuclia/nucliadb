@@ -256,7 +256,6 @@ async def download_api(sf: StorageField, headers: Headers, inline: bool = False)
                 status_code=416,
             )
         except (IndexError, ValueError):
-            # range errors fallback to full download
             raise HTTPException(
                 detail={"reason": "rangeNotParsable", "range": range_request},
                 headers={"Content-Range": f"bytes */{file_size}"},
