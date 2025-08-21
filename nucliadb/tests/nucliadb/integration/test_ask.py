@@ -1400,7 +1400,6 @@ async def test_all_rag_strategies_combinations(
 
     assert len(valid_combinations) == 19
     for combination in valid_combinations:  # type: ignore
-        print(f"Combination: {sorted([strategy.name for strategy in combination])}")
         resp = await nucliadb_reader.post(
             f"/kb/{standalone_knowledgebox}/ask",
             headers={"X-Synchronous": "True"},

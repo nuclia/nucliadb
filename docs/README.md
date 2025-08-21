@@ -41,11 +41,11 @@ By default, the tests assume that you have a `nidx:latest` image built locally. 
 ```shell
 docker build -f Dockerfile.nidx -t nidx:latest .
 ```
-However, if you don't want to build the nidx image, you can point to th public Dockerhub image by setting the
+However, if you don't want to build the nidx image, you can point to the public Dockerhub image by setting the
 `NIDX_IMAGE` env var:
 
 ```shell
-export NIDX_IMAGE=nuclia/nidx:local
+export NIDX_IMAGE=nuclia/nidx:latest
 ```
 
 
