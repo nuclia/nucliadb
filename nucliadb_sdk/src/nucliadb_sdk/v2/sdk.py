@@ -408,6 +408,11 @@ SDK_DEFINITION = {
         method="POST",
         path_params=("kbid",),
     ),
+    "update_configuration": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/configuration",
+        method="PATCH",
+        path_params=("kbid",),
+    ),
     # Learning models
     "download_model": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/models/{model_id}/{filename}",
@@ -1078,6 +1083,7 @@ class NucliaDB(_NucliaDBBase):
     # Learning Configuration
     get_configuration = _request_json_sync_builder("get_configuration")
     set_configuration = _request_json_sync_builder("set_configuration")
+    update_configuration = _request_json_sync_builder("update_configuration")
 
     # Learning models
     download_model = _request_iterator_sync_builder("download_model")
@@ -1281,6 +1287,7 @@ class NucliaDBAsync(_NucliaDBBase):
     # Learning Configuration
     get_configuration = _request_json_async_builder("get_configuration")
     set_configuration = _request_json_async_builder("set_configuration")
+    update_configuration = _request_json_async_builder("update_configuration")
 
     # Learning models
     download_model = _request_iterator_async_builder("download_model")
