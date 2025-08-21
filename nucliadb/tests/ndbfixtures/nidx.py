@@ -17,7 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import dataclasses
 import logging
+import os
+import platform
+import sys
 
 import nats
 import pytest
@@ -30,10 +34,45 @@ from nucliadb_utils.tests.fixtures import get_testing_storage_backend
 
 logger = logging.getLogger(__name__)
 
+
+@dataclasses.dataclass
+class Image:
+    name: str
+    version: str
+
+
+def get_image() -> Image:
+    """
+    Returns the nidx image to be used in tests.
+    By default, it expects to find a locally-build image named `nidx`, but it
+    can be overridden to use the dockerhub image instead (nuclia/nidx:latest).
+    """
+    locally_built_image_tag = "nidx"
+    image_tag = os.environ.get("NIDX_IMAGE", locally_built_image_tag)
+    if ":" not in image_tag:
+        image_tag += ":latest"
+    name, version = image_tag.split(":", 1)
+    return Image(name=name, version=version)
+
+
+def get_platform():
+    if sys.platform.startswith("darwin"):
+        # macOS uses Darwin, but we want to run on Linux containers
+        return f"linux/{platform.machine()}"
+    elif sys.platform.startswith("linux"):
+        # If we are on Linux, we can return the architecture directly
+        return "linux/amd64"
+    else:
+        raise ValueError("Unsupported platform: {}".format(sys.platform))
+
+
 images.settings["nidx"] = {
-    "image": "nidx",
-    "version": "latest",
-    "env": {},
+    "image": get_image().name,
+    "version": get_image().version,
+    "env": {
+        "RUST_BACKTRACE": "1",
+        "RUST_LOG": "debug",
+    },
     "options": {
         # A few indexers on purpose for faster indexing
         "command": [
@@ -49,7 +88,7 @@ images.settings["nidx"] = {
         ],
         "ports": {"10000": ("0.0.0.0", 0), "10001": ("0.0.0.0", 0)},
         "publish_all_ports": False,
-        "platform": "linux/amd64",
+        "platform": get_platform(),
     },
 }
 
@@ -79,20 +118,34 @@ def s3_nidx_storage(s3):
     return {
         "INDEXER__OBJECT_STORE": "s3",
         "INDEXER__BUCKET": "indexing",
+        "INDEXER__REGION_NAME": "nidx",
         "INDEXER__ENDPOINT": s3,
         "STORAGE__OBJECT_STORE": "s3",
         "STORAGE__ENDPOINT": s3,
         "STORAGE__BUCKET": "nidx",
+        "STORAGE__REGION_NAME": "nidx",
     }
 
 
 @pytest.fixture(scope="session")
-def nidx_storage(request):
+def in_memory_nidx_storage():
+    return {
+        "INDEXER__OBJECT_STORE": "memory",
+        "STORAGE__OBJECT_STORE": "memory",
+    }
+
+
+@pytest.fixture(scope="session")
+def nidx_storage(request) -> dict[str, str]:
     backend = get_testing_storage_backend()
     if backend == "gcs":
         return request.getfixturevalue("gcs_nidx_storage")
     elif backend == "s3":
         return request.getfixturevalue("s3_nidx_storage")
+    elif backend == "file":
+        return {}
+    else:
+        return request.getfixturevalue("in_memory_nidx_storage")
 
 
 @pytest.fixture(scope="session")
@@ -106,12 +159,14 @@ async def nidx(natsd, nidx_storage, pg):
     await nc.close()
 
     # Run nidx
-    images.settings["nidx"]["env"] = {
-        "RUST_LOG": "info",
-        "METADATA__DATABASE_URL": f"postgresql://postgres:postgres@172.17.0.1:{pg[1]}/postgres",
-        "INDEXER__NATS_SERVER": natsd.replace("localhost", "172.17.0.1"),
-        **nidx_storage,
-    }
+    images.settings["nidx"].setdefault("env", {}).update(
+        {
+            "RUST_LOG": "info",
+            "METADATA__DATABASE_URL": f"postgresql://postgres:postgres@172.17.0.1:{pg[1]}/postgres",
+            "INDEXER__NATS_SERVER": natsd.replace("localhost", "172.17.0.1"),
+            **nidx_storage,
+        }
+    )
     image = NidxImage()
     image.run()
 

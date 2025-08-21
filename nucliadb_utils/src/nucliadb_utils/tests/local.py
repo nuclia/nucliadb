@@ -45,7 +45,6 @@ def local_storage_settings(tmp_path: Path) -> Iterator[dict[str, Any]]:
 @pytest.fixture(scope="function")
 async def local_storage(local_storage_settings: dict[str, Any]):
     assert storage_settings.local_files is not None
-
     storage = LocalStorage(
         local_testing_files=storage_settings.local_files,
         indexing_bucket=storage_settings.local_indexing_bucket,

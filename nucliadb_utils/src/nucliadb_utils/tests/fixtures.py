@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import os
+import sys
 from typing import Any, Iterator, Type
 from unittest.mock import Mock
 
@@ -51,8 +52,17 @@ def hosted_nucliadb():
     nuclia_settings.onprem = original
 
 
-def get_testing_storage_backend(default="gcs"):
-    return os.environ.get("TESTING_STORAGE_BACKEND", default)
+def get_testing_storage_backend():
+    """
+    Default to gcs for linux users and s3 for macOS users. This is because some
+    tests fail on macOS with the gcs backend with a weird nidx error (to be looked into).
+    """
+    if sys.platform.startswith("darwin"):
+        default = "s3"
+    else:
+        default = "gcs"
+    selected = os.environ.get("TESTING_STORAGE_BACKEND", default)
+    return selected
 
 
 def lazy_storage_fixture():
