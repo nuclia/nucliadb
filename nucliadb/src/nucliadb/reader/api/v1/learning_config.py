@@ -27,7 +27,7 @@ from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.authentication import requires
+from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.settings import is_onprem_nucliadb
 
 
@@ -39,7 +39,7 @@ from nucliadb_utils.settings import is_onprem_nucliadb
     response_model=None,
     tags=["Models"],
 )
-@requires(NucliaDBRoles.READER)
+@requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def download_model(
     request: Request,
@@ -58,7 +58,7 @@ async def download_model(
     response_model=None,
     tags=["Models"],
 )
-@requires(NucliaDBRoles.READER)
+@requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def get_configuration(
     request: Request,
@@ -80,7 +80,7 @@ async def get_configuration(
     response_model=None,
     tags=["Models"],
 )
-@requires(NucliaDBRoles.READER)
+@requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def get_models(
     request: Request,
@@ -97,7 +97,7 @@ async def get_models(
     response_model=None,
     tags=["Models"],
 )
-@requires(NucliaDBRoles.READER)
+@requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def get_model(
     request: Request,
@@ -120,7 +120,7 @@ async def get_model(
     response_model=None,
     tags=["Models"],
 )
-@requires(NucliaDBRoles.READER)
+@requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def get_schema_for_configuration_updates(
     request: Request,
@@ -138,7 +138,7 @@ async def get_schema_for_configuration_updates(
     tags=["Models"],
     include_in_schema=False,
 )
-@requires(NucliaDBRoles.READER)
+@requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def get_schema_for_configuration_creation(
     request: Request,
@@ -156,7 +156,7 @@ async def get_schema_for_configuration_creation(
     response_model=Dict[str, ExtractConfig],
     tags=["Extract Strategies"],
 )
-@requires(NucliaDBRoles.READER)
+@requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def get_extract_strategies(
     request: Request,
@@ -173,7 +173,7 @@ async def get_extract_strategies(
     response_model=None,
     tags=["Extract Strategies"],
 )
-@requires(NucliaDBRoles.READER)
+@requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def get_extract_strategy_from_id(
     request: Request,
@@ -193,7 +193,7 @@ async def get_extract_strategy_from_id(
     response_model=Dict[str, SplitConfiguration],
     tags=["Split Strategies"],
 )
-@requires(NucliaDBRoles.READER)
+@requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def get_split_strategies(
     request: Request,
@@ -210,7 +210,7 @@ async def get_split_strategies(
     response_model=None,
     tags=["Split Strategies"],
 )
-@requires(NucliaDBRoles.READER)
+@requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def get_split_strategy_from_id(
     request: Request,
