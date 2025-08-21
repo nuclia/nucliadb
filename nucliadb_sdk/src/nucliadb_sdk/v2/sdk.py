@@ -695,6 +695,8 @@ def _request_json_sync_builder(
         try:
             return orjson.loads(resp.content.decode())
         except orjson.JSONDecodeError:
+            if resp.status_code != 204:
+                warnings.warn(f"Response content is not valid JSON: {resp.content}")
             return None
 
     return _func
@@ -789,6 +791,8 @@ def _request_json_async_builder(
         try:
             return orjson.loads(resp.content.decode())
         except orjson.JSONDecodeError:
+            if resp.status_code != 204:
+                warnings.warn(f"Response content is not valid JSON: {resp.content}")
             return None
 
     return _func
