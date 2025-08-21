@@ -54,7 +54,8 @@ def hosted_nucliadb():
 
 def get_testing_storage_backend():
     """
-    Default to gcs for linux users and s3 for macOS users.
+    Default to gcs for linux users and s3 for macOS users. This is because some
+    tests fail on macOS with the gcs backend with a weird nidx error (to be looked into).
     """
     if sys.platform.startswith("darwin"):
         default = "s3"
