@@ -44,10 +44,11 @@ class Image:
 def get_image() -> Image:
     """
     Returns the nidx image to be used in tests.
-    By default, it uses the image from dockerhub, but it can be overridden to use a local image.
+    By default, it expects to find a locally-build image named `nidx`, but it
+    can be overridden to use the dockerhub image instead (nuclia/nidx:latest).
     """
-    dockerhub_image_tag = "nuclia/nidx"
-    image_tag = os.environ.get("NIDX_IMAGE", dockerhub_image_tag)
+    locally_built_image_tag = "nidx"
+    image_tag = os.environ.get("NIDX_IMAGE", locally_built_image_tag)
     if ":" not in image_tag:
         image_tag += ":latest"
     name, version = image_tag.split(":", 1)
