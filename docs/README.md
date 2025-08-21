@@ -36,6 +36,15 @@ source .venv/bin/activate
 make -C nucliadb test-nucliadb
 ```
 
+By default, the tests that start nidx in docker will pull the `nuclia/nidx:latest`.
+However, you can build a local nidx image and use it in tests  by setting the
+`NIDX_IMAGE` env var:
+
+```shell
+docker build -f Dockerfile.nidx -t nidx:local .
+export NIDX_IMAGE=nidx:local
+```
+
 
 ### Lint and formatting
 
