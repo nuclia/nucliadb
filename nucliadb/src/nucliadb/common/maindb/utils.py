@@ -61,6 +61,7 @@ async def setup_driver(application_name: str = "nucliadb") -> Driver:
         if "application_name=" not in url:
             sep = "&" if "?" in url else "?"
             url += f"{sep}application_name={application_name}"
+        print(f"Using Postgres driver with url: {url}")
         pg_driver = PGDriver(
             url=url,
             connection_pool_min_size=settings.driver_pg_connection_pool_min_size,
