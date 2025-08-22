@@ -19,9 +19,7 @@ from pydantic import BaseModel
 
 from .common import (
     Classification,
-    CloudFile,
     CloudLink,
-    FieldID,
     Paragraph,
     QuestionAnswers,
 )
@@ -32,12 +30,6 @@ class ExtractedText(BaseModel):
     text: Optional[str] = None
     split_text: Optional[Dict[str, str]] = None
     deleted_splits: Optional[List[str]] = None
-
-
-class ExtractedTextWrapper(BaseModel):
-    body: Optional[ExtractedText] = None
-    file: Optional[CloudFile] = None
-    field: Optional[FieldID] = None
 
 
 class Vector(BaseModel):
@@ -56,12 +48,6 @@ class VectorObject(BaseModel):
     vectors: Optional[Vectors] = None
     split_vectors: Optional[Dict[str, Vectors]] = None
     deleted_splits: Optional[List[str]] = None
-
-
-class ExtractedVectorsWrapper(BaseModel):
-    vectors: Optional[VectorObject] = None
-    file: Optional[CloudFile] = None
-    field: Optional[FieldID] = None
 
 
 class Position(BaseModel):
@@ -113,11 +99,6 @@ class FieldComputedMetadata(BaseModel):
     deleted_splits: Optional[List[str]] = None
 
 
-class FieldComputedMetadataWrapper(BaseModel):
-    metadata: Optional[FieldComputedMetadata] = None
-    field: Optional[FieldID] = None
-
-
 class Entity(BaseModel):
     token: Optional[str] = None
     root: Optional[str] = None
@@ -133,12 +114,6 @@ class LargeComputedMetadata(BaseModel):
     metadata: Optional[FieldLargeMetadata] = None
     split_metadata: Optional[Dict[str, FieldLargeMetadata]] = None
     deleted_splits: Optional[List[str]] = None
-
-
-class LargeComputedMetadataWrapper(BaseModel):
-    real: Optional[LargeComputedMetadata] = None
-    file: Optional[CloudFile] = None
-    field: Optional[FieldID] = None
 
 
 class LinkExtractedData(BaseModel):
