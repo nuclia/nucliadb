@@ -84,7 +84,7 @@ class ApplicationContext:
 
     async def _initialize(self):
         if self.enabled_kv_driver:
-            self._kv_driver = await setup_driver()
+            self._kv_driver = await setup_driver(application_name=self.service_name)
         if self.enabled_blob_storage:
             self._blob_storage = await get_storage()
         if self.enabled_shard_manager:

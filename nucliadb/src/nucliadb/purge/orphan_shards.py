@@ -202,7 +202,7 @@ async def main():
 
     await start_nidx_utility()
     await setup_cluster()
-    driver = await setup_driver()
+    driver = await setup_driver(application_name="nucliadb.purge")
 
     try:
         if args.purge:

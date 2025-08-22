@@ -48,7 +48,7 @@ from nucliadb_utils.utilities import get_pubsub, get_storage
 class UploadServicer:
     async def initialize(self):
         storage = await get_storage(service_name=SERVICE_NAME)
-        driver = await setup_driver()
+        driver = await setup_driver(application_name=SERVICE_NAME)
         pubsub = await get_pubsub()
         self.proc = Processor(driver=driver, storage=storage, pubsub=pubsub)
 

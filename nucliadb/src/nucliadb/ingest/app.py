@@ -150,7 +150,7 @@ async def main_subscriber_workers():  # pragma: no cover
     shard_creator_closer = await consumer_service.start_shard_creator()
     materializer_closer = await consumer_service.start_materializer()
 
-    await start_ingest_utility()
+    await start_ingest_utility("subscriber-workers")
     exports_consumer = get_exports_consumer()
     await exports_consumer.initialize(context)
     imports_consumer = get_imports_consumer()

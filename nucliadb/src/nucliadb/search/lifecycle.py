@@ -25,7 +25,6 @@ from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context.fastapi import inject_app_context
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.common.nidx import start_nidx_utility
-from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.search import SERVICE_NAME
 from nucliadb.search.predict import start_predict_engine
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
@@ -43,10 +42,9 @@ from nucliadb_utils.utilities import (
 async def lifespan(app: FastAPI):
     await setup_telemetry(SERVICE_NAME)
 
-    await start_ingest(SERVICE_NAME)
     await start_predict_engine()
 
-    await setup_driver()
+    await setup_driver(SERVICE_NAME)
     await setup_cluster()
     await start_nidx_utility(SERVICE_NAME)
 
@@ -55,7 +53,6 @@ async def lifespan(app: FastAPI):
     async with inject_app_context(app):
         yield
 
-    await stop_ingest()
     if get_utility(Utility.PARTITION):
         clean_utility(Utility.PARTITION)
     if get_utility(Utility.PREDICT):

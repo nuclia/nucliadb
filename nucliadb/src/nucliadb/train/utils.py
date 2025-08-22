@@ -23,6 +23,7 @@ from grpc import aio
 from grpc_health.v1 import health, health_pb2_grpc
 
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
+from nucliadb.train import SERVICE_NAME
 from nucliadb.train.nodes import TrainShardManager
 from nucliadb.train.settings import settings
 from nucliadb_protos import train_pb2_grpc
@@ -79,7 +80,7 @@ async def start_shard_manager():
     """
     XXX this is weird but too much to untangle right now
     """
-    driver = await setup_driver()
+    driver = await setup_driver(application_name=SERVICE_NAME)
     storage = await get_storage()
     set_utility(_TRAIN_SM_NAME, TrainShardManager(driver=driver, storage=storage))
 

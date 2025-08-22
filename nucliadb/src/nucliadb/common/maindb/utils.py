@@ -46,7 +46,7 @@ def get_driver() -> Driver:
     return driver
 
 
-async def setup_driver() -> Driver:
+async def setup_driver(application_name: str = "nucliadb") -> Driver:
     driver = get_utility(Utility.MAINDB_DRIVER)
     if driver is not None:
         return driver
@@ -56,8 +56,13 @@ async def setup_driver() -> Driver:
             raise ConfigurationError("`psycopg` python package not installed.")
         if settings.driver_pg_url is None:
             raise ConfigurationError("No DRIVER_PG_URL env var defined.")
+        # Add application_name to the pg url if not present
+        url = settings.driver_pg_url.lower()
+        if "application_name=" not in url:
+            sep = "&" if "?" in url else "?"
+            url += f"{sep}application_name={application_name}"
         pg_driver = PGDriver(
-            url=settings.driver_pg_url,
+            url=url,
             connection_pool_min_size=settings.driver_pg_connection_pool_min_size,
             connection_pool_max_size=settings.driver_pg_connection_pool_max_size,
             acquire_timeout_ms=settings.driver_pg_connection_pool_acquire_timeout_ms,

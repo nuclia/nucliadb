@@ -83,7 +83,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
-        self.driver = await setup_driver()
+        self.driver = await setup_driver(application_name=SERVICE_NAME + ".grpc")
         self.proc = Processor(driver=self.driver, storage=self.storage, pubsub=await get_pubsub())
         self.shards_manager = get_shard_manager()
 

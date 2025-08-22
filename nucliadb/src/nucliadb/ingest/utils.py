@@ -27,7 +27,7 @@ from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_ut
 
 
 async def start_ingest(service_name: Optional[str] = None):
-    await setup_driver()
+    await setup_driver(application_name=service_name or "nucliadb.ingest")
 
     actual_service = get_utility(Utility.INGEST)
     if actual_service is not None:
