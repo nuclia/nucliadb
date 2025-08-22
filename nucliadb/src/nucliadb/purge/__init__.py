@@ -100,39 +100,40 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
     # Here we'll delete those storage buckets
     logger.info("START PURGING KB STORAGE")
     async for key in _iter_keys(driver, KB_TO_DELETE_STORAGE_BASE):
-        logger.info(f"Purging storage {key}")
         try:
             kbid = key.split("/")[2]
         except Exception:
-            logger.info(
-                f"  X Skipping purge {key}, wrong key format, expected {KB_TO_DELETE_STORAGE_BASE}"
+            logger.warning(
+                f"Skipping purge, wrong key format, expected {KB_TO_DELETE_STORAGE_BASE}",
+                extra={"key": key},
             )
             continue
 
-        deleted, conflict = await storage.delete_kb(kbid)
+        logger.info(f"Purging storage bucket", extra={"kbid": kbid})
+
+        _, conflict = await storage.delete_kb(kbid)
 
         delete_marker = False
         if conflict:
-            logger.info(f"  . Nothing was deleted for {key}, (Bucket not yet empty), will try next time")
+            logger.info(
+                f"Nothing could be deleted as the bucket is not yet empty. Scheduling deletion.",
+                extra={"kbid": kbid},
+            )
             # Just in case something failed while setting a lifecycle policy to
             # remove all elements from the bucket, reschedule it
-            await storage.schedule_delete_kb(kbid)
-        elif not deleted:
-            logger.info(f"  ! Expected bucket for {key} was not found, will delete marker")
-            delete_marker = True
-        elif deleted:
-            logger.info("  √ Bucket successfully deleted")
-            delete_marker = True
+            delete_marker = await storage.schedule_delete_kb(kbid)
 
         if delete_marker:
             try:
                 async with driver.transaction() as txn:
                     await txn.delete(key)
                     await txn.commit()
-                logger.info(f"  √ Deleted storage deletion marker {key}")
+                logger.info("Bucket successfully deleted", extra={"kbid": kbid})
             except Exception as exc:
                 errors.capture_exception(exc)
-                logger.info(f"  X Error while deleting key {key}")
+                logger.exception(f"Error while deleting key", extra={"kbid": kbid})
+        else:
+            logger.error(f"Could not schedule deletion of bucket", extra={"kbid": kbid})
 
     logger.info("FINISH PURGING KB STORAGE")
 

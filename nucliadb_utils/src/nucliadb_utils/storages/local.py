@@ -270,7 +270,7 @@ class LocalStorage(Storage):
         if os.path.exists(metadata_path):
             os.remove(metadata_path)
 
-    async def schedule_delete_kb(self, kbid: str):
+    async def schedule_delete_kb(self, kbid: str) -> bool:
         bucket = self.get_bucket_name(kbid)
         path = self.get_bucket_path(bucket)
         try:

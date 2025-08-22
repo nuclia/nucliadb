@@ -341,9 +341,9 @@ class KnowledgeBox:
         to delete once the emptying have been completed.
         """
         storage = await get_storage(service_name=SERVICE_NAME)
-        exists = await storage.schedule_delete_kb(kbid)
-        if exists is False:
-            logger.error(f"{kbid} KB does not exists on Storage")
+        deleted = await storage.schedule_delete_kb(kbid)
+        if deleted is False:
+            logger.error(f"{kbid} could not be scheduled for deletion on storage")
 
         nidx_api = get_nidx_api_client()
 

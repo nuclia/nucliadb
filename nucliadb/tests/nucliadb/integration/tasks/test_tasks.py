@@ -105,7 +105,6 @@ async def test_consumer_consumes_multiple_messages_concurrently(context):
 
     async def some_work(context: ApplicationContext, msg: Message):
         nonlocal work_done
-        print(f"Doing some work! {msg.kbid}")
         await asyncio.sleep(work_duration_s)
         work_done[msg.kbid].set()
 
@@ -154,7 +153,6 @@ async def test_consumer_finalize_cancels_tasks(context):
     cancelled_event = asyncio.Event()
 
     async def some_work(context: ApplicationContext, msg: Message):
-        print(f"Doing some work! {msg.kbid}")
         try:
             await asyncio.sleep(10)
         except asyncio.CancelledError:
@@ -194,13 +192,10 @@ async def test_consumer_max_concurrent_tasks(context):
     nconsumer = NatsConsumer(subject="work_with_max", group="work_with_max")
 
     async def some_work(context: ApplicationContext, msg: Message):
-        print(f"Doing some work! {msg.kbid}")
-        start = time.perf_counter()
         try:
             await asyncio.sleep(10)
         except asyncio.CancelledError:
-            elapsed = time.perf_counter() - start
-            print(f"Work cancelled after {elapsed:.2f}s! {msg.kbid}")
+            pass
 
     producer = tasks.create_producer(
         name="some_work",
@@ -234,11 +229,12 @@ async def test_consumer_max_concurrent_tasks(context):
 
 async def test_task_retry_handler_ok(context):
     task_id = str(uuid.uuid4())
+    kbid = uuid.uuid4().hex
 
     async def callback(*args, **kwargs):
         return 100
 
-    trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id=task_id, context=context)
+    trh = TaskRetryHandler(kbid=kbid, task_type="foo", task_id=task_id, context=context)
     callback_retried = trh.wrap(callback)
 
     result = await callback_retried("some", param="param")
@@ -256,7 +252,8 @@ async def test_task_retry_handler_errors_are_retried(context):
     callback.side_effect = ValueError("foo")
 
     task_id = str(uuid.uuid4())
-    trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id=task_id, context=context, max_retries=2)
+    kbid = uuid.uuid4().hex
+    trh = TaskRetryHandler(kbid=kbid, task_type="foo", task_id=task_id, context=context, max_retries=2)
     callback_retried = trh.wrap(callback)
 
     with pytest.raises(ValueError):
@@ -283,7 +280,8 @@ async def test_task_retry_handler_ignored_statuses(context):
     callback = AsyncMock()
 
     task_id = str(uuid.uuid4())
-    trh = TaskRetryHandler(kbid="kbid", task_type="foo", task_id=task_id, context=context)
+    kbid = uuid.uuid4().hex
+    trh = TaskRetryHandler(kbid=kbid, task_type="foo", task_id=task_id, context=context)
     callback_retried = trh.wrap(callback)
 
     for status in (TaskMetadata.Status.FAILED, TaskMetadata.Status.COMPLETED):
@@ -302,8 +300,9 @@ async def test_task_retry_handler_max_retries(context):
     callback = AsyncMock()
 
     task_id = str(uuid.uuid4())
+    kbid = uuid.uuid4().hex
     trh = TaskRetryHandler(
-        kbid="kbid",
+        kbid=kbid,
         task_type="foo",
         task_id=task_id,
         context=context,
@@ -329,7 +328,8 @@ async def test_task_retry_handler_max_retries(context):
 
 
 async def test_purge_metadata(context):
-    trh1 = TaskRetryHandler(kbid="kbid", task_type="foo", task_id="task_id", context=context)
+    kbid = uuid.uuid4().hex
+    trh1 = TaskRetryHandler(kbid=kbid, task_type="foo", task_id="task_id", context=context)
     old_metadata = TaskMetadata(
         task_id="task_id",
         status=TaskMetadata.Status.COMPLETED,
@@ -339,7 +339,7 @@ async def test_purge_metadata(context):
     )
     await trh1.set_metadata(old_metadata)
 
-    trh2 = TaskRetryHandler(kbid="kbid", task_type="bar", task_id="task_id", context=context)
+    trh2 = TaskRetryHandler(kbid=kbid, task_type="bar", task_id="task_id", context=context)
     recent_metadata = TaskMetadata(
         task_id="task_id",
         status=TaskMetadata.Status.RUNNING,
@@ -349,7 +349,7 @@ async def test_purge_metadata(context):
     )
     await trh2.set_metadata(recent_metadata)
 
-    assert await purge_metadata(context.kv_driver) == 1
+    assert await purge_metadata(context.kv_driver) >= 1
     assert await purge_metadata(context.kv_driver) == 0
 
     assert await trh1.get_metadata() is None
