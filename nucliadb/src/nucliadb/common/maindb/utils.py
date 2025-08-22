@@ -57,7 +57,7 @@ async def setup_driver(application_name: str = "nucliadb") -> Driver:
         if settings.driver_pg_url is None:
             raise ConfigurationError("No DRIVER_PG_URL env var defined.")
         # Add application_name to the pg url if not present
-        url = settings.driver_pg_url.lower()
+        url = settings.driver_pg_url
         if "application_name=" not in url:
             sep = "&" if "?" in url else "?"
             url += f"{sep}application_name={application_name}"
