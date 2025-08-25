@@ -547,3 +547,56 @@ async def test_conversation_field_indexing(
     assert len(results.best_matches) == 0
     results = await search_message(vector=vectors[question], top_k=3, min_score=-1)
     assert len(results.best_matches) == 0
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_conversation_field_empty_create(
+    nucliadb_ingest_grpc,
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+    # Create an conversation field with an empty conversation first
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        headers={"Content-Type": "application/json"},
+        content=CreateResourcePayload(
+            slug="myresource",
+            conversations={
+                "faq": InputConversationField(),
+            },
+        ).model_dump_json(by_alias=True),
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Now append a message
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/resource/{rid}/conversation/faq/messages",
+        json=[
+            {
+                "to": ["computer"],
+                "who": "person1",
+                "timestamp": datetime.now().isoformat(),
+                "content": {"text": "What is the meaning of life?"},
+                "ident": "1",
+                "type": MessageType.QUESTION.value,
+            }
+        ],
+    )
+    resp.raise_for_status()
+
+    # Get the conversation field and check that the message is in page 1
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/conversation/faq",
+        params={
+            "page": 1,
+            "show": ["value"],
+        },
+    )
+    assert resp.status_code == 200
+    field_resp = ResourceField.model_validate(resp.json())
+    msgs = field_resp.value["messages"]  # type: ignore
+    assert len(msgs) == 1
+    assert msgs[0]["ident"] == "1"
