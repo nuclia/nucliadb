@@ -635,7 +635,7 @@ class GCSStorage(Storage):
         return created
 
     @storage_ops_observer.wrap({"type": "schedule_delete"})
-    async def schedule_delete_kb(self, kbid: str):
+    async def schedule_delete_kb(self, kbid: str) -> bool:
         if self.session is None:
             raise AttributeError()
         bucket_name = self.get_bucket_name(kbid)
@@ -643,21 +643,16 @@ class GCSStorage(Storage):
         url = f"{self.object_base_url}/{bucket_name}?fields=lifecycle"
         deleted = False
         async with self.session.patch(url, headers=headers, json=POLICY_DELETE) as resp:
-            try:
-                data = await resp.json()
-            except Exception:
-                text = await resp.text()
-                data = {"text": text}
             if resp.status not in (200, 204, 404):
                 if resp.status == 405:
                     # For testing purposes, gcs fixture doesn't have patch
                     logger.error("Not implemented")
-                elif resp.status == 404:
-                    logger.error(
-                        f"Attempt to delete not found gcloud: {data}, status: {resp.status}",
-                        exc_info=True,
-                    )
                 else:
+                    try:
+                        data = await resp.json()
+                    except Exception:
+                        text = await resp.text()
+                        data = {"text": text}
                     raise GoogleCloudException(f"{resp.status}: {json.dumps(data)}")
             deleted = True
         return deleted

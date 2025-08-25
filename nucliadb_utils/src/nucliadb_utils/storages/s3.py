@@ -446,21 +446,19 @@ class S3Storage(Storage):
             self._s3aioclient, bucket_name, self._bucket_tags, self._region_name, self._kms_key_id
         )
 
-    async def schedule_delete_kb(self, kbid: str):
+    async def schedule_delete_kb(self, kbid: str) -> bool:
         bucket_name = self.get_bucket_name(kbid)
-
-        missing = False
         deleted = False
         try:
             res = await self._s3aioclient.head_bucket(Bucket=bucket_name)
             if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
-                missing = True
+                deleted = True
         except botocore.exceptions.ClientError as e:
             error_code = parse_status_code(e)
             if error_code == 404:
-                missing = True
+                deleted = True
 
-        if missing is False:
+        if deleted is False:
             await self._s3aioclient.put_bucket_lifecycle_configuration(
                 Bucket=bucket_name, LifecycleConfiguration=POLICY_DELETE
             )
@@ -489,7 +487,7 @@ class S3Storage(Storage):
                 error_code = parse_status_code(e)
                 if error_code == 409:
                     conflict = True
-                if error_code in (200, 204):
+                elif error_code in (200, 204):
                     deleted = True
         return deleted, conflict
 

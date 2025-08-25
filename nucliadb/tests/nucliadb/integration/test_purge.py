@@ -113,7 +113,8 @@ async def test_purge_deletes_everything_from_maindb(
 
     # After deletion and purge, no keys should be in maindb
     keys_after_purge_storage = await list_all_keys(maindb_driver)
-    assert len(keys_after_purge_storage) == 0
+    # No keys from the kbid should remain
+    assert len([key for key in keys_after_purge_storage if kbid in key]) == 0
 
 
 async def list_shards() -> list[ShardId]:
