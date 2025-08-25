@@ -10,3 +10,4 @@ exclude_lines =
 [run]
 omit =
     *setup.py
+    */tests/*
