@@ -99,7 +99,7 @@ class Conversation(Field[PBConversation]):
         metadata.total += len(messages)
 
         # Store the messages in pages of PAGE_SIZE messages
-        while len(messages) > 0:
+        while True:
             # Fit the messages in the last page
             available_space = metadata.size - len(last_page.messages)
             last_page.messages.extend(messages[:available_space])
@@ -112,6 +112,8 @@ class Conversation(Field[PBConversation]):
             if len(messages) > 0:
                 metadata.pages += 1
                 last_page = PBConversation()
+            else:
+                break
 
         # Finally, set the metadata
         await self.db_set_metadata(metadata)
@@ -176,11 +178,10 @@ class Conversation(Field[PBConversation]):
                 page=page,
             )
             payload = await self.resource.txn.get(field_key)
-            if payload:
-                self.value[page] = PBConversation()
-                self.value[page].ParseFromString(payload)
-            else:
+            if payload is None:
                 raise PageNotFound()
+            self.value[page] = PBConversation()
+            self.value[page].ParseFromString(payload)
         return self.value[page]
 
     async def db_set_value(self, payload: PBConversation, page: int = 0):
