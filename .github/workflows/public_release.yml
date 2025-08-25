@@ -173,16 +173,11 @@ jobs:
       - name: Install nucliadb
         run: uv sync --no-editable --no-group nidx
 
-      - name: Authenticate to Google Cloud
-        id: gcp-auth
-        uses: google-github-actions/auth@v2
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          workload_identity_provider: "${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}"
-          service_account: "${{ env.GCP_SERVICE_ACCOUNT }}"
-          token_format: access_token
-
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v2"
+          role-to-assume: ${{ secrets.AWS_DOCS_SYNC_ROLE }}
+          aws-region: ${{ secrets.AWS_DOCS_SYNC_REGION }}
 
       - name: Upload docs
         run: |
@@ -190,10 +185,10 @@ jobs:
           source .venv/bin/activate
           nucliadb-extract-openapi-reader /tmp/openapi/nucliadb-reader.json $API_VERSION $GITHUB_SHA
           nucliadb-extract-openapi-writer /tmp/openapi/nucliadb-writer.json $API_VERSION $GITHUB_SHA
-          nucliadb-extract-openapi-search /tmp/openapi/nucliadb-search.json $API_VERSION $GITHUB_SHA
-          gsutil copy /tmp/openapi/nucliadb-reader.json gs://ncl-docs-gcp-global-stage-1/api/nucliadb/v$API_VERSION/nucliadb-reader/spec.json
-          gsutil copy /tmp/openapi/nucliadb-writer.json gs://ncl-docs-gcp-global-stage-1/api/nucliadb/v$API_VERSION/nucliadb-writer/spec.json
-          gsutil copy /tmp/openapi/nucliadb-search.json gs://ncl-docs-gcp-global-stage-1/api/nucliadb/v$API_VERSION/nucliadb-search/spec.json
+          nucliadb-extract-openapi-search /tmp/openapi/nucliadb-search.json $API_VERSION $GITHUB_SHA 
+          aws s3 cp /tmp/openapi/nucliadb-reader.json s3://nuclia-docs-aws-global-stage-1/api/nucliadb/v$API_VERSION/nucliadb-reader/spec.json
+          aws s3 cp /tmp/openapi/nucliadb-writer.json s3://nuclia-docs-aws-global-stage-1/api/nucliadb/v$API_VERSION/nucliadb-writer/spec.json
+          aws s3 cp /tmp/openapi/nucliadb-search.json s3://nuclia-docs-aws-global-stage-1/api/nucliadb/v$API_VERSION/nucliadb-search/spec.json
 
       - name: Trigger doc update
         uses: peter-evans/repository-dispatch@v3
