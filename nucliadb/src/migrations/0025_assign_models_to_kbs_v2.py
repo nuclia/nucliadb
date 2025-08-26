@@ -103,7 +103,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
         matryoshka_dimensions=maindb_matryoshka_dimensions,
     )
 
-    async with context.kv_driver.transaction() as txn:
+    async with context.kv_driver.transaction(read_only=False) as txn:
         # Populate KB vectorsets with data from learning. We are skipping KBs
         # with this key already set, so we can set here safely
         await datamanagers.vectorsets.set(txn, kbid=kbid, config=default_vectorset)

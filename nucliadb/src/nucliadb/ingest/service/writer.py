@@ -167,7 +167,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             )
 
         try:
-            async with self.driver.transaction() as txn:
+            async with self.driver.transaction(read_only=False) as txn:
                 kbid = await KnowledgeBoxORM.update(
                     txn, uuid=request.uuid, slug=request.slug, config=request.config
                 )
@@ -227,7 +227,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = NewEntitiesGroupResponse.Status.KB_NOT_FOUND
                 return response
 
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=False) as txn:
             kbobj.txn = txn
             entities_manager = EntitiesManager(kbobj, txn)
             try:
@@ -321,7 +321,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = OpStatusWriter.Status.NOTFOUND
                 return response
 
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=False) as txn:
             kbobj.txn = txn
             entities_manager = EntitiesManager(kbobj, txn)
             try:
@@ -345,7 +345,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = UpdateEntitiesGroupResponse.Status.KB_NOT_FOUND
                 return response
 
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=False) as txn:
             kbobj.txn = txn
             entities_manager = EntitiesManager(kbobj, txn)
             try:
@@ -374,7 +374,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = OpStatusWriter.Status.NOTFOUND
                 return response
 
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=False) as txn:
             kbobj.txn = txn
             entities_manager = EntitiesManager(kbobj, txn)
             try:
@@ -405,7 +405,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return response
 
     async def Index(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=True) as txn:
             kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
             resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
             bm = await generate_broker_message(resobj)
@@ -419,7 +419,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         try:
-            async with self.driver.transaction() as txn:
+            async with self.driver.transaction(read_only=True) as txn:
                 kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
                 resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
                 resobj.disable_vectors = not request.reindex_vectors

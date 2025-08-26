@@ -182,7 +182,7 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> Kn
             hidden_resources_hide_on_creation=item.hidden_resources_hide_on_creation,
         )
     try:
-        async with driver.transaction() as txn:
+        async with driver.transaction(read_only=False) as txn:
             await KnowledgeBox.update(
                 txn,
                 uuid=kbid,

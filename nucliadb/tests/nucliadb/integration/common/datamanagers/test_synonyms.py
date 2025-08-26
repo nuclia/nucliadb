@@ -35,7 +35,7 @@ async def test_kb_synonyms(maindb_driver: Driver):
     synonyms = knowledgebox_pb2.Synonyms()
     synonyms.terms["planet"].synonyms.extend(["globe", "earth"])
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=False) as txn:
         await datamanagers.synonyms.set(txn, kbid=kbid, synonyms=synonyms)
         await txn.commit()
 
@@ -44,7 +44,7 @@ async def test_kb_synonyms(maindb_driver: Driver):
     assert stored == synonyms
 
     # Delete and validate
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=False) as txn:
         await datamanagers.synonyms.delete(txn, kbid=kbid)
         await txn.commit()
 

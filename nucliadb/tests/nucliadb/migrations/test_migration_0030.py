@@ -41,7 +41,7 @@ async def test_migration_0030_duplicated_labels(maindb_driver: Driver):
 
     kb_labels.labelset["another"].labels.append(knowledgebox_pb2.Label(title="another label"))
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=False) as txn:
         await datamanagers.labels.set_labels(txn, kbid=kbid, labels=kb_labels)
         await txn.commit()
 

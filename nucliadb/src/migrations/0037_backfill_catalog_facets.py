@@ -37,7 +37,7 @@ async def migrate(context: ExecutionContext) -> None:
     driver = cast(PGDriver, context.kv_driver)
 
     BATCH_SIZE = 1_000
-    async with driver.transaction() as txn:
+    async with driver.transaction(read_only=False) as txn:
         txn = cast(PGTransaction, txn)
         start_kbid = "00000000000000000000000000000000"
         start_rid = "00000000000000000000000000000000"

@@ -112,14 +112,14 @@ async def get_last_restored(context: ApplicationContext, kbid: str, backup_id: s
 
 async def set_last_restored(context: ApplicationContext, kbid: str, backup_id: str, resource_id: str):
     key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)
-    async with context.kv_driver.transaction() as txn:
+    async with context.kv_driver.transaction(read_only=False) as txn:
         await txn.set(key, resource_id.encode())
         await txn.commit()
 
 
 async def delete_last_restored(context: ApplicationContext, kbid: str, backup_id: str):
     key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)
-    async with context.kv_driver.transaction() as txn:
+    async with context.kv_driver.transaction(read_only=False) as txn:
         await txn.delete(key)
         await txn.commit()
 

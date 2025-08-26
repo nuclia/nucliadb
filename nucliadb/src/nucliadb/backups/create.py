@@ -277,7 +277,7 @@ async def get_metadata(
 
 
 async def set_metadata(context: ApplicationContext, kbid: str, backup_id: str, metadata: BackupMetadata):
-    async with context.kv_driver.transaction() as txn:
+    async with context.kv_driver.transaction(read_only=False) as txn:
         await txn.set(
             MaindbKeys.METADATA.format(kbid=kbid, backup_id=backup_id),
             metadata.model_dump_json().encode(),
@@ -286,7 +286,7 @@ async def set_metadata(context: ApplicationContext, kbid: str, backup_id: str, m
 
 
 async def delete_metadata(context: ApplicationContext, kbid: str, backup_id: str):
-    async with context.kv_driver.transaction() as txn:
+    async with context.kv_driver.transaction(read_only=False) as txn:
         await txn.delete(MaindbKeys.METADATA.format(kbid=kbid, backup_id=backup_id))
         await txn.commit()
 

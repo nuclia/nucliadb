@@ -81,9 +81,9 @@ async def purge_kb(driver: Driver):
             )
             continue
 
-        # Now delete the tikv delete mark
+        # Now delete the delete mark
         try:
-            async with driver.transaction() as txn:
+            async with driver.transaction(read_only=False) as txn:
                 key_to_purge = KB_TO_DELETE.format(kbid=kbid)
                 await txn.delete(key_to_purge)
                 await txn.commit()
@@ -126,7 +126,7 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
 
         if delete_marker:
             try:
-                async with driver.transaction() as txn:
+                async with driver.transaction(read_only=False) as txn:
                     await txn.delete(key)
                     await txn.commit()
                 logger.info(f"  √ Deleted storage deletion marker {key}")
@@ -194,7 +194,7 @@ async def _purge_resources_storage_batch(driver: Driver, storage: Storage, batch
     await asyncio.gather(*tasks)
 
     # Delete the schedule-to-delete keys
-    async with driver.transaction() as txn:
+    async with driver.transaction(read_only=False) as txn:
         for key in to_delete_batch:
             await txn.delete(key)
         await txn.commit()
@@ -259,7 +259,7 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
                 await asyncio.gather(*tasks)
 
             # Finally, delete the key
-            async with driver.transaction() as txn:
+            async with driver.transaction(read_only=False) as txn:
                 await txn.delete(key)
                 await txn.commit()
 

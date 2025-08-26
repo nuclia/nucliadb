@@ -232,7 +232,7 @@ async def test_ingest_error_message(kbid: str, storage: Storage, processor, main
 
     await processor.process(message=message1, seqid=2)
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=True) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         r = await kb_obj.get(message1.uuid)
         assert r is not None
@@ -270,7 +270,7 @@ async def test_ingest_messages_origin(
     message1.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message1, seqid=1)
 
-    async with processor.driver.transaction() as txn:
+    async with processor.driver.transaction(read_only=True) as txn:
         storage = await get_storage(service_name=SERVICE_NAME)
         kb = KnowledgeBox(txn, storage, knowledgebox_ingest)
         res = Resource(txn, storage, kb, rid)
@@ -289,7 +289,7 @@ async def test_ingest_messages_origin(
     )
     await processor.process(message=message1, seqid=2)
 
-    async with processor.driver.transaction() as txn:
+    async with processor.driver.transaction(read_only=True) as txn:
         kb = KnowledgeBox(txn, storage, knowledgebox_ingest)
         res = Resource(txn, storage, kb, rid)
         origin = await res.get_origin()
@@ -526,7 +526,7 @@ async def test_qa(
 
     await processor.process(message=message, seqid=1)
 
-    async with driver.transaction() as txn:
+    async with driver.transaction(read_only=True) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         r = await kb_obj.get(message.uuid)
         assert r is not None
@@ -625,7 +625,7 @@ async def test_ingest_account_seq_stored(
     add_filefields(message, [("file_1", "file.png")])
     await processor.process(message=message, seqid=1)
 
-    async with driver.transaction() as txn:
+    async with driver.transaction(read_only=True) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         r = await kb_obj.get(message.uuid)
         assert r is not None
@@ -664,7 +664,7 @@ async def test_ingest_autocommit_deadletter_marks_resource(
         mock_notify.side_effect = Exception("test")
         await processor.process(message=message, seqid=1)
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=True) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         resource = await kb_obj.get(message.uuid)
 

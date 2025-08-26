@@ -35,7 +35,7 @@ async def test_migration_0021(maindb_driver: Driver):
     kbid = str(uuid.uuid4())
 
     # Create a bunch of deprecated vectorsets keys and add
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=False) as txn:
         await txn.set(f"/kbs/{kbid}", b"my kb")
         await txn.set(f"/kbs/{kbid}/vectorsets", b"vectorset data")
         await txn.set(f"/kbs/{kbid}/other", b"other data")
@@ -63,7 +63,7 @@ async def test_migration_0021_kb_without_vectorset_key(maindb_driver: Driver):
     kbid = str(uuid.uuid4())
 
     # Create a bunch of deprecated vectorsets keys and add
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=False) as txn:
         await txn.set(f"/kbs/{kbid}", b"my kb")
         await txn.set(f"/kbs/{kbid}/other", b"other data")
         await txn.commit()

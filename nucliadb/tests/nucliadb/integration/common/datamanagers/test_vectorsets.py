@@ -39,7 +39,7 @@ async def test_kb_vectorsets(maindb_driver: Driver):
         assert await vectorsets.exists(txn, kbid=kbid, vectorset_id=vectorset_id_2) is False
 
     # Set two vectorsets
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=False) as txn:
         await vectorsets.set(txn, kbid=kbid, config=vectoset_config_1)
         await vectorsets.set(txn, kbid=kbid, config=vectorset_config_2)
         await txn.commit()
@@ -52,7 +52,7 @@ async def test_kb_vectorsets(maindb_driver: Driver):
     assert stored_vectorset_1 == vectoset_config_1
 
     # Delete one vectorset an validate the second one is still there
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=False) as txn:
         await vectorsets.delete(txn, kbid=kbid, vectorset_id=vectorset_id_1)
         await txn.commit()
 

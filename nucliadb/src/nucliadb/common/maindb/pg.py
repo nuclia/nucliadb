@@ -330,7 +330,7 @@ class PGDriver(Driver):
             metric.set(value)
 
     @asynccontextmanager
-    async def transaction(self, read_only: bool = False) -> AsyncGenerator[Transaction, None]:
+    async def transaction(self, *, read_only: bool) -> AsyncGenerator[Transaction, None]:
         if read_only:
             yield ReadOnlyPGTransaction(self)
         else:

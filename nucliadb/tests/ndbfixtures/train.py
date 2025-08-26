@@ -331,7 +331,7 @@ async def test_pagination_resources(processor: Processor, knowledgebox_ingest: s
 
     # Add entities
     storage = await get_storage()
-    async with driver.transaction() as txn:
+    async with driver.transaction(read_only=False) as txn:
         kb = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
         entities_manager = EntitiesManager(kb, txn)
         entities = EntitiesGroup()

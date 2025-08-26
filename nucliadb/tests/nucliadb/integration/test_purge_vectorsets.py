@@ -57,7 +57,7 @@ async def test_purge_vectorsets__kb_with_vectorsets(
     with patch.object(
         storage, "delete_upload", new=AsyncMock(side_effect=storage.delete_upload)
     ) as mock:
-        async with maindb_driver.transaction() as txn:
+        async with maindb_driver.transaction(read_only=False) as txn:
             kb_obj = KnowledgeBox(txn, storage, kbid)
             await kb_obj.delete_vectorset(vectorset_id)
             await txn.commit()

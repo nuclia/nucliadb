@@ -30,7 +30,7 @@ from nucliadb_utils.storages.storage import Storage
 async def test_create_resource_orm_field_link(
     storage: Storage, cache, dummy_nidx_utility, knowledgebox_ingest: str, maindb_driver
 ):
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=False) as txn:
         uuid = str(uuid4())
         kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
         r = await kb_obj.add_resource(uuid=uuid, slug="slug")
@@ -44,22 +44,22 @@ async def test_create_resource_orm_field_link(
     t2.added.FromDatetime(datetime.now())
     t2.headers["AUTHORIZATION"] = "Bearer xxxxx"
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=False) as txn:
         r.txn = txn
         await r.set_field(FieldType.LINK, "link1", t2)
         await txn.commit()
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=True) as txn:
         r.txn = txn
         linkfield: Link = await r.get_field("link1", FieldType.LINK, load=True)
         assert linkfield.value.uri == t2.uri
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=False) as txn:
         r.txn = txn
         await r.delete_field(FieldType.LINK, "link1")
         await txn.commit()
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=True) as txn:
         r.txn = txn
         linkfield = await r.get_field("link1", FieldType.LINK, load=True)
         assert linkfield.value is None

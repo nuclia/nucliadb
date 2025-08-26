@@ -39,7 +39,7 @@ async def test_migration_0028_single_vectorset_kb(maindb_driver: Driver):
         storage_key_kind=knowledgebox_pb2.VectorSetConfig.StorageKeyKind.UNSET,
     )
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=False) as txn:
         await datamanagers.vectorsets.set(txn, kbid=kbid, config=config)
         await txn.commit()
 
@@ -69,7 +69,7 @@ async def test_migration_0028_multi_vectorset_kb(maindb_driver: Driver):
         storage_key_kind=knowledgebox_pb2.VectorSetConfig.StorageKeyKind.UNSET,
     )
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=False) as txn:
         await datamanagers.vectorsets.set(txn, kbid=kbid, config=config_1)
         await datamanagers.vectorsets.set(txn, kbid=kbid, config=config_2)
         await txn.commit()

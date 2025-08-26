@@ -42,7 +42,7 @@ async def test_migration_0018_global(maindb_driver: Driver):
         ),
     ):
         # setup some orphan /kbslugs keys and some real ones
-        async with maindb_driver.transaction() as txn:
+        async with maindb_driver.transaction(read_only=False) as txn:
             fake_kb_slug = "fake-kb-slug"
             fake_kb_id = "fake-kb-id"
             key = KB_SLUGS.format(slug=fake_kb_slug)

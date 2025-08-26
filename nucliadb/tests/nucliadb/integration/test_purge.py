@@ -158,7 +158,7 @@ async def test_purge_orphan_shards(
 
     # We have removed the shards in maindb but left them orphan in the index
     # nodes
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=True) as txn:
         maindb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         assert maindb_shards is None
 
@@ -212,7 +212,7 @@ async def test_purge_orphan_shard_detection(
     orphan_shard_id = orphan_shard.id
 
     # Rollover shard
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.transaction(read_only=False) as txn:
         rollover_shards = writer_pb2.Shards(
             shards=[writer_pb2.ShardObject(shard="rollover-shard")],
             kbid=kbid,
@@ -225,13 +225,13 @@ async def test_purge_orphan_shard_detection(
 
 
 async def list_all_keys(driver: Driver) -> list[str]:
-    async with driver.transaction() as txn:
+    async with driver.transaction(read_only=True) as txn:
         keys = [key async for key in txn.keys(match="")]
     return keys
 
 
 async def kb_catalog_entries_count(driver: Driver, kbid: str) -> int:
-    async with driver.transaction() as txn:
+    async with driver.transaction(read_only=True) as txn:
         txn = cast(PGTransaction, txn)
         async with txn.connection.cursor() as cur:
             await cur.execute(

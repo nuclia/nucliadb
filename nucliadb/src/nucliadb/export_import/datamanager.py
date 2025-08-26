@@ -89,13 +89,13 @@ class ExportImportDataManager:
         metadata.modified = datetime.now(timezone.utc)
         key = self._get_maindb_metadata_key(type, metadata.kbid, metadata.id)
         data = metadata.model_dump_json().encode("utf-8")
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=False) as txn:
             await txn.set(key, data)
             await txn.commit()
 
     async def delete_metadata(self, type: str, metadata: Metadata):
         key = self._get_maindb_metadata_key(type, metadata.kbid, metadata.id)
-        async with self.driver.transaction() as txn:
+        async with self.driver.transaction(read_only=False) as txn:
             await txn.delete(key)
             await txn.commit()
 

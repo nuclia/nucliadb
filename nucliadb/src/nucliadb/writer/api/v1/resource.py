@@ -373,7 +373,7 @@ async def update_resource_slug(
     rid: str,
     new_slug: str,
 ):
-    async with driver.transaction() as txn:
+    async with driver.transaction(read_only=False) as txn:
         old_slug = await datamanagers.resources.modify_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
         await txn.commit()
         return old_slug
