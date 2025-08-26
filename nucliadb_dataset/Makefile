@@ -15,4 +15,14 @@ test:
 
 .PHONY: test-cov
 test-cov:
-	TEST_LOCAL_NUCLIADB=START pytest -rfE -sxv --cov=nucliadb_dataset --cov-config=../.coveragerc --tb=native --cov-report term-missing:skip-covered --cov-report xml --cov-append tests
+	TEST_LOCAL_NUCLIADB=START pytest \
+		-rfE -sxv \
+		--cov=nucliadb_dataset \
+		--cov=nucliadb_models \
+		--cov=nucliadb_sdk \
+		--cov-config=../.coveragerc \
+		--cov-report term-missing:skip-covered \
+		--cov-report xml \
+		--cov-append \
+		--tb=native \
+		tests
