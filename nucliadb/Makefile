@@ -49,6 +49,9 @@ test-%:
 test-cov-%:
 	$(PYTEST) \
 		--cov=nucliadb \
+		--cov=nucliadb_models \
+		--cov=nucliadb_telemetry \
+		--cov=nucliadb_utils \
 		--cov-config=../.coveragerc \
 		--cov-report xml \
 		--cov-report term-missing:skip-covered \
