@@ -32,7 +32,7 @@ from nidx_protos.noderesources_pb2 import EmptyQuery, ShardId
 import nucliadb.common.nidx
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.pg import PGTransaction
+from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE_BASE,
@@ -231,9 +231,9 @@ async def list_all_keys(driver: Driver) -> list[str]:
 
 
 async def kb_catalog_entries_count(driver: Driver, kbid: str) -> int:
-    async with driver.transaction(read_only=True) as txn:
-        txn = cast(PGTransaction, txn)
-        async with txn.connection.cursor() as cur:
+    driver = cast(PGDriver, driver)
+    async with driver._get_connection() as conn:
+        async with conn.cursor() as cur:
             await cur.execute(
                 "SELECT COUNT(*) FROM catalog WHERE kbid = %s",
                 (kbid,),
