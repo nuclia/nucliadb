@@ -4,11 +4,84 @@ coverage:
       default:
         target: auto
         threshold: 1%
+
     patch: off
+
 ignore:
   - "**/setup.py"
   - "**/tests/**"
   - "**/test_*.py"
+
+component_management:
+  default_rules:
+    carryforward: true
+    statuses:
+      - type: project
+        target: auto
+        threshold: 1%
+
+  individual_components:
+
+    - component_id: standalone
+      name: standalone
+      paths:
+        - nucliadb/src/nucliadb/standalone/**
+
+    - component_id: ingest
+      name: ingest
+      paths:
+        - nucliadb/src/nucliadb/ingest/**
+
+    - component_id: reader
+      name: reader
+      paths:
+        - nucliadb/src/nucliadb/reader/**
+
+    - component_id: writer
+      name: writer
+      paths:
+        - nucliadb/src/nucliadb/writer/**
+
+    - component_id: search
+      name: search
+      paths:
+        - nucliadb/src/nucliadb/search/**
+
+    - component_id: train
+      name: train
+      paths:
+        - nucliadb/src/nucliadb/train/**
+
+    - component_id: sdk
+      name: sdk
+      paths:
+        - nucliadb_sdk/src/nucliadb_sdk/**
+
+    - component_id: dataset
+      name: dataset
+      paths:
+        - nucliadb_dataset/src/nucliadb_dataset/**
+
+    - component_id: models
+      name: nucliadb_models
+      paths:
+        - nucliadb_models/**
+
+    - component_id: utils
+      name: nucliadb_utils
+      paths:
+        - nucliadb_utils/**
+
+    - component_id: telemetry
+      name: nucliadb_telemetry
+      paths:
+        - nucliadb_telemetry/**
+
+    - component_id: nidx
+      name: nidx
+      paths:
+        - nidx/**
+
 flag_management:
   default_rules: # the rules that will be followed for any flag added, generally
     carryforward: true # needed for monorepos: total coverage is not uploaded at every commit.
