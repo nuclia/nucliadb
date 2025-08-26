@@ -142,6 +142,7 @@ def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
 def test_learning_config_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.set_configuration(kbid=kb.uuid, content={"foo": "bar"})
     sdk.get_configuration(kbid=kb.uuid)
+    sdk.update_configuration(kbid=kb.uuid, content={"foo": "baz"})
     sdk.download_model(kbid=kb.uuid, model_id="foo", filename="bar")
     sdk.get_models(kbid=kb.uuid)
     sdk.get_model(kbid=kb.uuid, model_id="foo")
