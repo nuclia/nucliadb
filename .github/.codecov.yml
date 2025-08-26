@@ -14,7 +14,6 @@ ignore:
 
 component_management:
   default_rules:
-    carryforward: true
     statuses:
       - type: project
         target: auto
@@ -22,25 +21,25 @@ component_management:
 
   individual_components:
 
+    - component_id: sdk
+      name: sdk
+      paths:
+        - nucliadb_sdk/src/nucliadb_sdk/**
+
+    - component_id: dataset
+      name: dataset
+      paths:
+        - nucliadb_dataset/src/nucliadb_dataset/**
+
     - component_id: standalone
       name: standalone
       paths:
         - nucliadb/src/nucliadb/standalone/**
 
-    - component_id: ingest
-      name: ingest
-      paths:
-        - nucliadb/src/nucliadb/ingest/**
-
     - component_id: reader
       name: reader
       paths:
         - nucliadb/src/nucliadb/reader/**
-
-    - component_id: writer
-      name: writer
-      paths:
-        - nucliadb/src/nucliadb/writer/**
 
     - component_id: search
       name: search
@@ -52,15 +51,15 @@ component_management:
       paths:
         - nucliadb/src/nucliadb/train/**
 
-    - component_id: sdk
-      name: sdk
+    - component_id: writer
+      name: writer
       paths:
-        - nucliadb_sdk/src/nucliadb_sdk/**
+        - nucliadb/src/nucliadb/writer/**
 
-    - component_id: dataset
-      name: dataset
+    - component_id: ingest
+      name: ingest
       paths:
-        - nucliadb_dataset/src/nucliadb_dataset/**
+        - nucliadb/src/nucliadb/ingest/**
 
     - component_id: models
       name: nucliadb_models
@@ -81,85 +80,3 @@ component_management:
       name: nidx
       paths:
         - nidx/**
-
-flag_management:
-  default_rules: # the rules that will be followed for any flag added, generally
-    carryforward: true # needed for monorepos: total coverage is not uploaded at every commit.
-  individual_flags:
-    - name: standalone
-      paths:
-        - nucliadb/src/nucliadb/standalone/**
-      carryforward: true
-      statuses:
-        - type: project
-          target: 80%
-    - name: ingest
-      paths:
-        - nucliadb/src/nucliadb/ingest/**
-      carryforward: true
-      statuses:
-        - type: project
-          target: 50%
-    - name: utils
-      paths:
-        - nucliadb_utils/**
-      carryforward: true
-      statuses:
-        - type: project
-          target: 80%
-    - name: train
-      paths:
-        - nucliadb/src/nucliadb/train/**
-      carryforward: true
-      statuses:
-        - type: project
-          target: 55%
-    - name: telemetry
-      paths:
-        - nucliadb_telemetry/**
-      carryforward: true
-      statuses:
-        - type: project
-          target: 78%
-    - name: search
-      paths:
-        - nucliadb/src/nucliadb/search/**
-      carryforward: true
-      statuses:
-        - type: project
-          target: 74%
-    - name: writer
-      paths:
-        - nucliadb/src/nucliadb/writer/**
-      carryforward: true
-      statuses:
-        - type: project
-          target: 83%
-    - name: reader
-      paths:
-        - nucliadb/src/nucliadb/reader/**
-      carryforward: true
-      statuses:
-        - type: project
-          target: 60%
-    - name: sdk
-      paths:
-        - nucliadb_sdk/src/nucliadb_sdk/**
-      carryforward: true
-      statuses:
-        - type: project
-          target: 38%
-    - name: dataset
-      paths:
-        - nucliadb_dataset/src/nucliadb_dataset/**
-      carryforward: true
-      statuses:
-        - type: project
-          target: 60%
-    - name: nidx
-      paths:
-        - nidx/**
-      carryforward: true
-      statuses:
-        - type: project
-          target: 70%
