@@ -1,13 +1,9 @@
 [report]
 exclude_lines =
     pragma: no cover
-    # blank implementations with ...
-    ^\s*\.\.\.\s*$
-    # abstract methods and properties
+    ^\s*...\s*$
     raise NotImplementedError
-    @(abc\.)?abstract
-    # main functions
-    if __name__ == .__main__.:
+    @abstract
 
 [run]
 omit =
