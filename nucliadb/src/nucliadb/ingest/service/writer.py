@@ -419,7 +419,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         try:
-            async with self.driver.transaction(read_only=True) as txn:
+            async with self.driver.transaction(read_only=False) as txn:
                 kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
                 resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
                 resobj.disable_vectors = not request.reindex_vectors
