@@ -1,9 +1,12 @@
 codecov:
   notify:
-    # we upload 5 coverage reports (nucliadb, search, rest of components, nidx
-    # and libraries). With this we make codecov wait until we reported all to
-    # return the aggregated report
-    after_n_builds: 5
+    # we upload coverage reports for all the components we test:
+    # - nidx
+    # - search
+    # - nucliadb (in 3 parallel steps)
+    # - nucliadb components (ingest, reader, standalone, train and writer)
+    # - libraries (dataset, models, sdk, telemetry, utils)
+    after_n_builds: 15
 
 coverage:
   status:
