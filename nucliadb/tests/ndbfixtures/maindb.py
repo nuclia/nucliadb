@@ -70,8 +70,11 @@ async def maindb_driver(pg_maindb_driver) -> AsyncIterator[Driver]:
 async def cleanup_maindb(driver: Driver):
     if not driver.initialized:
         return
-    async with driver.transaction() as txn:
+
+    async with driver.ro_transaction() as txn:
         all_keys = [k async for k in txn.keys("")]
+
+    async with driver.rw_transaction() as txn:
         for key in all_keys:
             await txn.delete(key)
         await txn.commit()

@@ -151,7 +151,7 @@ class TaskRetryHandler:
 
 
 async def _get_metadata(kv_driver: Driver, metadata_key: str) -> Optional[TaskMetadata]:
-    async with kv_driver.transaction(read_only=True) as txn:
+    async with kv_driver.ro_transaction() as txn:
         metadata = await txn.get(metadata_key)
         if metadata is None:
             return None
@@ -159,7 +159,7 @@ async def _get_metadata(kv_driver: Driver, metadata_key: str) -> Optional[TaskMe
 
 
 async def _set_metadata(kv_driver: Driver, metadata_key: str, metadata: TaskMetadata) -> None:
-    async with kv_driver.transaction() as txn:
+    async with kv_driver.rw_transaction() as txn:
         await txn.set(metadata_key, metadata.model_dump_json().encode())
         await txn.commit()
 
@@ -188,7 +188,7 @@ async def purge_batch(
     """
     Returns the next start key and the number of purged records. If start is None, it means there are no more records to purge.
     """
-    async with kv_driver.transaction() as txn:
+    async with kv_driver.rw_transaction() as txn:
         txn = cast(PGTransaction, txn)
         async with txn.connection.cursor() as cur:
             await cur.execute(
@@ -226,7 +226,7 @@ async def purge_batch(
     while len(to_delete) > 0:
         batch = to_delete[:delete_batch_size]
         to_delete = to_delete[delete_batch_size:]
-        async with kv_driver.transaction() as txn:
+        async with kv_driver.rw_transaction() as txn:
             for key in batch:
                 logger.info("Purging task metadata", extra={"key": key})
                 await txn.delete(key)

@@ -42,7 +42,7 @@ async def test_migration_0018_global(maindb_driver: Driver):
         ),
     ):
         # setup some orphan /kbslugs keys and some real ones
-        async with maindb_driver.transaction() as txn:
+        async with maindb_driver.rw_transaction() as txn:
             fake_kb_slug = "fake-kb-slug"
             fake_kb_id = "fake-kb-id"
             key = KB_SLUGS.format(slug=fake_kb_slug)
@@ -62,7 +62,7 @@ async def test_migration_0018_global(maindb_driver: Driver):
 
         # tikv needs to open a second transaction to be able to read values from
         # the first one using `scan_keys`
-        async with maindb_driver.transaction(read_only=True) as txn:
+        async with maindb_driver.ro_transaction() as txn:
             kb_slugs = [kb_slug async for kbid, kb_slug in datamanagers.kb.get_kbs(txn, prefix="")]
             assert len(kb_slugs) == 2
             assert fake_kb_slug in kb_slugs
@@ -71,7 +71,7 @@ async def test_migration_0018_global(maindb_driver: Driver):
     # execute migration, removing orphan kbslug keys
     await migration.module.migrate(execution_context)
 
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         assert not await datamanagers.kb.exists_kb(txn, kbid=fake_kb_id)
         assert await datamanagers.kb.exists_kb(txn, kbid=real_kb_id)
 

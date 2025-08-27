@@ -75,7 +75,7 @@ class _Lock:
         start = time.time()
         while True:
             try:
-                async with self.driver.transaction() as txn:
+                async with self.driver.rw_transaction() as txn:
                     lock_data = await self.get_lock_data(txn)
                     if lock_data is None:
                         await self._set_lock_value(txn)
@@ -128,7 +128,7 @@ class _Lock:
         while True:
             try:
                 await asyncio.sleep(self.refresh_timeout)
-                async with self.driver.transaction() as txn:
+                async with self.driver.rw_transaction() as txn:
                     await self._update_lock_value(txn)
                     await txn.commit()
             except (asyncio.CancelledError, RuntimeError):
@@ -138,12 +138,12 @@ class _Lock:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         self.task.cancel()
-        async with self.driver.transaction() as txn:
+        async with self.driver.rw_transaction() as txn:
             await txn.delete(self.key)
             await txn.commit()
 
     async def is_locked(self) -> bool:
-        async with get_driver().transaction(read_only=True) as txn:
+        async with get_driver().ro_transaction() as txn:
             lock_data = await self.get_lock_data(txn)
         return lock_data is not None and time.time() < lock_data.expires_at
 

@@ -133,7 +133,7 @@ async def inject_message(
 async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
     # Make sure is indexed
     driver = get_driver()
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         shard_manager = KBShardManager()
         shard = await shard_manager.get_current_active_shard(txn, knowledgebox_ingest)
         if shard is None:

@@ -211,7 +211,7 @@ async def run_pg_schema_migrations(driver: PGDriver):
 
     # The migration uses two transactions. The former is only used to get a lock (pg_advisory_lock)
     # without having to worry about correctly unlocking it (postgres unlocks it when the transaction ends)
-    async with driver.transaction() as tx_lock, tx_lock.connection.cursor() as cur_lock:  # type: ignore[attr-defined]
+    async with driver.rw_transaction() as tx_lock, tx_lock.connection.cursor() as cur_lock:  # type: ignore[attr-defined]
         await cur_lock.execute(
             "CREATE TABLE IF NOT EXISTS migrations (version INT PRIMARY KEY, migrated_at TIMESTAMP NOT NULL DEFAULT NOW())"
         )
@@ -227,7 +227,7 @@ async def run_pg_schema_migrations(driver: PGDriver):
 
             # Gets a new transaction for each migration, so if they get interrupted we at least
             # save the state of the last finished transaction
-            async with driver.transaction() as tx, tx.connection.cursor() as cur:  # type: ignore[attr-defined]
+            async with driver.rw_transaction() as tx, tx.connection.cursor() as cur:  # type: ignore[attr-defined]
                 await migration.migrate(tx)
                 await cur.execute("INSERT INTO migrations (version) VALUES (%s)", (version,))
                 await tx.commit()

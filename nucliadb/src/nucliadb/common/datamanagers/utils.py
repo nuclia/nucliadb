@@ -42,7 +42,7 @@ async def get_kv_pb(
 @contextlib.asynccontextmanager
 async def with_rw_transaction():
     driver = get_driver()
-    async with driver.transaction(read_only=False) as txn:
+    async with driver.rw_transaction() as txn:
         yield txn
 
 
@@ -53,5 +53,5 @@ with_transaction = with_rw_transaction
 @contextlib.asynccontextmanager
 async def with_ro_transaction():
     driver = get_driver()
-    async with driver.transaction(read_only=True) as ro_txn:
+    async with driver.ro_transaction() as ro_txn:
         yield ro_txn

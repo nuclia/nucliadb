@@ -135,7 +135,7 @@ async def serialize(
     slug: Optional[str] = None,
 ) -> Optional[Resource]:
     driver = get_driver()
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         return await managed_serialize(
             txn,
             kbid,
@@ -392,6 +392,6 @@ async def get_resource_uuid_by_slug(
 ) -> Optional[str]:
     storage = await get_storage(service_name=service_name)
     driver = get_driver()
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         kb = KnowledgeBox(txn, storage, kbid)
         return await kb.get_resource_uuid_by_slug(slug)

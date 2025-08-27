@@ -222,7 +222,7 @@ class LocalDriver(Driver):
         pass
 
     @asynccontextmanager
-    async def transaction(self, read_only: bool = False) -> AsyncGenerator[Transaction, None]:
+    async def _transaction(self, *, read_only: bool) -> AsyncGenerator[Transaction, None]:
         if self.url is None:
             raise AttributeError("Invalid url")
         txn = LocalTransaction(self.url, self)

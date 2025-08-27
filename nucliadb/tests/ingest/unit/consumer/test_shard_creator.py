@@ -67,8 +67,9 @@ def shard_manager(dummy_nidx_utility, reader):
 
 @pytest.fixture()
 async def shard_creator_handler(pubsub, shard_manager):
+    txn = MagicMock(return_value=AsyncMock())
     sc = shard_creator.ShardCreatorHandler(
-        driver=AsyncMock(transaction=MagicMock(return_value=AsyncMock())),
+        driver=AsyncMock(ro_transaction=txn, rw_transaction=txn),
         storage=AsyncMock(),
         pubsub=pubsub,
         check_delay=0.05,

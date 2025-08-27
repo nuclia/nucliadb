@@ -39,16 +39,16 @@ async def test_migration_0028_single_vectorset_kb(maindb_driver: Driver):
         storage_key_kind=knowledgebox_pb2.VectorSetConfig.StorageKeyKind.UNSET,
     )
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.rw_transaction() as txn:
         await datamanagers.vectorsets.set(txn, kbid=kbid, config=config)
         await txn.commit()
 
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         assert (await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id="single-1")) == config
 
     await migration.module.migrate_kb(execution_context, kbid)
 
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         vs = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id="single-1")
         assert vs is not None
         assert vs.vectorset_id == "single-1"
@@ -69,18 +69,18 @@ async def test_migration_0028_multi_vectorset_kb(maindb_driver: Driver):
         storage_key_kind=knowledgebox_pb2.VectorSetConfig.StorageKeyKind.UNSET,
     )
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.rw_transaction() as txn:
         await datamanagers.vectorsets.set(txn, kbid=kbid, config=config_1)
         await datamanagers.vectorsets.set(txn, kbid=kbid, config=config_2)
         await txn.commit()
 
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         assert (await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id="multi-1")) == config_1
         assert (await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id="multi-2")) == config_2
 
     await migration.module.migrate_kb(execution_context, kbid)
 
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         vs = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id="multi-1")
         assert vs is not None
         assert vs.vectorset_id == "multi-1"

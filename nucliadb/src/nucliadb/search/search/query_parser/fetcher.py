@@ -393,7 +393,7 @@ async def get_matryoshka_dimension_cached(kbid: str, vectorset: str) -> Optional
 
 @query_parse_dependency_observer.wrap({"type": "matryoshka_dimension"})
 async def get_matryoshka_dimension(kbid: str, vectorset: Optional[str]) -> Optional[int]:
-    async with get_driver().transaction(read_only=True) as txn:
+    async with get_driver().ro_transaction() as txn:
         matryoshka_dimension = None
         if not vectorset:
             # XXX this should be migrated once we remove the "default" vectorset
@@ -409,23 +409,23 @@ async def get_matryoshka_dimension(kbid: str, vectorset: Optional[str]) -> Optio
 
 @query_parse_dependency_observer.wrap({"type": "classification_labels"})
 async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
-    async with get_driver().transaction(read_only=True) as txn:
+    async with get_driver().ro_transaction() as txn:
         return await datamanagers.labels.get_labels(txn, kbid=kbid)
 
 
 @query_parse_dependency_observer.wrap({"type": "synonyms"})
 async def get_kb_synonyms(kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
-    async with get_driver().transaction(read_only=True) as txn:
+    async with get_driver().ro_transaction() as txn:
         return await datamanagers.synonyms.get(txn, kbid=kbid)
 
 
 @query_parse_dependency_observer.wrap({"type": "entities_meta_cache"})
 async def get_entities_meta_cache(kbid: str) -> datamanagers.entities.EntitiesMetaCache:
-    async with get_driver().transaction(read_only=True) as txn:
+    async with get_driver().ro_transaction() as txn:
         return await datamanagers.entities.get_entities_meta_cache(txn, kbid=kbid)
 
 
 @query_parse_dependency_observer.wrap({"type": "deleted_entities_groups"})
 async def get_deleted_entity_groups(kbid: str) -> list[str]:
-    async with get_driver().transaction(read_only=True) as txn:
+    async with get_driver().ro_transaction() as txn:
         return list((await datamanagers.entities.get_deleted_groups(txn, kbid=kbid)).entities_groups)

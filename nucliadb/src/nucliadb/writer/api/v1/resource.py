@@ -373,7 +373,7 @@ async def update_resource_slug(
     rid: str,
     new_slug: str,
 ):
-    async with driver.transaction() as txn:
+    async with driver.rw_transaction() as txn:
         old_slug = await datamanagers.resources.modify_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
         await txn.commit()
         return old_slug
@@ -460,7 +460,7 @@ async def _reprocess_resource(
     driver = get_driver()
 
     writer = BrokerMessage()
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         kb = KnowledgeBox(txn, storage, kbid)
 
         resource = await kb.get(rid)

@@ -127,7 +127,7 @@ class KnowledgeBox:
         rollback_ops: list[Callable[[], Coroutine[Any, Any, Any]]] = []
 
         try:
-            async with driver.transaction() as txn:
+            async with driver.rw_transaction() as txn:
                 exists = await datamanagers.kb.get_kb_uuid(
                     txn, slug=slug
                 ) or await datamanagers.kb.exists_kb(txn, kbid=kbid)
@@ -281,7 +281,7 @@ class KnowledgeBox:
 
     @classmethod
     async def delete(cls, driver: Driver, kbid: str):
-        async with driver.transaction() as txn:
+        async with driver.rw_transaction() as txn:
             exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
             if not exists:
                 return
@@ -347,7 +347,7 @@ class KnowledgeBox:
 
         nidx_api = get_nidx_api_client()
 
-        async with driver.transaction() as txn:
+        async with driver.rw_transaction() as txn:
             storage_to_delete = KB_TO_DELETE_STORAGE.format(kbid=kbid)
             await txn.set(storage_to_delete, b"")
 
@@ -377,7 +377,7 @@ class KnowledgeBox:
     @classmethod
     async def delete_all_kb_keys(cls, driver: Driver, kbid: str, chunk_size: int = 1_000):
         prefix = KB_KEYS.format(kbid=kbid)
-        async with driver.transaction() as txn:
+        async with driver.rw_transaction() as txn:
             await txn.delete_by_prefix(prefix)
             await txn.commit()
 

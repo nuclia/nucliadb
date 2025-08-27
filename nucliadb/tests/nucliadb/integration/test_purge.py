@@ -32,7 +32,7 @@ from nidx_protos.noderesources_pb2 import EmptyQuery, ShardId
 import nucliadb.common.nidx
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.pg import PGTransaction
+from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE_BASE,
@@ -158,7 +158,7 @@ async def test_purge_orphan_shards(
 
     # We have removed the shards in maindb but left them orphan in the index
     # nodes
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.ro_transaction() as txn:
         maindb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         assert maindb_shards is None
 
@@ -212,7 +212,7 @@ async def test_purge_orphan_shard_detection(
     orphan_shard_id = orphan_shard.id
 
     # Rollover shard
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.rw_transaction() as txn:
         rollover_shards = writer_pb2.Shards(
             shards=[writer_pb2.ShardObject(shard="rollover-shard")],
             kbid=kbid,
@@ -225,15 +225,15 @@ async def test_purge_orphan_shard_detection(
 
 
 async def list_all_keys(driver: Driver) -> list[str]:
-    async with driver.transaction() as txn:
+    async with driver.ro_transaction() as txn:
         keys = [key async for key in txn.keys(match="")]
     return keys
 
 
 async def kb_catalog_entries_count(driver: Driver, kbid: str) -> int:
-    async with driver.transaction() as txn:
-        txn = cast(PGTransaction, txn)
-        async with txn.connection.cursor() as cur:
+    driver = cast(PGDriver, driver)
+    async with driver._get_connection() as conn:
+        async with conn.cursor() as cur:
             await cur.execute(
                 "SELECT COUNT(*) FROM catalog WHERE kbid = %s",
                 (kbid,),

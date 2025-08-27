@@ -48,36 +48,36 @@ class MigrationsDataManager:
 
     async def schedule_all_kbs(self, target_version: int) -> None:
         # Get all kb ids
-        async with self.driver.transaction(read_only=True) as txn:
+        async with self.driver.ro_transaction() as txn:
             kbids = [kbid async for kbid, _ in datamanagers.kb.get_kbs(txn)]
         # Schedule the migrations
-        async with self.driver.transaction() as txn:
+        async with self.driver.rw_transaction() as txn:
             for kbid in kbids:
                 await txn.set(MIGRATIONS_KEY.format(kbid=kbid), str(target_version).encode())
             await txn.commit()
 
     async def get_kb_migrations(self) -> list[str]:
         keys = []
-        async with self.driver.transaction() as txn:
+        async with self.driver.ro_transaction() as txn:
             async for key in txn.keys(MIGRATIONS_CONTAINER_KEY):
                 keys.append(key.split("/")[-1])
 
         return keys
 
     async def delete_kb_migration(self, *, kbid: str) -> None:
-        async with self.driver.transaction() as txn:
+        async with self.driver.rw_transaction() as txn:
             await txn.delete(MIGRATIONS_KEY.format(kbid=kbid))
             await txn.commit()
 
     async def get_kb_info(self, kbid: str) -> Optional[KnowledgeBoxInfo]:
-        async with self.driver.transaction(read_only=True) as txn:
+        async with self.driver.ro_transaction() as txn:
             kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
             if kb_config is None:
                 return None
         return KnowledgeBoxInfo(current_version=kb_config.migration_version)
 
     async def update_kb_info(self, *, kbid: str, current_version: int) -> None:
-        async with self.driver.transaction() as txn:
+        async with self.driver.rw_transaction() as txn:
             kb_config = await datamanagers.kb.get_config(txn, kbid=kbid, for_update=True)
             if kb_config is None:
                 raise Exception(f"KB {kbid} does not exist")
@@ -86,7 +86,7 @@ class MigrationsDataManager:
             await txn.commit()
 
     async def get_global_info(self) -> GlobalInfo:
-        async with self.driver.transaction(read_only=True) as txn:
+        async with self.driver.ro_transaction() as txn:
             raw_pb = await txn.get(MIGRATION_INFO_KEY)
         if raw_pb is None:
             return GlobalInfo(current_version=0, target_version=None)
@@ -100,7 +100,7 @@ class MigrationsDataManager:
         current_version: Union[int, _Unset] = _UNSET,
         target_version: Union[int, None, _Unset] = _UNSET,
     ) -> None:
-        async with self.driver.transaction() as txn:
+        async with self.driver.rw_transaction() as txn:
             raw_pb = await txn.get(MIGRATION_INFO_KEY, for_update=True)
             pb = migrations_pb2.MigrationInfo()
             if raw_pb is not None:
@@ -116,18 +116,18 @@ class MigrationsDataManager:
 
     async def get_kbs_to_rollover(self) -> list[str]:
         keys = []
-        async with self.driver.transaction() as txn:
+        async with self.driver.ro_transaction() as txn:
             async for key in txn.keys(ROLLOVER_CONTAINER_KEY):
                 keys.append(key.split("/")[-1])
 
         return keys
 
     async def add_kb_rollover(self, kbid: str) -> None:
-        async with self.driver.transaction() as txn:
+        async with self.driver.rw_transaction() as txn:
             await txn.set(ROLLOVER_KEY.format(kbid=kbid), b"")
             await txn.commit()
 
     async def delete_kb_rollover(self, kbid: str) -> None:
-        async with self.driver.transaction() as txn:
+        async with self.driver.rw_transaction() as txn:
             await txn.delete(ROLLOVER_KEY.format(kbid=kbid))
             await txn.commit()

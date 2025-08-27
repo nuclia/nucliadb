@@ -245,12 +245,12 @@ async def test_generate_broker_message(
     full_resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
 
     # Now fetch it
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.ro_transaction() as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
         resource = await kb_obj.get(full_resource.uuid)
         assert resource is not None
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.ro_transaction() as txn:
         resource.txn = txn
         bm = await generate_broker_message(resource)
 
@@ -383,7 +383,7 @@ async def test_generate_index_message_contains_all_metadata(
     resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
     resource.disable_vectors = False
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.ro_transaction() as txn:
         resource.txn = txn  # I don't like this but this is the API we have...
         index_message = await get_resource_index_message(resource, reindex=False)
 
@@ -464,7 +464,7 @@ async def test_generate_index_message_vectorsets(
     resource = await create_resource(storage, maindb_driver, knowledgebox_with_vectorsets)
     resource.disable_vectors = False
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.ro_transaction() as txn:
         resource.txn = txn  # I don't like this but this is the API we have...
         index_message = await get_resource_index_message(resource, reindex=False)
 
@@ -494,7 +494,7 @@ async def test_generate_index_message_cancels_labels(
     # Create a resource with all possible metadata in it
     resource = await create_resource(storage, maindb_driver, knowledgebox_with_vectorsets)
 
-    async with maindb_driver.transaction() as txn:
+    async with maindb_driver.ro_transaction() as txn:
         resource.txn = txn  # I don't like this but this is the API we have...
         index_message = await get_resource_index_message(resource, reindex=False)
 

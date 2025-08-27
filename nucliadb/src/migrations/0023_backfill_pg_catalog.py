@@ -44,7 +44,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
         return
 
     BATCH_SIZE = 100
-    async with context.kv_driver.transaction() as txn:
+    async with context.kv_driver.rw_transaction() as txn:
         txn = cast(PGTransaction, txn)
         continue_sql = ""
         while True:

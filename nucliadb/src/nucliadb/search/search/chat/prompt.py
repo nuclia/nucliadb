@@ -246,7 +246,7 @@ async def default_prompt_context(
     - Using an dict prevents from duplicates pulled in through conversation expansion.
     """
     # Sort retrieved paragraphs by decreasing order (most relevant first)
-    async with get_driver().transaction(read_only=True) as txn:
+    async with get_driver().ro_transaction() as txn:
         storage = await get_storage()
         kb = KnowledgeBoxORM(txn, storage, kbid)
         for paragraph in ordered_paragraphs:
@@ -779,7 +779,7 @@ async def conversation_prompt_context(
 ):
     analyzed_fields: List[str] = []
     ops = 0
-    async with get_driver().transaction(read_only=True) as txn:
+    async with get_driver().ro_transaction() as txn:
         storage = await get_storage()
         kb = KnowledgeBoxORM(txn, storage, kbid)
         for paragraph in ordered_paragraphs:

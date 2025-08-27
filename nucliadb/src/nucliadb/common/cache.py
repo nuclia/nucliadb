@@ -90,7 +90,7 @@ class ResourceCache(Cache[[str, str], ResourceORM]):
         @alru_cache(maxsize=cache_size)
         async def _get_resource(kbid: str, rid: str) -> Optional[ResourceORM]:
             storage = await get_storage()
-            async with get_driver().transaction(read_only=True) as txn:
+            async with get_driver().ro_transaction() as txn:
                 kb = KnowledgeBoxORM(txn, storage, kbid)
                 return await kb.get(rid)
 

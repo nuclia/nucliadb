@@ -167,7 +167,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             )
 
         try:
-            async with self.driver.transaction() as txn:
+            async with self.driver.rw_transaction() as txn:
                 kbid = await KnowledgeBoxORM.update(
                     txn, uuid=request.uuid, slug=request.slug, config=request.config
                 )
@@ -221,13 +221,13 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: NewEntitiesGroupRequest, context=None
     ) -> NewEntitiesGroupResponse:
         response = NewEntitiesGroupResponse()
-        async with self.driver.transaction(read_only=True) as ro_txn:
+        async with self.driver.ro_transaction() as ro_txn:
             kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
             if kbobj is None:
                 response.status = NewEntitiesGroupResponse.Status.KB_NOT_FOUND
                 return response
 
-        async with self.driver.transaction() as txn:
+        async with self.driver.rw_transaction() as txn:
             kbobj.txn = txn
             entities_manager = EntitiesManager(kbobj, txn)
             try:
@@ -244,7 +244,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
         response = GetEntitiesResponse()
-        async with self.driver.transaction(read_only=True) as txn:
+        async with self.driver.ro_transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = GetEntitiesResponse.Status.NOTFOUND
@@ -266,7 +266,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: ListEntitiesGroupsRequest, context=None
     ) -> ListEntitiesGroupsResponse:
         response = ListEntitiesGroupsResponse()
-        async with self.driver.transaction(read_only=True) as txn:
+        async with self.driver.ro_transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = ListEntitiesGroupsResponse.Status.NOTFOUND
@@ -290,7 +290,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: GetEntitiesGroupRequest, context=None
     ) -> GetEntitiesGroupResponse:
         response = GetEntitiesGroupResponse()
-        async with self.driver.transaction(read_only=True) as txn:
+        async with self.driver.ro_transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = GetEntitiesGroupResponse.Status.KB_NOT_FOUND
@@ -315,13 +315,13 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def SetEntities(self, request: SetEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
         response = OpStatusWriter()
-        async with self.driver.transaction(read_only=True) as ro_txn:
+        async with self.driver.ro_transaction() as ro_txn:
             kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
             if kbobj is None:
                 response.status = OpStatusWriter.Status.NOTFOUND
                 return response
 
-        async with self.driver.transaction() as txn:
+        async with self.driver.rw_transaction() as txn:
             kbobj.txn = txn
             entities_manager = EntitiesManager(kbobj, txn)
             try:
@@ -339,13 +339,13 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: UpdateEntitiesGroupRequest, context=None
     ) -> UpdateEntitiesGroupResponse:
         response = UpdateEntitiesGroupResponse()
-        async with self.driver.transaction(read_only=True) as ro_txn:
+        async with self.driver.ro_transaction() as ro_txn:
             kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
             if kbobj is None:
                 response.status = UpdateEntitiesGroupResponse.Status.KB_NOT_FOUND
                 return response
 
-        async with self.driver.transaction() as txn:
+        async with self.driver.rw_transaction() as txn:
             kbobj.txn = txn
             entities_manager = EntitiesManager(kbobj, txn)
             try:
@@ -368,13 +368,13 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def DelEntities(self, request: DelEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
         response = OpStatusWriter()
 
-        async with self.driver.transaction(read_only=True) as ro_txn:
+        async with self.driver.ro_transaction() as ro_txn:
             kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
             if kbobj is None:
                 response.status = OpStatusWriter.Status.NOTFOUND
                 return response
 
-        async with self.driver.transaction() as txn:
+        async with self.driver.rw_transaction() as txn:
             kbobj.txn = txn
             entities_manager = EntitiesManager(kbobj, txn)
             try:
@@ -393,7 +393,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> WriterStatusResponse:
         logger.info("Status Call")
         response = WriterStatusResponse()
-        async with self.driver.transaction(read_only=True) as txn:
+        async with self.driver.ro_transaction() as txn:
             async for _, slug in datamanagers.kb.get_kbs(txn):
                 response.knowledgeboxes.append(slug)
 
@@ -405,7 +405,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return response
 
     async def Index(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
-        async with self.driver.transaction() as txn:
+        async with self.driver.ro_transaction() as txn:
             kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
             resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
             bm = await generate_broker_message(resobj)
@@ -419,7 +419,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         try:
-            async with self.driver.transaction() as txn:
+            async with self.driver.rw_transaction() as txn:
                 kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
                 resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
                 resobj.disable_vectors = not request.reindex_vectors

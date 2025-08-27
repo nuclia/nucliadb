@@ -47,7 +47,7 @@ from nucliadb_utils.utilities import get_storage
 
 
 async def _iter_keys(driver: Driver, match: str) -> AsyncGenerator[str, None]:
-    async with driver.transaction(read_only=True) as keys_txn:
+    async with driver.ro_transaction() as keys_txn:
         async for key in keys_txn.keys(match=match):
             yield key
 
@@ -81,9 +81,9 @@ async def purge_kb(driver: Driver):
             )
             continue
 
-        # Now delete the tikv delete mark
+        # Now delete the delete mark
         try:
-            async with driver.transaction() as txn:
+            async with driver.rw_transaction() as txn:
                 key_to_purge = KB_TO_DELETE.format(kbid=kbid)
                 await txn.delete(key_to_purge)
                 await txn.commit()
@@ -126,7 +126,7 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
 
         if delete_marker:
             try:
-                async with driver.transaction() as txn:
+                async with driver.rw_transaction() as txn:
                     await txn.delete(key)
                     await txn.commit()
                 logger.info(f"  √ Deleted storage deletion marker {key}")
@@ -163,7 +163,7 @@ async def _count_resources_storage_to_purge(driver: Driver) -> int:
     """
     Count the number of resources marked as deleted in storage.
     """
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         return await txn.count(match=RESOURCE_TO_DELETE_STORAGE_BASE)
 
 
@@ -174,7 +174,7 @@ async def _purge_resources_storage_batch(driver: Driver, storage: Storage, batch
     """
     # Get the keys of the resources to delete in batches of 100
     to_delete_batch = []
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         async for key in txn.keys(match=RESOURCE_TO_DELETE_STORAGE_BASE, count=batch_size):
             to_delete_batch.append(key)
 
@@ -194,7 +194,7 @@ async def _purge_resources_storage_batch(driver: Driver, storage: Storage, batch
     await asyncio.gather(*tasks)
 
     # Delete the schedule-to-delete keys
-    async with driver.transaction() as txn:
+    async with driver.rw_transaction() as txn:
         for key in to_delete_batch:
             await txn.delete(key)
         await txn.commit()
@@ -220,14 +220,14 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
             continue
 
         try:
-            async with driver.transaction(read_only=True) as txn:
+            async with driver.ro_transaction() as txn:
                 value = await txn.get(key)
                 assert value is not None, "Key must exist or we wouldn't had fetch it iterating keys"
                 purge_payload = VectorSetPurge()
                 purge_payload.ParseFromString(value)
 
             fields: list[Field] = []
-            async with driver.transaction(read_only=True) as txn:
+            async with driver.ro_transaction() as txn:
                 kb = KnowledgeBox(txn, storage, kbid)
                 async for resource in kb.iterate_resources():
                     fields.extend((await resource.get_fields(force=True)).values())
@@ -259,7 +259,7 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
                 await asyncio.gather(*tasks)
 
             # Finally, delete the key
-            async with driver.transaction() as txn:
+            async with driver.rw_transaction() as txn:
                 await txn.delete(key)
                 await txn.commit()
 

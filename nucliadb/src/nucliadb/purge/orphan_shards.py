@@ -100,7 +100,7 @@ async def _get_indexed_shards() -> dict[str, ShardKb]:
 async def _get_stored_shards(driver: Driver) -> dict[str, ShardKb]:
     stored_shards: dict[str, ShardKb] = {}
 
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         async for kbid, _ in datamanagers.kb.get_kbs(txn):
             kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
             if kb_shards is None:
@@ -135,7 +135,7 @@ async def _get_kbid(shard_id: str) -> Optional[str]:
 async def report_orphan_shards(driver: Driver):
     orphan_shards = await detect_orphan_shards(driver)
     logger.info(f"Found {len(orphan_shards)} orphan shards")
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         for shard_id, kbid in orphan_shards.items():
             if kbid == UNKNOWN_KB:
                 msg = "Found orphan shard but could not get KB info"
