@@ -54,7 +54,8 @@ def driver(txn):
     mock = AsyncMock()
     cm = AsyncMock()
     cm.__aenter__.return_value = txn
-    mock._transaction = MagicMock(return_value=cm)
+    mock.ro_transaction = MagicMock(return_value=cm)
+    mock.rw_transaction = MagicMock(return_value=cm)
     yield mock
 
 
