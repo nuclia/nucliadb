@@ -71,7 +71,7 @@ async def test_create_knowledgebox(
         semantic_models={"my-semantic-model": SemanticModelMetadata()},
     )
     assert result == (kbid, slug)
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
         assert exists
 
@@ -112,7 +112,7 @@ async def test_create_knowledgebox_with_multiple_vectorsets(
         },
     )
     assert result == (kbid, slug)
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
         assert exists
 
@@ -236,7 +236,7 @@ async def test_knowledgebox_delete_all_kb_keys(
     maindb_driver,
     knowledgebox_ingest: str,
 ):
-    async with maindb_driver.transaction(read_only=False) as txn:
+    async with maindb_driver.rw_transaction() as txn:
         kbid = knowledgebox_ingest
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
 
@@ -255,7 +255,7 @@ async def test_knowledgebox_delete_all_kb_keys(
         await txn.commit()
 
     # Check that all of them are there
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         for rid, slug in rids_and_slugs:
             assert await kb_obj.get_resource_uuid_by_slug(slug) == rid
@@ -265,7 +265,7 @@ async def test_knowledgebox_delete_all_kb_keys(
     await KnowledgeBox.delete_all_kb_keys(maindb_driver, kbid, chunk_size=10)
 
     # Check that all of them were deleted
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         for rid, slug in rids_and_slugs:
             assert await kb_obj.get_resource_uuid_by_slug(slug) is None

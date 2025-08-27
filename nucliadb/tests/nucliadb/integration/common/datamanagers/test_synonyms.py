@@ -28,25 +28,25 @@ async def test_kb_synonyms(maindb_driver: Driver):
     kbid = "kbid"
 
     # Check initially there are no synonyms
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         assert await datamanagers.synonyms.get(txn, kbid=kbid) is None
 
     # Set and validate storage
     synonyms = knowledgebox_pb2.Synonyms()
     synonyms.terms["planet"].synonyms.extend(["globe", "earth"])
 
-    async with maindb_driver.transaction(read_only=False) as txn:
+    async with maindb_driver.rw_transaction() as txn:
         await datamanagers.synonyms.set(txn, kbid=kbid, synonyms=synonyms)
         await txn.commit()
 
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         stored = await datamanagers.synonyms.get(txn, kbid=kbid)
     assert stored == synonyms
 
     # Delete and validate
-    async with maindb_driver.transaction(read_only=False) as txn:
+    async with maindb_driver.rw_transaction() as txn:
         await datamanagers.synonyms.delete(txn, kbid=kbid)
         await txn.commit()
 
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         assert await datamanagers.synonyms.get(txn, kbid=kbid) is None

@@ -79,7 +79,7 @@ async def hydrate_resource_text(
         return []
 
     # Schedule the extraction of the text of each field in the resource
-    async with get_driver().transaction(read_only=True) as txn:
+    async with get_driver().ro_transaction() as txn:
         resource.txn = txn
         runner = ConcurrentRunner(max_tasks=max_concurrent_tasks)
         for field_type, field_key in await resource.get_fields(force=True):
@@ -120,7 +120,7 @@ async def hydrate_resource_metadata(
         if concurrency_control is not None:
             await stack.enter_async_context(concurrency_control)
 
-        async with get_driver().transaction(read_only=True) as ro_txn:
+        async with get_driver().ro_transaction() as ro_txn:
             serialized_resource = await managed_serialize(
                 txn=ro_txn,
                 kbid=kbid,

@@ -81,15 +81,15 @@ class Driver:
                     pass
 
     @asynccontextmanager
-    async def transaction(self, *, read_only: bool) -> AsyncGenerator[Transaction, None]:
+    async def _transaction(self, *, read_only: bool) -> AsyncGenerator[Transaction, None]:
         yield Transaction()
 
     @asynccontextmanager
     async def ro_transaction(self) -> AsyncGenerator[Transaction, None]:
-        async with self.transaction(read_only=True) as txn:
+        async with self._transaction(read_only=True) as txn:
             yield txn
 
     @asynccontextmanager
     async def rw_transaction(self) -> AsyncGenerator[Transaction, None]:
-        async with self.transaction(read_only=False) as txn:
+        async with self._transaction(read_only=False) as txn:
             yield txn

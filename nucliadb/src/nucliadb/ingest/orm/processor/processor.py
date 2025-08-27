@@ -208,7 +208,7 @@ class Processor:
         partition: str,
         transaction_check: bool = True,
     ) -> None:
-        async with self.driver.transaction(read_only=False) as txn:
+        async with self.driver.rw_transaction() as txn:
             try:
                 kb = KnowledgeBox(txn, self.storage, message.kbid)
 
@@ -267,7 +267,7 @@ class Processor:
         # so we commit it in a different transaction to make it as short as possible
         prev_txn = resource.txn
         try:
-            async with self.driver.transaction(read_only=False) as txn:
+            async with self.driver.rw_transaction() as txn:
                 resource.txn = txn
                 await resource.set_slug()
                 await txn.commit()
@@ -294,7 +294,7 @@ class Processor:
                     await txn.commit()
             return None
 
-        async with self.driver.transaction(read_only=False) as txn:
+        async with self.driver.rw_transaction() as txn:
             try:
                 multi = messages[0].multiid
                 kb = KnowledgeBox(txn, self.storage, kbid)
@@ -731,7 +731,7 @@ class Processor:
             logger.info(f"Skip when resource does not even have basic metadata: {resource}")
             return
         try:
-            async with self.driver.transaction(read_only=False) as txn:
+            async with self.driver.rw_transaction() as txn:
                 kb.txn = resource.txn = txn
                 resource.basic.metadata.status = resources_pb2.Metadata.Status.ERROR
                 await resource.set_basic(resource.basic)

@@ -319,7 +319,7 @@ async def test_pagination_resources(processor: Processor, knowledgebox_ingest: s
     t0 = time()
 
     while time() - t0 < 30:  # wait max 30 seconds for it
-        async with driver.transaction(read_only=True) as txn:
+        async with driver.ro_transaction() as txn:
             count = 0
             async for key in txn.keys(match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox_ingest)):
                 count += 1
@@ -331,7 +331,7 @@ async def test_pagination_resources(processor: Processor, knowledgebox_ingest: s
 
     # Add entities
     storage = await get_storage()
-    async with driver.transaction(read_only=False) as txn:
+    async with driver.rw_transaction() as txn:
         kb = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
         entities_manager = EntitiesManager(kb, txn)
         entities = EntitiesGroup()

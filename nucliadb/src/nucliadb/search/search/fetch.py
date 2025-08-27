@@ -55,7 +55,7 @@ async def fetch_resources(
         extracted = []
 
     result = {}
-    async with get_driver().transaction(read_only=True) as txn:
+    async with get_driver().ro_transaction() as txn:
         tasks = []
         for resource in resources:
             tasks.append(

@@ -287,7 +287,7 @@ async def processing_status(
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
 
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         kb = KnowledgeBox(txn, storage, kbid)
 
         max_simultaneous = asyncio.Semaphore(10)

@@ -54,7 +54,7 @@ class ExportImportDataManager:
 
     async def get_metadata(self, type: str, kbid: str, id: str) -> Metadata:
         key = self._get_maindb_metadata_key(type, kbid, id)
-        async with self.driver.transaction(read_only=True) as txn:
+        async with self.driver.ro_transaction() as txn:
             data = await txn.get(key)
         if data is None or data == b"":
             raise MetadataNotFound()
@@ -89,13 +89,13 @@ class ExportImportDataManager:
         metadata.modified = datetime.now(timezone.utc)
         key = self._get_maindb_metadata_key(type, metadata.kbid, metadata.id)
         data = metadata.model_dump_json().encode("utf-8")
-        async with self.driver.transaction(read_only=False) as txn:
+        async with self.driver.rw_transaction() as txn:
             await txn.set(key, data)
             await txn.commit()
 
     async def delete_metadata(self, type: str, metadata: Metadata):
         key = self._get_maindb_metadata_key(type, metadata.kbid, metadata.id)
-        async with self.driver.transaction(read_only=False) as txn:
+        async with self.driver.rw_transaction() as txn:
             await txn.delete(key)
             await txn.commit()
 

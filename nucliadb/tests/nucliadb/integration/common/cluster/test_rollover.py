@@ -119,7 +119,7 @@ async def test_rollover_kb_index_does_a_clean_cutover(
     knowledgebox,
 ):
     async def get_kb_shards(kbid: str):
-        async with app_context.kv_driver.transaction(read_only=True) as txn:
+        async with app_context.kv_driver.ro_transaction() as txn:
             return await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
 
     shards1 = await get_kb_shards(knowledgebox)

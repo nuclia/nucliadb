@@ -41,13 +41,13 @@ async def test_migration_0030_duplicated_labels(maindb_driver: Driver):
 
     kb_labels.labelset["another"].labels.append(knowledgebox_pb2.Label(title="another label"))
 
-    async with maindb_driver.transaction(read_only=False) as txn:
+    async with maindb_driver.rw_transaction() as txn:
         await datamanagers.labels.set_labels(txn, kbid=kbid, labels=kb_labels)
         await txn.commit()
 
     await migration.module.migrate_kb(execution_context, kbid)
 
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         dedup_labels = await datamanagers.labels.get_labels(txn, kbid=kbid)
         assert len(dedup_labels.labelset["labelset"].labels) == 1
         assert dedup_labels.labelset["labelset"].labels[0].title == "my duplicated label"

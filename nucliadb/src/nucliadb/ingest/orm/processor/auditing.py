@@ -34,7 +34,7 @@ async def collect_audit_fields(
         return []
 
     audit_storage_fields: list[audit_pb2.AuditField] = []
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         kb = KnowledgeBox(txn, storage, message.kbid)
         resource = Resource(txn, storage, kb, message.uuid)
         field_keys = await resource.get_fields_ids()

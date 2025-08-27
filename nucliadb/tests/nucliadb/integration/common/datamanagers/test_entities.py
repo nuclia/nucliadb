@@ -27,13 +27,13 @@ async def test_set_duplicate_entities_index(maindb_driver):
             "foo": ["1", "2"],
         }
     }
-    async with maindb_driver.transaction(read_only=False) as txn:
+    async with maindb_driver.rw_transaction() as txn:
         meta_cache = await datamanagers.entities.get_entities_meta_cache(txn, kbid="kbid")
         meta_cache.set_duplicates("ORG", duplicates["ORG"])
         await datamanagers.entities.set_entities_meta_cache(txn, kbid="kbid", cache=meta_cache)
         await txn.commit()
 
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         assert (
             await datamanagers.entities.get_entities_meta_cache(txn, kbid="kbid")
         ).duplicate_entities == duplicates

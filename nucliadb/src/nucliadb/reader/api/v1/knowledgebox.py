@@ -46,7 +46,7 @@ from nucliadb_utils.authentication import requires, requires_one
 @version(1)
 async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
     driver = get_driver()
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         response = KnowledgeBoxList()
         async for kbid, slug in datamanagers.kb.get_kbs(txn, prefix=prefix):
             response.kbs.append(KnowledgeBoxObjSummary(slug=slug or None, uuid=kbid))
@@ -64,7 +64,7 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
 @version(1)
 async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
     driver = get_driver()
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
         if kb_config is None:
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -87,7 +87,7 @@ async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
 @version(1)
 async def get_kb_by_slug(request: Request, slug: str) -> KnowledgeBoxObj:
     driver = get_driver()
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         kbid = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
         if kbid is None:
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")

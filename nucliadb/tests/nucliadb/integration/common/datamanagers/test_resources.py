@@ -27,7 +27,7 @@ from nucliadb_protos.resources_pb2 import Basic
 
 
 async def check_slug(driver: Driver, kbid, rid, slug):
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
         assert basic is not None
         assert basic.slug == slug
@@ -41,7 +41,7 @@ async def resource_with_slug(maindb_driver: Driver):
     rid = "rid"
     slug = "slug"
 
-    async with maindb_driver.transaction(read_only=False) as txn:
+    async with maindb_driver.rw_transaction() as txn:
         await txn.set(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug), rid.encode())
         basic = Basic(slug=slug)
         await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
@@ -56,7 +56,7 @@ async def test_modify_slug(resource_with_slug, maindb_driver: Driver):
     kbid, rid, _ = resource_with_slug
     new_slug = "new_slug"
 
-    async with maindb_driver.transaction(read_only=False) as txn:
+    async with maindb_driver.rw_transaction() as txn:
         await datamanagers.resources.modify_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
         await txn.commit()
 
@@ -68,7 +68,7 @@ async def test_all_fields(maindb_driver: Driver):
     rid = "myresource"
     field = resources_pb2.FieldID(field="myfield", field_type=resources_pb2.FieldType.LINK)
 
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
         assert all_fields is None
 
@@ -76,13 +76,13 @@ async def test_all_fields(maindb_driver: Driver):
 
     # set a field for a resource
 
-    async with maindb_driver.transaction(read_only=False) as txn:
+    async with maindb_driver.rw_transaction() as txn:
         pb = resources_pb2.AllFieldIDs()
         pb.fields.append(field)
         await datamanagers.resources.set_all_field_ids(txn, kbid=kbid, rid=rid, allfields=pb)
         await txn.commit()
 
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
         assert all_fields is not None
         assert len(all_fields.fields) == 1
@@ -91,13 +91,13 @@ async def test_all_fields(maindb_driver: Driver):
 
     # set no fields
 
-    async with maindb_driver.transaction(read_only=False) as txn:
+    async with maindb_driver.rw_transaction() as txn:
         await datamanagers.resources.set_all_field_ids(
             txn, kbid=kbid, rid=rid, allfields=resources_pb2.AllFieldIDs()
         )
         await txn.commit()
 
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
         assert all_fields is not None
         assert len(all_fields.fields) == 0

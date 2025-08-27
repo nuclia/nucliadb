@@ -54,7 +54,7 @@ async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
 
 
 async def _orm_get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
-    async with get_driver().transaction(read_only=True) as txn:
+    async with get_driver().ro_transaction() as txn:
         storage = await get_storage(service_name=SERVICE_NAME)
         kb = KnowledgeBoxORM(txn, storage, kbid)
         return await kb.get(uuid)

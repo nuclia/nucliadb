@@ -45,7 +45,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None: ...
 
 async def do_batch(context: ExecutionContext, start: str) -> Optional[str]:
     logger.info(f"Running batch from {start}")
-    async with context.kv_driver.transaction(read_only=False) as txn:
+    async with context.kv_driver.rw_transaction() as txn:
         async with txn.connection.cursor() as cur:  # type: ignore
             # Retrieve a batch of fields
             await cur.execute(

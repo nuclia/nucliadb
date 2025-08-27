@@ -57,12 +57,12 @@ async def test_purge_vectorsets__kb_with_vectorsets(
     with patch.object(
         storage, "delete_upload", new=AsyncMock(side_effect=storage.delete_upload)
     ) as mock:
-        async with maindb_driver.transaction(read_only=False) as txn:
+        async with maindb_driver.rw_transaction() as txn:
             kb_obj = KnowledgeBox(txn, storage, kbid)
             await kb_obj.delete_vectorset(vectorset_id)
             await txn.commit()
 
-        async with maindb_driver.transaction(read_only=True) as txn:
+        async with maindb_driver.ro_transaction() as txn:
             value = await txn.get(KB_VECTORSET_TO_DELETE.format(kbid=kbid, vectorset=vectorset_id))
             assert value is not None
             purge_payload = VectorSetPurge()
@@ -71,7 +71,7 @@ async def test_purge_vectorsets__kb_with_vectorsets(
 
         await purge_kb_vectorsets(maindb_driver, storage)
 
-        async with maindb_driver.transaction(read_only=True) as txn:
+        async with maindb_driver.ro_transaction() as txn:
             value = await txn.get(KB_VECTORSET_TO_DELETE.format(kbid=kbid, vectorset=vectorset_id))
             assert value is None
 
@@ -94,7 +94,7 @@ async def create_broker_message_with_vectorset(
 
     bm.extracted_text.append(make_extracted_text(field_id, body))
 
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         async for vectorset_id, vs in datamanagers.vectorsets.iter(txn, kbid=kbid):
             # custom vectorset
             field_vectors = resources_pb2.ExtractedVectorsWrapper()

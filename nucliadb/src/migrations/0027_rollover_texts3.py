@@ -49,7 +49,7 @@ async def maybe_fix_vector_dimensions(context: ExecutionContext, kbid: str) -> N
         logger.warning(f"KB has no learning config", extra={"kbid": kbid})
         return
 
-    async with context.kv_driver.transaction(read_only=False) as txn:
+    async with context.kv_driver.rw_transaction() as txn:
         vectorsets = [vs async for vs in datamanagers.vectorsets.iter(txn, kbid=kbid)]
         if len(vectorsets) != 1:
             # If multiple vectorsets, they are new shards created correctly, we can safely skip it

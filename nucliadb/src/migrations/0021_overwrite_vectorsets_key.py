@@ -38,7 +38,7 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    async with context.kv_driver.transaction(read_only=False) as txn:
+    async with context.kv_driver.rw_transaction() as txn:
         logger.info(f"Overwriting vectorsets key", extra={"kbid": kbid})
         await datamanagers.vectorsets.initialize(txn, kbid=kbid)
         await txn.commit()

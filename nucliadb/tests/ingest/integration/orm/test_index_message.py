@@ -56,7 +56,7 @@ async def test_for_writer_bm_with_prefilter_update(
 ):
     full_resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
 
-    async with maindb_driver.transaction(read_only=True) as txn:
+    async with maindb_driver.ro_transaction() as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
         resource = await kb_obj.get(full_resource.uuid)
         assert resource is not None

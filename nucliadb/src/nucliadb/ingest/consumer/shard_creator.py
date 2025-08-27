@@ -91,7 +91,7 @@ class ShardCreatorHandler:
     @metrics.handler_histo.wrap({"type": "shard_creator"})
     async def process_kb(self, kbid: str) -> None:
         logger.info({"message": "Processing notification for kbid", "kbid": kbid})
-        async with self.driver.transaction(read_only=True) as txn:
+        async with self.driver.ro_transaction() as txn:
             current_shard = await self.shard_manager.get_current_active_shard(txn, kbid)
 
         if current_shard is None:

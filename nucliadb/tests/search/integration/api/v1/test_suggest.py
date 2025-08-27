@@ -45,7 +45,7 @@ async def test_suggest_resource_all(
     # get shards ids
 
     driver = get_driver()
-    async with driver.transaction(read_only=True) as txn:
+    async with driver.ro_transaction() as txn:
         key = KB_SHARDS.format(kbid=kbid)
         async for key in txn.keys(key):
             value = await txn.get(key)
