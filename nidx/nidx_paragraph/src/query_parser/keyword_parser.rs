@@ -85,7 +85,10 @@ pub fn parse_quoted(schema: &ParagraphSchema, quoted: &str) -> Box<dyn Query> {
         );
         // we return a fallback to protect us from tokenizer errors, but this branch should never
         // happen
-        error!("Keyword tokenizer build a query with a only whitespaces Quoted token!");
+        error!(
+            ?quoted,
+            "Keyword tokenizer built a query with a only whitespaces Quoted token!"
+        );
         Box::new(EmptyQuery)
     }
 }
