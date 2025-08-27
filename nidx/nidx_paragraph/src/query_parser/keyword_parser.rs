@@ -18,18 +18,22 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use tantivy::Term;
-use tantivy::query::{AllQuery, BooleanQuery, EmptyQuery, Occur, PhraseQuery, Query, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, Occur, PhraseQuery, Query, TermQuery};
 use tantivy::schema::IndexRecordOption;
-use tracing::error;
 
 use crate::ParagraphSchema;
 
+use super::FallbackQuery;
 use super::tokenizer::Token;
 
 /// Convert a tokenized query into a tantivy keyword query
 ///
 /// Empty queries will match everything.
-pub fn parse_keyword_query<'a>(query: &'a [Token<'a>], schema: &ParagraphSchema) -> Box<dyn Query> {
+pub fn parse_keyword_query<'a>(
+    query: &'a [Token<'a>],
+    schema: &ParagraphSchema,
+) -> Result<Box<dyn Query>, FallbackQuery> {
+    let mut errors = vec![];
     let mut subqueries = vec![];
     for item in query {
         match item {
@@ -37,10 +41,10 @@ pub fn parse_keyword_query<'a>(query: &'a [Token<'a>], schema: &ParagraphSchema)
                 let q = parse_literal(schema, literal);
                 subqueries.push((Occur::Should, q));
             }
-            Token::Quoted(quoted) => {
-                let q = parse_quoted(schema, quoted);
-                subqueries.push((Occur::Should, q));
-            }
+            Token::Quoted(quoted) => match parse_quoted(schema, quoted) {
+                Ok(q) => subqueries.push((Occur::Should, q)),
+                Err(error) => errors.push(error),
+            },
             Token::Excluded(excluded) => {
                 let q = parse_excluded(schema, excluded);
                 subqueries.push((Occur::Should, q));
@@ -48,13 +52,15 @@ pub fn parse_keyword_query<'a>(query: &'a [Token<'a>], schema: &ParagraphSchema)
         }
     }
 
-    if subqueries.is_empty() {
+    let q = if subqueries.is_empty() {
         Box::new(AllQuery)
     } else if subqueries.len() == 1 {
         subqueries.pop().unwrap().1
     } else {
         Box::new(BooleanQuery::new(subqueries))
-    }
+    };
+
+    if errors.is_empty() { Ok(q) } else { Err((q, errors)) }
 }
 
 #[inline]
@@ -65,7 +71,7 @@ pub fn parse_literal(schema: &ParagraphSchema, literal: &str) -> Box<dyn Query> 
     ))
 }
 
-pub fn parse_quoted(schema: &ParagraphSchema, quoted: &str) -> Box<dyn Query> {
+pub fn parse_quoted(schema: &ParagraphSchema, quoted: &str) -> Result<Box<dyn Query>, String> {
     let mut terms: Vec<Term> = quoted
         .split_whitespace()
         .map(|word| Term::from_field_text(schema.text, word))
@@ -75,18 +81,18 @@ pub fn parse_quoted(schema: &ParagraphSchema, quoted: &str) -> Box<dyn Query> {
     if terms.len() == 1 {
         // phrase queries must have more than one term, so we use a term query
         let term = terms.remove(0); // safe because terms.len() == 1
-        Box::new(TermQuery::new(term, IndexRecordOption::Basic))
+        Ok(Box::new(TermQuery::new(term, IndexRecordOption::Basic)))
     } else if terms.len() > 1 {
-        Box::new(PhraseQuery::new(terms))
+        Ok(Box::new(PhraseQuery::new(terms)))
     } else {
+        #[cfg(not(test))] // we don't want an assert on tests, we want the error
         debug_assert!(
             false,
             "Quoted content should have been validated to not only contain whitespaces"
         );
-        // we return a fallback to protect us from tokenizer errors, but this branch should never
+        // we return an error to protect us from tokenizer errors, but this branch should never
         // happen
-        error!("Keyword tokenizer build a query with a only whitespaces Quoted token!");
-        Box::new(EmptyQuery)
+        Err("Keyword tokenizer built a query with a only whitespaces Quoted token!".to_string())
     }
 }
 
@@ -111,7 +117,7 @@ mod tests {
     #[test]
     fn test_empty_query_is_all_query() {
         let schema = ParagraphSchema::new();
-        let query = parse_keyword_query(&[], &schema);
+        let query = parse_keyword_query(&[], &schema).unwrap();
         assert!(query.is::<AllQuery>());
     }
 
@@ -119,7 +125,7 @@ mod tests {
     fn test_one_clause_simplification() {
         let schema = ParagraphSchema::new();
 
-        let query = parse_keyword_query(&[Token::Literal("nucliadb".into())], &schema);
+        let query = parse_keyword_query(&[Token::Literal("nucliadb".into())], &schema).unwrap();
         let term = extract_term_from(&query);
         assert_eq!(*term, Term::from_field_text(schema.text, "nucliadb"));
     }
@@ -137,7 +143,7 @@ mod tests {
             Token::Literal("with".into()),
             Token::Quoted("superpowers".into()),
         ];
-        let r = downcast_boolean_query(parse_keyword_query(&query, &schema));
+        let r = downcast_boolean_query(parse_keyword_query(&query, &schema).unwrap());
         let clauses = r.clauses();
         assert_eq!(clauses.len(), 6);
 
@@ -186,6 +192,19 @@ mod tests {
         assert_eq!(clauses[5].0, Occur::Should);
         let term = extract_term_from(&clauses[5].1);
         assert_eq!(*term, Term::from_field_text(schema.text, "superpowers"));
+    }
+
+    #[test]
+    /// The tokenizer should not allow an empty (whitespaces) Quoted token
+    fn test_parse_quoted_error() {
+        let schema = ParagraphSchema::new();
+
+        let quoted = "   ";
+        let r = parse_quoted(&schema, quoted);
+        assert!(r.is_err());
+
+        let r = parse_keyword_query(&[Token::Quoted("   ".into())], &schema);
+        assert!(r.is_err());
     }
 
     fn downcast_boolean_query(q: Box<dyn Query>) -> Box<BooleanQuery> {

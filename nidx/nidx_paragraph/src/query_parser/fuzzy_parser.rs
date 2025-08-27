@@ -30,6 +30,7 @@ use crate::fuzzy_query::FuzzyTermQuery;
 use crate::schema::ParagraphSchema;
 use crate::search_query::SharedTermC;
 
+use super::FallbackQuery;
 use super::keyword_parser;
 use super::tokenizer::Token;
 
@@ -53,7 +54,13 @@ pub const FUZZY_DISTANCE: u8 = 1;
 /// literals will be searched as fuzzy. The last literal can be searched as a
 /// fuzzy prefix if a suggest-like feature is desired.
 ///
-pub fn parse_fuzzy_query(query: &[Token], term_collector: SharedTermC, last_literal_as_prefix: bool) -> Box<dyn Query> {
+pub fn parse_fuzzy_query(
+    query: &[Token],
+    term_collector: SharedTermC,
+    last_literal_as_prefix: bool,
+) -> Result<Box<dyn Query>, FallbackQuery> {
+    let mut errors = vec![];
+
     let last_literal_index = if last_literal_as_prefix {
         query.iter().rposition(|token| matches!(token, Token::Literal(_)))
     } else {
@@ -92,8 +99,14 @@ pub fn parse_fuzzy_query(query: &[Token], term_collector: SharedTermC, last_lite
                 subqueries.push((Occur::Should, q));
             }
             Token::Quoted(quoted) => {
-                let q = keyword_parser::parse_quoted(&schema, quoted);
-                subqueries.push((Occur::Should, q));
+                match keyword_parser::parse_quoted(&schema, quoted) {
+                    Ok(q) => {
+                        subqueries.push((Occur::Should, q));
+                    }
+                    Err(error) => {
+                        errors.push(error);
+                    }
+                };
             }
             Token::Excluded(excluded) => {
                 let q = keyword_parser::parse_excluded(&schema, excluded);
@@ -102,13 +115,15 @@ pub fn parse_fuzzy_query(query: &[Token], term_collector: SharedTermC, last_lite
         }
     }
 
-    if subqueries.is_empty() {
+    let q = if subqueries.is_empty() {
         Box::new(AllQuery)
     } else if subqueries.len() == 1 {
         subqueries.pop().unwrap().1
     } else {
         Box::new(BooleanQuery::new(subqueries))
-    }
+    };
+
+    if errors.is_empty() { Ok(q) } else { Err((q, errors)) }
 }
 
 #[cfg(test)]
@@ -125,7 +140,7 @@ mod tests {
         let literal = "ab";
         assert!(literal.len() < MIN_FUZZY_LEN);
         let query = [Token::Literal(literal.into())];
-        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), false);
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), false).unwrap();
         assert!(fuzzy.is::<TermQuery>());
         let q = fuzzy.downcast::<TermQuery>().unwrap();
         assert_eq!(q.term().value().as_str(), Some(literal));
@@ -138,7 +153,7 @@ mod tests {
         let literal = "abcd";
         assert!(literal.len() >= MIN_FUZZY_LEN);
         let query = [Token::Literal(literal.into())];
-        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), false);
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), false).unwrap();
         assert!(fuzzy.is::<FuzzyTermQuery>());
         assert!(!fuzzy.downcast::<FuzzyTermQuery>().unwrap().is_prefix());
     }
@@ -154,18 +169,18 @@ mod tests {
         assert!(literal.len() >= MIN_FUZZY_PREFIX_LEN);
         let query = [Token::Literal(literal.into())];
 
-        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), false);
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), false).unwrap();
         assert!(fuzzy.is::<FuzzyTermQuery>());
         assert!(!fuzzy.downcast::<FuzzyTermQuery>().unwrap().is_prefix());
 
-        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), true);
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), true).unwrap();
         assert!(fuzzy.is::<FuzzyTermQuery>());
         assert!(fuzzy.downcast::<FuzzyTermQuery>().unwrap().is_prefix());
 
         // only the last term is fuzzy prefix
 
         let query = [Token::Literal(literal.into()), Token::Literal(literal.into())];
-        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), true);
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), true).unwrap();
         assert!(fuzzy.is::<BooleanQuery>());
         let q = fuzzy.downcast::<BooleanQuery>().unwrap();
         let clauses = q.clauses();
@@ -181,11 +196,11 @@ mod tests {
         assert!(literal.len() < MIN_FUZZY_PREFIX_LEN);
         let query = [Token::Literal(literal.into())];
 
-        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), false);
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), false).unwrap();
         assert!(fuzzy.is::<FuzzyTermQuery>());
         assert!(!fuzzy.downcast::<FuzzyTermQuery>().unwrap().is_prefix());
 
-        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), true);
+        let fuzzy = parse_fuzzy_query(&query, term_collector.clone(), true).unwrap();
         assert!(fuzzy.is::<FuzzyTermQuery>());
         assert!(!fuzzy.downcast::<FuzzyTermQuery>().unwrap().is_prefix());
     }
