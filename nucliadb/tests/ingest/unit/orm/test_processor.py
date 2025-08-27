@@ -36,7 +36,7 @@ def txn():
 @pytest.fixture()
 def driver(txn):
     mock = MagicMock()
-    mock.transaction.return_value.__aenter__.return_value = txn
+    mock._transaction.return_value.__aenter__.return_value = txn
     yield mock
 
 

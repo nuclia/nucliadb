@@ -40,7 +40,7 @@ class TestWriterServicer:
     def writer(self, hosted_nucliadb):
         servicer = WriterServicer()
         servicer.driver = AsyncMock()
-        servicer.driver.transaction = MagicMock(return_value=AsyncMock())
+        servicer.driver._transaction = MagicMock(return_value=AsyncMock())
         servicer.proc = AsyncMock()
         servicer.proc.driver = servicer.driver
         servicer.storage = AsyncMock()
