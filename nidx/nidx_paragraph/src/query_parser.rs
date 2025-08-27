@@ -24,6 +24,7 @@ mod tokenizer;
 
 use tantivy::query::Query;
 use tokenizer::{Token, tokenize_query_infallible};
+use tracing::error;
 
 use crate::{
     schema::ParagraphSchema,
@@ -32,6 +33,10 @@ use crate::{
 
 pub use fuzzy_parser::FUZZY_DISTANCE;
 use stop_words::remove_stop_words;
+
+/// Alias to make clippy happier. A FallbackQuery is no more than a query with a list of errors
+/// found while parsing
+pub type FallbackQuery = (Box<dyn Query>, Vec<String>);
 
 /// `Parser` is the nidx keyword grammar query parser
 ///
@@ -82,12 +87,29 @@ impl<'a> Parser<'a> {
         }
         let shared_term_collector = SharedTermC::from(term_collector);
 
-        let keyword = keyword_parser::parse_keyword_query(&tokenized, self.schema);
-        let fuzzy = fuzzy_parser::parse_fuzzy_query(
+        let keyword = match keyword_parser::parse_keyword_query(&tokenized, self.schema) {
+            Ok(q) => q,
+            Err((q, errors)) => {
+                for err in errors {
+                    error!(?query, parser = "keyword", err);
+                }
+                q
+            }
+        };
+
+        let fuzzy = match fuzzy_parser::parse_fuzzy_query(
             &tokenized,
             shared_term_collector.clone(),
             self.last_fuzzy_term_as_prefix,
-        );
+        ) {
+            Ok(q) => q,
+            Err((q, errors)) => {
+                for err in errors {
+                    error!(?query, parser = "fuzzy", err);
+                }
+                q
+            }
+        };
 
         ParsedQuery {
             keyword,
