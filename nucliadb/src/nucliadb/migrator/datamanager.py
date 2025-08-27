@@ -100,7 +100,7 @@ class MigrationsDataManager:
         current_version: Union[int, _Unset] = _UNSET,
         target_version: Union[int, None, _Unset] = _UNSET,
     ) -> None:
-        async with self.driver.transaction(read_only=True) as txn:
+        async with self.driver.transaction(read_only=False) as txn:
             raw_pb = await txn.get(MIGRATION_INFO_KEY, for_update=True)
             pb = migrations_pb2.MigrationInfo()
             if raw_pb is not None:

@@ -188,7 +188,7 @@ async def purge_batch(
     """
     Returns the next start key and the number of purged records. If start is None, it means there are no more records to purge.
     """
-    async with kv_driver.transaction(read_only=True) as txn:
+    async with kv_driver.transaction(read_only=False) as txn:
         txn = cast(PGTransaction, txn)
         async with txn.connection.cursor() as cur:
             await cur.execute(
