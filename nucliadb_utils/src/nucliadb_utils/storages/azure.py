@@ -30,12 +30,15 @@ from azure.storage.blob import BlobProperties, BlobType, ContentSettings
 from azure.storage.blob.aio import BlobServiceClient
 
 from nucliadb_protos.resources_pb2 import CloudFile
+from nucliadb_telemetry import metrics
 from nucliadb_utils.storages.exceptions import ObjectNotFoundError
 from nucliadb_utils.storages.object_store import ObjectStore
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
 
 logger = logging.getLogger(__name__)
+
+ops_observer = metrics.Observer("azure_ops", labels={"type": ""})
 
 
 class AzureStorageField(StorageField):
@@ -256,6 +259,7 @@ class AzureObjectStore(ObjectStore):
             logger.warning("Error closing Azure client", exc_info=True)
         self._service_client = None
 
+    @ops_observer.wrap({"type": "bucket_create"})
     async def bucket_create(self, bucket: str, labels: dict[str, str] | None = None) -> bool:
         container_client = self.service_client.get_container_client(bucket)
         try:
@@ -264,6 +268,7 @@ class AzureObjectStore(ObjectStore):
         except ResourceExistsError:
             return False
 
+    @ops_observer.wrap({"type": "bucket_delete"})
     async def bucket_delete(self, bucket: str) -> tuple[bool, bool]:
         container_client = self.service_client.get_container_client(bucket)
         # There's never a conflict on Azure
@@ -276,6 +281,7 @@ class AzureObjectStore(ObjectStore):
             deleted = False
         return deleted, conflict
 
+    @ops_observer.wrap({"type": "bucket_exists"})
     async def bucket_exists(self, bucket: str) -> bool:
         container_client = self.service_client.get_container_client(bucket)
         try:
@@ -284,10 +290,12 @@ class AzureObjectStore(ObjectStore):
         except ResourceNotFoundError:
             return False
 
+    @ops_observer.wrap({"type": "bucket_schedule_delete"})
     async def bucket_schedule_delete(self, bucket: str) -> None:
         # In Azure, there is no option to schedule for deletion
         await self.bucket_delete(bucket)
 
+    @ops_observer.wrap({"type": "move"})
     async def move(
         self,
         origin_bucket: str,
@@ -298,6 +306,7 @@ class AzureObjectStore(ObjectStore):
         await self.copy(origin_bucket, origin_key, destination_bucket, destination_key)
         await self.delete(origin_bucket, origin_key)
 
+    @ops_observer.wrap({"type": "copy"})
     async def copy(
         self,
         origin_bucket: str,
@@ -313,6 +322,7 @@ class AzureObjectStore(ObjectStore):
         result = await destination_blob_client.start_copy_from_url(origin_url, requires_sync=True)
         assert result["copy_status"] == "success"
 
+    @ops_observer.wrap({"type": "delete"})
     async def delete(self, bucket: str, key: str) -> None:
         container_client = self.service_client.get_container_client(bucket)
         try:
@@ -320,6 +330,7 @@ class AzureObjectStore(ObjectStore):
         except ResourceNotFoundError:
             raise ObjectNotFoundError()
 
+    @ops_observer.wrap({"type": "upload"})
     async def upload(
         self,
         bucket: str,
@@ -347,10 +358,12 @@ class AzureObjectStore(ObjectStore):
             ),
         )
 
+    @ops_observer.wrap({"type": "insert"})
     async def insert(self, bucket: str, key: str, data: bytes) -> None:
         container_client = self.service_client.get_container_client(bucket)
         await container_client.upload_blob(name=key, data=data, length=len(data))
 
+    @ops_observer.wrap({"type": "download"})
     async def download(self, bucket: str, key: str) -> bytes:
         container_client = self.service_client.get_container_client(bucket)
         blob_client = container_client.get_blob_client(key)
@@ -390,6 +403,7 @@ class AzureObjectStore(ObjectStore):
                 continue
             yield ObjectInfo(name=blob.name)
 
+    @ops_observer.wrap({"type": "get_metadata"})
     async def get_metadata(self, bucket: str, key: str) -> ObjectMetadata:
         container_client = self.service_client.get_container_client(bucket)
         blob_client = container_client.get_blob_client(key)
@@ -399,6 +413,7 @@ class AzureObjectStore(ObjectStore):
         except ResourceNotFoundError:
             raise ObjectNotFoundError()
 
+    @ops_observer.wrap({"type": "multipart_start"})
     async def upload_multipart_start(self, bucket: str, key: str, metadata: ObjectMetadata) -> None:
         container_client = self.service_client.get_container_client(bucket)
         custom_metadata = {key: str(value) for key, value in metadata.model_dump().items()}
@@ -411,6 +426,7 @@ class AzureObjectStore(ObjectStore):
             ),
         )
 
+    @ops_observer.wrap({"type": "multipart_append"})
     async def upload_multipart_append(
         self, bucket: str, key: str, iterable: AsyncIterator[bytes]
     ) -> int:
