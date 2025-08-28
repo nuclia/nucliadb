@@ -165,7 +165,14 @@ fn tantivy_retokenize(tokens: Vec<Token>) -> Vec<Token> {
                     let token = stream.token();
                     tokens.push(token.text.clone())
                 }
-                vec![Token::Quoted(Cow::Owned(tokens.into_iter().join(" ")))]
+                let text = tokens.into_iter().join(" ");
+                // as with the nom tokenizer, empty quotes make no sense so we
+                // get rid of them
+                if !text.is_empty() {
+                    vec![Token::Quoted(Cow::Owned(text))]
+                } else {
+                    vec![]
+                }
             }
             Token::Excluded(Cow::Borrowed(excluded)) => {
                 let mut stream = tantivy_tokenizer.token_stream(excluded);
@@ -329,6 +336,12 @@ mod tests {
             Literal("uoted".into()),
             Literal("string".into()),
         ];
+        let tokens = tokenize_query_infallible(query);
+        assert_eq!(tokens, expected);
+
+        // quoted strings with special characters that tantivy tokenizer removes are removed
+        let query = r#"tantivy deletes "...""#;
+        let expected = vec![Literal("tantivy".into()), Literal("deletes".into())];
         let tokens = tokenize_query_infallible(query);
         assert_eq!(tokens, expected);
     }

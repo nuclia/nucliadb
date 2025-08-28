@@ -137,6 +137,16 @@ mod tests {
                 // keeps last term even if is a stop word
                 "nuclia database the",
             ),
+            (
+                "nuclia \"is\" a database for the",
+                // keeps last term even if is a stop word
+                "nuclia \"is\" database the",
+            ),
+            (
+                "nuclia \"...\" a database for the",
+                // keeps last term even if is a stop word
+                "nuclia database the",
+            ),
             ("is a for and", "and"),
             ("what does stop is?", "stop is"),
             ("", ""),
