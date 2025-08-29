@@ -74,7 +74,8 @@ zone:
 tracing:
   enabled: false
 
-extra_pod_annotations: {}
+# extra_pod_annotations:
+#   key: value
 
 autoscaling:
   minReplicas: 2
