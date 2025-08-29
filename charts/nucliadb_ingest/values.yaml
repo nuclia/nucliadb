@@ -40,9 +40,7 @@ affinity: {}
 nodeSelector: {}
 tolerations: []
 topologySpreadConstraints: []
-podAnnotations:
-  traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
-  traffic.sidecar.istio.io/excludeOutboundPorts: '5432,4222'
+podAnnotations: {}
 replicaCount: 2
 revisionHistoryLimit: 2
 debug: False
@@ -92,9 +90,7 @@ ingest_orm_grpc_autoscaling:
         target:
           type: Utilization
           averageUtilization: 75
-ingest_orm_grpc_podAnnotations:
-  traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
-  traffic.sidecar.istio.io/excludeOutboundPorts: '5432,4222'
+ingest_orm_grpc_podAnnotations: {}
 
 # ingest-processed-consumer settings
 ingest_processed_consumer_resources:
@@ -112,9 +108,7 @@ ingest_processed_consumer_autoscaling:
         target:
           type: Utilization
           averageUtilization: 75
-ingest_processed_consumer_podAnnotations:
-  traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
-  traffic.sidecar.istio.io/excludeOutboundPorts: '5432,4222'
+ingest_processed_consumer_podAnnotations: {}
 
 # ingest-subscriber-workers settings
 ingest_subscriber_workers_resources:
@@ -132,29 +126,22 @@ ingest_subscriber_workers_autoscaling:
         target:
           type: Utilization
           averageUtilization: 75
-ingest_subscriber_workers_podAnnotations:
-  traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
-  traffic.sidecar.istio.io/excludeOutboundPorts: '5432,4222'
+ingest_subscriber_workers_podAnnotations: {}
 
 exporter:
   # serviceAccount: default
-  podAnnotations:
-    traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
-    traffic.sidecar.istio.io/excludeOutboundPorts: '5432,4222'
+  podAnnotations: {}
 
 # migrator settings
 migrator:
   # serviceAccount: default
-  podAnnotations:
-    traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
-    traffic.sidecar.istio.io/excludeOutboundPorts: '5432,4222'
+  podAnnotations: {}
 
 # extra_pod_annotations:
 #   what: "add annotations"
 #   where: "in the pods"
 
-extra_cronjob_pod_annotations:
-  sidecar.istio.io/inject: "false"
+extra_cronjob_pod_annotations: {}
 
 tracing:
   enabled: false

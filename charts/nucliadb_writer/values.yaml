@@ -75,9 +75,7 @@ serviceMonitor:
 tracing:
   enabled: false
 
-extra_pod_annotations:
-  traffic.sidecar.istio.io/excludeOutboundPorts: "6379,5432,4222"
-  traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
+extra_pod_annotations: {}
 
 autoscaling:
   minReplicas: 2
