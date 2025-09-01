@@ -72,9 +72,8 @@ vs:
 
 zone:
 
-extra_pod_annotations:
-  traffic.sidecar.istio.io/excludeOutboundPorts: "5432,4222"
-  traffic.sidecar.istio.io/excludeInboundPorts: *metricsPort
+# extra_pod_annotations:
+#   key: value
 
 autoscaling:
   minReplicas: 2
