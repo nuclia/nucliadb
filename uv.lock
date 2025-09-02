@@ -1788,12 +1788,12 @@ nkeys = [
 
 [[package]]
 name = "nidx-binding"
-version = "6.7.1"
+version = "6.7.2"
 source = { editable = "nidx/nidx_binding" }
 
 [[package]]
 name = "nidx-protos"
-version = "6.7.1"
+version = "6.7.2"
 source = { editable = "nidx/nidx_protos" }
 
 [[package]]
@@ -1816,19 +1816,19 @@ wheels = [
 
 [[package]]
 name = "nuclia-models"
-version = "0.46.0"
+version = "0.47.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic", extra = ["email"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/95/cd/3aeef7b2a96ee7def1d1abe3e7a080c60f5df75e9ffc265b7bb73632c088/nuclia_models-0.46.0.tar.gz", hash = "sha256:cebeebd992738a13e36c6c5e0fd23f5a69cb0e511f5a5b62eba0f7ca8d7c7ccc", size = 21993, upload-time = "2025-07-21T10:39:51.831Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/74/f8d209d3855dce53c5b1aec81c0c09333203fe8d144e37187bec342f2271/nuclia_models-0.47.0.tar.gz", hash = "sha256:4b0154a1fed0bea89fc49607896ffcf1ca71fce1ae03de91657ec839954d9ce8", size = 22010, upload-time = "2025-09-01T18:48:02.315Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/53/da/c2d70e88086faa2187ffac6d2e313792e99425ca1042af655eda630a49e8/nuclia_models-0.46.0-py3-none-any.whl", hash = "sha256:8c77ea4104e219827b6ac962ae38d5b75ff6e1ac64b35452365db3d783a57d74", size = 26273, upload-time = "2025-07-21T10:39:50.644Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/fc/973fa74eafdc20b157445c55b99a64e02ea356a56d9a3b5e96e81e1f1834/nuclia_models-0.47.0-py3-none-any.whl", hash = "sha256:51cdb65b722d9d08348085725f6eb345692fc6b979750f25092d8e5e324ee26c", size = 26296, upload-time = "2025-09-01T18:48:01.446Z" },
 ]
 
 [[package]]
 name = "nucliadb"
-version = "6.7.1"
+version = "6.7.2"
 source = { editable = "nucliadb" }
 dependencies = [
     { name = "aiobotocore" },
@@ -1927,7 +1927,7 @@ requires-dist = [
     { name = "mmh3", specifier = ">=3.0.0" },
     { name = "multidict", specifier = ">=6.0.4" },
     { name = "nidx-protos", editable = "nidx/nidx_protos" },
-    { name = "nuclia-models", specifier = ">=0.46.0" },
+    { name = "nuclia-models", specifier = ">=0.47.0" },
     { name = "nucliadb-admin-assets", specifier = ">=1.0.0.post1224" },
     { name = "nucliadb-models", editable = "nucliadb_models" },
     { name = "nucliadb-protos", editable = "nucliadb_protos" },
@@ -1965,7 +1965,7 @@ wheels = [
 
 [[package]]
 name = "nucliadb-dataset"
-version = "6.7.1"
+version = "6.7.2"
 source = { editable = "nucliadb_dataset" }
 dependencies = [
     { name = "aiohttp" },
@@ -1998,7 +1998,7 @@ requires-dist = [
 
 [[package]]
 name = "nucliadb-models"
-version = "6.7.1"
+version = "6.7.2"
 source = { editable = "nucliadb_models" }
 dependencies = [
     { name = "pydantic" },
@@ -2009,7 +2009,7 @@ requires-dist = [{ name = "pydantic", specifier = ">=2.6,!=2.11.5,!=2.11.6" }]
 
 [[package]]
 name = "nucliadb-protos"
-version = "6.7.1"
+version = "6.7.2"
 source = { editable = "nucliadb_protos" }
 dependencies = [
     { name = "mypy-protobuf" },
@@ -2026,7 +2026,7 @@ requires-dist = [
 
 [[package]]
 name = "nucliadb-sdk"
-version = "6.7.1"
+version = "6.7.2"
 source = { editable = "nucliadb_sdk" }
 dependencies = [
     { name = "httpx" },
@@ -2039,7 +2039,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "httpx" },
-    { name = "nuclia-models", specifier = ">=0.46.0" },
+    { name = "nuclia-models", specifier = ">=0.47.0" },
     { name = "nucliadb-models", editable = "nucliadb_models" },
     { name = "orjson" },
     { name = "pydantic", specifier = ">=2.6" },
@@ -2047,7 +2047,7 @@ requires-dist = [
 
 [[package]]
 name = "nucliadb-telemetry"
-version = "6.7.1"
+version = "6.7.2"
 source = { editable = "nucliadb_telemetry" }
 dependencies = [
     { name = "orjson" },
@@ -2211,7 +2211,7 @@ provides-extras = ["otel", "grpc", "nats", "fastapi", "all"]
 
 [[package]]
 name = "nucliadb-utils"
-version = "6.7.1"
+version = "6.7.2"
 source = { editable = "nucliadb_utils" }
 dependencies = [
     { name = "aiohttp" },
@@ -2286,7 +2286,7 @@ provides-extras = ["cache", "fastapi", "storages"]
 
 [[package]]
 name = "nucliadb-workspace"
-version = "6.7.1"
+version = "6.7.2"
 source = { virtual = "." }
 dependencies = [
     { name = "nucliadb" },

@@ -2210,6 +2210,11 @@ class SyncAskResponse(BaseModel):
         title="Answer",
         description="The generative answer to the query",
     )
+    reasoning: Optional[str] = Field(
+        default=None,
+        title="Reasoning",
+        description="The reasoning steps followed by the LLM to generate the answer. This is returned only if the reasoning feature is enabled in the request.",  # noqa: E501
+    )
     answer_json: Optional[dict[str, Any]] = Field(
         default=None,
         title="Answer JSON",
@@ -2314,6 +2319,11 @@ class AnswerAskResponseItem(BaseModel):
     text: str
 
 
+class ReasoningAskResponseItem(BaseModel):
+    type: Literal["reasoning"] = "reasoning"
+    text: str
+
+
 class JSONAskResponseItem(BaseModel):
     type: Literal["answer_json"] = "answer_json"
     object: dict[str, Any]
@@ -2377,6 +2387,7 @@ class DebugAskResponseItem(BaseModel):
 
 AskResponseItemType = Union[
     AnswerAskResponseItem,
+    ReasoningAskResponseItem,
     JSONAskResponseItem,
     MetadataAskResponseItem,
     AugmentedContextResponseItem,
