@@ -75,26 +75,40 @@ class ProcessingPullMode(Enum):
 
 
 class Settings(DriverSettings):
-    grpc_port: int = 8030
-
-    partitions: list[str] = ["1"]
-
+    # Pull worker settings
     pull_time_error_backoff: int = 30
     pull_api_timeout: int = 60
-    disable_pull_worker: bool = False
+    disable_pull_worker: bool = Field(
+        default=False, description="Set to true to disable the pull worker task"
+    )
 
-    # ingest consumer sts replica settings
-    replica_number: int = -1
-    total_replicas: int = 1  # number of ingest processor replicas in the cluster
-    nuclia_partitions: int = 50
+    # Ingest consumer sts replica settings
+    replica_number: int = Field(
+        default=-1,
+        description="The replica number of this ingest statefulset instance. Leave to -1 to auto-assign based on hostname.",
+    )
+    total_replicas: int = Field(default=1, description="Number of ingest statefulset replicas deployed")
+    nuclia_partitions: int = Field(
+        default=50, description="Total number of partitions of the nats stream."
+    )
+    partitions: list[str] = Field(
+        default=["1"],
+        description="List of partitions assigned to this ingest statefulset instance. This is automatically assigned based on the replica number and total replicas.",
+    )
+    max_concurrent_ingest_processing: int = Field(
+        default=5,
+        description="Controls the number of concurrent messages from different partitions that can be processed at the same time by ingest statefulset consumers.",
+    )
 
-    max_receive_message_length: int = 500  # In MB
+    # Grpc server settings
+    grpc_port: int = 8030
+    max_receive_message_length: int = Field(
+        default=500, description="Maximum receive grpc message length in MB."
+    )
 
     # Search query timeouts
     relation_search_timeout: float = 10.0
     relation_types_timeout: float = 10.0
-
-    max_concurrent_ingest_processing: int = 5
 
 
 settings = Settings()

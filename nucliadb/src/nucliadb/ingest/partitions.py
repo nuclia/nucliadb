@@ -25,12 +25,17 @@ from nucliadb.ingest.settings import Settings
 
 
 def assign_partitions(settings: Settings):
+    """
+    This function dynamically assigns the partitions to the current ingest sts
+    replica based on its hostname, typically (ingest-0, ingest-1, etc).
+    """
     # partitions start from 1, instead of 0
     all_partitions = [str(part + 1) for part in range(settings.nuclia_partitions)]
 
     # get replica number and total replicas from environment
     logger.info(f"PARTITIONS: Total Replicas = {settings.total_replicas}")
     if settings.replica_number == -1:
+        # Get replica number from hostname
         hostname = os.environ.get("HOSTNAME")
         if hostname is not None:
             sts_values = hostname.split("-")
@@ -39,10 +44,16 @@ def assign_partitions(settings: Settings):
                     settings.replica_number = int(sts_values[-1])
                 except Exception:
                     logger.error(f"Could not extract replica number from hostname: {hostname}")
-                    pass
+            else:
+                logger.warning(f"Could not determine replica number from hostname: {hostname}")
+        else:
+            logger.warning(f"Could not determine replica number from hostname.")
 
         if settings.replica_number == -1:
             settings.replica_number = 0
+    else:
+        # We assume that replica numbers are set manually via env variables
+        pass
     logger.info(f"PARTITIONS: Replica Number = {settings.replica_number}")
 
     # calculate assigned partitions based on total replicas and own replica number
