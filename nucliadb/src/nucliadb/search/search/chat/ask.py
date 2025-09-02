@@ -169,7 +169,7 @@ class AskResult:
 
         # Computed from the predict chat answer stream
         self._answer_text = ""
-        self._reasoning_text = None
+        self._reasoning_text: Optional[str] = None
         self._object: Optional[JSONGenerativeResponse] = None
         self._status: Optional[StatusGenerativeResponse] = None
         self._citations: Optional[CitationsGenerativeResponse] = None
@@ -447,7 +447,10 @@ class AskResult:
                 self._answer_text += item.text
                 yield item
             elif isinstance(item, ReasoningGenerativeResponse):
-                self._reasoning_text += item.text
+                if self._reasoning_text is None:
+                    self._reasoning_text = item.text
+                else:
+                    self._reasoning_text += item.text
                 yield item
             elif isinstance(item, JSONGenerativeResponse):
                 self._object = item
