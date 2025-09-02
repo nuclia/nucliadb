@@ -209,6 +209,10 @@ class ProcessingHTTPClient:
     async def close(self):
         await self.session.close()
 
+    async def reset_session(self):
+        await self.close()
+        self.session = aiohttp.ClientSession()
+
     async def in_progress(self, ack_token: str):
         url = self.base_url_v2 + "/pull/in_progress"
         request = InProgressRequest(ack=[ack_token])

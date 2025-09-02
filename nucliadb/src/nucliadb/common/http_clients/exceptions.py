@@ -21,6 +21,10 @@ class ClientException(Exception):
     pass
 
 
+class ServerException(Exception):
+    pass
+
+
 class NotFoundException(ClientException):
     pass
 
@@ -34,4 +38,8 @@ class RateLimitException(ClientException):
 
 
 class AccountLimitException(ClientException):
+    pass
+
+
+class ServiceUnavailableException(ServerException):
     pass

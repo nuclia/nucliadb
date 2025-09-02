@@ -116,6 +116,9 @@ def run():
     if nuclia_settings.nuclia_service_account:
         settings_to_output["NUA API key"] = "Configured ✔"
         settings_to_output["NUA API zone"] = nuclia_settings.nuclia_zone
+        settings_to_output["NUA API url"] = (
+            nuclia_settings.nuclia_public_url.format(zone=nuclia_settings.nuclia_zone) + "/api"
+        )
 
     settings_to_output_fmted = "\n".join(
         [f"||      - {k}:{' ' * (27 - len(k))}{v}" for k, v in settings_to_output.items()]

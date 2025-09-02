@@ -33,5 +33,8 @@ def check_status(resp: aiohttp.ClientResponse, resp_text: str) -> None:
         raise exceptions.AuthorizationException(f"Unauthorized to access: {resp.status}")
     elif resp.status == 429:
         raise exceptions.RateLimitException("Rate limited")
+    elif resp.status in (502, 503):
+        # Service unavailable, can be retried
+        raise exceptions.ServiceUnavailableException(f"Service unavailable: {resp.status} - {resp_text}")
     else:
         raise exceptions.ClientException(f"Unknown error: {resp.status} - {resp_text}")
