@@ -31,6 +31,7 @@ from opentelemetry.trace import (
     Link,
 )
 
+from nucliadb.common.http_clients.exceptions import ServiceUnavailableException
 from nucliadb.common.http_clients.processing import (
     ProcessingHTTPClient,
     ProcessingPullMessageProgressUpdater,
@@ -209,6 +210,12 @@ class PullV2Worker:
                             payload_length = len(base64.b64decode(data.payload))
                         logger.error(f"Message too big for transaction: {payload_length}")
                     raise e
+
+                except ServiceUnavailableException as ex:
+                    logger.warning(f"Processing api is unavailable, will retry shortly: {ex}")
+                    await processing_http_client.reset_session()
+                    await asyncio.sleep(self.pull_time_error_backoff)
+
                 except Exception:
                     logger.exception("Unhandled error pulling messages from processing")
                     await asyncio.sleep(self.pull_time_error_backoff)
