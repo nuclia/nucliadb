@@ -73,10 +73,11 @@ class TestProcessingHTTPClient:
     @pytest.fixture()
     async def client(self, response):
         cl = processing.ProcessingHTTPClient()
-        cl.session = mock.MagicMock()
+        cl.session = mock.MagicMock(close=mock.AsyncMock())
         resp_handler = mock.AsyncMock()
         resp_handler.__aenter__.return_value = response
         cl.session.get.return_value = resp_handler
+        cl.session.post.return_value = resp_handler
         yield cl
 
     async def test_requests(self, client: processing.ProcessingHTTPClient, response):
@@ -92,3 +93,38 @@ class TestProcessingHTTPClient:
         response.text.return_value = response_data.model_dump_json()
 
         assert await client.stats("kbid") == response_data
+
+    async def test_pull_status(self, client: processing.ProcessingHTTPClient, response):
+        response_data = processing.PullStatusResponse(pending=1)
+        response.status = 200
+        response.text.return_value = response_data.model_dump_json()
+
+        assert await client.pull_status() == response_data
+
+    async def test_pull_v2(self, client: processing.ProcessingHTTPClient, response):
+        response_data = processing.PullResponseV2(
+            messages=[
+                processing.PulledMessage(
+                    payload=b"data",
+                    headers={},
+                    ack_token="ack",
+                    seq=1,
+                )
+            ],
+            ttl=10.0,
+            pending=1,
+        )
+        response.status = 200
+        response.text.return_value = response_data.model_dump_json()
+
+        assert await client.pull_v2(ack_tokens=["ack"]) == response_data
+
+        response.status = 204
+        assert await client.pull_v2(ack_tokens=["ack"]) is None
+
+    async def test_reset_session(self, client: processing.ProcessingHTTPClient):
+        old_session = client.session
+        await client.reset_session()
+        assert client.session != old_session
+        old_session.close.assert_awaited_once()  # type: ignore
+        await client.close()
