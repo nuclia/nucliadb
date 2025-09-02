@@ -36,6 +36,8 @@ def test_check_status():
         processing.check_status(Response(status=404), "notfound")
     with pytest.raises(exceptions.RateLimitException):
         processing.check_status(Response(status=429), "rate")
+    with pytest.raises(exceptions.ServiceUnavailableException):
+        processing.check_status(Response(status=503), "service unavailable")
     with pytest.raises(exceptions.ClientException):
         processing.check_status(Response(status=500), "unk")
 
