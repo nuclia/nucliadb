@@ -20,7 +20,7 @@
 import dataclasses
 import functools
 import json
-from typing import AsyncGenerator, Optional, cast
+from typing import AsyncGenerator, Optional, Union, cast
 
 from nuclia_models.common.consumption import Consumption
 from nuclia_models.predict.generative_responses import (
@@ -430,7 +430,7 @@ class AskResult:
 
     async def _stream_predict_answer_text(
         self,
-    ) -> AsyncGenerator[TextGenerativeResponse | ReasoningGenerativeResponse, None]:
+    ) -> AsyncGenerator[Union[TextGenerativeResponse, ReasoningGenerativeResponse], None]:
         """
         Reads the stream of the generative model, yielding the answer text but also parsing
         other items like status codes, citations and miscellaneous metadata.

@@ -1081,7 +1081,7 @@ class ChatModel(BaseModel):
         default=None,
         description="Seed use for the generative model for a deterministic output.",
     )
-    reasoning: Reasoning | bool = Field(
+    reasoning: Union[Reasoning, bool] = Field(
         default=False,
         description=(
             "Reasoning options for the generative model. "
