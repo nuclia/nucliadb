@@ -86,6 +86,17 @@ async def test_ask(
     assert resp.status_code == 200
 
 
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_reasoning(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask", json={"query": "query", "reasoning": True}
+    )
+    assert resp.status_code == 200
+
+
 @pytest.fixture(scope="function")
 def find_incomplete_results():
     with mock.patch(

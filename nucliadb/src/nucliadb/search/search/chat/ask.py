@@ -430,7 +430,7 @@ class AskResult:
 
     async def _stream_predict_answer_text(
         self,
-    ) -> AsyncGenerator[TextGenerativeResponse, ReasoningGenerativeResponse, None]:
+    ) -> AsyncGenerator[TextGenerativeResponse | ReasoningGenerativeResponse, None]:
         """
         Reads the stream of the generative model, yielding the answer text but also parsing
         other items like status codes, citations and miscellaneous metadata.
