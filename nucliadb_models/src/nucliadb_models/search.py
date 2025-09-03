@@ -985,6 +985,29 @@ def parse_max_tokens(max_tokens: Optional[Union[int, MaxTokens]]) -> Optional[Ma
     return max_tokens
 
 
+class Reasoning(BaseModel):
+    display: bool = Field(
+        default=True,
+        description="Whether to display the reasoning steps in the response.",
+    )
+    effort: Literal["low", "medium", "high"] = Field(
+        default="medium",
+        description=(
+            "Level of reasoning effort. Used by OpenAI models to control the depth of reasoning. "
+            "This parameter will be automatically mapped to budget_tokens "
+            "if the chosen model does not support effort."
+        ),
+    )
+    budget_tokens: int = Field(
+        default=15_000,
+        description=(
+            "Token budget for reasoning. Used by Anthropic or Google models to limit the number of "
+            "tokens used for reasoning. This parameter will be automatically mapped to effort "
+            "if the chosen model does not support budget_tokens."
+        ),
+    )
+
+
 class ChatModel(BaseModel):
     """
     This is the model for the predict request payload on the chat endpoint
@@ -1057,6 +1080,13 @@ class ChatModel(BaseModel):
     seed: Optional[int] = Field(
         default=None,
         description="Seed use for the generative model for a deterministic output.",
+    )
+    reasoning: Union[Reasoning, bool] = Field(
+        default=False,
+        description=(
+            "Reasoning options for the generative model. "
+            "Set to True to enable default reasoning, False to disable, or provide a Reasoning object for custom options."
+        ),
     )
 
 
@@ -1723,6 +1753,14 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
         description="Load ask parameters from this configuration. Parameters in the request override parameters from the configuration.",
     )
 
+    reasoning: Union[Reasoning, bool] = Field(
+        default=False,
+        description=(
+            "Reasoning options for the generative model. "
+            "Set to True to enable default reasoning, False to disable, or provide a Reasoning object for custom options."
+        ),
+    )
+
     @field_validator("rag_strategies", mode="before")
     @classmethod
     def validate_rag_strategies(cls, rag_strategies: list[RagStrategies]) -> list[RagStrategies]:
@@ -2180,6 +2218,11 @@ class SyncAskResponse(BaseModel):
         title="Answer",
         description="The generative answer to the query",
     )
+    reasoning: Optional[str] = Field(
+        default=None,
+        title="Reasoning",
+        description="The reasoning steps followed by the LLM to generate the answer. This is returned only if the reasoning feature is enabled in the request.",  # noqa: E501
+    )
     answer_json: Optional[dict[str, Any]] = Field(
         default=None,
         title="Answer JSON",
@@ -2284,6 +2327,11 @@ class AnswerAskResponseItem(BaseModel):
     text: str
 
 
+class ReasoningAskResponseItem(BaseModel):
+    type: Literal["reasoning"] = "reasoning"
+    text: str
+
+
 class JSONAskResponseItem(BaseModel):
     type: Literal["answer_json"] = "answer_json"
     object: dict[str, Any]
@@ -2347,6 +2395,7 @@ class DebugAskResponseItem(BaseModel):
 
 AskResponseItemType = Union[
     AnswerAskResponseItem,
+    ReasoningAskResponseItem,
     JSONAskResponseItem,
     MetadataAskResponseItem,
     AugmentedContextResponseItem,

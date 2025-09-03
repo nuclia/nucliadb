@@ -447,6 +447,10 @@ class DummyPredictEngine(PredictEngine):
         self.cluster_url = "http://localhost:8000"
         self.public_url = "http://localhost:8000"
         self.calls = []
+        self.ndjson_reasoning = [
+            b'{"chunk": {"type": "reasoning", "text": "dummy "}}\n',
+            b'{"chunk": {"type": "reasoning", "text": "reasoning"}}\n',
+        ]
         self.ndjson_answer = [
             b'{"chunk": {"type": "text", "text": "valid "}}\n',
             b'{"chunk": {"type": "text", "text": "answer "}}\n',
@@ -482,8 +486,11 @@ class DummyPredictEngine(PredictEngine):
         self.calls.append(("chat_query_ndjson", item))
 
         async def generate():
-            for item in self.ndjson_answer:
-                yield GenerativeChunk.model_validate_json(item)
+            if item.reasoning is not False:
+                for chunk in self.ndjson_reasoning:
+                    yield GenerativeChunk.model_validate_json(chunk)
+            for chunk in self.ndjson_answer:
+                yield GenerativeChunk.model_validate_json(chunk)
 
         return (DUMMY_LEARNING_ID, DUMMY_LEARNING_MODEL, generate())
 

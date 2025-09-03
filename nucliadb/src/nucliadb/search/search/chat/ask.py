@@ -20,7 +20,7 @@
 import dataclasses
 import functools
 import json
-from typing import AsyncGenerator, Optional, cast
+from typing import AsyncGenerator, Optional, Union, cast
 
 from nuclia_models.common.consumption import Consumption
 from nuclia_models.predict.generative_responses import (
@@ -28,6 +28,7 @@ from nuclia_models.predict.generative_responses import (
     GenerativeChunk,
     JSONGenerativeResponse,
     MetaGenerativeResponse,
+    ReasoningGenerativeResponse,
     StatusGenerativeResponse,
     TextGenerativeResponse,
 )
@@ -102,6 +103,7 @@ from nucliadb_models.search import (
     PromptContext,
     PromptContextOrder,
     RagStrategyName,
+    ReasoningAskResponseItem,
     Relations,
     RelationsAskResponseItem,
     RetrievalAskResponseItem,
@@ -167,6 +169,7 @@ class AskResult:
 
         # Computed from the predict chat answer stream
         self._answer_text = ""
+        self._reasoning_text: Optional[str] = None
         self._object: Optional[JSONGenerativeResponse] = None
         self._status: Optional[StatusGenerativeResponse] = None
         self._citations: Optional[CitationsGenerativeResponse] = None
@@ -222,7 +225,11 @@ class AskResult:
         first_chunk_yielded = False
         with self.metrics.time("stream_predict_answer"):
             async for answer_chunk in self._stream_predict_answer_text():
-                yield AnswerAskResponseItem(text=answer_chunk)
+                if isinstance(answer_chunk, TextGenerativeResponse):
+                    yield AnswerAskResponseItem(text=answer_chunk.text)
+                elif isinstance(answer_chunk, ReasoningGenerativeResponse):
+                    yield ReasoningAskResponseItem(text=answer_chunk.text)
+
                 if not first_chunk_yielded:
                     self.metrics.record_first_chunk_yielded()
                     first_chunk_yielded = True
@@ -384,6 +391,7 @@ class AskResult:
 
         response = SyncAskResponse(
             answer=self._answer_text,
+            reasoning=self._reasoning_text,
             answer_json=answer_json,
             status=self.status_code.prettify(),
             relations=self._relations,
@@ -420,7 +428,9 @@ class AskResult:
                 )
         return self._relations
 
-    async def _stream_predict_answer_text(self) -> AsyncGenerator[str, None]:
+    async def _stream_predict_answer_text(
+        self,
+    ) -> AsyncGenerator[Union[TextGenerativeResponse, ReasoningGenerativeResponse], None]:
         """
         Reads the stream of the generative model, yielding the answer text but also parsing
         other items like status codes, citations and miscellaneous metadata.
@@ -435,7 +445,13 @@ class AskResult:
             item = generative_chunk.chunk
             if isinstance(item, TextGenerativeResponse):
                 self._answer_text += item.text
-                yield item.text
+                yield item
+            elif isinstance(item, ReasoningGenerativeResponse):
+                if self._reasoning_text is None:
+                    self._reasoning_text = item.text
+                else:
+                    self._reasoning_text += item.text
+                yield item
             elif isinstance(item, JSONGenerativeResponse):
                 self._object = item
             elif isinstance(item, StatusGenerativeResponse):
@@ -625,6 +641,7 @@ async def ask(
         json_schema=ask_request.answer_json_schema,
         rerank_context=False,
         top_k=ask_request.top_k,
+        reasoning=ask_request.reasoning,
     )
 
     nuclia_learning_id = None
