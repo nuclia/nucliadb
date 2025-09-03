@@ -1753,6 +1753,14 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
         description="Load ask parameters from this configuration. Parameters in the request override parameters from the configuration.",
     )
 
+    reasoning: Union[Reasoning, bool] = Field(
+        default=False,
+        description=(
+            "Reasoning options for the generative model. "
+            "Set to True to enable default reasoning, False to disable, or provide a Reasoning object for custom options."
+        ),
+    )
+
     @field_validator("rag_strategies", mode="before")
     @classmethod
     def validate_rag_strategies(cls, rag_strategies: list[RagStrategies]) -> list[RagStrategies]:

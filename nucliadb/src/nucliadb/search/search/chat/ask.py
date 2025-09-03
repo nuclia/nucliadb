@@ -641,6 +641,7 @@ async def ask(
         json_schema=ask_request.answer_json_schema,
         rerank_context=False,
         top_k=ask_request.top_k,
+        reasoning=ask_request.reasoning,
     )
 
     nuclia_learning_id = None
