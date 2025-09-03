@@ -21,7 +21,6 @@ import nucliadb_sdk
 from nucliadb_models.metadata import RelationType
 from nucliadb_models.search import (
     AnswerAskResponseItem,
-    ReasoningAskResponseItem,
     AskResponseItem,
     AskTimings,
     AskTokens,
@@ -32,6 +31,7 @@ from nucliadb_models.search import (
     KnowledgeboxFindResults,
     MaxTokens,
     MetadataAskResponseItem,
+    ReasoningAskResponseItem,
     RelationDirection,
     Relations,
     RelationsAskResponseItem,
