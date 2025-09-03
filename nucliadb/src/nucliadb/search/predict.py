@@ -486,8 +486,11 @@ class DummyPredictEngine(PredictEngine):
         self.calls.append(("chat_query_ndjson", item))
 
         async def generate():
-            for item in [*self.ndjson_reasoning, *self.ndjson_answer]:
-                yield GenerativeChunk.model_validate_json(item)
+            if item.reasoning is not False:
+                for chunk in self.ndjson_reasoning:
+                    yield GenerativeChunk.model_validate_json(chunk)
+            for chunk in self.ndjson_answer:
+                yield GenerativeChunk.model_validate_json(chunk)
 
         return (DUMMY_LEARNING_ID, DUMMY_LEARNING_MODEL, generate())
 

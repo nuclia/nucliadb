@@ -75,6 +75,7 @@ from nucliadb_models.resource import (
 )
 from nucliadb_models.search import (
     AnswerAskResponseItem,
+    ReasoningAskResponseItem,
     AskRequest,
     AskResponseItem,
     AugmentedContext,
@@ -481,6 +482,7 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
         return response_type.model_validate_json(response.content)
 
     answer = ""
+    reasoning: Optional[str] = None
     answer_json = None
     status = ""
     retrieval_results = None
@@ -497,6 +499,11 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
             item = AskResponseItem.model_validate_json(line).item
             if isinstance(item, AnswerAskResponseItem):
                 answer += item.text
+            elif isinstance(item, ReasoningAskResponseItem):
+                if reasoning is None:
+                    reasoning = item.text
+                else:
+                    reasoning += item.text
             elif isinstance(item, JSONAskResponseItem):
                 answer_json = item.object
             elif isinstance(item, RelationsAskResponseItem):
@@ -534,6 +541,7 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
     return response_type.model_validate(
         {
             "answer": answer,
+            "reasoning": reasoning,
             "answer_json": answer_json,
             "status": status,
             "retrieval_results": retrieval_results,
