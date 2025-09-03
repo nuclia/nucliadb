@@ -75,7 +75,6 @@ from nucliadb_models.resource import (
 )
 from nucliadb_models.search import (
     AnswerAskResponseItem,
-    ReasoningAskResponseItem,
     AskRequest,
     AskResponseItem,
     AugmentedContext,
@@ -93,6 +92,7 @@ from nucliadb_models.search import (
     KnowledgeboxFindResults,
     KnowledgeboxSearchResults,
     MetadataAskResponseItem,
+    ReasoningAskResponseItem,
     RelationsAskResponseItem,
     RetrievalAskResponseItem,
     SearchRequest,

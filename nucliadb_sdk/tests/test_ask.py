@@ -21,6 +21,7 @@ import nucliadb_sdk
 from nucliadb_models.metadata import RelationType
 from nucliadb_models.search import (
     AnswerAskResponseItem,
+    ReasoningAskResponseItem,
     AskResponseItem,
     AskTimings,
     AskTokens,
@@ -102,6 +103,8 @@ def test_ask_on_resource(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
 
 def test_ask_response_parser_stream():
     items = [
+        ReasoningAskResponseItem(text="test"),
+        ReasoningAskResponseItem(text=" reasoning."),
         AnswerAskResponseItem(text="This is"),
         AnswerAskResponseItem(text=" your Nuclia answer."),
         StatusAskResponseItem(code="0", status="success"),
@@ -143,6 +146,7 @@ def test_ask_response_parser_stream():
 
     assert ask_response.learning_id == "learning_id"
     assert ask_response.answer == "This is your Nuclia answer."
+    assert ask_response.reasoning == "test reasoning."
     assert ask_response.status == "success"
     assert ask_response.relations.entities["Nuclia"].related_to[0].entity == "Semantic Search"
     assert ask_response.relations.entities["Nuclia"].related_to[0].entity_subtype == "concept"
