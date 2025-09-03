@@ -101,7 +101,7 @@ async def test_ask_reasoning(nucliadb_reader: AsyncClient, standalone_knowledgeb
         },
     )
     assert resp.status_code == 200, resp.text
-    assert predict.calls[-2][1].reasoning is True
+    assert predict.calls[-2][1].reasoning is True  # type: ignore
     results = parse_ask_response(resp)
     reasoning = ""
     answer = ""
