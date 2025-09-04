@@ -57,6 +57,7 @@ spec:
       containers:
       - name: nidx-worker
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["nidx", "worker"]
         {{- with .Values.envFrom }}
         envFrom:

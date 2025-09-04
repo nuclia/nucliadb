@@ -57,6 +57,7 @@ spec:
       containers:
       - name: nidx-searcher
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["nidx", "searcher"]
         {{- with .Values.envFrom }}
         envFrom:

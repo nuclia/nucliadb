@@ -12,10 +12,7 @@ spec:
   # Only 1 scheduler max running at a time, even during deployment (stop before starting).
   replicas: 1
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
-      maxSurge: 0
+    type: Recreate
   selector:
     matchLabels:
       app: nidx-scheduler
@@ -60,6 +57,7 @@ spec:
       containers:
       - name: nidx-scheduler
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["nidx", "scheduler"]
         {{- with .Values.envFrom }}
         envFrom:
