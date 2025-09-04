@@ -1,0 +1,389 @@
+# Copyright 2025 Bosutech XXI S.L.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+from typing import Optional, Union
+
+from pydantic import BaseModel, Field
+
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.metadata import Origin
+from nucliadb_models.resource import FieldConversation, FieldFile, FieldLink, FieldText
+from nucliadb_models.search import Image
+from nucliadb_models.security import ResourceSecurity
+
+
+class ResourceHydration(BaseModel):
+    title: bool = Field(
+        default=True,
+        description="Hydrate resource titles",
+    )
+    summary: bool = Field(
+        default=False,
+        description="Hydrate resource summaries",
+    )
+
+    origin: bool = Field(
+        default=False,
+        description="Hydrate resource origin",
+    )
+
+    security: bool = Field(
+        default=False,
+        description="Hydrate resource security metadata",
+    )
+
+
+class TextFieldHydration(BaseModel):
+    value: bool = Field(
+        default=False,
+        description="Hydrate text field values. Field values are similar payloads to the ones used to create them",
+    )
+    extracted_text: bool = Field(
+        default=False,
+        description="Hydrate extracted text for text fields",
+    )
+    # TODO: what else should be interesting to add?
+
+
+class FileFieldHydration(BaseModel):
+    value: bool = Field(
+        default=False,
+        description="Hydrate file field values. Field values are similar payloads to the ones used to create them",
+    )
+    extracted_text: bool = Field(
+        default=False,
+        description="Hydrate extracted text for file fields",
+    )
+    # TODO: what else should be interesting to add?
+
+
+class LinkFieldHydration(BaseModel):
+    value: bool = Field(
+        default=False,
+        description="Hydrate link field values. Field values are similar payloads to the ones used to create them",
+    )
+    extracted_text: bool = Field(
+        default=False,
+        description="Hydrate extracted text for link fields",
+    )
+    # TODO: what else should be interesting to add?
+
+
+class ConversationFieldHydration(BaseModel):
+    value: bool = Field(
+        default=False,
+        description="Hydrate conversation field values. Field values are similar payloads to the ones used to create them",
+    )
+
+    # TODO: add fields to hydrate conversation fields. Think about how to handle
+    # splits and fulfill the conversational RAG strategies
+
+    # TODO: what else should be interesting to add?
+
+
+class GenericFieldHydration(BaseModel):
+    value: bool = Field(
+        default=False,
+        description="Hydrate generic field values. Field values are similar payloads to the ones used to create them",
+    )
+    extracted_text: bool = Field(
+        default=False,
+        description="Hydrate extracted text for generic fields",
+    )
+    # TODO: what else should be interesting to add?
+
+
+class FieldHydration(BaseModel):
+    text: Optional[TextFieldHydration] = Field(
+        default=None,
+        description="Text fields hydration options",
+    )
+    file: Optional[FileFieldHydration] = Field(
+        default=None,
+        description="File fields hydration options",
+    )
+    link: Optional[LinkFieldHydration] = Field(
+        default=None,
+        description="Link fields hydration options",
+    )
+    conversation: Optional[ConversationFieldHydration] = Field(
+        default=None,
+        description="Conversation fields hydration options",
+    )
+    generic: Optional[GenericFieldHydration] = Field(
+        default=None,
+        description="Generic fields hydration options",
+    )
+
+
+class NeighbourParagraphHydration(BaseModel):
+    before: int = Field(
+        default=2,
+        ge=0,
+        description="Number of previous paragraphs to hydrate",
+    )
+    after: int = Field(
+        default=2,
+        ge=0,
+        description="Number of following paragraphs to hydrate",
+    )
+
+
+class RelatedParagraphHydration(BaseModel):
+    neighbours: Optional[NeighbourParagraphHydration] = Field(
+        default=None,
+        description="Hydrate extra paragraphs that surround the original one",
+    )
+
+    # TODO: FEATURE: implement related paragraphs by page
+    # page: bool = Field(
+    #     default=False,
+    #     description="Hydrate all paragraphs in the same page. This only applies to fields with pages",
+    # )
+
+    # TODO: description
+    # XXX: should we let users control the amount of elements?
+    parents: bool = False
+    # TODO: description
+    # XXX: should we let users control the amount of elements?
+    siblings: bool = False
+    # TODO: description
+    # XXX: should we let users control the amount of elements?
+    replacements: bool = False
+
+
+class ImageParagraphHydration(BaseModel):
+    # The source image is also known as reference or reference_file in the
+    # paragraph context. The reference/reference_file is the filename of the
+    # source image from which the paragraph has been extracted
+    source_image: bool = Field(
+        default=False,
+        description=(
+            "When a paragraph has been extracted from an image (using OCR, inception...), "
+            "hydrate the image that represents it"
+        ),
+    )
+
+
+class TableParagraphHydration(BaseModel):
+    # TODO: implement. ARAG uses the label "/k/table" to check whether a
+    # paragraph is or a table or not. We can also use info on maindb
+    table_page_preview: bool = Field(
+        default=False,
+        description="Hydrate the page preview for the table. This will only hydrate fields with pages",
+    )
+
+
+class ParagraphPageHydration(BaseModel):
+    # For some field types (file and link) learning generates previews. A
+    # preview is a PDF file representing the content. For a docx for example, is
+    # the PDF equivalent. Depending on the field type, the preview can
+    # represent, for example, a page in a document or a portion of a webpage.
+    page_with_visual: bool = Field(
+        default=False,
+        description=(
+            "When a paragraph has been extracted from a page containing visual "
+            "content (images, tables...), hydrate the preview of the paragraph's "
+            "page as an image. Not all field types have previews nor visual content"
+        ),
+    )
+
+
+class ParagraphHydration(BaseModel):
+    text: bool = Field(
+        default=True,
+        description="Hydrate paragraph text",
+    )
+    image: Optional[ImageParagraphHydration] = Field(
+        default=None,
+        description="Hydrate options for paragraphs extracted from images (using OCR, inception...)",
+    )
+    table: Optional[TableParagraphHydration] = Field(
+        default=None,
+        description="Hydrate options for paragraphs extracted from tables",
+    )
+
+    # TODO: at some point, we should add hydration options for paragraphs from
+    # audio and video
+
+    page: Optional[ParagraphPageHydration] = Field(
+        default=None,
+        description="Hydrte options for paragraphs within a page. This applies to paragraphs in fields with pages",
+    )
+
+    related: Optional[RelatedParagraphHydration] = Field(
+        default=None,
+        description="Hydration options for related paragraphs. For example, neighbours or sibling paragraphs",
+    )
+
+
+class Hydration(BaseModel):
+    resource: ResourceHydration = Field(
+        default_factory=ResourceHydration,
+        description="Resource hydration options",
+    )
+    field: FieldHydration = Field(
+        default_factory=FieldHydration,
+        description="Field hydration options",
+    )
+    paragraph: ParagraphHydration = Field(
+        default_factory=ParagraphHydration,
+        description="Paragraph hydration options",
+    )
+
+
+class HydrateRequest(BaseModel):
+    data: list[str]
+    hydration: Hydration
+
+
+### Response models
+
+
+class HydratedResource(BaseModel):
+    id: str = Field(description="Unique resource id")
+    slug: str = Field(description="Resource slug")
+
+    title: Optional[str] = None
+    summary: Optional[str] = None
+
+    origin: Optional[Origin] = None
+
+    security: Optional[ResourceSecurity] = None
+
+    # TODO: add resource labels to hydrated resources
+
+
+class FieldExtractedData(BaseModel):
+    text: Optional[str] = None
+
+
+class SplitFieldExtractedData(BaseModel):
+    texts: Optional[dict[str, str]] = None
+
+
+class HydratedTextField(BaseModel):
+    id: str = Field("Unique field id")
+    resource: str = Field("Field resource id")
+    field_type: FieldTypeName = FieldTypeName.TEXT
+
+    value: Optional[FieldText] = None
+    extracted: Optional[FieldExtractedData] = None
+
+
+class HydratedFileField(BaseModel):
+    id: str = Field("Unique field id")
+    resource: str = Field("Field resource id")
+    field_type: FieldTypeName = FieldTypeName.FILE
+
+    value: Optional[FieldFile] = None
+    extracted: Optional[FieldExtractedData] = None
+
+    previews: Optional[dict[str, Image]] = Field(
+        default=None,
+        title="Previews of specific parts of the field",
+        description=(
+            "Field previews will be different depending on the field type. For "
+            "example, a preview for a PDF will be an image of a single page, "
+            "while a preview of a link will be a screenshot of the webpage. Here, "
+            "some previews will be populated according to the hydration options "
+            "requested Here, some previews will be populated according to the "
+            "hydration options requested."
+        ),
+    )
+
+
+class HydratedLinkField(BaseModel):
+    id: str = Field("Unique field id")
+    resource: str = Field("Field resource id")
+    field_type: FieldTypeName = FieldTypeName.LINK
+
+    value: Optional[FieldLink] = None
+    extracted: Optional[FieldExtractedData] = None
+
+
+class HydratedConversationField(BaseModel):
+    id: str = Field("Unique field id")
+    resource: str = Field("Field resource id")
+    field_type: FieldTypeName = FieldTypeName.CONVERSATION
+
+    value: Optional[FieldConversation] = None
+    extracted: Optional[FieldExtractedData] = None
+
+
+class HydratedGenericField(BaseModel):
+    id: str = Field("Unique field id")
+    resource: str = Field("Field resource id")
+    field_type: FieldTypeName = FieldTypeName.TEXT
+
+    value: Optional[str] = None
+    extracted: Optional[FieldExtractedData] = None
+
+
+class RelatedNeighbourParagraphRefs(BaseModel):
+    before: Optional[list[str]] = None
+    after: Optional[list[str]] = None
+
+
+class RelatedParagraphRefs(BaseModel):
+    neighbours: Optional[RelatedNeighbourParagraphRefs] = None
+    parents: Optional[list[str]] = None
+    siblings: Optional[list[str]] = None
+    replacements: Optional[list[str]] = None
+
+
+class HydratedParagraph(BaseModel):
+    id: str = Field(description="Unique paragraph id")
+    field: str = Field(description="Paragraph field id")
+    resource: str = Field(description="Paragraph resource id")
+
+    text: Optional[str] = None
+
+    # TODO: add labels to hydrated paragraphs
+    # labels: Optional[list[str]] = None
+
+    related: Optional[RelatedParagraphRefs] = None
+
+    source_image: Optional[Image] = Field(
+        default=None,
+        description=(
+            "Source image for this paragraph. This only applies to paragraphs "
+            "extracted from an image using OCR, inception or other techniques "
+            "and if this hydration option has been enabled in the request"
+        ),
+    )
+
+    page_preview: Optional[str] = Field(
+        default=None,
+        description=(
+            "Reference to its field page preview. This only applies to "
+            "paragraphs extracted from a page containing visual content and if "
+            "this hydration option has been enabled in the request"
+        ),
+    )
+
+
+class Hydrated(BaseModel):
+    resources: dict[str, HydratedResource]
+    fields: dict[
+        str,
+        Union[
+            HydratedTextField,
+            HydratedFileField,
+            HydratedLinkField,
+            HydratedConversationField,
+            HydratedGenericField,
+        ],
+    ]
+    paragraphs: dict[str, HydratedParagraph]
