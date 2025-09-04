@@ -1,3 +1,4 @@
+{{- if .Values.api.service.enabled }}
 kind: Service
 apiVersion: v1
 metadata:
@@ -9,8 +10,15 @@ metadata:
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
+  {{- with .Values.api.service.labels }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.api.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  type: ClusterIP
+  type: {{ .Values.api.service.type | default "ClusterIP" }}
   selector:
     app: nidx-api
   ports:
@@ -18,3 +26,4 @@ spec:
       port: 10000
       protocol: TCP
       appProtocol: grpc
+{{- end }}
