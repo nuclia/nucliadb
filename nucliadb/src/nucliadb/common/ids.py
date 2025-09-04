@@ -47,6 +47,8 @@ FIELD_TYPE_NAME_TO_STR = {
     FieldTypeName.CONVERSATION: "c",
 }
 
+FIELD_TYPE_STR_TO_NAME = {v: k for k, v in FIELD_TYPE_NAME_TO_STR.items()}
+
 
 @dataclass
 class FieldId:
@@ -65,7 +67,7 @@ class FieldId:
 
     Examples:
 
-    >>> FieldId(rid="rid", type="u", key="/my-link")
+    >>> FieldId(rid="rid", type="u", key="my-link")
     FieldID("rid/u/my-link")
     >>> FieldId.from_string("rid/u/my-link")
     FieldID("rid/u/my-link")
@@ -76,31 +78,6 @@ class FieldId:
     key: str
     # also knwon as `split`, this indicates a part of a field in, for example, conversations
     subfield_id: Optional[str] = None
-
-    def __repr__(self) -> str:
-        return f"FieldId({self.full()})"
-
-    def short_without_subfield(self) -> str:
-        return f"/{self.type}/{self.key}"
-
-    def full(self) -> str:
-        if self.subfield_id is None:
-            return f"{self.rid}/{self.type}/{self.key}"
-        else:
-            return f"{self.rid}/{self.type}/{self.key}/{self.subfield_id}"
-
-    def __hash__(self) -> int:
-        return hash(self.full())
-
-    @property
-    def pb_type(self) -> FieldType.ValueType:
-        return FIELD_TYPE_STR_TO_PB[self.type]
-
-    @classmethod
-    def from_pb(
-        cls, rid: str, field_type: FieldType.ValueType, key: str, subfield_id: Optional[str] = None
-    ) -> "FieldId":
-        return cls(rid=rid, type=FIELD_TYPE_PB_TO_STR[field_type], key=key, subfield_id=subfield_id)
 
     @classmethod
     def from_string(cls, value: str) -> "FieldId":
@@ -120,11 +97,11 @@ class FieldId:
         parts = value.split("/")
         if len(parts) == 3:
             rid, _type, key = parts
-            _type = cls.parse_field_type(_type)
+            _type = cls._parse_field_type(_type)
             return cls(rid=rid, type=_type, key=key)
         elif len(parts) == 4:
             rid, _type, key, subfield_id = parts
-            _type = cls.parse_field_type(_type)
+            _type = cls._parse_field_type(_type)
             return cls(
                 rid=rid,
                 type=_type,
@@ -135,7 +112,46 @@ class FieldId:
             raise ValueError(f"Invalid FieldId: {value}")
 
     @classmethod
-    def parse_field_type(cls, _type: str) -> str:
+    def from_pb(
+        cls, rid: str, field_type: FieldType.ValueType, key: str, subfield_id: Optional[str] = None
+    ) -> "FieldId":
+        return cls(rid=rid, type=FIELD_TYPE_PB_TO_STR[field_type], key=key, subfield_id=subfield_id)
+
+    @property
+    def pb_type(self) -> FieldType.ValueType:
+        return FIELD_TYPE_STR_TO_PB[self.type]
+
+    def full(self) -> str:
+        if self.subfield_id is None:
+            return f"{self.rid}/{self.type}/{self.key}"
+        else:
+            return f"{self.rid}/{self.type}/{self.key}/{self.subfield_id}"
+
+    def short_without_subfield(self) -> str:
+        return f"/{self.type}/{self.key}"
+
+    def paragraph_id(self, paragraph_start: int, paragraph_end: int) -> "ParagraphId":
+        """Generate a ParagraphId from the current field given its start and
+        end.
+
+        """
+        return ParagraphId(
+            field_id=self,
+            paragraph_start=paragraph_start,
+            paragraph_end=paragraph_end,
+        )
+
+    def __str__(self) -> str:
+        return self.full()
+
+    def __repr__(self) -> str:
+        return f"FieldId({self.full()})"
+
+    def __hash__(self) -> int:
+        return hash(self.full())
+
+    @staticmethod
+    def _parse_field_type(_type: str) -> str:
         if _type not in FIELD_TYPE_STR_TO_PB:
             # Try to parse the enum value
             # XXX: This is to support field types that are integer values of FieldType
@@ -156,19 +172,6 @@ class ParagraphId:
     field_id: FieldId
     paragraph_start: int
     paragraph_end: int
-
-    def __repr__(self) -> str:
-        return f"ParagraphId({self.full()})"
-
-    def full(self) -> str:
-        return f"{self.field_id.full()}/{self.paragraph_start}-{self.paragraph_end}"
-
-    def __hash__(self) -> int:
-        return hash(self.full())
-
-    @property
-    def rid(self) -> str:
-        return self.field_id.rid
 
     @classmethod
     def from_string(cls, value: str) -> "ParagraphId":
@@ -191,6 +194,22 @@ class ParagraphId:
             paragraph_start=vid.vector_start,
             paragraph_end=vid.vector_end,
         )
+
+    @property
+    def rid(self) -> str:
+        return self.field_id.rid
+
+    def full(self) -> str:
+        return f"{self.field_id.full()}/{self.paragraph_start}-{self.paragraph_end}"
+
+    def __str__(self) -> str:
+        return self.full()
+
+    def __repr__(self) -> str:
+        return f"ParagraphId({self.full()})"
+
+    def __hash__(self) -> int:
+        return hash(self.full())
 
 
 @dataclass
@@ -217,19 +236,6 @@ class VectorId:
     vector_start: int
     vector_end: int
 
-    def __repr__(self) -> str:
-        return f"VectorId({self.full()})"
-
-    def full(self) -> str:
-        return f"{self.field_id.full()}/{self.index}/{self.vector_start}-{self.vector_end}"
-
-    def __hash__(self) -> int:
-        return hash(self.full())
-
-    @property
-    def rid(self) -> str:
-        return self.field_id.rid
-
     @classmethod
     def from_string(cls, value: str) -> "VectorId":
         parts = value.split("/")
@@ -238,6 +244,22 @@ class VectorId:
         index = int(parts[-2])
         field_id = FieldId.from_string("/".join(parts[:-2]))
         return cls(field_id=field_id, index=index, vector_start=start, vector_end=end)
+
+    @property
+    def rid(self) -> str:
+        return self.field_id.rid
+
+    def full(self) -> str:
+        return f"{self.field_id.full()}/{self.index}/{self.vector_start}-{self.vector_end}"
+
+    def __str__(self) -> str:
+        return self.full()
+
+    def __repr__(self) -> str:
+        return f"VectorId({self.full()})"
+
+    def __hash__(self) -> int:
+        return hash(self.full())
 
 
 def extract_data_augmentation_id(generated_field_id: str) -> Optional[str]:
