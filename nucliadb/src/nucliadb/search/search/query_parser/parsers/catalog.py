@@ -19,13 +19,10 @@
 #
 
 from nucliadb.common import datamanagers
+from nucliadb.common.catalog.interface import CatalogExpression, CatalogQuery
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.filter_expression import FacetFilterTypes, facet_from_filter
 from nucliadb.search.search.filters import translate_label
-from nucliadb.search.search.query_parser.models import (
-    CatalogExpression,
-    CatalogQuery,
-)
 from nucliadb_models import search as search_models
 from nucliadb_models.filters import (
     And,

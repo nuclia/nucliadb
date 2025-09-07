@@ -25,6 +25,7 @@ from fastapi import Request, Response
 from fastapi_versioning import version
 from pydantic import ValidationError
 
+from nucliadb.common.catalog.utils import catalog_search
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.models.responses import HTTPClientError
@@ -33,7 +34,6 @@ from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.search import cache
 from nucliadb.search.search.merge import fetch_resources
-from nucliadb.search.search.pgcatalog import pgcatalog_facets, pgcatalog_search
 from nucliadb.search.search.query_parser.parsers import parse_catalog
 from nucliadb.search.search.utils import (
     maybe_log_request_payload,
@@ -164,9 +164,11 @@ async def catalog(
             query_parser = await parse_catalog(kbid, item)
 
             catalog_results = CatalogResponse()
-            catalog_results.fulltext = await pgcatalog_search(query_parser)
+            catalog_results.fulltext = await catalog_search(query_parser)
             catalog_results.resources = await fetch_resources(
-                resources=[r.rid for r in catalog_results.fulltext.results],
+                resources=[r.rid for r in catalog_results.fulltext.results]
+                if catalog_results.fulltext
+                else [],
                 kbid=kbid,
                 show=item.show,
                 field_type_filter=list(FieldTypeName),
@@ -208,4 +210,4 @@ async def catalog(
 async def catalog_facets(
     request: Request, kbid: str, item: CatalogFacetsRequest
 ) -> CatalogFacetsResponse:
-    return CatalogFacetsResponse(facets=await pgcatalog_facets(kbid, item))
+    return CatalogFacetsResponse(facets=await catalog_facets(kbid, item))

@@ -28,9 +28,10 @@ import logging
 from typing import cast
 
 from nucliadb.common import datamanagers
+from nucliadb.common.catalog.pg import PGCatalog
+from nucliadb.common.catalog.utils import catalog_update, get_catalog
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.ingest.orm.index_message import get_resource_index_message
-from nucliadb.ingest.orm.processor.pgcatalog import pgcatalog_update
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,9 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     if not isinstance(context.kv_driver, PGDriver):
+        return
+
+    if not isinstance(get_catalog(), PGCatalog):
         return
 
     BATCH_SIZE = 100
@@ -75,7 +79,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                         continue
 
                     index_message = await get_resource_index_message(resource, reindex=False)
-                    await pgcatalog_update(txn, kbid, resource, index_message)
+                    await catalog_update(txn, kbid, resource, index_message)
 
                 await txn.commit()
                 continue_sql = f"AND key > '/kbs/{kbid}/r/{rid}'"

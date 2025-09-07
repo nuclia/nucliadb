@@ -17,9 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal, Optional, Union
+from typing import Optional, Union
 
 from nidx_protos import nodereader_pb2
 from pydantic import BaseModel, ConfigDict, Field
@@ -151,33 +150,6 @@ class ParsedQuery(BaseModel):
     fetcher: Fetcher
     retrieval: UnitRetrieval
     generation: Optional[Generation] = None
-
-
-### Catalog
-@dataclass
-class CatalogExpression:
-    @dataclass
-    class Date:
-        field: Union[Literal["created_at"], Literal["modified_at"]]
-        since: Optional[datetime]
-        until: Optional[datetime]
-
-    bool_and: Optional[list["CatalogExpression"]] = None
-    bool_or: Optional[list["CatalogExpression"]] = None
-    bool_not: Optional["CatalogExpression"] = None
-    date: Optional[Date] = None
-    facet: Optional[str] = None
-    resource_id: Optional[str] = None
-
-
-class CatalogQuery(BaseModel):
-    kbid: str
-    query: Optional[search_models.CatalogQuery]
-    filters: Optional[CatalogExpression]
-    sort: search_models.SortOptions
-    faceted: list[str]
-    page_size: int
-    page_number: int
 
 
 ### Graph
