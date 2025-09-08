@@ -108,7 +108,7 @@ class PGCatalog(Catalog):
                 {
                     "kbid": kbid,
                     "rid": rid,
-                    "facets": list(self.extract_facets(data.labels)),
+                    "facets": list(extract_facets(data.labels)),
                 },
             )
 
@@ -474,3 +474,14 @@ def translate_label(literal: str) -> str:
     if literal[0] != "/":
         raise InvalidQueryError("filters", f"Invalid label. It must start with a `/`: {literal}")
     return translate_alias_to_system_label(literal)
+
+
+def extract_facets(labels: list[str]) -> set[str]:
+    facets = set()
+    for label in labels:
+        parts = label.split("/")
+        facet = ""
+        for part in parts[1:]:
+            facet += f"/{part}"
+            facets.add(facet)
+    return facets

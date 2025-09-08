@@ -72,17 +72,6 @@ class CatalogQuery(BaseModel):
 
 
 class Catalog(abc.ABC, metaclass=abc.ABCMeta):
-    @staticmethod
-    def extract_facets(labels: list[str]) -> set[str]:
-        facets = set()
-        for label in labels:
-            parts = label.split("/")
-            facet = ""
-            for part in parts[1:]:
-                facet += f"/{part}"
-                facets.add(facet)
-        return facets
-
     @abc.abstractmethod
     async def update(self, txn: Transaction, kbid: str, rid: str, data: CatalogResourceData): ...
 
