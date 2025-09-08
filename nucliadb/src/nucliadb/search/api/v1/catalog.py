@@ -25,7 +25,7 @@ from fastapi import Request, Response
 from fastapi_versioning import version
 from pydantic import ValidationError
 
-from nucliadb.common.catalog import catalog_search
+from nucliadb.common.catalog import catalog_facets, catalog_search
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.models.responses import HTTPClientError
@@ -205,7 +205,7 @@ async def catalog(
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def catalog_facets(
+async def catalog_facets_endpoint(
     request: Request, kbid: str, item: CatalogFacetsRequest
 ) -> CatalogFacetsResponse:
     return CatalogFacetsResponse(facets=await catalog_facets(kbid, item))

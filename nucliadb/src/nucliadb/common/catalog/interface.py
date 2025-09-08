@@ -67,8 +67,8 @@ class CatalogQuery(BaseModel):
     filters: Optional[CatalogExpression] = Field(description="Filters to apply to the search")
     sort: search_models.SortOptions = Field(description="Sorting option")
     faceted: list[str] = Field(description="List of facets to compute during the search")
-    page_size: int = Field(gt=0, le=100, description="Used for pagination. Maximum page size is 100")
-    page_number: int = Field(ge=0, description="Used for pagination. First page is 0")
+    page_size: int = Field(description="Used for pagination. Maximum page size is 100")
+    page_number: int = Field(description="Used for pagination. First page is 0")
 
 
 class Catalog(abc.ABC, metaclass=abc.ABCMeta):
