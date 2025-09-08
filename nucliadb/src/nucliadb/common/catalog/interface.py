@@ -24,16 +24,18 @@ import datetime
 from dataclasses import dataclass
 from typing import Literal, Optional, Union
 
-from nidx_protos.noderesources_pb2 import Resource as IndexMessage
 from pydantic import BaseModel, Field
 
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.ingest.orm.resource import Resource
 from nucliadb_models import search as search_models
 from nucliadb_models.search import CatalogFacetsRequest, Resources
 
 
 class CatalogResourceData(BaseModel):
+    """
+    Data extracted from a resource to be indexed in the catalog
+    """
+
     title: str = Field(description="Resource title")
     created_at: datetime.datetime = Field(description="Resource creation date")
     modified_at: datetime.datetime = Field(description="Resource last modification date")
@@ -61,47 +63,15 @@ class CatalogExpression:
 
 class CatalogQuery(BaseModel):
     kbid: str
-    query: Optional[search_models.CatalogQuery]
-    filters: Optional[CatalogExpression]
-    sort: search_models.SortOptions
-    faceted: list[str]
-    page_size: int
-    page_number: int
+    query: Optional[search_models.CatalogQuery] = Field(description="Full-text search query")
+    filters: Optional[CatalogExpression] = Field(description="Filters to apply to the search")
+    sort: search_models.SortOptions = Field(description="Sorting option")
+    faceted: list[str] = Field(description="List of facets to compute during the search")
+    page_size: int = Field(gt=0, le=100, description="Used for pagination. Maximum page size is 100")
+    page_number: int = Field(ge=0, description="Used for pagination. First page is 0")
 
 
 class Catalog(abc.ABC, metaclass=abc.ABCMeta):
-    def get_resource_data(self, resource: Resource, index_message: IndexMessage) -> CatalogResourceData:
-        if resource.basic is None:
-            raise ValueError("Cannot index into the catalog a resource without basic metadata ")
-
-        created_at = resource.basic.created.ToDatetime()
-        modified_at = resource.basic.modified.ToDatetime()
-        if modified_at < created_at:
-            modified_at = created_at
-
-        # Do not index canceled labels
-        cancelled_labels = {
-            f"/l/{clf.labelset}/{clf.label}"
-            for clf in resource.basic.usermetadata.classifications
-            if clf.cancelled_by_user
-        }
-
-        # Labels from the resource and classification labels from each field
-        labels = [label for label in index_message.labels]
-        for classification in resource.basic.computedmetadata.field_classifications:
-            for clf in classification.classifications:
-                label = f"/l/{clf.labelset}/{clf.label}"
-                if label not in cancelled_labels:
-                    labels.append(label)
-
-        return CatalogResourceData(
-            title=resource.basic.title,
-            created_at=created_at,
-            modified_at=modified_at,
-            labels=labels,
-            slug=resource.basic.slug,
-        )
-
     @staticmethod
     def extract_facets(labels: list[str]) -> set[str]:
         facets = set()
@@ -113,11 +83,8 @@ class Catalog(abc.ABC, metaclass=abc.ABCMeta):
                 facets.add(facet)
         return facets
 
-    async def update(self, txn: Transaction, kbid: str, resource: Resource, index_message: IndexMessage):
-        await self._update(txn, kbid, resource.uuid, self.get_resource_data(resource, index_message))
-
     @abc.abstractmethod
-    async def _update(self, txn: Transaction, kbid: str, rid: str, data: CatalogResourceData): ...
+    async def update(self, txn: Transaction, kbid: str, rid: str, data: CatalogResourceData): ...
 
     @abc.abstractmethod
     async def delete(self, txn: Transaction, kbid: str, rid: str): ...

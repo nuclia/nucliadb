@@ -28,8 +28,8 @@ import logging
 from typing import cast
 
 from nucliadb.common import datamanagers
+from nucliadb.common.catalog import catalog_update, get_catalog
 from nucliadb.common.catalog.pg import PGCatalog
-from nucliadb.common.catalog.utils import catalog_update, get_catalog
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.ingest.orm.index_message import get_resource_index_message
 from nucliadb.migrator.context import ExecutionContext

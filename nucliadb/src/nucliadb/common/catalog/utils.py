@@ -16,43 +16,41 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
+#
 from nidx_protos.noderesources_pb2 import Resource as IndexMessage
 
-from nucliadb.common.catalog.dummy import DummyCatalog
-from nucliadb.common.catalog.interface import Catalog, CatalogQuery
-from nucliadb.common.catalog.pg import PGCatalog
-from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.catalog.interface import CatalogResourceData
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.ingest.settings import CatalogConfig, settings
-from nucliadb_models.search import CatalogFacetsRequest, Resources
-from nucliadb_utils.exceptions import ConfigurationError
 
 
-def get_catalog() -> Catalog:
-    if settings.catalog == CatalogConfig.UNSET:
-        return DummyCatalog()
-    elif settings.catalog == CatalogConfig.PG:
-        return PGCatalog()
-    else:
-        raise ConfigurationError(f"Unknown catalog configuration: {settings.catalog}")
+def build_catalog_resource_data(resource: Resource, index_message: IndexMessage) -> CatalogResourceData:
+    if resource.basic is None:
+        raise ValueError("Cannot index into the catalog a resource without basic metadata ")
 
+    created_at = resource.basic.created.ToDatetime()
+    modified_at = resource.basic.modified.ToDatetime()
+    if modified_at < created_at:
+        modified_at = created_at
 
-async def catalog_update(txn: Transaction, kbid: str, resource: Resource, index_message: IndexMessage):
-    catalog = get_catalog()
-    await catalog.update(txn, kbid, resource, index_message)
+    # Do not index canceled labels
+    cancelled_labels = {
+        f"/l/{clf.labelset}/{clf.label}"
+        for clf in resource.basic.usermetadata.classifications
+        if clf.cancelled_by_user
+    }
 
+    # Labels from the resource and classification labels from each field
+    labels = [label for label in index_message.labels]
+    for classification in resource.basic.computedmetadata.field_classifications:
+        for clf in classification.classifications:
+            label = f"/l/{clf.labelset}/{clf.label}"
+            if label not in cancelled_labels:
+                labels.append(label)
 
-async def catalog_delete(txn: Transaction, kbid: str, rid: str):
-    catalog = get_catalog()
-    await catalog.delete(txn, kbid, rid)
-
-
-async def catalog_search(query: CatalogQuery) -> Resources:
-    catalog = get_catalog()
-    return await catalog.search(query)
-
-
-async def catalog_facets(kbid: str, request: CatalogFacetsRequest) -> dict[str, int]:
-    catalog = get_catalog()
-    return await catalog.facets(kbid, request)
+    return CatalogResourceData(
+        title=resource.basic.title,
+        created_at=created_at,
+        modified_at=modified_at,
+        labels=labels,
+        slug=resource.basic.slug,
+    )

@@ -23,7 +23,7 @@ from nucliadb_models.search import CatalogFacetsRequest, Resources
 
 
 class DummyCatalog(Catalog):
-    async def _update(self, txn: Transaction, kbid: str, rid: str, data: CatalogResourceData):
+    async def update(self, txn: Transaction, kbid: str, rid: str, data: CatalogResourceData):
         return
 
     async def delete(self, txn: Transaction, kbid: str, rid: str):

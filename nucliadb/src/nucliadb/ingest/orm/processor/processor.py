@@ -28,7 +28,7 @@ from nidx_protos import noderesources_pb2, nodewriter_pb2
 from nidx_protos.noderesources_pb2 import Resource as PBBrainResource
 
 from nucliadb.common import datamanagers, locking
-from nucliadb.common.catalog.utils import catalog_delete, catalog_update
+from nucliadb.common.catalog import catalog_delete, catalog_update
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.external_index_providers.base import ExternalIndexManager

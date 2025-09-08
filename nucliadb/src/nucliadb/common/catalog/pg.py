@@ -69,7 +69,7 @@ def _pg_driver() -> PGDriver:
 
 class PGCatalog(Catalog):
     @write_observer.wrap({"type": "update"})
-    async def _update(self, txn: Transaction, kbid: str, rid: str, data: CatalogResourceData):
+    async def update(self, txn: Transaction, kbid: str, rid: str, data: CatalogResourceData):
         if not pgcatalog_enabled(kbid):
             return
 
