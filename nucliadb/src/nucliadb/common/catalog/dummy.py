@@ -17,23 +17,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-from nidx_protos import nodewriter_pb2 as Nidx
-
-from nucliadb_protos import knowledgebox_pb2 as Nucliadb
-
-
-def nucliadb_vector_type_to_nidx(nucliadb: Nucliadb.VectorType.ValueType) -> Nidx.VectorType.ValueType:
-    if nucliadb == Nucliadb.DENSE_F32:
-        return Nidx.DENSE_F32
-    else:  # pragma: no cover
-        raise Exception("Unknown vector type")
+from nucliadb.common.catalog.interface import Catalog, CatalogQuery, CatalogResourceData
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb_models.search import CatalogFacetsRequest, Resources
 
 
-def nucliadb_index_config_to_nidx(nucliadb: Nucliadb.VectorIndexConfig) -> Nidx.VectorIndexConfig:
-    return Nidx.VectorIndexConfig(
-        normalize_vectors=nucliadb.normalize_vectors,
-        similarity=nucliadb.similarity,
-        vector_dimension=nucliadb.vector_dimension,
-        vector_type=nucliadb_vector_type_to_nidx(nucliadb.vector_type),
-    )
+class DummyCatalog(Catalog):
+    async def update(self, txn: Transaction, kbid: str, rid: str, data: CatalogResourceData):
+        return
+
+    async def delete(self, txn: Transaction, kbid: str, rid: str):
+        return
+
+    async def search(self, query: CatalogQuery) -> Resources:
+        return Resources(results=[], min_score=0.0)
+
+    async def facets(self, kbid: str, request: CatalogFacetsRequest) -> dict[str, int]:
+        return {}
