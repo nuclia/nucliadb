@@ -29,15 +29,22 @@ from nucliadb_models.search import CatalogFacetsRequest, SortField, SortOptions
 @pytest.mark.asyncio
 async def test_dummy_catalog():
     catalog = DummyCatalog()
-    data = CatalogResourceData(
-        title="Test Title",
-        created_at="2021-01-01T00:00:00Z",
-        modified_at="2021-01-01T00:00:00Z",
-        labels=["/l/test"],
-        slug="test-title",
+
+    await catalog.update(
+        None,
+        "kbid",
+        "rid",
+        CatalogResourceData(
+            title="Test Title",
+            created_at="2021-01-01T00:00:00Z",
+            modified_at="2021-01-01T00:00:00Z",
+            labels=["/l/test"],
+            slug="test-title",
+        ),
     )
-    await catalog.update(None, "kbid", "rid", data)
+
     await catalog.delete(None, "kbid", "rid")
+
     results = await catalog.search(
         CatalogQuery(
             kbid="kbid",
@@ -51,6 +58,7 @@ async def test_dummy_catalog():
             page_number=0,
         )
     )
-    assert results == []
+    assert results.results == []
+
     facets = await catalog.facets("kbid", CatalogFacetsRequest(prefixes=[]))
     assert facets == {}
