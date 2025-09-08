@@ -59,10 +59,6 @@ def _pg_transaction(txn: Transaction) -> PGTransaction:
     return cast(PGTransaction, txn)
 
 
-def pgcatalog_enabled(kbid):
-    return isinstance(get_driver(), PGDriver)
-
-
 def _pg_driver() -> PGDriver:
     return cast(PGDriver, get_driver())
 
@@ -70,9 +66,6 @@ def _pg_driver() -> PGDriver:
 class PGCatalog(Catalog):
     @write_observer.wrap({"type": "update"})
     async def update(self, txn: Transaction, kbid: str, rid: str, data: CatalogResourceData):
-        if not pgcatalog_enabled(kbid):  # pragma: no cover
-            return
-
         async with _pg_transaction(txn).connection.cursor() as cur:
             await cur.execute(
                 """
@@ -114,8 +107,6 @@ class PGCatalog(Catalog):
 
     @write_observer.wrap({"type": "delete"})
     async def delete(self, txn: Transaction, kbid: str, rid: str):
-        if not pgcatalog_enabled(kbid):  # pragma: no cover
-            return
         async with _pg_transaction(txn).connection.cursor() as cur:
             await cur.execute(
                 "DELETE FROM catalog where kbid = %(kbid)s AND rid = %(rid)s", {"kbid": kbid, "rid": rid}
