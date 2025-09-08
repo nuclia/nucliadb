@@ -39,7 +39,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     async with datamanagers.with_rw_transaction() as txn:
         vectorsets = [vs async for (_vid, vs) in datamanagers.vectorsets.iter(txn, kbid=kbid)]
 
-        if len(vectorsets) == 0:  # pragma: nocover
+        if len(vectorsets) == 0:  # pragma: no cover
             # should never happen, everyone should have at least one
             logger.warning(f"KB has no vectorsets!", extra={"kbid": kbid})
             return

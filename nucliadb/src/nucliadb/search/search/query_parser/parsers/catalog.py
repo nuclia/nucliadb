@@ -182,7 +182,7 @@ async def parse_filter_expression(expr: ResourceFilterExpression, kbid: str) -> 
             if rid is None:
                 raise InvalidQueryError("slug", f"Cannot find slug {expr.slug}")
             cat.resource_id = rid
-        else:  # pragma: nocover
+        else:  # pragma: no cover
             # Cannot happen due to model validation
             raise ValueError("Resource needs id or slug")
     elif isinstance(expr, DateCreated):

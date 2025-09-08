@@ -193,7 +193,7 @@ class ResourceBrain:
         if field_author is not None and field_author.WhichOneof("author") == "data_augmentation":
             field_type, field_id = field_key.split("/")
             da_task_id = ids.extract_data_augmentation_id(field_id)
-            if da_task_id is None:  # pragma: nocover
+            if da_task_id is None:  # pragma: no cover
                 logger.warning(
                     "Data augmentation field id has an unexpected format! Skipping label",
                     extra={

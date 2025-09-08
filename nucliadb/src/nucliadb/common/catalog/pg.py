@@ -70,7 +70,7 @@ def _pg_driver() -> PGDriver:
 class PGCatalog(Catalog):
     @write_observer.wrap({"type": "update"})
     async def update(self, txn: Transaction, kbid: str, rid: str, data: CatalogResourceData):
-        if not pgcatalog_enabled(kbid):
+        if not pgcatalog_enabled(kbid):  # pragma: no cover
             return
 
         async with _pg_transaction(txn).connection.cursor() as cur:
@@ -114,7 +114,7 @@ class PGCatalog(Catalog):
 
     @write_observer.wrap({"type": "delete"})
     async def delete(self, txn: Transaction, kbid: str, rid: str):
-        if not pgcatalog_enabled(kbid):
+        if not pgcatalog_enabled(kbid):  # pragma: no cover
             return
         async with _pg_transaction(txn).connection.cursor() as cur:
             await cur.execute(
@@ -382,7 +382,7 @@ def _prepare_query_search(query: search_models.CatalogQuery, params: dict[str, A
     elif query.match == search_models.CatalogQueryMatch.Contains:
         params["query"] = "%" + query.query + "%"
         return sql.SQL("title ILIKE %(query)s")
-    else:  # pragma: nocover
+    else:  # pragma: no cover
         # This is a trick so mypy generates an error if this branch can be reached,
         # that is, if we are missing some ifs
         _a: int = "a"
