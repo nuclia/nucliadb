@@ -26,7 +26,7 @@ from nucliadb_protos import knowledgebox_pb2 as Nucliadb
 def nucliadb_vector_type_to_nidx(nucliadb: Nucliadb.VectorType.ValueType) -> Nidx.VectorType.ValueType:
     if nucliadb == Nucliadb.DENSE_F32:
         return Nidx.DENSE_F32
-    else:  # pragma: nocover
+    else:  # pragma: no cover
         raise Exception("Unknown vector type")
 
 

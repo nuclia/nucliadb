@@ -56,7 +56,6 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.broker_messages.fields import FieldBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 
@@ -1619,10 +1618,7 @@ async def test_ask_neighbouring_paragraphs_rag_strategy(
 
     # Inject the processing broker message
     bmb = BrokerMessageBuilder(kbid=kbid, rid=rid, source=wpb2.BrokerMessage.MessageSource.PROCESSOR)
-    fb = FieldBuilder(
-        field="text1",
-        field_type=wpb2.FieldType.TEXT,
-    )
+    fb = bmb.field_builder("text1", wpb2.FieldType.TEXT)
     fb.with_extracted_text(extracted_text)
 
     for i, (start, end) in positions.items():
@@ -1632,7 +1628,6 @@ async def test_ask_neighbouring_paragraphs_rag_strategy(
             text=paragraphs[i],
         )
         fb.with_extracted_paragraph_metadata(pbpar)
-    bmb.add_field_builder(fb)
 
     await inject_message(nucliadb_ingest_grpc, bmb.build(), wait_for_ready=True)
 

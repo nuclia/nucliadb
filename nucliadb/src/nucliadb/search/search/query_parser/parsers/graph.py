@@ -153,7 +153,7 @@ def parse_path_query(expr: graph_requests.GraphPathQuery) -> nodereader_pb2.Grap
     elif isinstance(expr, graph_requests.Generated):
         _set_generated_to_pb(expr, pb)
 
-    else:  # pragma: nocover
+    else:  # pragma: no cover
         # This is a trick so mypy generates an error if this branch can be reached,
         # that is, if we are missing some ifs
         _a: int = "a"
@@ -182,7 +182,7 @@ def _parse_node_query(expr: graph_requests.GraphNodesQuery) -> nodereader_pb2.Gr
     elif isinstance(expr, graph_requests.Generated):
         _set_generated_to_pb(expr, pb)
 
-    else:  # pragma: nocover
+    else:  # pragma: no cover
         # This is a trick so mypy generates an error if this branch can be reached,
         # that is, if we are missing some ifs
         _a: int = "a"
@@ -212,7 +212,7 @@ def _parse_relation_query(
     elif isinstance(expr, graph_requests.Generated):
         _set_generated_to_pb(expr, pb)
 
-    else:  # pragma: nocover
+    else:  # pragma: no cover
         # This is a trick so mypy generates an error if this branch can be reached,
         # that is, if we are missing some ifs
         _a: int = "a"
@@ -230,7 +230,7 @@ def _set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuer
             pb.fuzzy.kind = nodereader_pb2.GraphQuery.Node.MatchLocation.PREFIX
             pb.fuzzy.distance = 1
 
-        else:  # pragma: nocover
+        else:  # pragma: no cover
             # This is a trick so mypy generates an error if this branch can be reached,
             # that is, if we are missing some ifs
             _a: int = "a"
@@ -263,7 +263,7 @@ def _set_generated_to_pb(generated: graph_requests.Generated, pb: nodereader_pb2
 
         pb.facet.facet = facet
 
-    else:  # pragma: nocover
+    else:  # pragma: no cover
         # This is a trick so mypy generates an error if this branch can be reached,
         # that is, if we are missing some ifs
         _a: int = "a"

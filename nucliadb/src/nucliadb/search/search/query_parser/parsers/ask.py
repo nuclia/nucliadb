@@ -63,7 +63,7 @@ class _AskParser:
             )
         elif isinstance(self.item.max_tokens, MaxTokens):
             max_tokens = self.item.max_tokens
-        else:  # pragma: nocover
+        else:  # pragma: no cover
             # This is a trick so mypy generates an error if this branch can be reached,
             # that is, if we are missing some ifs
             _a: int = "a"

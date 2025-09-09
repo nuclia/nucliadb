@@ -28,6 +28,7 @@ from nidx_protos import noderesources_pb2, nodewriter_pb2
 from nidx_protos.noderesources_pb2 import Resource as PBBrainResource
 
 from nucliadb.common import datamanagers, locking
+from nucliadb.common.catalog import catalog_delete, catalog_update
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
@@ -60,8 +61,6 @@ from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage, has_feature
-
-from .pgcatalog import pgcatalog_delete, pgcatalog_update
 
 logger = logging.getLogger("ingest-processor")
 
@@ -227,7 +226,8 @@ class Processor:
                     shard = await kb.get_resource_shard(shard_id)
                     if shard is None:
                         raise AttributeError("Shard not available")
-                    await pgcatalog_delete(txn, message.kbid, uuid)
+
+                    await catalog_delete(txn, message.kbid, uuid)
                     external_index_manager = await get_external_index_manager(kbid=message.kbid)
                     if external_index_manager is not None:
                         await self.external_index_delete_resource(external_index_manager, uuid)
@@ -374,8 +374,7 @@ class Processor:
                             index_message.labels.remove(current_status[0])
                             index_message.labels.append("/n/s/ERROR")
 
-                    await pgcatalog_update(txn, kbid, resource, index_message)
-
+                    await catalog_update(txn, kbid, resource, index_message)
                     if transaction_check:
                         await sequence_manager.set_last_seqid(txn, partition, seqid)
                     await txn.commit()

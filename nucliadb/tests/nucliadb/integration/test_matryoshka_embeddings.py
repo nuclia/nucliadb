@@ -30,7 +30,7 @@ from nucliadb_models.search import SearchOptions
 from nucliadb_protos import knowledgebox_pb2, resources_pb2, utils_pb2, writer_pb2
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
+from tests.utils.broker_messages import BrokerMessageBuilder
 
 fake = Faker()
 
@@ -100,7 +100,7 @@ async def test_matryoshka_embeddings(
     )
     bmb.with_title(title)
 
-    text_field = FieldBuilder(field_id, resources_pb2.FieldType.FILE)  # TODO: implement TEXT
+    text_field = bmb.field_builder(field_id, resources_pb2.FieldType.FILE)  # TODO: implement TEXT
     text_field.with_extracted_text(body)
 
     vectors = []
@@ -117,8 +117,6 @@ async def test_matryoshka_embeddings(
             )
         )
     text_field.with_extracted_vectors(vectors, vectorset="my-semantic-model")
-
-    bmb.add_field_builder(text_field)
 
     bm = bmb.build()
     await inject_message(nucliadb_ingest_grpc, bm)

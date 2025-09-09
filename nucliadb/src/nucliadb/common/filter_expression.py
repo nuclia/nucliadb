@@ -110,7 +110,7 @@ async def parse_expression(
             if rid is None:
                 raise InvalidQueryError("slug", f"Cannot find slug {expr.slug}")
             f.resource.resource_id = rid
-        else:  # pragma: nocover
+        else:  # pragma: no cover
             # Cannot happen due to model validation
             raise ValueError("Resource needs id or slug")
     elif isinstance(expr, Field):

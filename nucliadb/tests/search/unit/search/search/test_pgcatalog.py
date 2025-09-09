@@ -19,8 +19,8 @@
 #
 from datetime import datetime
 
-from nucliadb.search.search.pgcatalog import _convert_filter, _prepare_query
-from nucliadb.search.search.query_parser.models import CatalogExpression
+from nucliadb.common.catalog.interface import CatalogExpression
+from nucliadb.common.catalog.pg import _convert_filter, _prepare_query
 from nucliadb.search.search.query_parser.parsers import parse_catalog
 from nucliadb_models.filters import CatalogFilterExpression
 from nucliadb_models.search import (

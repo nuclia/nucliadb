@@ -17,23 +17,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from nucliadb.common.catalog.interface import Catalog, CatalogQuery, CatalogResourceData
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb_models.search import CatalogFacetsRequest, Resources
 
-from typing import Optional
 
-from nucliadb_protos.resources_pb2 import Classification
+class DummyCatalog(Catalog):
+    async def update(self, txn: Transaction, kbid: str, rid: str, data: CatalogResourceData):
+        return
 
+    async def delete(self, txn: Transaction, kbid: str, rid: str):
+        return
 
-def labels_to_classifications(
-    labelset: str, labels: list[str], split: Optional[str] = None
-) -> list[Classification]:
-    classifications = []
-    for label in labels:
-        classification = Classification(
-            labelset=labelset,
-            label=label,
-            cancelled_by_user=False,
-        )
-        if split is not None:
-            classification.split = split
-        classifications.append(classification)
-    return classifications
+    async def search(self, query: CatalogQuery) -> Resources:
+        return Resources(results=[], min_score=0.0)
+
+    async def facets(self, kbid: str, request: CatalogFacetsRequest) -> dict[str, int]:
+        return {}
