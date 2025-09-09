@@ -45,7 +45,7 @@ from nucliadb_protos.writer_pb2 import (
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.utilities import get_storage
 from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
+from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
 from tests.utils.vectorsets import add_vectorset
 
@@ -269,7 +269,7 @@ async def test_vectorset_migration(
         source=BrokerMessage.MessageSource.PROCESSOR,
     )
 
-    link_field = FieldBuilder("link", FieldType.LINK)
+    link_field = bmb.field_builder("link", FieldType.LINK)
     text = "Lionel Messi is a football player."
     link_field.with_extracted_text(text)
     link_field.with_extracted_paragraph_metadata(Paragraph(start=0, end=len(text)))
@@ -284,9 +284,8 @@ async def test_vectorset_migration(
         )
     ]
     link_field.with_extracted_vectors(vectors, vectorset="multilingual-2024-05-06")
-    bmb.add_field_builder(link_field)
 
-    title_field = FieldBuilder("title", FieldType.GENERIC)
+    title_field = bmb.field_builder("title", FieldType.GENERIC)
     text = "link"
     title_field.with_extracted_text(text)
     title_field.with_extracted_paragraph_metadata(Paragraph(start=0, end=len(text)))
@@ -301,7 +300,6 @@ async def test_vectorset_migration(
         )
     ]
     title_field.with_extracted_vectors(vectors, vectorset="multilingual-2024-05-06")
-    bmb.add_field_builder(title_field)
     bm = bmb.build()
 
     await inject_message(nucliadb_ingest_grpc, bm)
@@ -613,7 +611,7 @@ async def test_vectorset_migration_split_field(
         rid=rid,
         source=BrokerMessage.MessageSource.PROCESSOR,
     )
-    conv_field = FieldBuilder("conversation", FieldType.CONVERSATION)
+    conv_field = bmb.field_builder("conversation", FieldType.CONVERSATION)
     for idx, (_, _, text) in enumerate(messages):
         split = str(idx + 1)  # split "0" is forbidden
         conv_field.with_extracted_text(text, split=split)
@@ -641,7 +639,6 @@ async def test_vectorset_migration_split_field(
             )
         ]
         conv_field.with_extracted_vectors(vectors, vectorset=old_vectorset_id, split=split)
-    bmb.add_field_builder(conv_field)
     bm = bmb.build()
 
     await inject_message(nucliadb_ingest_grpc, bm)

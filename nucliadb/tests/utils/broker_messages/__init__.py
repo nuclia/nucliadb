@@ -58,6 +58,7 @@ class BrokerMessageBuilder:
 
         if rid is None:
             rid = str(uuid4())
+        self.rid = rid
         self.bm.uuid = rid
 
         if slug is None:
@@ -71,15 +72,18 @@ class BrokerMessageBuilder:
         self._apply_fields()
         return self.bm
 
-    def add_field_builder(self, field: FieldBuilder):
-        self.fields[(field.id.field, field.id.field_type)] = field
-        return field
-
     def field_builder(self, field_id: str, field_type: rpb.FieldType.ValueType) -> FieldBuilder:
+        """Get a field builder for a specific field id and type. If the builder
+        didn't have this field builder, add it and return it.
+
+        """
+        if (field_id, field_type) not in self.fields:
+            field_builder = FieldBuilder(self.rid, field_id, field_type)
+            self.fields[(field_id, field_type)] = field_builder
         return self.fields[(field_id, field_type)]
 
     def with_title(self, title: str) -> FieldBuilder:
-        title_builder = FieldBuilder("title", rpb.FieldType.GENERIC)
+        title_builder = self.field_builder("title", rpb.FieldType.GENERIC)
         title_builder.with_extracted_text(title)
         # we do this to writer BMs in write resource API endpoint
         title_builder.with_extracted_paragraph_metadata(
@@ -90,11 +94,10 @@ class BrokerMessageBuilder:
             )
         )
         self.bm.basic.title = title
-        self.add_field_builder(title_builder)
         return title_builder
 
     def with_summary(self, summary: str) -> FieldBuilder:
-        summary_builder = FieldBuilder("summary", rpb.FieldType.GENERIC)
+        summary_builder = self.field_builder("summary", rpb.FieldType.GENERIC)
         summary_builder.with_extracted_text(summary)
         # we do this to writer BMs in write resource API endpoint
         summary_builder.with_extracted_paragraph_metadata(
@@ -105,7 +108,6 @@ class BrokerMessageBuilder:
             )
         )
         self.bm.basic.summary = summary
-        self.add_field_builder(summary_builder)
         return summary_builder
 
     def with_resource_labels(self, labelset: str, labels: list[str]):

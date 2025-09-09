@@ -18,16 +18,22 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import Optional
+
 from nucliadb_protos.resources_pb2 import Classification
 
 
-def labels_to_classifications(labelset: str, labels: list[str]) -> list[Classification]:
-    classifications = [
-        Classification(
+def labels_to_classifications(
+    labelset: str, labels: list[str], split: Optional[str] = None
+) -> list[Classification]:
+    classifications = []
+    for label in labels:
+        classification = Classification(
             labelset=labelset,
             label=label,
             cancelled_by_user=False,
         )
-        for label in labels
-    ]
+        if split is not None:
+            classification.split = split
+        classifications.append(classification)
     return classifications

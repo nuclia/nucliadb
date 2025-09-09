@@ -32,7 +32,7 @@ from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
+from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import wait_for_sync
 
 
@@ -262,7 +262,7 @@ def prepare_broker_message(
         summary.vector[0],
     )
 
-    field_builder = bmb.add_field_builder(FieldBuilder(text_field.field_id, text_field.field_type))
+    field_builder = bmb.field_builder(text_field.field_id, text_field.field_type)
     field_builder.with_extracted_text(text_field.extracted_text)
     field_builder.with_extracted_paragraph_metadata(
         Paragraph(start=0, end=len(text_field.extracted_text))

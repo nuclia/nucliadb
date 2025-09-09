@@ -25,7 +25,6 @@ import aiohttp
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
 from nucliadb_protos import resources_pb2 as rpb
@@ -34,7 +33,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
+from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import wait_for_sync
 
 
@@ -113,49 +112,37 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     bmb.with_title("Super Mario Bros. Wonder")
     bmb.with_summary("SMB Wonder: the new Mario game from Nintendo")
 
-    field_builder = FieldBuilder("smb-wonder", rpb.FieldType.FILE)
-    paragraphs = [
+    field_builder = bmb.field_builder("smb-wonder", rpb.FieldType.FILE)
+    extracted_text = [
         "Super Mario Bros. Wonder (SMB Wonder) is a 2023 platform game developed and published by Nintendo.\n",  # noqa
         "SMB Wonder is a side-scrolling plaftorm game.\n",
         "As one of eight player characters, the player completes levels across the Flower Kingdom.",  # noqa
     ]
-    field_builder.with_extracted_text("".join(paragraphs))
-    start = 0
-    for paragraph in paragraphs:
-        end = start + len(paragraph)
-        field_builder.with_extracted_paragraph_metadata(rpb.Paragraph(start=start, end=end))
-        start = end
-
-    start = 0
-    end = len(paragraphs[0])
-    paragraph_0_id = f"{rid}/{FIELD_TYPE_PB_TO_STR[rpb.FieldType.FILE]}/smb-wonder/{start}-{end}"
-
-    start = len(paragraphs[0])
-    end = len(paragraphs[0]) + len(paragraphs[1])
-    paragraph_1_id = f"{rid}/{FIELD_TYPE_PB_TO_STR[rpb.FieldType.FILE]}/smb-wonder/{start}-{end}"
+    paragraph_ids = []
+    for paragraph in extracted_text:
+        paragraph_pb = field_builder.add_paragraph(paragraph)
+        paragraph_ids.append(paragraph_pb.key)
 
     question = "What is SMB Wonder?"
     field_builder.add_question_answer(
         question=question,
-        question_paragraph_ids=[paragraph_0_id],
+        question_paragraph_ids=[paragraph_ids[0]],
         answer="SMB Wonder is a side-scrolling Nintendo Switch game",
-        answer_paragraph_ids=[paragraph_0_id, paragraph_1_id],
+        answer_paragraph_ids=[paragraph_ids[0], paragraph_ids[1]],
     )
     field_builder.add_question_answer(
         question=question,
-        question_paragraph_ids=[paragraph_0_id],
+        question_paragraph_ids=[paragraph_ids[0]],
         answer="It's the new Mario game for Nintendo Switch",
-        answer_paragraph_ids=[paragraph_0_id],
+        answer_paragraph_ids=[paragraph_ids[0]],
     )
 
     question = "Give me an example of side-scrolling game"
     field_builder.add_question_answer(
         question=question,
         answer="SMB Wonder game",
-        answer_paragraph_ids=[paragraph_1_id],
+        answer_paragraph_ids=[paragraph_ids[1]],
     )
-
-    bmb.add_field_builder(field_builder)
 
     bm = bmb.build()
 
