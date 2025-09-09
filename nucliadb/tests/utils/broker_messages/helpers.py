@@ -26,7 +26,7 @@ from nucliadb_protos.resources_pb2 import Classification
 def labels_to_classifications(
     labelset: str, labels: list[str], split: Optional[str] = None
 ) -> list[Classification]:
-    classifications: list[Classification] = []
+    classifications = []
     for label in labels:
         classification = Classification(
             labelset=labelset,
@@ -35,4 +35,5 @@ def labels_to_classifications(
         )
         if split is not None:
             classification.split = split
+        classifications.append(classification)
     return classifications
