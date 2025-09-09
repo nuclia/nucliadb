@@ -284,7 +284,7 @@ class AskResult:
             audit_answer = json.dumps(self._object.object).encode("utf-8")
         self.auditor.audit(
             text_answer=audit_answer,
-            reasoning_text=self._reasoning_text,
+            text_reasoning=self._reasoning_text,
             generative_answer_time=self.metrics["stream_predict_answer"],
             generative_answer_first_chunk_time=self.metrics.get_first_chunk_time() or 0,
             generative_reasoning_first_chunk_time=self.metrics.get_first_reasoning_chunk_time(),
@@ -586,7 +586,7 @@ async def ask(
             rephrased_query=rephrased_query,
             retrieval_rephrase_query=err.main_query.rephrased_query if err.main_query else None,
             text_answer=b"",
-            reasoning_text=None,
+            text_reasoning=None,
             status_code=AnswerStatusCode.NO_RETRIEVAL_DATA,
             chat_history=chat_history,
             query_context={},
