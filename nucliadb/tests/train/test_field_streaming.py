@@ -179,12 +179,8 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
         "SMB Wonder is a side-scrolling plaftorm game.\n",
         "As one of eight player characters, the player completes levels across the Flower Kingdom.",  # noqa
     ]
-    field_builder.with_extracted_text("".join(paragraphs))
-    start = 0
     for paragraph in paragraphs:
-        end = start + len(paragraph)
-        field_builder.with_extracted_paragraph_metadata(rpb.Paragraph(start=start, end=end))
-        start = end
+        field_builder.add_paragraph(paragraph)
 
     bm = bmb.build()
 

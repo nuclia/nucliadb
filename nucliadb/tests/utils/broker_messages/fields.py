@@ -22,6 +22,7 @@ import dataclasses
 from datetime import datetime
 from typing import Optional
 
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FieldId, ParagraphId
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2
 
@@ -162,12 +163,79 @@ class FieldBuilder:
             rpb.FieldEntity(text=name, label=klass, positions=positions)
         )
 
-    def with_user_paragraph_labels(self, key: str, labelset: str, labels: list[str]):
-        classifications = labels_to_classifications(labelset, labels)
+    def with_user_paragraph_labels(
+        self, key: str, labelset: str, labels: list[str], split: Optional[str] = None
+    ):
+        classifications = labels_to_classifications(labelset, labels, split)
         pa = rpb.ParagraphAnnotation()
         pa.key = key
         pa.classifications.extend(classifications)
         self._user_metadata.paragraphs.append(pa)
+
+    def add_paragraph(
+        self,
+        text: str,
+        split: Optional[str] = None,
+        kind: rpb.Paragraph.TypeParagraph.ValueType = rpb.Paragraph.TypeParagraph.TEXT,
+        labels: Optional[list[tuple[str, list[str]]]] = None,
+        user_labels: Optional[list[tuple[str, list[str]]]] = None,
+        vectors: Optional[dict[str, list[float]]] = None,
+    ) -> rpb.Paragraph:
+        """Add a single paragraph to the field.
+
+        This adds the paragraph at the end of the extracted text. Repeated calls
+        to this will create a broker message with paragraphs on each part of the
+        extracted text. However, there's nothing restricting the processor to
+        skip parts of the text in their paragraph extraction. In fact, some
+        legacy testing broker messages do this.
+
+        Despite that, we've chosen a simpler behavior for this function.
+
+        """
+
+        if split is None:
+            start = len(self._extracted_text.body.text)
+            self._extracted_text.body.text += text
+        else:
+            start = len(self._extracted_text.body.split_text[split])
+            self._extracted_text.body.split_text[split] += text
+
+        end = start + len(text)
+
+        paragraph = rpb.Paragraph()
+        paragraph.key = ParagraphId(
+            field_id=FieldId(
+                rid=self._rid,
+                key=self.id.field,
+                type=FIELD_TYPE_PB_TO_STR[self.id.field_type],
+                subfield_id=split,
+            ),
+            paragraph_start=start,
+            paragraph_end=end,
+        ).full()
+        paragraph.start = start
+        paragraph.end = end
+        paragraph.text = text
+        paragraph.kind = kind
+
+        if labels is not None:
+            for labelset, labels_ in labels:
+                classifications = labels_to_classifications(labelset, labels_, split)
+                paragraph.classifications.extend(classifications)
+
+        if user_labels is not None:
+            for labelset, labels_ in user_labels:
+                self.with_user_paragraph_labels(paragraph.key, labelset, labels_, split)
+
+        if vectors is not None:
+            for vectorset, vector in vectors.items():
+                vector_pb = utils_pb2.Vector(
+                    start=start, end=end, start_paragraph=start, end_paragraph=end, vector=vector
+                )
+                self.with_extracted_vectors([vector_pb], vectorset, split)
+
+        self.with_extracted_paragraph_metadata(paragraph, split)
+        return paragraph
 
     def add_question_answer(
         self,

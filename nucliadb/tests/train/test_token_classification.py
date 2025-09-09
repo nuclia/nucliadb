@@ -106,13 +106,15 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     summary_field.with_extracted_entity("ORG", "Debian", positions=[Position(start=24, end=30)])
 
     file_field = bmb.field_builder("file", rpb.FieldType.FILE)
-    file_field.with_extracted_text(
-        "My own text Ramon. This is great to be at Nuclia. \n Where is the Generalitat de Catalunya? Eudald Camprubi, do you want to go shooping? This is a test Carmen Iniesta!"  # noqa
-    )
-    file_field.with_extracted_paragraph_metadata(rpb.Paragraph(start=0, end=49))
-    file_field.with_extracted_paragraph_metadata(rpb.Paragraph(start=50, end=90))
-    file_field.with_extracted_paragraph_metadata(rpb.Paragraph(start=91, end=135))
-    file_field.with_extracted_paragraph_metadata(rpb.Paragraph(start=136, end=166))
+
+    extracted_text = [
+        "My own text Ramon. This is great to be at Nuclia.",
+        "\n Where is the Generalitat de Catalunya?",
+        "Eudald Camprubi, do you want to go shooping?",
+        "This is a test Carmen Iniesta!",
+    ]
+    for paragraph in extracted_text:
+        file_field.add_paragraph(paragraph)
 
     bm = bmb.build()
 
