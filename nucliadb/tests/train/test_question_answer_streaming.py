@@ -34,7 +34,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
+from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import wait_for_sync
 
 
@@ -113,7 +113,7 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     bmb.with_title("Super Mario Bros. Wonder")
     bmb.with_summary("SMB Wonder: the new Mario game from Nintendo")
 
-    field_builder = FieldBuilder("smb-wonder", rpb.FieldType.FILE)
+    field_builder = bmb.field_builder("smb-wonder", rpb.FieldType.FILE)
     paragraphs = [
         "Super Mario Bros. Wonder (SMB Wonder) is a 2023 platform game developed and published by Nintendo.\n",  # noqa
         "SMB Wonder is a side-scrolling plaftorm game.\n",
@@ -154,8 +154,6 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
         answer="SMB Wonder game",
         answer_paragraph_ids=[paragraph_1_id],
     )
-
-    bmb.add_field_builder(field_builder)
 
     bm = bmb.build()
 

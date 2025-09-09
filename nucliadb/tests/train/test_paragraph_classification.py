@@ -31,7 +31,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
+from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import wait_for_sync
 
 
@@ -85,7 +85,7 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     bmb.with_summary("Summary of document")
     bmb.with_resource_labels("labelset_resources", ["label_user"])
 
-    file_field = FieldBuilder("file", rpb.FieldType.FILE)
+    file_field = bmb.field_builder("file", rpb.FieldType.FILE)
     file_field.with_extracted_text(
         "My own text Ramon. This is great to be here. \n Where is my beer? Do you want to go shooping? This is a test!"  # noqa
     )
@@ -112,8 +112,6 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     )
 
     file_field.with_extracted_labels("labelset_resources", ["label_machine"])
-
-    bmb.add_field_builder(file_field)
 
     bm = bmb.build()
 

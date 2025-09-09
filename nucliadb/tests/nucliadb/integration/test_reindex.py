@@ -142,13 +142,13 @@ async def create_resource(kbid: str, nucliadb_writer: AsyncClient, nucliadb_inge
 async def broker_resource(kbid: str, rid: str) -> BrokerMessage:
     from nucliadb.tests.vectors import V1, V2, V3
     from nucliadb_protos import resources_pb2 as rpb
-    from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
+    from tests.utils.broker_messages import BrokerMessageBuilder
 
     bmb = BrokerMessageBuilder(kbid=kbid, rid=rid)
     bmb.with_title("Title Resource")
     bmb.with_summary("Summary of document")
 
-    file_field = FieldBuilder("myfile", rpb.FieldType.FILE)
+    file_field = bmb.field_builder("myfile", rpb.FieldType.FILE)
     file_field.with_extracted_text("My own text Ramon. This is great to be here. \n Where is my beer?")
     file_field.with_extracted_paragraph_metadata(
         rpb.Paragraph(
@@ -192,7 +192,6 @@ async def broker_resource(kbid: str, rid: str) -> BrokerMessage:
             ]
             file_field.with_extracted_vectors(vectors, vectorset_id)
 
-    bmb.add_field_builder(file_field)
     bm = bmb.build()
 
     return bm

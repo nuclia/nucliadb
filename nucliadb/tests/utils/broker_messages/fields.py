@@ -49,7 +49,8 @@ class Field:
 
 
 class FieldBuilder:
-    def __init__(self, field: str, field_type: rpb.FieldType.ValueType):
+    def __init__(self, rid: str, field: str, field_type: rpb.FieldType.ValueType):
+        self._rid = rid
         self._field_id = rpb.FieldID(field=field, field_type=field_type)
         self.__extracted_metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
         self.__extracted_text: Optional[rpb.ExtractedTextWrapper] = None
