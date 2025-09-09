@@ -223,16 +223,19 @@ class AskResult:
     async def _stream(self) -> AsyncGenerator[AskResponseItemType, None]:
         # First, stream out the predict answer
         first_chunk_yielded = False
+        first_reasoning_chunk_yielded = False
         with self.metrics.time("stream_predict_answer"):
             async for answer_chunk in self._stream_predict_answer_text():
                 if isinstance(answer_chunk, TextGenerativeResponse):
                     yield AnswerAskResponseItem(text=answer_chunk.text)
+                    if not first_chunk_yielded:
+                        self.metrics.record_first_chunk_yielded()
+                        first_chunk_yielded = True
                 elif isinstance(answer_chunk, ReasoningGenerativeResponse):
                     yield ReasoningAskResponseItem(text=answer_chunk.text)
-
-                if not first_chunk_yielded:
-                    self.metrics.record_first_chunk_yielded()
-                    first_chunk_yielded = True
+                    if not first_reasoning_chunk_yielded:
+                        self.metrics.record_first_reasoning_chunk_yielded()
+                        first_reasoning_chunk_yielded = True
 
         if self._object is not None:
             yield JSONAskResponseItem(object=self._object.object)
@@ -281,8 +284,10 @@ class AskResult:
             audit_answer = json.dumps(self._object.object).encode("utf-8")
         self.auditor.audit(
             text_answer=audit_answer,
+            reasoning_text=self._reasoning_text,
             generative_answer_time=self.metrics["stream_predict_answer"],
             generative_answer_first_chunk_time=self.metrics.get_first_chunk_time() or 0,
+            generative_reasoning_first_chunk_time=self.metrics.get_first_reasoning_chunk_time(),
             rephrase_time=self.metrics.get("rephrase"),
             status_code=self.status_code,
         )
@@ -575,11 +580,13 @@ async def ask(
             origin=origin,
             generative_answer_time=0,
             generative_answer_first_chunk_time=0,
+            generative_reasoning_first_chunk_time=None,
             rephrase_time=metrics.get("rephrase"),
             user_query=user_query,
             rephrased_query=rephrased_query,
             retrieval_rephrase_query=err.main_query.rephrased_query if err.main_query else None,
             text_answer=b"",
+            reasoning_text=None,
             status_code=AnswerStatusCode.NO_RETRIEVAL_DATA,
             chat_history=chat_history,
             query_context={},

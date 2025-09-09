@@ -49,6 +49,10 @@ buckets = [
 ]
 
 generative_first_chunk_histogram = metrics.Histogram(
+    name="generative_reasoning_first_chunk",
+    buckets=buckets,
+)
+reasoning_first_chunk_histogram = metrics.Histogram(
     name="generative_first_chunk",
     buckets=buckets,
 )
@@ -107,12 +111,24 @@ class AskMetrics(Metrics):
         super().__init__(id="ask")
         self.global_start = time.monotonic()
         self.first_chunk_yielded_at: Optional[float] = None
+        self.first_reasoning_chunk_yielded_at: Optional[float] = None
 
     def record_first_chunk_yielded(self):
         self.first_chunk_yielded_at = time.monotonic()
         generative_first_chunk_histogram.observe(self.first_chunk_yielded_at - self.global_start)
 
+    def record_first_reasoning_chunk_yielded(self):
+        self.first_reasoning_chunk_yielded_at = time.monotonic()
+        reasoning_first_chunk_histogram.observe(
+            self.first_reasoning_chunk_yielded_at - self.global_start
+        )
+
     def get_first_chunk_time(self) -> Optional[float]:
         if self.first_chunk_yielded_at is None:
             return None
         return self.first_chunk_yielded_at - self.global_start
+
+    def get_first_reasoning_chunk_time(self) -> Optional[float]:
+        if self.first_reasoning_chunk_yielded_at is None:
+            return None
+        return self.first_reasoning_chunk_yielded_at - self.global_start

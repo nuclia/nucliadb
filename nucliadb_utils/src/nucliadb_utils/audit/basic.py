@@ -87,12 +87,14 @@ class BasicAuditStorage(AuditStorage):
         chat_context: List[ChatContext],
         retrieved_context: List[RetrievedContext],
         answer: Optional[str],
+        reasoning: Optional[str],
         learning_id: Optional[str],
         status_code: int,
         model: Optional[str],
         rephrase_time: Optional[float] = None,
         generative_answer_time: Optional[float] = None,
         generative_answer_first_chunk_time: Optional[float] = None,
+        generative_reasoning_first_chunk_time: Optional[float] = None,
     ):
         logger.debug(f"CHAT {kbid} {user} {origin}")
 
