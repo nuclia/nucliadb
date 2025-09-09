@@ -28,9 +28,9 @@ from multidict import CIMultiDictProxy
 from nuclia_models.predict.generative_responses import (
     GenerativeChunk,
     JSONGenerativeResponse,
+    ReasoningGenerativeResponse,
     StatusGenerativeResponse,
     TextGenerativeResponse,
-    ReasoningGenerativeResponse,
 )
 from pydantic import ValidationError
 
