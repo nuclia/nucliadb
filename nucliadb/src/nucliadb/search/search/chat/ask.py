@@ -236,6 +236,10 @@ class AskResult:
                     if not first_reasoning_chunk_yielded:
                         self.metrics.record_first_reasoning_chunk_yielded()
                         first_reasoning_chunk_yielded = True
+                else:
+                    # This is a trick so mypy generates an error if this branch can be reached,
+                    # that is, if we are missing some ifs
+                    _a: int = "a"
 
         if self._object is not None:
             yield JSONAskResponseItem(object=self._object.object)
