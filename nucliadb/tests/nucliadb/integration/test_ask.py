@@ -85,6 +85,34 @@ async def test_ask(
     assert resp.status_code == 200
 
 
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_reasoning(nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources):
+    predict = get_predict()
+    predict.calls.clear()  # type: ignore
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={
+            "query": "title",
+            "features": ["keyword", "semantic", "relations"],
+            "rag_strategies": [{"name": "field_extension", "fields": ["a/summary"]}],
+            "reasoning": True,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    assert predict.calls[-2][1].reasoning is True  # type: ignore
+    results = parse_ask_response(resp)
+    reasoning = ""
+    answer = ""
+    for item in results:
+        if item.item.type == "reasoning":
+            reasoning += item.item.text
+        elif item.item.type == "answer":
+            answer += item.item.text
+    assert reasoning == "dummy reasoning"
+    assert answer == "valid answer to"
+
+
 @pytest.fixture(scope="function")
 def find_incomplete_results():
     with mock.patch(

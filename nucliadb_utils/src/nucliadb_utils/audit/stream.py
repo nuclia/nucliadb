@@ -425,12 +425,14 @@ class StreamAuditStorage(AuditStorage):
         chat_context: List[ChatContext],
         retrieved_context: List[RetrievedContext],
         answer: Optional[str],
+        reasoning: Optional[str],
         learning_id: Optional[str],
         status_code: int,
         model: Optional[str],
         rephrase_time: Optional[float] = None,
         generative_answer_time: Optional[float] = None,
         generative_answer_first_chunk_time: Optional[float] = None,
+        generative_reasoning_first_chunk_time: Optional[float] = None,
     ):
         rcontext = get_request_context()
         if rcontext is None:
@@ -448,6 +450,8 @@ class StreamAuditStorage(AuditStorage):
             auditrequest.generative_answer_time = generative_answer_time
         if generative_answer_first_chunk_time is not None:
             auditrequest.generative_answer_first_chunk_time = generative_answer_first_chunk_time
+        if generative_reasoning_first_chunk_time is not None:
+            auditrequest.generative_reasoning_first_chunk_time = generative_reasoning_first_chunk_time
 
         if retrieval_rephrased_question is not None:
             auditrequest.retrieval_rephrased_question = retrieval_rephrased_question
@@ -462,6 +466,9 @@ class StreamAuditStorage(AuditStorage):
             auditrequest.chat.rephrased_question = rephrased_question
         if answer is not None:
             auditrequest.chat.answer = answer
+        if reasoning is not None:
+            auditrequest.chat.reasoning = reasoning
+
         auditrequest.chat.status_code = status_code
         if model is not None:
             auditrequest.chat.model = model

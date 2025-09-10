@@ -28,6 +28,7 @@ from multidict import CIMultiDictProxy
 from nuclia_models.predict.generative_responses import (
     GenerativeChunk,
     JSONGenerativeResponse,
+    ReasoningGenerativeResponse,
     StatusGenerativeResponse,
     TextGenerativeResponse,
 )
@@ -140,8 +141,10 @@ async def predict_proxy(
                 client_type=client_type,
                 origin=origin,
                 text_answer=content,
+                text_reasoning=None,
                 generative_answer_time=metrics[PREDICT_ANSWER_METRIC],
                 generative_answer_first_chunk_time=None,
+                generative_reasoning_first_chunk_time=None,
                 status_code=AnswerStatusCode(str(llm_status_code)),
             )
 
@@ -173,23 +176,33 @@ async def chat_streaming_generator(
     is_json: bool,
 ):
     first = True
+    first_reasoning = True
     status_code = AnswerStatusCode.ERROR.value
     text_answer = ""
+    text_reasoning = ""
     json_object = None
     metrics = AskMetrics()
     with metrics.time(PREDICT_ANSWER_METRIC):
         async for chunk in predict_response.content:
-            if first:
-                metrics.record_first_chunk_yielded()
-                first = False
-
             yield chunk
 
             if is_json:
                 try:
                     parsed_chunk = GenerativeChunk.model_validate_json(chunk).chunk
+                    if first and isinstance(
+                        parsed_chunk,
+                        (TextGenerativeResponse, JSONGenerativeResponse, StatusGenerativeResponse),
+                    ):
+                        metrics.record_first_chunk_yielded()
+                        first = False
+
                     if isinstance(parsed_chunk, TextGenerativeResponse):
                         text_answer += parsed_chunk.text
+                    elif isinstance(parsed_chunk, ReasoningGenerativeResponse):
+                        if first_reasoning:
+                            metrics.record_first_reasoning_chunk_yielded()
+                            first_reasoning = False
+                        text_reasoning += parsed_chunk.text
                     elif isinstance(parsed_chunk, JSONGenerativeResponse):
                         json_object = parsed_chunk.object
                     elif isinstance(parsed_chunk, StatusGenerativeResponse):
@@ -218,8 +231,10 @@ async def chat_streaming_generator(
         client_type=client_type,
         origin=origin,
         text_answer=text_answer.encode() if json_object is None else json.dumps(json_object).encode(),
+        text_reasoning=text_reasoning if text_reasoning else None,
         generative_answer_time=metrics[PREDICT_ANSWER_METRIC],
         generative_answer_first_chunk_time=metrics.get_first_chunk_time(),
+        generative_reasoning_first_chunk_time=metrics.get_first_reasoning_chunk_time(),
         status_code=AnswerStatusCode(status_code),
     )
 
@@ -232,8 +247,10 @@ def audit_predict_proxy_endpoint(
     client_type: NucliaDBClientType,
     origin: str,
     text_answer: bytes,
+    text_reasoning: Optional[str],
     generative_answer_time: float,
     generative_answer_first_chunk_time: Optional[float],
+    generative_reasoning_first_chunk_time: Optional[float],
     status_code: AnswerStatusCode,
 ):
     maybe_audit_chat(
@@ -250,8 +267,10 @@ def audit_predict_proxy_endpoint(
         query_context_order={},
         model=headers.get(NUCLIA_LEARNING_MODEL_HEADER),
         text_answer=text_answer,
+        text_reasoning=text_reasoning,
         generative_answer_time=generative_answer_time,
         generative_answer_first_chunk_time=generative_answer_first_chunk_time or 0,
+        generative_reasoning_first_chunk_time=generative_reasoning_first_chunk_time,
         rephrase_time=None,
         status_code=status_code,
     )

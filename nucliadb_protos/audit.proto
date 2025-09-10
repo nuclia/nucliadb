@@ -56,6 +56,7 @@ message ChatAudit {
   optional string learning_id = 5;
   int32 status_code = 9;
   optional string model = 10;
+  optional string reasoning = 11;
 }
 
 enum TaskType {
@@ -118,6 +119,7 @@ message AuditRequest {
   optional string user_request = 27;
   optional string processing_id = 28;
   optional string retrieval_rephrased_question = 29;
+  optional float generative_reasoning_first_chunk_time = 30;
 }
 
 
