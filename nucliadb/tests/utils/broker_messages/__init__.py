@@ -84,28 +84,20 @@ class BrokerMessageBuilder:
 
     def with_title(self, title: str) -> FieldBuilder:
         title_builder = self.field_builder("title", rpb.FieldType.GENERIC)
-        title_builder.with_extracted_text(title)
-        # we do this to writer BMs in write resource API endpoint
-        title_builder.with_extracted_paragraph_metadata(
-            rpb.Paragraph(
-                start=0,
-                end=len(title),
-                kind=rpb.Paragraph.TypeParagraph.TITLE,
-            )
+        title_builder.add_paragraph(
+            text=title,
+            # we do this to writer BMs in write resource API endpoint
+            kind=rpb.Paragraph.TypeParagraph.TITLE,
         )
         self.bm.basic.title = title
         return title_builder
 
     def with_summary(self, summary: str) -> FieldBuilder:
         summary_builder = self.field_builder("summary", rpb.FieldType.GENERIC)
-        summary_builder.with_extracted_text(summary)
-        # we do this to writer BMs in write resource API endpoint
-        summary_builder.with_extracted_paragraph_metadata(
-            rpb.Paragraph(
-                start=0,
-                end=len(summary),
-                kind=rpb.Paragraph.TypeParagraph.DESCRIPTION,
-            )
+        summary_builder.add_paragraph(
+            text=summary,
+            # we do this to writer BMs in write resource API endpoint
+            kind=rpb.Paragraph.TypeParagraph.DESCRIPTION,
         )
         self.bm.basic.summary = summary
         return summary_builder

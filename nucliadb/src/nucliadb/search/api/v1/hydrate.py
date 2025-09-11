@@ -42,6 +42,7 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import Image
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_protos import resources_pb2
+from nucliadb_protos.resources_pb2 import FieldComputedMetadata
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_storage
 
@@ -416,16 +417,22 @@ class Hydrator:
 
         config = self.config.paragraph
 
+        field_id = paragraph_id.field_id
+        field = await resource.get_field(field_id.key, field_id.pb_type)
+
+        field_metadata = await field.get_field_metadata()
+        if field_metadata is None:
+            # we can't hydrate paragraphs for fields that don't have extracted
+            # metadata, as we don't have any information about paragraphs
+            return
+
         if config.text:
             text = await paragraphs.get_paragraph_text(kbid=self.kbid, paragraph_id=paragraph_id)
             hydrated.text = text
 
-        field_id = paragraph_id.field_id
-        field = await resource.get_field(field_id.key, field_id.pb_type)
-
         if field_id not in self.field_paragraphs:
-            index = ParagraphIndex(resource, field_id)
-            await index.build()
+            index = ParagraphIndex()
+            await index.build(field_id, field_metadata)
             self.field_paragraphs[field_id] = index
         field_paragraphs = self.field_paragraphs[field_id]
 
@@ -437,19 +444,21 @@ class Hydrator:
 
                 if config.related.neighbours.before is not None:
                     hydrated.related.neighbours.before = []
-                    for previous_id in field_paragraphs.n_previous(
-                        paragraph_id, config.related.neighbours.before
-                    ):
-                        await self._hydrate_related_paragraph(ParagraphId.from_string(previous_id))
-                        hydrated.related.neighbours.before.insert(0, previous_id)
+                    if config.related.neighbours.before > 0:
+                        for previous_id in field_paragraphs.n_previous(
+                            paragraph_id, config.related.neighbours.before
+                        ):
+                            await self._hydrate_related_paragraph(ParagraphId.from_string(previous_id))
+                            hydrated.related.neighbours.before.insert(0, previous_id)
 
                 if config.related.neighbours.after is not None:
                     hydrated.related.neighbours.after = []
-                    for next_id in field_paragraphs.n_next(
-                        paragraph_id, config.related.neighbours.after
-                    ):
-                        await self._hydrate_related_paragraph(ParagraphId.from_string(next_id))
-                        hydrated.related.neighbours.after.append(next_id)
+                    if config.related.neighbours.after > 0:
+                        for next_id in field_paragraphs.n_next(
+                            paragraph_id, config.related.neighbours.after
+                        ):
+                            await self._hydrate_related_paragraph(ParagraphId.from_string(next_id))
+                            hydrated.related.neighbours.after.append(next_id)
 
             if config.related.parents:
                 hydrated.related.parents = []
@@ -612,39 +621,44 @@ class ParagraphIndex:
 
     """
 
-    def __init__(self, resource: Resource, field_id: FieldId):
-        self.resource = resource
-        self.field_id = field_id
+    NEXT = "next"
+    PREVIOUS = "previous"
+    PARENTS = "parents"
+    SIBLINGS = "siblings"
+    REPLACEMENTS = "replacements"
 
+    def __init__(self) -> None:
         self.paragraphs: dict[str, resources_pb2.Paragraph] = {}
         self.neighbours: dict[tuple[str, str], str] = {}
         self.related: dict[tuple[str, str], list[str]] = {}
 
-    async def build(self):
-        field = await self.resource.get_field(self.field_id.key, self.field_id.pb_type)
-        field_metadata = await field.get_field_metadata()
-        assert field_metadata is not None
+    async def build(self, field_id: FieldId, field_metadata: FieldComputedMetadata):
+        self.paragraphs.clear()
+        self.neighbours.clear()
+        self.related.clear()
 
-        if self.field_id.subfield_id is None:
+        if field_id.subfield_id is None:
             field_paragraphs = field_metadata.metadata.paragraphs
         else:
-            field_paragraphs = field_metadata.split_metadata[self.field_id.subfield_id].paragraphs
+            field_paragraphs = field_metadata.split_metadata[field_id.subfield_id].paragraphs
 
         previous = None
         for paragraph in field_paragraphs:
-            paragraph_id = self.field_id.paragraph_id(paragraph.start, paragraph.end).full()
+            paragraph_id = field_id.paragraph_id(paragraph.start, paragraph.end).full()
             self.paragraphs[paragraph_id] = paragraph
 
             if previous is not None:
-                self.neighbours[(previous, "next")] = paragraph_id
-                self.neighbours[(paragraph_id, "previous")] = previous
+                self.neighbours[(previous, ParagraphIndex.NEXT)] = paragraph_id
+                self.neighbours[(paragraph_id, ParagraphIndex.PREVIOUS)] = previous
             previous = paragraph_id
 
-            self.related[(paragraph_id, "parents")] = [parent for parent in paragraph.relations.parents]
-            self.related[(paragraph_id, "siblings")] = [
+            self.related[(paragraph_id, ParagraphIndex.PARENTS)] = [
+                parent for parent in paragraph.relations.parents
+            ]
+            self.related[(paragraph_id, ParagraphIndex.SIBLINGS)] = [
                 sibling for sibling in paragraph.relations.siblings
             ]
-            self.related[(paragraph_id, "replacements")] = [
+            self.related[(paragraph_id, ParagraphIndex.REPLACEMENTS)] = [
                 replacement for replacement in paragraph.relations.replacements
             ]
 
@@ -654,14 +668,14 @@ class ParagraphIndex:
 
     def previous(self, paragraph_id: Union[str, ParagraphId]) -> Optional[str]:
         paragraph_id = str(paragraph_id)
-        return self.neighbours.get((paragraph_id, "previous"))
+        return self.neighbours.get((paragraph_id, ParagraphIndex.PREVIOUS))
 
     def next(self, paragraph_id: Union[str, ParagraphId]) -> Optional[str]:
         paragraph_id = str(paragraph_id)
-        return self.neighbours.get((paragraph_id, "next"))
+        return self.neighbours.get((paragraph_id, ParagraphIndex.NEXT))
 
     def n_previous(self, paragraph_id: Union[str, ParagraphId], count: int = 1) -> list[str]:
-        assert count >= 1, "can't find negative previous"
+        assert count >= 1, f"can't find negative previous {count}"
         paragraph_id = str(paragraph_id)
         previous: list[str] = []
         current_id = paragraph_id
@@ -675,7 +689,7 @@ class ParagraphIndex:
         return previous
 
     def n_next(self, paragraph_id: Union[str, ParagraphId], count: int = 1) -> list[str]:
-        assert count >= 1, "can't find negative nexts"
+        assert count >= 1, f"can't find negative nexts {count}"
         paragraph_id = str(paragraph_id)
         nexts = []
         current_id = paragraph_id
@@ -690,12 +704,12 @@ class ParagraphIndex:
 
     def parents(self, paragraph_id: Union[str, ParagraphId]) -> list[str]:
         paragraph_id = str(paragraph_id)
-        return self.related.get((paragraph_id, "parents"), [])
+        return self.related.get((paragraph_id, ParagraphIndex.PARENTS), [])
 
     def siblings(self, paragraph_id: Union[str, ParagraphId]) -> list[str]:
         paragraph_id = str(paragraph_id)
-        return self.related.get((paragraph_id, "siblings"), [])
+        return self.related.get((paragraph_id, ParagraphIndex.SIBLINGS), [])
 
     def replacements(self, paragraph_id: Union[str, ParagraphId]) -> list[str]:
         paragraph_id = str(paragraph_id)
-        return self.related.get((paragraph_id, "replacements"), [])
+        return self.related.get((paragraph_id, ParagraphIndex.REPLACEMENTS), [])
