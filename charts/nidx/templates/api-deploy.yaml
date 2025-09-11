@@ -9,7 +9,7 @@ metadata:
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 spec:
-  replicas: 2
+  replicas: {{ .Values.api.replicas | default 2 }}
   selector:
     matchLabels:
       app: nidx-api
@@ -54,6 +54,7 @@ spec:
       containers:
       - name: nidx-api
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["nidx", "api"]
         {{- with .Values.envFrom }}
         envFrom:
