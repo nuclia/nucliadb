@@ -24,7 +24,7 @@ from unittest.mock import AsyncMock, Mock
 from nucliadb.metrics_exporter import (
     run_exporter,
     run_exporter_task,
-    update_migration_metrics,
+    update_kb_metrics,
 )
 
 
@@ -39,18 +39,18 @@ async def test_run_exporter_task():
 
 
 async def test_run_exporter():
-    with mock.patch("nucliadb.metrics_exporter.update_migration_metrics") as update_migration_metrics:
+    with mock.patch("nucliadb.metrics_exporter.update_kb_metrics") as update_kb_metrics:
         context = Mock()
         task = asyncio.create_task(run_exporter(context))
 
         await asyncio.sleep(1)
 
-        update_migration_metrics.assert_called()
+        update_kb_metrics.assert_called()
 
         task.cancel()
 
 
-async def test_update_migration_metrics():
+async def test_update_kb_metrics():
     async def iter_kbids(context):
         yield "foo"
         yield "bar"
@@ -64,6 +64,6 @@ async def test_update_migration_metrics():
                 driver = Mock()
                 context = Mock(kv_driver=driver)
 
-                await update_migration_metrics(context)
+                await update_kb_metrics(context)
 
                 assert migration_count.set.call_count == 2

@@ -37,6 +37,9 @@ MIGRATION_COUNT = metrics.Gauge("nucliadb_migration", labels={"type": "", "versi
 
 PENDING_RESOURCE_COUNT = metrics.Gauge("nucliadb_pending_resources_count")
 
+KBS_COUNT = metrics.Gauge("nucliadb_kbs_count")
+RESOURCES_COUNT = metrics.Gauge("nucliadb_resources_count")
+
 
 async def iter_kbids(context: ApplicationContext) -> AsyncGenerator[str, None]:
     """
@@ -47,9 +50,11 @@ async def iter_kbids(context: ApplicationContext) -> AsyncGenerator[str, None]:
             yield kbid
 
 
-async def update_migration_metrics(context: ApplicationContext):
+async def update_kb_metrics(context: ApplicationContext):
     """
-    Report the global migration version and the number of KBs per migration version.
+    Report metrics at the kb level:
+      - total number of KBs
+      - the global migration version and the number of KBs per migration version.
     """
     # Clear previoulsy set values so that we report only the current state
     MIGRATION_COUNT.gauge.clear()
@@ -60,12 +65,16 @@ async def update_migration_metrics(context: ApplicationContext):
         MIGRATION_COUNT.set(1, labels=dict(type="global", version=str(global_info.current_version)))
 
     version_count: dict[str, int] = {}
+    n_kbs = 0
     async for kbid in iter_kbids(context):
         kb_info = await mdm.get_kb_info(kbid)
         if kb_info is not None:
             current_version = str(kb_info.current_version)
             version_count.setdefault(current_version, 0)
             version_count[current_version] += 1
+            n_kbs += 1
+
+    KBS_COUNT.set(n_kbs)
 
     for version, count in version_count.items():
         MIGRATION_COUNT.set(count, labels=dict(type="kb", version=version))
@@ -88,6 +97,10 @@ async def update_resource_metrics(context: ApplicationContext):
         count = cast(Tuple[int], await cur.fetchone())[0]
         PENDING_RESOURCE_COUNT.set(count)
 
+        await cur.execute("SELECT COUNT(*) FROM catalog")
+        count = cast(Tuple[int], await cur.fetchone())[0]
+        RESOURCES_COUNT.set(count)
+
 
 async def run_exporter_task(context: ApplicationContext, exporter_task: Callable, interval: int):
     """
@@ -109,7 +122,7 @@ async def run_exporter(context: ApplicationContext):
     # Schedule exporter tasks
     tasks = []
     for export_task, interval in [
-        (update_migration_metrics, 60 * 3),
+        (update_kb_metrics, 60 * 3),
         (update_resource_metrics, 60 * 5),
     ]:
         tasks.append(asyncio.create_task(run_exporter_task(context, export_task, interval=interval)))
