@@ -20,7 +20,7 @@
 
 import dataclasses
 from datetime import datetime
-from typing import Optional
+from typing import Iterator, Optional
 
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FieldId, ParagraphId
 from nucliadb_protos import resources_pb2 as rpb
@@ -145,11 +145,15 @@ class FieldBuilder:
         else:
             self._extracted_vectors(vectorset).vectors.split_vectors[split].vectors.extend(vectors)
 
-    def with_extracted_paragraph_metadata(self, paragraph: rpb.Paragraph, split: Optional[str] = None):
+    def with_extracted_paragraph_metadata(
+        self, paragraph: rpb.Paragraph, split: Optional[str] = None
+    ) -> rpb.Paragraph:
         if split is None:
             self._extracted_metadata.metadata.metadata.paragraphs.append(paragraph)
+            return self._extracted_metadata.metadata.metadata.paragraphs[-1]
         else:
             self._extracted_metadata.metadata.split_metadata[split].paragraphs.append(paragraph)
+            return self._extracted_metadata.metadata.split_metadata[split].paragraphs[-1]
 
     def with_extracted_entity(
         self,
@@ -234,8 +238,7 @@ class FieldBuilder:
                 )
                 self.with_extracted_vectors([vector_pb], vectorset, split)
 
-        self.with_extracted_paragraph_metadata(paragraph, split)
-        return paragraph
+        return self.with_extracted_paragraph_metadata(paragraph, split)
 
     def add_question_answer(
         self,
@@ -266,3 +269,12 @@ class FieldBuilder:
         question_answer = rpb.QuestionAnswer(question=question_pb)
         question_answer.answers.append(answer_pb)
         self._question_answers.question_answers.question_answers.question_answer.append(question_answer)
+
+    def iter_paragraphs(self, split: Optional[str] = None) -> Iterator[rpb.Paragraph]:
+        if split is None:
+            paragraphs = self._extracted_metadata.metadata.metadata.paragraphs
+        else:
+            paragraphs = self._extracted_metadata.metadata.split_metadata[split].paragraphs
+
+        for paragraph in paragraphs:
+            yield paragraph
