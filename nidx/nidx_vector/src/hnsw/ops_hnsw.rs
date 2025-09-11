@@ -19,11 +19,11 @@
 //
 
 use bit_set::BitSet;
-use fxhash::FxHashSet;
 use ram_hnsw::*;
 use rand::distributions::Uniform;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
+use rustc_hash::FxHashSet;
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 

@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use fxhash::FxHashMap;
 use ops_hnsw::{Hnsw, Layer};
+use rustc_hash::FxHashMap;
 
 use super::*;
 

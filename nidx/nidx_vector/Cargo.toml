@@ -18,7 +18,7 @@ nidx_protos = { version = "0.1.0", path = "../nidx_protos" }
 tracing = "0.1.40"
 serde = { version = "1.0.210", features = ["derive"] }
 anyhow = "1.0.89"
-fxhash = "0.2.1"
+rustc-hash = "2.1"
 stream-vbyte = "0.4.1"
 fst = "0.4.7"
 bit-vec = "0.8.0"
