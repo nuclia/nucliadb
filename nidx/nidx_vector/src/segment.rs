@@ -71,6 +71,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
     #[cfg(not(target_os = "windows"))]
     {
         index.advise(memmap2::Advice::Random)?;
+        index.advise(memmap2::Advice::WillNeed)?;
     }
 
     let inverted_indexes = InvertedIndexes::open(path, metadata.records)?;
