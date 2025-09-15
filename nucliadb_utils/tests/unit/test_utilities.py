@@ -55,6 +55,7 @@ async def test_get_storage_gcs():
     gcs = AsyncMock()
     with (
         patch.object(utilities.storage_settings, "file_backend", FileBackendConfig("gcs")),
+        patch.object(utilities.storage_settings, "gcs_bucket", "bucket-{kbid}"),
         patch("nucliadb_utils.storages.gcs.GCSStorage", return_value=gcs),
     ):
         assert await utilities.get_storage() == gcs

@@ -20,7 +20,7 @@
 import re
 from concurrent.futures.thread import ThreadPoolExecutor
 from contextlib import ExitStack
-from typing import Any, Iterator, Optional, cast
+from typing import Any, Iterator, Optional
 from unittest.mock import patch
 
 import docker  # type: ignore  # type: ignore
@@ -119,7 +119,7 @@ async def gcs_storage(gcs, gcs_storage_settings: dict[str, Any]):
     storage = GCSStorage(
         url=storage_settings.gcs_endpoint_url,
         account_credentials=storage_settings.gcs_base64_creds,
-        bucket=cast(str, storage_settings.gcs_bucket),
+        bucket=storage_settings.gcs_bucket,  # type: ignore
         location=storage_settings.gcs_location,
         project=storage_settings.gcs_project,
         executor=ThreadPoolExecutor(1),
