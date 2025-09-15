@@ -25,6 +25,11 @@ from typing import Iterator, Optional
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FieldId, ParagraphId
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2
+from nucliadb_utils.storages.azure import AzureStorage
+from nucliadb_utils.storages.gcs import GCSStorage
+from nucliadb_utils.storages.local import LocalStorage
+from nucliadb_utils.storages.s3 import S3Storage
+from nucliadb_utils.utilities import get_storage
 
 from .helpers import labels_to_classifications
 
@@ -40,6 +45,10 @@ class FieldExtracted:
     text: Optional[rpb.ExtractedTextWrapper] = None
     vectors: Optional[list[rpb.ExtractedVectorsWrapper]] = None
     question_answers: Optional[rpb.FieldQuestionAnswerWrapper] = None
+    # only applies to file fields
+    file: Optional[rpb.FileExtractedData] = None
+    # only applies to file fields
+    link: Optional[rpb.LinkExtractedData] = None
 
 
 @dataclasses.dataclass
@@ -50,7 +59,8 @@ class Field:
 
 
 class FieldBuilder:
-    def __init__(self, rid: str, field: str, field_type: rpb.FieldType.ValueType):
+    def __init__(self, kbid: str, rid: str, field: str, field_type: rpb.FieldType.ValueType):
+        self._kbid = kbid
         self._rid = rid
         self._field_id = rpb.FieldID(field=field, field_type=field_type)
         self.__extracted_metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
@@ -58,6 +68,8 @@ class FieldBuilder:
         self.__extracted_vectors: Optional[dict[str, rpb.ExtractedVectorsWrapper]] = None
         self.__user_metadata: Optional[rpb.UserFieldMetadata] = None
         self.__question_answers: Optional[rpb.FieldQuestionAnswerWrapper] = None
+        self.__file: Optional[rpb.FileExtractedData] = None
+        self.__link: Optional[rpb.LinkExtractedData] = None
 
     @property
     def id(self) -> rpb.FieldID:
@@ -103,6 +115,20 @@ class FieldBuilder:
             self.__user_metadata = rpb.UserFieldMetadata(field=self._field_id)
         return self.__user_metadata
 
+    @property
+    def _file(self) -> rpb.FileExtractedData:
+        if self.__file is None:
+            # TODO: what should the field `field` be?
+            self.__file = rpb.FileExtractedData(field=self._field_id.field)
+        return self.__file
+
+    @property
+    def _link(self) -> rpb.LinkExtractedData:
+        if self.__link is None:
+            # TODO: what should the field `field` be?
+            self.__link = rpb.LinkExtractedData()
+        return self.__link
+
     def build(self) -> Field:
         field = Field(id=self._field_id)
 
@@ -120,6 +146,14 @@ class FieldBuilder:
         if self.__question_answers is not None:
             field.extracted.question_answers = rpb.FieldQuestionAnswerWrapper()
             field.extracted.question_answers.CopyFrom(self.__question_answers)
+
+        if self.__file is not None:
+            field.extracted.file = rpb.FileExtractedData()
+            field.extracted.file.CopyFrom(self.__file)
+
+        if self.__link is not None:
+            field.extracted.link = rpb.LinkExtractedData()
+            field.extracted.link.CopyFrom(self.__link)
 
         if self.__user_metadata is not None:
             field.user.metadata = rpb.UserFieldMetadata()
@@ -278,3 +312,61 @@ class FieldBuilder:
 
         for paragraph in paragraphs:
             yield paragraph
+
+    async def add_page_preview(self, page: int, content: bytes):
+        assert self._field_id.field_type == rpb.FieldType.FILE, "only file fields have page previews"
+
+        storage = await get_storage()
+
+        sf = storage.file_extracted(self._kbid, self._rid, "f", "myfile", f"file_pages_previews/{page}")
+        await storage.chunked_upload_object(
+            sf.bucket,
+            sf.key,
+            payload=content,
+            filename=f"file_pages_previews/{page}",
+            content_type="application/pdf",
+        )
+
+        if isinstance(storage, GCSStorage):
+            source = rpb.CloudFile.Source.GCS
+        elif isinstance(storage, S3Storage):
+            source = rpb.CloudFile.Source.S3
+        elif isinstance(storage, AzureStorage):
+            source = rpb.CloudFile.Source.AZURE
+        elif isinstance(storage, LocalStorage):
+            source = rpb.CloudFile.Source.LOCAL
+        else:
+            raise NotImplementedError()
+
+        # REVIEW: probably learning is setting this to the actual name. We could
+        # make sure and use it here
+        cf = rpb.CloudFile(
+            uri=sf.key,
+            filename=f"file_pages_previews/{page}",
+            size=len(content),
+            content_type="application/pdf",
+            source=source,
+        )
+        self._file.file_pages_previews.pages.append(cf)
+        # XXX: adding an empty page but we should be setting a proper start and
+        # end position
+        self._file.file_pages_previews.positions.append(rpb.PagePositions())
+
+        # REVIEW HACK: when it can, learning is also uploading a PNG image from
+        # the page preview to a specific location. Some hydration relies on
+        # finding this images in the bucket, although NucliaDB has absolutely no
+        # knowledge about them.
+        #
+        # As this is a testing utility, we also upload this images to the bucket
+        # so the tests can get them. But the existence of this images **only**
+        # depend on learning
+        sf = storage.file_extracted(
+            self._kbid, self._rid, "f", "myfile", f"generated/extracted_images_{page}.png"
+        )
+        await storage.chunked_upload_object(
+            sf.bucket,
+            sf.key,
+            payload=content,
+            filename=f"generated/extracted_images_{page}.png",
+            content_type="image/png",
+        )

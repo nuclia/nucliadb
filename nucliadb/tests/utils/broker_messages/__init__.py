@@ -78,7 +78,7 @@ class BrokerMessageBuilder:
 
         """
         if (field_id, field_type) not in self.fields:
-            field_builder = FieldBuilder(self.rid, field_id, field_type)
+            field_builder = FieldBuilder(self.bm.kbid, self.rid, field_id, field_type)
             self.fields[(field_id, field_type)] = field_builder
         return self.fields[(field_id, field_type)]
 
@@ -123,13 +123,13 @@ class BrokerMessageBuilder:
         self.bm.basic.created.FromDatetime(datetime.now())
         self.bm.basic.modified.FromDatetime(datetime.now())
 
-    def _default_origin(self):
+    def _default_origin(self) -> None:
         self.bm.origin.source = rpb.Origin.Source.API
         self.bm.origin.source_id = "My Source"
         self.bm.origin.created.FromDatetime(datetime.now())
         self.bm.origin.modified.FromDatetime(datetime.now())
 
-    def _apply_fields(self):
+    def _apply_fields(self) -> None:
         # clear broker message fields before adding data
         self.bm.basic.ClearField("fieldmetadata")
         self.bm.ClearField("field_metadata")
@@ -154,14 +154,18 @@ class BrokerMessageBuilder:
                 file_field.added.FromDatetime(datetime.now())
                 file_field.file.source = rpb.CloudFile.Source.EXTERNAL
 
+                if field.extracted.file is not None:
+                    self.bm.file_extracted_data.append(field.extracted.file)
+
             elif (
                 field.id.field_type == rpb.FieldType.LINK
                 and self.bm.source == wpb.BrokerMessage.MessageSource.PROCESSOR
             ):
-                # we don't need to do anything else
-                pass
-            else:
-                raise Exception("Unsupported field type: {field.id.field_type}")
+                if field.extracted.link is not None:
+                    self.bm.link_extracted_data.append(field.extracted.link)
+
+            else:  # pragma: no cover
+                raise Exception(f"Unsupported field type: {field.id.field_type}")
 
             if field.user.metadata is not None:
                 self.bm.basic.fieldmetadata.append(field.user.metadata)

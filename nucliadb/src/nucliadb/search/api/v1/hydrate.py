@@ -50,8 +50,8 @@ from nucliadb_utils.utilities import get_storage
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/hydrate",
     status_code=200,
-    summary="",  # TODO
-    description="",  # TODO
+    summary="Hydrate a set of paragraphs",
+    description="Internal API endpoint to hydrate a set of paragraphs",
     response_model_exclude_unset=True,
     tags=["Hydration"],
 )
@@ -218,7 +218,30 @@ class HydratedBuilder:
 
         preview_id = f"{page}"
         field.previews[preview_id] = image
-        self._paragraphs[paragraph_id.full()].page_preview = preview_id
+
+        paragraph = self._paragraphs[paragraph_id.full()]
+        assert paragraph.page is not None, "should already be set"
+        paragraph.page.page_preview_ref = preview_id
+
+        return preview_id
+
+    def add_table_page_preview(self, paragraph_id: ParagraphId, page: int, image: Image) -> str:
+        field_id = paragraph_id.field_id
+        field = self._fields[field_id.full()]
+        # TODO: implement link previews
+        assert isinstance(field, hydration_models.HydratedFileField), (
+            f"field type '{field_id.type}' has no preview concept"
+        )
+
+        if field.previews is None:
+            field.previews = {}
+
+        preview_id = f"{page}"
+        field.previews[preview_id] = image
+
+        paragraph = self._paragraphs[paragraph_id.full()]
+        assert paragraph.table is not None, "should already be set"
+        paragraph.table.page_preview_ref = preview_id
 
         return preview_id
 
@@ -381,7 +404,9 @@ class Hydrator:
     async def _hydrate_conversation_field(
         self, resource: Resource, field_id: FieldId
     ) -> hydration_models.HydratedConversationField:
-        raise NotImplementedError()
+        hydrated = self.hydrated.add_field(field_id, FieldTypeName.CONVERSATION)
+        # TODO: implement conversation fields
+        return hydrated
 
     async def _hydrate_generic_field(
         self, resource: Resource, field_id: FieldId
@@ -484,9 +509,19 @@ class Hydrator:
 
         paragraph = field_paragraphs.get(paragraph_id)
         if config.image:
+            if hydrated.image is None:
+                hydrated.image = hydration_models.HydratedParagraphImage()
+
             if config.image.source_image:
                 source_image = paragraph.representation.reference_file
-                if source_image:
+                if (
+                    paragraph.kind
+                    in (
+                        resources_pb2.Paragraph.TypeParagraph.OCR,
+                        resources_pb2.Paragraph.TypeParagraph.INCEPTION,
+                    )
+                    and source_image
+                ):
                     # Paragraphs extracted from an image store its original image
                     # representation in the reference file. The path is incomplete
                     # though, as it's stored in the `generated` folder
@@ -499,9 +534,12 @@ class Hydrator:
                         # assumption. We should check it by ourselves
                         mime_type="image/png",
                     )
-                    hydrated.source_image = image
+                    hydrated.image.source_image = image
 
         if config.page:
+            if hydrated.page is None:
+                hydrated.page = hydration_models.HydratedParagraphPage()
+
             if config.page.page_with_visual:
                 if paragraph.page.page_with_visual:
                     # Paragraphs can be found on pages with visual content. In this
@@ -510,9 +548,12 @@ class Hydrator:
                     page_number = paragraph.page.page
                     preview = await download_page_preview(field, page_number)
                     if preview is not None:
-                        preview_id = self.hydrated.add_page_preview(paragraph_id, page_number, preview)
+                        self.hydrated.add_page_preview(paragraph_id, page_number, preview)
 
         if config.table:
+            if hydrated.table is None:
+                hydrated.table = hydration_models.HydratedParagraphTable()
+
             if config.table.table_page_preview:
                 if paragraph.representation.is_a_table:
                     # When a paragraph comes with a table and table hydration is
@@ -524,9 +565,7 @@ class Hydrator:
                     page_number = paragraph.page.page
                     preview = await download_page_preview(field, page_number)
                     if preview is not None:
-                        # TODO: implement table page previews
-                        preview_id = self.add_table_preview(field_id, page_number, preview)
-                        hydrated.page_preview = preview_id
+                        self.hydrated.add_table_page_preview(paragraph_id, page_number, preview)
 
         return hydrated
 
@@ -554,7 +593,9 @@ class Hydrator:
         return hydrated
 
 
-async def download_image(kbid: str, field_id: FieldId, image_path: str, *, mime_type: str) -> Image:
+async def download_image(
+    kbid: str, field_id: FieldId, image_path: str, *, mime_type: str
+) -> Optional[Image]:
     storage = await get_storage(service_name=SERVICE_NAME)
     sf = storage.file_extracted(
         kbid,
@@ -564,6 +605,8 @@ async def download_image(kbid: str, field_id: FieldId, image_path: str, *, mime_
         image_path,
     )
     raw_image = (await storage.downloadbytes(sf.bucket, sf.key)).getvalue()
+    if not raw_image:
+        return None
     return Image(content_type=mime_type, b64encoded=base64.b64encode(raw_image).decode())
 
 
@@ -597,7 +640,7 @@ async def download_page_preview(field: Field, page: int) -> Optional[Image]:
     elif field_type == FieldTypeName.LINK:
         # TODO: in case of links, we want to return the link preview, that is a
         # link converted to PDF and screenshotted
-        raise NotImplementedError("TODO")
+        image = None
 
     elif (
         field_type == FieldTypeName.TEXT
