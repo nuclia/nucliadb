@@ -432,8 +432,9 @@ class GCSStorage(Storage):
 
     def __init__(
         self,
+        *,
+        bucket: str,
         account_credentials: Optional[str] = None,
-        bucket: Optional[str] = None,
         location: Optional[str] = None,
         project: Optional[str] = None,
         executor: Optional[ThreadPoolExecutor] = None,
@@ -470,7 +471,7 @@ class GCSStorage(Storage):
         self.source = CloudFile.GCS
         self.deadletter_bucket = deadletter_bucket
         self.indexing_bucket = indexing_bucket
-        self.bucket = bucket or ""
+        self.bucket = bucket
         self._location = location
         self._project = project
         # https://cloud.google.com/storage/docs/bucket-locations
@@ -513,7 +514,9 @@ class GCSStorage(Storage):
             logger.exception(f"Could not create bucket {self.indexing_bucket}", exc_info=True)
 
     async def finalize(self):
-        await self._session.close()
+        if self._session is not None:
+            await self._session.close()
+            self._session = None
 
     async def get_access_headers(self):
         if self._credentials is None:
