@@ -74,7 +74,7 @@ RETRIABLE_EXCEPTIONS = (
 
 
 class GCloudBlobStore(BlobStore):
-    session: Optional[aiohttp.ClientSession] = None
+    _session: Optional[aiohttp.ClientSession] = None
     loop = None
     upload_url: str
     object_base_url: str
@@ -83,6 +83,12 @@ class GCloudBlobStore(BlobStore):
     location: str
     project: str
     executor = ThreadPoolExecutor(max_workers=5)
+
+    @property
+    def session(self) -> aiohttp.ClientSession:
+        if self._session is None:  # pragma: no cover
+            raise AttributeError("Session not initialized")
+        return self._session
 
     async def get_access_headers(self):
         if self._credentials is None:
@@ -106,8 +112,9 @@ class GCloudBlobStore(BlobStore):
             return access_token.access_token
 
     async def finalize(self):
-        if self.session is not None:
-            await self.session.close()
+        if self._session is not None:
+            await self._session.close()
+            self._session = None
 
     async def initialize(
         self,
@@ -143,12 +150,9 @@ class GCloudBlobStore(BlobStore):
                 self._credentials = None
 
         loop = asyncio.get_event_loop()
-        self.session = aiohttp.ClientSession(loop=loop, timeout=TIMEOUT)
+        self._session = aiohttp.ClientSession(loop=loop, timeout=TIMEOUT)
 
     async def check_exists(self, bucket_name: str):
-        if self.session is None:
-            raise AttributeError()
-
         headers = await self.get_access_headers()
         # Using object access url instead of bucket access to avoid
         # giving admin permission to the SA, needed to GET a bucket
@@ -163,8 +167,6 @@ class GCloudBlobStore(BlobStore):
         return False
 
     async def create_bucket(self, bucket_name: str):
-        if self.session is None:
-            raise AttributeError()
         headers = await self.get_access_headers()
         url = f"{self.object_base_url}?project={self.project}"
 
@@ -199,10 +201,6 @@ class GCloudFileStorageManager(FileStorageManager):
         _resumable_uri : uri to resumable upload
         _uri : finished uploaded image
         """
-
-        if self.storage.session is None:
-            raise AttributeError()
-
         upload_file_id = dm.get("upload_file_id")
         if upload_file_id is not None:
             await self.delete_upload(upload_file_id, kbid)
@@ -287,8 +285,6 @@ class GCloudFileStorageManager(FileStorageManager):
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4)
     async def _append(self, dm: FileDataManager, data, offset):
-        if self.storage.session is None:
-            raise AttributeError()
         if dm.size:
             size = str(dm.size)
         else:
@@ -353,8 +349,6 @@ class GCloudFileStorageManager(FileStorageManager):
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=4)
     async def finish(self, dm: FileDataManager):
         if dm.size == 0:
-            if self.storage.session is None:
-                raise AttributeError()
             # In case of empty file, we need to send a PUT request with empty body
             # and Content-Range header set to "bytes */0"
             headers = {
