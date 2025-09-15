@@ -23,7 +23,7 @@ from nucliadb_models.search import Image
 from nucliadb_models.security import ResourceSecurity
 
 
-class ResourceHydration(BaseModel):
+class ResourceHydration(BaseModel, extra="forbid"):
     title: bool = Field(
         default=True,
         description="Hydrate resource titles",
@@ -44,7 +44,7 @@ class ResourceHydration(BaseModel):
     )
 
 
-class TextFieldHydration(BaseModel):
+class TextFieldHydration(BaseModel, extra="forbid"):
     value: bool = Field(
         default=False,
         description="Hydrate text field values. Field values are similar payloads to the ones used to create them",
@@ -56,7 +56,7 @@ class TextFieldHydration(BaseModel):
     # TODO: what else should be interesting to add?
 
 
-class FileFieldHydration(BaseModel):
+class FileFieldHydration(BaseModel, extra="forbid"):
     value: bool = Field(
         default=False,
         description="Hydrate file field values. Field values are similar payloads to the ones used to create them",
@@ -68,7 +68,7 @@ class FileFieldHydration(BaseModel):
     # TODO: what else should be interesting to add?
 
 
-class LinkFieldHydration(BaseModel):
+class LinkFieldHydration(BaseModel, extra="forbid"):
     value: bool = Field(
         default=False,
         description="Hydrate link field values. Field values are similar payloads to the ones used to create them",
@@ -80,7 +80,7 @@ class LinkFieldHydration(BaseModel):
     # TODO: what else should be interesting to add?
 
 
-class ConversationFieldHydration(BaseModel):
+class ConversationFieldHydration(BaseModel, extra="forbid"):
     value: bool = Field(
         default=False,
         description="Hydrate conversation field values. Field values are similar payloads to the ones used to create them",
@@ -92,7 +92,7 @@ class ConversationFieldHydration(BaseModel):
     # TODO: what else should be interesting to add?
 
 
-class GenericFieldHydration(BaseModel):
+class GenericFieldHydration(BaseModel, extra="forbid"):
     value: bool = Field(
         default=False,
         description="Hydrate generic field values. Field values are similar payloads to the ones used to create them",
@@ -104,7 +104,7 @@ class GenericFieldHydration(BaseModel):
     # TODO: what else should be interesting to add?
 
 
-class FieldHydration(BaseModel):
+class FieldHydration(BaseModel, extra="forbid"):
     text: Optional[TextFieldHydration] = Field(
         default=None,
         description="Text fields hydration options",
@@ -127,7 +127,7 @@ class FieldHydration(BaseModel):
     )
 
 
-class NeighbourParagraphHydration(BaseModel):
+class NeighbourParagraphHydration(BaseModel, extra="forbid"):
     before: int = Field(
         default=2,
         ge=0,
@@ -140,7 +140,7 @@ class NeighbourParagraphHydration(BaseModel):
     )
 
 
-class RelatedParagraphHydration(BaseModel):
+class RelatedParagraphHydration(BaseModel, extra="forbid"):
     neighbours: Optional[NeighbourParagraphHydration] = Field(
         default=None,
         description="Hydrate extra paragraphs that surround the original one",
@@ -163,7 +163,7 @@ class RelatedParagraphHydration(BaseModel):
     replacements: bool = False
 
 
-class ImageParagraphHydration(BaseModel):
+class ImageParagraphHydration(BaseModel, extra="forbid"):
     # The source image is also known as reference or reference_file in the
     # paragraph context. The reference/reference_file is the filename of the
     # source image from which the paragraph has been extracted
@@ -176,7 +176,7 @@ class ImageParagraphHydration(BaseModel):
     )
 
 
-class TableParagraphHydration(BaseModel):
+class TableParagraphHydration(BaseModel, extra="forbid"):
     # TODO: implement. ARAG uses the label "/k/table" to check whether a
     # paragraph is or a table or not. We can also use info on maindb
     table_page_preview: bool = Field(
@@ -185,7 +185,7 @@ class TableParagraphHydration(BaseModel):
     )
 
 
-class ParagraphPageHydration(BaseModel):
+class ParagraphPageHydration(BaseModel, extra="forbid"):
     # For some field types (file and link) learning generates previews. A
     # preview is a PDF file representing the content. For a docx for example, is
     # the PDF equivalent. Depending on the field type, the preview can
@@ -200,7 +200,7 @@ class ParagraphPageHydration(BaseModel):
     )
 
 
-class ParagraphHydration(BaseModel):
+class ParagraphHydration(BaseModel, extra="forbid"):
     text: bool = Field(
         default=True,
         description="Hydrate paragraph text",
@@ -228,7 +228,7 @@ class ParagraphHydration(BaseModel):
     )
 
 
-class Hydration(BaseModel):
+class Hydration(BaseModel, extra="forbid"):
     resource: ResourceHydration = Field(
         default_factory=ResourceHydration,
         description="Resource hydration options",
@@ -243,7 +243,7 @@ class Hydration(BaseModel):
     )
 
 
-class HydrateRequest(BaseModel):
+class HydrateRequest(BaseModel, extra="forbid"):
     data: list[str]
     hydration: Hydration
 
@@ -251,7 +251,7 @@ class HydrateRequest(BaseModel):
 ### Response models
 
 
-class HydratedResource(BaseModel):
+class HydratedResource(BaseModel, extra="forbid"):
     id: str = Field(description="Unique resource id")
     slug: str = Field(description="Resource slug")
 
@@ -265,15 +265,15 @@ class HydratedResource(BaseModel):
     # TODO: add resource labels to hydrated resources
 
 
-class FieldExtractedData(BaseModel):
+class FieldExtractedData(BaseModel, extra="forbid"):
     text: Optional[str] = None
 
 
-class SplitFieldExtractedData(BaseModel):
+class SplitFieldExtractedData(BaseModel, extra="forbid"):
     texts: Optional[dict[str, str]] = None
 
 
-class HydratedTextField(BaseModel):
+class HydratedTextField(BaseModel, extra="forbid"):
     id: str = Field("Unique field id")
     resource: str = Field("Field resource id")
     field_type: FieldTypeName = FieldTypeName.TEXT
@@ -282,7 +282,7 @@ class HydratedTextField(BaseModel):
     extracted: Optional[FieldExtractedData] = None
 
 
-class HydratedFileField(BaseModel):
+class HydratedFileField(BaseModel, extra="forbid"):
     id: str = Field("Unique field id")
     resource: str = Field("Field resource id")
     field_type: FieldTypeName = FieldTypeName.FILE
@@ -304,7 +304,7 @@ class HydratedFileField(BaseModel):
     )
 
 
-class HydratedLinkField(BaseModel):
+class HydratedLinkField(BaseModel, extra="forbid"):
     id: str = Field("Unique field id")
     resource: str = Field("Field resource id")
     field_type: FieldTypeName = FieldTypeName.LINK
@@ -313,7 +313,7 @@ class HydratedLinkField(BaseModel):
     extracted: Optional[FieldExtractedData] = None
 
 
-class HydratedConversationField(BaseModel):
+class HydratedConversationField(BaseModel, extra="forbid"):
     id: str = Field("Unique field id")
     resource: str = Field("Field resource id")
     field_type: FieldTypeName = FieldTypeName.CONVERSATION
@@ -322,7 +322,7 @@ class HydratedConversationField(BaseModel):
     extracted: Optional[FieldExtractedData] = None
 
 
-class HydratedGenericField(BaseModel):
+class HydratedGenericField(BaseModel, extra="forbid"):
     id: str = Field("Unique field id")
     resource: str = Field("Field resource id")
     field_type: FieldTypeName = FieldTypeName.TEXT
@@ -331,19 +331,55 @@ class HydratedGenericField(BaseModel):
     extracted: Optional[FieldExtractedData] = None
 
 
-class RelatedNeighbourParagraphRefs(BaseModel):
+class RelatedNeighbourParagraphRefs(BaseModel, extra="forbid"):
     before: Optional[list[str]] = None
     after: Optional[list[str]] = None
 
 
-class RelatedParagraphRefs(BaseModel):
+class RelatedParagraphRefs(BaseModel, extra="forbid"):
     neighbours: Optional[RelatedNeighbourParagraphRefs] = None
     parents: Optional[list[str]] = None
     siblings: Optional[list[str]] = None
     replacements: Optional[list[str]] = None
 
 
-class HydratedParagraph(BaseModel):
+class HydratedParagraphImage(BaseModel, extra="forbid"):
+    source_image: Optional[Image] = Field(
+        default=None,
+        description=(
+            "Source image for this paragraph. This only applies to paragraphs "
+            "extracted from an image using OCR or inception, and if this "
+            "hydration option has been enabled in the request"
+        ),
+    )
+
+
+class HydratedParagraphTable(BaseModel, extra="forbid"):
+    page_preview_ref: Optional[str] = Field(
+        default=None,
+        description=(
+            "Referento to the page preview for this paragraph. The actual "
+            "preview will be found in the previews of its field. This only "
+            "applies to paragraphs generated from a table and if the "
+            "corresponding hydration option has been enabled in the request"
+        ),
+    )
+
+
+class HydratedParagraphPage(BaseModel, extra="forbid"):
+    page_preview_ref: Optional[str] = Field(
+        default=None,
+        description=(
+            "Reference to the page preview for this paragraph. The actual "
+            "preview will be found in the previews of its field. This only "
+            "applies to paragraphs extracted from a page containing visual "
+            "content and if the corresponding hydration option has been enabled "
+            "in the request"
+        ),
+    )
+
+
+class HydratedParagraph(BaseModel, extra="forbid"):
     id: str = Field(description="Unique paragraph id")
     field: str = Field(description="Paragraph field id")
     resource: str = Field(description="Paragraph resource id")
@@ -355,26 +391,12 @@ class HydratedParagraph(BaseModel):
 
     related: Optional[RelatedParagraphRefs] = None
 
-    source_image: Optional[Image] = Field(
-        default=None,
-        description=(
-            "Source image for this paragraph. This only applies to paragraphs "
-            "extracted from an image using OCR, inception or other techniques "
-            "and if this hydration option has been enabled in the request"
-        ),
-    )
-
-    page_preview: Optional[str] = Field(
-        default=None,
-        description=(
-            "Reference to its field page preview. This only applies to "
-            "paragraphs extracted from a page containing visual content and if "
-            "this hydration option has been enabled in the request"
-        ),
-    )
+    image: Optional[HydratedParagraphImage] = None
+    table: Optional[HydratedParagraphTable] = None
+    page: Optional[HydratedParagraphPage] = None
 
 
-class Hydrated(BaseModel):
+class Hydrated(BaseModel, extra="forbid"):
     resources: dict[str, HydratedResource]
     fields: dict[
         str,

@@ -394,6 +394,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         key: str,
         payload: bytes,
         filename: str = "payload",
+        # REVIEW: this default may be settings file without content type
         content_type: str = "",
     ):
         """

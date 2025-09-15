@@ -19,6 +19,7 @@
 #
 
 import asyncio
+import base64
 from dataclasses import dataclass
 from typing import AsyncIterable
 
@@ -29,8 +30,10 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 from nucliadb_models import hydration
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.hydration import Hydrated
+from nucliadb_protos import resources_pb2
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldType
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_utils.utilities import get_storage
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import wait_for_sync
@@ -325,6 +328,134 @@ async def test_hydration_related_paragraphs(
     assert f"{rid}/t/mytext/214-281" in hydrated.paragraphs
 
 
+@pytest.mark.deploy_modes("standalone")
+async def test_hydration_paragraph_source_image__WIP(
+    nucliadb_reader: AsyncClient,
+    hydration_kb: HydrationKb,
+):
+    kbid = hydration_kb.kbid
+    rid = hydration_kb.rid
+
+    # a list of hardcoded ids to hydrate. These are taken from the broker
+    # message data. Changing the broker message will probably affect these:
+    paragraph_ids = [
+        # inception paragraph
+        f"{rid}/f/myfile/0-29",
+    ]
+
+    resp = await nucliadb_reader.post(
+        f"/{KB_PREFIX}/{kbid}/hydrate",
+        json={
+            "data": paragraph_ids,
+            "hydration": hydration.Hydration(
+                paragraph=hydration.ParagraphHydration(
+                    image=hydration.ImageParagraphHydration(
+                        source_image=True,
+                    ),
+                )
+            ).model_dump(),
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    hydrated = Hydrated.model_validate(body)
+
+    assert hydrated.paragraphs[f"{rid}/f/myfile/0-29"].image.source_image.content_type == "image/png"  # type: ignore[union-attr]
+    assert (
+        hydrated.paragraphs[f"{rid}/f/myfile/0-29"].image.source_image.b64encoded  # type: ignore[union-attr]
+        == base64.b64encode(b"delicious cookies image").decode()
+    )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_hydration_paragraph_table_page_preview__WIP(
+    nucliadb_reader: AsyncClient,
+    hydration_kb: HydrationKb,
+):
+    kbid = hydration_kb.kbid
+    rid = hydration_kb.rid
+
+    # a list of hardcoded ids to hydrate. These are taken from the broker
+    # message data. Changing the broker message will probably affect these:
+    paragraph_ids = [
+        # table paragraph
+        f"{rid}/f/myfile/29-75",
+    ]
+
+    resp = await nucliadb_reader.post(
+        f"/{KB_PREFIX}/{kbid}/hydrate",
+        json={
+            "data": paragraph_ids,
+            "hydration": hydration.Hydration(
+                paragraph=hydration.ParagraphHydration(
+                    table=hydration.TableParagraphHydration(
+                        table_page_preview=True,
+                    ),
+                    page=hydration.ParagraphPageHydration(
+                        page_with_visual=True,
+                    ),
+                )
+            ).model_dump(),
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    hydrated = Hydrated.model_validate(body)
+
+    assert hydrated.paragraphs[f"{rid}/f/myfile/29-75"].image is None
+    assert hydrated.paragraphs[f"{rid}/f/myfile/29-75"].table.page_preview_ref == "1"  # type: ignore[union-attr,index]
+
+    assert hydrated.fields[f"{rid}/f/myfile"].previews is not None  # type: ignore[union-attr]
+    assert hydrated.fields[f"{rid}/f/myfile"].previews["1"].content_type == "image/png"  # type: ignore[union-attr,index]
+    assert (
+        hydrated.fields[f"{rid}/f/myfile"].previews["1"].b64encoded  # type: ignore[union-attr,index]
+        == base64.b64encode(b"A page with a table with ingredients and quantities").decode()
+    )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_hydration_paragraph_page_preview__WIP(
+    nucliadb_reader: AsyncClient,
+    hydration_kb: HydrationKb,
+):
+    kbid = hydration_kb.kbid
+    rid = hydration_kb.rid
+
+    # a list of hardcoded ids to hydrate. These are taken from the broker
+    # message data. Changing the broker message will probably affect these:
+    paragraph_ids = [
+        # table paragraph
+        f"{rid}/f/myfile/75-125",
+    ]
+
+    resp = await nucliadb_reader.post(
+        f"/{KB_PREFIX}/{kbid}/hydrate",
+        json={
+            "data": paragraph_ids,
+            "hydration": hydration.Hydration(
+                paragraph=hydration.ParagraphHydration(
+                    page=hydration.ParagraphPageHydration(
+                        page_with_visual=True,
+                    )
+                )
+            ).model_dump(),
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    hydrated = Hydrated.model_validate(body)
+
+    assert hydrated.paragraphs[f"{rid}/f/myfile/75-125"].page is not None
+    assert hydrated.paragraphs[f"{rid}/f/myfile/75-125"].page.page_preview_ref == "1"  # type: ignore[union-attr]
+
+    assert hydrated.fields[f"{rid}/f/myfile"].previews is not None  # type: ignore[union-attr]
+    assert hydrated.fields[f"{rid}/f/myfile"].previews["1"].content_type == "image/png"  # type: ignore[union-attr,index]
+    assert (
+        hydrated.fields[f"{rid}/f/myfile"].previews["1"].b64encoded  # type: ignore[union-attr,index]
+        == base64.b64encode(b"A page with a table with ingredients and quantities").decode()
+    )
+
+
 @pytest.fixture
 async def hydration_kb(
     nucliadb_reader: AsyncClient,
@@ -352,6 +483,22 @@ async def hydration_kb(
                     "testers",
                 ]
             },
+            "texts": {
+                "mytext": {
+                    "body": "Replaced text",
+                    "format": "PLAIN",
+                },
+            },
+            "files": {
+                "myfile": {
+                    "language": "en",
+                    "file": {
+                        "filename": "cookies.pdf",
+                        "content_type": "application/pdf",
+                        "payload": base64.b64encode(b"some content we're not going to check").decode(),
+                    },
+                }
+            },
         },
     )
     assert resp.status_code == 201
@@ -363,7 +510,7 @@ async def hydration_kb(
     bmb = BrokerMessageBuilder(
         kbid=kbid, rid=rid, slug=slug, source=BrokerMessage.MessageSource.PROCESSOR
     )
-    bm = cookies_broker_message(bmb)
+    bm = await cookies_broker_message(bmb)
 
     # customize fields we don't want to overwrite from the writer BM
     bm.origin.url = "my://url"
@@ -376,11 +523,12 @@ async def hydration_kb(
     yield HydrationKb(kbid=kbid, rid=rid, slug=slug)
 
 
-def cookies_broker_message(bmb: BrokerMessageBuilder) -> BrokerMessage:
+async def cookies_broker_message(bmb: BrokerMessageBuilder) -> BrokerMessage:
     """Given an empty broker message builder, construct a fairly complete broker
     message.
 
     """
+    storage = await get_storage()
 
     title_field = bmb.with_title("A tale of cookies")
     bmb.with_summary("Once upon a time, cookies were made...")
@@ -407,5 +555,60 @@ def cookies_broker_message(bmb: BrokerMessageBuilder) -> BrokerMessage:
     paragraph_pbs[1].relations.siblings.append(paragraph_pbs[0].key)
 
     paragraph_pbs[1].relations.replacements.extend([paragraph_pbs[2].key, paragraph_pbs[3].key])
+
+    ## Add a file field with some visual content, pages and a table
+
+    file_field = bmb.field_builder("myfile", FieldType.FILE)
+
+    paragraph_pb = file_field.add_paragraph(
+        "A yummy image of some cookies",
+        kind=resources_pb2.Paragraph.TypeParagraph.INCEPTION,
+    )
+    paragraph_pb.representation.reference_file = "cookies.png"
+
+    # upload an source "image" for this paragraph
+    sf = storage.file_extracted(bmb.bm.kbid, bmb.bm.uuid, "f", "myfile", "generated/cookies.png")
+    await storage.chunked_upload_object(sf.bucket, sf.key, payload=b"delicious cookies image")
+
+    paragraph_pb.page.page = 0
+    paragraph_pb.page.page_with_visual = True
+    await file_field.add_page_preview(
+        page=0,
+        content=b"A page with an image of cookies",
+    )
+
+    # add a table.
+
+    paragraph_pb = file_field.add_paragraph(
+        "|Ingredient|Quantity|\n|Peanut butter|100g|\n...",
+        kind=resources_pb2.Paragraph.TypeParagraph.TABLE,
+    )
+    paragraph_pb.representation.is_a_table = True
+    paragraph_pb.representation.reference_file = "ingredients_table.png"
+
+    # unused right now, but this would be the source image for the table
+    sf = storage.file_extracted(
+        bmb.bm.kbid, bmb.bm.uuid, "f", "myfile", "generated/ingredients_table.png"
+    )
+    await storage.chunked_upload_object(sf.bucket, sf.key, payload=b"ingredients table")
+
+    paragraph_pb.page.page = 1
+    paragraph_pb.page.page_with_visual = True
+    await file_field.add_page_preview(
+        page=1,
+        content=b"A page with a table with ingredients and quantities",
+    )
+
+    # add a normal paragraph in the same page
+    paragraph_pb = file_field.add_paragraph("Above you can see a table with all the ingredients")
+
+    paragraph_pb.page.page = 1
+    paragraph_pb.page.page_with_visual = True
+
+    # TODO
+    # link_field = bmb.field_builder("mylink", FieldType.LINK)
+
+    # TODO
+    # conversation_field = bmb.field_builder("myconversation", FieldType.CONVERSATION)
 
     return bmb.build()
