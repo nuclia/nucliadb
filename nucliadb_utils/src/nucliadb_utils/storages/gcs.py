@@ -43,7 +43,6 @@ from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import (
     CouldNotCopyNotFound,
-    CouldNotCreateBucket,
     InvalidOffset,
     ResumableUploadGone,
 )
@@ -97,7 +96,6 @@ RETRIABLE_EXCEPTIONS = (
     aiohttp.client_exceptions.ClientOSError,
     aiohttp.client_exceptions.ServerConnectionError,
     aiohttp.client_exceptions.ServerDisconnectedError,
-    CouldNotCreateBucket,
     socket.gaierror,
 )
 
@@ -131,9 +129,6 @@ class GCSStorageField(StorageField):
         origin_bucket_name: str,
         destination_bucket_name: str,
     ):
-        if self.storage.session is None:
-            raise AttributeError()
-
         url = "{}/{}/o/{}/rewriteTo/b/{}/o/{}".format(
             self.storage.object_base_url,
             origin_bucket_name,
@@ -231,9 +226,6 @@ class GCSStorageField(StorageField):
 
         cf: New file to upload
         """
-        if self.storage.session is None:
-            raise AttributeError()
-
         if self.field is not None and self.field.upload_uri != "":
             # If there is a temporal url
             await self.storage.delete_upload(self.field.upload_uri, self.field.bucket_name)
@@ -308,10 +300,6 @@ class GCSStorageField(StorageField):
     async def _append(self, cf: CloudFile, data: bytes):
         if self.field is None:
             raise AttributeError()
-
-        if self.storage.session is None:
-            raise AttributeError()
-
         # size = 0 ==> size may be unset, as 0 is the default protobuffer value
         # Makes no sense to assume a file with size = 0 in upload
         if cf.size > 0:
@@ -394,8 +382,6 @@ class GCSStorageField(StorageField):
         Existence can be checked either with a CloudFile data in the field attribute
         or own StorageField key and bucket. Field takes precendece
         """
-        if self.storage.session is None:
-            raise AttributeError()
         key = None
         bucket = None
         if self.field is not None and self.field.uri != "":
@@ -439,7 +425,7 @@ class GCSStorageField(StorageField):
 
 class GCSStorage(Storage):
     field_klass = GCSStorageField
-    session: Optional[aiohttp.ClientSession] = None
+    _session: Optional[aiohttp.ClientSession] = None
     _credentials = None
     _json_credentials = None
     chunk_size = CHUNK_SIZE
@@ -484,7 +470,7 @@ class GCSStorage(Storage):
         self.source = CloudFile.GCS
         self.deadletter_bucket = deadletter_bucket
         self.indexing_bucket = indexing_bucket
-        self.bucket = bucket
+        self.bucket = bucket or ""
         self._location = location
         self._project = project
         # https://cloud.google.com/storage/docs/bucket-locations
@@ -492,7 +478,7 @@ class GCSStorage(Storage):
         self._executor = executor
         self._upload_url = url + "/upload/storage/v1/b/{bucket}/o"
         self.object_base_url = url + "/storage/v1/b"
-        self._client = None
+        self._session = None
 
     def _get_access_token(self):
         if self._credentials.expired or self._credentials.valid is False:
@@ -501,11 +487,17 @@ class GCSStorage(Storage):
 
         return self._credentials.token
 
+    @property
+    def session(self) -> aiohttp.ClientSession:
+        if self._session is None:  # pragma: no cover
+            raise AttributeError("Session not initialized, call initialize first")
+        return self._session
+
     @storage_ops_observer.wrap({"type": "initialize"})
     async def initialize(self):
         loop = asyncio.get_event_loop()
 
-        self.session = aiohttp.ClientSession(
+        self._session = aiohttp.ClientSession(
             loop=loop, connector=aiohttp.TCPConnector(ttl_dns_cache=60 * 5), timeout=TIMEOUT
         )
         try:
@@ -521,7 +513,7 @@ class GCSStorage(Storage):
             logger.exception(f"Could not create bucket {self.indexing_bucket}", exc_info=True)
 
     async def finalize(self):
-        await self.session.close()
+        await self._session.close()
 
     async def get_access_headers(self):
         if self._credentials is None:
@@ -538,8 +530,6 @@ class GCSStorage(Storage):
     )
     @storage_ops_observer.wrap({"type": "delete"})
     async def delete_upload(self, uri: str, bucket_name: str):
-        if self.session is None:
-            raise AttributeError()
         if uri:
             url = "{}/{}/o/{}".format(self.object_base_url, bucket_name, quote_plus(uri))
             headers = await self.get_access_headers()
@@ -557,9 +547,6 @@ class GCSStorage(Storage):
 
     @storage_ops_observer.wrap({"type": "check_bucket_exists"})
     async def check_exists(self, bucket_name: str):
-        if self.session is None:
-            raise AttributeError()
-
         headers = await self.get_access_headers()
         # Using object access url instead of bucket access to avoid
         # giving admin permission to the SA, needed to GET a bucket
@@ -573,10 +560,14 @@ class GCSStorage(Storage):
                 return True
         return False
 
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
+    @storage_ops_observer.wrap({"type": "create_bucket"})
     async def create_bucket(self, bucket_name: str, kbid: Optional[str] = None):
-        if self.session is None:
-            raise AttributeError()
-
         if await self.check_exists(bucket_name=bucket_name):
             return
 
@@ -586,10 +577,7 @@ class GCSStorage(Storage):
         labels = deepcopy(self._bucket_labels)
         if kbid is not None:
             labels["kbid"] = kbid.lower()
-        await self._create_bucket(url, headers, bucket_name, labels)
 
-    @storage_ops_observer.wrap({"type": "create_bucket"})
-    async def _create_bucket(self, url, headers, bucket_name, labels):
         async with self.session.post(
             url,
             headers=headers,
@@ -605,20 +593,12 @@ class GCSStorage(Storage):
                 },
             },
         ) as resp:
-            if resp.status != 200:  # pragma: no cover
-                logger.info(f"Creation of bucket error: {resp.status}")
-                text = await resp.text()
-                logger.info(f"Bucket : {bucket_name}")
-                logger.info(f"Location : {self._location}")
-                logger.info(f"Labels : {labels}")
-                logger.info(f"URL : {url}")
-                logger.info(text)
-
-                raise CouldNotCreateBucket(text)
+            if resp.status == 200:
+                return
+            text = await resp.text()
+            raise GoogleCloudException(f"Bucket creation failed with status {resp.status}: {text}")
 
     def get_bucket_name(self, kbid: str):
-        if self.bucket is None:
-            raise AttributeError()
         bucket_name = self.bucket.format(
             kbid=kbid,
         )
@@ -631,13 +611,12 @@ class GCSStorage(Storage):
             await self.create_bucket(bucket_name, kbid)
             created = True
         except Exception as e:
+            errors.capture_exception(e)
             logger.exception(f"Could not create bucket {kbid}", exc_info=e)
         return created
 
     @storage_ops_observer.wrap({"type": "schedule_delete"})
     async def schedule_delete_kb(self, kbid: str):
-        if self.session is None:
-            raise AttributeError()
         bucket_name = self.get_bucket_name(kbid)
         headers = await self.get_access_headers()
         url = f"{self.object_base_url}/{bucket_name}?fields=lifecycle"
@@ -664,8 +643,6 @@ class GCSStorage(Storage):
 
     @storage_ops_observer.wrap({"type": "delete"})
     async def delete_kb(self, kbid: str) -> tuple[bool, bool]:
-        if self.session is None:
-            raise AttributeError()
         bucket_name = self.get_bucket_name(kbid)
         headers = await self.get_access_headers()
         url = f"{self.object_base_url}/{bucket_name}"
@@ -694,8 +671,6 @@ class GCSStorage(Storage):
     async def iterate_objects(
         self, bucket: str, prefix: str, start: Optional[str] = None
     ) -> AsyncGenerator[ObjectInfo, None]:
-        if self.session is None:
-            raise AttributeError()
         url = "{}/{}/o".format(self.object_base_url, bucket)
         headers = await self.get_access_headers()
         params = {"prefix": prefix}
@@ -743,8 +718,6 @@ class GCSStorage(Storage):
         """
         Put an object in the storage without any metadata.
         """
-        if self.session is None:  # pragma: no cover
-            raise AttributeError()
         bucket_upload_url = self._upload_url.format(bucket=bucket_name)
         url = f"{bucket_upload_url}?uploadType=media&name={quote_plus(key)}"
         headers = await self.get_access_headers()
