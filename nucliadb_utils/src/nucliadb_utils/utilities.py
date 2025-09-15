@@ -155,6 +155,9 @@ async def _create_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
     elif storage_settings.file_backend == FileBackendConfig.GCS:
         from nucliadb_utils.storages.gcs import GCSStorage
 
+        if storage_settings.gcs_bucket is None:
+            raise ConfigurationError("GCS_BUCKET env var not configured")
+
         gcsutil = GCSStorage(
             url=storage_settings.gcs_endpoint_url,
             account_credentials=storage_settings.gcs_base64_creds,

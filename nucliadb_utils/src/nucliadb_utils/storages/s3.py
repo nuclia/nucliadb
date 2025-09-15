@@ -522,6 +522,12 @@ async def bucket_exists(client: AioSession, bucket_name: str) -> bool:
     return exists
 
 
+@backoff.on_exception(
+    backoff.expo,
+    RETRIABLE_EXCEPTIONS,
+    jitter=backoff.random_jitter,
+    max_tries=MAX_TRIES,
+)
 async def create_bucket(
     client: AioSession,
     bucket_name: str,
