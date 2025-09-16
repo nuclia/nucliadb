@@ -135,7 +135,7 @@ class Resource:
         await self.txn.set(new_key, self.uuid.encode())
 
     # Basic
-    async def get_basic(self) -> Optional[PBBasic]:
+    async def get_basic(self) -> PBBasic:
         if self.basic is None:
             basic = await datamanagers.resources.get_basic(self.txn, kbid=self.kb.kbid, rid=self.uuid)
             self.basic = basic if basic is not None else PBBasic()

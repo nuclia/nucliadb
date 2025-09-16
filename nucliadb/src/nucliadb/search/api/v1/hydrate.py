@@ -289,16 +289,15 @@ class Hydrator:
         return self.hydrated.build()
 
     async def _hydrate_resource(self, resource: Resource, rid: str):
-        await resource.get_basic()
-        assert resource.basic is not None
+        basic = await resource.get_basic()
 
-        slug = resource.basic.slug
+        slug = basic.slug
         hydrated = self.hydrated.add_resource(rid, slug)
 
         if self.config.resource.title:
-            hydrated.title = resource.basic.title
+            hydrated.title = basic.title
         if self.config.resource.summary:
-            hydrated.summary = resource.basic.summary
+            hydrated.summary = basic.summary
 
         if self.config.resource.security:
             security = await resource.get_security()
