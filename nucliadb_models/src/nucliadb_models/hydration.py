@@ -229,7 +229,7 @@ class ParagraphHydration(BaseModel, extra="forbid"):
 
 
 class Hydration(BaseModel, extra="forbid"):
-    resource: ResourceHydration = Field(
+    resource: Optional[ResourceHydration] = Field(
         default_factory=ResourceHydration,
         description="Resource hydration options",
     )

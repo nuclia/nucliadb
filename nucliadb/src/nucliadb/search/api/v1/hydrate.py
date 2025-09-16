@@ -276,8 +276,8 @@ class Hydrator:
                     db_resources[rid] = resource
                 resource = db_resources[rid]
 
-                if rid not in self.hydrated.resources:
-                    await self._hydrate_resource(resource, rid)
+                if rid not in self.hydrated.resources and self.config.resource is not None:
+                    await self._hydrate_resource(resource, rid, self.config.resource)
 
                 if field_id.full() not in self.hydrated.fields:
                     await self._hydrate_field(resource, field_id)
@@ -288,25 +288,27 @@ class Hydrator:
 
         return self.hydrated.build()
 
-    async def _hydrate_resource(self, resource: Resource, rid: str):
+    async def _hydrate_resource(
+        self, resource: Resource, rid: str, config: hydration_models.ResourceHydration
+    ):
         basic = await resource.get_basic()
 
         slug = basic.slug
         hydrated = self.hydrated.add_resource(rid, slug)
 
-        if self.config.resource.title:
+        if config.title:
             hydrated.title = basic.title
-        if self.config.resource.summary:
+        if config.summary:
             hydrated.summary = basic.summary
 
-        if self.config.resource.security:
+        if config.security:
             security = await resource.get_security()
             hydrated.security = ResourceSecurity(access_groups=[])
             if security is not None:
                 for group_id in security.access_groups:
                     hydrated.security.access_groups.append(group_id)
 
-        if self.config.resource.origin:
+        if config.origin:
             origin = await resource.get_origin()
             if origin is not None:
                 # TODO: we want a better hydration than proto to JSON
@@ -318,26 +320,26 @@ class Hydrator:
         field_type = FIELD_TYPE_STR_TO_NAME[field_id.type]
 
         if field_type == FieldTypeName.TEXT:
-            if not self.config.field.text:
+            if not self.config.field.text is not None:
                 return
             await self._hydrate_text_field(resource, field_id, self.config.field.text)
 
-        elif field_type == FieldTypeName.FILE:
+        elif field_type == FieldTypeName.FILE is not None:
             if not self.config.field.file:
                 return
             await self._hydrate_file_field(resource, field_id, self.config.field.file)
 
-        elif field_type == FieldTypeName.LINK:
+        elif field_type == FieldTypeName.LINK is not None:
             if not self.config.field.link:
                 return
             await self._hydrate_link_field(resource, field_id, self.config.field.link)
 
-        elif field_type == FieldTypeName.CONVERSATION:
+        elif field_type == FieldTypeName.CONVERSATION is not None:
             if not self.config.field.conversation:
                 return
             await self._hydrate_conversation_field(resource, field_id, self.config.field.conversation)
 
-        elif field_type == FieldTypeName.GENERIC:
+        elif field_type == FieldTypeName.GENERIC is not None:
             if not self.config.field.generic:
                 return
             await self._hydrate_generic_field(resource, field_id, self.config.field.generic)
