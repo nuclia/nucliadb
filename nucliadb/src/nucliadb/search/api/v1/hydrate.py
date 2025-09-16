@@ -52,6 +52,7 @@ from nucliadb_utils.utilities import get_storage
     status_code=200,
     summary="Hydrate a set of paragraphs",
     description="Internal API endpoint to hydrate a set of paragraphs",
+    include_in_schema=False,
     response_model_exclude_unset=True,
     tags=["Hydration"],
 )
