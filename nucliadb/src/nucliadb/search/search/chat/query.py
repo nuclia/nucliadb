@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from itertools import chain
 from typing import Iterable, Optional, Union
 
 from nidx_protos.nodereader_pb2 import (
@@ -41,6 +42,7 @@ from nucliadb.search.utilities import get_predict
 from nucliadb_models import filters
 from nucliadb_models.search import (
     AskRequest,
+    AugmentedContext,
     ChatContextMessage,
     ChatOptions,
     FindOptions,
@@ -319,6 +321,7 @@ def maybe_audit_chat(
     chat_history: list[ChatContextMessage],
     query_context: PromptContext,
     query_context_order: PromptContextOrder,
+    augmented_context: AugmentedContext,
     learning_id: Optional[str],
     model: Optional[str],
 ):
@@ -332,11 +335,15 @@ def maybe_audit_chat(
         audit_pb2.ChatContext(author=message.author, text=message.text) for message in chat_history
     ]
 
-    # Append paragraphs retrieved on this chat
     chat_retrieved_context = [
-        audit_pb2.RetrievedContext(text_block_id=paragraph_id, text=text)
-        for paragraph_id, text in query_context.items()
+        audit_pb2.RetrievedContext(text_block_id=id, text=text)
+        for id, text in chain(augmented_context.paragraphs.items(), augmented_context.fields.items())
     ]
+    if not chat_retrieved_context:
+        chat_retrieved_context = [
+            audit_pb2.RetrievedContext(text_block_id=paragraph_id, text=text)
+            for paragraph_id, text in query_context.items()
+        ]
 
     audit.chat(
         kbid,
@@ -387,6 +394,7 @@ class ChatAuditor:
         learning_id: Optional[str],
         query_context: PromptContext,
         query_context_order: PromptContextOrder,
+        augmented_context: AugmentedContext,
         model: Optional[str],
     ):
         self.kbid = kbid
@@ -400,6 +408,7 @@ class ChatAuditor:
         self.learning_id = learning_id
         self.query_context = query_context
         self.query_context_order = query_context_order
+        self.augmented_context = augmented_context
         self.model = model
 
     def audit(
@@ -430,6 +439,7 @@ class ChatAuditor:
             chat_history=self.chat_history,
             query_context=self.query_context,
             query_context_order=self.query_context_order,
+            augmented_context=self.augmented_context,
             learning_id=self.learning_id or "unknown",
             model=self.model,
         )

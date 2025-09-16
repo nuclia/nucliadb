@@ -681,6 +681,7 @@ async def ask(
         learning_id=nuclia_learning_id,
         query_context=prompt_context,
         query_context_order=prompt_context_order,
+        augmented_context=augmented_context,
         model=nuclia_learning_model,
     )
     return AskResult(
