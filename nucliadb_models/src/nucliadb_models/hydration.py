@@ -294,12 +294,11 @@ class HydratedFileField(BaseModel, extra="forbid"):
         default=None,
         title="Previews of specific parts of the field",
         description=(
-            "Field previews will be different depending on the field type. For "
-            "example, a preview for a PDF will be an image of a single page, "
-            "while a preview of a link will be a screenshot of the webpage. Here, "
-            "some previews will be populated according to the hydration options "
-            "requested Here, some previews will be populated according to the "
-            "hydration options requested."
+            "Previews for specific pages of this field. Previews are differents"
+            "depending on the file type. For example, for a PDF file, a preview"
+            "will be an image of a single page."
+            "In this field, previews will be populated according to the hydration"
+            "options requested."
         ),
     )
 
