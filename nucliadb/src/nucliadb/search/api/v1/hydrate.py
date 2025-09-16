@@ -188,7 +188,7 @@ class HydratedBuilder:
                 field_type=field_type,
             )
 
-        else:
+        else:  # pragma: no cover
             # This is a trick so mypy generates an error if this branch can be reached,
             # that is, if we are missing some ifs
             _a: int = "a"
@@ -332,7 +332,7 @@ class Hydrator:
         elif field_type == FieldTypeName.GENERIC:
             await self._hydrate_generic_field(resource, field_id)
 
-        else:
+        else:  # pragma: no cover
             # This is a trick so mypy generates an error if this branch can be reached,
             # that is, if we are missing some ifs
             _a: int = "a"
@@ -650,7 +650,7 @@ async def download_page_preview(field: Field, page: int) -> Optional[Image]:
         # these fields don't have previews
         image = None
 
-    else:
+    else:  # pragma: no cover
         # This is a trick so mypy generates an error if this branch can be reached,
         # that is, if we are missing some ifs
         _a: int = "a"
