@@ -318,19 +318,29 @@ class Hydrator:
         field_type = FIELD_TYPE_STR_TO_NAME[field_id.type]
 
         if field_type == FieldTypeName.TEXT:
-            await self._hydrate_text_field(resource, field_id)
+            if not self.config.field.text:
+                return
+            await self._hydrate_text_field(resource, field_id, self.config.field.text)
 
         elif field_type == FieldTypeName.FILE:
-            await self._hydrate_file_field(resource, field_id)
+            if not self.config.field.file:
+                return
+            await self._hydrate_file_field(resource, field_id, self.config.field.file)
 
         elif field_type == FieldTypeName.LINK:
-            await self._hydrate_link_field(resource, field_id)
+            if not self.config.field.link:
+                return
+            await self._hydrate_link_field(resource, field_id, self.config.field.link)
 
         elif field_type == FieldTypeName.CONVERSATION:
-            await self._hydrate_conversation_field(resource, field_id)
+            if not self.config.field.conversation:
+                return
+            await self._hydrate_conversation_field(resource, field_id, self.config.field.conversation)
 
         elif field_type == FieldTypeName.GENERIC:
-            await self._hydrate_generic_field(resource, field_id)
+            if not self.config.field.generic:
+                return
+            await self._hydrate_generic_field(resource, field_id, self.config.field.generic)
 
         else:  # pragma: no cover
             # This is a trick so mypy generates an error if this branch can be reached,
@@ -338,14 +348,12 @@ class Hydrator:
             _a: int = "a"
 
     async def _hydrate_text_field(
-        self, resource: Resource, field_id: FieldId
+        self,
+        resource: Resource,
+        field_id: FieldId,
+        config: hydration_models.TextFieldHydration,
     ) -> hydration_models.HydratedTextField:
         hydrated = self.hydrated.add_field(field_id, FieldTypeName.TEXT)
-
-        if not self.config.field.text:
-            return hydrated
-
-        config = self.config.field.text
 
         if config.extracted_text:
             field_text = await hydrate_field_text(self.kbid, field_id)
@@ -356,14 +364,12 @@ class Hydrator:
         return hydrated
 
     async def _hydrate_file_field(
-        self, resource: Resource, field_id: FieldId
+        self,
+        resource: Resource,
+        field_id: FieldId,
+        config: hydration_models.FileFieldHydration,
     ) -> hydration_models.HydratedFileField:
         hydrated = self.hydrated.add_field(field_id, FieldTypeName.FILE)
-
-        if not self.config.field.file:
-            return hydrated
-
-        config = self.config.field.file
 
         if config.value:
             field = await resource.get_field(field_id.key, field_id.pb_type)
@@ -379,14 +385,12 @@ class Hydrator:
         return hydrated
 
     async def _hydrate_link_field(
-        self, resource: Resource, field_id: FieldId
+        self,
+        resource: Resource,
+        field_id: FieldId,
+        config: hydration_models.LinkFieldHydration,
     ) -> hydration_models.HydratedLinkField:
         hydrated = self.hydrated.add_field(field_id, FieldTypeName.LINK)
-
-        if not self.config.field.link:
-            return hydrated
-
-        config = self.config.field.link
 
         if config.value:
             field = await resource.get_field(field_id.key, field_id.pb_type)
@@ -402,21 +406,22 @@ class Hydrator:
         return hydrated
 
     async def _hydrate_conversation_field(
-        self, resource: Resource, field_id: FieldId
+        self,
+        resource: Resource,
+        field_id: FieldId,
+        config: hydration_models.ConversationFieldHydration,
     ) -> hydration_models.HydratedConversationField:
         hydrated = self.hydrated.add_field(field_id, FieldTypeName.CONVERSATION)
         # TODO: implement conversation fields
         return hydrated
 
     async def _hydrate_generic_field(
-        self, resource: Resource, field_id: FieldId
+        self,
+        resource: Resource,
+        field_id: FieldId,
+        config: hydration_models.GenericFieldHydration,
     ) -> hydration_models.HydratedGenericField:
         hydrated = self.hydrated.add_field(field_id, FieldTypeName.GENERIC)
-
-        if not self.config.field.generic:
-            return hydrated
-
-        config = self.config.field.generic
 
         if config.value:
             field = await resource.get_field(field_id.key, field_id.pb_type)
