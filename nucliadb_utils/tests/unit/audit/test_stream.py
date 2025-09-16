@@ -167,3 +167,5 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
     assert pb.chat.chat_context[0].text == "epa"
     assert pb.chat.retrieved_context[0].text_block_id == "some/id/path"
     assert pb.chat.retrieved_context[0].text == "epa"
+    assert pb.generative_answer_first_chunk_time == 1
+    assert pb.generative_reasoning_first_chunk_time == 1
