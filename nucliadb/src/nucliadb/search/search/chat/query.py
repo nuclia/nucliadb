@@ -321,7 +321,7 @@ def maybe_audit_chat(
     chat_history: list[ChatContextMessage],
     query_context: PromptContext,
     query_context_order: PromptContextOrder,
-    augmented_context: AugmentedContext,
+    augmented_context: Optional[AugmentedContext],
     learning_id: Optional[str],
     model: Optional[str],
 ):
@@ -335,10 +335,15 @@ def maybe_audit_chat(
         audit_pb2.ChatContext(author=message.author, text=message.text) for message in chat_history
     ]
 
-    chat_retrieved_context = [
-        audit_pb2.RetrievedContext(text_block_id=id, text=text)
-        for id, text in chain(augmented_context.paragraphs.items(), augmented_context.fields.items())
-    ]
+    chat_retrieved_context = (
+        [
+            audit_pb2.RetrievedContext(text_block_id=value.id, text=value.text)
+            for _, value in chain(augmented_context.paragraphs.items(), augmented_context.fields.items())
+        ]
+        if augmented_context is not None
+        else []
+    )
+
     if not chat_retrieved_context:
         chat_retrieved_context = [
             audit_pb2.RetrievedContext(text_block_id=paragraph_id, text=text)

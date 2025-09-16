@@ -264,6 +264,7 @@ def audit_predict_proxy_endpoint(
         chat_history=[],
         learning_id=headers.get(NUCLIA_LEARNING_ID_HEADER),
         query_context={},
+        augmented_context=None,
         query_context_order={},
         model=headers.get(NUCLIA_LEARNING_MODEL_HEADER),
         text_answer=text_answer,

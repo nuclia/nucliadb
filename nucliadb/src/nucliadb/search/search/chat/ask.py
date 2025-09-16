@@ -594,6 +594,7 @@ async def ask(
             status_code=AnswerStatusCode.NO_RETRIEVAL_DATA,
             chat_history=chat_history,
             query_context={},
+            augmented_context=None,
             query_context_order={},
             learning_id=None,
             model=ask_request.generative_model,
