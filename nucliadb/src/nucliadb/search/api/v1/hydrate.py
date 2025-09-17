@@ -24,15 +24,13 @@ from fastapi import Request, Response
 from fastapi_versioning import version
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_NAME, FieldId, ParagraphId
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.ingest.serialize import get_orm_resource
 from nucliadb.search import SERVICE_NAME
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.search import paragraphs
+from nucliadb.search.search import cache, paragraphs
 from nucliadb.search.search.cache import request_caches
 from nucliadb.search.search.hydrator import hydrate_field_text
 from nucliadb_models import hydration as hydration_models
@@ -253,32 +251,31 @@ class Hydrator:
         self.field_paragraphs: dict[FieldId, ParagraphIndex] = {}
 
     async def hydrate(self, paragraph_ids: list[str]) -> Hydrated:
-        driver = get_driver()
-        db_resources = {}
-        async with driver.ro_transaction() as txn:
-            for raw_paragraph_id in paragraph_ids:
-                # TODO if we accept user ids, we must validate them
+        # TODO: implement paragraph id dedup
+        for raw_paragraph_id in paragraph_ids:
+            try:
                 paragraph_id = ParagraphId.from_string(raw_paragraph_id)
-                field_id = paragraph_id.field_id
-                rid = paragraph_id.rid
+            except ValueError:
+                # skip paragraphs with invalid format
+                continue
 
-                if rid not in db_resources:
-                    resource = await get_orm_resource(txn, self.kbid, rid, service_name=SERVICE_NAME)
-                    if resource is None:
-                        # skip resources that aren't in the DB
-                        continue
-                    db_resources[rid] = resource
-                resource = db_resources[rid]
+            field_id = paragraph_id.field_id
+            rid = paragraph_id.rid
 
-                if rid not in self.hydrated.resources and self.config.resource is not None:
-                    await self._hydrate_resource(resource, rid, self.config.resource)
+            resource = await cache.get_resource(self.kbid, rid)
+            if resource is None:
+                # skip resources that aren't in the DB
+                continue
 
-                if field_id.full() not in self.hydrated.fields:
-                    await self._hydrate_field(resource, field_id)
+            if rid not in self.hydrated.resources and self.config.resource is not None:
+                await self._hydrate_resource(resource, rid, self.config.resource)
 
-                # We can't skip paragraphs as we may have found a paragraph due
-                # to a relation but, as a match, we'll hydrate more information
-                await self._hydrate_paragraph(resource, paragraph_id)
+            if field_id.full() not in self.hydrated.fields:
+                await self._hydrate_field(resource, field_id)
+
+            # We can't skip paragraphs as we may have found a paragraph due
+            # to a relation but, as a match, we'll hydrate more information
+            await self._hydrate_paragraph(resource, paragraph_id)
 
         return self.hydrated.build()
 
