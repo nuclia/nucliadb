@@ -251,8 +251,7 @@ class Hydrator:
         self.field_paragraphs: dict[FieldId, ParagraphIndex] = {}
 
     async def hydrate(self, paragraph_ids: list[str]) -> Hydrated:
-        # TODO: implement paragraph id dedup
-        for raw_paragraph_id in paragraph_ids:
+        for raw_paragraph_id in set(paragraph_ids):
             try:
                 paragraph_id = ParagraphId.from_string(raw_paragraph_id)
             except ValueError:
