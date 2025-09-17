@@ -88,6 +88,7 @@ async def predict_proxy(
     predict_headers = predict.get_predict_headers(kbid)
     user_headers = {k: v for k, v in headers.items() if k.capitalize() in ALLOWED_HEADERS}
 
+    metrics = AskMetrics()
     # Proxy the request to predict API
     predict_response = await predict.make_request(
         method=method,
@@ -111,6 +112,7 @@ async def predict_proxy(
                 origin=origin,
                 user_query=user_query,
                 is_json="json" in (media_type or ""),
+                metrics=metrics,
             )
         else:
             streaming_generator = predict_response.content.iter_any()
@@ -121,7 +123,6 @@ async def predict_proxy(
             media_type=media_type,
         )
     else:
-        metrics = AskMetrics()
         with metrics.time(PREDICT_ANSWER_METRIC):
             content = await predict_response.read()
 
@@ -174,6 +175,7 @@ async def chat_streaming_generator(
     origin: str,
     user_query: str,
     is_json: bool,
+    metrics: AskMetrics,
 ):
     first = True
     first_reasoning = True
@@ -181,11 +183,9 @@ async def chat_streaming_generator(
     text_answer = ""
     text_reasoning = ""
     json_object = None
-    metrics = AskMetrics()
     with metrics.time(PREDICT_ANSWER_METRIC):
         async for chunk in predict_response.content:
             yield chunk
-
             if is_json:
                 try:
                     parsed_chunk = GenerativeChunk.model_validate_json(chunk).chunk
@@ -214,6 +214,9 @@ async def chat_streaming_generator(
                     )
             else:
                 text_answer += chunk.decode()
+                if first:
+                    metrics.record_first_chunk_yielded()
+                    first = False
 
     if is_json is False and chunk:  # Ensure chunk is not empty before decoding
         # If response is text the status_code comes at the last chunk of data
