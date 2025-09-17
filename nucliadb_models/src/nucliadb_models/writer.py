@@ -36,7 +36,7 @@ from nucliadb_models.utils import FieldIdPattern, FieldIdString, SlugString
 
 
 class FieldDefaults:
-    title = Field(None, title="Title")
+    title = Field(None, title="Title", max_length=2048)
     summary = Field(None, title="Summary")
     slug = Field(
         None,
