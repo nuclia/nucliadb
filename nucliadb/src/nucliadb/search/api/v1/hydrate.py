@@ -319,26 +319,46 @@ class Hydrator:
 
         if field_type == FieldTypeName.TEXT:
             if not self.config.field.text is not None:
+                # REVIEW: we still need to add the field, as a paragraph can
+                # trigger hydration of some part of it even if it has no
+                # specific hydration
+                self.hydrated.add_field(field_id, field_type)
                 return
             await self._hydrate_text_field(resource, field_id, self.config.field.text)
 
         elif field_type == FieldTypeName.FILE is not None:
             if not self.config.field.file:
+                # REVIEW: we still need to add the field, as a paragraph can
+                # trigger hydration of some part of it even if it has no
+                # specific hydration
+                self.hydrated.add_field(field_id, field_type)
                 return
             await self._hydrate_file_field(resource, field_id, self.config.field.file)
 
         elif field_type == FieldTypeName.LINK is not None:
             if not self.config.field.link:
+                # REVIEW: we still need to add the field, as a paragraph can
+                # trigger hydration of some part of it even if it has no
+                # specific hydration
+                self.hydrated.add_field(field_id, field_type)
                 return
             await self._hydrate_link_field(resource, field_id, self.config.field.link)
 
         elif field_type == FieldTypeName.CONVERSATION is not None:
             if not self.config.field.conversation:
+                # REVIEW: we still need to add the field, as a paragraph can
+                # trigger hydration of some part of it even if it has no
+                # specific hydration
+                self.hydrated.add_field(field_id, field_type)
                 return
             await self._hydrate_conversation_field(resource, field_id, self.config.field.conversation)
 
         elif field_type == FieldTypeName.GENERIC is not None:
             if not self.config.field.generic:
+                # REVIEW: we still need to add the field, as a paragraph can
+                # trigger hydration of some part of it even if it has no
+                # specific hydration
+                self.hydrated.add_field(field_id, field_type)
                 return
             await self._hydrate_generic_field(resource, field_id, self.config.field.generic)
 
