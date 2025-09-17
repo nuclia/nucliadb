@@ -206,13 +206,13 @@ class HydratedBuilder:
         self._paragraphs[paragraph_id.full()] = hydrated
         return hydrated
 
-    def add_page_preview(self, paragraph_id: ParagraphId, page: int, image: Image) -> str:
+    def add_page_preview(self, paragraph_id: ParagraphId, page: int, image: Image):
         field_id = paragraph_id.field_id
         field = self._fields[field_id.full()]
-        # TODO: implement link previews
-        assert isinstance(field, hydration_models.HydratedFileField), (
-            f"field type '{field_id.type}' has no preview concept"
-        )
+
+        if not isinstance(field, hydration_models.HydratedFileField):
+            # Other field types have no page preview concept
+            return
 
         if field.previews is None:
             field.previews = {}
@@ -224,15 +224,13 @@ class HydratedBuilder:
         assert paragraph.page is not None, "should already be set"
         paragraph.page.page_preview_ref = preview_id
 
-        return preview_id
-
-    def add_table_page_preview(self, paragraph_id: ParagraphId, page: int, image: Image) -> str:
+    def add_table_page_preview(self, paragraph_id: ParagraphId, page: int, image: Image):
         field_id = paragraph_id.field_id
         field = self._fields[field_id.full()]
-        # TODO: implement link previews
-        assert isinstance(field, hydration_models.HydratedFileField), (
-            f"field type '{field_id.type}' has no preview concept"
-        )
+
+        if not isinstance(field, hydration_models.HydratedFileField):
+            # Other field types have no page preview concept
+            return
 
         if field.previews is None:
             field.previews = {}
@@ -243,8 +241,6 @@ class HydratedBuilder:
         paragraph = self._paragraphs[paragraph_id.full()]
         assert paragraph.table is not None, "should already be set"
         paragraph.table.page_preview_ref = preview_id
-
-        return preview_id
 
 
 class Hydrator:
@@ -272,7 +268,9 @@ class Hydrator:
 
                 if rid not in db_resources:
                     resource = await get_orm_resource(txn, self.kbid, rid, service_name=SERVICE_NAME)
-                    assert resource is not None
+                    if resource is None:
+                        # skip resources that aren't in the DB
+                        continue
                     db_resources[rid] = resource
                 resource = db_resources[rid]
 
@@ -359,9 +357,9 @@ class Hydrator:
 
         if config.extracted_text:
             field_text = await hydrate_field_text(self.kbid, field_id)
-            assert field_text is not None
-            (_, text) = field_text
-            hydrated.extracted = hydration_models.FieldExtractedData(text=text)
+            if field_text is not None:
+                (_, text) = field_text
+                hydrated.extracted = hydration_models.FieldExtractedData(text=text)
 
         return hydrated
 
@@ -380,9 +378,9 @@ class Hydrator:
 
         if config.extracted_text:
             field_text = await hydrate_field_text(self.kbid, field_id)
-            assert field_text is not None
-            (_, text) = field_text
-            hydrated.extracted = hydration_models.FieldExtractedData(text=text)
+            if field_text is not None:
+                (_, text) = field_text
+                hydrated.extracted = hydration_models.FieldExtractedData(text=text)
 
         return hydrated
 
@@ -401,9 +399,9 @@ class Hydrator:
 
         if config.extracted_text:
             field_text = await hydrate_field_text(self.kbid, field_id)
-            assert field_text is not None
-            (_, text) = field_text
-            hydrated.extracted = hydration_models.FieldExtractedData(text=text)
+            if field_text is not None:
+                (_, text) = field_text
+                hydrated.extracted = hydration_models.FieldExtractedData(text=text)
 
         return hydrated
 
@@ -432,9 +430,9 @@ class Hydrator:
 
         if config.extracted_text:
             field_text = await hydrate_field_text(self.kbid, field_id)
-            assert field_text is not None
-            (_, text) = field_text
-            hydrated.extracted = hydration_models.FieldExtractedData(text=text)
+            if field_text is not None:
+                (_, text) = field_text
+                hydrated.extracted = hydration_models.FieldExtractedData(text=text)
 
         return hydrated
 
