@@ -251,9 +251,9 @@ class Hydrator:
         self.field_paragraphs: dict[FieldId, ParagraphIndex] = {}
 
     async def hydrate(self, paragraph_ids: list[str]) -> Hydrated:
-        for raw_paragraph_id in set(paragraph_ids):
+        for user_paragraph_id in set(paragraph_ids):
             try:
-                paragraph_id = ParagraphId.from_string(raw_paragraph_id)
+                paragraph_id = ParagraphId.from_string(user_paragraph_id)
             except ValueError:
                 # skip paragraphs with invalid format
                 continue
