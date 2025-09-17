@@ -460,131 +460,133 @@ class Hydrator:
         config = self.config.paragraph
 
         field_id = paragraph_id.field_id
+        # TODO: double check this is resilient with unexistent fields
         field = await resource.get_field(field_id.key, field_id.pb_type)
-
-        field_metadata = await field.get_field_metadata()
-        if field_metadata is None:
-            # we can't hydrate paragraphs for fields that don't have extracted
-            # metadata, as we don't have any information about paragraphs
-            return
 
         if config.text:
             text = await paragraphs.get_paragraph_text(kbid=self.kbid, paragraph_id=paragraph_id)
             hydrated.text = text
 
-        if field_id not in self.field_paragraphs:
-            index = ParagraphIndex()
-            await index.build(field_id, field_metadata)
-            self.field_paragraphs[field_id] = index
-        field_paragraphs = self.field_paragraphs[field_id]
+        # hydration that requires the paragraph to actually exist in our metadata
+        if config.image or config.table or config.page or config.related:
+            field_metadata = await field.get_field_metadata()
+            if field_metadata is not None:
+                # TODO: related paragraphs need an index to navigate relations, but
+                # the rest of options are fine with a simple O(n) scan. We don't
+                # need the index in those cases
+                if field_id not in self.field_paragraphs:
+                    index = ParagraphIndex()
+                    await index.build(field_id, field_metadata)
+                    self.field_paragraphs[field_id] = index
+                field_paragraphs = self.field_paragraphs[field_id]
 
-        if config.related:
-            hydrated.related = hydration_models.RelatedParagraphRefs()
+                paragraph = field_paragraphs.get(paragraph_id)
+                if paragraph is not None:
+                    # otherwise, this is a fake paragraph. We can't hydrate anything
+                    # else here
 
-            if config.related.neighbours:
-                hydrated.related.neighbours = hydration_models.RelatedNeighbourParagraphRefs()
+                    if config.related:
+                        hydrated.related, related_ids = await self._hydrate_related_paragraphs_refs(
+                            paragraph_id, field_paragraphs, config.related
+                        )
+                        # TODO: we should check there are no requested paragraphs
+                        # matching, and fetch them in parallel (in the background?)
+                        for pid in related_ids:
+                            await self._hydrate_related_paragraph(pid)
 
-                if config.related.neighbours.before is not None:
-                    hydrated.related.neighbours.before = []
-                    if config.related.neighbours.before > 0:
-                        for previous_id in field_paragraphs.n_previous(
-                            paragraph_id, config.related.neighbours.before
-                        ):
-                            await self._hydrate_related_paragraph(ParagraphId.from_string(previous_id))
-                            hydrated.related.neighbours.before.insert(0, previous_id)
+                    if config.image:
+                        hydrated.image = hydration_models.HydratedParagraphImage()
 
-                if config.related.neighbours.after is not None:
-                    hydrated.related.neighbours.after = []
-                    if config.related.neighbours.after > 0:
-                        for next_id in field_paragraphs.n_next(
-                            paragraph_id, config.related.neighbours.after
-                        ):
-                            await self._hydrate_related_paragraph(ParagraphId.from_string(next_id))
-                            hydrated.related.neighbours.after.append(next_id)
+                        if config.image.source_image:
+                            hydrated.image.source_image = await paragraph_source_image(
+                                self.kbid, paragraph
+                            )
 
-            if config.related.parents:
-                hydrated.related.parents = []
-                for parent_id in field_paragraphs.parents(paragraph_id):
-                    await self._hydrate_related_paragraph(ParagraphId.from_string(parent_id))
-                    hydrated.related.parents.append(parent_id)
+                    if config.page:
+                        if hydrated.page is None:
+                            hydrated.page = hydration_models.HydratedParagraphPage()
 
-            if config.related.siblings:
-                hydrated.related.siblings = []
-                for sibling_id in field_paragraphs.siblings(paragraph_id):
-                    await self._hydrate_related_paragraph(
-                        ParagraphId.from_string(sibling_id),
-                    )
-                    hydrated.related.siblings.append(sibling_id)
+                        if config.page.page_with_visual:
+                            if paragraph.page.page_with_visual:
+                                # Paragraphs can be found on pages with visual content. In this
+                                # case, we want to return the preview of the paragraph page as
+                                # an image
+                                page_number = paragraph.page.page
+                                preview = await download_page_preview(field, page_number)
+                                if preview is not None:
+                                    self.hydrated.add_page_preview(paragraph_id, page_number, preview)
 
-            if config.related.replacements:
-                hydrated.related.replacements = []
-                for replacement_id in field_paragraphs.replacements(paragraph_id):
-                    await self._hydrate_related_paragraph(
-                        ParagraphId.from_string(replacement_id),
-                    )
-                    hydrated.related.replacements.append(replacement_id)
+                    if config.table:
+                        if hydrated.table is None:
+                            hydrated.table = hydration_models.HydratedParagraphTable()
 
-        paragraph = field_paragraphs.get(paragraph_id)
-        if config.image:
-            if hydrated.image is None:
-                hydrated.image = hydration_models.HydratedParagraphImage()
-
-            if config.image.source_image:
-                source_image = paragraph.representation.reference_file
-                if (
-                    paragraph.kind
-                    in (
-                        resources_pb2.Paragraph.TypeParagraph.OCR,
-                        resources_pb2.Paragraph.TypeParagraph.INCEPTION,
-                    )
-                    and source_image
-                ):
-                    # Paragraphs extracted from an image store its original image
-                    # representation in the reference file. The path is incomplete
-                    # though, as it's stored in the `generated` folder
-                    image = await download_image(
-                        self.kbid,
-                        field_id,
-                        f"generated/{source_image}",
-                        # TODO: we assume all reference files are PNG images, but
-                        # this actually depends on learning so it's a dangerous
-                        # assumption. We should check it by ourselves
-                        mime_type="image/png",
-                    )
-                    hydrated.image.source_image = image
-
-        if config.page:
-            if hydrated.page is None:
-                hydrated.page = hydration_models.HydratedParagraphPage()
-
-            if config.page.page_with_visual:
-                if paragraph.page.page_with_visual:
-                    # Paragraphs can be found on pages with visual content. In this
-                    # case, we want to return the preview of the paragraph page as
-                    # an image
-                    page_number = paragraph.page.page
-                    preview = await download_page_preview(field, page_number)
-                    if preview is not None:
-                        self.hydrated.add_page_preview(paragraph_id, page_number, preview)
-
-        if config.table:
-            if hydrated.table is None:
-                hydrated.table = hydration_models.HydratedParagraphTable()
-
-            if config.table.table_page_preview:
-                if paragraph.representation.is_a_table:
-                    # When a paragraph comes with a table and table hydration is
-                    # enabled, we want to return the image representing that table.
-                    # Ideally we should hydrate the paragraph reference_file, but
-                    # table screenshots are not always perfect so we prefer to use
-                    # the page preview. If at some point the table images are good
-                    # enough, it'd be better to use those
-                    page_number = paragraph.page.page
-                    preview = await download_page_preview(field, page_number)
-                    if preview is not None:
-                        self.hydrated.add_table_page_preview(paragraph_id, page_number, preview)
+                        if config.table.table_page_preview:
+                            if paragraph.representation.is_a_table:
+                                # When a paragraph comes with a table and table hydration is
+                                # enabled, we want to return the image representing that table.
+                                # Ideally we should hydrate the paragraph reference_file, but
+                                # table screenshots are not always perfect so we prefer to use
+                                # the page preview. If at some point the table images are good
+                                # enough, it'd be better to use those
+                                page_number = paragraph.page.page
+                                preview = await download_page_preview(field, page_number)
+                                if preview is not None:
+                                    self.hydrated.add_table_page_preview(
+                                        paragraph_id, page_number, preview
+                                    )
 
         return hydrated
+
+    async def _hydrate_related_paragraphs_refs(
+        self,
+        paragraph_id: ParagraphId,
+        index: "ParagraphIndex",
+        config: hydration_models.RelatedParagraphHydration,
+    ) -> tuple[hydration_models.RelatedParagraphRefs, list[ParagraphId]]:
+        """Compute the related paragraph references for a specific
+        `paragraph_id` and return them with the plain list of related paragraphs
+        (to facilitate work to the caller).
+
+        """
+        hydrated = hydration_models.RelatedParagraphRefs()
+        related = set()
+
+        if config.neighbours:
+            hydrated.neighbours = hydration_models.RelatedNeighbourParagraphRefs()
+
+            if config.neighbours.before is not None:
+                hydrated.neighbours.before = []
+                if config.neighbours.before > 0:
+                    for previous_id in index.n_previous(paragraph_id, config.neighbours.before):
+                        hydrated.neighbours.before.insert(0, previous_id)
+                        related.add(ParagraphId.from_string(previous_id))
+
+            if config.neighbours.after is not None:
+                hydrated.neighbours.after = []
+                if config.neighbours.after > 0:
+                    for next_id in index.n_next(paragraph_id, config.neighbours.after):
+                        hydrated.neighbours.after.append(next_id)
+                        related.add(ParagraphId.from_string(next_id))
+
+        if config.parents:
+            hydrated.parents = []
+            for parent_id in index.parents(paragraph_id):
+                hydrated.parents.append(parent_id)
+                related.add(ParagraphId.from_string(parent_id))
+
+        if config.siblings:
+            hydrated.siblings = []
+            for sibling_id in index.siblings(paragraph_id):
+                hydrated.siblings.append(sibling_id)
+                related.add(ParagraphId.from_string(sibling_id))
+
+        if config.replacements:
+            hydrated.replacements = []
+            for replacement_id in index.replacements(paragraph_id):
+                hydrated.replacements.append(replacement_id)
+                related.add(ParagraphId.from_string(replacement_id))
+
+        return hydrated, list(related)
 
     async def _hydrate_related_paragraph(
         self, paragraph_id: ParagraphId
@@ -608,6 +610,36 @@ class Hydrator:
             hydrated.text = text
 
         return hydrated
+
+
+async def paragraph_source_image(kbid: str, paragraph: resources_pb2.Paragraph) -> Optional[Image]:
+    """Certain paragraphs are extracted from images using techniques like OCR or
+    inception. If that's the case, return the original image for this paragraph.
+
+    """
+    source_image = paragraph.representation.reference_file
+
+    if paragraph.kind not in (
+        resources_pb2.Paragraph.TypeParagraph.OCR,
+        resources_pb2.Paragraph.TypeParagraph.INCEPTION,
+    ):
+        return None
+
+    field_id = ParagraphId.from_string(paragraph.key).field_id
+
+    # Paragraphs extracted from an image store its original image representation
+    # in the reference file. The path is incomplete though, as it's stored in
+    # the `generated` folder
+    image = await download_image(
+        kbid,
+        field_id,
+        f"generated/{source_image}",
+        # XXX: we assume all reference files are PNG images, but this actually
+        # depends on learning so it's a dangerous assumption. We should check it
+        # by ourselves
+        mime_type="image/png",
+    )
+    return image
 
 
 async def download_image(
@@ -722,9 +754,9 @@ class ParagraphIndex:
                 replacement for replacement in paragraph.relations.replacements
             ]
 
-    def get(self, paragraph_id: Union[str, ParagraphId]) -> resources_pb2.Paragraph:
+    def get(self, paragraph_id: Union[str, ParagraphId]) -> Optional[resources_pb2.Paragraph]:
         paragraph_id = str(paragraph_id)
-        return self.paragraphs[paragraph_id]
+        return self.paragraphs.get(paragraph_id)
 
     def previous(self, paragraph_id: Union[str, ParagraphId]) -> Optional[str]:
         paragraph_id = str(paragraph_id)
