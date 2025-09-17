@@ -257,10 +257,6 @@ class Hydrator:
         db_resources = {}
         async with driver.ro_transaction() as txn:
             for raw_paragraph_id in paragraph_ids:
-                # TODO: remove this HACK skip
-                if raw_paragraph_id.startswith(":"):
-                    continue
-
                 # TODO if we accept user ids, we must validate them
                 paragraph_id = ParagraphId.from_string(raw_paragraph_id)
                 field_id = paragraph_id.field_id
