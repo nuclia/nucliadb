@@ -218,7 +218,7 @@ async def chat_streaming_generator(
                     metrics.record_first_chunk_yielded()
                     first = False
 
-    if is_json is False and chunk:  # Ensure chunk is not empty before decoding
+    if is_ndjson_stream is False and chunk:  # Ensure chunk is not empty before decoding
         # If response is text the status_code comes at the last chunk of data
         last_chunk = chunk.decode()
         if last_chunk[-1] == "0":
