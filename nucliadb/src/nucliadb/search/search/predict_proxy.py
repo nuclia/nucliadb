@@ -111,7 +111,7 @@ async def predict_proxy(
                 client_type=client_type,
                 origin=origin,
                 user_query=user_query,
-                is_json="json" in (media_type or ""),
+                is_ndjson_stream="json" in (media_type or ""),
                 metrics=metrics,
             )
         else:
@@ -174,7 +174,7 @@ async def chat_streaming_generator(
     client_type: NucliaDBClientType,
     origin: str,
     user_query: str,
-    is_json: bool,
+    is_ndjson_stream: bool,
     metrics: AskMetrics,
 ):
     first = True
@@ -186,7 +186,7 @@ async def chat_streaming_generator(
     with metrics.time(PREDICT_ANSWER_METRIC):
         async for chunk in predict_response.content:
             yield chunk
-            if is_json:
+            if is_ndjson_stream:
                 try:
                     parsed_chunk = GenerativeChunk.model_validate_json(chunk).chunk
                     if first and isinstance(
