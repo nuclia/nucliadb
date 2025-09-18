@@ -106,23 +106,23 @@ class GenericFieldHydration(BaseModel, extra="forbid"):
 
 class FieldHydration(BaseModel, extra="forbid"):
     text: Optional[TextFieldHydration] = Field(
-        default=None,
+        default_factory=TextFieldHydration,
         description="Text fields hydration options",
     )
     file: Optional[FileFieldHydration] = Field(
-        default=None,
+        default_factory=FileFieldHydration,
         description="File fields hydration options",
     )
     link: Optional[LinkFieldHydration] = Field(
-        default=None,
+        default_factory=LinkFieldHydration,
         description="Link fields hydration options",
     )
     conversation: Optional[ConversationFieldHydration] = Field(
-        default=None,
+        default_factory=ConversationFieldHydration,
         description="Conversation fields hydration options",
     )
     generic: Optional[GenericFieldHydration] = Field(
-        default=None,
+        default_factory=GenericFieldHydration,
         description="Generic fields hydration options",
     )
 

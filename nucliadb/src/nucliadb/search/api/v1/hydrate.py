@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from dataclasses import dataclass
-from typing import Literal, Optional, Union, overload
+from typing import Optional, Union
 
 from fastapi import Request, Response
 from fastapi_versioning import version
@@ -116,82 +116,56 @@ class HydratedBuilder:
         self._resources[rid] = hydrated
         return hydrated
 
-    @overload
-    def add_field(
-        self, field_id: FieldId, field_type: Literal[FieldTypeName.TEXT]
-    ) -> hydration_models.HydratedTextField: ...
+    def new_text_field(self, field_id: FieldId) -> hydration_models.HydratedTextField:
+        return hydration_models.HydratedTextField(
+            id=field_id.full(),
+            resource=field_id.rid,
+            field_type=FieldTypeName.TEXT,
+        )
 
-    @overload
-    def add_field(
-        self, field_id: FieldId, field_type: Literal[FieldTypeName.FILE]
-    ) -> hydration_models.HydratedFileField: ...
+    def new_file_field(self, field_id: FieldId) -> hydration_models.HydratedFileField:
+        return hydration_models.HydratedFileField(
+            id=field_id.full(),
+            resource=field_id.rid,
+            field_type=FieldTypeName.FILE,
+        )
 
-    @overload
-    def add_field(
-        self, field_id: FieldId, field_type: Literal[FieldTypeName.LINK]
-    ) -> hydration_models.HydratedLinkField: ...
+    def new_link_field(self, field_id: FieldId) -> hydration_models.HydratedLinkField:
+        return hydration_models.HydratedLinkField(
+            id=field_id.full(),
+            resource=field_id.rid,
+            field_type=FieldTypeName.LINK,
+        )
 
-    @overload
-    def add_field(
-        self, field_id: FieldId, field_type: Literal[FieldTypeName.CONVERSATION]
-    ) -> hydration_models.HydratedConversationField: ...
+    def new_conversation_field(self, field_id: FieldId) -> hydration_models.HydratedConversationField:
+        return hydration_models.HydratedConversationField(
+            id=field_id.full(),
+            resource=field_id.rid,
+            field_type=FieldTypeName.CONVERSATION,
+        )
 
-    @overload
-    def add_field(
-        self, field_id: FieldId, field_type: Literal[FieldTypeName.GENERIC]
-    ) -> hydration_models.HydratedGenericField: ...
+    def new_generic_field(self, field_id: FieldId) -> hydration_models.HydratedGenericField:
+        return hydration_models.HydratedGenericField(
+            id=field_id.full(),
+            resource=field_id.rid,
+            field_type=FieldTypeName.GENERIC,
+        )
 
-    def add_field(self, field_id: FieldId, field_type: FieldTypeName):
-        hydrated: Union[
+    def add_field(
+        self,
+        field_id: FieldId,
+        field: Union[
             hydration_models.HydratedTextField,
             hydration_models.HydratedFileField,
             hydration_models.HydratedLinkField,
             hydration_models.HydratedConversationField,
             hydration_models.HydratedGenericField,
-        ]
+        ],
+    ):
+        self._fields[field_id.full()] = field
 
-        if field_type == FieldTypeName.TEXT:
-            hydrated = hydration_models.HydratedTextField(
-                id=field_id.full(),
-                resource=field_id.rid,
-                field_type=field_type,
-            )
-
-        elif field_type == FieldTypeName.FILE:
-            hydrated = hydration_models.HydratedFileField(
-                id=field_id.full(),
-                resource=field_id.rid,
-                field_type=field_type,
-            )
-
-        elif field_type == FieldTypeName.LINK:
-            hydrated = hydration_models.HydratedLinkField(
-                id=field_id.full(),
-                resource=field_id.rid,
-                field_type=field_type,
-            )
-
-        elif field_type == FieldTypeName.CONVERSATION:
-            hydrated = hydration_models.HydratedConversationField(
-                id=field_id.full(),
-                resource=field_id.rid,
-                field_type=field_type,
-            )
-
-        elif field_type == FieldTypeName.GENERIC:
-            hydrated = hydration_models.HydratedGenericField(
-                id=field_id.full(),
-                resource=field_id.rid,
-                field_type=field_type,
-            )
-
-        else:  # pragma: no cover
-            # This is a trick so mypy generates an error if this branch can be reached,
-            # that is, if we are missing some ifs
-            _a: int = "a"
-
-        self._fields[field_id.full()] = hydrated
-        return hydrated
+    def has_field(self, field_id: FieldId) -> bool:
+        return field_id.full() in self._fields
 
     def new_paragraph(self, paragraph_id: ParagraphId) -> hydration_models.HydratedParagraph:
         return hydration_models.HydratedParagraph(
@@ -303,21 +277,26 @@ class Hydrator:
             # hydrate field
 
             if field_id.full() not in self.hydrated.fields:
-                await self._hydrate_field(resource, field_id)
+                hydrated_field = await self._hydrate_field(resource, field_id, self.config.field)
+                if hydrated_field is not None:
+                    self.hydrated.add_field(field_id, hydrated_field)
 
-            # hydrate other pages requested for this field
+            # skip page and table previews if the user explictly disabled
+            # hydration for this field
+            if self.hydrated.has_field(field_id):
+                # TODO: skip if already hydrated
+                if extra.field_page is not None:
+                    preview = await download_page_preview(field, extra.field_page)
+                    if preview is not None:
+                        self.hydrated.add_page_preview(paragraph_id, extra.field_page, preview)
 
-            # TODO: skip if already hydrated
-            if extra.field_page is not None:
-                preview = await download_page_preview(field, extra.field_page)
-                if preview is not None:
-                    self.hydrated.add_page_preview(paragraph_id, extra.field_page, preview)
-
-            # TODO: skip if already hydrated
-            if extra.field_table_page is not None:
-                preview = await download_page_preview(field, extra.field_table_page)
-                if preview is not None:
-                    self.hydrated.add_table_page_preview(paragraph_id, extra.field_table_page, preview)
+                # TODO: skip if already hydrated
+                if extra.field_table_page is not None:
+                    preview = await download_page_preview(field, extra.field_table_page)
+                    if preview is not None:
+                        self.hydrated.add_table_page_preview(
+                            paragraph_id, extra.field_table_page, preview
+                        )
 
             # hydrate resource
 
@@ -354,53 +333,35 @@ class Hydrator:
 
         return hydrated
 
-    async def _hydrate_field(self, resource: Resource, field_id: FieldId):
+    async def _hydrate_field(
+        self, resource: Resource, field_id: FieldId, config: hydration_models.FieldHydration
+    ):
         field_type = FIELD_TYPE_STR_TO_NAME[field_id.type]
 
         if field_type == FieldTypeName.TEXT:
-            if not self.config.field.text is not None:
-                # REVIEW: we still need to add the field, as a paragraph can
-                # trigger hydration of some part of it even if it has no
-                # specific hydration
-                self.hydrated.add_field(field_id, field_type)
+            if not config.text is not None:
                 return
-            await self._hydrate_text_field(resource, field_id, self.config.field.text)
+            return await self._hydrate_text_field(resource, field_id, config.text)
 
         elif field_type == FieldTypeName.FILE is not None:
-            if not self.config.field.file:
-                # REVIEW: we still need to add the field, as a paragraph can
-                # trigger hydration of some part of it even if it has no
-                # specific hydration
-                self.hydrated.add_field(field_id, field_type)
+            if not config.file:
                 return
-            await self._hydrate_file_field(resource, field_id, self.config.field.file)
+            return await self._hydrate_file_field(resource, field_id, config.file)
 
         elif field_type == FieldTypeName.LINK is not None:
-            if not self.config.field.link:
-                # REVIEW: we still need to add the field, as a paragraph can
-                # trigger hydration of some part of it even if it has no
-                # specific hydration
-                self.hydrated.add_field(field_id, field_type)
+            if not config.link:
                 return
-            await self._hydrate_link_field(resource, field_id, self.config.field.link)
+            return await self._hydrate_link_field(resource, field_id, config.link)
 
         elif field_type == FieldTypeName.CONVERSATION is not None:
-            if not self.config.field.conversation:
-                # REVIEW: we still need to add the field, as a paragraph can
-                # trigger hydration of some part of it even if it has no
-                # specific hydration
-                self.hydrated.add_field(field_id, field_type)
+            if not config.conversation:
                 return
-            await self._hydrate_conversation_field(resource, field_id, self.config.field.conversation)
+            return await self._hydrate_conversation_field(resource, field_id, config.conversation)
 
         elif field_type == FieldTypeName.GENERIC is not None:
-            if not self.config.field.generic:
-                # REVIEW: we still need to add the field, as a paragraph can
-                # trigger hydration of some part of it even if it has no
-                # specific hydration
-                self.hydrated.add_field(field_id, field_type)
+            if not config.generic:
                 return
-            await self._hydrate_generic_field(resource, field_id, self.config.field.generic)
+            return await self._hydrate_generic_field(resource, field_id, config.generic)
 
         else:  # pragma: no cover
             # This is a trick so mypy generates an error if this branch can be reached,
@@ -413,7 +374,7 @@ class Hydrator:
         field_id: FieldId,
         config: hydration_models.TextFieldHydration,
     ) -> hydration_models.HydratedTextField:
-        hydrated = self.hydrated.add_field(field_id, FieldTypeName.TEXT)
+        hydrated = self.hydrated.new_text_field(field_id)
 
         if config.extracted_text:
             field_text = await hydrate_field_text(self.kbid, field_id)
@@ -429,7 +390,7 @@ class Hydrator:
         field_id: FieldId,
         config: hydration_models.FileFieldHydration,
     ) -> hydration_models.HydratedFileField:
-        hydrated = self.hydrated.add_field(field_id, FieldTypeName.FILE)
+        hydrated = self.hydrated.new_file_field(field_id)
 
         if config.value:
             field = await resource.get_field(field_id.key, field_id.pb_type)
@@ -450,7 +411,7 @@ class Hydrator:
         field_id: FieldId,
         config: hydration_models.LinkFieldHydration,
     ) -> hydration_models.HydratedLinkField:
-        hydrated = self.hydrated.add_field(field_id, FieldTypeName.LINK)
+        hydrated = self.hydrated.new_link_field(field_id)
 
         if config.value:
             field = await resource.get_field(field_id.key, field_id.pb_type)
@@ -471,7 +432,7 @@ class Hydrator:
         field_id: FieldId,
         config: hydration_models.ConversationFieldHydration,
     ) -> hydration_models.HydratedConversationField:
-        hydrated = self.hydrated.add_field(field_id, FieldTypeName.CONVERSATION)
+        hydrated = self.hydrated.new_conversation_field(field_id)
         # TODO: implement conversation fields
         return hydrated
 
@@ -481,7 +442,7 @@ class Hydrator:
         field_id: FieldId,
         config: hydration_models.GenericFieldHydration,
     ) -> hydration_models.HydratedGenericField:
-        hydrated = self.hydrated.add_field(field_id, FieldTypeName.GENERIC)
+        hydrated = self.hydrated.new_generic_field(field_id)
 
         if config.value:
             field = await resource.get_field(field_id.key, field_id.pb_type)
