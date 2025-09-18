@@ -354,7 +354,16 @@ class Resource:
 
         await field_obj.delete()
 
+    async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
+        """Return whether this resource has this field or not."""
+        all_fields_ids = await self.get_fields_ids()
+        for field_type, field_id in all_fields_ids:
+            if field_type == type and field_id == field:
+                return True
+        return False
+
     def has_field(self, type: FieldType.ValueType, field: str) -> bool:
+        # REVIEW: are we sure we don't want to actually check this?
         return (type, field) in self.fields
 
     async def get_all_field_ids(self, *, for_update: bool) -> Optional[PBAllFieldIDs]:
