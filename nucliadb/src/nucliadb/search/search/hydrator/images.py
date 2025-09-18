@@ -20,13 +20,44 @@
 import base64
 from typing import Optional, cast
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_NAME, FieldId
+from nucliadb.common.ids import FIELD_TYPE_STR_TO_NAME, FieldId, ParagraphId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.file import File
 from nucliadb.search import SERVICE_NAME
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.search import Image
+from nucliadb_protos import resources_pb2
 from nucliadb_utils.utilities import get_storage
+
+
+async def paragraph_source_image(kbid: str, paragraph: resources_pb2.Paragraph) -> Optional[Image]:
+    """Certain paragraphs are extracted from images using techniques like OCR or
+    inception. If that's the case, return the original image for this paragraph.
+
+    """
+    source_image = paragraph.representation.reference_file
+
+    if paragraph.kind not in (
+        resources_pb2.Paragraph.TypeParagraph.OCR,
+        resources_pb2.Paragraph.TypeParagraph.INCEPTION,
+    ):
+        return None
+
+    field_id = ParagraphId.from_string(paragraph.key).field_id
+
+    # Paragraphs extracted from an image store its original image representation
+    # in the reference file. The path is incomplete though, as it's stored in
+    # the `generated` folder
+    image = await download_image(
+        kbid,
+        field_id,
+        f"generated/{source_image}",
+        # XXX: we assume all reference files are PNG images, but this actually
+        # depends on learning so it's a dangerous assumption. We should check it
+        # by ourselves
+        mime_type="image/png",
+    )
+    return image
 
 
 async def download_image(
