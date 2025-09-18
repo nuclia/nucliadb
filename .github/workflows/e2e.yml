@@ -47,7 +47,7 @@ jobs:
 
       - name: Wait for PostgreSQL to be ready
         run: |
-          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql,app.kubernetes.io/instance=my-postgresql
+          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql,app.kubernetes.io/instance=my-postgresql --timeout=60s
 
       - name: Install Minio with Helm
         run: |
