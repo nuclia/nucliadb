@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from dataclasses import dataclass
 from typing import Optional, Union
 
@@ -48,12 +49,40 @@ class ParagraphIndex:
         self.paragraphs: dict[str, resources_pb2.Paragraph] = {}
         self.neighbours: dict[tuple[str, str], str] = {}
         self.related: dict[tuple[str, str], list[str]] = {}
+        self._lock = asyncio.Lock()
         self._built = False
 
-    def built(self) -> bool:
-        return self._built
+    async def build(self, field: Field):
+        """Build the index if it hasn't been built yet.
 
-    def build(self, field_metadata: FieldComputedMetadata):
+        This function is async-safe, multiple concurrent tasks can ask for a
+        built and it'll only be done once
+        """
+        if self._built:
+            return
+
+        async with self._lock:
+            # double check we haven't built the index meanwhile we waited for the
+            # lock
+            if self._built:
+                return
+
+            field_metadata = await field.get_field_metadata()
+
+            if field_metadata is None:
+                # field metadata may be still processing. As we want to provide a
+                # consistent view, even if it can appear meanwhile we hydrate, we
+                # consider we don't have it. We mark the index as built and any
+                # paragraph will be found for this field
+                self._built = True
+                return None
+
+            # REVIEW: this is a CPU-bound code, we may consider running this in an
+            # executor to not block the loop
+            self._build(field_metadata)
+            self._built = True
+
+    def _build(self, field_metadata: FieldComputedMetadata):
         self.paragraphs.clear()
         self.neighbours.clear()
         self.related.clear()
@@ -82,8 +111,6 @@ class ParagraphIndex:
             self.related[(paragraph_id, ParagraphIndex.REPLACEMENTS)] = [
                 replacement for replacement in paragraph.relations.replacements
             ]
-
-        self._built = True
 
     def get(self, paragraph_id: Union[str, ParagraphId]) -> Optional[resources_pb2.Paragraph]:
         paragraph_id = str(paragraph_id)
@@ -175,62 +202,54 @@ async def hydrate_paragraph(
         text = await paragraphs.get_paragraph_text(kbid=kbid, paragraph_id=paragraph_id)
         hydrated.text = text
 
-    requires_field_metadata = config.image or config.table or config.page or config.related
-    if requires_field_metadata:
-        field_metadata = await field.get_field_metadata()
-        if field_metadata is not None:
-            # TODO: related paragraphs need an index to navigate relations, but
-            # the rest of options are fine with a simple O(n) scan. We don't
-            # need the index in those cases
-            if not field_paragraphs_index.built():
-                field_paragraphs_index.build(field_metadata)
+    requires_paragraph_metadata = config.image or config.table or config.page or config.related
+    if requires_paragraph_metadata:
+        await field_paragraphs_index.build(field)
+        paragraph = field_paragraphs_index.get(paragraph_id)
+        if paragraph is not None:
+            # otherwise, this is a fake paragraph. We can't hydrate anything else here
 
-            paragraph = field_paragraphs_index.get(paragraph_id)
-            if paragraph is not None:
-                # otherwise, this is a fake paragraph. We can't hydrate anything
-                # else here
+            if config.related:
+                hydrated.related, related_ids = await related_paragraphs_refs(
+                    paragraph_id, field_paragraphs_index, config.related
+                )
+                extra_hydration.related_paragraph_ids = related_ids
 
-                if config.related:
-                    hydrated.related, related_ids = await related_paragraphs_refs(
-                        paragraph_id, field_paragraphs_index, config.related
-                    )
-                    extra_hydration.related_paragraph_ids = related_ids
+            if config.image:
+                hydrated.image = hydration_models.HydratedParagraphImage()
 
-                if config.image:
-                    hydrated.image = hydration_models.HydratedParagraphImage()
+                if config.image.source_image:
+                    hydrated.image.source_image = await paragraph_source_image(kbid, paragraph)
 
-                    if config.image.source_image:
-                        hydrated.image.source_image = await paragraph_source_image(kbid, paragraph)
+            if config.page:
+                if hydrated.page is None:
+                    hydrated.page = hydration_models.HydratedParagraphPage()
 
-                if config.page:
-                    if hydrated.page is None:
-                        hydrated.page = hydration_models.HydratedParagraphPage()
+                if config.page.page_with_visual:
+                    if paragraph.page.page_with_visual:
+                        # Paragraphs can be found on pages with visual content. In this
+                        # case, we want to return the preview of the paragraph page as
+                        # an image
+                        page_number = paragraph.page.page
+                        # TODO: what should I do if I later find there's no page in the DB?
+                        hydrated.page.page_preview_ref = page_preview_id(page_number)
+                        extra_hydration.field_page = page_number
 
-                    if config.page.page_with_visual:
-                        if paragraph.page.page_with_visual:
-                            # Paragraphs can be found on pages with visual content. In this
-                            # case, we want to return the preview of the paragraph page as
-                            # an image
-                            page_number = paragraph.page.page
-                            # TODO: what should I do if I later find there's no page in the DB?
-                            hydrated.page.page_preview_ref = page_preview_id(page_number)
-                            extra_hydration.field_page = page_number
+            if config.table:
+                if hydrated.table is None:
+                    hydrated.table = hydration_models.HydratedParagraphTable()
 
-                if config.table:
-                    if hydrated.table is None:
-                        hydrated.table = hydration_models.HydratedParagraphTable()
-
-                    if config.table.table_page_preview:
-                        if paragraph.representation.is_a_table:
-                            # When a paragraph comes with a table and table hydration is
-                            # enabled, we want to return the image representing that table.
-                            # Ideally we should hydrate the paragraph reference_file, but
-                            # table screenshots are not always perfect so we prefer to use
-                            # the page preview. If at some point the table images are good
-                            # enough, it'd be better to use those
-                            page_number = paragraph.page.page
-                            hydrated.table.page_preview_ref = page_preview_id(page_number)
-                            extra_hydration.field_table_page = page_number
+                if config.table.table_page_preview:
+                    if paragraph.representation.is_a_table:
+                        # When a paragraph comes with a table and table hydration is
+                        # enabled, we want to return the image representing that table.
+                        # Ideally we should hydrate the paragraph reference_file, but
+                        # table screenshots are not always perfect so we prefer to use
+                        # the page preview. If at some point the table images are good
+                        # enough, it'd be better to use those
+                        page_number = paragraph.page.page
+                        hydrated.table.page_preview_ref = page_preview_id(page_number)
+                        extra_hydration.field_table_page = page_number
 
     return hydrated, extra_hydration
 
