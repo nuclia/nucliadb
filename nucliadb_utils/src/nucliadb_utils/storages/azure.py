@@ -31,7 +31,6 @@ from azure.storage.blob.aio import BlobServiceClient
 
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import metrics
-from nucliadb_utils.storages.exceptions import ObjectNotFoundError
 from nucliadb_utils.storages.object_store import ObjectStore
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
@@ -146,7 +145,7 @@ class AzureStorageField(StorageField):
             return None
         try:
             return await self.storage.object_store.get_metadata(bucket, key)
-        except ObjectNotFoundError:
+        except KeyError:
             return None
 
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
@@ -169,8 +168,8 @@ class AzureStorage(Storage):
     def __init__(
         self,
         account_url: str,
-        deadletter_bucket: str = "deadletter",
-        indexing_bucket: str = "indexing",
+        deadletter_bucket: Optional[str] = "deadletter",
+        indexing_bucket: Optional[str] = "indexing",
         connection_string: Optional[str] = None,
     ):
         self.object_store = AzureObjectStore(account_url, connection_string=connection_string)
@@ -196,7 +195,7 @@ class AzureStorage(Storage):
     async def delete_upload(self, uri: str, bucket_name: str):
         try:
             await self.object_store.delete(bucket_name, uri)
-        except ObjectNotFoundError:
+        except KeyError:
             pass
 
     async def create_bucket(self, bucket_name: str, kbid: Optional[str] = None):
@@ -328,7 +327,7 @@ class AzureObjectStore(ObjectStore):
         try:
             await container_client.delete_blob(key, delete_snapshots="include")
         except ResourceNotFoundError:
-            raise ObjectNotFoundError()
+            raise KeyError(f"Not found: {bucket}/{key}")
 
     @ops_observer.wrap({"type": "upload"})
     async def upload(
@@ -350,6 +349,7 @@ class AzureObjectStore(ObjectStore):
             name=key,
             data=data,
             length=length,
+            overwrite=True,
             blob_type=BlobType.BLOCKBLOB,
             metadata=custom_metadata,
             content_settings=ContentSettings(
@@ -361,7 +361,7 @@ class AzureObjectStore(ObjectStore):
     @ops_observer.wrap({"type": "insert"})
     async def insert(self, bucket: str, key: str, data: bytes) -> None:
         container_client = self.service_client.get_container_client(bucket)
-        await container_client.upload_blob(name=key, data=data, length=len(data))
+        await container_client.upload_blob(name=key, data=data, length=len(data), overwrite=True)
 
     @ops_observer.wrap({"type": "download"})
     async def download(self, bucket: str, key: str) -> bytes:
@@ -370,7 +370,7 @@ class AzureObjectStore(ObjectStore):
         try:
             downloader = await blob_client.download_blob()
         except ResourceNotFoundError:
-            raise ObjectNotFoundError()
+            raise KeyError(f"Not found: {bucket}/{key}")
         return await downloader.readall()
 
     async def download_stream(
@@ -390,7 +390,7 @@ class AzureObjectStore(ObjectStore):
                 length=length,  # type: ignore
             )
         except ResourceNotFoundError:
-            raise ObjectNotFoundError()
+            raise KeyError(f"Not found: {bucket}/{key}")
         async for chunk in downloader.chunks():
             yield chunk
 
@@ -411,7 +411,7 @@ class AzureObjectStore(ObjectStore):
             properties: BlobProperties = await blob_client.get_blob_properties()
             return parse_object_metadata(properties, key)
         except ResourceNotFoundError:
-            raise ObjectNotFoundError()
+            raise KeyError(f"Not found: {bucket}/{key}")
 
     @ops_observer.wrap({"type": "multipart_start"})
     async def upload_multipart_start(self, bucket: str, key: str, metadata: ObjectMetadata) -> None:

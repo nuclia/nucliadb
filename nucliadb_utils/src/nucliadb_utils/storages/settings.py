@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     s3_deadletter_bucket: Optional[str] = None
     s3_indexing_bucket: Optional[str] = None
 
+    azure_deadletter_bucket: Optional[str] = None
+    azure_indexing_bucket: Optional[str] = None
+
     local_testing_files: str = os.path.dirname(__file__)
 
 

@@ -82,6 +82,24 @@ def _storage_config(prefix: str, bucket: Optional[str]) -> dict[str, str]:
         config[f"{prefix}__REGION_NAME"] = storage_settings.s3_region_name or ""
         if storage_settings.s3_endpoint:
             config[f"{prefix}__ENDPOINT"] = storage_settings.s3_endpoint
+    elif storage_settings.file_backend == FileBackendConfig.AZURE:
+        if storage_settings.azure_account_url is None:
+            raise ValueError("Azure account is required")
+        config[f"{prefix}__OBJECT_STORE"] = "azure"
+        url = storage_settings.azure_account_url
+        container = bucket or extended_storage_settings.azure_indexing_bucket
+        if container:
+            url += f"/{container}"
+        config[f"{prefix}__CONTAINER_URL"] = url
+        if storage_settings.azure_connection_string:
+            params = {
+                p.split("=", 1)[0]: p.split("=", 1)[1]
+                for p in storage_settings.azure_connection_string.split(";")
+            }
+            if "AccountKey" in params:
+                config[f"{prefix}__ACCOUNT_KEY"] = params["AccountKey"]
+            if "BlobEndpoint" in params:
+                config[f"{prefix}__ENDPOINT"] = params["BlobEndpoint"]
 
     return config
 

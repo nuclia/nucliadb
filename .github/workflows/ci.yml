@@ -282,6 +282,8 @@ jobs:
 
       - name: Run tests
         run: source .venv/bin/activate && make -C nucliadb test-cov-search
+        env:
+          TESTING_STORAGE_BACKEND: "azure"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -333,6 +335,7 @@ jobs:
       - name: Run NucliaDB tests
         env:
           TESTING_PG_URL: "postgresql://postgres:postgres@localhost/postgres"
+          TESTING_STORAGE_BACKEND: "azure"
         run: |
           source .venv/bin/activate &&
           make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 4" ||
@@ -379,6 +382,8 @@ jobs:
 
       - name: Run package tests
         run: source .venv/bin/activate && make -C nucliadb test-cov-${{ matrix.component }}
+        env:
+          TESTING_STORAGE_BACKEND: "azure"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

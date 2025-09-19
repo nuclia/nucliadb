@@ -125,6 +125,8 @@ async def _create_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
         azureutil = AzureStorage(
             account_url=storage_settings.azure_account_url,
             connection_string=storage_settings.azure_connection_string,
+            deadletter_bucket=extended_storage_settings.azure_deadletter_bucket,
+            indexing_bucket=extended_storage_settings.azure_indexing_bucket,
         )
 
         logger.info("Configuring Azure Storage")
