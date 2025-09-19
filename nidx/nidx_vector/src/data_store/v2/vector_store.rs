@@ -85,8 +85,8 @@ impl VectorStore {
         self.data.len()
     }
 
-    pub fn stored_elements(&self) -> usize {
-        self.data.len() / (self.record_len_bytes)
+    pub fn stored_elements(&self) -> u32 {
+        (self.data.len() / (self.record_len_bytes)) as u32
     }
 
     fn record_start(&self, VectorAddr(addr): VectorAddr) -> usize {

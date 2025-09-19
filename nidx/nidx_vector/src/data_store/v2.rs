@@ -91,11 +91,11 @@ impl DataStore for DataStoreV2 {
         self.vectors.size_bytes() + self.paragraphs.size_bytes()
     }
 
-    fn stored_paragraph_count(&self) -> usize {
+    fn stored_paragraph_count(&self) -> u32 {
         self.paragraphs.stored_elements()
     }
 
-    fn stored_vector_count(&self) -> usize {
+    fn stored_vector_count(&self) -> u32 {
         self.vectors.stored_elements()
     }
 

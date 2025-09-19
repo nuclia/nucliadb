@@ -27,26 +27,26 @@ use rustc_hash::FxHashSet;
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
-use crate::ParagraphAddr;
 use crate::inverted_index::FilterBitSet;
+use crate::{ParagraphAddr, VectorAddr};
 
 use super::params;
 use super::*;
 
 /// Implementors of this trait can guide the hnsw search
 pub trait DataRetriever: std::marker::Sync {
-    fn similarity(&self, x: Address, y: Address) -> f32;
-    fn paragraph(&self, x: Address) -> ParagraphAddr;
-    fn get_vector(&self, x: Address) -> &[u8];
+    fn similarity(&self, x: VectorAddr, y: VectorAddr) -> f32;
+    fn paragraph(&self, x: VectorAddr) -> ParagraphAddr;
+    fn get_vector(&self, x: VectorAddr) -> &[u8];
     /// Embeddings with smaller similarity should not be considered.
     fn min_score(&self) -> f32;
-    fn will_need(&self, x: Address);
+    fn will_need(&self, x: VectorAddr);
 }
 
 /// Implementors of this trait are layers of an HNSW where a nearest neighbour search can be ran.
 pub trait Layer {
-    type EdgeIt: Iterator<Item = (Address, Edge)>;
-    fn get_out_edges(&self, node: Address) -> Self::EdgeIt;
+    type EdgeIt: Iterator<Item = (VectorAddr, Edge)>;
+    fn get_out_edges(&self, node: VectorAddr) -> Self::EdgeIt;
 }
 
 /// Implementors of this trait are an HNSW where search can be ran.
@@ -56,11 +56,11 @@ pub trait Hnsw {
     fn get_layer(&self, i: usize) -> Self::L;
 }
 
-///  Tuples ([`Address`], [`f32`]) can not be stored in a [`BinaryHeap`] because [`f32`] does not
+///  Tuples ([`VectorAddr`], [`f32`]) can not be stored in a [`BinaryHeap`] because [`f32`] does not
 /// implement [`Ord`]. [`Cnx`] is an application of the new-type pattern that lets us bypass the
 /// orphan rules and store such tuples in a [`BinaryHeap`].
 #[derive(Clone, Copy)]
-pub struct Cnx(pub Address, pub f32);
+pub struct Cnx(pub VectorAddr, pub f32);
 impl Eq for Cnx {}
 impl Ord for Cnx {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -79,7 +79,7 @@ impl PartialOrd for Cnx {
 }
 
 /// A list of neighbours containing a pointer to the embedding and their similarity.
-pub type Neighbours = Vec<(Address, f32)>;
+pub type Neighbours = Vec<(VectorAddr, f32)>;
 
 /// Guides an algorithm to the valid nodes.
 struct NodeFilter<'a, DR> {
@@ -94,7 +94,7 @@ impl<DR: DataRetriever> NodeFilter<'_, DR> {
         self.filter.contains(n)
     }
 
-    pub fn is_valid(&self, n: Address, score: f32) -> bool {
+    pub fn is_valid(&self, n: VectorAddr, score: f32) -> bool {
         !score.is_nan()
         // Reject the candidate if we already have a result for the same paragraph
         && !self.paragraphs.contains(&self.retriever.paragraph(n))
@@ -104,7 +104,7 @@ impl<DR: DataRetriever> NodeFilter<'_, DR> {
 
     /// Adds a result so that further candidates with the same vector
     /// or paragraph will get rejected.
-    pub fn add_result(&mut self, n: Address) {
+    pub fn add_result(&mut self, n: VectorAddr) {
         self.paragraphs.insert(self.retriever.paragraph(n));
         self.vec_counter.add(self.retriever.get_vector(n));
     }
@@ -121,9 +121,9 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     fn select_neighbours_heuristic(
         &self,
         k_neighbours: usize,
-        candidates: Vec<(Address, Edge)>,
+        candidates: Vec<(VectorAddr, Edge)>,
         layer: &RAMLayer,
-    ) -> Vec<(Address, Edge)> {
+    ) -> Vec<(VectorAddr, Edge)> {
         let mut results = Vec::new();
         let mut discarded = BinaryHeap::new();
 
@@ -163,7 +163,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
 
         results
     }
-    fn similarity(&self, x: Address, y: Address) -> f32 {
+    fn similarity(&self, x: VectorAddr, y: VectorAddr) -> f32 {
         self.retriever.similarity(x, y)
     }
     fn get_random_layer(&mut self) -> usize {
@@ -173,19 +173,19 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     }
     fn closest_up_nodes<L: Layer>(
         &'a self,
-        entry_points: Vec<Address>,
-        query: Address,
+        entry_points: Vec<VectorAddr>,
+        query: VectorAddr,
         layer: L,
         number_of_results: usize,
         mut filter: NodeFilter<'a, DR>,
-    ) -> Vec<(Address, f32)> {
+    ) -> Vec<(VectorAddr, f32)> {
         // We just need to perform BFS, the replacement is the closest node to the actual
         // best solution. This algorithm takes a lazy approach to computing the similarity of
         // candidates.
 
         const MAX_VECTORS_TO_PRELOAD: u32 = 20_000;
         let mut results = Vec::new();
-        let inner_entry_points_iter = entry_points.iter().map(|Address(inner)| *inner);
+        let inner_entry_points_iter = entry_points.iter().map(|VectorAddr(inner)| *inner as usize);
         let mut visited_nodes: BitSet = BitSet::from_iter(inner_entry_points_iter);
         let mut candidates = VecDeque::from(entry_points);
 
@@ -215,8 +215,8 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             let mut sorted_out: Vec<_> = layer.get_out_edges(candidate).collect();
             sorted_out.sort_by(|a, b| b.1.total_cmp(&a.1));
             sorted_out.into_iter().for_each(|(new_candidate, _)| {
-                if !visited_nodes.contains(new_candidate.0) {
-                    visited_nodes.insert(new_candidate.0);
+                if !visited_nodes.contains(new_candidate.0 as usize) {
+                    visited_nodes.insert(new_candidate.0 as usize);
                     candidates.push_back(new_candidate);
 
                     if self.preload_nodes && preloaded < MAX_VECTORS_TO_PRELOAD {
@@ -231,10 +231,10 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     }
     fn layer_search<L: Layer>(
         &self,
-        x: Address,
+        x: VectorAddr,
         layer: L,
         k_neighbours: usize,
-        entry_points: &[Address],
+        entry_points: &[VectorAddr],
     ) -> Neighbours {
         let mut visited = FxHashSet::default();
         let mut candidates = BinaryHeap::new();
@@ -280,7 +280,13 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             .collect()
     }
 
-    fn layer_insert(&self, x: Address, layer: &mut RAMLayer, entry_points: &[Address], mmax: usize) -> Vec<Address> {
+    fn layer_insert(
+        &self,
+        x: VectorAddr,
+        layer: &mut RAMLayer,
+        entry_points: &[VectorAddr],
+        mmax: usize,
+    ) -> Vec<VectorAddr> {
         use params::*;
         let neighbours = self.layer_search::<&RAMLayer>(x, layer, ef_construction(), entry_points);
         let neighbours = self.select_neighbours_heuristic(m(), neighbours, layer);
@@ -304,7 +310,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         }
         result
     }
-    pub fn insert(&mut self, x: Address, hnsw: &mut RAMHnsw) {
+    pub fn insert(&mut self, x: VectorAddr, hnsw: &mut RAMHnsw) {
         match hnsw.entry_point {
             None => {
                 let top_level = self.get_random_layer();
@@ -331,7 +337,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
 
     pub fn search<H: Hnsw>(
         &self,
-        query: Address,
+        query: VectorAddr,
         hnsw: H,
         k_neighbours: usize,
         with_filter: &FilterBitSet,

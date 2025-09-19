@@ -134,7 +134,8 @@ fn merge_indexes<DS: DataStore + 'static>(
     config: &VectorConfig,
 ) -> VectorR<OpenSegment> {
     // Check if the first segment has deletions. If it doesn't, we can reuse its HNSW index
-    let has_deletions = operants[0].alive_paragraphs().count() < operants[0].data_store.stored_paragraph_count();
+    let has_deletions =
+        operants[0].alive_paragraphs().count() < operants[0].data_store.stored_paragraph_count() as usize;
 
     let mut index;
     let start_vector_index;
@@ -153,7 +154,7 @@ fn merge_indexes<DS: DataStore + 'static>(
     let retriever = Retriever::new(&[], &data_store, config, -1.0);
     let mut ops = HnswOps::new(&retriever, false);
     for id in start_vector_index..merged_vectors_count {
-        ops.insert(Address(id), &mut index);
+        ops.insert(VectorAddr(id), &mut index);
     }
 
     let hnsw_path = segment_path.join(file_names::HNSW);
@@ -180,14 +181,14 @@ fn merge_indexes<DS: DataStore + 'static>(
 
     let metadata = VectorSegmentMetadata {
         path: segment_path.to_path_buf(),
-        records: data_store.stored_paragraph_count(),
+        records: data_store.stored_paragraph_count() as usize,
         index_metadata: VectorSegmentMeta {
             tags: operants[0].metadata.index_metadata.tags.clone(),
         },
     };
 
     build_indexes(segment_path, &data_store)?;
-    let inverted_indexes = InvertedIndexes::open(segment_path, merged_vectors_count)?;
+    let inverted_indexes = InvertedIndexes::open(segment_path, merged_vectors_count as usize)?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
@@ -260,7 +261,7 @@ fn create_indexes<DS: DataStore + 'static>(
     let retriever = Retriever::new(&[], &data_store, config, -1.0);
     let mut ops = HnswOps::new(&retriever, false);
     for id in 0..vector_count {
-        ops.insert(Address(id), &mut index)
+        ops.insert(VectorAddr(id), &mut index)
     }
 
     {
@@ -282,12 +283,12 @@ fn create_indexes<DS: DataStore + 'static>(
 
     let metadata = VectorSegmentMetadata {
         path: path.to_path_buf(),
-        records: data_store.stored_paragraph_count(),
+        records: data_store.stored_paragraph_count() as usize,
         index_metadata: VectorSegmentMeta { tags },
     };
 
     build_indexes(path, &data_store)?;
-    let inverted_indexes = InvertedIndexes::open(path, vector_count)?;
+    let inverted_indexes = InvertedIndexes::open(path, vector_count as usize)?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
@@ -301,7 +302,7 @@ fn create_indexes<DS: DataStore + 'static>(
 
 pub struct Retriever<'a, DS: DataStore> {
     similarity_function: fn(&[u8], &[u8]) -> f32,
-    vector_count: usize,
+    vector_count: u32,
     temp: &'a [u8],
     data_store: &'a DS,
     min_score: f32,
@@ -316,24 +317,24 @@ impl<'a, DS: DataStore> Retriever<'a, DS> {
             min_score,
         }
     }
-    fn find_vector(&'a self, x: Address) -> VectorRef<'a> {
-        self.data_store.get_vector(x.into())
+    fn find_vector(&'a self, x: VectorAddr) -> VectorRef<'a> {
+        self.data_store.get_vector(x)
     }
 }
 
 impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
-    fn will_need(&self, x: Address) {
-        self.data_store.will_need(x.into());
+    fn will_need(&self, x: VectorAddr) {
+        self.data_store.will_need(x);
     }
 
-    fn get_vector(&self, x @ Address(addr): Address) -> &[u8] {
+    fn get_vector(&self, x @ VectorAddr(addr): VectorAddr) -> &[u8] {
         if addr == self.vector_count {
             self.temp
         } else {
             self.find_vector(x).vector()
         }
     }
-    fn similarity(&self, x @ Address(a0): Address, y @ Address(a1): Address) -> f32 {
+    fn similarity(&self, x @ VectorAddr(a0): VectorAddr, y @ VectorAddr(a1): VectorAddr) -> f32 {
         if a0 == self.vector_count {
             let y = self.find_vector(y).vector();
             (self.similarity_function)(self.temp, y)
@@ -351,7 +352,7 @@ impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
         self.min_score
     }
 
-    fn paragraph(&self, x: Address) -> ParagraphAddr {
+    fn paragraph(&self, x: VectorAddr) -> ParagraphAddr {
         self.find_vector(x).paragraph()
     }
 }
@@ -395,8 +396,8 @@ pub struct ScoredVector<'a> {
 }
 
 impl ScoredVector<'_> {
-    fn new(addr: Address, data_store: &dyn DataStore, score: f32) -> ScoredVector {
-        let node = data_store.get_vector(addr.into());
+    fn new(addr: VectorAddr, data_store: &dyn DataStore, score: f32) -> ScoredVector {
+        let node = data_store.get_vector(addr);
         ScoredVector { score, vector: node }
     }
     pub fn score(&self) -> f32 {
@@ -488,7 +489,7 @@ impl OpenSegment {
     ) -> Box<dyn Iterator<Item = ScoredVector> + '_> {
         let encoded_query = config.vector_type.encode(query);
         let retriever = Retriever::new(&encoded_query, data_store, config, min_score);
-        let query_address = Address(self.metadata.records);
+        let query_address = VectorAddr(self.metadata.records as u32);
 
         let mut filter_bitset = self.inverted_indexes.filter(filter);
         if let Some(ref mut bitset) = filter_bitset {
@@ -512,9 +513,8 @@ impl OpenSegment {
                 let best_vector_score = paragraph
                     .vectors(&paragraph_addr)
                     .map(|va| {
-                        let address = va.into();
-                        let score = retriever.similarity(query_address, address);
-                        Cnx(address, score)
+                        let score = retriever.similarity(query_address, va);
+                        Cnx(va, score)
                     })
                     .max_by(|v, w| v.1.total_cmp(&w.1))
                     .unwrap();

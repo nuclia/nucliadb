@@ -21,13 +21,15 @@
 use ops_hnsw::{Hnsw, Layer};
 use rustc_hash::FxHashMap;
 
+use crate::VectorAddr;
+
 use super::*;
 
-const NO_EDGES: [(Address, Edge); 0] = [];
+const NO_EDGES: [(VectorAddr, Edge); 0] = [];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EntryPoint {
-    pub node: Address,
+    pub node: VectorAddr,
     pub layer: usize,
 }
 
@@ -35,11 +37,11 @@ pub type Edge = f32;
 
 #[derive(Default, Clone)]
 pub struct RAMLayer {
-    pub out: FxHashMap<Address, Vec<(Address, Edge)>>,
+    pub out: FxHashMap<VectorAddr, Vec<(VectorAddr, Edge)>>,
 }
 
 impl RAMLayer {
-    fn out_edges(&self, node: Address) -> std::iter::Copied<std::slice::Iter<'_, (Address, Edge)>> {
+    fn out_edges(&self, node: VectorAddr) -> std::iter::Copied<std::slice::Iter<'_, (VectorAddr, Edge)>> {
         self.out
             .get(&node)
             .map_or_else(|| NO_EDGES.iter().copied(), |out| out.iter().copied())
@@ -47,21 +49,21 @@ impl RAMLayer {
     pub fn new() -> RAMLayer {
         RAMLayer::default()
     }
-    pub fn add_node(&mut self, node: Address) {
+    pub fn add_node(&mut self, node: VectorAddr) {
         self.out.entry(node).or_default();
     }
-    pub fn add_edge(&mut self, from: Address, edge: Edge, to: Address) {
+    pub fn add_edge(&mut self, from: VectorAddr, edge: Edge, to: VectorAddr) {
         if let Some(edges) = self.out.get_mut(&from) {
             edges.push((to, edge))
         }
     }
-    pub fn take_out_edges(&mut self, x: Address) -> Vec<(Address, Edge)> {
+    pub fn take_out_edges(&mut self, x: VectorAddr) -> Vec<(VectorAddr, Edge)> {
         self.out.get_mut(&x).map(std::mem::take).unwrap_or_default()
     }
-    pub fn no_out_edges(&self, node: Address) -> usize {
+    pub fn no_out_edges(&self, node: VectorAddr) -> usize {
         self.out.get(&node).map_or(0, |v| v.len())
     }
-    pub fn first(&self) -> Option<Address> {
+    pub fn first(&self) -> Option<VectorAddr> {
         self.out.keys().next().cloned()
     }
     pub fn is_empty(&self) -> bool {
@@ -78,7 +80,7 @@ impl RAMHnsw {
     pub fn new() -> RAMHnsw {
         Self::default()
     }
-    pub fn increase_layers_with(&mut self, x: Address, level: usize) -> &mut Self {
+    pub fn increase_layers_with(&mut self, x: VectorAddr, level: usize) -> &mut Self {
         while self.layers.len() <= level {
             let mut new_layer = RAMLayer::new();
             new_layer.add_node(x);
@@ -109,8 +111,8 @@ impl RAMHnsw {
 }
 
 impl<'a> Layer for &'a RAMLayer {
-    type EdgeIt = std::iter::Copied<std::slice::Iter<'a, (Address, Edge)>>;
-    fn get_out_edges(&self, node: Address) -> Self::EdgeIt {
+    type EdgeIt = std::iter::Copied<std::slice::Iter<'a, (VectorAddr, Edge)>>;
+    fn get_out_edges(&self, node: VectorAddr) -> Self::EdgeIt {
         self.out_edges(node)
     }
 }

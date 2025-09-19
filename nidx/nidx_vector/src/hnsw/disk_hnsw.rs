@@ -46,9 +46,9 @@
 use std::collections::HashMap;
 use std::io;
 
-use super::Address;
 use super::ops_hnsw::{Hnsw, Layer};
 use super::ram_hnsw::{Edge, EntryPoint, RAMHnsw, RAMLayer};
+use crate::VectorAddr;
 use crate::data_types::usize_utils::*;
 
 const EDGE_LEN: usize = 4;
@@ -68,16 +68,16 @@ pub struct DiskLayer<'a> {
 
 impl<'a> Layer for &'a DiskLayer<'a> {
     type EdgeIt = EdgeIter<'a>;
-    fn get_out_edges(&self, Address(node): Address) -> Self::EdgeIt {
-        let node = DiskHnsw::get_node(self.hnsw, node);
+    fn get_out_edges(&self, address: VectorAddr) -> Self::EdgeIt {
+        let node = DiskHnsw::get_node(self.hnsw, address);
         DiskHnsw::get_out_edges(node, self.layer)
     }
 }
 
 impl<'a> Layer for DiskLayer<'a> {
     type EdgeIt = EdgeIter<'a>;
-    fn get_out_edges(&self, Address(node): Address) -> Self::EdgeIt {
-        let node = DiskHnsw::get_node(self.hnsw, node);
+    fn get_out_edges(&self, address: VectorAddr) -> Self::EdgeIt {
+        let node = DiskHnsw::get_node(self.hnsw, address);
         DiskHnsw::get_out_edges(node, self.layer)
     }
 }
@@ -97,30 +97,30 @@ pub struct EdgeIter<'a> {
     buf: &'a [u8],
 }
 impl Iterator for EdgeIter<'_> {
-    type Item = (Address, Edge);
+    type Item = (VectorAddr, Edge);
     fn next(&mut self) -> Option<Self::Item> {
         if self.buf.len() == self.crnt {
             None
         } else {
             let buf = self.buf;
             let mut crnt = self.crnt;
-            let node = usize_from_slice_le(&buf[crnt..(crnt + NODE_LEN)]);
+            let node_addr = usize_from_slice_le(&buf[crnt..(crnt + NODE_LEN)]);
             crnt += USIZE_LEN;
             let edge = f32_from_le_bytes(&buf[crnt..(crnt + EDGE_LEN)]);
             crnt += EDGE_LEN;
             self.crnt = crnt;
-            Some((Address(node), edge))
+            Some((VectorAddr(node_addr as u32), edge))
         }
     }
 }
 
 pub struct DiskHnsw;
 impl DiskHnsw {
-    fn serialize_node<W>(mut buf: W, offset: usize, node: usize, hnsw: &RAMHnsw) -> io::Result<usize>
+    fn serialize_node<W>(mut buf: W, offset: usize, node_addr: u32, hnsw: &RAMHnsw) -> io::Result<usize>
     where
         W: io::Write,
     {
-        let node = Address(node);
+        let node = VectorAddr(node_addr);
         let mut length = offset;
         let mut indexing = HashMap::new();
         for layer in 0..hnsw.no_layers() {
@@ -129,7 +129,7 @@ impl DiskHnsw {
             buf.write_all(&no_edges.to_le_bytes())?;
             length += USIZE_LEN;
             for (cnx, edge) in hnsw.get_layer(layer).get_out_edges(node) {
-                buf.write_all(&cnx.0.to_le_bytes())?;
+                buf.write_all(&(cnx.0 as usize).to_le_bytes())?;
                 buf.write_all(&edge.to_le_bytes())?;
                 length += CNX_LEN;
             }
@@ -157,7 +157,7 @@ impl DiskHnsw {
             buf: &node[cnx_start..cnx_end],
         }
     }
-    pub fn serialize_into<W: io::Write>(mut buf: W, no_nodes: usize, hnsw: RAMHnsw) -> io::Result<()> {
+    pub fn serialize_into<W: io::Write>(mut buf: W, no_nodes: u32, hnsw: RAMHnsw) -> io::Result<()> {
         if let Some(entry_point) = hnsw.entry_point {
             let mut length = 0;
             let mut nodes_end = vec![];
@@ -171,7 +171,7 @@ impl DiskHnsw {
             }
             let EntryPoint { node, layer } = entry_point;
             buf.write_all(&layer.to_le_bytes())?;
-            buf.write_all(&node.0.to_le_bytes())?;
+            buf.write_all(&(node.0 as usize).to_le_bytes())?;
             let _length = length + 2 * USIZE_LEN;
             buf.flush()?;
         }
@@ -182,10 +182,10 @@ impl DiskHnsw {
         if !hnsw.is_empty() {
             let node_start = hnsw.len() - USIZE_LEN;
             let layer_start = node_start - USIZE_LEN;
-            let node = usize_from_slice_le(&hnsw[node_start..(node_start + USIZE_LEN)]);
+            let node_addr = usize_from_slice_le(&hnsw[node_start..(node_start + NODE_LEN)]);
             let layer = usize_from_slice_le(&hnsw[layer_start..(layer_start + USIZE_LEN)]);
             Some(EntryPoint {
-                node: Address(node),
+                node: VectorAddr(node_addr as u32),
                 layer,
             })
         } else {
@@ -194,12 +194,12 @@ impl DiskHnsw {
     }
     // hnsw must be serialized using MHnsw, may have trailing bytes at the start.
     // The returned node will have trailing bytes at the start.
-    pub fn get_node(hnsw: &[u8], node: usize) -> &[u8] {
+    pub fn get_node(hnsw: &[u8], address: VectorAddr) -> &[u8] {
         let indexing_end = hnsw.len() - (2 * USIZE_LEN);
         // node + 1 since the layers are stored in reverse order.
         // [n3, n2, n1, n0, end] Since we have the position of end, the node i is
         // i + 1 positions to its left.
-        let pos = indexing_end - ((node + 1) * USIZE_LEN);
+        let pos = indexing_end - ((address.0 as usize + 1) * USIZE_LEN);
         let node_end = usize_from_slice_le(&hnsw[pos..(pos + USIZE_LEN)]);
         &hnsw[..node_end]
     }
@@ -213,9 +213,9 @@ impl DiskHnsw {
         let end = hnsw.len();
         ram.entry_point = Self::get_entry_point(hnsw);
 
-        let mut node_index = 0;
+        let mut node_index: u32 = 0;
         loop {
-            let indexing_pos = end - (node_index + 3) * USIZE_LEN;
+            let indexing_pos = end - (node_index as usize + 3) * USIZE_LEN;
             let node_end = usize_from_slice_le(&hnsw[indexing_pos..indexing_pos + USIZE_LEN]);
             let mut layer_index = 0;
             loop {
@@ -231,7 +231,7 @@ impl DiskHnsw {
                 let cnx_end = cnx_start + number_edges * CNX_LEN;
 
                 if number_edges > 0 {
-                    let ram_edges = ram.layers[layer_index].out.entry(Address(node_index)).or_default();
+                    let ram_edges = ram.layers[layer_index].out.entry(VectorAddr(node_index)).or_default();
                     let edges = EdgeIter {
                         crnt: 0,
                         buf: &hnsw[cnx_start..cnx_end],
@@ -261,11 +261,11 @@ impl DiskHnsw {
 mod tests {
     use super::*;
     use crate::hnsw::ram_hnsw::RAMLayer;
-    fn layer_check<L: Layer>(buf: L, no_nodes: usize, cnx: &[Vec<(Address, Edge)>]) {
+    fn layer_check<L: Layer>(buf: L, no_nodes: u32, cnx: &[Vec<(VectorAddr, Edge)>]) {
         let no_cnx = vec![];
         for i in 0..no_nodes {
-            let expected = cnx.get(i).unwrap_or(&no_cnx);
-            let got: Vec<_> = buf.get_out_edges(Address(i)).collect();
+            let expected = cnx.get(i as usize).unwrap_or(&no_cnx);
+            let got: Vec<_> = buf.get_out_edges(VectorAddr(i)).collect();
             assert_eq!(expected, &got);
         }
     }
@@ -282,23 +282,35 @@ mod tests {
     fn hnsw_test() {
         let no_nodes = 3;
         let cnx0 = vec![
-            vec![(Address(1), 1.0)],
-            vec![(Address(2), 2.0)],
-            vec![(Address(3), 3.0)],
+            vec![(VectorAddr(1), 1.0)],
+            vec![(VectorAddr(2), 2.0)],
+            vec![(VectorAddr(3), 3.0)],
         ];
         let layer0 = RAMLayer {
-            out: cnx0.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
+            out: cnx0
+                .iter()
+                .enumerate()
+                .map(|(i, c)| (VectorAddr(i as u32), c.clone()))
+                .collect(),
         };
-        let cnx1 = vec![vec![(Address(1), 4.0)], vec![(Address(2), 5.0)]];
+        let cnx1 = vec![vec![(VectorAddr(1), 4.0)], vec![(VectorAddr(2), 5.0)]];
         let layer1 = RAMLayer {
-            out: cnx1.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
+            out: cnx1
+                .iter()
+                .enumerate()
+                .map(|(i, c)| (VectorAddr(i as u32), c.clone()))
+                .collect(),
         };
-        let cnx2 = vec![vec![(Address(1), 6.0)]];
+        let cnx2 = vec![vec![(VectorAddr(1), 6.0)]];
         let layer2 = RAMLayer {
-            out: cnx2.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
+            out: cnx2
+                .iter()
+                .enumerate()
+                .map(|(i, c)| (VectorAddr(i as u32), c.clone()))
+                .collect(),
         };
         let entry_point = EntryPoint {
-            node: Address(0),
+            node: VectorAddr(0),
             layer: 2,
         };
         let mut hnsw = RAMHnsw::new();
@@ -320,23 +332,35 @@ mod tests {
     fn hnsw_deserialize_test() {
         let no_nodes = 3;
         let cnx0 = [
-            vec![(Address(1), 1.0)],
-            vec![(Address(2), 2.0)],
-            vec![(Address(3), 3.0)],
+            vec![(VectorAddr(1), 1.0)],
+            vec![(VectorAddr(2), 2.0)],
+            vec![(VectorAddr(3), 3.0)],
         ];
         let layer0 = RAMLayer {
-            out: cnx0.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
+            out: cnx0
+                .iter()
+                .enumerate()
+                .map(|(i, c)| (VectorAddr(i as u32), c.clone()))
+                .collect(),
         };
-        let cnx1 = [vec![(Address(1), 4.0)], vec![(Address(2), 5.0)]];
+        let cnx1 = [vec![(VectorAddr(1), 4.0)], vec![(VectorAddr(2), 5.0)]];
         let layer1 = RAMLayer {
-            out: cnx1.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
+            out: cnx1
+                .iter()
+                .enumerate()
+                .map(|(i, c)| (VectorAddr(i as u32), c.clone()))
+                .collect(),
         };
-        let cnx2 = [vec![(Address(1), 6.0)]];
+        let cnx2 = [vec![(VectorAddr(1), 6.0)]];
         let layer2 = RAMLayer {
-            out: cnx2.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
+            out: cnx2
+                .iter()
+                .enumerate()
+                .map(|(i, c)| (VectorAddr(i as u32), c.clone()))
+                .collect(),
         };
         let entry_point = EntryPoint {
-            node: Address(0),
+            node: VectorAddr(0),
             layer: 2,
         };
         let mut hnsw = RAMHnsw::new();

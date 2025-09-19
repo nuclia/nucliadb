@@ -51,6 +51,7 @@ pub use request_types::VectorSearchRequest;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct ParagraphAddr(u32);
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct VectorAddr(u32);
 
 #[derive(Clone, Serialize, Deserialize)]

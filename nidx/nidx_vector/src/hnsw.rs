@@ -28,21 +28,3 @@ pub use ops_hnsw::Cnx;
 pub use ops_hnsw::DataRetriever;
 pub use ops_hnsw::HnswOps;
 pub use ram_hnsw::RAMHnsw;
-
-use crate::VectorAddr;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct Address(pub(super) usize);
-
-// VectorAddr and HNSW Address are the same thing with a different data type for serialization purposes
-impl From<Address> for VectorAddr {
-    fn from(value: Address) -> Self {
-        Self(value.0 as u32)
-    }
-}
-
-impl From<VectorAddr> for Address {
-    fn from(value: VectorAddr) -> Self {
-        Self(value.0 as usize)
-    }
-}
