@@ -43,19 +43,27 @@ jobs:
 
       - name: Install PostgreSQL with Helm
         run: |
-          helm install my-postgresql oci://registry-1.docker.io/bitnamicharts/postgresql --version 12.9.0
+          helm install my-postgresql oci://docker.io/bitnamicharts/postgresql --version 16.7.27 --set image.repository="bitnamilegacy/postgresql",image.tag="17.6.0-debian-12-r4"
 
       - name: Wait for PostgreSQL to be ready
         run: |
-          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql,app.kubernetes.io/instance=my-postgresql --timeout=60s
+          kubectl wait --for=condition=Ready --timeout=2m pod -l app.kubernetes.io/name=postgresql,app.kubernetes.io/instance=my-postgresql || (
+            kubectl get all --all-namespaces
+            microk8s inspect &&
+            kubectl -n default describe pod/my-postgresql-0
+            exit 1)
 
       - name: Install Minio with Helm
         run: |
-          helm install my-minio oci://registry-1.docker.io/bitnamicharts/minio
+          helm install my-minio oci://registry-1.docker.io/bitnamicharts/minio --version 17.0.21 --set image.repository="bitnamilegacy/minio",image.tag="2025.7.23-debian-12-r5"
 
       - name: Wait for Minio to be ready
         run: |
-          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=minio,app.kubernetes.io/instance=my-minio
+          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=minio,app.kubernetes.io/instance=my-minio || (
+            kubectl get all --all-namespaces
+            microk8s inspect &&
+            kubectl -n default describe pod/my-minio-0
+            exit 1)
           kubectl exec deploy/my-minio -- mkdir /bitnami/minio/data/nidx
 
       - name: Credentials
