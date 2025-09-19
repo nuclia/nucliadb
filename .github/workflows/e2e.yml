@@ -50,7 +50,7 @@ jobs:
           kubectl wait --for=condition=Ready --timeout=2m pod -l app.kubernetes.io/name=postgresql,app.kubernetes.io/instance=my-postgresql  || (
             kubectl get all --all-namespaces
             microk8s inspect &&
-            kubectl -n default describe pod pod/my-postgresql-0
+            kubectl -n default describe pod/my-postgresql-0
             exit 1)
 
       - name: Install Minio with Helm
