@@ -17,24 +17,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Union
 
 from fastapi import Request, Response
 from fastapi_versioning import version
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
-from nucliadb.ingest.fields.base import Field
-from nucliadb.ingest.orm.resource import Resource
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.search import cache, paragraphs
+from nucliadb.search.search import cache
 from nucliadb.search.search.cache import request_caches
-from nucliadb.search.search.hydrator.fields import hydrate_field
+from nucliadb.search.search.hydrator.fields import hydrate_field, page_preview_id
 from nucliadb.search.search.hydrator.images import (
     download_page_preview,
-    paragraph_source_image,
 )
-from nucliadb.search.search.hydrator.paragraphs import ParagraphIndex, related_paragraphs_refs
+from nucliadb.search.search.hydrator.paragraphs import ParagraphIndex, hydrate_paragraph
 from nucliadb.search.search.hydrator.resources import hydrate_resource
 from nucliadb_models import hydration as hydration_models
 from nucliadb_models.hydration import Hydrated, HydrateRequest, Hydration
@@ -133,9 +129,6 @@ class HydratedBuilder:
     def add_paragraph(self, paragraph_id: ParagraphId, paragraph: hydration_models.HydratedParagraph):
         self._paragraphs[paragraph_id.full()] = paragraph
 
-    def page_preview_id(self, page: int) -> str:
-        return f"{page}"
-
     def add_page_preview(self, paragraph_id: ParagraphId, page: int, image: Image):
         field_id = paragraph_id.field_id
         field = self._fields[field_id.full()]
@@ -147,7 +140,7 @@ class HydratedBuilder:
         if field.previews is None:
             field.previews = {}
 
-        preview_id = self.page_preview_id(page)
+        preview_id = page_preview_id(page)
         field.previews[preview_id] = image
 
         paragraph = self._paragraphs[paragraph_id.full()]
@@ -165,19 +158,12 @@ class HydratedBuilder:
         if field.previews is None:
             field.previews = {}
 
-        preview_id = self.page_preview_id(page)
+        preview_id = page_preview_id(page)
         field.previews[preview_id] = image
 
         paragraph = self._paragraphs[paragraph_id.full()]
         assert paragraph.table is not None, "should already be set"
         paragraph.table.page_preview_ref = preview_id
-
-
-@dataclass
-class ExtraParagraphHydration:
-    field_page: Optional[int]
-    field_table_page: Optional[int]
-    related_paragraph_ids: list[ParagraphId]
 
 
 class Hydrator:
@@ -214,19 +200,25 @@ class Hydrator:
 
             # hydrate paragraphs (requested and related)
 
-            (hydrated_paragraph, extra) = await self._hydrate_paragraph(
-                resource, field, paragraph_id, self.config.paragraph
+            if field_id not in self.field_paragraphs:
+                field_paragraphs_index = ParagraphIndex(field_id)
+                self.field_paragraphs[field_id] = field_paragraphs_index
+            field_paragraphs_index = self.field_paragraphs[field_id]
+
+            (hydrated_paragraph, extra) = await hydrate_paragraph(
+                resource, field, paragraph_id, self.config.paragraph, field_paragraphs_index
             )
             self.hydrated.add_paragraph(paragraph_id, hydrated_paragraph)
 
             for related_paragraph_id in extra.related_paragraph_ids:
-                (hydrated_paragraph, _) = await self._hydrate_paragraph(
+                (hydrated_paragraph, _) = await hydrate_paragraph(
                     resource,
                     field,
                     related_paragraph_id,
                     hydration_models.ParagraphHydration(
                         text=self.config.paragraph.text, image=None, table=None, page=None, related=None
                     ),
+                    field_paragraphs_index,
                 )
                 self.hydrated.add_paragraph(related_paragraph_id, hydrated_paragraph)
 
@@ -261,98 +253,3 @@ class Hydrator:
                 self.hydrated.add_resource(rid, hydrated_resource)
 
         return self.hydrated.build()
-
-    async def _hydrate_paragraph(
-        self,
-        resource: Resource,
-        field: Field,
-        paragraph_id: ParagraphId,
-        config: hydration_models.ParagraphHydration,
-    ) -> tuple[hydration_models.HydratedParagraph, ExtraParagraphHydration]:
-        """This function assumes the paragraph field exists in the resource.
-        However, the paragraph doesn't necessarily exist in the paragraph
-        metadata, it can be made-up to include more or less text than the
-        originally extracted.
-
-        """
-        hydrated = hydration_models.HydratedParagraph(
-            id=paragraph_id.full(),
-            field=paragraph_id.field_id.full(),
-            resource=paragraph_id.rid,
-        )
-        extra_hydration = ExtraParagraphHydration(
-            field_page=None, field_table_page=None, related_paragraph_ids=[]
-        )
-
-        if config.text:
-            text = await paragraphs.get_paragraph_text(kbid=self.kbid, paragraph_id=paragraph_id)
-            hydrated.text = text
-
-        requires_field_metadata = config.image or config.table or config.page or config.related
-        if requires_field_metadata:
-            field_metadata = await field.get_field_metadata()
-            if field_metadata is not None:
-                # TODO: related paragraphs need an index to navigate relations, but
-                # the rest of options are fine with a simple O(n) scan. We don't
-                # need the index in those cases
-                field_id = paragraph_id.field_id
-                if field_id not in self.field_paragraphs:
-                    index = ParagraphIndex()
-                    await index.build(field_id, field_metadata)
-                    self.field_paragraphs[field_id] = index
-                field_paragraphs = self.field_paragraphs[field_id]
-
-                paragraph = field_paragraphs.get(paragraph_id)
-                if paragraph is not None:
-                    # otherwise, this is a fake paragraph. We can't hydrate anything
-                    # else here
-
-                    if config.related:
-                        hydrated.related, related_ids = await related_paragraphs_refs(
-                            paragraph_id, field_paragraphs, config.related
-                        )
-                        extra_hydration.related_paragraph_ids = related_ids
-
-                    if config.image:
-                        hydrated.image = hydration_models.HydratedParagraphImage()
-
-                        if config.image.source_image:
-                            hydrated.image.source_image = await paragraph_source_image(
-                                self.kbid, paragraph
-                            )
-
-                    if config.page:
-                        if hydrated.page is None:
-                            hydrated.page = hydration_models.HydratedParagraphPage()
-
-                        if config.page.page_with_visual:
-                            if paragraph.page.page_with_visual:
-                                # Paragraphs can be found on pages with visual content. In this
-                                # case, we want to return the preview of the paragraph page as
-                                # an image
-                                page_number = paragraph.page.page
-                                # TODO: what should I do if I later find there's no page in the DB?
-                                hydrated.page.page_preview_ref = self.hydrated.page_preview_id(
-                                    page_number
-                                )
-                                extra_hydration.field_page = page_number
-
-                    if config.table:
-                        if hydrated.table is None:
-                            hydrated.table = hydration_models.HydratedParagraphTable()
-
-                        if config.table.table_page_preview:
-                            if paragraph.representation.is_a_table:
-                                # When a paragraph comes with a table and table hydration is
-                                # enabled, we want to return the image representing that table.
-                                # Ideally we should hydrate the paragraph reference_file, but
-                                # table screenshots are not always perfect so we prefer to use
-                                # the page preview. If at some point the table images are good
-                                # enough, it'd be better to use those
-                                page_number = paragraph.page.page
-                                hydrated.table.page_preview_ref = self.hydrated.page_preview_id(
-                                    page_number
-                                )
-                                extra_hydration.field_table_page = page_number
-
-        return hydrated, extra_hydration

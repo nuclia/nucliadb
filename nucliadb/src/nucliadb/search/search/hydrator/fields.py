@@ -27,6 +27,11 @@ from nucliadb_models import hydration as hydration_models
 from nucliadb_models.common import FieldTypeName
 
 
+def page_preview_id(page_number: int) -> str:
+    """Return the string page number for an specific page"""
+    return f"{page_number}"
+
+
 async def hydrate_field(resource: Resource, field_id: FieldId, config: hydration_models.FieldHydration):
     field_type = FIELD_TYPE_STR_TO_NAME[field_id.type]
 

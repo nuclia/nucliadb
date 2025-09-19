@@ -17,9 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from dataclasses import dataclass
 from typing import Optional, Union
 
 from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.ingest.fields.base import Field
+from nucliadb.ingest.orm.resource import Resource
+from nucliadb.search.search import paragraphs
+from nucliadb.search.search.hydrator.fields import page_preview_id
+from nucliadb.search.search.hydrator.images import paragraph_source_image
 from nucliadb_models import hydration as hydration_models
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import FieldComputedMetadata
@@ -37,24 +43,29 @@ class ParagraphIndex:
     SIBLINGS = "siblings"
     REPLACEMENTS = "replacements"
 
-    def __init__(self) -> None:
+    def __init__(self, field_id: FieldId) -> None:
+        self.field_id = field_id
         self.paragraphs: dict[str, resources_pb2.Paragraph] = {}
         self.neighbours: dict[tuple[str, str], str] = {}
         self.related: dict[tuple[str, str], list[str]] = {}
+        self._built = False
 
-    async def build(self, field_id: FieldId, field_metadata: FieldComputedMetadata):
+    def built(self) -> bool:
+        return self._built
+
+    def build(self, field_metadata: FieldComputedMetadata):
         self.paragraphs.clear()
         self.neighbours.clear()
         self.related.clear()
 
-        if field_id.subfield_id is None:
+        if self.field_id.subfield_id is None:
             field_paragraphs = field_metadata.metadata.paragraphs
         else:
-            field_paragraphs = field_metadata.split_metadata[field_id.subfield_id].paragraphs
+            field_paragraphs = field_metadata.split_metadata[self.field_id.subfield_id].paragraphs
 
         previous = None
         for paragraph in field_paragraphs:
-            paragraph_id = field_id.paragraph_id(paragraph.start, paragraph.end).full()
+            paragraph_id = self.field_id.paragraph_id(paragraph.start, paragraph.end).full()
             self.paragraphs[paragraph_id] = paragraph
 
             if previous is not None:
@@ -71,6 +82,8 @@ class ParagraphIndex:
             self.related[(paragraph_id, ParagraphIndex.REPLACEMENTS)] = [
                 replacement for replacement in paragraph.relations.replacements
             ]
+
+        self._built = True
 
     def get(self, paragraph_id: Union[str, ParagraphId]) -> Optional[resources_pb2.Paragraph]:
         paragraph_id = str(paragraph_id)
@@ -123,6 +136,103 @@ class ParagraphIndex:
     def replacements(self, paragraph_id: Union[str, ParagraphId]) -> list[str]:
         paragraph_id = str(paragraph_id)
         return self.related.get((paragraph_id, ParagraphIndex.REPLACEMENTS), [])
+
+
+@dataclass
+class ExtraParagraphHydration:
+    field_page: Optional[int]
+    field_table_page: Optional[int]
+    related_paragraph_ids: list[ParagraphId]
+
+
+async def hydrate_paragraph(
+    resource: Resource,
+    field: Field,
+    paragraph_id: ParagraphId,
+    config: hydration_models.ParagraphHydration,
+    field_paragraphs_index: ParagraphIndex,
+) -> tuple[hydration_models.HydratedParagraph, ExtraParagraphHydration]:
+    """Hydrate a paragraph and return the extra hydration to built a coherent
+    hydration around this paragraph.
+
+    Although the resource and field exist, the paragraph doesn't necessarily
+    need to be a real one in the paragraph metadata, it can be made-up to
+    include more or less text than the originally extracted.
+
+    """
+    kbid = resource.kb.kbid
+
+    hydrated = hydration_models.HydratedParagraph(
+        id=paragraph_id.full(),
+        field=paragraph_id.field_id.full(),
+        resource=paragraph_id.rid,
+    )
+    extra_hydration = ExtraParagraphHydration(
+        field_page=None, field_table_page=None, related_paragraph_ids=[]
+    )
+
+    if config.text:
+        text = await paragraphs.get_paragraph_text(kbid=kbid, paragraph_id=paragraph_id)
+        hydrated.text = text
+
+    requires_field_metadata = config.image or config.table or config.page or config.related
+    if requires_field_metadata:
+        field_metadata = await field.get_field_metadata()
+        if field_metadata is not None:
+            # TODO: related paragraphs need an index to navigate relations, but
+            # the rest of options are fine with a simple O(n) scan. We don't
+            # need the index in those cases
+            if not field_paragraphs_index.built():
+                field_paragraphs_index.build(field_metadata)
+
+            paragraph = field_paragraphs_index.get(paragraph_id)
+            if paragraph is not None:
+                # otherwise, this is a fake paragraph. We can't hydrate anything
+                # else here
+
+                if config.related:
+                    hydrated.related, related_ids = await related_paragraphs_refs(
+                        paragraph_id, field_paragraphs_index, config.related
+                    )
+                    extra_hydration.related_paragraph_ids = related_ids
+
+                if config.image:
+                    hydrated.image = hydration_models.HydratedParagraphImage()
+
+                    if config.image.source_image:
+                        hydrated.image.source_image = await paragraph_source_image(kbid, paragraph)
+
+                if config.page:
+                    if hydrated.page is None:
+                        hydrated.page = hydration_models.HydratedParagraphPage()
+
+                    if config.page.page_with_visual:
+                        if paragraph.page.page_with_visual:
+                            # Paragraphs can be found on pages with visual content. In this
+                            # case, we want to return the preview of the paragraph page as
+                            # an image
+                            page_number = paragraph.page.page
+                            # TODO: what should I do if I later find there's no page in the DB?
+                            hydrated.page.page_preview_ref = page_preview_id(page_number)
+                            extra_hydration.field_page = page_number
+
+                if config.table:
+                    if hydrated.table is None:
+                        hydrated.table = hydration_models.HydratedParagraphTable()
+
+                    if config.table.table_page_preview:
+                        if paragraph.representation.is_a_table:
+                            # When a paragraph comes with a table and table hydration is
+                            # enabled, we want to return the image representing that table.
+                            # Ideally we should hydrate the paragraph reference_file, but
+                            # table screenshots are not always perfect so we prefer to use
+                            # the page preview. If at some point the table images are good
+                            # enough, it'd be better to use those
+                            page_number = paragraph.page.page
+                            hydrated.table.page_preview_ref = page_preview_id(page_number)
+                            extra_hydration.field_table_page = page_number
+
+    return hydrated, extra_hydration
 
 
 async def related_paragraphs_refs(
