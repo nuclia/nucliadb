@@ -71,7 +71,6 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
     #[cfg(not(target_os = "windows"))]
     {
         index.advise(memmap2::Advice::Random)?;
-        index.advise(memmap2::Advice::WillNeed)?;
     }
 
     let inverted_indexes = InvertedIndexes::open(path, metadata.records)?;
@@ -545,7 +544,10 @@ impl OpenSegment {
 
 #[cfg(test)]
 mod test {
-    use std::collections::{BTreeMap, HashSet};
+    use std::{
+        collections::{BTreeMap, HashSet},
+        time::Instant,
+    };
 
     use nidx_protos::{Position, Representation, SentenceMetadata};
     use rand::{Rng, SeedableRng, rngs::SmallRng};
@@ -555,13 +557,13 @@ mod test {
         ParagraphAddr, VectorAddr,
         config::{Similarity, VectorCardinality, VectorConfig},
         formula::Formula,
-        vector_types::dense_f32::{dot_similarity, encode_vector},
+        vector_types::dense_f32::{self, dot_similarity, encode_vector},
     };
 
     use super::{Elem, create, merge};
     use nidx_protos::prost::*;
 
-    const DIMENSION: usize = 128;
+    const DIMENSION: usize = 2048;
 
     fn random_vector(rng: &mut impl Rng) -> Vec<f32> {
         let v: Vec<f32> = (0..DIMENSION).map(|_| rng.gen_range(-1.0..1.0)).collect();
@@ -802,6 +804,150 @@ mod test {
         println!("Assessed recall = {recall}");
         // Expected 0.90-0.92, has a little margin because HNSW can be non-deterministic
         assert!(recall >= 0.88);
+
+        Ok(())
+    }
+
+    struct RabitQ {
+        v: Vec<bool>,
+        dis_quant_original: f32,
+    }
+
+    fn rabitq(v: &Vec<f32>) -> RabitQ {
+        let rd = (DIMENSION as f32).sqrt();
+        let bv: Vec<bool> = v.iter().map(|v| *v > 0.0).collect();
+        let qv: Vec<f32> = bv.iter().map(|w| if *w { 1.0 / rd } else { -1.0 / rd }).collect();
+        let dot = dense_f32::dot_similarity(&encode_vector(&v), &encode_vector(&qv));
+
+        RabitQ {
+            v: bv,
+            dis_quant_original: dot,
+        }
+    }
+
+    impl RabitQ {
+        fn sim(&self, other: &Vec<f32>) -> (f32, f32) {
+            let rd = (DIMENSION as f32).sqrt();
+            // let dot: usize = self
+            //     .v
+            //     .iter()
+            //     .zip(other.v.iter())
+            //     .map(|(a, b)| a ^ b)
+            //     .filter(|a| *a)
+            //     .count();
+
+            let qv: Vec<f32> = self.v.iter().map(|w| if *w { 1.0 / rd } else { -1.0 / rd }).collect();
+            let t = Instant::now();
+            let dot_other_to_self_repr = dense_f32::dot_similarity(&encode_vector(&qv), &encode_vector(other));
+
+            let qo: Vec<u8> = other.iter().map(|w| ((w + 1.0) * 128.0) as u8).collect();
+            let sum_qo: u32 = qo.iter().map(|x| *x as u32).sum();
+            let sum_bits = self.v.iter().filter(|a| **a).count();
+            let qd: u32 = qo
+                .iter()
+                .zip(self.v.iter())
+                .filter(|(_, b)| **b)
+                .map(|(i, _)| *i as u32)
+                .sum();
+            let d =
+                4 as f32 / 256.0 / rd * qd as f32 - 2.0 / rd * sum_bits as f32 - 2.0 / 256.0 / rd * sum_qo as f32 + rd;
+            // println!("real dot {dot_other_to_self_repr}, d {d}, {sum_qo}, {sum_bits}, {qd}");
+            let estimate = d / self.dis_quant_original;
+
+            let d2 = self.dis_quant_original * self.dis_quant_original;
+            let error = 2.0 * ((1.0 - d2) / d2).sqrt() * 1.9 / (DIMENSION as f32 - 1.0).sqrt();
+
+            (estimate, error)
+        }
+
+        fn sim2(&self, other: &RabitQ) -> (f32, f32) {
+            let rd = (DIMENSION as f32).sqrt();
+            let dot: i32 = self
+                .v
+                .iter()
+                .zip(other.v.iter())
+                .map(|(a, b)| if a == b { 1 } else { -1 })
+                .sum();
+
+            let qv1: Vec<f32> = self.v.iter().map(|w| if *w { 1.0 / rd } else { -1.0 / rd }).collect();
+            let qv2: Vec<f32> = other.v.iter().map(|w| if *w { 1.0 / rd } else { -1.0 / rd }).collect();
+            let slow = dense_f32::dot_similarity(&encode_vector(&qv1), &encode_vector(&qv2));
+
+            println!("dot {dot}  slow {slow}");
+
+            let estimate = dot as f32 / self.dis_quant_original / DIMENSION as f32;
+
+            let d2 = self.dis_quant_original * self.dis_quant_original;
+            let error = 2.0 * ((1.0 - d2) / d2).sqrt() * 1.9 / (DIMENSION as f32 - 1.0).sqrt();
+
+            (estimate, error)
+        }
+    }
+
+    #[test]
+    fn test_rabiq() -> anyhow::Result<()> {
+        let mut rng = SmallRng::seed_from_u64(6234567890);
+        let v1a = random_vector(&mut rng);
+        let v1b = random_nearby_vector(&mut rng, &v1a, 0.05);
+        let v1c = random_nearby_vector(&mut rng, &v1a, 0.2);
+        let v1d = random_nearby_vector(&mut rng, &v1a, 1.0);
+        let v2 = random_vector(&mut rng);
+
+        println!(
+            "v1a-v1d: {} {:?} {:?}",
+            dense_f32::dot_similarity(&encode_vector(&v1a), &encode_vector(&v1d)),
+            rabitq(&v1a).sim(&v1d),
+            rabitq(&v1a).sim2(&rabitq(&v1d)),
+        );
+
+        for _ in 0..10 {
+            let v1a = random_vector(&mut rng);
+            for dist in [0.05, 0.9, 2.2, 6.6, 55.5] {
+                for _ in 0..20 {
+                    let vo = random_nearby_vector(&mut rng, &v1a, dist);
+                    let (est, err) = rabitq(&v1a).sim(&vo);
+                    let act = dense_f32::dot_similarity(&encode_vector(&v1a), &encode_vector(&vo));
+                    if (est - act).abs() > err {
+                        println!("EXCEEDED ERROR {} > {}", (est - act).abs(), err);
+                        println!(
+                            "v1a-vo: {} {:?}",
+                            dense_f32::dot_similarity(&encode_vector(&v1a), &encode_vector(&vo)),
+                            rabitq(&v1a).sim(&vo)
+                        );
+                    }
+                }
+            }
+        }
+
+        println!(
+            "v1a-v1a: {} {:?}",
+            dense_f32::dot_similarity(&encode_vector(&v1a), &encode_vector(&v1a)),
+            rabitq(&v1a).sim(&v1a)
+        );
+
+        println!(
+            "v1a-v1b: {} {:?}",
+            dense_f32::dot_similarity(&encode_vector(&v1a), &encode_vector(&v1b)),
+            rabitq(&v1a).sim(&v1b)
+        );
+
+        println!(
+            "v1a-v1c: {} {:?}",
+            dense_f32::dot_similarity(&encode_vector(&v1a), &encode_vector(&v1c)),
+            rabitq(&v1a).sim(&v1c)
+        );
+
+        println!(
+            "v1a-v1d: {} {:?}",
+            dense_f32::dot_similarity(&encode_vector(&v1a), &encode_vector(&v1d)),
+            rabitq(&v1a).sim(&v1d)
+        );
+
+        println!(
+            "v1a-v2: {} {:?}",
+            dense_f32::dot_similarity(&encode_vector(&v1a), &encode_vector(&v2)),
+            rabitq(&v1a).sim(&v2)
+        );
 
         Ok(())
     }
