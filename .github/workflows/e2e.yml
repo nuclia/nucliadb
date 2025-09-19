@@ -63,6 +63,7 @@ jobs:
             kubectl get all --all-namespaces
             microk8s inspect &&
             kubectl -n default describe pod/my-minio-0
+            exit 1)
           kubectl exec deploy/my-minio -- mkdir /bitnami/minio/data/nidx
 
       - name: Credentials
