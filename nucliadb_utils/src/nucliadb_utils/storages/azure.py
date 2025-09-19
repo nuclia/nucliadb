@@ -383,7 +383,7 @@ class AzureObjectStore(ObjectStore):
         length = None
         if range.any():
             offset = range.start or 0
-            length = range.end - offset + 1 if range.end else None
+            length = range.end - offset + 1 if range.end is not None else None
         try:
             downloader = await blob_client.download_blob(
                 offset=offset,  # type: ignore

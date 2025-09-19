@@ -71,9 +71,3 @@ class UnparsableResponse(Exception):
     Raised when trying to parse a response from a storage API and it's not
     possible
     """
-
-
-class ObjectNotFoundError(Exception):
-    """
-    Raised when the object is not found in storage
-    """
