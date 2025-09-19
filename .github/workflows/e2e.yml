@@ -43,7 +43,7 @@ jobs:
 
       - name: Install PostgreSQL with Helm
         run: |
-          helm install my-postgresql oci://registry-1.docker.io/bitnamicharts/postgresql --version 16.7.26
+          helm install my-postgresql oci://docker.io/bitnamicharts/postgresql --version 16.7.27 --set image.repository="bitnamilegacy/postgresql",image.tag="17.6.0-debian-12-r4"
 
       - name: Wait for PostgreSQL to be ready
         run: |
