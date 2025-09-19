@@ -55,7 +55,7 @@ jobs:
 
       - name: Install Minio with Helm
         run: |
-          helm install my-minio oci://registry-1.docker.io/bitnamicharts/minio --version 17.0.22
+          helm install my-minio oci://registry-1.docker.io/bitnamicharts/minio --version 17.0.21 --set image.repository="bitnamilegacy/minio",image.tag="2025.7.23-debian-12-r5"
 
       - name: Wait for Minio to be ready
         run: |
