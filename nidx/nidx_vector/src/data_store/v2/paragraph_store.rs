@@ -106,8 +106,8 @@ impl ParagraphStore {
         self.data.len() + self.pos.len()
     }
 
-    pub fn stored_elements(&self) -> usize {
-        self.pos.len() / U32_LEN
+    pub fn stored_elements(&self) -> u32 {
+        (self.pos.len() / U32_LEN) as u32
     }
 }
 

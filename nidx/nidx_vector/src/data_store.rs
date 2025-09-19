@@ -90,8 +90,8 @@ impl ParagraphRef<'_> {
 
 pub trait DataStore: Sync + Send {
     fn size_bytes(&self) -> usize;
-    fn stored_paragraph_count(&self) -> usize;
-    fn stored_vector_count(&self) -> usize;
+    fn stored_paragraph_count(&self) -> u32;
+    fn stored_vector_count(&self) -> u32;
     fn get_paragraph(&self, id: ParagraphAddr) -> ParagraphRef;
     fn get_vector(&self, id: VectorAddr) -> VectorRef;
     fn will_need(&self, id: VectorAddr);
@@ -99,5 +99,5 @@ pub trait DataStore: Sync + Send {
 }
 
 pub fn iter_paragraphs(data_store: &impl DataStore) -> impl Iterator<Item = ParagraphAddr> {
-    (0..data_store.stored_paragraph_count() as u32).map(ParagraphAddr)
+    (0..data_store.stored_paragraph_count()).map(ParagraphAddr)
 }
