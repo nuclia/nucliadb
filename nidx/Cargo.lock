@@ -2411,6 +2411,7 @@ dependencies = [
  "bytes",
  "chrono",
  "futures",
+ "httparse",
  "humantime",
  "hyper",
  "itertools 0.13.0",

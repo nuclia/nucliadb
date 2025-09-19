@@ -27,7 +27,6 @@ from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.azure import AzureObjectStore
-from nucliadb_utils.storages.exceptions import ObjectNotFoundError
 from nucliadb_utils.storages.utils import ObjectMetadata
 
 
@@ -63,7 +62,7 @@ class AzureBlobStore(BlobStore):
 class AzureFileStorageManager(FileStorageManager):
     storage: AzureBlobStore
     chunk_size = CHUNK_SIZE
-    min_upload_size = None
+    min_upload_size = CHUNK_SIZE
 
     @property
     def object_store(self) -> AzureObjectStore:
@@ -87,7 +86,7 @@ class AzureFileStorageManager(FileStorageManager):
         bucket = self.storage.get_bucket_name(kbid)
         try:
             await self.object_store.delete(bucket, uri)
-        except ObjectNotFoundError:
+        except KeyError:
             logger.warning(
                 "Attempt to delete an upload but not found",
                 extra={"uri": uri, "kbid": kbid, "bucket": bucket},
@@ -108,4 +107,5 @@ class AzureFileStorageManager(FileStorageManager):
         return path
 
     def validate_intermediate_chunk(self, uploaded_bytes: int):
-        pass
+        if uploaded_bytes < self.min_upload_size:
+            raise ValueError(f"Intermediate chunks cannot be smaller than {self.min_upload_size} bytes")

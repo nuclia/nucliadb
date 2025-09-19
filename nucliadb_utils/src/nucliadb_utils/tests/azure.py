@@ -28,6 +28,7 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore  #
 
 from nucliadb_utils.settings import FileBackendConfig, storage_settings
 from nucliadb_utils.storages.azure import AzureStorage
+from nucliadb_utils.storages.settings import settings as extended_storage_settings
 
 images.settings["azurite"] = {
     "image": "mcr.microsoft.com/azure-storage/azurite",
@@ -105,7 +106,7 @@ def azurite() -> Generator[AzuriteFixture, None, None]:
             port=port,
             container=container.container_obj,
             connection_string=get_connection_string(host, port),
-            account_url=f"http://{host}:{port}/devstoreaccount1",
+            account_url=f"https://devstoreaccount1.blob.core.windows.net",
         )
     finally:
         container.stop()
@@ -118,12 +119,18 @@ def azure_storage_settings(azurite: AzuriteFixture) -> Iterator[dict[str, Any]]:
         "azure_account_url": azurite.account_url,
         "azure_connection_string": azurite.connection_string,
     }
+    extended_settings = {
+        "azure_deadletter_bucket": "deadletter",
+        "azure_indexing_bucket": "indexing",
+    }
     with ExitStack() as stack:
         for key, value in settings.items():
             context = patch.object(storage_settings, key, value)
             stack.enter_context(context)
-
-        yield settings
+        for key, value in extended_settings.items():
+            context = patch.object(extended_storage_settings, key, value)
+            stack.enter_context(context)
+        yield settings | extended_settings
 
 
 @pytest.fixture(scope="function")
@@ -135,5 +142,6 @@ async def azure_storage(azurite, azure_storage_settings: dict[str, Any]):
         connection_string=storage_settings.azure_connection_string,
     )
     await storage.initialize()
+    await storage.create_bucket("nidx")
     yield storage
     await storage.finalize()

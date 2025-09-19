@@ -128,6 +128,21 @@ def s3_nidx_storage(s3):
 
 
 @pytest.fixture(scope="session")
+def azure_nidx_storage(azurite):
+    endpoint = f"http://172.17.0.1:{azurite.port}/devstoreaccount1"
+    return {
+        "INDEXER__OBJECT_STORE": "azure",
+        "INDEXER__CONTAINER_URL": "https://devstoreaccount1.blob.core.windows.net/indexing",
+        "INDEXER__ACCOUNT_KEY": "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==",
+        "INDEXER__ENDPOINT": endpoint,
+        "STORAGE__OBJECT_STORE": "azure",
+        "STORAGE__CONTAINER_URL": "https://devstoreaccount1.blob.core.windows.net/nidx",
+        "STORAGE__ACCOUNT_KEY": "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==",
+        "STORAGE__ENDPOINT": endpoint,
+    }
+
+
+@pytest.fixture(scope="session")
 def in_memory_nidx_storage():
     return {
         "INDEXER__OBJECT_STORE": "memory",
@@ -142,6 +157,8 @@ def nidx_storage(request) -> dict[str, str]:
         return request.getfixturevalue("gcs_nidx_storage")
     elif backend == "s3":
         return request.getfixturevalue("s3_nidx_storage")
+    elif backend == "azure":
+        return request.getfixturevalue("azure_nidx_storage")
     elif backend == "file":
         return {}
     else:

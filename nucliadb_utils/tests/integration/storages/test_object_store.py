@@ -26,7 +26,6 @@ from typing import AsyncGenerator
 
 import pytest
 
-from nucliadb_utils.storages.exceptions import ObjectNotFoundError
 from nucliadb_utils.storages.object_store import ObjectStore
 from nucliadb_utils.storages.utils import ObjectMetadata, Range
 
@@ -103,17 +102,17 @@ async def objects_crud_test(object_store: ObjectStore):
     # Move object
     object_key_move = "folder/file_move.txt"
     await object_store.move(bucket_name, object_key_copy, bucket_name, object_key_move)
-    with pytest.raises(ObjectNotFoundError):
+    with pytest.raises(KeyError):
         await object_store.get_metadata(bucket_name, object_key_copy)
 
     # Delete object
     await object_store.delete(bucket_name, object_key)
     await object_store.delete(bucket_name, object_key_move)
-    with pytest.raises(ObjectNotFoundError):
+    with pytest.raises(KeyError):
         await object_store.get_metadata(bucket_name, object_key)
 
     # Deleting again should raise an error
-    with pytest.raises(ObjectNotFoundError):
+    with pytest.raises(KeyError):
         await object_store.delete(bucket_name, object_key)
 
     # Insert object
@@ -130,10 +129,10 @@ async def objects_upload_download_test(object_store: ObjectStore):
     await object_store.bucket_create(bucket_name)
 
     # Test that downloading a non-existing object raises an error
-    with pytest.raises(ObjectNotFoundError):
+    with pytest.raises(KeyError):
         await object_store.download(bucket_name, "foobar")
 
-    with pytest.raises(ObjectNotFoundError):
+    with pytest.raises(KeyError):
         async for chunk in object_store.download_stream(bucket_name, "foobar"):
             ...
 

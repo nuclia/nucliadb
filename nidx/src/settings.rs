@@ -29,6 +29,7 @@ use base64::engine::general_purpose::STANDARD as base64;
 use config::{Config, Environment};
 use object_store::ClientOptions;
 use object_store::aws::AmazonS3Builder;
+use object_store::azure::MicrosoftAzureBuilder;
 use object_store::limit::LimitStore;
 use object_store::local::LocalFileSystem;
 use object_store::memory::InMemory;
@@ -55,6 +56,11 @@ pub enum ObjectStoreKind {
         client_secret: Option<String>,
         region_name: String,
         endpoint: Option<String>,
+    },
+    Azure {
+        container_url: String,
+        endpoint: Option<String>,
+        account_key: Option<String>,
     },
 }
 
@@ -127,6 +133,24 @@ impl ObjectStoreConfig {
                 if let Some(t) = self.timeout {
                     builder = builder.with_client_options(ClientOptions::new().with_timeout(Duration::from_secs(t)));
                 }
+                Box::new(builder.build().unwrap())
+            }
+            ObjectStoreKind::Azure {
+                container_url,
+                endpoint,
+                account_key,
+            } => {
+                let mut builder = MicrosoftAzureBuilder::new().with_url(container_url);
+                if let Some(endpoint) = endpoint {
+                    builder = builder.with_endpoint(endpoint.clone());
+                    if endpoint.starts_with("http:") {
+                        builder = builder.with_allow_http(true);
+                    }
+                }
+                if let Some(account_key) = account_key {
+                    builder = builder.with_access_key(account_key);
+                }
+
                 Box::new(builder.build().unwrap())
             }
             ObjectStoreKind::File { file_path } => Box::new(LocalFileSystem::new_with_prefix(file_path).unwrap()),
