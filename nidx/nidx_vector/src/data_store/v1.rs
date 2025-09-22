@@ -46,11 +46,11 @@ impl DataStore for DataStoreV1 {
         self.nodes.len()
     }
 
-    fn stored_paragraph_count(&self) -> usize {
-        store::stored_elements(&self.nodes)
+    fn stored_paragraph_count(&self) -> u32 {
+        store::stored_elements(&self.nodes) as u32
     }
 
-    fn stored_vector_count(&self) -> usize {
+    fn stored_vector_count(&self) -> u32 {
         self.stored_paragraph_count()
     }
 

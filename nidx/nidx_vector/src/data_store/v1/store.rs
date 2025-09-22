@@ -67,7 +67,7 @@ impl<T: AsRef<[u8]>> IntoBuffer for T {
 // O(1)
 // Returns how many elements are in x, alive or deleted.
 pub fn stored_elements(x: &[u8]) -> usize {
-    usize_from_slice_le(&x[..HEADER_LEN])
+    usize_from_slice_le(&x[..USIZE_LEN])
 }
 
 // O(1)
@@ -230,7 +230,7 @@ mod tests {
 
         let buf_map = unsafe { memmap2::Mmap::map(&buf).unwrap() };
         let no_values = stored_elements(&buf_map);
-        assert_eq!(no_values, expected.len());
+        assert_eq!(no_values as usize, expected.len());
         for (id, expected_value) in expected.iter().enumerate() {
             let actual_value = get_value(&buf_map, id);
             assert_eq!(actual_value.key(), expected_value.key);
@@ -275,7 +275,7 @@ mod tests {
             .map(|s| s.key().parse().unwrap())
             .collect();
 
-        assert_eq!(number_of_elements, values.len());
+        assert_eq!(number_of_elements as usize, values.len());
         assert_eq!(values.len(), expected.len());
         assert!(values.iter().all(|i| expected.contains(i)));
     }
@@ -317,7 +317,7 @@ mod tests {
             .map(|s| s.key().parse().unwrap())
             .collect();
 
-        assert_eq!(number_of_elements, values.len());
+        assert_eq!(number_of_elements as usize, values.len());
         assert_eq!(values.len(), expected.len());
         assert!(values.iter().all(|i| expected.contains(i)));
     }
@@ -358,7 +358,7 @@ mod tests {
             .map(|s| s.key().parse().unwrap())
             .collect();
 
-        assert_eq!(number_of_elements, values.len());
+        assert_eq!(number_of_elements as usize, values.len());
         assert_eq!(values.len(), expected.len());
         assert!(values.iter().all(|i| expected.contains(i)));
     }
@@ -399,7 +399,7 @@ mod tests {
             .map(|s| s.key().parse().unwrap())
             .collect();
 
-        assert_eq!(number_of_elements, values.len());
+        assert_eq!(number_of_elements as usize, values.len());
         assert_eq!(values.len(), expected.len());
         assert!(values.iter().all(|i| expected.contains(i)));
     }
@@ -440,7 +440,7 @@ mod tests {
             .map(|s| s.key().parse().unwrap())
             .collect();
 
-        assert_eq!(number_of_elements, values.len());
+        assert_eq!(number_of_elements as usize, values.len());
         assert_eq!(values.len(), expected.len());
         assert!(values.iter().all(|i| expected.contains(i)));
     }
@@ -482,7 +482,7 @@ mod tests {
             .map(|s| s.key().parse().unwrap())
             .collect();
 
-        assert_eq!(number_of_elements, values.len());
+        assert_eq!(number_of_elements as usize, values.len());
         assert_eq!(values.len(), expected.len());
         assert!(values.iter().all(|i| expected.contains(i)));
     }
