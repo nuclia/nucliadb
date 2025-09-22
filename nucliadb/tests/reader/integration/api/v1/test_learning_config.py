@@ -31,8 +31,8 @@ class MockProxy:
     def __init__(self):
         self.calls = []
 
-    async def __call__(self, request, method, url, extra_headers=None):
-        self.calls.append((request, method, url, extra_headers))
+    async def __call__(self, request, method, url, headers=None):
+        self.calls.append((request, method, url, headers))
         if method == "GET" and "download" in url:
 
             async def iter_content():
@@ -56,12 +56,14 @@ async def test_api(
 ):
     kbid = knowledgebox
     # Get configuration
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/configuration", headers={"x-nucliadb-user": "userfoo"})
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/configuration", headers={"x-nucliadb-account": "account"}
+    )
     assert resp.status_code == 200
     assert learning_config_proxy_mock.calls[-1][1:] == (
         "GET",
         f"/config/{kbid}",
-        {"X-STF-USER": "userfoo"},
+        {"account-id": "account"},
     )
 
     # Download model
@@ -87,21 +89,21 @@ async def test_api(
     )
 
     # Get metadata of a model
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/model/model1", headers={"x-nucliadb-user": "userfoo"})
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/model/model1")
     assert resp.status_code == 200
     assert learning_config_proxy_mock.calls[-1][1:] == (
         "GET",
         f"/models/{kbid}/model/model1",
-        {"X-STF-USER": "userfoo"},
+        None,
     )
 
     # Get schema for updates
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/schema")
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/schema", headers={"x-nucliadb-account": "account"})
     assert resp.status_code == 200
     assert learning_config_proxy_mock.calls[-1][1:] == (
         "GET",
         f"/schema/{kbid}",
-        None,
+        {"account-id": "account"},
     )
 
     # Get schema for creation
