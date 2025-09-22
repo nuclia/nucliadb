@@ -66,7 +66,7 @@ impl<'a> ResourceWrapper<'a> {
         &self.resource.labels
     }
 
-    pub fn fields(&self) -> impl Iterator<Item = (&String, impl Iterator<Item = ParagraphVectors>)> {
+    pub fn fields(&self) -> impl Iterator<Item = (&String, impl Iterator<Item = ParagraphVectors<'_>>)> {
         self.resource.paragraphs.iter().map(|(field_id, paragraphs_wrapper)| {
             let sentences_iterator = paragraphs_wrapper
                 .paragraphs

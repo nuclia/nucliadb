@@ -99,11 +99,11 @@ impl DataStore for DataStoreV2 {
         self.vectors.stored_elements()
     }
 
-    fn get_paragraph(&self, id: ParagraphAddr) -> super::ParagraphRef {
+    fn get_paragraph(&self, id: ParagraphAddr) -> super::ParagraphRef<'_> {
         self.paragraphs.get_paragraph(id)
     }
 
-    fn get_vector(&self, id: VectorAddr) -> super::VectorRef {
+    fn get_vector(&self, id: VectorAddr) -> super::VectorRef<'_> {
         self.vectors.get_vector(id)
     }
 

@@ -71,7 +71,7 @@ pub fn stored_elements(x: &[u8]) -> usize {
 }
 
 // O(1)
-pub fn get_value(src: &[u8], id: usize) -> Node {
+pub fn get_value(src: &[u8], id: usize) -> Node<'_> {
     let pointer = get_pointer(src, id);
     Node::new(&src[pointer..])
 }
@@ -128,7 +128,7 @@ pub fn create_key_value<D: IntoBuffer>(
     for slot in slots {
         // slot serialization
         let mut slot_address = recipient_buffer.seek(SeekFrom::End(0))?;
-        if slot_address as usize % alignment > 0 {
+        if !(slot_address as usize).is_multiple_of(alignment) {
             let pad = alignment - (slot_address as usize % alignment);
             recipient_buffer.seek(SeekFrom::Current(pad as i64))?;
             slot_address += pad as u64;
@@ -185,7 +185,7 @@ pub fn merge(
             // Moving to the end of the file to write the current element.
             let exact_element = Node::new(element_slice);
             let mut element_pointer = recipient_buffer.seek(SeekFrom::End(0))?;
-            if element_pointer as usize % alignment > 0 {
+            if !(element_pointer as usize).is_multiple_of(alignment) {
                 let pad = alignment - (element_pointer as usize % alignment);
                 recipient_buffer.seek(SeekFrom::Current(pad as i64))?;
                 element_pointer += pad as u64;

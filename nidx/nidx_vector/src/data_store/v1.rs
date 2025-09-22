@@ -54,7 +54,7 @@ impl DataStore for DataStoreV1 {
         self.stored_paragraph_count()
     }
 
-    fn get_vector(&self, VectorAddr(id): VectorAddr) -> VectorRef {
+    fn get_vector(&self, VectorAddr(id): VectorAddr) -> VectorRef<'_> {
         VectorRef {
             vector: store::get_value(&self.nodes, id as usize).vector(),
             paragraph_addr: ParagraphAddr(id),
@@ -68,7 +68,7 @@ impl DataStore for DataStoreV1 {
         self
     }
 
-    fn get_paragraph(&self, ParagraphAddr(id): ParagraphAddr) -> ParagraphRef {
+    fn get_paragraph(&self, ParagraphAddr(id): ParagraphAddr) -> ParagraphRef<'_> {
         ParagraphRef::V1(store::get_value(&self.nodes, id as usize))
     }
 }

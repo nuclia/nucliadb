@@ -87,7 +87,7 @@ impl<'a> Node<'a> {
 
         // Pointer computations
         let vector_start = HEADER_LEN + metadata_len;
-        let vector_pad = if vector_start % alignment > 0 {
+        let vector_pad = if !vector_start.is_multiple_of(alignment) {
             alignment - (vector_start % alignment)
         } else {
             0

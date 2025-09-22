@@ -173,10 +173,9 @@ pub fn control_client(settings: &EnvSettings, request: ControlRequest) -> anyhow
         nats_connected,
         ..
     } = response
+        && !(alive.all_ok() && searcher_initally_synced.unwrap_or(true) && nats_connected.unwrap_or(true))
     {
-        if !(alive.all_ok() && searcher_initally_synced.unwrap_or(true) && nats_connected.unwrap_or(true)) {
-            return Err(anyhow!("Not ready"));
-        }
+        return Err(anyhow!("Not ready"));
     }
 
     Ok(())

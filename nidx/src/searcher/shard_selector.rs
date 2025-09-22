@@ -129,10 +129,10 @@ impl KubernetesCluster {
             return false;
         }
         // Any condition exists and says it's not ready
-        if let Some(conds) = &p.status.as_ref().unwrap().conditions {
-            if conds.iter().any(|c| c.type_ == "Ready" && c.status == "False") {
-                return false;
-            }
+        if let Some(conds) = &p.status.as_ref().unwrap().conditions
+            && conds.iter().any(|c| c.type_ == "Ready" && c.status == "False")
+        {
+            return false;
         }
 
         true

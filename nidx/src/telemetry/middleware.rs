@@ -115,6 +115,7 @@ impl Extractor for HeaderMapWrapper<'_> {
     }
 }
 
+#[allow(clippy::result_large_err)]
 pub fn add_telemetry_headers(mut req: tonic::Request<()>) -> tonic::Result<tonic::Request<()>> {
     opentelemetry::global::get_text_map_propagator(|propagator| {
         propagator.inject(&mut MetadataMapWrapper {
