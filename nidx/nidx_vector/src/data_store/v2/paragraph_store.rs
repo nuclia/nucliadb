@@ -94,7 +94,7 @@ impl ParagraphStore {
         Ok(Self { pos, data })
     }
 
-    pub fn get_paragraph(&self, ParagraphAddr(addr): ParagraphAddr) -> ParagraphRef {
+    pub fn get_paragraph(&self, ParagraphAddr(addr): ParagraphAddr) -> ParagraphRef<'_> {
         let start_bytes = &self.pos[addr as usize * U32_LEN..addr as usize * U32_LEN + U32_LEN];
         let start = u32::from_le_bytes(start_bytes.try_into().unwrap()) as usize;
         let (paragraph, _) =

@@ -92,8 +92,8 @@ pub trait DataStore: Sync + Send {
     fn size_bytes(&self) -> usize;
     fn stored_paragraph_count(&self) -> u32;
     fn stored_vector_count(&self) -> u32;
-    fn get_paragraph(&self, id: ParagraphAddr) -> ParagraphRef;
-    fn get_vector(&self, id: VectorAddr) -> VectorRef;
+    fn get_paragraph(&self, id: ParagraphAddr) -> ParagraphRef<'_>;
+    fn get_vector(&self, id: VectorAddr) -> VectorRef<'_>;
     fn will_need(&self, id: VectorAddr);
     fn as_any(&self) -> &dyn Any;
 }

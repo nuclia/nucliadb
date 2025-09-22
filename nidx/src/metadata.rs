@@ -64,7 +64,7 @@ impl NidxMetadata {
         Ok(NidxMetadata { pool })
     }
 
-    pub async fn transaction(&self) -> sqlx::Result<sqlx::Transaction<sqlx::Postgres>> {
+    pub async fn transaction(&self) -> sqlx::Result<sqlx::Transaction<'_, sqlx::Postgres>> {
         self.pool.begin().await
     }
 

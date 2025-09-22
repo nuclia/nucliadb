@@ -236,7 +236,7 @@ impl Searcher {
         &self,
         request: &SearchRequest,
         segment_filter: &Option<BooleanExpression<String>>,
-    ) -> VectorR<Vec<ScoredParagraph>> {
+    ) -> VectorR<Vec<ScoredParagraph<'_>>> {
         let normalized_query;
         let query = if self.config.normalize_vectors {
             normalized_query = utils::normalize_vector(request.get_query());
@@ -342,7 +342,7 @@ impl Searcher {
         })
     }
 
-    fn search_multi_vector(&self, search: &SearchRequest) -> VectorR<Vec<ScoredParagraph>> {
+    fn search_multi_vector(&self, search: &SearchRequest) -> VectorR<Vec<ScoredParagraph<'_>>> {
         let search_vectors = extract_multi_vectors(&search.request.vector, &self.config.vector_type)?;
         let encoded_query = search_vectors
             .iter()

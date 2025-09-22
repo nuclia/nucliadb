@@ -73,7 +73,7 @@ impl VectorStore {
         })
     }
 
-    pub fn get_vector(&self, addr: VectorAddr) -> VectorRef {
+    pub fn get_vector(&self, addr: VectorAddr) -> VectorRef<'_> {
         let start = self.record_start(addr);
         let vector = &self.data[start..start + self.vector_len_bytes];
         let paragraph_bytes = &self.data[start + self.vector_len_bytes..start + self.vector_len_bytes + U32_LEN];

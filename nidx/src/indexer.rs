@@ -279,7 +279,7 @@ pub async fn delete_resource(meta: &NidxMetadata, shard_id: &str, resource: Stri
 
     let mut tx = meta.transaction().await?;
     for index in indexes {
-        Deletion::create(&mut *tx, index.id, seq, &[resource.clone()]).await?;
+        Deletion::create(&mut *tx, index.id, seq, std::slice::from_ref(&resource)).await?;
         Index::updated(&mut *tx, &index.id).await?;
     }
     tx.commit().await?;

@@ -21,7 +21,7 @@ use crate::{VectorErr, VectorR, config::VectorType};
 
 pub fn extract_multi_vectors(vector: &[f32], vector_type: &VectorType) -> VectorR<Vec<Vec<f32>>> {
     let dimension = vector_type.dimension();
-    if vector.len() % dimension != 0 {
+    if !vector.len().is_multiple_of(dimension) {
         return Err(VectorErr::InconsistentDimensions {
             index_config: dimension,
             vector: vector.len(),

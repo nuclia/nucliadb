@@ -52,7 +52,7 @@ pub fn open_index_with_deletions(
     for segment in index.searchable_segments()? {
         let segment_deletions = open_index
             .deletions()
-            .filter(|&(_, del_seq)| (Seq::from(segment.meta().delete_opstamp().unwrap() as i64) < del_seq))
+            .filter(|&(_, del_seq)| Seq::from(segment.meta().delete_opstamp().unwrap() as i64) < del_seq)
             .map(|(key, _)| key);
         let segment_reader = SegmentReader::open(&segment)?;
         let mut bitset = BitSet::with_max_value_and_full(segment.meta().max_doc());

@@ -90,7 +90,7 @@ fn field_id_key(paragraph_key: &str) -> Option<Vec<u8>> {
 
 /// The key for the labels, ending with a separator to allow for easy prefix search
 fn labels_key(label: &str) -> Vec<u8> {
-    [label[1..].as_bytes(), "/".as_bytes()].concat()
+    [&label.as_bytes()[1..], "/".as_bytes()].concat()
 }
 
 /// Helper to build indexes when the input is not sorted by key

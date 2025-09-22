@@ -143,7 +143,7 @@ impl DiskHnsw {
     }
 
     // node must be serialized using DiskNode, may have trailing bytes at the start.
-    fn get_out_edges(node: &[u8], layer: usize) -> EdgeIter {
+    fn get_out_edges(node: &[u8], layer: usize) -> EdgeIter<'_> {
         // layer + 1 since the layers are stored in reverse order.
         // [l3, l2, l1, l0, end] Since we have the position of end, the layer i is
         // i + 1 positions to its left.

@@ -396,7 +396,7 @@ pub struct ScoredVector<'a> {
 }
 
 impl ScoredVector<'_> {
-    fn new(addr: VectorAddr, data_store: &dyn DataStore, score: f32) -> ScoredVector {
+    fn new(addr: VectorAddr, data_store: &dyn DataStore, score: f32) -> ScoredVector<'_> {
         let node = data_store.get_vector(addr);
         ScoredVector { score, vector: node }
     }
@@ -450,11 +450,11 @@ impl OpenSegment {
         self.data_store.size_bytes() + self.index.len() + self.inverted_indexes.space_usage()
     }
 
-    pub fn get_paragraph(&self, id: ParagraphAddr) -> ParagraphRef {
+    pub fn get_paragraph(&self, id: ParagraphAddr) -> ParagraphRef<'_> {
         self.data_store.get_paragraph(id)
     }
 
-    pub fn get_vector(&self, id: VectorAddr) -> VectorRef {
+    pub fn get_vector(&self, id: VectorAddr) -> VectorRef<'_> {
         self.data_store.get_vector(id)
     }
 
@@ -466,7 +466,7 @@ impl OpenSegment {
         results: usize,
         config: &VectorConfig,
         min_score: f32,
-    ) -> Box<dyn Iterator<Item = ScoredVector> + '_> {
+    ) -> Box<dyn Iterator<Item = ScoredVector<'_>> + '_> {
         if let Some(v1) = self.data_store.as_any().downcast_ref::<DataStoreV1>() {
             self._search(v1, query, filter, with_duplicates, results, config, min_score)
         } else if let Some(v2) = self.data_store.as_any().downcast_ref::<DataStoreV2>() {
@@ -486,7 +486,7 @@ impl OpenSegment {
         results: usize,
         config: &VectorConfig,
         min_score: f32,
-    ) -> Box<dyn Iterator<Item = ScoredVector> + '_> {
+    ) -> Box<dyn Iterator<Item = ScoredVector<'_>> + '_> {
         let encoded_query = config.vector_type.encode(query);
         let retriever = Retriever::new(&encoded_query, data_store, config, min_score);
         let query_address = VectorAddr(self.metadata.records as u32);
@@ -537,7 +537,7 @@ impl OpenSegment {
         Box::new(
             neighbours
                 .into_iter()
-                .map(|(address, dist)| (ScoredVector::new(address, self.data_store.as_ref(), dist)))
+                .map(|(address, dist)| ScoredVector::new(address, self.data_store.as_ref(), dist))
                 .take(results),
         )
     }

@@ -190,11 +190,10 @@ pub async fn run_sync(
             }
 
             // We do not marked as synced until initial sync has fully finished without error
-            if !initial_sync {
-                if let Some(ref sync_status) = sync_status {
+            if !initial_sync
+                && let Some(ref sync_status) = sync_status {
                     let _ = sync_status.send(SyncStatus::Synced);
                 }
-            }
 
             // If we didn't sync anything, wait for a bit
             if no_updates {
@@ -588,7 +587,7 @@ impl GuardedIndexMetadata {
         Self { guard, index_id }
     }
 
-    pub async fn get(&self) -> Option<RwLockReadGuard<IndexMetadata>> {
+    pub async fn get(&self) -> Option<RwLockReadGuard<'_, IndexMetadata>> {
         let m = self.guard.get(&self.index_id)?;
         Some(m.read().await)
     }

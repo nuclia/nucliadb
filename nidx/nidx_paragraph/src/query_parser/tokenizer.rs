@@ -72,7 +72,7 @@ pub fn tokenize_query_infallible(input: &str) -> Vec<Token<'_>> {
     }
 }
 
-fn nidx_grammar_tokenize(input: &str) -> IResult<&str, Vec<Token>, nom::error::Error<&str>> {
+fn nidx_grammar_tokenize(input: &str) -> IResult<&str, Vec<Token<'_>>, nom::error::Error<&str>> {
     let is_literal_char = |c: char| -> bool {
         c.is_alphanumeric()
             || (

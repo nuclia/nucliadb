@@ -205,7 +205,7 @@ fn build_resource_with_field(shard_id: String, field_id: String) -> noderesource
         nanos: 0,
     };
 
-    let label = field_id.split('/').last().unwrap();
+    let label = field_id.split('/').next_back().unwrap();
     let mut texts = HashMap::new();
     texts.insert(
         field_id.clone(),

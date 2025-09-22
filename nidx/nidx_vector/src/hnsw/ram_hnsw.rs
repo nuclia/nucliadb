@@ -100,7 +100,7 @@ impl RAMHnsw {
             .layers
             .iter()
             .enumerate()
-            .last()
+            .next_back()
             .and_then(|(index, l)| l.first().map(|node| (node, index)))
             .map(|(node, layer)| EntryPoint { node, layer });
         self
