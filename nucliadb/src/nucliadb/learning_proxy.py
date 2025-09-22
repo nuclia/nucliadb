@@ -43,10 +43,8 @@ logger = logging.getLogger(SERVICE_NAME)
 WHITELISTED_HEADERS = {
     "x-nucliadb-user",
     "x-nucliadb-roles",
-    "x-stf-roles",
-    "x-stf-user",
-    "x-stf-account",
-    "x-stf-account-type",
+    "x-nucliadb-account",
+    "x-nucliadb-account-type",
     "x-forwarded-for",
     "x-forwarded-host",
     "x-forwarded-proto",
@@ -206,14 +204,14 @@ async def learning_config_proxy(
     request: Request,
     method: str,
     url: str,
-    extra_headers: Optional[dict[str, str]] = None,
+    headers: dict[str, str] = {},
 ) -> Union[Response, StreamingResponse]:
     return await proxy(
         service=LearningService.CONFIG,
         request=request,
         method=method,
         url=url,
-        extra_headers=extra_headers,
+        headers=headers,
     )
 
 
@@ -246,24 +244,21 @@ async def proxy(
     request: Request,
     method: str,
     url: str,
-    extra_headers: Optional[dict[str, str]] = None,
+    headers: dict[str, str] = {},
 ) -> Union[Response, StreamingResponse]:
     """
     Proxy the request to a learning API.
 
-    service: LearningService. The learning service to proxy the request to.
-    request: Request. The incoming request.
-    method: str. The HTTP method to use.
-    url: str. The URL to proxy the request to.
-    extra_headers: Optional[dict[str, str]]. Extra headers to include in the proxied request.
+    service: The learning service to proxy the request to.
+    request: The incoming request.
+    method: The HTTP method to use.
+    url: The URL to proxy the request to.
+    headers: Extra headers to include in the proxied request.
 
     Returns: Response. The response from the learning API. If the response is chunked, a StreamingResponse is returned.
     """
-
-    proxied_headers = extra_headers or {}
-    proxied_headers.update(
-        {k.lower(): v for k, v in request.headers.items() if is_white_listed_header(k)}
-    )
+    proxied_headers = {k.lower(): v for k, v in request.headers.items() if is_white_listed_header(k)}
+    proxied_headers.update(**headers)
 
     async with service_client(
         base_url=get_base_url(service=service),

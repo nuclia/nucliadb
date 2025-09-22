@@ -68,7 +68,7 @@ async def get_configuration(
         request,
         "GET",
         f"/config/{kbid}",
-        extra_headers={"X-STF-USER": request.headers.get("X-NUCLIADB-USER", "")},
+        headers={"account-id": request.headers.get("x-nucliadb-account", "")},
     )
 
 
@@ -108,7 +108,6 @@ async def get_model(
         request,
         "GET",
         f"/models/{kbid}/model/{model_id}",
-        extra_headers={"X-STF-USER": request.headers.get("X-NUCLIADB-USER", "")},
     )
 
 
@@ -126,7 +125,12 @@ async def get_schema_for_configuration_updates(
     request: Request,
     kbid: str,
 ):
-    return await learning_config_proxy(request, "GET", f"/schema/{kbid}")
+    return await learning_config_proxy(
+        request,
+        "GET",
+        f"/schema/{kbid}",
+        headers={"account-id": request.headers.get("x-nucliadb-account", "")},
+    )
 
 
 @api.get(
