@@ -56,12 +56,14 @@ async def test_api(
 ):
     kbid = knowledgebox
     # Get configuration
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/configuration", headers={"x-nucliadb-user": "userfoo"})
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/configuration", headers={"x-nucliadb-account": "account"}
+    )
     assert resp.status_code == 200
     assert learning_config_proxy_mock.calls[-1][1:] == (
         "GET",
         f"/config/{kbid}",
-        {"X-STF-USER": "userfoo"},
+        {"account-id": "account"},
     )
 
     # Download model
@@ -87,12 +89,14 @@ async def test_api(
     )
 
     # Get metadata of a model
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/model/model1", headers={"x-nucliadb-user": "userfoo"})
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/model/model1", headers={"x-nucliadb-account": "account"}
+    )
     assert resp.status_code == 200
     assert learning_config_proxy_mock.calls[-1][1:] == (
         "GET",
         f"/models/{kbid}/model/model1",
-        {"X-STF-USER": "userfoo"},
+        {"account-id": "account"},
     )
 
     # Get schema for updates

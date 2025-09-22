@@ -152,7 +152,7 @@ async def test_proxy(async_client):
         body=mock.AsyncMock(return_value=b"some data"),
         headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
     )
-    response = await proxy(LearningService.CONFIG, request, "GET", "url", extra_headers={"foo": "bar"})
+    response = await proxy(LearningService.CONFIG, request, "GET", "url", headers={"foo": "bar"})
 
     assert response.status_code == 200
     assert response.body == b"some data"
