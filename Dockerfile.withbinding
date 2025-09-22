@@ -6,7 +6,7 @@
 #
 # Stage to build nidx_binding (with Rust)
 #
-FROM python:3.13 AS python_rust
+FROM python:3.13-trixie AS python_rust
 
 ARG RUST_BUILD_PROFILE=release
 
@@ -49,16 +49,16 @@ RUN set -eux; \
 #
 # This stage builds a virtual env with all dependencies
 #
-FROM python:3.13-slim-bookworm AS builder
+FROM python:3.13-slim-trixie AS builder
 RUN pip install uv
 
 # Install Python dependencies
 WORKDIR /usr/src/app
-COPY pyproject.toml uv.lock .
+COPY pyproject.toml uv.lock ./
 RUN python -m venv /app && VIRTUAL_ENV=/app uv sync --active --no-group nidx --no-group sdk --no-install-workspace --frozen
 
 # Copy application
-COPY VERSION pyproject.toml uv.lock /usr/src/app
+COPY VERSION pyproject.toml uv.lock /usr/src/app/
 COPY nucliadb_utils /usr/src/app/nucliadb_utils
 COPY nucliadb_telemetry /usr/src/app/nucliadb_telemetry
 COPY nucliadb_protos /usr/src/app/nucliadb_protos
@@ -80,7 +80,7 @@ RUN /app/bin/pip install /wheels/*.whl --force
 #
 # This is the main image, it just copies the virtual env into the base image
 #
-FROM python:3.13-slim-bookworm
+FROM python:3.13-slim-trixie
 # media-types needed for content type checks (python mimetype module uses this)
 RUN apt update && apt install -y media-types && apt clean && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app /app
