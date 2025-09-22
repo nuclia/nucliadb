@@ -45,6 +45,8 @@ WHITELISTED_HEADERS = {
     "x-nucliadb-roles",
     "x-stf-roles",
     "x-stf-user",
+    "x-stf-account",
+    "x-stf-account-type",
     "x-forwarded-for",
     "x-forwarded-host",
     "x-forwarded-proto",
