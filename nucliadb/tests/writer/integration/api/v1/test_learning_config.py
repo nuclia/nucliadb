@@ -29,8 +29,8 @@ class MockProxy:
     def __init__(self):
         self.calls = []
 
-    async def __call__(self, request, method, url):
-        self.calls.append((request, method, url))
+    async def __call__(self, request, method, url, headers={}):
+        self.calls.append((request, method, url, headers))
         return Response(status_code=204)
 
 
@@ -51,10 +51,16 @@ async def test_api(
     resp = await nucliadb_writer.post(f"/kb/{kbid}/configuration", json={"some": "data"})
     assert resp.status_code == 204
 
-    assert learning_config_proxy_mock.calls[0][1:] == ("POST", f"/config/{kbid}")
+    assert learning_config_proxy_mock.calls[0][1:] == ("POST", f"/config/{kbid}", {})
 
     # patch configuration
-    resp = await nucliadb_writer.patch(f"/kb/{kbid}/configuration", json={"some": "data"})
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/configuration", json={"some": "data"}, headers={"x-nucliadb-account": "account"}
+    )
     assert resp.status_code == 204
 
-    assert learning_config_proxy_mock.calls[1][1:] == ("PATCH", f"/config/{kbid}")
+    assert learning_config_proxy_mock.calls[1][1:] == (
+        "PATCH",
+        f"/config/{kbid}",
+        {"account-id": "account"},
+    )
