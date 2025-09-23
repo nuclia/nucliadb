@@ -25,7 +25,6 @@ from nuclia_models.config.proto import ExtractConfig, SplitConfiguration
 
 from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.reader import logger
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
@@ -126,16 +125,11 @@ async def get_schema_for_configuration_updates(
     request: Request,
     kbid: str,
 ):
-    account_id = request.headers.get("x-nucliadb-account", "")
-    if not account_id:
-        logger.warning(
-            "Account header not sent by authorizer", extra={"request_headers": request.headers}
-        )
     return await learning_config_proxy(
         request,
         "GET",
         f"/schema/{kbid}",
-        headers={"account-id": account_id},
+        headers={"account-id": request.headers.get("x-nucliadb-account", "")},
     )
 
 
