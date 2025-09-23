@@ -18,12 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Awaitable, Union
+from typing import Awaitable, Optional, Union
 
+from async_lru import alru_cache
 from fastapi import Request, Response
 from fastapi_versioning import version
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
+from nucliadb.ingest.fields.base import Field
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search import cache
 from nucliadb.search.search.cache import request_caches
@@ -291,15 +293,13 @@ class Hydrator:
                 # allowed hydration, skipping fields with explicitly disabled
                 # hydration
 
-                # TODO: skip if already hydrated
                 if extra.field_page is not None:
-                    preview = await download_page_preview(field, extra.field_page)
+                    preview = await self.cached_download_page_preview(field, extra.field_page)
                     if preview is not None:
                         self.hydrated.add_page_preview(paragraph_id, extra.field_page, preview)
 
-                # TODO: skip if already hydrated
                 if extra.field_table_page is not None:
-                    preview = await download_page_preview(field, extra.field_table_page)
+                    preview = await self.cached_download_page_preview(field, extra.field_table_page)
                     if preview is not None:
                         self.hydrated.add_table_page_preview(
                             paragraph_id, extra.field_table_page, preview
@@ -311,3 +311,7 @@ class Hydrator:
     async def _limited_concurrency(self, aw: Awaitable):
         async with self.max_ops:
             return await aw
+
+    @alru_cache(maxsize=None)
+    async def cached_download_page_preview(self, field: Field, page: int) -> Optional[Image]:
+        return await download_page_preview(field, page)
