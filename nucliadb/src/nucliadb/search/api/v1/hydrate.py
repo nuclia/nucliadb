@@ -294,16 +294,16 @@ class Hydrator:
                 # hydration
 
                 if extra.field_page is not None:
-                    preview = await self.cached_download_page_preview(field, extra.field_page)
+                    page_number = extra.field_page
+                    preview = await self.cached_download_page_preview(field, page_number)
                     if preview is not None:
-                        self.hydrated.add_page_preview(paragraph_id, extra.field_page, preview)
+                        self.hydrated.add_page_preview(paragraph_id, page_number, preview)
 
                 if extra.field_table_page is not None:
-                    preview = await self.cached_download_page_preview(field, extra.field_table_page)
+                    page_number = extra.field_table_page
+                    preview = await self.cached_download_page_preview(field, page_number)
                     if preview is not None:
-                        self.hydrated.add_table_page_preview(
-                            paragraph_id, extra.field_table_page, preview
-                        )
+                        self.hydrated.add_table_page_preview(paragraph_id, page_number, preview)
 
         return self.hydrated.build()
 
