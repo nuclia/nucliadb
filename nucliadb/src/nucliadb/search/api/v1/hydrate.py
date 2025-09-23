@@ -18,15 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from dataclasses import dataclass
-from typing import Any, Union
+from typing import Awaitable, Union
 
 from fastapi import Request, Response
 from fastapi_versioning import version
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
-from nucliadb.ingest.fields.base import Field
-from nucliadb.ingest.orm.resource import Resource
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search import cache
 from nucliadb.search.search.cache import request_caches
@@ -170,13 +167,6 @@ class HydratedBuilder:
         paragraph.table.page_preview_ref = preview_id
 
 
-@dataclass
-class HydrationSchedule:
-    resources: dict[str, Resource]
-    fields: dict[FieldId, tuple[Resource, Field]]
-    paragraphs: dict[ParagraphId, tuple[Resource, Field, ParagraphIndex]]
-
-
 class Hydrator:
     def __init__(self, kbid: str, config: Hydration):
         self.kbid = kbid
@@ -186,12 +176,12 @@ class Hydrator:
         # cached paragraphs per field
         self.field_paragraphs: dict[FieldId, ParagraphIndex] = {}
 
+        self.max_ops = asyncio.Semaphore(50)
+
     async def hydrate(self, paragraph_ids: list[str]) -> Hydrated:
-        schedule = HydrationSchedule(
-            resources={},
-            fields={},
-            paragraphs={},
-        )
+        paragraph_tasks = {}
+        field_tasks = {}
+        resource_tasks = {}
 
         unique_paragraph_ids = set(paragraph_ids)
         for user_paragraph_id in unique_paragraph_ids:
@@ -220,59 +210,71 @@ class Hydrator:
                 self.field_paragraphs[field_id] = field_paragraphs_index
             field_paragraphs_index = self.field_paragraphs[field_id]
 
-            schedule.paragraphs[paragraph_id] = (resource, field, field_paragraphs_index)
-            schedule.fields[field_id] = (resource, field)
-
-            if self.config.resource is not None:
-                schedule.resources[rid] = resource
-
-        max_ops = asyncio.Semaphore(50)
-
-        async def traceable_task(id: Any, aw):
-            async with max_ops:
-                return (id, await aw)
-
-        paragraph_ops = []
-        for paragraph_id, (resource, field, field_paragraph_index) in schedule.paragraphs.items():
-            paragraph_ops.append(
-                traceable_task(
-                    paragraph_id,
+            paragraph_tasks[paragraph_id] = asyncio.create_task(
+                self._limited_concurrency(
                     hydrate_paragraph(
                         resource, field, paragraph_id, self.config.paragraph, field_paragraphs_index
                     ),
                 )
             )
 
-        field_ops = []
-        for field_id, (resource, field) in schedule.fields.items():
-            field_ops.append(
-                traceable_task(field_id, hydrate_field(resource, field_id, self.config.field))
-            )
-
-        resource_ops = []
-        if self.config.resource is not None:
-            for rid, resource in schedule.resources.items():
-                resource_ops.append(
-                    traceable_task(rid, hydrate_resource(resource, rid, self.config.resource))
+            if field_id not in field_tasks:
+                field_tasks[field_id] = asyncio.create_task(
+                    self._limited_concurrency(hydrate_field(resource, field_id, self.config.field))
                 )
 
+            if rid not in resource_tasks:
+                if self.config.resource is not None:
+                    resource_tasks[rid] = asyncio.create_task(
+                        self._limited_concurrency(hydrate_resource(resource, rid, self.config.resource))
+                    )
+
         ops = [
-            *paragraph_ops,
-            *field_ops,
-            *resource_ops,
+            *paragraph_tasks.values(),
+            *field_tasks.values(),
+            *resource_tasks.values(),
         ]
         results = await asyncio.gather(*ops)
-        hydrated_paragraphs = results[: len(paragraph_ops)]
-        hydrated_fields = results[len(paragraph_ops) : len(paragraph_ops) + len(field_ops)]
+        hydrated_paragraphs = results[: len(paragraph_tasks)]
+        hydrated_fields = results[len(paragraph_tasks) : len(paragraph_tasks) + len(field_tasks)]
         hydrated_resources = results[
-            len(paragraph_ops) + len(field_ops) : len(paragraph_ops) + len(field_ops) + len(resource_ops)
+            len(paragraph_tasks) + len(field_tasks) : len(paragraph_tasks)
+            + len(field_tasks)
+            + len(resource_tasks)
         ]
 
-        for paragraph_id, (hydrated_paragraph, extra) in hydrated_paragraphs:
+        for rid, hydrated_resource in zip(resource_tasks.keys(), hydrated_resources):
+            self.hydrated.add_resource(rid, hydrated_resource)
+
+        for field_id, hydrated_field in zip(field_tasks.keys(), hydrated_fields):
+            if hydrated_field is not None:
+                self.hydrated.add_field(field_id, hydrated_field)
+
+        for paragraph_id, (hydrated_paragraph, extra) in zip(
+            paragraph_tasks.keys(), hydrated_paragraphs
+        ):
             self.hydrated.add_paragraph(paragraph_id, hydrated_paragraph)
 
-            (resource, field, field_paragraph_index) = schedule.paragraphs[paragraph_id]
             for related_paragraph_id in extra.related_paragraph_ids:
+                field_id = related_paragraph_id.field_id
+                rid = related_paragraph_id.rid
+
+                resource = await cache.get_resource(self.kbid, rid)
+                if resource is None:
+                    # skip resources that aren't in the DB
+                    continue
+
+                field_type_pb = FIELD_TYPE_STR_TO_PB[field_id.type]
+                if not (await resource.field_exists(field_type_pb, field_id.key)):
+                    # skip a fields that aren't in the DB
+                    continue
+                field = await resource.get_field(field_id.key, field_id.pb_type)
+
+                if field_id not in self.field_paragraphs:
+                    field_paragraphs_index = ParagraphIndex(field_id)
+                    self.field_paragraphs[field_id] = field_paragraphs_index
+                field_paragraphs_index = self.field_paragraphs[field_id]
+
                 (hydrated_paragraph, _) = await hydrate_paragraph(
                     resource,
                     field,
@@ -283,10 +285,6 @@ class Hydrator:
                     field_paragraphs_index,
                 )
                 self.hydrated.add_paragraph(related_paragraph_id, hydrated_paragraph)
-
-        for field_id, hydrated_field in hydrated_fields:
-            if hydrated_field is not None:
-                self.hydrated.add_field(field_id, hydrated_field)
 
             if self.hydrated.has_field(field_id):
                 # we only hydrate page and table previews for fields the user
@@ -307,7 +305,9 @@ class Hydrator:
                             paragraph_id, extra.field_table_page, preview
                         )
 
-        for rid, hydrated_resource in hydrated_resources:
-            self.hydrated.add_resource(rid, hydrated_resource)
-
         return self.hydrated.build()
+
+    # TODO: proper typing
+    async def _limited_concurrency(self, aw: Awaitable):
+        async with self.max_ops:
+            return await aw
