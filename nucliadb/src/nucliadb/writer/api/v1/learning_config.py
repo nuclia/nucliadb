@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from fastapi import Request
+from fastapi import Header, Request
 from fastapi_versioning import version
 from nuclia_models.config.proto import ExtractConfig, SplitConfiguration
 
@@ -55,10 +55,11 @@ async def set_configuration(
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
 async def patch_configuration(
-    request: Request,
-    kbid: str,
+    request: Request, kbid: str, x_nucliadb_account: str = Header(default="", include_in_schema=False)
 ):
-    return await learning_config_proxy(request, "PATCH", f"/config/{kbid}")
+    return await learning_config_proxy(
+        request, "PATCH", f"/config/{kbid}", headers={"account-id": x_nucliadb_account}
+    )
 
 
 @api.post(

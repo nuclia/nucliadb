@@ -56,14 +56,12 @@ async def test_api(
 ):
     kbid = knowledgebox
     # Get configuration
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/configuration", headers={"x-nucliadb-account": "account"}
-    )
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/configuration")
     assert resp.status_code == 200
     assert learning_config_proxy_mock.calls[-1][1:] == (
         "GET",
         f"/config/{kbid}",
-        {"account-id": "account"},
+        None,
     )
 
     # Download model

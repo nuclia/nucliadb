@@ -19,7 +19,7 @@
 #
 from typing import Dict
 
-from fastapi import Request
+from fastapi import Header, Request
 from fastapi_versioning import version
 from nuclia_models.config.proto import ExtractConfig, SplitConfiguration
 
@@ -60,15 +60,11 @@ async def download_model(
 )
 @requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
-async def get_configuration(
-    request: Request,
-    kbid: str,
-):
+async def get_configuration(request: Request, kbid: str):
     return await learning_config_proxy(
         request,
         "GET",
         f"/config/{kbid}",
-        headers={"account-id": request.headers.get("x-nucliadb-account", "")},
     )
 
 
@@ -122,14 +118,13 @@ async def get_model(
 @requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def get_schema_for_configuration_updates(
-    request: Request,
-    kbid: str,
+    request: Request, kbid: str, x_nucliadb_account: str = Header(default="", include_in_schema=False)
 ):
     return await learning_config_proxy(
         request,
         "GET",
         f"/schema/{kbid}",
-        headers={"account-id": request.headers.get("x-nucliadb-account", "")},
+        headers={"account-id": x_nucliadb_account},
     )
 
 
