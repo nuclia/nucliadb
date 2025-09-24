@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from typing import Optional, Union
+from typing import Annotated, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import Origin
@@ -243,9 +243,23 @@ class Hydration(BaseModel, extra="forbid"):
     )
 
 
+ParagraphId = Annotated[
+    str,
+    StringConstraints(
+        pattern=r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+/[0-9]+-[0-9]+$",
+        min_length=32 + 1 + 1 + 1 + 1 + 1 + 3,
+        # max field id of 250 and 10 digit paragraphs. More than enough
+        max_length=32 + 1 + 1 + 1 + 250 + 1 + 21,
+    ),
+]
+
+
 class HydrateRequest(BaseModel, extra="forbid"):
-    data: list[str]
-    hydration: Hydration
+    data: list[ParagraphId] = Field(
+        description="List of paragraph ids we want to hydrate",
+        max_length=50,
+    )
+    hydration: Hydration = Field(description="Description of how hydration must be performed")
 
 
 ### Response models
