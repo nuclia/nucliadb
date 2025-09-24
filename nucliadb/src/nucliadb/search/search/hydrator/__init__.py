@@ -28,7 +28,8 @@ from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import FieldId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
-from nucliadb.search.search import cache, paragraphs
+from nucliadb.search.search import cache
+from nucliadb.search.search.paragraphs import get_paragraph_text
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import (
@@ -170,7 +171,7 @@ async def hydrate_text_block(
         if concurrency_control is not None:
             await stack.enter_async_context(concurrency_control)
 
-        text_block.text = await paragraphs.get_paragraph_text(
+        text_block.text = await get_paragraph_text(
             kbid=kbid,
             paragraph_id=text_block.paragraph_id,
             highlight=options.highlight,
