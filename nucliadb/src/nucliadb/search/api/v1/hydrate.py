@@ -35,8 +35,19 @@ from nucliadb.search.search.hydrator.images import (
 )
 from nucliadb.search.search.hydrator.paragraphs import ParagraphIndex, hydrate_paragraph
 from nucliadb.search.search.hydrator.resources import hydrate_resource
-from nucliadb_models import hydration as hydration_models
-from nucliadb_models.hydration import Hydrated, HydrateRequest, Hydration
+from nucliadb_models.hydration import (
+    Hydrated,
+    HydratedConversationField,
+    HydratedFileField,
+    HydratedGenericField,
+    HydratedLinkField,
+    HydratedParagraph,
+    HydratedResource,
+    HydratedTextField,
+    HydrateRequest,
+    Hydration,
+    ParagraphHydration,
+)
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import Image
 from nucliadb_utils.authentication import requires
@@ -67,21 +78,21 @@ class HydratedBuilder:
     """Builder class to construct an Hydrated payload."""
 
     def __init__(self) -> None:
-        self._resources: dict[str, hydration_models.HydratedResource] = {}
+        self._resources: dict[str, HydratedResource] = {}
         self._fields: dict[
             str,
             Union[
-                hydration_models.HydratedTextField,
-                hydration_models.HydratedFileField,
-                hydration_models.HydratedLinkField,
-                hydration_models.HydratedConversationField,
-                hydration_models.HydratedGenericField,
+                HydratedTextField,
+                HydratedFileField,
+                HydratedLinkField,
+                HydratedConversationField,
+                HydratedGenericField,
             ],
         ] = {}
-        self._paragraphs: dict[str, hydration_models.HydratedParagraph] = {}
+        self._paragraphs: dict[str, HydratedParagraph] = {}
 
     @property
-    def resources(self) -> dict[str, hydration_models.HydratedResource]:
+    def resources(self) -> dict[str, HydratedResource]:
         return self._resources
 
     @property
@@ -90,17 +101,17 @@ class HydratedBuilder:
     ) -> dict[
         str,
         Union[
-            hydration_models.HydratedTextField,
-            hydration_models.HydratedFileField,
-            hydration_models.HydratedLinkField,
-            hydration_models.HydratedConversationField,
-            hydration_models.HydratedGenericField,
+            HydratedTextField,
+            HydratedFileField,
+            HydratedLinkField,
+            HydratedConversationField,
+            HydratedGenericField,
         ],
     ]:
         return self._fields
 
     @property
-    def paragraphs(self) -> dict[str, hydration_models.HydratedParagraph]:
+    def paragraphs(self) -> dict[str, HydratedParagraph]:
         return self._paragraphs
 
     def build(self) -> Hydrated:
@@ -110,18 +121,18 @@ class HydratedBuilder:
             paragraphs=self._paragraphs,
         )
 
-    def add_resource(self, rid: str, resource: hydration_models.HydratedResource):
+    def add_resource(self, rid: str, resource: HydratedResource):
         self._resources[rid] = resource
 
     def add_field(
         self,
         field_id: FieldId,
         field: Union[
-            hydration_models.HydratedTextField,
-            hydration_models.HydratedFileField,
-            hydration_models.HydratedLinkField,
-            hydration_models.HydratedConversationField,
-            hydration_models.HydratedGenericField,
+            HydratedTextField,
+            HydratedFileField,
+            HydratedLinkField,
+            HydratedConversationField,
+            HydratedGenericField,
         ],
     ):
         self._fields[field_id.full()] = field
@@ -129,14 +140,14 @@ class HydratedBuilder:
     def has_field(self, field_id: FieldId) -> bool:
         return field_id.full() in self._fields
 
-    def add_paragraph(self, paragraph_id: ParagraphId, paragraph: hydration_models.HydratedParagraph):
+    def add_paragraph(self, paragraph_id: ParagraphId, paragraph: HydratedParagraph):
         self._paragraphs[paragraph_id.full()] = paragraph
 
     def add_page_preview(self, paragraph_id: ParagraphId, page: int, image: Image):
         field_id = paragraph_id.field_id
         field = self._fields[field_id.full()]
 
-        if not isinstance(field, hydration_models.HydratedFileField):
+        if not isinstance(field, HydratedFileField):
             # Other field types have no page preview concept
             return
 
@@ -154,7 +165,7 @@ class HydratedBuilder:
         field_id = paragraph_id.field_id
         field = self._fields[field_id.full()]
 
-        if not isinstance(field, hydration_models.HydratedFileField):
+        if not isinstance(field, HydratedFileField):
             # Other field types have no page preview concept
             return
 
@@ -281,7 +292,7 @@ class Hydrator:
                     resource,
                     field,
                     related_paragraph_id,
-                    hydration_models.ParagraphHydration(
+                    ParagraphHydration(
                         text=self.config.paragraph.text, image=None, table=None, page=None, related=None
                     ),
                     field_paragraphs_index,
