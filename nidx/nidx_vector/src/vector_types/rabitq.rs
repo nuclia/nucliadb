@@ -21,6 +21,8 @@
 use bit_vec::BitVec;
 use simsimd::SpatialSimilarity;
 
+use crate::config::VectorType;
+
 const EPSILON: f32 = 1.9;
 
 pub struct EncodedVector<'a> {
@@ -72,6 +74,8 @@ impl<'a> EncodedVector<'a> {
 }
 
 pub struct QueryVector {
+    /// Original vector, encoded for similarity search
+    original: Vec<u8>,
     /// Vector quantized to u8
     quantized: Vec<u8>,
     /// Lowest value in original vector. quantized value 0 maps to this
@@ -85,7 +89,7 @@ pub struct QueryVector {
 }
 
 impl QueryVector {
-    pub fn from_vector(q: &[f32]) -> Self {
+    pub fn from_vector(q: &[f32], vector_type: &VectorType) -> Self {
         let (low, hi) = q.iter().fold((q[0], q[0]), |(min, max), it| {
             (if *it < min { *it } else { min }, if *it > max { *it } else { max })
         });
@@ -96,12 +100,17 @@ impl QueryVector {
         let root_dim = (q.len() as f32).sqrt();
 
         QueryVector {
+            original: vector_type.encode(q),
             quantized,
             sum_quantized,
             root_dim,
             low,
             delta,
         }
+    }
+
+    pub fn original(&self) -> &[u8] {
+        &self.original
     }
 
     pub fn similarity(&self, other: EncodedVector) -> (f32, f32) {
@@ -133,7 +142,10 @@ mod tests {
     use rand::{Rng, SeedableRng, rngs::SmallRng};
     use simsimd::SpatialSimilarity;
 
-    use crate::vector_types::rabitq::{EncodedVector, QueryVector};
+    use crate::{
+        config::VectorType,
+        vector_types::rabitq::{EncodedVector, QueryVector},
+    };
 
     const DIMENSION: usize = 2048;
 
@@ -174,14 +186,14 @@ mod tests {
         // v1-v2 (high similarity)
         let actual = f32::dot(&v1, &v2).unwrap() as f32;
         let v1_encoded = EncodedVector::encode(&v1);
-        let v2_query = QueryVector::from_vector(&v2);
+        let v2_query = QueryVector::from_vector(&v2, &VectorType::DenseF32 { dimension: DIMENSION });
         let (estimate, err) = v2_query.similarity(EncodedVector { data: &v1_encoded });
         assert!((actual - estimate).abs() < err);
         assert!(err < 0.05);
 
         // v1-v3 (low similarity)
         let actual = f32::dot(&v1, &v3).unwrap() as f32;
-        let v3_query = QueryVector::from_vector(&v3);
+        let v3_query = QueryVector::from_vector(&v3, &VectorType::DenseF32 { dimension: DIMENSION });
         let (estimate, err) = v3_query.similarity(EncodedVector { data: &v1_encoded });
         assert!((actual - estimate).abs() < err);
         assert!(err < 0.05);

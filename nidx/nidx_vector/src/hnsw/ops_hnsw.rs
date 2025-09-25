@@ -42,6 +42,7 @@ pub trait DataRetriever: std::marker::Sync {
     /// Embeddings with smaller similarity should not be considered.
     fn min_score(&self) -> f32;
     fn will_need(&self, x: VectorAddr);
+    fn will_need_vector(&self, x: VectorAddr);
 }
 
 pub enum SearchVector {
@@ -240,23 +241,32 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         k_neighbours: usize,
         entry_points: &[VectorAddr],
     ) -> Neighbours {
+        // Nodes already visited
         let mut visited = FxHashSet::default();
+        // Nodes to visit
         let mut candidates = BinaryHeap::new();
+        // Best results so far
         let mut ms_neighbours = BinaryHeap::new();
+
+        // The initial candidates are the entry points
         for ep in entry_points.iter().copied() {
             visited.insert(ep);
             let similarity = self.retriever.similarity(ep, query);
             candidates.push(Cnx(ep, similarity));
             ms_neighbours.push(Reverse(Cnx(ep, similarity)));
         }
+
         loop {
             match (candidates.pop(), ms_neighbours.peek().cloned()) {
+                // No more candidates, done
                 (None, _) => break,
+                // Candidate is worse than worse result, done
                 (Some(Cnx(_, cs)), Some(Reverse(Cnx(_, ws)))) if cs < ws => break,
+                // Candidate is better than worse result
                 (Some(Cnx(cn, _)), Some(Reverse(Cnx(_, mut ws)))) => {
                     for (y, _) in layer.get_out_edges(cn) {
                         if self.preload_nodes && !visited.contains(&y) {
-                            self.retriever.will_need(y);
+                            self.retriever.will_need_vector(y);
                         }
                     }
                     for (y, _) in layer.get_out_edges(cn) {
@@ -367,9 +377,30 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             crnt_layer -= 1;
         }
 
+        // If using RabitQ, request more vectors to rerank later
+        let original_query = if let SearchVector::RabitQ(rq) = query {
+            Some(&SearchVector::Query(rq.original().to_vec()))
+        } else {
+            None
+        };
+        let last_layer_k = if original_query.is_some() {
+            std::cmp::min(k_neighbours * 100, 2000)
+        } else {
+            0
+        };
+
         let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
         let layer = hnsw.get_layer(crnt_layer);
-        let neighbors = self.layer_search(query, layer, k_neighbours, &entry_points);
+        let mut neighbors = self.layer_search(query, layer, last_layer_k, &entry_points);
+
+        // If using RabitQ, rerank using the original vectors
+        if let Some(query) = original_query {
+            neighbors = neighbors
+                .into_iter()
+                .map(|(addr, _)| (addr, self.retriever.similarity(addr, query)))
+                .collect();
+            neighbors.sort_unstable_by(|x, y| y.1.partial_cmp(&x.1).unwrap_or(Ordering::Equal));
+        }
 
         let filter = NodeFilter {
             filter: with_filter,
@@ -379,7 +410,14 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         };
         let layer_zero = hnsw.get_layer(0);
         let entry_points: Vec<_> = neighbors.into_iter().map(|(node, _)| node).collect();
-        let mut filtered_result = self.closest_up_nodes(entry_points, &query, layer_zero, k_neighbours, filter);
+
+        let mut filtered_result = self.closest_up_nodes(
+            entry_points,
+            original_query.unwrap_or(query),
+            layer_zero,
+            k_neighbours * 10,
+            filter,
+        );
 
         // order may be lost
         filtered_result.sort_by(|a, b| b.1.total_cmp(&a.1));

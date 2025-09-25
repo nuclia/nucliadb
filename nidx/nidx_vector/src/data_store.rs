@@ -96,6 +96,7 @@ pub trait DataStore: Sync + Send {
     fn get_vector(&self, id: VectorAddr) -> VectorRef<'_>;
     fn get_quantized_vector(&self, id: VectorAddr) -> rabitq::EncodedVector<'_>;
     fn will_need(&self, id: VectorAddr);
+    fn will_need_quantized(&self, id: VectorAddr);
     fn as_any(&self) -> &dyn Any;
     fn has_quantized(&self) -> bool;
 }

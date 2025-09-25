@@ -39,7 +39,7 @@ use std::iter::empty;
 use std::path::Path;
 
 /// How much expensive is to find a node via HNSW compared to a simple brute force scan
-const HNSW_COST_FACTOR: usize = 200;
+const HNSW_COST_FACTOR: usize = 100;
 
 mod file_names {
     pub const HNSW: &str = "index.hnsw";
@@ -321,6 +321,14 @@ impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
         self.data_store.will_need(x);
     }
 
+    fn will_need_vector(&self, x: VectorAddr) {
+        if self.data_store.has_quantized() {
+            self.data_store.will_need_quantized(x);
+        } else {
+            self.data_store.will_need(x);
+        }
+    }
+
     fn get_vector(&self, x: VectorAddr) -> &[u8] {
         self.data_store.get_vector(x).vector()
     }
@@ -485,7 +493,7 @@ impl OpenSegment {
     ) -> Box<dyn Iterator<Item = ScoredVector<'_>> + '_> {
         let raw_query = SearchVector::Query(config.vector_type.encode(query));
         let encoded_query = if data_store.has_quantized() {
-            let rabitq = rabitq::QueryVector::from_vector(query);
+            let rabitq = rabitq::QueryVector::from_vector(query, &config.vector_type);
             &SearchVector::RabitQ(rabitq)
         } else {
             &raw_query
@@ -506,6 +514,7 @@ impl OpenSegment {
         let expected_traversal_scan = results * self.metadata.records / count;
 
         if count < expected_traversal_scan * HNSW_COST_FACTOR {
+            println!("Brute");
             let mut scored_results = Vec::new();
             for paragraph_addr in bitset.iter() {
                 let paragraph = data_store.get_paragraph(paragraph_addr);
@@ -778,7 +787,7 @@ mod test {
         )?;
 
         // Search a few times
-        let correct = (0..100)
+        let correct: f32 = (0..100)
             .map(|_| {
                 // Search near an existing segment (simulates that the query is related to the data)
                 let base_v = elems.values().nth(rng.gen_range(0..elems.len())).unwrap();
@@ -794,15 +803,20 @@ mod test {
                     .map(|r| dp.data_store.get_paragraph(r.paragraph()).id().to_string())
                     .collect();
                 let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();
-                search == brute_force
+                let mut r = 0.0;
+                for b in brute_force {
+                    if search.contains(&b) {
+                        r += 0.2;
+                    }
+                }
+                r
             })
-            .filter(|x| *x)
-            .count();
+            .sum();
 
-        let recall = correct as f32 / 100.0;
+        let recall = correct / 100.0;
         println!("Assessed recall = {recall}");
-        // Expected 0.90-0.92, has a little margin because HNSW can be non-deterministic
-        assert!(recall >= 0.88);
+        // Expected ~0.98, has a little margin because HNSW can be non-deterministic
+        assert!(recall >= 0.95);
 
         Ok(())
     }

@@ -23,7 +23,6 @@ use memmap2::Mmap;
 use std::{fs::File, io::Write as _, path::Path};
 
 use crate::{
-    config::VectorType,
     data_store::{OpenReason, VectorAddr},
     vector_types::rabitq,
 };

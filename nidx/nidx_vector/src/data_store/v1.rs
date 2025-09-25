@@ -73,6 +73,9 @@ impl DataStore for DataStoreV1 {
     fn will_need(&self, id: VectorAddr) {
         store::will_need(&self.nodes, id.0 as usize, self.vector_len_bytes);
     }
+
+    fn will_need_quantized(&self, _id: VectorAddr) {}
+
     fn as_any(&self) -> &dyn Any {
         self
     }

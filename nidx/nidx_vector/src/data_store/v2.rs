@@ -142,6 +142,10 @@ impl DataStore for DataStoreV2 {
         self.vectors.will_need(id);
     }
 
+    fn will_need_quantized(&self, id: VectorAddr) {
+        self.quantized.as_ref().unwrap().will_need(id);
+    }
+
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
