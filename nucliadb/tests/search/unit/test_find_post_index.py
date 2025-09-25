@@ -146,7 +146,7 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
             side_effect=mock_hydrate_resource_metadata,
         ),
         patch(
-            "nucliadb.search.search.hydrator.paragraphs.get_paragraph_text",
+            "nucliadb.search.search.hydrator.get_paragraph_text",
             return_value="extracted text",
         ),
         patch.object(predict_mock, "rerank", AsyncMock(side_effect=fake_reranking)),

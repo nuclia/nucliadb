@@ -78,34 +78,26 @@ class BrokerMessageBuilder:
 
         """
         if (field_id, field_type) not in self.fields:
-            field_builder = FieldBuilder(self.rid, field_id, field_type)
+            field_builder = FieldBuilder(self.bm.kbid, self.rid, field_id, field_type)
             self.fields[(field_id, field_type)] = field_builder
         return self.fields[(field_id, field_type)]
 
     def with_title(self, title: str) -> FieldBuilder:
         title_builder = self.field_builder("title", rpb.FieldType.GENERIC)
-        title_builder.with_extracted_text(title)
-        # we do this to writer BMs in write resource API endpoint
-        title_builder.with_extracted_paragraph_metadata(
-            rpb.Paragraph(
-                start=0,
-                end=len(title),
-                kind=rpb.Paragraph.TypeParagraph.TITLE,
-            )
+        title_builder.add_paragraph(
+            text=title,
+            # we do this to writer BMs in write resource API endpoint
+            kind=rpb.Paragraph.TypeParagraph.TITLE,
         )
         self.bm.basic.title = title
         return title_builder
 
     def with_summary(self, summary: str) -> FieldBuilder:
         summary_builder = self.field_builder("summary", rpb.FieldType.GENERIC)
-        summary_builder.with_extracted_text(summary)
-        # we do this to writer BMs in write resource API endpoint
-        summary_builder.with_extracted_paragraph_metadata(
-            rpb.Paragraph(
-                start=0,
-                end=len(summary),
-                kind=rpb.Paragraph.TypeParagraph.DESCRIPTION,
-            )
+        summary_builder.add_paragraph(
+            text=summary,
+            # we do this to writer BMs in write resource API endpoint
+            kind=rpb.Paragraph.TypeParagraph.DESCRIPTION,
         )
         self.bm.basic.summary = summary
         return summary_builder
@@ -131,13 +123,13 @@ class BrokerMessageBuilder:
         self.bm.basic.created.FromDatetime(datetime.now())
         self.bm.basic.modified.FromDatetime(datetime.now())
 
-    def _default_origin(self):
+    def _default_origin(self) -> None:
         self.bm.origin.source = rpb.Origin.Source.API
         self.bm.origin.source_id = "My Source"
         self.bm.origin.created.FromDatetime(datetime.now())
         self.bm.origin.modified.FromDatetime(datetime.now())
 
-    def _apply_fields(self):
+    def _apply_fields(self) -> None:
         # clear broker message fields before adding data
         self.bm.basic.ClearField("fieldmetadata")
         self.bm.ClearField("field_metadata")
@@ -162,14 +154,18 @@ class BrokerMessageBuilder:
                 file_field.added.FromDatetime(datetime.now())
                 file_field.file.source = rpb.CloudFile.Source.EXTERNAL
 
+                if field.extracted.file is not None:
+                    self.bm.file_extracted_data.append(field.extracted.file)
+
             elif (
                 field.id.field_type == rpb.FieldType.LINK
                 and self.bm.source == wpb.BrokerMessage.MessageSource.PROCESSOR
             ):
-                # we don't need to do anything else
-                pass
-            else:
-                raise Exception("Unsupported field type: {field.id.field_type}")
+                if field.extracted.link is not None:
+                    self.bm.link_extracted_data.append(field.extracted.link)
+
+            else:  # pragma: no cover
+                raise Exception(f"Unsupported field type: {field.id.field_type}")
 
             if field.user.metadata is not None:
                 self.bm.basic.fieldmetadata.append(field.user.metadata)

@@ -21,8 +21,6 @@ import contextlib
 import logging
 from typing import Optional
 
-import backoff
-
 from nucliadb.common.cache import (
     extracted_text_cache,
     get_extracted_text_cache,
@@ -72,23 +70,6 @@ async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
     extracted_text = await cache.get(field.kbid, FieldId(field.uuid, field.type, field.id))
     field.extracted_text = extracted_text
     return extracted_text
-
-
-@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
-async def field_get_extracted_text(field: Field) -> Optional[ExtractedText]:
-    try:
-        return await field.get_extracted_text()
-    except Exception:
-        logger.warning(
-            "Error getting extracted text for field. Retrying",
-            exc_info=True,
-            extra={
-                "kbid": field.kbid,
-                "resource_id": field.resource.uuid,
-                "field": f"{field.type}/{field.id}",
-            },
-        )
-        raise
 
 
 async def get_extracted_text_from_field_id(kbid: str, field: FieldId) -> Optional[ExtractedText]:

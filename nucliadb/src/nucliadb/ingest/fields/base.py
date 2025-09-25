@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar
 from google.protobuf.message import DecodeError, Message
 
 from nucliadb.common import datamanagers
+from nucliadb.common.ids import FieldId
 from nucliadb.ingest.fields.exceptions import InvalidFieldClass, InvalidPBClass
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import (
@@ -124,6 +125,14 @@ class Field(Generic[PbType]):
     @property
     def uuid(self) -> str:
         return self.resource.uuid
+
+    @property
+    def field_id(self) -> FieldId:
+        return FieldId(
+            rid=self.resource.uuid,
+            type=self.type,
+            key=self.id,
+        )
 
     @property
     def storage(self) -> Storage:
