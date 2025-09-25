@@ -483,11 +483,12 @@ impl OpenSegment {
         config: &VectorConfig,
         min_score: f32,
     ) -> Box<dyn Iterator<Item = ScoredVector<'_>> + '_> {
+        let raw_query = SearchVector::Query(config.vector_type.encode(query));
         let encoded_query = if data_store.has_quantized() {
             let rabitq = rabitq::QueryVector::from_vector(query);
-            SearchVector::RabitQ(rabitq)
+            &SearchVector::RabitQ(rabitq)
         } else {
-            SearchVector::Query(config.vector_type.encode(query))
+            &raw_query
         };
         let retriever = Retriever::new(data_store, config, min_score);
 
@@ -513,7 +514,7 @@ impl OpenSegment {
                 let best_vector_score = paragraph
                     .vectors(&paragraph_addr)
                     .map(|va| {
-                        let score = retriever.similarity(va, &encoded_query);
+                        let score = retriever.similarity(va, &raw_query);
                         Cnx(va, score)
                     })
                     .max_by(|v, w| v.1.total_cmp(&w.1))

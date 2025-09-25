@@ -342,7 +342,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
 
     pub fn search<H: Hnsw>(
         &self,
-        query: SearchVector,
+        query: &SearchVector,
         hnsw: H,
         k_neighbours: usize,
         with_filter: &FilterBitSet,
@@ -362,14 +362,14 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         while crnt_layer != 0 {
             let layer = hnsw.get_layer(crnt_layer);
             let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
-            let layer_res = self.layer_search(&query, layer, 1, &entry_points);
+            let layer_res = self.layer_search(query, layer, 1, &entry_points);
             neighbours = layer_res;
             crnt_layer -= 1;
         }
 
         let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
         let layer = hnsw.get_layer(crnt_layer);
-        let neighbors = self.layer_search(&query, layer, k_neighbours, &entry_points);
+        let neighbors = self.layer_search(query, layer, k_neighbours, &entry_points);
 
         let filter = NodeFilter {
             filter: with_filter,
@@ -379,9 +379,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         };
         let layer_zero = hnsw.get_layer(0);
         let entry_points: Vec<_> = neighbors.into_iter().map(|(node, _)| node).collect();
-        println!("Search from {entry_points:?}");
         let mut filtered_result = self.closest_up_nodes(entry_points, &query, layer_zero, k_neighbours, filter);
-        println!("Found {filtered_result:?}");
 
         // order may be lost
         filtered_result.sort_by(|a, b| b.1.total_cmp(&a.1));
