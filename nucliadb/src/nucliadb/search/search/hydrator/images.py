@@ -36,6 +36,8 @@ async def paragraph_source_image(kbid: str, paragraph: resources_pb2.Paragraph) 
 
     """
     source_image = paragraph.representation.reference_file
+    if not source_image:
+        return None
 
     if paragraph.kind not in (
         resources_pb2.Paragraph.TypeParagraph.OCR,
