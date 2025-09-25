@@ -71,7 +71,7 @@ impl<'a> EncodedVector<'a> {
     }
 }
 
-struct QueryVector {
+pub struct QueryVector {
     /// Vector quantized to u8
     quantized: Vec<u8>,
     /// Lowest value in original vector. quantized value 0 maps to this
@@ -104,7 +104,7 @@ impl QueryVector {
         }
     }
 
-    fn similarity(&self, other: &EncodedVector) -> (f32, f32) {
+    pub fn similarity(&self, other: EncodedVector) -> (f32, f32) {
         let dot = self
             .quantized
             .iter()
@@ -175,14 +175,14 @@ mod tests {
         let actual = f32::dot(&v1, &v2).unwrap() as f32;
         let v1_encoded = EncodedVector::encode(&v1);
         let v2_query = QueryVector::from_vector(&v2);
-        let (estimate, err) = v2_query.similarity(&EncodedVector { data: &v1_encoded });
+        let (estimate, err) = v2_query.similarity(EncodedVector { data: &v1_encoded });
         assert!((actual - estimate).abs() < err);
         assert!(err < 0.05);
 
         // v1-v3 (low similarity)
         let actual = f32::dot(&v1, &v3).unwrap() as f32;
         let v3_query = QueryVector::from_vector(&v3);
-        let (estimate, err) = v3_query.similarity(&EncodedVector { data: &v1_encoded });
+        let (estimate, err) = v3_query.similarity(EncodedVector { data: &v1_encoded });
         assert!((actual - estimate).abs() < err);
         assert!(err < 0.05);
     }

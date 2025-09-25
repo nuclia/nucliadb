@@ -26,6 +26,7 @@ use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, Paragra
 use crate::formula::Formula;
 use crate::hnsw::*;
 use crate::inverted_index::{FilterBitSet, InvertedIndexes, build_indexes};
+use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use core::f32;
 use io::{BufWriter, Write};
@@ -151,7 +152,7 @@ fn merge_indexes<DS: DataStore + 'static>(
     let merged_vectors_count = data_store.stored_vector_count();
 
     // Creating the hnsw for the new node store.
-    let retriever = Retriever::new(&[], &data_store, config, -1.0);
+    let retriever = Retriever::new(&data_store, config, -1.0);
     let mut ops = HnswOps::new(&retriever, false);
     for id in start_vector_index..merged_vectors_count {
         ops.insert(VectorAddr(id), &mut index);
@@ -258,7 +259,7 @@ fn create_indexes<DS: DataStore + 'static>(
 
     // Creating the HNSW using the mmaped nodes
     let mut index = RAMHnsw::new();
-    let retriever = Retriever::new(&[], &data_store, config, -1.0);
+    let retriever = Retriever::new(&data_store, config, -1.0);
     let mut ops = HnswOps::new(&retriever, false);
     for id in 0..vector_count {
         ops.insert(VectorAddr(id), &mut index)
@@ -302,23 +303,22 @@ fn create_indexes<DS: DataStore + 'static>(
 
 pub struct Retriever<'a, DS: DataStore> {
     similarity_function: fn(&[u8], &[u8]) -> f32,
-    vector_count: u32,
-    temp: &'a [u8],
     data_store: &'a DS,
     min_score: f32,
 }
 impl<'a, DS: DataStore> Retriever<'a, DS> {
-    pub fn new(temp: &'a [u8], data_store: &'a DS, config: &VectorConfig, min_score: f32) -> Retriever<'a, DS> {
+    pub fn new(data_store: &'a DS, config: &VectorConfig, min_score: f32) -> Retriever<'a, DS> {
         Retriever {
-            temp,
             data_store,
             similarity_function: config.similarity_function(),
-            vector_count: data_store.stored_vector_count(),
             min_score,
         }
     }
     fn find_vector(&'a self, x: VectorAddr) -> VectorRef<'a> {
         self.data_store.get_vector(x)
+    }
+    fn get_quantized_vector(&self, x: VectorAddr) -> rabitq::EncodedVector<'_> {
+        self.data_store.get_quant_vector(x)
     }
 }
 
@@ -327,24 +327,26 @@ impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
         self.data_store.will_need(x);
     }
 
-    fn get_vector(&self, x @ VectorAddr(addr): VectorAddr) -> &[u8] {
-        if addr == self.vector_count {
-            self.temp
-        } else {
-            self.find_vector(x).vector()
-        }
+    fn get_vector(&self, x: VectorAddr) -> &[u8] {
+        self.find_vector(x).vector()
     }
-    fn similarity(&self, x @ VectorAddr(a0): VectorAddr, y @ VectorAddr(a1): VectorAddr) -> f32 {
-        if a0 == self.vector_count {
-            let y = self.find_vector(y).vector();
-            (self.similarity_function)(self.temp, y)
-        } else if a1 == self.vector_count {
-            let x = self.find_vector(x).vector();
-            (self.similarity_function)(self.temp, x)
-        } else {
-            let x = self.find_vector(x).vector();
-            let y = self.find_vector(y).vector();
-            (self.similarity_function)(x, y)
+
+    fn similarity(&self, x: VectorAddr, y: &SearchVector) -> f32 {
+        match y {
+            SearchVector::Stored(vector_addr) => {
+                let x = self.find_vector(x).vector();
+                let y = self.find_vector(*vector_addr).vector();
+                (self.similarity_function)(x, y)
+            }
+            SearchVector::Query(query) => {
+                let x = self.find_vector(x).vector();
+                (self.similarity_function)(x, query)
+            }
+            SearchVector::RabitQ(query) => {
+                let x = self.get_quantized_vector(x);
+                let (est, _err) = query.similarity(x);
+                est
+            }
         }
     }
 
@@ -487,9 +489,8 @@ impl OpenSegment {
         config: &VectorConfig,
         min_score: f32,
     ) -> Box<dyn Iterator<Item = ScoredVector<'_>> + '_> {
-        let encoded_query = config.vector_type.encode(query);
-        let retriever = Retriever::new(&encoded_query, data_store, config, min_score);
-        let query_address = VectorAddr(self.metadata.records as u32);
+        let encoded_query = SearchVector::Query(config.vector_type.encode(query));
+        let retriever = Retriever::new(data_store, config, min_score);
 
         let mut filter_bitset = self.inverted_indexes.filter(filter);
         if let Some(ref mut bitset) = filter_bitset {
@@ -513,7 +514,7 @@ impl OpenSegment {
                 let best_vector_score = paragraph
                     .vectors(&paragraph_addr)
                     .map(|va| {
-                        let score = retriever.similarity(query_address, va);
+                        let score = retriever.similarity(va, &encoded_query);
                         Cnx(va, score)
                     })
                     .max_by(|v, w| v.1.total_cmp(&w.1))
@@ -533,7 +534,7 @@ impl OpenSegment {
         }
 
         let ops = HnswOps::new(&retriever, true);
-        let neighbours = ops.search(query_address, self.index.as_ref(), results, bitset, with_duplicates);
+        let neighbours = ops.search(encoded_query, self.index.as_ref(), results, bitset, with_duplicates);
         Box::new(
             neighbours
                 .into_iter()

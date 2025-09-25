@@ -66,6 +66,7 @@ impl DataStoreV2 {
 
         paragraphs.close()?;
         vectors.close()?;
+        quantized.close()?;
 
         Ok(())
     }
