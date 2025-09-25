@@ -47,7 +47,12 @@ impl DataStoreV2 {
         Ok(Self {
             vectors: VectorStore::open(path, vector_type, &reason)?,
             paragraphs: ParagraphStore::open(path, &reason)?,
-            quantized: QuantVectorStore::open(path, vector_type, &reason).ok(),
+            quantized: QuantVectorStore::open(
+                path,
+                rabitq::EncodedVector::encoded_len(vector_type.dimension()),
+                &reason,
+            )
+            .ok(),
         })
     }
 
@@ -102,6 +107,10 @@ impl DataStoreV2 {
 }
 
 impl DataStore for DataStoreV2 {
+    fn has_quantized(&self) -> bool {
+        self.quantized.is_some()
+    }
+
     fn size_bytes(&self) -> usize {
         self.vectors.size_bytes() + self.paragraphs.size_bytes()
     }
@@ -122,7 +131,7 @@ impl DataStore for DataStoreV2 {
         self.vectors.get_vector(id)
     }
 
-    fn get_quant_vector(&self, id: VectorAddr) -> rabitq::EncodedVector<'_> {
+    fn get_quantized_vector(&self, id: VectorAddr) -> rabitq::EncodedVector<'_> {
         let Some(quantized) = &self.quantized else {
             panic!("Store does not have quantized vectors")
         };

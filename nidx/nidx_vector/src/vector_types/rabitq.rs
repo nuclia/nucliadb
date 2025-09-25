@@ -47,7 +47,7 @@ impl<'a> EncodedVector<'a> {
         u32::from_le_bytes(self.data[4..8].try_into().unwrap())
     }
 
-    fn encoded_len(dimension: usize) -> usize {
+    pub fn encoded_len(dimension: usize) -> usize {
         // 4 bytes (f32, dot_quant_original) + 4 bytes (u32, sum_bit) + one byte per 8 dimensions (binary vector)
         dimension / 8 + 8
     }
@@ -85,7 +85,7 @@ pub struct QueryVector {
 }
 
 impl QueryVector {
-    fn from_vector(q: &[f32]) -> Self {
+    pub fn from_vector(q: &[f32]) -> Self {
         let (low, hi) = q.iter().fold((q[0], q[0]), |(min, max), it| {
             (if *it < min { *it } else { min }, if *it > max { *it } else { max })
         });

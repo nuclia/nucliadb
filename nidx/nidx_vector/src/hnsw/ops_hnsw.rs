@@ -379,7 +379,9 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         };
         let layer_zero = hnsw.get_layer(0);
         let entry_points: Vec<_> = neighbors.into_iter().map(|(node, _)| node).collect();
+        println!("Search from {entry_points:?}");
         let mut filtered_result = self.closest_up_nodes(entry_points, &query, layer_zero, k_neighbours, filter);
+        println!("Found {filtered_result:?}");
 
         // order may be lost
         filtered_result.sort_by(|a, b| b.1.total_cmp(&a.1));

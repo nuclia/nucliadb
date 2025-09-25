@@ -37,7 +37,7 @@ pub struct QuantVectorStore {
 }
 
 impl QuantVectorStore {
-    pub fn open(path: &Path, vector_type: &VectorType, reason: &OpenReason) -> std::io::Result<Self> {
+    pub fn open(path: &Path, vector_len_bytes: usize, reason: &OpenReason) -> std::io::Result<Self> {
         let data = unsafe { Mmap::map(&File::open(path.join(FILENAME))?)? };
 
         #[cfg(not(target_os = "windows"))]
@@ -49,10 +49,7 @@ impl QuantVectorStore {
             data.advise(advice)?;
         }
 
-        Ok(Self {
-            data,
-            vector_len_bytes: vector_type.len_bytes(),
-        })
+        Ok(Self { data, vector_len_bytes })
     }
 
     pub fn get_vector(&self, addr: VectorAddr) -> rabitq::EncodedVector<'_> {

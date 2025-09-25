@@ -314,12 +314,6 @@ impl<'a, DS: DataStore> Retriever<'a, DS> {
             min_score,
         }
     }
-    fn find_vector(&'a self, x: VectorAddr) -> VectorRef<'a> {
-        self.data_store.get_vector(x)
-    }
-    fn get_quantized_vector(&self, x: VectorAddr) -> rabitq::EncodedVector<'_> {
-        self.data_store.get_quant_vector(x)
-    }
 }
 
 impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
@@ -328,22 +322,22 @@ impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
     }
 
     fn get_vector(&self, x: VectorAddr) -> &[u8] {
-        self.find_vector(x).vector()
+        self.data_store.get_vector(x).vector()
     }
 
     fn similarity(&self, x: VectorAddr, y: &SearchVector) -> f32 {
         match y {
             SearchVector::Stored(vector_addr) => {
-                let x = self.find_vector(x).vector();
-                let y = self.find_vector(*vector_addr).vector();
+                let x = self.data_store.get_vector(x).vector();
+                let y = self.data_store.get_vector(*vector_addr).vector();
                 (self.similarity_function)(x, y)
             }
             SearchVector::Query(query) => {
-                let x = self.find_vector(x).vector();
+                let x = self.data_store.get_vector(x).vector();
                 (self.similarity_function)(x, query)
             }
             SearchVector::RabitQ(query) => {
-                let x = self.get_quantized_vector(x);
+                let x = self.data_store.get_quantized_vector(x);
                 let (est, _err) = query.similarity(x);
                 est
             }
@@ -355,7 +349,7 @@ impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
     }
 
     fn paragraph(&self, x: VectorAddr) -> ParagraphAddr {
-        self.find_vector(x).paragraph()
+        self.data_store.get_vector(x).paragraph()
     }
 }
 
@@ -489,7 +483,12 @@ impl OpenSegment {
         config: &VectorConfig,
         min_score: f32,
     ) -> Box<dyn Iterator<Item = ScoredVector<'_>> + '_> {
-        let encoded_query = SearchVector::Query(config.vector_type.encode(query));
+        let encoded_query = if data_store.has_quantized() {
+            let rabitq = rabitq::QueryVector::from_vector(query);
+            SearchVector::RabitQ(rabitq)
+        } else {
+            SearchVector::Query(config.vector_type.encode(query))
+        };
         let retriever = Retriever::new(data_store, config, min_score);
 
         let mut filter_bitset = self.inverted_indexes.filter(filter);

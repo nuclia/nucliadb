@@ -43,6 +43,10 @@ pub struct DataStoreV1 {
 }
 
 impl DataStore for DataStoreV1 {
+    fn has_quantized(&self) -> bool {
+        false
+    }
+
     fn size_bytes(&self) -> usize {
         self.nodes.len()
     }
@@ -62,7 +66,7 @@ impl DataStore for DataStoreV1 {
         }
     }
 
-    fn get_quant_vector(&self, _id: VectorAddr) -> rabitq::EncodedVector<'_> {
+    fn get_quantized_vector(&self, _id: VectorAddr) -> rabitq::EncodedVector<'_> {
         panic!("Store does not have quantized vectors")
     }
 
