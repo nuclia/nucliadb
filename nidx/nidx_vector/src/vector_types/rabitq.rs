@@ -23,11 +23,15 @@ use simsimd::SpatialSimilarity;
 
 const EPSILON: f32 = 1.9;
 
-struct EncodedVector<'a> {
+pub struct EncodedVector<'a> {
     data: &'a [u8],
 }
 
 impl<'a> EncodedVector<'a> {
+    pub fn from_bytes(data: &'a [u8]) -> Self {
+        Self { data }
+    }
+
     /// Binary quantized vector
     fn quantized(&self) -> BitVec {
         BitVec::from_bytes(&self.data[8..])
@@ -43,7 +47,12 @@ impl<'a> EncodedVector<'a> {
         u32::from_le_bytes(self.data[4..8].try_into().unwrap())
     }
 
-    fn encode(v: &[f32]) -> Vec<u8> {
+    fn encoded_len(dimension: usize) -> usize {
+        // 4 bytes (f32, dot_quant_original) + 4 bytes (u32, sum_bit) + one byte per 8 dimensions (binary vector)
+        dimension / 8 + 8
+    }
+
+    pub fn encode(v: &[f32]) -> Vec<u8> {
         let root_dim = (v.len() as f32).sqrt();
         let quantized: BitVec<u32> = BitVec::from_iter(v.iter().map(|v| *v > 0.0));
         let sum_bits = quantized.count_ones() as u32;
@@ -53,7 +62,7 @@ impl<'a> EncodedVector<'a> {
             .collect();
         let dot_quant_original = f32::dot(v, &qv).unwrap() as f32;
 
-        let mut serialized = Vec::with_capacity(v.len() / 8 + 8);
+        let mut serialized = Vec::with_capacity(Self::encoded_len(v.len()));
         serialized.extend_from_slice(&dot_quant_original.to_le_bytes());
         serialized.extend_from_slice(&sum_bits.to_le_bytes());
         serialized.append(&mut quantized.to_bytes());

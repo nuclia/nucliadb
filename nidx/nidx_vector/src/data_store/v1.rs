@@ -21,6 +21,7 @@
 use crate::{
     config::{VectorConfig, VectorType},
     segment::Elem,
+    vector_types::rabitq,
 };
 use memmap2::Mmap;
 use node::Node;
@@ -59,6 +60,10 @@ impl DataStore for DataStoreV1 {
             vector: store::get_value(&self.nodes, id as usize).vector(),
             paragraph_addr: ParagraphAddr(id),
         }
+    }
+
+    fn get_quant_vector(&self, _id: VectorAddr) -> rabitq::EncodedVector<'_> {
+        panic!("Store does not have quantized vectors")
     }
 
     fn will_need(&self, id: VectorAddr) {

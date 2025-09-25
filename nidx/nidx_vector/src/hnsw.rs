@@ -25,6 +25,5 @@ mod ram_hnsw;
 
 pub use disk_hnsw::DiskHnsw;
 pub use ops_hnsw::Cnx;
-pub use ops_hnsw::DataRetriever;
 pub use ops_hnsw::HnswOps;
 pub use ram_hnsw::RAMHnsw;
