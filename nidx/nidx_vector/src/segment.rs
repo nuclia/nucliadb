@@ -39,7 +39,7 @@ use std::iter::empty;
 use std::path::Path;
 
 /// How much expensive is to find a node via HNSW compared to a simple brute force scan
-const HNSW_COST_FACTOR: usize = 100;
+const HNSW_COST_FACTOR: usize = 2000000;
 
 mod file_names {
     pub const HNSW: &str = "index.hnsw";
@@ -514,7 +514,6 @@ impl OpenSegment {
         let expected_traversal_scan = results * self.metadata.records / count;
 
         if count < expected_traversal_scan * HNSW_COST_FACTOR {
-            println!("Brute");
             let mut scored_results = Vec::new();
             for paragraph_addr in bitset.iter() {
                 let paragraph = data_store.get_paragraph(paragraph_addr);
@@ -523,7 +522,7 @@ impl OpenSegment {
                 let best_vector_score = paragraph
                     .vectors(&paragraph_addr)
                     .map(|va| {
-                        let score = retriever.similarity(va, &raw_query);
+                        let score = retriever.similarity(va, encoded_query);
                         Cnx(va, score)
                     })
                     .max_by(|v, w| v.1.total_cmp(&w.1))
@@ -533,7 +532,17 @@ impl OpenSegment {
                     scored_results.push(Reverse(best_vector_score));
                 }
             }
-            scored_results.sort();
+            scored_results.sort_unstable();
+            // If using RabitQ, rerank top results using the raw vectors
+            if data_store.has_quantized() {
+                scored_results = scored_results
+                    .into_iter()
+                    .take(std::cmp::min(results * 100, 2000))
+                    .map(|Reverse(Cnx(addr, _))| Reverse(Cnx(addr, retriever.similarity(addr, &raw_query))))
+                    .collect();
+                scored_results.sort_unstable();
+            }
+
             return Box::new(
                 scored_results
                     .into_iter()
@@ -555,7 +564,11 @@ impl OpenSegment {
 
 #[cfg(test)]
 mod test {
-    use std::collections::{BTreeMap, HashSet};
+    use std::{
+        collections::{BTreeMap, HashSet},
+        iter::Inspect,
+        time::Instant,
+    };
 
     use nidx_protos::{Position, Representation, SentenceMetadata};
     use rand::{Rng, SeedableRng, rngs::SmallRng};
@@ -753,13 +766,13 @@ mod test {
 
         // Create some clusters
         let mut center = random_vector(&mut rng);
-        for _ in 0..4 {
+        for _ in 0..8 {
             // 80 tightly clustered vectors, ideally more than Mmax0
-            for _ in 0..80 {
+            for _ in 0..200 {
                 elems.insert(random_key(&mut rng), random_nearby_vector(&mut rng, &center, 0.01));
             }
             // 80 tightly clustered vectors
-            for _ in 0..80 {
+            for _ in 0..200 {
                 elems.insert(random_key(&mut rng), random_nearby_vector(&mut rng, &center, 0.03));
             }
             // Next cluster is nearby
@@ -798,10 +811,12 @@ mod test {
 
                 let results: Vec<_> = dp.search(&query, &Formula::new(), false, 5, &config, 0.0).collect();
 
+                let t = Instant::now();
                 let search: Vec<_> = results
                     .iter()
                     .map(|r| dp.data_store.get_paragraph(r.paragraph()).id().to_string())
                     .collect();
+                println!("Elapsed {:?}", t.elapsed());
                 let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();
                 let mut r = 0.0;
                 for b in brute_force {
@@ -816,7 +831,7 @@ mod test {
         let recall = correct / 100.0;
         println!("Assessed recall = {recall}");
         // Expected ~0.98, has a little margin because HNSW can be non-deterministic
-        assert!(recall >= 0.95);
+        assert!(recall >= 10.95);
 
         Ok(())
     }

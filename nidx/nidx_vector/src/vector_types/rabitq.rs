@@ -35,8 +35,12 @@ impl<'a> EncodedVector<'a> {
     }
 
     /// Binary quantized vector
-    fn quantized(&self) -> BitVec {
-        BitVec::from_bytes(&self.data[8..])
+    fn quantized(&self) -> &[u64] {
+        let (p, data, s) = unsafe { self.data[8..].align_to() };
+        debug_assert!(p.is_empty());
+        debug_assert!(s.is_empty());
+
+        data
     }
 
     /// Dot product of the original vector and the quantized version
@@ -56,18 +60,27 @@ impl<'a> EncodedVector<'a> {
 
     pub fn encode(v: &[f32]) -> Vec<u8> {
         let root_dim = (v.len() as f32).sqrt();
-        let quantized: BitVec<u32> = BitVec::from_iter(v.iter().map(|v| *v > 0.0));
-        let sum_bits = quantized.count_ones() as u32;
-        let qv: Vec<f32> = quantized
-            .iter()
-            .map(|w| if w { 1.0 / root_dim } else { -1.0 / root_dim })
-            .collect();
-        let dot_quant_original = f32::dot(v, &qv).unwrap() as f32;
+        assert!(v.len().is_multiple_of(64));
+        let mut quantized = vec![0u64; v.len() / 64];
+        let mut sum_bits: u32 = 0;
+        let mut v_repr = Vec::with_capacity(v.len());
+        for i in 0..v.len() {
+            if v[i] > 0.0 {
+                quantized[i / 64] += 1 << (i % 64);
+                sum_bits += 1;
+                v_repr.push(1.0 / root_dim);
+            } else {
+                v_repr.push(-1.0 / root_dim);
+            }
+        }
+        let dot_quant_original = f32::dot(v, &v_repr).unwrap() as f32;
 
         let mut serialized = Vec::with_capacity(Self::encoded_len(v.len()));
         serialized.extend_from_slice(&dot_quant_original.to_le_bytes());
         serialized.extend_from_slice(&sum_bits.to_le_bytes());
-        serialized.append(&mut quantized.to_bytes());
+        for x in quantized {
+            serialized.extend(x.to_le_bytes());
+        }
 
         serialized
     }
@@ -76,8 +89,8 @@ impl<'a> EncodedVector<'a> {
 pub struct QueryVector {
     /// Original vector, encoded for similarity search
     original: Vec<u8>,
-    /// Vector quantized to u8
-    quantized: Vec<u8>,
+    /// Vector quantized to u4. Each embedding occupies one bit in each element of the array
+    quantized: [Vec<u64>; 4],
     /// Lowest value in original vector. quantized value 0 maps to this
     low: f32,
     /// Delta in quantization. Each quantized unit maps to this differences in the original vector
@@ -90,19 +103,33 @@ pub struct QueryVector {
 
 impl QueryVector {
     pub fn from_vector(q: &[f32], vector_type: &VectorType) -> Self {
-        let (low, hi) = q.iter().fold((q[0], q[0]), |(min, max), it| {
+        let (low, mut hi) = q.iter().fold((q[0], q[0]), |(min, max), it| {
             (if *it < min { *it } else { min }, if *it > max { *it } else { max })
         });
-        let delta = (hi - low) / 256.0;
+        hi += 0.00001;
+        let delta = (hi - low) / 16.0;
+        // println!("{low}-{hi} {delta}");
 
-        let quantized: Vec<u8> = q.iter().map(|w| ((w - low) / delta) as u8).collect();
-        let sum_quantized = quantized.iter().map(|x| *x as u32).sum();
+        assert!(vector_type.dimension().is_multiple_of(64));
+        let u64_len = vector_type.dimension() / 64;
+        let mut quantized = [vec![0; u64_len], vec![0; u64_len], vec![0; u64_len], vec![0; u64_len]];
+        let mut sum_quantized = 0;
+        for i in 0..vector_type.dimension() {
+            let wq = ((q[i] - low) / delta) as u64;
+            // println!("quant {} to {wq}", q[i]);
+            sum_quantized += wq;
+            quantized[0][i / 64] += ((wq / 1) % 2) << (i % 64);
+            quantized[1][i / 64] += ((wq / 2) % 2) << (i % 64);
+            quantized[2][i / 64] += ((wq / 4) % 2) << (i % 64);
+            quantized[3][i / 64] += ((wq / 8) % 2) << (i % 64);
+            // println!("{quantized:?}");
+        }
         let root_dim = (q.len() as f32).sqrt();
 
         QueryVector {
             original: vector_type.encode(q),
             quantized,
-            sum_quantized,
+            sum_quantized: sum_quantized as u32,
             root_dim,
             low,
             delta,
@@ -113,14 +140,52 @@ impl QueryVector {
         &self.original
     }
 
-    pub fn similarity(&self, other: EncodedVector) -> (f32, f32) {
-        let dot = self
-            .quantized
+    fn dot(&self, other: &EncodedVector) -> u32 {
+        // let mut bits = Vec::new();
+        // for i in 0..1024 {
+        //     bits.push(
+        //         ((self.quantized[0][i / 64] >> (63 - (i % 64))) & 1)
+        //             + ((self.quantized[1][i / 64] >> (63 - (i % 64))) & 1) * 2
+        //             + ((self.quantized[2][i / 64] >> (63 - (i % 64))) & 1) * 4
+        //             + ((self.quantized[3][i / 64] >> (63 - (i % 64))) & 1) * 8,
+        //     )
+        // }
+
+        // let mut stored = BitVec::from_bytes(other.quantized());
+        // let st = stored
+        //     .iter()
+        //     .zip(bits.iter())
+        //     .filter(|(b, _)| *b)
+        //     .map(|(_, v)| v)
+        //     .sum::<u64>() as u32;
+
+        let stored = other.quantized();
+
+        let d0 = self.quantized[0]
             .iter()
-            .zip(other.quantized().iter())
-            .filter(|(_, b)| *b)
-            .map(|(i, _)| *i as u32)
-            .sum::<u32>() as f32;
+            .zip(stored.iter())
+            .map(|(a, b)| (a & b).count_ones())
+            .sum::<u32>();
+        let d1 = self.quantized[1]
+            .iter()
+            .zip(stored.iter())
+            .map(|(a, b)| (a & b).count_ones())
+            .sum::<u32>();
+        let d2 = self.quantized[2]
+            .iter()
+            .zip(stored.iter())
+            .map(|(a, b)| (a & b).count_ones())
+            .sum::<u32>();
+        let d3 = self.quantized[3]
+            .iter()
+            .zip(stored.iter())
+            .map(|(a, b)| (a & b).count_ones())
+            .sum::<u32>();
+        d0 + d1 * 2 + d2 * 4 + d3 * 8
+    }
+
+    pub fn similarity(&self, other: EncodedVector) -> (f32, f32) {
+        let dot = self.dot(&other) as f32;
 
         let dot_quant_query_vector = 2.0 * self.delta / self.root_dim * dot as f32
             + 2.0 * self.low * other.sum_bits() as f32 / self.root_dim
@@ -139,6 +204,7 @@ impl QueryVector {
 
 #[cfg(test)]
 mod tests {
+    use bit_vec::BitVec;
     use rand::{Rng, SeedableRng, rngs::SmallRng};
     use simsimd::SpatialSimilarity;
 

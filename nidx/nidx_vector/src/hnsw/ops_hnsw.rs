@@ -384,7 +384,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             None
         };
         let last_layer_k = if original_query.is_some() {
-            std::cmp::min(k_neighbours * 100, 2000)
+            std::cmp::min(k_neighbours * 1, 2000)
         } else {
             0
         };
