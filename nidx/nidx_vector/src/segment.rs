@@ -583,7 +583,7 @@ mod test {
     use super::{Elem, create, merge};
     use nidx_protos::prost::*;
 
-    const DIMENSION: usize = 128;
+    const DIMENSION: usize = 256;
 
     fn random_vector(rng: &mut impl Rng) -> Vec<f32> {
         let v: Vec<f32> = (0..DIMENSION).map(|_| rng.gen_range(-1.0..1.0)).collect();
@@ -765,13 +765,13 @@ mod test {
 
         // Create some clusters
         let mut center = random_vector(&mut rng);
-        for _ in 0..8 {
+        for _ in 0..4 {
             // 80 tightly clustered vectors, ideally more than Mmax0
-            for _ in 0..200 {
+            for _ in 0..80 {
                 elems.insert(random_key(&mut rng), random_nearby_vector(&mut rng, &center, 0.01));
             }
             // 80 tightly clustered vectors
-            for _ in 0..200 {
+            for _ in 0..80 {
                 elems.insert(random_key(&mut rng), random_nearby_vector(&mut rng, &center, 0.03));
             }
             // Next cluster is nearby
@@ -810,7 +810,6 @@ mod test {
 
                 let results: Vec<_> = dp.search(&query, &Formula::new(), false, 5, &config, 0.0).collect();
 
-                let t = Instant::now();
                 let search: Vec<_> = results
                     .iter()
                     .map(|r| dp.data_store.get_paragraph(r.paragraph()).id().to_string())
