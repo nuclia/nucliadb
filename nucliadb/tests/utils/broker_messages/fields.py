@@ -218,7 +218,7 @@ class FieldBuilder:
         labels: Optional[list[tuple[str, list[str]]]] = None,
         user_labels: Optional[list[tuple[str, list[str]]]] = None,
         vectors: Optional[dict[str, list[float]]] = None,
-    ) -> rpb.Paragraph:
+    ) -> tuple[ParagraphId, rpb.Paragraph]:
         """Add a single paragraph to the field.
 
         This adds the paragraph at the end of the extracted text. Repeated calls
@@ -240,8 +240,7 @@ class FieldBuilder:
 
         end = start + len(text)
 
-        paragraph = rpb.Paragraph()
-        paragraph.key = ParagraphId(
+        paragraph_id = ParagraphId(
             field_id=FieldId(
                 rid=self._rid,
                 key=self.id.field,
@@ -250,7 +249,8 @@ class FieldBuilder:
             ),
             paragraph_start=start,
             paragraph_end=end,
-        ).full()
+        )
+        paragraph = rpb.Paragraph()
         paragraph.start = start
         paragraph.end = end
         paragraph.text = text
@@ -263,7 +263,7 @@ class FieldBuilder:
 
         if user_labels is not None:
             for labelset, labels_ in user_labels:
-                self.with_user_paragraph_labels(paragraph.key, labelset, labels_, split)
+                self.with_user_paragraph_labels(paragraph_id.full(), labelset, labels_, split)
 
         if vectors is not None:
             for vectorset, vector in vectors.items():
@@ -272,7 +272,7 @@ class FieldBuilder:
                 )
                 self.with_extracted_vectors([vector_pb], vectorset, split)
 
-        return self.with_extracted_paragraph_metadata(paragraph, split)
+        return paragraph_id, self.with_extracted_paragraph_metadata(paragraph, split)
 
     def add_question_answer(
         self,
@@ -304,14 +304,26 @@ class FieldBuilder:
         question_answer.answers.append(answer_pb)
         self._question_answers.question_answers.question_answers.question_answer.append(question_answer)
 
-    def iter_paragraphs(self, split: Optional[str] = None) -> Iterator[rpb.Paragraph]:
+    def iter_paragraphs(
+        self, split: Optional[str] = None
+    ) -> Iterator[tuple[ParagraphId, rpb.Paragraph]]:
         if split is None:
             paragraphs = self._extracted_metadata.metadata.metadata.paragraphs
         else:
             paragraphs = self._extracted_metadata.metadata.split_metadata[split].paragraphs
 
         for paragraph in paragraphs:
-            yield paragraph
+            paragraph_id = ParagraphId(
+                field_id=FieldId(
+                    rid=self._rid,
+                    key=self.id.field,
+                    type=FIELD_TYPE_PB_TO_STR[self.id.field_type],
+                    subfield_id=split,
+                ),
+                paragraph_start=paragraph.start,
+                paragraph_end=paragraph.end,
+            )
+            yield paragraph_id, paragraph
 
     async def add_page_preview(self, page: int, content: bytes):
         assert self._field_id.field_type == rpb.FieldType.FILE, "only file fields have page previews"

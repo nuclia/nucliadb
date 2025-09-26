@@ -219,7 +219,9 @@ async def hydrate_paragraph(
                 hydrated.image = hydration_models.HydratedParagraphImage()
 
                 if config.image.source_image:
-                    hydrated.image.source_image = await paragraph_source_image(kbid, paragraph)
+                    hydrated.image.source_image = await paragraph_source_image(
+                        kbid, paragraph_id, paragraph
+                    )
 
             if config.page:
                 if hydrated.page is None:

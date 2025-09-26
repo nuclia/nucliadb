@@ -267,6 +267,8 @@ message ParagraphRelations {
 }
 
 message Paragraph {
+    reserved 8;
+
     uint32 start = 1;
     uint32 end = 2;
     repeated uint32 start_seconds = 3;
@@ -284,7 +286,6 @@ message Paragraph {
 
     repeated Classification classifications = 6;
     repeated Sentence sentences = 7;
-    string key = 8;
     string text = 9;  // Optional, as a computed value
     PageInformation page = 10;
     Representation representation = 11;

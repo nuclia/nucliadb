@@ -358,7 +358,6 @@ async def test_conversation_field_indexing(
             start=0,
             end=len(text),
             kind=Paragraph.TypeParagraph.TEXT,
-            key=f"{rid}/c/faq/{split}/0-{len(text)}",
         )
         fmw.metadata.split_metadata[split].paragraphs.append(paragraph)
         bm.field_metadata.append(fmw)
