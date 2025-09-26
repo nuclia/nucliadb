@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use bit_vec::BitVec;
 use simsimd::SpatialSimilarity;
 
 use crate::config::VectorType;
@@ -61,9 +60,14 @@ impl<'a> EncodedVector<'a> {
     pub fn encode(v: &[f32]) -> Vec<u8> {
         let root_dim = (v.len() as f32).sqrt();
         assert!(v.len().is_multiple_of(64));
+
+        // Binary vector
         let mut quantized = vec![0u64; v.len() / 64];
+        // Sum of '1' bits in the vector
         let mut sum_bits: u32 = 0;
+        // Float representation of the binary vector
         let mut v_repr = Vec::with_capacity(v.len());
+
         for i in 0..v.len() {
             if v[i] > 0.0 {
                 quantized[i / 64] += 1 << (i % 64);
@@ -73,6 +77,7 @@ impl<'a> EncodedVector<'a> {
                 v_repr.push(-1.0 / root_dim);
             }
         }
+        // Dot distance from the original vector to what the binary vector represents
         let dot_quant_original = f32::dot(v, &v_repr).unwrap() as f32;
 
         let mut serialized = Vec::with_capacity(Self::encoded_len(v.len()));
@@ -106,23 +111,23 @@ impl QueryVector {
         let (low, mut hi) = q.iter().fold((q[0], q[0]), |(min, max), it| {
             (if *it < min { *it } else { min }, if *it > max { *it } else { max })
         });
-        hi += 0.00001;
+        hi += 0.00001; // Add a small epsilon to hi, so the highest value in the vector maps to 15, not 16
         let delta = (hi - low) / 16.0;
-        // println!("{low}-{hi} {delta}");
 
         assert!(vector_type.dimension().is_multiple_of(64));
         let u64_len = vector_type.dimension() / 64;
         let mut quantized = [vec![0; u64_len], vec![0; u64_len], vec![0; u64_len], vec![0; u64_len]];
         let mut sum_quantized = 0;
         for i in 0..vector_type.dimension() {
+            // Quantize our vector to a 4-bit vector.
             let wq = ((q[i] - low) / delta) as u64;
-            // println!("quant {} to {wq}", q[i]);
             sum_quantized += wq;
+            // Stores it into 4 vectors (one bit in each vector)
+            // This makes it easier to optimize `fn dot()`
             quantized[0][i / 64] += ((wq / 1) % 2) << (i % 64);
             quantized[1][i / 64] += ((wq / 2) % 2) << (i % 64);
             quantized[2][i / 64] += ((wq / 4) % 2) << (i % 64);
             quantized[3][i / 64] += ((wq / 8) % 2) << (i % 64);
-            // println!("{quantized:?}");
         }
         let root_dim = (q.len() as f32).sqrt();
 
@@ -140,27 +145,21 @@ impl QueryVector {
         &self.original
     }
 
+    /// Dot product of a binary vector (other) and a 4-bit vector (self)
+    /// Our vector is stored as 4 1-bit vector (one per bit of our quantization)
+    /// in order to make the operations below easier to run by the CPU.
     fn dot(&self, other: &EncodedVector) -> u32 {
-        // let mut bits = Vec::new();
-        // for i in 0..1024 {
-        //     bits.push(
-        //         ((self.quantized[0][i / 64] >> (63 - (i % 64))) & 1)
-        //             + ((self.quantized[1][i / 64] >> (63 - (i % 64))) & 1) * 2
-        //             + ((self.quantized[2][i / 64] >> (63 - (i % 64))) & 1) * 4
-        //             + ((self.quantized[3][i / 64] >> (63 - (i % 64))) & 1) * 8,
-        //     )
-        // }
-
-        // let mut stored = BitVec::from_bytes(other.quantized());
-        // let st = stored
-        //     .iter()
-        //     .zip(bits.iter())
-        //     .filter(|(b, _)| *b)
-        //     .map(|(_, v)| v)
-        //     .sum::<u64>() as u32;
-
+        // The code below is auto-vectorized by the compiler. It's within
+        // 20% performance of a hand-written implementation, mainly because
+        // it doesn't assume the number of u64 elements in the vector is a
+        // multiple of the extended registry size.
         let stored = other.quantized();
 
+        // We need to do q * s. We have q split into one vector per bit position,
+        // so we can calculate the product of each bit with the stored vector and
+        // multiply it by the bit value (1, 2, 4, 8)
+        // Multiplication of binary vectors is just AND, and summing each bit can be
+        // done efficienctly with the count_ones / popcnt operation.
         let d0 = self.quantized[0]
             .iter()
             .zip(stored.iter())
@@ -181,6 +180,7 @@ impl QueryVector {
             .zip(stored.iter())
             .map(|(a, b)| (a & b).count_ones())
             .sum::<u32>();
+
         d0 + d1 * 2 + d2 * 4 + d3 * 8
     }
 
@@ -195,7 +195,8 @@ impl QueryVector {
         let estimate = dot_quant_query_vector / other.dot_quant_original();
 
         let d2 = other.dot_quant_original() * other.dot_quant_original();
-        // Should divide by sqrt(DIM - 1) but sqrt(DIM) is already computed and close enough
+
+        // Should divide by sqrt(DIM - 1) but sqrt(DIM) is already computed and close enough for usual values of DIM
         let error = ((1.0 - d2) / d2).sqrt() * EPSILON / self.root_dim;
 
         (estimate, error)
@@ -204,7 +205,6 @@ impl QueryVector {
 
 #[cfg(test)]
 mod tests {
-    use bit_vec::BitVec;
     use rand::{Rng, SeedableRng, rngs::SmallRng};
     use simsimd::SpatialSimilarity;
 
