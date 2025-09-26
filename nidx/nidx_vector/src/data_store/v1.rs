@@ -21,6 +21,7 @@
 use crate::{
     config::{VectorConfig, VectorType},
     segment::Elem,
+    vector_types::rabitq,
 };
 use memmap2::Mmap;
 use node::Node;
@@ -42,6 +43,10 @@ pub struct DataStoreV1 {
 }
 
 impl DataStore for DataStoreV1 {
+    fn has_quantized(&self) -> bool {
+        false
+    }
+
     fn size_bytes(&self) -> usize {
         self.nodes.len()
     }
@@ -61,9 +66,16 @@ impl DataStore for DataStoreV1 {
         }
     }
 
+    fn get_quantized_vector(&self, _id: VectorAddr) -> rabitq::EncodedVector<'_> {
+        panic!("Store does not have quantized vectors")
+    }
+
     fn will_need(&self, id: VectorAddr) {
         store::will_need(&self.nodes, id.0 as usize, self.vector_len_bytes);
     }
+
+    fn will_need_quantized(&self, _id: VectorAddr) {}
+
     fn as_any(&self) -> &dyn Any {
         self
     }

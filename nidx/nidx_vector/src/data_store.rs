@@ -28,7 +28,7 @@ pub use v1::node::Node;
 pub use v2::DataStoreV2;
 use v2::StoredParagraph;
 
-use crate::{ParagraphAddr, VectorAddr};
+use crate::{ParagraphAddr, VectorAddr, vector_types::rabitq};
 
 pub enum OpenReason {
     Search,
@@ -94,8 +94,11 @@ pub trait DataStore: Sync + Send {
     fn stored_vector_count(&self) -> u32;
     fn get_paragraph(&self, id: ParagraphAddr) -> ParagraphRef<'_>;
     fn get_vector(&self, id: VectorAddr) -> VectorRef<'_>;
+    fn get_quantized_vector(&self, id: VectorAddr) -> rabitq::EncodedVector<'_>;
     fn will_need(&self, id: VectorAddr);
+    fn will_need_quantized(&self, id: VectorAddr);
     fn as_any(&self) -> &dyn Any;
+    fn has_quantized(&self) -> bool;
 }
 
 pub fn iter_paragraphs(data_store: &impl DataStore) -> impl Iterator<Item = ParagraphAddr> {

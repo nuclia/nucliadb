@@ -21,7 +21,7 @@
 pub mod config;
 mod data_store;
 mod data_types;
-mod formula;
+pub mod formula;
 mod hnsw;
 mod indexer;
 mod inverted_index;
@@ -29,9 +29,9 @@ mod multivector;
 mod query_io;
 mod request_types;
 mod searcher;
-mod segment;
+pub mod segment;
 mod utils;
-mod vector_types;
+pub mod vector_types;
 
 use config::VectorConfig;
 use indexer::{ResourceWrapper, index_resource};
@@ -52,7 +52,7 @@ pub use request_types::VectorSearchRequest;
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct ParagraphAddr(u32);
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
-pub struct VectorAddr(u32);
+pub struct VectorAddr(pub u32);
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct VectorSegmentMeta {

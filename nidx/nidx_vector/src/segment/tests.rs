@@ -32,13 +32,16 @@ use crate::segment::{self, Elem};
 const CONFIG: VectorConfig = VectorConfig {
     similarity: Similarity::Cosine,
     normalize_vectors: false,
-    vector_type: crate::config::VectorType::DenseF32 { dimension: 178 },
+    vector_type: crate::config::VectorType::DenseF32 { dimension: 128 },
     flags: vec![],
     vector_cardinality: VectorCardinality::Single,
 };
 
 fn create_query() -> Vec<f32> {
-    let v: Vec<_> = vec![rand::random::<f32>; 178].into_iter().map(|f| f()).collect();
+    let v: Vec<_> = vec![rand::random::<f32>; 128]
+        .into_iter()
+        .map(|f| f() * 2.0 - 1.0)
+        .collect();
     let mut modulus = 0.0;
     for w in &v {
         modulus += w * w;
@@ -61,12 +64,12 @@ fn simple_flow() {
     let mut expected_keys = vec![];
     for i in 0..50 {
         let key = format!("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-{i}");
-        let vector = vec![rand::random::<f32>(); 178];
+        let vector = vec![rand::random::<f32>(); 128];
         elems.push(Elem::new(key.clone(), vector, labels.clone(), None));
         expected_keys.push(key);
     }
     let segment = segment::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
-    let query = vec![rand::random::<f32>(); 178];
+    let query = vec![rand::random::<f32>(); 128];
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
         acc.extend(i.clone());

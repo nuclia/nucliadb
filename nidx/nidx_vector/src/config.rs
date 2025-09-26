@@ -60,6 +60,12 @@ impl VectorType {
         }
     }
 
+    pub fn decode<'a>(&self, data: &'a [u8]) -> &'a [f32] {
+        match self {
+            VectorType::DenseF32 { .. } => dense_f32::decode_vector(data),
+        }
+    }
+
     pub fn vector_alignment(&self) -> usize {
         match self {
             VectorType::DenseF32 { .. } => size_of::<f32>(),
@@ -106,6 +112,11 @@ impl VectorConfig {
             (Similarity::Dot, VectorType::DenseF32 { .. }) => dense_f32::dot_similarity,
             (Similarity::Cosine, VectorType::DenseF32 { .. }) => dense_f32::cosine_similarity,
         }
+    }
+
+    pub fn quantizable_vectors(&self) -> bool {
+        matches!(self.similarity, Similarity::Dot)
+            && matches!(&self.vector_type, VectorType::DenseF32 { dimension } if dimension.is_multiple_of(64))
     }
 }
 
