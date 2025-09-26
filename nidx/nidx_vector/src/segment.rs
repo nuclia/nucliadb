@@ -39,7 +39,7 @@ use std::iter::empty;
 use std::path::Path;
 
 /// How much expensive is to find a node via HNSW compared to a simple brute force scan
-const HNSW_COST_FACTOR: usize = 200;
+const HNSW_COST_FACTOR: usize = 100;
 
 mod file_names {
     pub const HNSW: &str = "index.hnsw";
@@ -525,49 +525,60 @@ impl OpenSegment {
         let expected_traversal_scan = results * self.metadata.records / count;
 
         if count < expected_traversal_scan * HNSW_COST_FACTOR {
-            let mut scored_results = Vec::new();
-            for paragraph_addr in bitset.iter() {
-                let paragraph = data_store.get_paragraph(paragraph_addr);
-
-                // Only return the best vector match per paragraph
-                let best_vector_score = paragraph
-                    .vectors(&paragraph_addr)
-                    .map(|va| {
-                        let score = retriever.similarity_upper_bound(va, encoded_query);
-                        Cnx(va, score)
-                    })
-                    .max_by(|v, w| v.1.total_cmp(&w.1))
-                    .unwrap();
-
-                if best_vector_score.1 >= min_score {
-                    scored_results.push(Reverse(best_vector_score));
-                }
-            }
-            scored_results.sort_unstable();
-            // If using RabitQ, rerank top results using the raw vectors
-            if data_store.has_quantized() {
-                scored_results = scored_results
+            self.brute_force_search(bitset, results, retriever, encoded_query, &raw_query)
+        } else {
+            let ops = HnswOps::new(&retriever, true);
+            let neighbours = ops.search(encoded_query, self.index.as_ref(), results, bitset, with_duplicates);
+            Box::new(
+                neighbours
                     .into_iter()
-                    .take(std::cmp::min(results * 100, 2000))
-                    .map(|Reverse(Cnx(addr, _))| Reverse(Cnx(addr, retriever.similarity(addr, &raw_query))))
-                    .collect();
-                scored_results.sort_unstable();
-            }
-
-            return Box::new(
-                scored_results
-                    .into_iter()
-                    .map(|Reverse(a)| ScoredVector::new(a.0, self.data_store.as_ref(), a.1))
+                    .map(|(address, dist)| ScoredVector::new(address, self.data_store.as_ref(), dist))
                     .take(results),
-            );
+            )
+        }
+    }
+
+    fn brute_force_search<DS: DataStore>(
+        &self,
+        bitset: &FilterBitSet,
+        results: usize,
+        retriever: Retriever<DS>,
+        encoded_query: &SearchVector,
+        raw_query: &SearchVector,
+    ) -> Box<dyn Iterator<Item = ScoredVector<'_>> + '_> {
+        let mut scored_results = Vec::new();
+        for paragraph_addr in bitset.iter() {
+            let paragraph = retriever.data_store.get_paragraph(paragraph_addr);
+
+            // Only return the best vector match per paragraph
+            let best_vector_score = paragraph
+                .vectors(&paragraph_addr)
+                .map(|va| {
+                    let score = retriever.similarity_upper_bound(va, encoded_query);
+                    Cnx(va, score)
+                })
+                .max_by(|v, w| v.1.total_cmp(&w.1))
+                .unwrap();
+
+            if best_vector_score.1 >= retriever.min_score {
+                scored_results.push(Reverse(best_vector_score));
+            }
+        }
+        scored_results.sort_unstable();
+        // If using RabitQ, rerank top results using the raw vectors
+        if retriever.data_store.has_quantized() {
+            scored_results = scored_results
+                .into_iter()
+                .take(std::cmp::min(results * 100, 2000))
+                .map(|Reverse(Cnx(addr, _))| Reverse(Cnx(addr, retriever.similarity(addr, raw_query))))
+                .collect();
+            scored_results.sort_unstable();
         }
 
-        let ops = HnswOps::new(&retriever, true);
-        let neighbours = ops.search(encoded_query, self.index.as_ref(), results, bitset, with_duplicates);
         Box::new(
-            neighbours
+            scored_results
                 .into_iter()
-                .map(|(address, dist)| ScoredVector::new(address, self.data_store.as_ref(), dist))
+                .map(|Reverse(a)| ScoredVector::new(a.0, self.data_store.as_ref(), a.1))
                 .take(results),
         )
     }
