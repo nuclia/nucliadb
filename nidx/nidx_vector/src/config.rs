@@ -60,6 +60,12 @@ impl VectorType {
         }
     }
 
+    pub fn decode<'a>(&self, data: &'a [u8]) -> &'a [f32] {
+        match self {
+            VectorType::DenseF32 { .. } => dense_f32::decode_vector(data),
+        }
+    }
+
     pub fn vector_alignment(&self) -> usize {
         match self {
             VectorType::DenseF32 { .. } => size_of::<f32>(),

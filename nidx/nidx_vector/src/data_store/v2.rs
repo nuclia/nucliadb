@@ -87,10 +87,15 @@ impl DataStoreV2 {
     pub fn merge(
         path: &Path,
         producers: Vec<(impl Iterator<Item = ParagraphAddr>, &dyn DataStore)>,
-        vector_type: &VectorType,
+        config: &VectorConfig,
     ) -> VectorR<()> {
         let mut paragraphs = ParagraphStoreWriter::new(path)?;
-        let mut vectors = VectorStoreWriter::new(path, vector_type)?;
+        let mut vectors = VectorStoreWriter::new(path, &config.vector_type)?;
+        let mut quantized = if config.quantizable_vectors() {
+            Some(QuantVectorStoreWriter::new(path)?)
+        } else {
+            None
+        };
 
         let mut p_idx = 0;
         for (alive, store) in producers {
@@ -101,7 +106,13 @@ impl DataStoreV2 {
 
                 // Write to new store
                 let (first_vector, last_vector) = vectors.write(p_idx, p_vectors)?;
-                // TODO: quantize vectors
+                if let Some(quantized) = &mut quantized {
+                    let p_vectors = paragraph.vectors(&paragraph_addr).map(|v| store.get_vector(v).vector());
+                    for v in p_vectors {
+                        quantized.write(&rabitq::EncodedVector::encode(config.vector_type.decode(v)))?;
+                    }
+                }
+
                 paragraphs.write_paragraph_ref(paragraph, first_vector, last_vector - first_vector + 1)?;
                 p_idx += 1;
             }

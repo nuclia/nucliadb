@@ -122,7 +122,7 @@ pub fn merge(segment_path: &Path, operants: &[&OpenSegment], config: &VectorConf
             .iter()
             .map(|dp| (dp.alive_paragraphs(), dp.data_store.as_ref()))
             .collect();
-        DataStoreV2::merge(segment_path, node_producers, &config.vector_type)?;
+        DataStoreV2::merge(segment_path, node_producers, &config)?;
         let data_store = DataStoreV2::open(segment_path, &config.vector_type, OpenReason::Create)?;
         merge_indexes(segment_path, data_store, operants, config)
     }
@@ -564,10 +564,7 @@ impl OpenSegment {
 
 #[cfg(test)]
 mod test {
-    use std::{
-        collections::{BTreeMap, HashSet},
-        time::Instant,
-    };
+    use std::collections::{BTreeMap, HashSet};
 
     use nidx_protos::{Position, Representation, SentenceMetadata};
     use rand::{Rng, SeedableRng, rngs::SmallRng};
