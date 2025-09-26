@@ -26,6 +26,7 @@ import pytest
 from httpx import AsyncClient
 from nuclia_models.predict.generative_responses import (
     CitationsGenerativeResponse,
+    FootnoteCitationsGenerativeResponse,
     GenerativeChunk,
     JSONGenerativeResponse,
     StatusGenerativeResponse,
@@ -240,6 +241,61 @@ async def test_ask_with_citations(nucliadb_reader: AsyncClient, standalone_knowl
     resp_data = SyncAskResponse.model_validate_json(resp.content)
     resp_citations = resp_data.citations
     assert resp_citations == citations
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_with_footnote_citations_sync(
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource
+):
+    """Ensure synchronous ask returns footnote citations mapping when citations=llm_footnotes."""
+    predict = get_predict()
+    predict.calls.clear()  # type: ignore
+
+    footnotes_mapping = {
+        "block-AA": "some/paragraph/id-1",
+        "block-AB": "some/paragraph/id-2",
+    }
+    footnotes_chunk = GenerativeChunk(
+        chunk=FootnoteCitationsGenerativeResponse(footnote_to_context=footnotes_mapping)
+    )
+    predict.ndjson_answer.append(footnotes_chunk.model_dump_json() + "\n")  # type: ignore
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={"query": "title", "citations": "llm_footnotes"},
+        headers={"X-Synchronous": "true"},
+    )
+    assert resp.status_code == 200, resp.text
+    resp_data = SyncAskResponse.model_validate_json(resp.content)
+    assert resp_data.citation_footnote_to_context == footnotes_mapping
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_with_footnote_citations_stream(
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource
+):
+    """Ensure streaming ask yields a footnote_citations item when citations=llm_footnotes."""
+    predict = get_predict()
+    predict.calls.clear()  # type: ignore
+
+    footnotes_mapping = {
+        "block-AA": "some/paragraph/id-1",
+        "block-AB": "some/paragraph/id-2",
+    }
+    footnotes_chunk = GenerativeChunk(
+        chunk=FootnoteCitationsGenerativeResponse(footnote_to_context=footnotes_mapping)
+    )
+    predict.ndjson_answer.append(footnotes_chunk.model_dump_json() + "\n")  # type: ignore
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={"query": "title", "citations": "llm_footnotes"},
+    )
+    assert resp.status_code == 200, resp.text
+    chunks = parse_ask_response(resp)
+    footnote_chunks = [c for c in chunks if c.item.type == "footnote_citations"]
+    assert len(footnote_chunks) == 1, "Expected a single footnote_citations chunk"
+    assert footnote_chunks[0].item.footnote_to_context == footnotes_mapping
 
 
 @pytest.mark.parametrize("debug", (True, False))
