@@ -39,7 +39,7 @@ use std::iter::empty;
 use std::path::Path;
 
 /// How much expensive is to find a node via HNSW compared to a simple brute force scan
-const HNSW_COST_FACTOR: usize = 2000000;
+const HNSW_COST_FACTOR: usize = 200;
 
 mod file_names {
     pub const HNSW: &str = "index.hnsw";
@@ -233,7 +233,7 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
             tags,
         )
     } else {
-        DataStoreV2::create(path, elems, &config.vector_type)?;
+        DataStoreV2::create(path, elems, &config)?;
         create_indexes(
             path,
             DataStoreV2::open(path, &config.vector_type, OpenReason::Create)?,
@@ -566,7 +566,6 @@ impl OpenSegment {
 mod test {
     use std::{
         collections::{BTreeMap, HashSet},
-        iter::Inspect,
         time::Instant,
     };
 
@@ -816,7 +815,7 @@ mod test {
                     .iter()
                     .map(|r| dp.data_store.get_paragraph(r.paragraph()).id().to_string())
                     .collect();
-                println!("Elapsed {:?}", t.elapsed());
+
                 let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();
                 let mut r = 0.0;
                 for b in brute_force {
@@ -831,7 +830,7 @@ mod test {
         let recall = correct / 100.0;
         println!("Assessed recall = {recall}");
         // Expected ~0.98, has a little margin because HNSW can be non-deterministic
-        assert!(recall >= 10.95);
+        assert!(recall >= 0.95);
 
         Ok(())
     }

@@ -107,6 +107,13 @@ impl VectorConfig {
             (Similarity::Cosine, VectorType::DenseF32 { .. }) => dense_f32::cosine_similarity,
         }
     }
+
+    pub fn quantizable_vectors(&self) -> bool {
+        match (self.similarity, &self.vector_type) {
+            (Similarity::Dot, VectorType::DenseF32 { dimension }) if dimension.is_multiple_of(64) => true,
+            _ => false,
+        }
+    }
 }
 
 impl TryFrom<VectorIndexConfig> for VectorConfig {

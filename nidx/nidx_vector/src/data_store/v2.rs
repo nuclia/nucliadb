@@ -20,7 +20,7 @@
 
 use crate::{
     VectorR,
-    config::VectorType,
+    config::{VectorConfig, VectorType},
     data_store::v2::quant_vector_store::{QuantVectorStore, QuantVectorStoreWriter},
     segment::Elem,
     vector_types::rabitq,
@@ -56,22 +56,30 @@ impl DataStoreV2 {
         })
     }
 
-    pub fn create(path: &Path, entries: Vec<Elem>, vector_type: &VectorType) -> VectorR<()> {
+    pub fn create(path: &Path, entries: Vec<Elem>, config: &VectorConfig) -> VectorR<()> {
         let mut paragraphs = ParagraphStoreWriter::new(path)?;
-        let mut vectors = VectorStoreWriter::new(path, vector_type)?;
-        let mut quantized = QuantVectorStoreWriter::new(path)?;
+        let mut vectors = VectorStoreWriter::new(path, &config.vector_type)?;
+        let mut quantized = if config.quantizable_vectors() {
+            Some(QuantVectorStoreWriter::new(path)?)
+        } else {
+            None
+        };
 
         for (idx, elem) in (0..).zip(entries.into_iter()) {
-            let (first_vector, _) = vectors.write(idx, elem.vectors.iter().map(|v| vector_type.encode(v)))?;
-            for v in &elem.vectors {
-                quantized.write(&rabitq::EncodedVector::encode(v))?;
+            let (first_vector, _) = vectors.write(idx, elem.vectors.iter().map(|v| config.vector_type.encode(v)))?;
+            if let Some(quantized) = &mut quantized {
+                for v in &elem.vectors {
+                    quantized.write(&rabitq::EncodedVector::encode(v))?;
+                }
             }
             paragraphs.write(StoredParagraph::from_elem(&elem, first_vector))?;
         }
 
         paragraphs.close()?;
         vectors.close()?;
-        quantized.close()?;
+        if let Some(quantized) = quantized {
+            quantized.close()?;
+        }
 
         Ok(())
     }
