@@ -1045,7 +1045,7 @@ class ChatModel(BaseModel):
     user_prompt: Optional[UserPrompt] = Field(
         default=None, description="Optional custom prompt input by the user"
     )
-    citations: Optional[bool | CitationsType] = Field(
+    citations: Union[bool, None, CitationsType] = Field(
         default=None,
         description="Whether to include citations in the response. "
         "If set to None or False, no citations will be computed. "
