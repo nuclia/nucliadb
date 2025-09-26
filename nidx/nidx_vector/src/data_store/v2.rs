@@ -107,9 +107,16 @@ impl DataStoreV2 {
                 // Write to new store
                 let (first_vector, last_vector) = vectors.write(p_idx, p_vectors)?;
                 if let Some(quantized) = &mut quantized {
-                    let p_vectors = paragraph.vectors(&paragraph_addr).map(|v| store.get_vector(v).vector());
-                    for v in p_vectors {
-                        quantized.write(&rabitq::EncodedVector::encode(config.vector_type.decode(v)))?;
+                    // Copy quantized vectors if they exist, calculate them if not
+                    if store.has_quantized() {
+                        for vec_addr in paragraph.vectors(&paragraph_addr) {
+                            quantized.write(store.get_quantized_vector(vec_addr).bytes())?;
+                        }
+                    } else {
+                        let p_vectors = paragraph.vectors(&paragraph_addr).map(|v| store.get_vector(v).vector());
+                        for v in p_vectors {
+                            quantized.write(&rabitq::EncodedVector::encode(config.vector_type.decode(v)))?;
+                        }
                     }
                 }
 

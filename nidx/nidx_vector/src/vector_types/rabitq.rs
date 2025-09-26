@@ -33,6 +33,10 @@ impl<'a> EncodedVector<'a> {
         Self { data }
     }
 
+    pub fn bytes(&self) -> &[u8] {
+        self.data
+    }
+
     /// Binary quantized vector
     fn quantized(&self) -> &[u64] {
         let (p, data, s) = unsafe { self.data[8..].align_to() };
