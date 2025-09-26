@@ -122,7 +122,7 @@ pub fn merge(segment_path: &Path, operants: &[&OpenSegment], config: &VectorConf
             .iter()
             .map(|dp| (dp.alive_paragraphs(), dp.data_store.as_ref()))
             .collect();
-        DataStoreV2::merge(segment_path, node_producers, &config)?;
+        DataStoreV2::merge(segment_path, node_producers, config)?;
         let data_store = DataStoreV2::open(segment_path, &config.vector_type, OpenReason::Create)?;
         merge_indexes(segment_path, data_store, operants, config)
     }
@@ -233,7 +233,7 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
             tags,
         )
     } else {
-        DataStoreV2::create(path, elems, &config)?;
+        DataStoreV2::create(path, elems, config)?;
         create_indexes(
             path,
             DataStoreV2::open(path, &config.vector_type, OpenReason::Create)?,

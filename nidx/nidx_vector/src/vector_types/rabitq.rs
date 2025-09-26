@@ -122,13 +122,13 @@ impl QueryVector {
         let u64_len = vector_type.dimension() / 64;
         let mut quantized = [vec![0; u64_len], vec![0; u64_len], vec![0; u64_len], vec![0; u64_len]];
         let mut sum_quantized = 0;
-        for i in 0..vector_type.dimension() {
+        for (i, q_i) in q.iter().enumerate() {
             // Quantize our vector to a 4-bit vector.
-            let wq = ((q[i] - low) / delta) as u64;
+            let wq = ((q_i - low) / delta) as u64;
             sum_quantized += wq;
             // Stores it into 4 vectors (one bit in each vector)
             // This makes it easier to optimize `fn dot()`
-            quantized[0][i / 64] += ((wq / 1) % 2) << (i % 64);
+            quantized[0][i / 64] += (wq % 2) << (i % 64);
             quantized[1][i / 64] += ((wq / 2) % 2) << (i % 64);
             quantized[2][i / 64] += ((wq / 4) % 2) << (i % 64);
             quantized[3][i / 64] += ((wq / 8) % 2) << (i % 64);
@@ -191,7 +191,7 @@ impl QueryVector {
     pub fn similarity(&self, other: EncodedVector) -> (f32, f32) {
         let dot = self.dot(&other) as f32;
 
-        let dot_quant_query_vector = 2.0 * self.delta / self.root_dim * dot as f32
+        let dot_quant_query_vector = 2.0 * self.delta / self.root_dim * dot
             + 2.0 * self.low * other.sum_bits() as f32 / self.root_dim
             - self.delta * self.sum_quantized as f32 / self.root_dim
             - self.low * self.root_dim;

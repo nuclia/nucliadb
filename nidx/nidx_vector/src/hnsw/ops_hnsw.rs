@@ -202,7 +202,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 break;
             };
 
-            let candidate_similarity = self.retriever.similarity(candidate, &query);
+            let candidate_similarity = self.retriever.similarity(candidate, query);
 
             if candidate_similarity < self.retriever.min_score() {
                 break;

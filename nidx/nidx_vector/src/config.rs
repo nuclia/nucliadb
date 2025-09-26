@@ -115,10 +115,8 @@ impl VectorConfig {
     }
 
     pub fn quantizable_vectors(&self) -> bool {
-        match (self.similarity, &self.vector_type) {
-            (Similarity::Dot, VectorType::DenseF32 { dimension }) if dimension.is_multiple_of(64) => true,
-            _ => false,
-        }
+        matches!(self.similarity, Similarity::Dot)
+            && matches!(&self.vector_type, VectorType::DenseF32 { dimension } if dimension.is_multiple_of(64))
     }
 }
 
