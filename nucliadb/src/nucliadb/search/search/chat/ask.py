@@ -25,6 +25,7 @@ from typing import AsyncGenerator, Optional, Union, cast
 from nuclia_models.common.consumption import Consumption
 from nuclia_models.predict.generative_responses import (
     CitationsGenerativeResponse,
+    FootnoteCitationsGenerativeResponse,
     GenerativeChunk,
     JSONGenerativeResponse,
     MetaGenerativeResponse,
@@ -91,6 +92,7 @@ from nucliadb_models.search import (
     FindOptions,
     FindParagraph,
     FindRequest,
+    FootnoteCitationsAskResponseItem,
     GraphStrategy,
     JSONAskResponseItem,
     KnowledgeboxFindResults,
@@ -173,6 +175,7 @@ class AskResult:
         self._object: Optional[JSONGenerativeResponse] = None
         self._status: Optional[StatusGenerativeResponse] = None
         self._citations: Optional[CitationsGenerativeResponse] = None
+        self._footnote_citations: Optional[FootnoteCitationsGenerativeResponse] = None
         self._metadata: Optional[MetaGenerativeResponse] = None
         self._relations: Optional[Relations] = None
         self._consumption: Optional[Consumption] = None
@@ -303,6 +306,11 @@ class AskResult:
             yield CitationsAskResponseItem(
                 citations=self._citations.citations,
             )
+        # Stream out the footnote citations mapping
+        if self._footnote_citations is not None:
+            yield FootnoteCitationsAskResponseItem(
+                footnote_to_context=self._footnote_citations.footnote_to_context,
+            )
 
         # Stream out generic metadata about the answer
         if self._metadata is not None:
@@ -380,6 +388,10 @@ class AskResult:
         if self._citations is not None:
             citations = self._citations.citations
 
+        footnote_citations = {}
+        if self._footnote_citations is not None:
+            footnote_citations = self._footnote_citations.footnote_to_context
+
         answer_json = None
         if self._object is not None:
             answer_json = self._object.object
@@ -408,6 +420,7 @@ class AskResult:
             retrieval_best_matches=best_matches,
             prequeries=prequeries_results,
             citations=citations,
+            citation_footnote_to_context=footnote_citations,
             metadata=metadata,
             consumption=self._consumption,
             learning_id=self.nuclia_learning_id or "",
@@ -467,6 +480,8 @@ class AskResult:
                 self._status = item
             elif isinstance(item, CitationsGenerativeResponse):
                 self._citations = item
+            elif isinstance(item, FootnoteCitationsGenerativeResponse):
+                self._footnote_citations = item
             elif isinstance(item, MetaGenerativeResponse):
                 self._metadata = item
             elif isinstance(item, Consumption):
