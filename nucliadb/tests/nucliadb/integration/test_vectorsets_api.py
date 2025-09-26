@@ -273,7 +273,7 @@ async def test_vectorset_migration(
     text = "Lionel Messi is a football player."
     link_field.with_extracted_text(text)
     link_field.with_extracted_paragraph_metadata(Paragraph(start=0, end=len(text)))
-    link_vector = [1.0 for _ in range(1024)]
+    link_vector = [1.0 / 1024**0.5 for _ in range(1024)]
     vectors = [
         utils_pb2.Vector(
             start=0,
