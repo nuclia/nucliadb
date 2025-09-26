@@ -352,6 +352,17 @@ impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
         }
     }
 
+    fn similarity_upper_bound(&self, x: VectorAddr, y: &SearchVector) -> f32 {
+        match y {
+            SearchVector::RabitQ(query) => {
+                let x = self.data_store.get_quantized_vector(x);
+                let (est, err) = query.similarity(x);
+                est + err
+            }
+            _ => self.similarity(x, y),
+        }
+    }
+
     fn min_score(&self) -> f32 {
         self.min_score
     }
@@ -522,7 +533,7 @@ impl OpenSegment {
                 let best_vector_score = paragraph
                     .vectors(&paragraph_addr)
                     .map(|va| {
-                        let score = retriever.similarity(va, encoded_query);
+                        let score = retriever.similarity_upper_bound(va, encoded_query);
                         Cnx(va, score)
                     })
                     .max_by(|v, w| v.1.total_cmp(&w.1))

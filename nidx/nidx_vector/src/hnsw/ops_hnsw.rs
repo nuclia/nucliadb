@@ -37,6 +37,7 @@ use super::*;
 /// Implementors of this trait can guide the hnsw search
 pub trait DataRetriever: std::marker::Sync {
     fn similarity(&self, x: VectorAddr, y: &SearchVector) -> f32;
+    fn similarity_upper_bound(&self, x: VectorAddr, y: &SearchVector) -> f32;
     fn paragraph(&self, x: VectorAddr) -> ParagraphAddr;
     fn get_vector(&self, x: VectorAddr) -> &[u8];
     /// Embeddings with smaller similarity should not be considered.
