@@ -542,25 +542,27 @@ async def cookies_broker_message(bmb: BrokerMessageBuilder) -> BrokerMessage:
         "Chocolate, peanut butter and other delicious kinds of cookies. ",
         "Everyone loved them and those cookies are now part of their story. ",
     ]
+    paragraph_ids = []
     paragraph_pbs = []
     for paragraph in extracted_text:
-        paragraph_pb = text_field.add_paragraph(paragraph)
+        paragraph_id, paragraph_pb = text_field.add_paragraph(paragraph)
+        paragraph_ids.append(paragraph_id)
         paragraph_pbs.append(paragraph_pb)
 
     # add paragraph relations
 
-    title_paragraph_id = list(title_field.iter_paragraphs())[0].key
-    paragraph_pbs[1].relations.parents.append(title_paragraph_id)
+    title_paragraph_id = list(title_field.iter_paragraphs())[0][0]
+    paragraph_pbs[1].relations.parents.append(title_paragraph_id.full())
 
-    paragraph_pbs[1].relations.siblings.append(paragraph_pbs[0].key)
+    paragraph_pbs[1].relations.siblings.append(paragraph_ids[0].full())
 
-    paragraph_pbs[1].relations.replacements.extend([paragraph_pbs[2].key, paragraph_pbs[3].key])
+    paragraph_pbs[1].relations.replacements.extend([paragraph_ids[2].full(), paragraph_ids[3].full()])
 
     ## Add a file field with some visual content, pages and a table
 
     file_field = bmb.field_builder("myfile", FieldType.FILE)
 
-    paragraph_pb = file_field.add_paragraph(
+    (_, paragraph_pb) = file_field.add_paragraph(
         "A yummy image of some cookies",
         kind=resources_pb2.Paragraph.TypeParagraph.INCEPTION,
     )
@@ -579,7 +581,7 @@ async def cookies_broker_message(bmb: BrokerMessageBuilder) -> BrokerMessage:
 
     # add a table.
 
-    paragraph_pb = file_field.add_paragraph(
+    (_, paragraph_pb) = file_field.add_paragraph(
         "|Ingredient|Quantity|\n|Peanut butter|100g|\n...",
         kind=resources_pb2.Paragraph.TypeParagraph.TABLE,
     )
@@ -600,7 +602,7 @@ async def cookies_broker_message(bmb: BrokerMessageBuilder) -> BrokerMessage:
     )
 
     # add a normal paragraph in the same page
-    paragraph_pb = file_field.add_paragraph("Above you can see a table with all the ingredients")
+    (_, paragraph_pb) = file_field.add_paragraph("Above you can see a table with all the ingredients")
 
     paragraph_pb.page.page = 1
     paragraph_pb.page.page_with_visual = True

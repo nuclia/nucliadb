@@ -120,28 +120,28 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     ]
     paragraph_ids = []
     for paragraph in extracted_text:
-        paragraph_pb = field_builder.add_paragraph(paragraph)
-        paragraph_ids.append(paragraph_pb.key)
+        paragraph_id, paragraph_pb = field_builder.add_paragraph(paragraph)
+        paragraph_ids.append(paragraph_id)
 
     question = "What is SMB Wonder?"
     field_builder.add_question_answer(
         question=question,
-        question_paragraph_ids=[paragraph_ids[0]],
+        question_paragraph_ids=[paragraph_ids[0].full()],
         answer="SMB Wonder is a side-scrolling Nintendo Switch game",
-        answer_paragraph_ids=[paragraph_ids[0], paragraph_ids[1]],
+        answer_paragraph_ids=[paragraph_ids[0].full(), paragraph_ids[1].full()],
     )
     field_builder.add_question_answer(
         question=question,
-        question_paragraph_ids=[paragraph_ids[0]],
+        question_paragraph_ids=[paragraph_ids[0].full()],
         answer="It's the new Mario game for Nintendo Switch",
-        answer_paragraph_ids=[paragraph_ids[0]],
+        answer_paragraph_ids=[paragraph_ids[0].full()],
     )
 
     question = "Give me an example of side-scrolling game"
     field_builder.add_question_answer(
         question=question,
         answer="SMB Wonder game",
-        answer_paragraph_ids=[paragraph_ids[1]],
+        answer_paragraph_ids=[paragraph_ids[1].full()],
     )
 
     bm = bmb.build()

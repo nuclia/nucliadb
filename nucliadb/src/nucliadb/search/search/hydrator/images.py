@@ -30,12 +30,16 @@ from nucliadb_protos import resources_pb2
 from nucliadb_utils.utilities import get_storage
 
 
-async def paragraph_source_image(kbid: str, paragraph: resources_pb2.Paragraph) -> Optional[Image]:
+async def paragraph_source_image(
+    kbid: str, paragraph_id: ParagraphId, paragraph: resources_pb2.Paragraph
+) -> Optional[Image]:
     """Certain paragraphs are extracted from images using techniques like OCR or
     inception. If that's the case, return the original image for this paragraph.
 
     """
     source_image = paragraph.representation.reference_file
+    if not source_image:
+        return None
 
     if paragraph.kind not in (
         resources_pb2.Paragraph.TypeParagraph.OCR,
@@ -43,7 +47,7 @@ async def paragraph_source_image(kbid: str, paragraph: resources_pb2.Paragraph) 
     ):
         return None
 
-    field_id = ParagraphId.from_string(paragraph.key).field_id
+    field_id = paragraph_id.field_id
 
     # Paragraphs extracted from an image store its original image representation
     # in the reference file. The path is incomplete though, as it's stored in
