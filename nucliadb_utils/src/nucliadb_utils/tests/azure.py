@@ -139,6 +139,7 @@ async def azure_storage(azurite, azure_storage_settings: dict[str, Any]):
 
     storage = AzureStorage(
         account_url=storage_settings.azure_account_url,
+        kb_account_url=storage_settings.azure_kb_account_url or storage_settings.azure_account_url,
         connection_string=storage_settings.azure_connection_string,
     )
     await storage.initialize()
