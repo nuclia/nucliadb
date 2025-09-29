@@ -1628,7 +1628,7 @@ class AskRequest(AuditMetadataBase):
     )
     rank_fusion: Union[RankFusionName, RankFusion] = SearchParamDefaults.rank_fusion.to_pydantic_field()
     reranker: Union[RerankerName, Reranker] = SearchParamDefaults.reranker.to_pydantic_field()
-    citations: bool | None | CitationsType = Field(
+    citations: Union[bool, None, CitationsType] = Field(
         default=None,
         description="Whether to include citations in the response. "
         "If set to None or False, no citations will be computed. "
