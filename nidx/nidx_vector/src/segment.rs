@@ -503,7 +503,8 @@ impl OpenSegment {
         min_score: f32,
     ) -> Box<dyn Iterator<Item = ScoredVector<'_>> + '_> {
         let raw_query = SearchVector::Query(config.vector_type.encode(query));
-        let encoded_query = if data_store.has_quantized() {
+        let rabitq = data_store.has_quantized() && !config.flags.contains(&flags::DISABLE_RABITQ_SEARCH.to_string());
+        let encoded_query = if rabitq {
             let rabitq = rabitq::QueryVector::from_vector(query, &config.vector_type);
             &SearchVector::RabitQ(rabitq)
         } else {
@@ -566,7 +567,7 @@ impl OpenSegment {
         }
         scored_results.sort_unstable();
         // If using RabitQ, rerank top results using the raw vectors
-        if retriever.data_store.has_quantized() {
+        if matches!(encoded_query, SearchVector::RabitQ(_)) {
             scored_results = scored_results
                 .into_iter()
                 .take(std::cmp::min(results * 100, 2000))
