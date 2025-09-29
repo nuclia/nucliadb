@@ -162,22 +162,32 @@ class AzureStorageField(StorageField):
 
 class AzureStorage(Storage):
     field_klass = AzureStorageField
-    object_store: ObjectStore
+    object_store: AzureObjectStore
+    kb_object_store: AzureObjectStore
     source = CloudFile.AZURE
 
     def __init__(
         self,
         account_url: str,
+        kb_account_url: str,
         deadletter_bucket: Optional[str] = "deadletter",
         indexing_bucket: Optional[str] = "indexing",
         connection_string: Optional[str] = None,
     ):
         self.object_store = AzureObjectStore(account_url, connection_string=connection_string)
+        self.kb_object_store = AzureObjectStore(kb_account_url, connection_string=connection_string)
         self.deadletter_bucket = deadletter_bucket
         self.indexing_bucket = indexing_bucket
 
+    def object_store_for_bucket(self, bucket_name: str) -> AzureObjectStore:
+        if bucket_name in [self.indexing_bucket, self.deadletter_bucket]:
+            return self.object_store
+        else:
+            return self.kb_object_store
+
     async def initialize(self, service_name: Optional[str] = None):
         await self.object_store.initialize()
+        await self.kb_object_store.initialize()
         for bucket in [
             self.deadletter_bucket,
             self.indexing_bucket,
@@ -194,39 +204,39 @@ class AzureStorage(Storage):
 
     async def delete_upload(self, uri: str, bucket_name: str):
         try:
-            await self.object_store.delete(bucket_name, uri)
+            await self.object_store_for_bucket(bucket_name).delete(bucket_name, uri)
         except KeyError:
             pass
 
     async def create_bucket(self, bucket_name: str, kbid: Optional[str] = None):
-        if await self.object_store.bucket_exists(bucket_name):
+        if await self.object_store_for_bucket(bucket_name).bucket_exists(bucket_name):
             return
-        await self.object_store.bucket_create(bucket_name)
+        await self.object_store_for_bucket(bucket_name).bucket_create(bucket_name)
 
     def get_bucket_name(self, kbid: str):
         return f"nucliadb-{kbid}"
 
     async def create_kb(self, kbid: str) -> bool:
         bucket_name = self.get_bucket_name(kbid)
-        return await self.object_store.bucket_create(bucket_name)
+        return await self.kb_object_store.bucket_create(bucket_name)
 
     async def schedule_delete_kb(self, kbid: str) -> bool:
         bucket_name = self.get_bucket_name(kbid)
-        deleted, _ = await self.object_store.bucket_delete(bucket_name)
+        deleted, _ = await self.kb_object_store.bucket_delete(bucket_name)
         return deleted
 
     async def delete_kb(self, kbid: str) -> tuple[bool, bool]:
         bucket_name = self.get_bucket_name(kbid)
-        return await self.object_store.bucket_delete(bucket_name)
+        return await self.kb_object_store.bucket_delete(bucket_name)
 
     async def iterate_objects(
         self, bucket: str, prefix: str, start: Optional[str] = None
     ) -> AsyncGenerator[ObjectInfo, None]:
-        async for obj in self.object_store.iterate(bucket, prefix, start):
+        async for obj in self.object_store_for_bucket(bucket).iterate(bucket, prefix, start):
             yield obj
 
-    async def insert_object(self, bucket_name: str, key: str, data: bytes) -> None:
-        await self.object_store.insert(bucket_name, key, data)
+    async def insert_object(self, bucket: str, key: str, data: bytes) -> None:
+        await self.object_store_for_bucket(bucket).insert(bucket, key, data)
 
 
 class AzureObjectStore(ObjectStore):

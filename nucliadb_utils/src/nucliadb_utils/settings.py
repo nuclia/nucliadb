@@ -125,6 +125,12 @@ class StorageSettings(BaseSettings):
         examples=["https://<storageaccountname>.blob.core.windows.net"],
     )
 
+    azure_kb_account_url: Optional[str] = Field(
+        default=None,
+        description="Azure Account URL for KB containers. If unspecified, uses `azure_account_url`",  # noqa
+        examples=["https://<storageaccountname>.blob.core.windows.net"],
+    )
+
     # For testing purposes: Azurite docker image requires a connection string as it
     # doesn't support Azure's default credential authentication method
     azure_connection_string: Optional[str] = None
