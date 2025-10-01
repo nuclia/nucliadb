@@ -20,3 +20,4 @@
 
 pub mod dense_f32;
 pub mod rabitq;
+mod simsimd;
