@@ -186,12 +186,15 @@ def test_apply_field_paragraphs_populates_page_number():
     fcmw = FieldComputedMetadataWrapper()
     fcmw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_key))
 
-    p1 = Paragraph(start=40, end=54, start_seconds=[0], end_seconds=[10], text="Some text here")
-    p1.sentences.append(Sentence(start=40, end=54, key="test"))
+    text = "Some text here"
+    p1 = Paragraph(start=0, end=len(text), start_seconds=[0], end_seconds=[len(text)], text=text)
+    p1.sentences.append(Sentence(start=0, end=len(text), key="test"))
     fcmw.metadata.metadata.paragraphs.append(p1)
 
     # Add it to the split too
     fcmw.metadata.split_metadata["subfield"].paragraphs.append(p1)
+
+    extracted_text = ExtractedText(text=text, split_text={"subfield": text})
 
     page_positions = {
         0: (0, 20),
@@ -202,19 +205,51 @@ def test_apply_field_paragraphs_populates_page_number():
         field_key,
         fcmw.metadata,
         page_positions=page_positions,
-        extracted_text=None,
+        extracted_text=extracted_text,
         user_field_metadata=None,
         replace_field=False,
         skip_paragraphs=False,
     )
 
     assert len(br.brain.paragraphs[field_key].paragraphs) == 2
-    for paragraph in br.brain.paragraphs[field_key].paragraphs.values():
-        assert paragraph.metadata.position.page_number == 2
-        assert paragraph.metadata.position.start == 40
-        assert paragraph.metadata.position.end == 54
+    for pid, paragraph in br.brain.paragraphs[field_key].paragraphs.items():
+        assert paragraph.metadata.position.page_number == 0
+        assert paragraph.metadata.position.start == 0
+        assert paragraph.metadata.position.end == len(text)
         assert paragraph.metadata.position.start_seconds == [0]
-        assert paragraph.metadata.position.end_seconds == [10]
+        assert paragraph.metadata.position.end_seconds == [len(text)]
+        if "subfield" in pid:
+            assert paragraph.text == text
+        else:
+            assert not paragraph.HasField("text")
+
+
+def test_apply_field_paragraphs_populates_text_for_splits():
+    br = ResourceBrain(rid="foo")
+    field_key = "text1"
+
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_key))
+
+    text = "Some text here"
+    p1 = Paragraph(start=0, end=len(text), start_seconds=[0], end_seconds=[len(text)], text=text)
+    p1.sentences.append(Sentence(start=0, end=len(text), key="test"))
+    fcmw.metadata.split_metadata["subfield"].paragraphs.append(p1)
+
+    extracted_text = ExtractedText(split_text={"subfield": text})
+    br.apply_field_paragraphs(
+        field_key,
+        fcmw.metadata,
+        page_positions={},
+        extracted_text=extracted_text,
+        user_field_metadata=None,
+        replace_field=False,
+        skip_paragraphs=False,
+    )
+
+    assert len(br.brain.paragraphs[field_key].paragraphs) == 1
+    paragraph = br.brain.paragraphs[field_key].paragraphs.popitem()[1]
+    assert paragraph.text == "Some text here"
 
 
 def test_generate_resource_metadata_promotes_origin_dates():
@@ -253,3 +288,20 @@ def test_generate_resource_metadata_handles_timestamp_not_present():
     assert created > 0
     assert modified > 0
     assert modified >= created
+
+
+def test_generate_texts_does_not_index_split_texts():
+    brain = ResourceBrain("rid")
+    field_key = "foo"
+    extracted_text = ExtractedText(split_text={"subfield": "Some text"})
+    fcmw = FieldComputedMetadataWrapper()
+    brain.generate_texts(
+        field_key,
+        extracted_text=extracted_text,
+        field_computed_metadata=fcmw.metadata,
+        basic_user_metadata=None,
+        field_author=None,
+        replace_field=False,
+        skip_index=False,
+    )
+    assert brain.brain.texts[field_key].text == ""
