@@ -381,6 +381,7 @@ async def test_conversation_field_indexing(
         vector: Optional[list[float]] = None,
         top_k: int = 5,
         min_score: Optional[float] = None,
+        filters: Optional[list[str]] = None,
     ) -> KnowledgeboxFindResults:
         payload = {"top_k": top_k, "reranker": "noop"}
         features = []
@@ -392,6 +393,8 @@ async def test_conversation_field_indexing(
         if vector is not None:
             payload["vector"] = vector
             features.append("semantic")
+        if filters is not None:
+            payload["filters"] = filters
         if not features:
             raise ValueError("At least one of 'query' or 'vector' must be provided")
         payload["features"] = features
@@ -449,6 +452,9 @@ async def test_conversation_field_indexing(
         json={
             "slug": slug,
             "title": "My Resource",
+            "origin": {
+                "tags": ["football"],
+            },
             "conversations": {
                 "faq": {
                     "messages": [
@@ -521,6 +527,12 @@ async def test_conversation_field_indexing(
     )
     assert resp.status_code == 200
     assert len(resp.json()["fulltext"]["results"]) == 0
+
+    # Make sure that the prefiltering still works!
+    results = await search_message(query=question, filters=["/t/football"])
+    assert len(results.best_matches) == 1
+    results = await search_message(query=question, filters=["/t/non-existing"])
+    assert len(results.best_matches) == 0
 
     # Make sure the messages are searchable
     question_text_block_id = f"{rid}/c/faq/1/0-{len(question)}"
