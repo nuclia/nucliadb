@@ -284,6 +284,8 @@ class Processor:
             try:
                 kb = KnowledgeBox(txn, self.storage, kbid)
                 uuid = await self.get_resource_uuid(kb, message)
+
+                resource: Optional[Resource] = None
                 handled_exception = None
                 created = False
 
@@ -301,9 +303,14 @@ class Processor:
                     resource = await kb.get(uuid)
                     if resource is None:
                         logger.info(
-                            f"Secondary message for resource {message.uuid} and resource does not exist, ignoring"
+                            f"Processor message for resource received but the resource does not exist, ignoring.",
+                            extra={
+                                "kbid": kbid,
+                                "rid": uuid,
+                                "seqid": seqid,
+                            },
                         )
-                        return
+                        return None
                     else:
                         # It's an update from processor for an existing resource
                         ...
