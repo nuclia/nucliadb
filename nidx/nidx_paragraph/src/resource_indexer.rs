@@ -28,6 +28,7 @@ use regex::Regex;
 use std::collections::HashMap;
 use tantivy::doc;
 use tantivy::schema::Facet;
+use tracing::warn;
 
 lazy_static::lazy_static! {
     static ref REGEX: Regex = Regex::new(r"\\[a-zA-Z0-9]").unwrap();
@@ -88,6 +89,10 @@ pub fn index_paragraphs(
             } else {
                 let lower_bound = std::cmp::min(start_pos as usize, chars.len());
                 let upper_bound = std::cmp::min(end_pos as usize, chars.len());
+                if lower_bound >= upper_bound {
+                    warn!("Skipping paragraph with wrong start and end positions");
+                    continue;
+                }
                 text = chars[lower_bound..upper_bound].iter().collect();
                 text_ref = &text;
             }
