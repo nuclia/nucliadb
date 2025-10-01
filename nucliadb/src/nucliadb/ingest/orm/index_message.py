@@ -277,7 +277,6 @@ def get_bm_deleted_fields(
 
 
 def get_bm_modified_fields(message: BrokerMessage) -> list[FieldID]:
-    message_source = get_message_source(message)
     modified = set()
     # Added or modified fields need indexing
     for link in message.links:
@@ -295,7 +294,7 @@ def get_bm_modified_fields(message: BrokerMessage) -> list[FieldID]:
         if message.basic.summary != "":
             modified.add(("summary", FieldType.GENERIC))
 
-    if message_source == BrokerMessage.MessageSource.PROCESSOR:
+    if message.source == BrokerMessage.MessageSource.PROCESSOR:
         # Messages with field metadata, extracted text or field vectors need indexing
         for fm in message.field_metadata:
             modified.add((fm.field.field, fm.field.field_type))
@@ -304,17 +303,13 @@ def get_bm_modified_fields(message: BrokerMessage) -> list[FieldID]:
         for fv in message.field_vectors:
             modified.add((fv.field.field, fv.field.field_type))
 
-    if message_source == BrokerMessage.MessageSource.WRITER:
+    if message.source == BrokerMessage.MessageSource.WRITER:
         # Any field that has fieldmetadata annotations should be considered as modified
         # and needs to be reindexed
         if message.HasField("basic"):
             for ufm in message.basic.fieldmetadata:
                 modified.add((ufm.field.field, ufm.field.field_type))
     return [FieldID(field=field, field_type=field_type) for field, field_type in modified]
-
-
-def get_message_source(message: BrokerMessage) -> BrokerMessage.MessageSource.ValueType:
-    return message.source
 
 
 def needs_prefilter_update(message: BrokerMessage) -> bool:
