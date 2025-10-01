@@ -20,7 +20,7 @@
 
 use std::io::Write;
 
-use super::simsimd::SpatialSimilarity;
+use simsimd::SpatialSimilarity;
 
 type Unit = f32;
 type Dist = f32;
