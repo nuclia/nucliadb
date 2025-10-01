@@ -42,7 +42,9 @@ pub trait DataRetriever: std::marker::Sync {
     fn get_vector(&self, x: VectorAddr) -> &[u8];
     /// Embeddings with smaller similarity should not be considered.
     fn min_score(&self) -> f32;
+    /// Preload all data for a vector + paragraph (needed for similarity + filtering)
     fn will_need(&self, x: VectorAddr);
+    /// Preload a vector (only the vector, for similarity comparison)
     fn will_need_vector(&self, x: VectorAddr);
 }
 

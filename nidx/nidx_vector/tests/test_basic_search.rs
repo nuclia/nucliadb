@@ -130,7 +130,6 @@ fn test_basic_search(
         results.documents[0].doc_id.as_ref().unwrap().id,
         format!("{id}/a/title/0-42")
     );
-    println!("{results:?}");
     assert!(results.documents[0].score > 0.6);
     assert_eq!(
         results.documents[1].doc_id.as_ref().unwrap().id,
