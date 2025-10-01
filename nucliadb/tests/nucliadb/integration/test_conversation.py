@@ -341,6 +341,10 @@ async def test_conversation_field_indexing(
     kbid = standalone_knowledgebox
 
     def _broker_message(split: str, text: str, vector: list[float]):
+        """
+        Broker message that simulates the processing of the append of a message/split to a conversation.
+        The message contains one single paragraph in the split.
+        """
         bm = BrokerMessage()
         bm.source = BrokerMessage.MessageSource.PROCESSOR
         bm.uuid = rid
@@ -356,7 +360,7 @@ async def test_conversation_field_indexing(
         fmw.field.MergeFrom(field)
         paragraph = Paragraph(
             start=0,
-            end=len(text),
+            end=0 + len(text),
             kind=Paragraph.TypeParagraph.TEXT,
         )
         fmw.metadata.split_metadata[split].paragraphs.append(paragraph)
@@ -367,9 +371,9 @@ async def test_conversation_field_indexing(
         evw.vectors.split_vectors[split].vectors.append(
             Vector(
                 start=0,
-                end=len(text),
+                end=0 + len(text),
                 start_paragraph=0,
-                end_paragraph=len(text),
+                end_paragraph=0 + len(text),
                 vector=vector,
             )
         )
@@ -402,14 +406,14 @@ async def test_conversation_field_indexing(
 
     async def get_counters() -> KnowledgeboxCounters:
         # We call counters endpoint to get the sentences count only
-        resp = await nucliadb_reader.get(f"/kb/{kbid}/counters")
+        resp = await nucliadb_reader.get(f"/kb/{kbid}/counters", timeout=None)
         assert resp.status_code == 200, resp.text
         counters = KnowledgeboxCounters.model_validate(resp.json())
         n_sentences = counters.sentences
 
         # We don't call /counters endpoint purposefully, as deletions are not guaranteed to be merged yet.
         # Instead, we do some searches.
-        resp = await nucliadb_reader.get(f"/kb/{kbid}/search", params={"show": ["basic", "values"]})
+        resp = await nucliadb_reader.get(f"/kb/{kbid}/search", params={"show": ["basic", "values"]}, timeout=None)
         assert resp.status_code == 200, resp.text
         search = KnowledgeboxSearchResults.model_validate(resp.json())
         n_resources = len(search.resources)
@@ -441,7 +445,7 @@ async def test_conversation_field_indexing(
 
     # Add conversation field with messages
     question = "What is the meaning of life?"
-    vectors[question] = [1.0] * 768
+    vectors[question] = [0.1] * 768
 
     slug = "myresource"
     resp = await nucliadb_writer.post(
@@ -483,8 +487,8 @@ async def test_conversation_field_indexing(
     assert counters.resources == 1
 
     # Append a message
-    answer = "42"
-    vectors[answer] = [2.0] * 768
+    answer = "42 is the answer to everything."
+    vectors[answer] = [0.2] * 768
     resp = await nucliadb_writer.put(
         f"/kb/{kbid}/resource/{rid}/conversation/faq/messages",
         json=[
@@ -508,23 +512,27 @@ async def test_conversation_field_indexing(
 
     # Check counters after appending the message
     counters = await get_counters()
-    assert (
-        counters.sentences == 2 + 1
-    )  # One for each message (the title does not have a vector) + the initial message that has been marked as deleted but not yet merged
+    assert counters.sentences == 2  # One for each message (the title does not have a vector)
     assert counters.paragraphs == 3  # One for each message + the title paragraph
     assert counters.fields == 2  # One conversation field + the title field
     assert counters.resources == 1
 
     # Make sure the messages are searchable
-    question_text_block_id = f"{rid}/c/faq/1/0-{len(question)}"
-    results = await search_message(query=question)
-    assert len(results.best_matches) == 1
-    assert question_text_block_id in results.best_matches
+    text_block_ids = {
+        question: f"{rid}/c/faq/1/0-{len(question)}",
+        answer: f"{rid}/c/faq/2/0-{len(answer)}",
+    }
+    for text, block_id in text_block_ids.items():
+        # Test paragraph keyword search
+        results = await search_message(query=text)
+        assert len(results.best_matches) == 1
+        assert block_id in results.best_matches
 
-    # TODO: Look into why both messages of the conversation get the same vector score!
-    results = await search_message(vector=vectors[question], top_k=3, min_score=-1)
-    assert len(results.best_matches) == 2
-    assert question_text_block_id in results.best_matches
+        # Test semantic search
+        # TODO: Look into why both messages of the conversation get the same vector score!
+        results = await search_message(vector=vectors[text], top_k=1, min_score=0.99)
+        assert len(results.best_matches) == 1
+        assert block_id in results.best_matches
 
     # Remove the field
     resp = await nucliadb_writer.delete(f"/kb/{kbid}/resource/{rid}/conversation/faq")
@@ -536,16 +544,18 @@ async def test_conversation_field_indexing(
     # Make sure the messages are not searchable anymore
     counters = await get_counters()
     assert (
-        counters.sentences == 3
+        counters.sentences == 2
     )  # The messages are not indexed anymore, but deleted messages still count
     assert counters.paragraphs == 1  # the title
     assert counters.fields == 1  # the title
     assert counters.resources == 1
 
-    results = await search_message(query=question)
-    assert len(results.best_matches) == 0
-    results = await search_message(vector=vectors[question], top_k=3, min_score=-1)
-    assert len(results.best_matches) == 0
+    # Check that the messages are not searchable anymore
+    for text in [question, answer]:
+        results = await search_message(query=text)
+        assert len(results.best_matches) == 0
+        results = await search_message(vector=vectors[text], top_k=3, min_score=-1)
+        assert len(results.best_matches) == 0
 
 
 @pytest.mark.deploy_modes("standalone")

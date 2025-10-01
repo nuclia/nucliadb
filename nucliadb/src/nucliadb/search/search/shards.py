@@ -50,7 +50,6 @@ async def query_shard(shard: str, query: SearchRequest) -> SearchResponse:
     req.shard = shard
     return await get_nidx_searcher_client().Search(req)
 
-
 @backoff.on_exception(
     backoff.expo, Exception, jitter=None, factor=0.1, max_tries=3, giveup=should_giveup
 )
