@@ -340,7 +340,7 @@ class Processor:
                             seqid=seqid,
                             partition=partition,
                             kb=kb,
-                            source=get_message_source(message),
+                            source=to_index_message_source(message),
                         )
                         # Save indexing warnings
                         for field_id, warning in warnings:
@@ -501,13 +501,12 @@ class Processor:
         resource_created: bool,
     ) -> PBBrainResource:
         builder = IndexMessageBuilder(resource)
-        message_source = get_message_source(message)
-        if message_source == nodewriter_pb2.IndexMessageSource.WRITER:
+        if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
             return await builder.for_writer_bm(message, resource_created)
-        elif message_source == nodewriter_pb2.IndexMessageSource.PROCESSOR:
+        elif message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
             return await builder.for_processor_bm(message)
         else:  # pragma: no cover
-            raise InvalidBrokerMessage(f"Unknown broker message source: {message_source}")
+            raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
 
     async def external_index_delete_resource(
         self, external_index_manager: ExternalIndexManager, resource_uuid: str
@@ -708,7 +707,7 @@ class Processor:
         return kbobj
 
 
-def get_message_source(message: writer_pb2.BrokerMessage):
+def to_index_message_source(message: writer_pb2.BrokerMessage):
     if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
         return nodewriter_pb2.IndexMessageSource.WRITER
     elif message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
