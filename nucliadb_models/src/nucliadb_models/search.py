@@ -1049,7 +1049,7 @@ class ChatModel(BaseModel):
         default=None,
         description="Whether to include citations in the response. "
         "If set to None or False, no citations will be computed. "
-        "If set to True or 'default', citations will be computed after answer generation and send as a separate `CitationsGenerativeResponse` chunk"
+        "If set to True or 'default', citations will be computed after answer generation and send as a separate `CitationsGenerativeResponse` chunk. "
         "If set to 'llm_footnotes', citations will be included in the LLM's response as markdown-styled footnotes. A `FootnoteCitationsGenerativeResponse` chunk will also be sent to map footnote ids to context keys in the `query_context`.",
     )
     citation_threshold: Optional[float] = Field(
@@ -1632,7 +1632,7 @@ class AskRequest(AuditMetadataBase):
         default=None,
         description="Whether to include citations in the response. "
         "If set to None or False, no citations will be computed. "
-        "If set to True or 'default', citations will be computed after answer generation and send as a separate `CitationsGenerativeResponse` chunk"
+        "If set to True or 'default', citations will be computed after answer generation and send as a separate `CitationsGenerativeResponse` chunk. "
         "If set to 'llm_footnotes', citations will be included in the LLM's response as markdown-styled footnotes. A `FootnoteCitationsGenerativeResponse` chunk will also be sent to map footnote ids to context keys in the `query_context`.",
     )
     citation_threshold: Optional[float] = Field(
