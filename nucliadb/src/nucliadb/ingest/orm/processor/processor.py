@@ -29,6 +29,7 @@ from nidx_protos.noderesources_pb2 import Resource as PBBrainResource
 
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.catalog import catalog_delete, catalog_update
+from nucliadb.common.catalog.utils import build_catalog_resource_data
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
@@ -331,6 +332,7 @@ class Processor:
                 # index message
                 if resource and resource.modified:
                     index_message = await self.generate_index_message(resource, message, created)
+                    resource_indexed_labels = list(index_message.labels)
                     try:
                         warnings = await self.index_resource(
                             index_message=index_message,
@@ -352,12 +354,13 @@ class Processor:
                             e.field_id, e.message, writer_pb2.Error.Severity.ERROR
                         )
                         # Catalog takes status from index message labels, override it to error
-                        current_status = [x for x in index_message.labels if x.startswith("/n/s/")]
-                        if current_status:
-                            index_message.labels.remove(current_status[0])
-                            index_message.labels.append("/n/s/ERROR")
+                        current_status = [x for x in resource_indexed_labels if x.startswith("/n/s/")]
+                        if current_status and current_status != "/n/s/ERROR":
+                            resource_indexed_labels.remove(current_status[0])
+                            resource_indexed_labels.append("/n/s/ERROR")
 
-                    await catalog_update(txn, kbid, resource, index_message)
+                    resource_data = build_catalog_resource_data(resource, resource_indexed_labels)
+                    await catalog_update(txn, kbid, uuid, resource_data)
                     if transaction_check:
                         await sequence_manager.set_last_seqid(txn, partition, seqid)
                     await txn.commit()

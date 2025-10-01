@@ -30,6 +30,7 @@ from typing import cast
 from nucliadb.common import datamanagers
 from nucliadb.common.catalog import catalog_update, get_catalog
 from nucliadb.common.catalog.pg import PGCatalog
+from nucliadb.common.catalog.utils import build_catalog_resource_data
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.ingest.orm.index_message import get_resource_index_message
 from nucliadb.migrator.context import ExecutionContext
@@ -79,7 +80,8 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                         continue
 
                     index_message = await get_resource_index_message(resource, reindex=False)
-                    await catalog_update(txn, kbid, resource, index_message)
+                    resource_data = build_catalog_resource_data(resource, list(index_message.labels))
+                    await catalog_update(txn, kbid, rid, resource_data)
 
                 await txn.commit()
                 continue_sql = f"AND key > '/kbs/{kbid}/r/{rid}'"

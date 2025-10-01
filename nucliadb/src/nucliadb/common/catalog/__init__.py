@@ -36,14 +36,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from nidx_protos.noderesources_pb2 import Resource as IndexMessage
-
 from nucliadb.common.catalog.dummy import DummyCatalog
-from nucliadb.common.catalog.interface import Catalog, CatalogQuery
+from nucliadb.common.catalog.interface import Catalog, CatalogQuery, CatalogResourceData
 from nucliadb.common.catalog.pg import PGCatalog
-from nucliadb.common.catalog.utils import build_catalog_resource_data
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.settings import CatalogConfig, settings
 from nucliadb_models.search import CatalogFacetsRequest, Resources
 from nucliadb_utils.exceptions import ConfigurationError
@@ -58,10 +54,9 @@ def get_catalog() -> Catalog:
         raise ConfigurationError(f"Unknown catalog configuration: {settings.catalog}")
 
 
-async def catalog_update(txn: Transaction, kbid: str, resource: Resource, index_message: IndexMessage):
+async def catalog_update(txn: Transaction, kbid: str, rid: str, resource_data: CatalogResourceData):
     catalog = get_catalog()
-    resource_data = build_catalog_resource_data(resource, index_message)
-    await catalog.update(txn, kbid, resource.uuid, resource_data)
+    await catalog.update(txn, kbid, rid, resource_data)
 
 
 async def catalog_delete(txn: Transaction, kbid: str, rid: str):

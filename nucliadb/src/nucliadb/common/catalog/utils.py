@@ -17,13 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nidx_protos.noderesources_pb2 import Resource as IndexMessage
 
 from nucliadb.common.catalog.interface import CatalogResourceData
 from nucliadb.ingest.orm.resource import Resource
 
 
-def build_catalog_resource_data(resource: Resource, index_message: IndexMessage) -> CatalogResourceData:
+def build_catalog_resource_data(
+    resource: Resource, resource_indexed_labels: list[str]
+) -> CatalogResourceData:
     if resource.basic is None:
         raise ValueError("Cannot index into the catalog a resource without basic metadata ")
 
@@ -40,7 +41,7 @@ def build_catalog_resource_data(resource: Resource, index_message: IndexMessage)
     }
 
     # Labels from the resource and classification labels from each field
-    labels = [label for label in index_message.labels]
+    labels = resource_indexed_labels[:]
     for classification in resource.basic.computedmetadata.field_classifications:
         for clf in classification.classifications:
             label = f"/l/{clf.labelset}/{clf.label}"
