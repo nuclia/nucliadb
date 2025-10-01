@@ -112,10 +112,10 @@ fn test_basic_search(
 
     // Search near a few elements
     let mut vector: Vec<f32> = [0.0; DIMENSION].into();
-    vector[42] = 0.9;
-    vector[43] = 0.7;
-    vector[44] = 0.5;
-    vector[45] = 0.3;
+    vector[42] = 0.7;
+    vector[43] = 0.59;
+    vector[44] = 0.35;
+    vector[45] = 0.2;
     let results = searcher.search(
         &VectorSearchRequest {
             vector,
@@ -130,22 +130,22 @@ fn test_basic_search(
         results.documents[0].doc_id.as_ref().unwrap().id,
         format!("{id}/a/title/0-42")
     );
-    assert!(results.documents[0].score > 0.2);
+    assert!(results.documents[0].score > 0.6);
     assert_eq!(
         results.documents[1].doc_id.as_ref().unwrap().id,
         format!("{id}/a/title/0-43")
     );
-    assert!(results.documents[1].score > 0.2);
+    assert!(results.documents[1].score > 0.5);
     assert_eq!(
         results.documents[2].doc_id.as_ref().unwrap().id,
         format!("{id}/a/title/0-44")
     );
-    assert!(results.documents[2].score > 0.2);
+    assert!(results.documents[2].score > 0.3);
     assert_eq!(
         results.documents[3].doc_id.as_ref().unwrap().id,
         format!("{id}/a/title/0-45")
     );
-    assert!(results.documents[3].score > 0.2);
+    assert!(results.documents[3].score > 0.15);
     assert_eq!(results.documents[5].score, 0.0);
 
     Ok(())

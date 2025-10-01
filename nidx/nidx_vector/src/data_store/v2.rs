@@ -18,7 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::{VectorR, config::VectorType, segment::Elem};
+use crate::{
+    VectorR,
+    config::{VectorConfig, VectorType},
+    data_store::v2::quant_vector_store::{QuantVectorStore, QuantVectorStoreWriter},
+    segment::Elem,
+    vector_types::rabitq,
+};
 
 use super::{DataStore, OpenReason, ParagraphAddr, VectorAddr};
 pub use paragraph_store::StoredParagraph;
@@ -27,11 +33,13 @@ use std::path::Path;
 use vector_store::{VectorStore, VectorStoreWriter};
 
 mod paragraph_store;
+mod quant_vector_store;
 mod vector_store;
 
 pub struct DataStoreV2 {
     paragraphs: ParagraphStore,
     vectors: VectorStore,
+    quantized: Option<QuantVectorStore>,
 }
 
 impl DataStoreV2 {
@@ -39,20 +47,39 @@ impl DataStoreV2 {
         Ok(Self {
             vectors: VectorStore::open(path, vector_type, &reason)?,
             paragraphs: ParagraphStore::open(path, &reason)?,
+            quantized: QuantVectorStore::open(
+                path,
+                rabitq::EncodedVector::encoded_len(vector_type.dimension()),
+                &reason,
+            )
+            .ok(),
         })
     }
 
-    pub fn create(path: &Path, entries: Vec<Elem>, vector_type: &VectorType) -> VectorR<()> {
+    pub fn create(path: &Path, entries: Vec<Elem>, config: &VectorConfig) -> VectorR<()> {
         let mut paragraphs = ParagraphStoreWriter::new(path)?;
-        let mut vectors = VectorStoreWriter::new(path, vector_type)?;
+        let mut vectors = VectorStoreWriter::new(path, &config.vector_type)?;
+        let mut quantized = if config.quantizable_vectors() {
+            Some(QuantVectorStoreWriter::new(path)?)
+        } else {
+            None
+        };
 
         for (idx, elem) in (0..).zip(entries.into_iter()) {
-            let (first_vector, _) = vectors.write(idx, elem.vectors.iter().map(|v| vector_type.encode(v)))?;
+            let (first_vector, _) = vectors.write(idx, elem.vectors.iter().map(|v| config.vector_type.encode(v)))?;
+            if let Some(quantized) = &mut quantized {
+                for v in &elem.vectors {
+                    quantized.write(&rabitq::EncodedVector::encode(v))?;
+                }
+            }
             paragraphs.write(StoredParagraph::from_elem(&elem, first_vector))?;
         }
 
         paragraphs.close()?;
         vectors.close()?;
+        if let Some(quantized) = quantized {
+            quantized.close()?;
+        }
 
         Ok(())
     }
@@ -60,10 +87,15 @@ impl DataStoreV2 {
     pub fn merge(
         path: &Path,
         producers: Vec<(impl Iterator<Item = ParagraphAddr>, &dyn DataStore)>,
-        vector_type: &VectorType,
+        config: &VectorConfig,
     ) -> VectorR<()> {
         let mut paragraphs = ParagraphStoreWriter::new(path)?;
-        let mut vectors = VectorStoreWriter::new(path, vector_type)?;
+        let mut vectors = VectorStoreWriter::new(path, &config.vector_type)?;
+        let mut quantized = if config.quantizable_vectors() {
+            Some(QuantVectorStoreWriter::new(path)?)
+        } else {
+            None
+        };
 
         let mut p_idx = 0;
         for (alive, store) in producers {
@@ -74,6 +106,20 @@ impl DataStoreV2 {
 
                 // Write to new store
                 let (first_vector, last_vector) = vectors.write(p_idx, p_vectors)?;
+                if let Some(quantized) = &mut quantized {
+                    // Copy quantized vectors if they exist, calculate them if not
+                    if store.has_quantized() {
+                        for vec_addr in paragraph.vectors(&paragraph_addr) {
+                            quantized.write(store.get_quantized_vector(vec_addr).bytes())?;
+                        }
+                    } else {
+                        let p_vectors = paragraph.vectors(&paragraph_addr).map(|v| store.get_vector(v).vector());
+                        for v in p_vectors {
+                            quantized.write(&rabitq::EncodedVector::encode(config.vector_type.decode(v)))?;
+                        }
+                    }
+                }
+
                 paragraphs.write_paragraph_ref(paragraph, first_vector, last_vector - first_vector + 1)?;
                 p_idx += 1;
             }
@@ -87,6 +133,10 @@ impl DataStoreV2 {
 }
 
 impl DataStore for DataStoreV2 {
+    fn has_quantized(&self) -> bool {
+        self.quantized.is_some()
+    }
+
     fn size_bytes(&self) -> usize {
         self.vectors.size_bytes() + self.paragraphs.size_bytes()
     }
@@ -107,8 +157,19 @@ impl DataStore for DataStoreV2 {
         self.vectors.get_vector(id)
     }
 
+    fn get_quantized_vector(&self, id: VectorAddr) -> rabitq::EncodedVector<'_> {
+        let Some(quantized) = &self.quantized else {
+            panic!("Store does not have quantized vectors")
+        };
+        quantized.get_vector(id)
+    }
+
     fn will_need(&self, id: VectorAddr) {
         self.vectors.will_need(id);
+    }
+
+    fn will_need_quantized(&self, id: VectorAddr) {
+        self.quantized.as_ref().unwrap().will_need(id);
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

@@ -26,6 +26,7 @@ use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, Paragra
 use crate::formula::Formula;
 use crate::hnsw::*;
 use crate::inverted_index::{FilterBitSet, InvertedIndexes, build_indexes};
+use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use core::f32;
 use io::{BufWriter, Write};
@@ -38,7 +39,7 @@ use std::iter::empty;
 use std::path::Path;
 
 /// How much expensive is to find a node via HNSW compared to a simple brute force scan
-const HNSW_COST_FACTOR: usize = 200;
+const HNSW_COST_FACTOR: usize = 100;
 
 mod file_names {
     pub const HNSW: &str = "index.hnsw";
@@ -121,7 +122,7 @@ pub fn merge(segment_path: &Path, operants: &[&OpenSegment], config: &VectorConf
             .iter()
             .map(|dp| (dp.alive_paragraphs(), dp.data_store.as_ref()))
             .collect();
-        DataStoreV2::merge(segment_path, node_producers, &config.vector_type)?;
+        DataStoreV2::merge(segment_path, node_producers, config)?;
         let data_store = DataStoreV2::open(segment_path, &config.vector_type, OpenReason::Create)?;
         merge_indexes(segment_path, data_store, operants, config)
     }
@@ -151,7 +152,7 @@ fn merge_indexes<DS: DataStore + 'static>(
     let merged_vectors_count = data_store.stored_vector_count();
 
     // Creating the hnsw for the new node store.
-    let retriever = Retriever::new(&[], &data_store, config, -1.0);
+    let retriever = Retriever::new(&data_store, config, -1.0);
     let mut ops = HnswOps::new(&retriever, false);
     for id in start_vector_index..merged_vectors_count {
         ops.insert(VectorAddr(id), &mut index);
@@ -232,7 +233,7 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
             tags,
         )
     } else {
-        DataStoreV2::create(path, elems, &config.vector_type)?;
+        DataStoreV2::create(path, elems, config)?;
         create_indexes(
             path,
             DataStoreV2::open(path, &config.vector_type, OpenReason::Create)?,
@@ -258,7 +259,7 @@ fn create_indexes<DS: DataStore + 'static>(
 
     // Creating the HNSW using the mmaped nodes
     let mut index = RAMHnsw::new();
-    let retriever = Retriever::new(&[], &data_store, config, -1.0);
+    let retriever = Retriever::new(&data_store, config, -1.0);
     let mut ops = HnswOps::new(&retriever, false);
     for id in 0..vector_count {
         ops.insert(VectorAddr(id), &mut index)
@@ -302,23 +303,16 @@ fn create_indexes<DS: DataStore + 'static>(
 
 pub struct Retriever<'a, DS: DataStore> {
     similarity_function: fn(&[u8], &[u8]) -> f32,
-    vector_count: u32,
-    temp: &'a [u8],
     data_store: &'a DS,
     min_score: f32,
 }
 impl<'a, DS: DataStore> Retriever<'a, DS> {
-    pub fn new(temp: &'a [u8], data_store: &'a DS, config: &VectorConfig, min_score: f32) -> Retriever<'a, DS> {
+    pub fn new(data_store: &'a DS, config: &VectorConfig, min_score: f32) -> Retriever<'a, DS> {
         Retriever {
-            temp,
             data_store,
             similarity_function: config.similarity_function(),
-            vector_count: data_store.stored_vector_count(),
             min_score,
         }
-    }
-    fn find_vector(&'a self, x: VectorAddr) -> VectorRef<'a> {
-        self.data_store.get_vector(x)
     }
 }
 
@@ -327,24 +321,45 @@ impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
         self.data_store.will_need(x);
     }
 
-    fn get_vector(&self, x @ VectorAddr(addr): VectorAddr) -> &[u8] {
-        if addr == self.vector_count {
-            self.temp
+    fn will_need_vector(&self, x: VectorAddr) {
+        if self.data_store.has_quantized() {
+            self.data_store.will_need_quantized(x);
         } else {
-            self.find_vector(x).vector()
+            self.data_store.will_need(x);
         }
     }
-    fn similarity(&self, x @ VectorAddr(a0): VectorAddr, y @ VectorAddr(a1): VectorAddr) -> f32 {
-        if a0 == self.vector_count {
-            let y = self.find_vector(y).vector();
-            (self.similarity_function)(self.temp, y)
-        } else if a1 == self.vector_count {
-            let x = self.find_vector(x).vector();
-            (self.similarity_function)(self.temp, x)
-        } else {
-            let x = self.find_vector(x).vector();
-            let y = self.find_vector(y).vector();
-            (self.similarity_function)(x, y)
+
+    fn get_vector(&self, x: VectorAddr) -> &[u8] {
+        self.data_store.get_vector(x).vector()
+    }
+
+    fn similarity(&self, x: VectorAddr, y: &SearchVector) -> f32 {
+        match y {
+            SearchVector::Stored(vector_addr) => {
+                let x = self.data_store.get_vector(x).vector();
+                let y = self.data_store.get_vector(*vector_addr).vector();
+                (self.similarity_function)(x, y)
+            }
+            SearchVector::Query(query) => {
+                let x = self.data_store.get_vector(x).vector();
+                (self.similarity_function)(x, query)
+            }
+            SearchVector::RabitQ(query) => {
+                let x = self.data_store.get_quantized_vector(x);
+                let (est, _err) = query.similarity(x);
+                est
+            }
+        }
+    }
+
+    fn similarity_upper_bound(&self, x: VectorAddr, y: &SearchVector) -> f32 {
+        match y {
+            SearchVector::RabitQ(query) => {
+                let x = self.data_store.get_quantized_vector(x);
+                let (est, err) = query.similarity(x);
+                est + err
+            }
+            _ => self.similarity(x, y),
         }
     }
 
@@ -353,7 +368,7 @@ impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
     }
 
     fn paragraph(&self, x: VectorAddr) -> ParagraphAddr {
-        self.find_vector(x).paragraph()
+        self.data_store.get_vector(x).paragraph()
     }
 }
 
@@ -487,9 +502,15 @@ impl OpenSegment {
         config: &VectorConfig,
         min_score: f32,
     ) -> Box<dyn Iterator<Item = ScoredVector<'_>> + '_> {
-        let encoded_query = config.vector_type.encode(query);
-        let retriever = Retriever::new(&encoded_query, data_store, config, min_score);
-        let query_address = VectorAddr(self.metadata.records as u32);
+        let raw_query = SearchVector::Query(config.vector_type.encode(query));
+        let rabitq = data_store.has_quantized() && !config.flags.contains(&flags::DISABLE_RABITQ_SEARCH.to_string());
+        let encoded_query = if rabitq {
+            let rabitq = rabitq::QueryVector::from_vector(query, &config.vector_type);
+            &SearchVector::RabitQ(rabitq)
+        } else {
+            &raw_query
+        };
+        let retriever = Retriever::new(data_store, config, min_score);
 
         let mut filter_bitset = self.inverted_indexes.filter(filter);
         if let Some(ref mut bitset) = filter_bitset {
@@ -505,39 +526,60 @@ impl OpenSegment {
         let expected_traversal_scan = results * self.metadata.records / count;
 
         if count < expected_traversal_scan * HNSW_COST_FACTOR {
-            let mut scored_results = Vec::new();
-            for paragraph_addr in bitset.iter() {
-                let paragraph = data_store.get_paragraph(paragraph_addr);
-
-                // Only return the best vector match per paragraph
-                let best_vector_score = paragraph
-                    .vectors(&paragraph_addr)
-                    .map(|va| {
-                        let score = retriever.similarity(query_address, va);
-                        Cnx(va, score)
-                    })
-                    .max_by(|v, w| v.1.total_cmp(&w.1))
-                    .unwrap();
-
-                if best_vector_score.1 >= min_score {
-                    scored_results.push(Reverse(best_vector_score));
-                }
-            }
-            scored_results.sort();
-            return Box::new(
-                scored_results
+            self.brute_force_search(bitset, results, retriever, encoded_query, &raw_query)
+        } else {
+            let ops = HnswOps::new(&retriever, true);
+            let neighbours = ops.search(encoded_query, self.index.as_ref(), results, bitset, with_duplicates);
+            Box::new(
+                neighbours
                     .into_iter()
-                    .map(|Reverse(a)| ScoredVector::new(a.0, self.data_store.as_ref(), a.1))
+                    .map(|(address, dist)| ScoredVector::new(address, self.data_store.as_ref(), dist))
                     .take(results),
-            );
+            )
+        }
+    }
+
+    fn brute_force_search<DS: DataStore>(
+        &self,
+        bitset: &FilterBitSet,
+        results: usize,
+        retriever: Retriever<DS>,
+        encoded_query: &SearchVector,
+        raw_query: &SearchVector,
+    ) -> Box<dyn Iterator<Item = ScoredVector<'_>> + '_> {
+        let mut scored_results = Vec::new();
+        for paragraph_addr in bitset.iter() {
+            let paragraph = retriever.data_store.get_paragraph(paragraph_addr);
+
+            // Only return the best vector match per paragraph
+            let best_vector_score = paragraph
+                .vectors(&paragraph_addr)
+                .map(|va| {
+                    let score = retriever.similarity_upper_bound(va, encoded_query);
+                    Cnx(va, score)
+                })
+                .max_by(|v, w| v.1.total_cmp(&w.1))
+                .unwrap();
+
+            if best_vector_score.1 >= retriever.min_score {
+                scored_results.push(Reverse(best_vector_score));
+            }
+        }
+        scored_results.sort_unstable();
+        // If using RabitQ, rerank top results using the raw vectors
+        if matches!(encoded_query, SearchVector::RabitQ(_)) {
+            scored_results = scored_results
+                .into_iter()
+                .take(std::cmp::min(results * 100, 2000))
+                .map(|Reverse(Cnx(addr, _))| Reverse(Cnx(addr, retriever.similarity(addr, raw_query))))
+                .collect();
+            scored_results.sort_unstable();
         }
 
-        let ops = HnswOps::new(&retriever, true);
-        let neighbours = ops.search(query_address, self.index.as_ref(), results, bitset, with_duplicates);
         Box::new(
-            neighbours
+            scored_results
                 .into_iter()
-                .map(|(address, dist)| ScoredVector::new(address, self.data_store.as_ref(), dist))
+                .map(|Reverse(a)| ScoredVector::new(a.0, self.data_store.as_ref(), a.1))
                 .take(results),
         )
     }
@@ -561,7 +603,7 @@ mod test {
     use super::{Elem, create, merge};
     use nidx_protos::prost::*;
 
-    const DIMENSION: usize = 128;
+    const DIMENSION: usize = 256;
 
     fn random_vector(rng: &mut impl Rng) -> Vec<f32> {
         let v: Vec<f32> = (0..DIMENSION).map(|_| rng.gen_range(-1.0..1.0)).collect();
@@ -777,7 +819,7 @@ mod test {
         )?;
 
         // Search a few times
-        let correct = (0..100)
+        let correct: f32 = (0..100)
             .map(|_| {
                 // Search near an existing segment (simulates that the query is related to the data)
                 let base_v = elems.values().nth(rng.gen_range(0..elems.len())).unwrap();
@@ -792,16 +834,22 @@ mod test {
                     .iter()
                     .map(|r| dp.data_store.get_paragraph(r.paragraph()).id().to_string())
                     .collect();
-                let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();
-                search == brute_force
-            })
-            .filter(|x| *x)
-            .count();
 
-        let recall = correct as f32 / 100.0;
+                let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();
+                let mut r = 0.0;
+                for b in brute_force {
+                    if search.contains(&b) {
+                        r += 0.2;
+                    }
+                }
+                r
+            })
+            .sum();
+
+        let recall = correct / 100.0;
         println!("Assessed recall = {recall}");
-        // Expected 0.90-0.92, has a little margin because HNSW can be non-deterministic
-        assert!(recall >= 0.88);
+        // Expected ~0.98, has a little margin because HNSW can be non-deterministic
+        assert!(recall >= 0.95);
 
         Ok(())
     }

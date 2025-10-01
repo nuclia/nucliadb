@@ -29,6 +29,8 @@ use crate::vector_types::*;
 pub mod flags {
     // pub const DATA_STORE_V2: &str = "data_store_v2";
     pub const FORCE_DATA_STORE_V1: &str = "force_data_store_v1"; // For testing of v1+v2 merges
+
+    pub const DISABLE_RABITQ_SEARCH: &str = "disable_rabitq_search"; // Do not use RaBitQ vectors in search
 }
 
 #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
@@ -57,6 +59,12 @@ impl VectorType {
     pub fn encode(&self, vector: &[f32]) -> Vec<u8> {
         match self {
             VectorType::DenseF32 { .. } => dense_f32::encode_vector(vector),
+        }
+    }
+
+    pub fn decode<'a>(&self, data: &'a [u8]) -> &'a [f32] {
+        match self {
+            VectorType::DenseF32 { .. } => dense_f32::decode_vector(data),
         }
     }
 
@@ -106,6 +114,11 @@ impl VectorConfig {
             (Similarity::Dot, VectorType::DenseF32 { .. }) => dense_f32::dot_similarity,
             (Similarity::Cosine, VectorType::DenseF32 { .. }) => dense_f32::cosine_similarity,
         }
+    }
+
+    pub fn quantizable_vectors(&self) -> bool {
+        matches!(self.similarity, Similarity::Dot)
+            && matches!(&self.vector_type, VectorType::DenseF32 { dimension } if dimension.is_multiple_of(64))
     }
 }
 

@@ -273,7 +273,7 @@ async def test_vectorset_migration(
     text = "Lionel Messi is a football player."
     link_field.with_extracted_text(text)
     link_field.with_extracted_paragraph_metadata(Paragraph(start=0, end=len(text)))
-    link_vector = [1.0 for _ in range(1024)]
+    link_vector = [1.0 / 1024**0.5 for _ in range(1024)]
     vectors = [
         utils_pb2.Vector(
             start=0,
@@ -289,7 +289,7 @@ async def test_vectorset_migration(
     text = "link"
     title_field.with_extracted_text(text)
     title_field.with_extracted_paragraph_metadata(Paragraph(start=0, end=len(text)))
-    title_vector = [5.0 for _ in range(1024)]
+    title_vector = [1.0] + [0.0 for _ in range(1023)]
     vectors = [
         utils_pb2.Vector(
             start=0,
@@ -334,7 +334,7 @@ async def test_vectorset_migration(
     ev = ExtractedVectorsWrapper()
     ev.field.CopyFrom(field)
     ev.vectorset_id = "en-2024-05-06"
-    link_vector_migrated = [2.0 for _ in range(1024)]
+    link_vector_migrated = [0.0, 1.0] + [0.0 for _ in range(1022)]
     vector = utils_pb2.Vector(
         start=0,
         end=len(text),
@@ -375,13 +375,15 @@ async def test_vectorset_migration(
     )
     await _check_search(nucliadb_reader, kbid, query="football", vector=link_vector)
 
-    await _check_search(
-        nucliadb_reader,
-        kbid,
-        query="link",
-        vectorset="en-2024-05-06",
-        vector=title_vector,
-    )
+    # The title vector cannot be found in the new vectorset
+    with pytest.raises(AssertionError):
+        await _check_search(
+            nucliadb_reader,
+            kbid,
+            query="link",
+            vectorset="en-2024-05-06",
+            vector=title_vector,
+        )
 
     # Simulate that embeddings for the title field of this resource are also migrated
     # Ingest a new broker message as if it was coming from the migration
@@ -394,7 +396,7 @@ async def test_vectorset_migration(
     ev = ExtractedVectorsWrapper()
     ev.field.CopyFrom(FieldID(field_type=FieldType.GENERIC, field="title"))
     ev.vectorset_id = "en-2024-05-06"
-    title_vector_migrated = [6.0 for _ in range(1024)]
+    title_vector_migrated = [0.0, 0.0, 1.0] + [0.0 for _ in range(1021)]
     vector = utils_pb2.Vector(
         start=0,
         end=len(text),
@@ -415,7 +417,7 @@ async def test_vectorset_migration(
         kbid,
         query="football",
         vectorset="en-2024-05-06",
-        vector=link_vector_migrated,
+        vector=title_vector_migrated,
     )
 
     # With the default vectorset the document should also be found
@@ -424,9 +426,9 @@ async def test_vectorset_migration(
         kbid,
         query="football",
         vectorset="multilingual-2024-05-06",
-        vector=link_vector,
+        vector=title_vector,
     )
-    await _check_search(nucliadb_reader, kbid, query="football", vector=link_vector)
+    await _check_search(nucliadb_reader, kbid, query="football", vector=title_vector)
 
     # Do a rollover and test again
 
@@ -539,6 +541,11 @@ async def test_vectorset_migration_split_field(
     old_vectorset_id = "multilingual-2024-05-06"
     new_vectorset_id = "en-2024-05-06"
 
+    def vector_for_split(split_id):
+        vector = [0.0 for _ in range(1024)]
+        vector[split_id] = 1.0
+        return vector
+
     # Create a KB
     resp = await nucliadb_writer_manager.post(
         "/kbs",
@@ -634,7 +641,7 @@ async def test_vectorset_migration_split_field(
                 end=len(text),
                 start_paragraph=0,
                 end_paragraph=len(text),
-                vector=[float(split) for _ in range(1024)],
+                vector=vector_for_split(idx + 1),
             )
         ]
         conv_field.with_extracted_vectors(vectors, vectorset=old_vectorset_id, split=split)
@@ -651,7 +658,7 @@ async def test_vectorset_migration_split_field(
     assert counters.fields == 2  # the title and the conv field
 
     # Make a search and check that the document is found
-    await _check_search(nucliadb_reader, kbid, query="Python", vector=[1.0 for _ in range(1024)])
+    await _check_search(nucliadb_reader, kbid, query="Python", vector=vector_for_split(1))
 
     # Now add a new vectorset
     resp = await add_vectorset(
@@ -684,7 +691,7 @@ async def test_vectorset_migration_split_field(
             start_paragraph=0,
             end_paragraph=len(text),
         )
-        vector.vector.extend([2.0 for _ in range(1024)])
+        vector.vector.extend(vector_for_split(idx + 101))
         ev.vectors.split_vectors[split].vectors.append(vector)
         bm2.field_vectors.append(ev)
 
@@ -705,7 +712,7 @@ async def test_vectorset_migration_split_field(
         kbid,
         vectorset=new_vectorset_id,
         query="Python",
-        vector=[2.0 for _ in range(1024)],
+        vector=vector_for_split(101),
     )
 
     # With the default vectorset the document should also be found
@@ -714,9 +721,9 @@ async def test_vectorset_migration_split_field(
         kbid,
         vectorset=old_vectorset_id,
         query="Python",
-        vector=[1.0 for _ in range(1024)],
+        vector=vector_for_split(1),
     )
-    await _check_search(nucliadb_reader, kbid, query="Python", vector=[1.0 for _ in range(1024)])
+    await _check_search(nucliadb_reader, kbid, query="Python", vector=vector_for_split(1))
 
     # Do a rollover and test again
     app_context = ApplicationContext()
@@ -733,7 +740,7 @@ async def test_vectorset_migration_split_field(
         kbid,
         vectorset=new_vectorset_id,
         query="Python",
-        vector=[2.0 for _ in range(1024)],
+        vector=vector_for_split(101),
     )
 
     # With the default vectorset the document should also be found
@@ -742,8 +749,8 @@ async def test_vectorset_migration_split_field(
         kbid,
         vectorset=old_vectorset_id,
         query="Python",
-        vector=[1.0 for _ in range(1024)],
+        vector=vector_for_split(1),
     )
-    await _check_search(nucliadb_reader, kbid, query="Python", vector=[1.0 for _ in range(1024)])
+    await _check_search(nucliadb_reader, kbid, query="Python", vector=vector_for_split(1))
 
     await app_context.finalize()

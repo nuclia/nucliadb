@@ -71,27 +71,26 @@ fn encode_unit(mut buff: Vec<u8>, unit: Unit) -> Vec<u8> {
 }
 
 pub fn cosine_similarity(x: &[u8], y: &[u8]) -> Dist {
-    let (p, x, s) = unsafe { x.align_to() };
-    debug_assert!(p.is_empty());
-    debug_assert!(s.is_empty());
-    let (p, y, s) = unsafe { y.align_to() };
-    debug_assert!(p.is_empty());
-    debug_assert!(s.is_empty());
+    let x = decode_vector(x);
+    let y = decode_vector(y);
     1.0 - f32::cosine(x, y).unwrap() as f32
 }
 
 pub fn dot_similarity(x: &[u8], y: &[u8]) -> Dist {
-    let (p, x, s) = unsafe { x.align_to() };
-    debug_assert!(p.is_empty());
-    debug_assert!(s.is_empty());
-    let (p, y, s) = unsafe { y.align_to() };
-    debug_assert!(p.is_empty());
-    debug_assert!(s.is_empty());
+    let x = decode_vector(x);
+    let y = decode_vector(y);
     f32::dot(x, y).unwrap() as f32
 }
 
 pub fn encode_vector(vec: &[Unit]) -> Vec<u8> {
     vec.iter().cloned().fold(vec![], encode_unit)
+}
+
+pub fn decode_vector(x: &[u8]) -> &[f32] {
+    let (p, x, s) = unsafe { x.align_to() };
+    debug_assert!(p.is_empty());
+    debug_assert!(s.is_empty());
+    x
 }
 
 #[cfg(test)]
