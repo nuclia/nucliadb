@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.9.2, <4"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -1816,14 +1816,14 @@ wheels = [
 
 [[package]]
 name = "nuclia-models"
-version = "0.47.0"
+version = "0.50.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic", extra = ["email"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/07/74/f8d209d3855dce53c5b1aec81c0c09333203fe8d144e37187bec342f2271/nuclia_models-0.47.0.tar.gz", hash = "sha256:4b0154a1fed0bea89fc49607896ffcf1ca71fce1ae03de91657ec839954d9ce8", size = 22010, upload-time = "2025-09-01T18:48:02.315Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/05/a2/101b939bdb74aabed9b067bd595827ebcac27a130b76410f321070a01e66/nuclia_models-0.50.0.tar.gz", hash = "sha256:d0cf6ade5b80719fcc60864e54d026407f228f75f20a517c08c8f5ae9a2bd41e", size = 22400, upload-time = "2025-09-26T13:17:01.141Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f7/fc/973fa74eafdc20b157445c55b99a64e02ea356a56d9a3b5e96e81e1f1834/nuclia_models-0.47.0-py3-none-any.whl", hash = "sha256:51cdb65b722d9d08348085725f6eb345692fc6b979750f25092d8e5e324ee26c", size = 26296, upload-time = "2025-09-01T18:48:01.446Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/d8/01b981c1d0ad6a79294c6e61fa95643c0b6151cc23d4259e0f5513715db2/nuclia_models-0.50.0-py3-none-any.whl", hash = "sha256:ce400b6dd237b8aa936ef36afe8866f13e31d3a0cd8a61e210391576817158d8", size = 26431, upload-time = "2025-09-26T13:16:59.909Z" },
 ]
 
 [[package]]
@@ -1927,7 +1927,7 @@ requires-dist = [
     { name = "mmh3", specifier = ">=3.0.0" },
     { name = "multidict", specifier = ">=6.0.4" },
     { name = "nidx-protos", editable = "nidx/nidx_protos" },
-    { name = "nuclia-models", specifier = ">=0.47.0" },
+    { name = "nuclia-models", specifier = ">=0.50.0" },
     { name = "nucliadb-admin-assets", specifier = ">=1.0.0.post1224" },
     { name = "nucliadb-models", editable = "nucliadb_models" },
     { name = "nucliadb-protos", editable = "nucliadb_protos" },
@@ -2039,7 +2039,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "httpx" },
-    { name = "nuclia-models", specifier = ">=0.47.0" },
+    { name = "nuclia-models", specifier = ">=0.50.0" },
     { name = "nucliadb-models", editable = "nucliadb_models" },
     { name = "orjson" },
     { name = "pydantic", specifier = ">=2.6" },

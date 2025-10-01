@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb"
-version = "6.8.1"
+version = "6.9.0"
 license = "AGPL-3.0-or-later"
 description = "NucliaDB"
 authors = [{ name = "Nuclia", email = "nucliadb@nuclia.com" }]
@@ -30,7 +30,7 @@ dependencies = [
     "nidx-protos",
 
     "nucliadb-admin-assets>=1.0.0.post1224",
-    "nuclia-models>=0.47.0",
+    "nuclia-models>=0.50.0",
 
     # external dependencies
     "uvicorn[standard]",

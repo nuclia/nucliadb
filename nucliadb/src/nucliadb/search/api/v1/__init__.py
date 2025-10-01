@@ -23,6 +23,7 @@ from . import (  # noqa: F401
     feedback,
     find,
     graph,
+    hydrate,
     knowledgebox,
     predict_proxy,
     search,

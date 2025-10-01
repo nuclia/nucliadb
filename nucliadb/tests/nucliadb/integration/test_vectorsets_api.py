@@ -626,7 +626,6 @@ async def test_vectorset_migration_split_field(
             Paragraph(
                 start=0,
                 end=len(text),
-                key=split,
                 sentences=[
                     Sentence(
                         start=0,

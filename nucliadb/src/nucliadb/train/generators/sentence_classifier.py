@@ -116,10 +116,7 @@ async def get_sentences(kbid: str, result: str) -> list[str]:
     if split is not None:
         text = extracted_text.split_text[split]
         for paragraph in field_metadata.split_metadata[split].paragraphs:
-            if paragraph.key == "":
-                key = f"{rid}/{field_type}/{field}/{paragraph.start}-{paragraph.end}"
-            else:
-                key = paragraph.key
+            key = f"{rid}/{field_type}/{field}/{paragraph.start}-{paragraph.end}"
             if key == result:
                 for sentence in paragraph.sentences:
                     splitted_text = text[sentence.start : sentence.end]
@@ -127,10 +124,7 @@ async def get_sentences(kbid: str, result: str) -> list[str]:
     else:
         text = extracted_text.text
         for paragraph in field_metadata.metadata.paragraphs:
-            if paragraph.key == "":
-                key = f"{rid}/{field_type}/{field}/{paragraph.start}-{paragraph.end}"
-            else:
-                key = paragraph.key
+            key = f"{rid}/{field_type}/{field}/{paragraph.start}-{paragraph.end}"
             if key == result:
                 for sentence in paragraph.sentences:
                     splitted_text = text[sentence.start : sentence.end]

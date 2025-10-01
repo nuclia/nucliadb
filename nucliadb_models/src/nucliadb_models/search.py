@@ -1008,6 +1008,12 @@ class Reasoning(BaseModel):
     )
 
 
+class CitationsType(str, Enum):
+    NONE = "none"
+    DEFAULT = "default"
+    LLM_FOOTNOTES = "llm_footnotes"
+
+
 class ChatModel(BaseModel):
     """
     This is the model for the predict request payload on the chat endpoint
@@ -1039,10 +1045,16 @@ class ChatModel(BaseModel):
     user_prompt: Optional[UserPrompt] = Field(
         default=None, description="Optional custom prompt input by the user"
     )
-    citations: bool = Field(default=False, description="Whether to include the citations in the answer")
+    citations: Union[bool, None, CitationsType] = Field(
+        default=None,
+        description="Whether to include citations in the response. "
+        "If set to None or False, no citations will be computed. "
+        "If set to True or 'default', citations will be computed after answer generation and send as a separate `CitationsGenerativeResponse` chunk"
+        "If set to 'llm_footnotes', citations will be included in the LLM's response as markdown-styled footnotes. A `FootnoteCitationsGenerativeResponse` chunk will also be sent to map footnote ids to context keys in the `query_context`.",
+    )
     citation_threshold: Optional[float] = Field(
         default=None,
-        description="If citations is True, this sets the similarity threshold (0 to 1) for paragraphs to be included as citations. Lower values result in more citations. If not provided, Nuclia's default threshold is used.",  # noqa: E501
+        description="If citations is set to True or 'default', this will be the similarity threshold. Value between 0 and 1, lower values will produce more citations. If not set, it will be set to the optimized threshold found by Nuclia.",
         ge=0.0,
         le=1.0,
     )
@@ -1616,13 +1628,16 @@ class AskRequest(AuditMetadataBase):
     )
     rank_fusion: Union[RankFusionName, RankFusion] = SearchParamDefaults.rank_fusion.to_pydantic_field()
     reranker: Union[RerankerName, Reranker] = SearchParamDefaults.reranker.to_pydantic_field()
-    citations: bool = Field(
-        default=False,
-        description="Whether to include the citations for the answer in the response",
+    citations: Union[bool, None, CitationsType] = Field(
+        default=None,
+        description="Whether to include citations in the response. "
+        "If set to None or False, no citations will be computed. "
+        "If set to True or 'default', citations will be computed after answer generation and send as a separate `CitationsGenerativeResponse` chunk"
+        "If set to 'llm_footnotes', citations will be included in the LLM's response as markdown-styled footnotes. A `FootnoteCitationsGenerativeResponse` chunk will also be sent to map footnote ids to context keys in the `query_context`.",
     )
     citation_threshold: Optional[float] = Field(
         default=None,
-        description="If citations is True, this sets the similarity threshold (0 to 1) for paragraphs to be included as citations. Lower values result in more citations. If not provided, Nuclia's default threshold is used.",
+        description="If citations is set to True or 'default', this will be the similarity threshold. Value between 0 and 1, lower values will produce more citations. If not set, it will be set to the optimized threshold found by Nuclia.",
         ge=0.0,
         le=1.0,
     )
@@ -2257,9 +2272,14 @@ class SyncAskResponse(BaseModel):
         description="The detected relations of the answer",
     )
     citations: dict[str, Any] = Field(
-        default={},
+        default_factory=dict,
         title="Citations",
         description="The citations of the answer. List of references to the resources used to generate the answer.",
+    )
+    citation_footnote_to_context: dict[str, str] = Field(
+        default_factory=dict,
+        title="Citation footnote to context",
+        description="""Maps ids in the footnote citations to query_context keys (normally paragraph ids)""",
     )
     augmented_context: Optional[AugmentedContext] = Field(
         default=None,
@@ -2370,6 +2390,18 @@ class CitationsAskResponseItem(BaseModel):
     citations: dict[str, Any]
 
 
+class FootnoteCitationsAskResponseItem(BaseModel):
+    type: Literal["footnote_citations"] = "footnote_citations"
+    footnote_to_context: dict[str, str] = Field(
+        description="""Maps ids in the footnote citations to query_context keys (normally paragraph ids)
+e.g.,
+{ "block-AA": "f44f4e8acbfb1d48de3fd3c2fb04a885/f/f44f4e8acbfb1d48de3fd3c2fb04a885/73758-73972", ... }
+If the query_context is a list, it will map to 1-based indices as strings
+e.g., { "block-AA": "1", "block-AB": "2", ... }
+"""
+    )
+
+
 class StatusAskResponseItem(BaseModel):
     type: Literal["status"] = "status"
     code: str
@@ -2400,6 +2432,7 @@ AskResponseItemType = Union[
     MetadataAskResponseItem,
     AugmentedContextResponseItem,
     CitationsAskResponseItem,
+    FootnoteCitationsAskResponseItem,
     StatusAskResponseItem,
     ErrorAskResponseItem,
     RetrievalAskResponseItem,

@@ -70,6 +70,10 @@ spec:
             regex: '^/api/v\d+/kb/[^/]+/graph/relations'
           method:
             regex: "POST|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/hydrate'
+          method:
+            regex: "POST|OPTIONS"
       retries:
         attempts: 3
         retryOn: connect-failure

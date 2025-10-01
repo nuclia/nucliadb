@@ -38,7 +38,7 @@ MODULE = "nucliadb.search.search.hydrator"
 
 async def test_hydrate_text_block():
     with (
-        patch(f"{MODULE}.paragraphs.get_paragraph_text", return_value="some text"),
+        patch(f"{MODULE}.get_paragraph_text", return_value="some text"),
         patch(f"{MODULE}.get_driver"),
     ):
         text_block = TextBlockMatch(
