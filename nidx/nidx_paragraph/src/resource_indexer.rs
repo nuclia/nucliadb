@@ -82,10 +82,9 @@ pub fn index_paragraphs(
             let split = &p.split;
 
             // The text of the paragraph can be specified in the paragraph message, otherwise slice it from the full field text.
-            let text: String;
-            let text_ref: &str;
+            let text_ref: String;
             if let Some(t) = &p.text {
-                text_ref = t;
+                text_ref = t.to_string();
             } else {
                 let lower_bound = std::cmp::min(start_pos as usize, chars.len());
                 let upper_bound = std::cmp::min(end_pos as usize, chars.len());
@@ -93,8 +92,8 @@ pub fn index_paragraphs(
                     warn!("Skipping paragraph with wrong start and end positions");
                     continue;
                 }
-                text = chars[lower_bound..upper_bound].iter().collect();
-                text_ref = &text;
+                let slice = &chars[lower_bound..upper_bound];
+                text_ref = slice.iter().collect();
             }
             let facet_field = format!("/{field}");
             let paragraph_labels = p
