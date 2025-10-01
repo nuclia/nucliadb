@@ -71,10 +71,12 @@ message BrokerMessage {
 
     enum MessageType {
         AUTOCOMMIT = 0;
+        DELETE = 4;
+
+        // Deprecated, multi-commit transactions have never worked. Not implemented.
         MULTI = 1;
         COMMIT = 2;
         ROLLBACK = 3;
-        DELETE = 4;
     }
 
     enum MessageSource {

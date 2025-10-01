@@ -158,20 +158,20 @@ class IndexMessageBuilder:
     @observer.wrap({"type": "writer_bm"})
     async def for_writer_bm(
         self,
-        messages: list[BrokerMessage],
+        message: BrokerMessage,
         resource_created: bool,
     ) -> IndexMessage:
         """
-        Builds the index message for the broker messages coming from the writer.
+        Builds the index message for the broker message coming from the writer.
         The writer messages are not adding new vectors to the index.
         """
-        assert all(message.source == BrokerMessage.MessageSource.WRITER for message in messages)
+        assert message.source == BrokerMessage.MessageSource.WRITER
 
-        deleted_fields = get_bm_deleted_fields(messages)
+        deleted_fields = get_bm_deleted_fields(message)
         self._apply_field_deletions(self.brain, deleted_fields)
         await self._apply_resource_index_data(self.brain)
         basic = await self.get_basic()
-        prefilter_update = needs_prefilter_update(messages)
+        prefilter_update = needs_prefilter_update(message)
         if prefilter_update:
             # Changes on some metadata at the resource level that is used for filtering require that we reindex all the fields
             # in the texts index (as it is the one used for prefiltering).
@@ -181,7 +181,7 @@ class IndexMessageBuilder:
             ]
         else:
             # Simply process the fields that are in the message
-            fields_to_index = get_bm_modified_fields(messages)
+            fields_to_index = get_bm_modified_fields(message)
         for fieldid in fields_to_index:
             if fieldid in deleted_fields:
                 continue
@@ -189,8 +189,8 @@ class IndexMessageBuilder:
                 self.brain,
                 fieldid,
                 basic,
-                texts=prefilter_update or needs_texts_update(fieldid, messages),
-                paragraphs=needs_paragraphs_update(fieldid, messages),
+                texts=prefilter_update or needs_texts_update(fieldid, message),
+                paragraphs=needs_paragraphs_update(fieldid, message),
                 relations=False,  # Relations at the field level are not modified by the writer
                 vectors=False,  # Vectors are never added by the writer
                 replace=not resource_created,
@@ -200,18 +200,18 @@ class IndexMessageBuilder:
     @observer.wrap({"type": "processor_bm"})
     async def for_processor_bm(
         self,
-        messages: list[BrokerMessage],
+        message: BrokerMessage,
     ) -> IndexMessage:
         """
         Builds the index message for the broker messages coming from the processor.
         The processor can index new data to any index.
         """
-        assert all(message.source == BrokerMessage.MessageSource.PROCESSOR for message in messages)
-        deleted_fields = get_bm_deleted_fields(messages)
+        assert message.source == BrokerMessage.MessageSource.PROCESSOR
+        deleted_fields = get_bm_deleted_fields(message)
         self._apply_field_deletions(self.brain, deleted_fields)
         await self._apply_resource_index_data(self.brain)
         basic = await self.get_basic()
-        fields_to_index = get_bm_modified_fields(messages)
+        fields_to_index = get_bm_modified_fields(message)
         vectorsets_configs = await self.get_vectorsets_configs()
         for fieldid in fields_to_index:
             if fieldid in deleted_fields:
@@ -220,10 +220,10 @@ class IndexMessageBuilder:
                 self.brain,
                 fieldid,
                 basic,
-                texts=needs_texts_update(fieldid, messages),
-                paragraphs=needs_paragraphs_update(fieldid, messages),
-                relations=needs_relations_update(fieldid, messages),
-                vectors=needs_vectors_update(fieldid, messages),
+                texts=needs_texts_update(fieldid, message),
+                paragraphs=needs_paragraphs_update(fieldid, message),
+                relations=needs_relations_update(fieldid, message),
+                vectors=needs_vectors_update(fieldid, message),
                 replace=True,
                 vectorset_configs=vectorsets_configs,
             )
@@ -271,129 +271,116 @@ class IndexMessageBuilder:
 
 
 def get_bm_deleted_fields(
-    messages: list[BrokerMessage],
+    message: BrokerMessage,
 ) -> list[FieldID]:
-    deleted = []
-    for message in messages:
-        for field in message.delete_fields:
-            if field not in deleted:
-                deleted.append(field)
-    return deleted
+    return list(message.delete_fields)
 
 
-def get_bm_modified_fields(messages: list[BrokerMessage]) -> list[FieldID]:
-    message_source = get_messages_source(messages)
+def get_bm_modified_fields(message: BrokerMessage) -> list[FieldID]:
+    message_source = get_message_source(message)
     modified = set()
-    for message in messages:
-        # Added or modified fields need indexing
-        for link in message.links:
-            modified.add((link, FieldType.LINK))
-        for file in message.files:
-            modified.add((file, FieldType.FILE))
-        for conv in message.conversations:
-            modified.add((conv, FieldType.CONVERSATION))
-        for text in message.texts:
-            modified.add((text, FieldType.TEXT))
+    # Added or modified fields need indexing
+    for link in message.links:
+        modified.add((link, FieldType.LINK))
+    for file in message.files:
+        modified.add((file, FieldType.FILE))
+    for conv in message.conversations:
+        modified.add((conv, FieldType.CONVERSATION))
+    for text in message.texts:
+        modified.add((text, FieldType.TEXT))
+    if message.HasField("basic"):
+        # Add title and summary only if they have changed
+        if message.basic.title != "":
+            modified.add(("title", FieldType.GENERIC))
+        if message.basic.summary != "":
+            modified.add(("summary", FieldType.GENERIC))
+
+    if message_source == BrokerMessage.MessageSource.PROCESSOR:
+        # Messages with field metadata, extracted text or field vectors need indexing
+        for fm in message.field_metadata:
+            modified.add((fm.field.field, fm.field.field_type))
+        for et in message.extracted_text:
+            modified.add((et.field.field, et.field.field_type))
+        for fv in message.field_vectors:
+            modified.add((fv.field.field, fv.field.field_type))
+
+    if message_source == BrokerMessage.MessageSource.WRITER:
+        # Any field that has fieldmetadata annotations should be considered as modified
+        # and needs to be reindexed
         if message.HasField("basic"):
-            # Add title and summary only if they have changed
-            if message.basic.title != "":
-                modified.add(("title", FieldType.GENERIC))
-            if message.basic.summary != "":
-                modified.add(("summary", FieldType.GENERIC))
-
-        if message_source == BrokerMessage.MessageSource.PROCESSOR:
-            # Messages with field metadata, extracted text or field vectors need indexing
-            for fm in message.field_metadata:
-                modified.add((fm.field.field, fm.field.field_type))
-            for et in message.extracted_text:
-                modified.add((et.field.field, et.field.field_type))
-            for fv in message.field_vectors:
-                modified.add((fv.field.field, fv.field.field_type))
-
-        if message_source == BrokerMessage.MessageSource.WRITER:
-            # Any field that has fieldmetadata annotations should be considered as modified
-            # and needs to be reindexed
-            if message.HasField("basic"):
-                for ufm in message.basic.fieldmetadata:
-                    modified.add((ufm.field.field, ufm.field.field_type))
+            for ufm in message.basic.fieldmetadata:
+                modified.add((ufm.field.field, ufm.field.field_type))
     return [FieldID(field=field, field_type=field_type) for field, field_type in modified]
 
 
-def get_messages_source(messages: list[BrokerMessage]) -> BrokerMessage.MessageSource.ValueType:
-    assert len(set(message.source for message in messages)) == 1
-    return messages[0].source
+def get_message_source(message: BrokerMessage) -> BrokerMessage.MessageSource.ValueType:
+    return message.source
 
 
-def needs_prefilter_update(messages: list[BrokerMessage]) -> bool:
-    return any(message.reindex for message in messages)
+def needs_prefilter_update(message: BrokerMessage) -> bool:
+    return message.reindex
 
 
-def needs_paragraphs_update(field_id: FieldID, messages: list[BrokerMessage]) -> bool:
+def needs_paragraphs_update(field_id: FieldID, message: BrokerMessage) -> bool:
     return (
-        has_paragraph_annotations(field_id, messages)
-        or has_new_extracted_text(field_id, messages)
-        or has_new_field_metadata(field_id, messages)
+        has_paragraph_annotations(field_id, message)
+        or has_new_extracted_text(field_id, message)
+        or has_new_field_metadata(field_id, message)
     )
 
 
-def has_paragraph_annotations(field_id: FieldID, messages: list[BrokerMessage]) -> bool:
-    for message in messages:
-        ufm = next(
-            (fm for fm in message.basic.fieldmetadata if fm.field == field_id),
-            None,
-        )
-        if ufm is None:
-            continue
-        if len(ufm.paragraphs) > 0:
-            return True
-    return False
+def has_paragraph_annotations(field_id: FieldID, message: BrokerMessage) -> bool:
+    ufm = next(
+        (fm for fm in message.basic.fieldmetadata if fm.field == field_id),
+        None,
+    )
+    if ufm is None:
+        return False
+    return len(ufm.paragraphs) > 0
 
 
 def has_new_field_metadata(
     field_id: FieldID,
-    messages: list[BrokerMessage],
+    message: BrokerMessage,
 ) -> bool:
-    for message in messages:
-        for field_metadata in message.field_metadata:
-            if field_metadata.field == field_id:
-                return True
+    for field_metadata in message.field_metadata:
+        if field_metadata.field == field_id:
+            return True
     return False
 
 
 def has_new_extracted_text(
     field_id: FieldID,
-    messages: list[BrokerMessage],
+    message: BrokerMessage,
 ) -> bool:
-    for message in messages:
-        for extracted_text in message.extracted_text:
-            if extracted_text.field == field_id:
-                return True
+    for extracted_text in message.extracted_text:
+        if extracted_text.field == field_id:
+            return True
     return False
 
 
 def needs_texts_update(
     field_id: FieldID,
-    messages: list[BrokerMessage],
+    message: BrokerMessage,
 ) -> bool:
-    return has_new_extracted_text(field_id, messages) or has_new_field_metadata(field_id, messages)
+    return has_new_extracted_text(field_id, message) or has_new_field_metadata(field_id, message)
 
 
 def needs_vectors_update(
     field_id: FieldID,
-    messages: list[BrokerMessage],
+    message: BrokerMessage,
 ) -> bool:
-    for message in messages:
-        for field_vectors in message.field_vectors:
-            if field_vectors.field == field_id:
-                return True
+    for field_vectors in message.field_vectors:
+        if field_vectors.field == field_id:
+            return True
     return False
 
 
 def needs_relations_update(
     field_id: FieldID,
-    messages: list[BrokerMessage],
+    message: BrokerMessage,
 ) -> bool:
-    return has_new_field_metadata(field_id, messages) or has_new_extracted_text(field_id, messages)
+    return has_new_field_metadata(field_id, message) or has_new_extracted_text(field_id, message)
 
 
 async def get_resource_index_message(

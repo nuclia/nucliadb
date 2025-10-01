@@ -141,8 +141,6 @@ class Processor:
     and can not use the txn id
     """
 
-    messages: dict[str, list[writer_pb2.BrokerMessage]]
-
     def __init__(
         self,
         driver: Driver,
@@ -150,7 +148,6 @@ class Processor:
         pubsub: Optional[PubSubDriver] = None,
         partition: Optional[str] = None,
     ):
-        self.messages = {}
         self.driver = driver
         self.storage = storage
         self.partition = partition
@@ -179,18 +176,12 @@ class Processor:
         if message.type == writer_pb2.BrokerMessage.MessageType.DELETE:
             await self.delete_resource(message, seqid, partition, transaction_check)
         elif message.type == writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT:
-            await self.txn([message], seqid, partition, transaction_check)
-        elif message.type == writer_pb2.BrokerMessage.MessageType.MULTI:
-            # XXX Not supported right now
-            # MULTI, COMMIT and ROLLBACK are all not supported in transactional mode right now
-            # This concept is probably not tenable with current architecture because
-            # of how nats works and how we would need to manage rollbacks.
-            # XXX Should this be removed?
-            await self.multi(message, seqid)
-        elif message.type == writer_pb2.BrokerMessage.MessageType.COMMIT:
-            await self.commit(message, seqid, partition)
-        elif message.type == writer_pb2.BrokerMessage.MessageType.ROLLBACK:
-            await self.rollback(message, seqid, partition)
+            await self.txn(message, seqid, partition, transaction_check)
+        else:  # pragma: no cover
+            logger.error(
+                f"Unsupported message type: {message.type}",
+                extra={"seqid": seqid, "partition": partition},
+            )
 
     async def get_resource_uuid(self, kb: KnowledgeBox, message: writer_pb2.BrokerMessage) -> str:
         if message.uuid is None:
@@ -242,7 +233,6 @@ class Processor:
                         await self.notify_abort(
                             partition=partition,
                             seqid=seqid,
-                            multi=message.multiid,
                             kbid=message.kbid,
                             rid=message.uuid,
                             source=message.source,
@@ -256,7 +246,6 @@ class Processor:
         await self.notify_commit(
             partition=partition,
             seqid=seqid,
-            multi=message.multiid,
             message=message,
             write_type=writer_pb2.Notification.WriteType.DELETED,
         )
@@ -277,15 +266,12 @@ class Processor:
     @processor_observer.wrap({"type": "txn"})
     async def txn(
         self,
-        messages: list[writer_pb2.BrokerMessage],
+        message: writer_pb2.BrokerMessage,
         seqid: int,
         partition: str,
         transaction_check: bool = True,
     ) -> None:
-        if len(messages) == 0:
-            return None
-
-        kbid = messages[0].kbid
+        kbid = message.kbid
         if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
             logger.info(f"KB {kbid} is deleted: skiping txn")
             if transaction_check:
@@ -296,58 +282,48 @@ class Processor:
 
         async with self.driver.rw_transaction() as txn:
             try:
-                multi = messages[0].multiid
                 kb = KnowledgeBox(txn, self.storage, kbid)
-                uuid = await self.get_resource_uuid(kb, messages[0])
-                resource: Optional[Resource] = None
+                uuid = await self.get_resource_uuid(kb, message)
                 handled_exception = None
                 created = False
 
-                for message in messages:
-                    if resource is not None:
-                        assert resource.uuid == message.uuid
-
-                    if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
-                        resource = await kb.get(uuid)
-                        if resource is None:
-                            # It's a new resource
-                            resource = await kb.add_resource(uuid, message.slug, message.basic)
-                            created = True
-                        else:
-                            # It's an update from writer for an existing resource
-                            ...
-
-                    elif message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
-                        resource = await kb.get(uuid)
-                        if resource is None:
-                            logger.info(
-                                f"Secondary message for resource {message.uuid} and resource does not exist, ignoring"
-                            )
-                            continue
-                        else:
-                            # It's an update from processor for an existing resource
-                            ...
-
-                        generated_fields = await get_generated_fields(message, resource)
-                        if generated_fields.is_not_empty():
-                            await send_generated_fields_to_process(
-                                kbid, resource, generated_fields, message
-                            )
-                            # TODO: remove this when processor sends the field set
-                            for generated_text in generated_fields.texts:
-                                message.texts[
-                                    generated_text
-                                ].generated_by.data_augmentation.SetInParent()
-
+                if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
+                    resource = await kb.get(uuid)
+                    if resource is None:
+                        # It's a new resource
+                        resource = await kb.add_resource(uuid, message.slug, message.basic)
+                        created = True
                     else:
-                        raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
+                        # It's an update from writer for an existing resource
+                        ...
 
-                    # apply changes from the broker message to the resource
-                    await self.apply_resource(message, resource, update=(not created))
+                elif message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
+                    resource = await kb.get(uuid)
+                    if resource is None:
+                        logger.info(
+                            f"Secondary message for resource {message.uuid} and resource does not exist, ignoring"
+                        )
+                        return
+                    else:
+                        # It's an update from processor for an existing resource
+                        ...
+
+                    generated_fields = await get_generated_fields(message, resource)
+                    if generated_fields.is_not_empty():
+                        await send_generated_fields_to_process(kbid, resource, generated_fields, message)
+                        # TODO: remove this when processor sends the field set
+                        for generated_text in generated_fields.texts:
+                            message.texts[generated_text].generated_by.data_augmentation.SetInParent()
+
+                else:  # pragma: no cover
+                    raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
+
+                # apply changes from the broker message to the resource
+                await self.apply_resource(message, resource, update=(not created))
 
                 # index message
                 if resource and resource.modified:
-                    index_message = await self.generate_index_message(resource, messages, created)
+                    index_message = await self.generate_index_message(resource, message, created)
                     try:
                         warnings = await self.index_resource(
                             index_message=index_message,
@@ -357,7 +333,7 @@ class Processor:
                             seqid=seqid,
                             partition=partition,
                             kb=kb,
-                            source=messages_source(messages),
+                            source=get_message_source(message),
                         )
                         # Save indexing warnings
                         for field_id, warning in warnings:
@@ -385,7 +361,6 @@ class Processor:
                     await self.notify_commit(
                         partition=partition,
                         seqid=seqid,
-                        multi=multi,
                         message=message,
                         write_type=(
                             writer_pb2.Notification.WriteType.CREATED
@@ -398,7 +373,6 @@ class Processor:
                     await self.notify_abort(
                         partition=partition,
                         seqid=seqid,
-                        multi=multi,
                         kbid=kbid,
                         rid=uuid,
                         source=message.source,
@@ -418,7 +392,6 @@ class Processor:
                 await self.notify_abort(
                     partition=partition,
                     seqid=seqid,
-                    multi=multi,
                     kbid=kbid,
                     rid=uuid,
                     source=message.source,
@@ -428,11 +401,10 @@ class Processor:
                 # As we are in the middle of a transaction, we cannot let the exception raise directly
                 # as we need to do some cleanup. The exception will be reraised at the end of the function
                 # and then handled by the top caller, so errors can be handled in the same place.
-                await self.deadletter(messages, partition, seqid)
+                await self.deadletter(message, partition, seqid)
                 await self.notify_abort(
                     partition=partition,
                     seqid=seqid,
-                    multi=multi,
                     kbid=kbid,
                     rid=uuid,
                     source=message.source,
@@ -518,15 +490,15 @@ class Processor:
     async def generate_index_message(
         self,
         resource: Resource,
-        messages: list[writer_pb2.BrokerMessage],
+        message: writer_pb2.BrokerMessage,
         resource_created: bool,
     ) -> PBBrainResource:
         builder = IndexMessageBuilder(resource)
-        message_source = messages_source(messages)
+        message_source = get_message_source(message)
         if message_source == nodewriter_pb2.IndexMessageSource.WRITER:
-            return await builder.for_writer_bm(messages, resource_created)
+            return await builder.for_writer_bm(message, resource_created)
         elif message_source == nodewriter_pb2.IndexMessageSource.PROCESSOR:
-            return await builder.for_processor_bm(messages)
+            return await builder.for_processor_bm(message)
         else:  # pragma: no cover
             raise InvalidBrokerMessage(f"Unknown broker message source: {message_source}")
 
@@ -581,35 +553,8 @@ class Processor:
             resource_uuid=resource_uuid, resource_data=index_message
         )
 
-    async def multi(self, message: writer_pb2.BrokerMessage, seqid: int) -> None:
-        self.messages.setdefault(message.multiid, []).append(message)
-
-    async def commit(self, message: writer_pb2.BrokerMessage, seqid: int, partition: str) -> None:
-        if message.multiid not in self.messages:
-            # Error
-            logger.error(f"Closed multi {message.multiid}")
-            await self.deadletter([message], partition, seqid)
-        else:
-            await self.txn(self.messages[message.multiid], seqid, partition)
-
-    async def rollback(self, message: writer_pb2.BrokerMessage, seqid: int, partition: str) -> None:
-        # Error
-        logger.error(f"Closed multi {message.multiid}")
-        del self.messages[message.multiid]
-        await self.notify_abort(
-            partition=partition,
-            seqid=seqid,
-            multi=message.multiid,
-            kbid=message.kbid,
-            rid=message.uuid,
-            source=message.source,
-        )
-
-    async def deadletter(
-        self, messages: list[writer_pb2.BrokerMessage], partition: str, seqid: int
-    ) -> None:
-        for seq, message in enumerate(messages):
-            await self.storage.deadletter(message, seq, seqid, partition)
+    async def deadletter(self, message: writer_pb2.BrokerMessage, partition: str, seqid: int) -> None:
+        await self.storage.deadletter(message, 0, seqid, partition)
 
     @processor_observer.wrap({"type": "apply_resource"})
     async def apply_resource(
@@ -669,7 +614,6 @@ class Processor:
         *,
         partition: str,
         seqid: int,
-        multi: str,
         message: writer_pb2.BrokerMessage,
         write_type: writer_pb2.Notification.WriteType.ValueType,
     ):
@@ -677,7 +621,7 @@ class Processor:
         notification = writer_pb2.Notification(
             partition=int(partition),
             seqid=seqid,
-            multi=multi,
+            multi="",
             uuid=message.uuid,
             kbid=message.kbid,
             action=writer_pb2.Notification.Action.COMMIT,
@@ -697,7 +641,6 @@ class Processor:
         *,
         partition: str,
         seqid: int,
-        multi: str,
         kbid: str,
         rid: str,
         source: writer_pb2.BrokerMessage.MessageSource.ValueType,
@@ -705,7 +648,7 @@ class Processor:
         message = writer_pb2.Notification(
             partition=int(partition),
             seqid=seqid,
-            multi=multi,
+            multi="",
             uuid=rid,
             kbid=kbid,
             action=writer_pb2.Notification.ABORT,
@@ -758,23 +701,16 @@ class Processor:
         return kbobj
 
 
-def messages_source(messages: list[writer_pb2.BrokerMessage]):
-    from_writer = all(
-        (message.source == writer_pb2.BrokerMessage.MessageSource.WRITER for message in messages)
-    )
-    from_processor = all(
-        (message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR for message in messages)
-    )
-    if from_writer:
-        source = nodewriter_pb2.IndexMessageSource.WRITER
-    elif from_processor:
-        source = nodewriter_pb2.IndexMessageSource.PROCESSOR
+def get_message_source(message: writer_pb2.BrokerMessage):
+    if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
+        return nodewriter_pb2.IndexMessageSource.WRITER
+    elif message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
+        return nodewriter_pb2.IndexMessageSource.PROCESSOR
     else:  # pragma: no cover
-        msg = "Processor received multiple broker messages with different sources in the same txn!"
+        msg = f"Processor received a broker message with unexpected source! {message.source}"
         logger.error(msg)
         errors.capture_exception(Exception(msg))
-        source = nodewriter_pb2.IndexMessageSource.PROCESSOR
-    return source
+        return nodewriter_pb2.IndexMessageSource.PROCESSOR
 
 
 def has_vectors_operation(index_message: PBBrainResource) -> bool:
