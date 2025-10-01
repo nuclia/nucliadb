@@ -515,6 +515,13 @@ async def test_conversation_field_indexing(
     assert counters.fields == 2  # One conversation field + the title field
     assert counters.resources == 1
 
+    # Make sure that fulltext search is not working for conversations
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search", json={"query": "meaning of life", "features": ["fulltext"]}
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["fulltext"]["results"]) == 0
+
     # Make sure the messages are searchable
     question_text_block_id = f"{rid}/c/faq/1/0-{len(question)}"
     results = await search_message(query=question)
