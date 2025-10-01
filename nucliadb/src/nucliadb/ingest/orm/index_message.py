@@ -338,20 +338,14 @@ def has_new_field_metadata(
     field_id: FieldID,
     message: BrokerMessage,
 ) -> bool:
-    for field_metadata in message.field_metadata:
-        if field_metadata.field == field_id:
-            return True
-    return False
+    return any(field_metadata.field == field_id for field_metadata in message.field_metadata)
 
 
 def has_new_extracted_text(
     field_id: FieldID,
     message: BrokerMessage,
 ) -> bool:
-    for extracted_text in message.extracted_text:
-        if extracted_text.field == field_id:
-            return True
-    return False
+    return any(extracted_text.field == field_id for extracted_text in message.extracted_text)
 
 
 def needs_texts_update(
@@ -365,10 +359,7 @@ def needs_vectors_update(
     field_id: FieldID,
     message: BrokerMessage,
 ) -> bool:
-    for field_vectors in message.field_vectors:
-        if field_vectors.field == field_id:
-            return True
-    return False
+    return any(field_vectors.field == field_id for field_vectors in message.field_vectors)
 
 
 def needs_relations_update(
