@@ -126,10 +126,8 @@ class ResourceBrain:
     ):
         if skip_texts is not None:
             self.brain.skip_texts = skip_texts
-        field_text = extracted_text.text
-        for _, split in extracted_text.split_text.items():
-            field_text += f" {split} "
-        self.brain.texts[field_key].text = field_text
+
+        self.brain.texts[field_key].text = extracted_text.text
 
         if replace_field:
             ftype, fkey = field_key.split("/")
@@ -254,7 +252,10 @@ class ResourceBrain:
         paragraph_pages = ParagraphPages(page_positions) if page_positions else None
         # Splits of the field
         for subfield, field_metadata in field_computed_metadata.split_metadata.items():
-            extracted_text_str = extracted_text.split_text[subfield] if extracted_text else None
+            if subfield not in extracted_text.split_text:
+                # Split does not have extracted text
+                continue
+            extracted_text_str = extracted_text.split_text[subfield]
             for idx, paragraph in enumerate(field_metadata.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
                 denied_classifications = set(user_paragraph_classifications.denied.get(key, []))
@@ -295,6 +296,7 @@ class ResourceBrain:
                         page_with_visual=page_with_visual,
                         representation=representation,
                     ),
+                    text=extracted_text_str[paragraph.start : paragraph.end],
                 )
                 paragraph_kind_label = f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
                 paragraph_labels = {paragraph_kind_label}
@@ -308,7 +310,7 @@ class ResourceBrain:
                 self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
         # Main field
-        extracted_text_str = extracted_text.text if extracted_text else None
+        extracted_text_str = extracted_text.text
         for idx, paragraph in enumerate(field_computed_metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
             denied_classifications = set(user_paragraph_classifications.denied.get(key, []))
@@ -346,6 +348,8 @@ class ResourceBrain:
                     page_with_visual=page_with_visual,
                     representation=representation,
                 ),
+                # For non-split fields, the text is on the `texts` part of the index message
+                text=None,
             )
             paragraph_kind_label = f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
             paragraph_labels = {paragraph_kind_label}
@@ -748,12 +752,9 @@ class ResourceBrain:
 
 def is_paragraph_repeated_in_field(
     paragraph: Paragraph,
-    extracted_text: Optional[str],
+    extracted_text: str,
     unique_paragraphs: set[str],
 ) -> bool:
-    if extracted_text is None:
-        return False
-
     paragraph_text = extracted_text[paragraph.start : paragraph.end]
     if len(paragraph_text) == 0:
         return False

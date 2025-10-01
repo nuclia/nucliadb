@@ -79,9 +79,18 @@ pub fn index_paragraphs(
             let end_pos = p.end as u64;
             let index = p.index;
             let split = &p.split;
-            let lower_bound = std::cmp::min(start_pos as usize, chars.len());
-            let upper_bound = std::cmp::min(end_pos as usize, chars.len());
-            let text: String = chars[lower_bound..upper_bound].iter().collect();
+
+            // The text of the paragraph can be specified in the paragraph message, otherwise slice it from the full field text.
+            let text: String;
+            let text_ref: &str;
+            if let Some(t) = &p.text {
+                text_ref = t;
+            } else {
+                let lower_bound = std::cmp::min(start_pos as usize, chars.len());
+                let upper_bound = std::cmp::min(end_pos as usize, chars.len());
+                text = chars[lower_bound..upper_bound].iter().collect();
+                text_ref = &text;
+            }
             let facet_field = format!("/{field}");
             let paragraph_labels = p
                 .labels
@@ -109,7 +118,7 @@ pub fn index_paragraphs(
                 .for_each(|facet| doc.add_facet(schema.facets, facet));
             doc.add_facet(schema.field, Facet::from(&facet_field));
             doc.add_text(schema.paragraph, paragraph_id.clone());
-            doc.add_text(schema.text, &text);
+            doc.add_text(schema.text, text_ref);
             doc.add_u64(schema.start_pos, start_pos);
             doc.add_u64(schema.end_pos, end_pos);
             doc.add_u64(schema.index, index);
