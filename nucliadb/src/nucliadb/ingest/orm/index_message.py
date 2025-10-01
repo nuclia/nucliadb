@@ -20,7 +20,7 @@
 
 
 import asyncio
-from typing import Optional
+from typing import Optional, Sequence
 
 from nidx_protos.noderesources_pb2 import Resource as IndexMessage
 
@@ -150,7 +150,7 @@ class IndexMessageBuilder:
     def _apply_field_deletions(
         self,
         brain: ResourceBrain,
-        field_ids: list[FieldID],
+        field_ids: Sequence[FieldID],
     ) -> None:
         for field_id in field_ids:
             brain.delete_field(self.resource.generate_field_id(field_id))
@@ -167,8 +167,7 @@ class IndexMessageBuilder:
         """
         assert message.source == BrokerMessage.MessageSource.WRITER
 
-        deleted_fields = get_bm_deleted_fields(message)
-        self._apply_field_deletions(self.brain, deleted_fields)
+        self._apply_field_deletions(self.brain, message.delete_fields)
         await self._apply_resource_index_data(self.brain)
         basic = await self.get_basic()
         prefilter_update = needs_prefilter_update(message)
@@ -183,7 +182,7 @@ class IndexMessageBuilder:
             # Simply process the fields that are in the message
             fields_to_index = get_bm_modified_fields(message)
         for fieldid in fields_to_index:
-            if fieldid in deleted_fields:
+            if fieldid in message.delete_fields:
                 continue
             await self._apply_field_index_data(
                 self.brain,
@@ -207,14 +206,13 @@ class IndexMessageBuilder:
         The processor can index new data to any index.
         """
         assert message.source == BrokerMessage.MessageSource.PROCESSOR
-        deleted_fields = get_bm_deleted_fields(message)
-        self._apply_field_deletions(self.brain, deleted_fields)
+        self._apply_field_deletions(self.brain, message.delete_fields)
         await self._apply_resource_index_data(self.brain)
         basic = await self.get_basic()
         fields_to_index = get_bm_modified_fields(message)
         vectorsets_configs = await self.get_vectorsets_configs()
         for fieldid in fields_to_index:
-            if fieldid in deleted_fields:
+            if fieldid in message.delete_fields:
                 continue
             await self._apply_field_index_data(
                 self.brain,
@@ -268,12 +266,6 @@ class IndexMessageBuilder:
             )
         ]
         return vectorset_configs
-
-
-def get_bm_deleted_fields(
-    message: BrokerMessage,
-) -> list[FieldID]:
-    return list(message.delete_fields)
 
 
 def get_bm_modified_fields(message: BrokerMessage) -> list[FieldID]:
