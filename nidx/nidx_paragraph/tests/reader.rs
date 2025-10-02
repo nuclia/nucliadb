@@ -547,7 +547,7 @@ fn create_resource_with_paragraphs_text_in_paragraph(shard_id: String) -> (Strin
             field: field_id.to_string(),
             start: 0,
             end: paragraph_text.len() as i32,
-            index: 0 as u64,
+            index: 0,
             labels: vec![],
             text: Some(paragraph_text.clone()), // Add the text in the paragraph message instead of the text information.
             ..Default::default()
