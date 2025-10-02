@@ -222,6 +222,7 @@ class IndexMessageBuilder:
             # For conversation fields, we only replace the full field if it is not an append messages operation.
             # All other fields are always replaced upon modification.
             replace_field = True
+            modified_splits: Optional[list[str]] = None
             if fieldid.field_type == FieldType.CONVERSATION:
                 modified_splits = await get_bm_modified_split_ids(fieldid, message, self.resource)
                 stored_splits = await get_stored_split_ids(fieldid, self.resource)
