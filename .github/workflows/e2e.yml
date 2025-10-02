@@ -34,7 +34,7 @@ jobs:
 
       - uses: balchua/microk8s-actions@v0.3.2
         with:
-          channel: "1.27/stable"
+          channel: "1.33/stable"
           devMode: "true"
           addons: '["dns", "rbac", "hostpath-storage", "registry", "helm", "storage"]'
 
@@ -55,7 +55,7 @@ jobs:
 
       - name: Install Minio with Helm
         run: |
-          helm install my-minio oci://registry-1.docker.io/bitnamicharts/minio --version 17.0.21 --set image.repository="bitnamilegacy/minio",image.tag="2025.7.23-debian-12-r5"
+          helm install my-minio oci://registry-1.docker.io/bitnamicharts/minio --version 17.0.21 --set image.repository="bitnamilegacy/minio",image.tag="2025.7.23-debian-12-r5",global.security.allowInsecureImages="true",persistence.enabled="false",console.enabled="false"
 
       - name: Wait for Minio to be ready
         run: |
