@@ -24,13 +24,20 @@ spec:
         {{- with .Values.excludeInboundPorts }}
         traffic.sidecar.istio.io/excludeInboundPorts: "{{ . }}"
         {{- end }}
+        {{- $annotations := merge .Values.worker.podAnnotations .Values.podAnnotations -}}
+        {{- with $annotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         app: nidx-worker
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
-        nidxMetrics: "enabled"
+        {{- $labels := merge .Values.worker.podLabels .Values.podLabels -}}
+        {{- with $labels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- with .Values.worker.nodeSelector }}
       nodeSelector:

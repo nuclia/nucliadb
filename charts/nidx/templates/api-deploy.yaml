@@ -25,13 +25,20 @@ spec:
         {{- with .Values.excludeInboundPorts }}
         traffic.sidecar.istio.io/excludeInboundPorts: "{{ . }}"
         {{- end }}
+        {{- $annotations := merge .Values.api.podAnnotations .Values.podAnnotations -}}
+        {{- with $annotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         app: nidx-api
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
-        nidxMetrics: "enabled"
+        {{- $labels := merge .Values.api.podLabels .Values.podLabels -}}
+        {{- with $labels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- with .Values.api.nodeSelector }}
       nodeSelector:

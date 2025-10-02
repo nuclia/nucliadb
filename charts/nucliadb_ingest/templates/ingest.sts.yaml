@@ -46,6 +46,9 @@ spec:
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
+        {{- with .Values.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}

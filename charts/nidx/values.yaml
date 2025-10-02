@@ -16,6 +16,13 @@ image: IMAGE_TO_REPLACE
 env: {}
 envFrom: {}
 
+# -- Global pod annotations to add to all pods
+podAnnotations: {}
+
+# -- Global pod labels to add to all pods
+podLabels:
+  nidxMetrics: "enabled"
+
 api:
   # -- Number of replicas for the API deployment
   replicas: 2
@@ -23,6 +30,10 @@ api:
   nodeSelector: {}
   # -- Topology spread constraints for the API pods
   topologySpreadConstraints: []
+  # -- Pod annotations to add to the API pods
+  podAnnotations: {}
+  # -- Pod labels to add to the API pods
+  podLabels: {}
   # -- Service account name for the API pods
   serviceAccount: default
   # -- Affinity settings for the API pods
@@ -46,14 +57,33 @@ api:
     # -- Annotations for the API service
     annotations: {}
 
-indexer: {}
-scheduler: {}
-worker: {}
+indexer:
+  # -- Pod annotations to add to the indexer pods
+  podAnnotations: {}
+  # -- Pod labels to add to the indexer pods
+  podLabels: {}
+
+scheduler:
+  # -- Pod annotations to add to the scheduler pods
+  podAnnotations: {}
+  # -- Pod labels to add to the scheduler pods
+  podLabels: {}
+
+worker:
+  # -- Pod annotations to add to the worker pods
+  podAnnotations: {}
+  # -- Pod labels to add to the worker pods
+  podLabels: {}
+
 searcher:
   # -- Number of replicas for the searcher deployment
   replicas: 2
   # -- Node selector for the searcher pods
   nodeSelector: {}
+  # -- Pod annotations to add to the searcher pods
+  podAnnotations: {}
+  # -- Pod labels to add to the searcher pods
+  podLabels: {}
   # -- Topology spread constraints for the searcher pods
   topologySpreadConstraints: []
   # -- Service account name for the searcher pods

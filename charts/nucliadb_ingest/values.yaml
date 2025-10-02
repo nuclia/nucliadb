@@ -41,6 +41,7 @@ nodeSelector: {}
 tolerations: []
 topologySpreadConstraints: []
 podAnnotations: {}
+podLabels: {}
 replicaCount: 2
 revisionHistoryLimit: 2
 debug: False
@@ -90,6 +91,7 @@ ingest_orm_grpc_autoscaling:
         target:
           type: Utilization
           averageUtilization: 75
+ingest_orm_grpc_podLabels: {}
 ingest_orm_grpc_podAnnotations: {}
 
 # ingest-processed-consumer settings
@@ -108,6 +110,7 @@ ingest_processed_consumer_autoscaling:
         target:
           type: Utilization
           averageUtilization: 75
+ingest_processed_consumer_podLabels: {}
 ingest_processed_consumer_podAnnotations: {}
 
 # ingest-subscriber-workers settings
@@ -126,21 +129,25 @@ ingest_subscriber_workers_autoscaling:
         target:
           type: Utilization
           averageUtilization: 75
+ingest_subscriber_workers_podLabels: {}
 ingest_subscriber_workers_podAnnotations: {}
 
 exporter:
   # serviceAccount: default
+  podLabels: {}
   podAnnotations: {}
 
 # migrator settings
 migrator:
   # serviceAccount: default
+  podLabels: {}
   podAnnotations: {}
 
 # extra_pod_annotations:
 #   what: "add annotations"
 #   where: "in the pods"
 
+extra_cronjob_pod_labels: {}
 extra_cronjob_pod_annotations: {}
 
 tracing:

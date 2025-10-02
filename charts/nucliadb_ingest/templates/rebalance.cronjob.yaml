@@ -29,6 +29,9 @@ spec:
             role: cronjobs
             version: "{{ .Values.hash }}"
             release: "{{ .Release.Name }}"
+          {{- with .Values.extra_cronjob_pod_labels -}}
+            {{ toYaml . | trim | nindent 12 }}
+          {{- end }}
           {{- if or (hasKey .Values "extra_pod_annotations") (hasKey .Values "extra_cronjob_pod_annotations") }}
           annotations:
             {{- if hasKey .Values "extra_pod_annotations" }}
