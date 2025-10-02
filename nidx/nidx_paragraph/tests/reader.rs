@@ -505,3 +505,100 @@ fn test_query_parsing_weird_stuff() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+fn create_resource_with_paragraphs_text_in_paragraph(shard_id: String) -> (String, Resource) {
+    let rid = "5cfcbf5a-0a69-4431-8c9b-2cb7c6532c19".to_string();
+    let fields = vec![Field {
+        field_id: "title",
+        paragraphs: vec![("What is the meaning of life?", vec![])],
+        labels: vec![],
+    }];
+
+    let resource_id = ResourceId {
+        shard_id: shard_id.clone(),
+        uuid: rid.clone(),
+    };
+
+    let seconds = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|t| t.as_secs() as i64)
+        .unwrap();
+    let timestamp = Timestamp { seconds, nanos: 0 };
+
+    let metadata = IndexMetadata {
+        created: Some(timestamp),
+        modified: Some(timestamp),
+    };
+
+    let field_id = "title";
+
+    // Build the texts
+    let mut texts = HashMap::new();
+    texts.insert(
+        field_id.to_string(),
+        TextInformation {
+            text: "".to_string(), // Do not add the text in the text information message. Place it in the paragaphs instead.
+            labels: vec![],
+        },
+    );
+
+    // Build the paragraphs
+    let mut index_paragraphs = HashMap::new();
+    let paragraph_text = "What is the meaning of life?".to_string();
+    let paragraph_length = paragraph_text.len() as i32;
+    let paragraph_id = format!("{rid}/{field_id}/{}-{}", 0, paragraph_length);
+    index_paragraphs.insert(
+        paragraph_id,
+        IndexParagraph {
+            field: field_id.to_string(),
+            start: 0,
+            end: paragraph_text.len() as i32,
+            index: 0 as u64,
+            labels: vec![],
+            text: Some(paragraph_text.clone()), // Add the text in the paragraph message instead of the text information.
+            ..Default::default()
+        },
+    );
+    let mut field_paragraphs = HashMap::new();
+    field_paragraphs.insert(
+        field_id.to_string(),
+        IndexParagraphs {
+            paragraphs: index_paragraphs,
+        },
+    );
+
+    let resource = Resource {
+        shard_id,
+        resource: Some(resource_id),
+        metadata: Some(metadata),
+        texts,
+        status: ResourceStatus::Processed as i32,
+        paragraphs: field_paragraphs,
+        ..Default::default()
+    };
+
+    (rid, resource)
+}
+
+#[test]
+fn test_search_works_when_indexing_text_in_paragraph_message() -> anyhow::Result<()> {
+    let shard_id = "shard1".to_string();
+    let (rid, resource) = create_resource_with_paragraphs_text_in_paragraph(shard_id.clone());
+    let paragraph_reader_service = test_reader(&resource);
+
+    let mut search = ParagraphSearchRequest {
+        id: shard_id,
+        uuid: rid,
+        body: "".to_string(),
+        faceted: None,
+        order: None,
+        result_per_page: 20,
+        only_faceted: false,
+        ..Default::default()
+    };
+
+    search.body = "meaning of life".to_string();
+    let result = paragraph_reader_service.search(&search, &PrefilterResult::All).unwrap();
+    assert_eq!(result.total, 1);
+    Ok(())
+}
