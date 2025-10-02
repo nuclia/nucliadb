@@ -120,6 +120,10 @@ message IndexParagraph {
     uint64 index = 7;
     bool repeated_in_field = 8;
     ParagraphMetadata metadata = 9;
+
+    // This is to be used for conversational fields where we don't index the fulltext, thus we want the individual text of each paragraph
+    // to be included in the paragraph message instead of depending on the texts part of the index message payload.
+    optional string text = 11;
 }
 
 message VectorSetID {

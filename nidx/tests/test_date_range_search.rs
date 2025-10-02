@@ -74,6 +74,7 @@ async fn populate(fixture: &mut NidxFixture, shard_id: String, metadata: IndexMe
         split: "".to_string(),
         repeated_in_field: false,
         metadata: None,
+        ..Default::default()
     };
     let paragraphs = IndexParagraphs {
         paragraphs: HashMap::from([(format!("{raw_resource_id}/{field_id}/1"), paragraph)]),

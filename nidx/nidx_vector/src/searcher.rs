@@ -461,6 +461,7 @@ mod tests {
             split: "".to_string(),
             repeated_in_field: false,
             metadata: None,
+            ..Default::default()
         };
         let paragraphs = IndexParagraphs {
             paragraphs: HashMap::from([("6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1".to_string(), paragraph)]),
@@ -557,6 +558,7 @@ mod tests {
             split: "".to_string(),
             repeated_in_field: false,
             metadata: None,
+            ..Default::default()
         };
         let paragraphs = IndexParagraphs {
             paragraphs: HashMap::from([("DOC/KEY/1".to_string(), paragraph)]),
@@ -667,6 +669,7 @@ mod tests {
             split: "".to_string(),
             repeated_in_field: false,
             metadata: None,
+            ..Default::default()
         };
         let paragraphs = IndexParagraphs {
             paragraphs: HashMap::from([("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string(), paragraph)]),
