@@ -508,12 +508,6 @@ fn test_query_parsing_weird_stuff() -> anyhow::Result<()> {
 
 fn create_resource_with_paragraphs_text_in_paragraph(shard_id: String) -> (String, Resource) {
     let rid = "5cfcbf5a-0a69-4431-8c9b-2cb7c6532c19".to_string();
-    let fields = vec![Field {
-        field_id: "title",
-        paragraphs: vec![("What is the meaning of life?", vec![])],
-        labels: vec![],
-    }];
-
     let resource_id = ResourceId {
         shard_id: shard_id.clone(),
         uuid: rid.clone(),
