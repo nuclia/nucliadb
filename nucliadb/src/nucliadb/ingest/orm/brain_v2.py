@@ -217,6 +217,7 @@ class ResourceBrain:
         replace_field: bool,
         skip_paragraphs_index: Optional[bool],
         skip_texts_index: Optional[bool],
+        append_splits: Optional[list[str]],
     ) -> None:
         # We need to add the extracted text to the texts section of the Resource so that
         # the paragraphs can be indexed
@@ -234,6 +235,7 @@ class ResourceBrain:
             user_field_metadata,
             replace_field=replace_field,
             skip_paragraphs=skip_paragraphs_index,
+            append_splits=append_splits,
         )
 
     @observer.wrap({"type": "apply_field_paragraphs"})
@@ -246,6 +248,7 @@ class ResourceBrain:
         user_field_metadata: Optional[UserFieldMetadata],
         replace_field: bool,
         skip_paragraphs: Optional[bool],
+        append_splits: Optional[list[str]],
     ) -> None:
         if skip_paragraphs is not None:
             self.brain.skip_paragraphs = skip_paragraphs
@@ -254,7 +257,13 @@ class ResourceBrain:
         paragraph_pages = ParagraphPages(page_positions) if page_positions else None
         # Splits of the field
         for subfield, field_metadata in field_computed_metadata.split_metadata.items():
-            extracted_text_str = extracted_text.split_text[subfield] if extracted_text else None
+            if append_splits is not None and subfield not in append_splits:
+                # We're only indexing the splits that are appended
+                continue
+            if subfield not in extracted_text.split_text:
+                # No extracted text for this split
+                continue
+            extracted_text_str = extracted_text.split_text[subfield]
             for idx, paragraph in enumerate(field_metadata.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
                 denied_classifications = set(user_paragraph_classifications.denied.get(key, []))
@@ -308,7 +317,7 @@ class ResourceBrain:
                 self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
         # Main field
-        extracted_text_str = extracted_text.text if extracted_text else None
+        extracted_text_str = extracted_text.text
         for idx, paragraph in enumerate(field_computed_metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
             denied_classifications = set(user_paragraph_classifications.denied.get(key, []))
@@ -496,9 +505,14 @@ class ResourceBrain:
         replace_field: bool = False,
         # cut to specific dimension if specified
         vector_dimension: Optional[int] = None,
+        append_splits: Optional[list[str]],
     ):
         fid = ids.FieldId.from_string(f"{self.rid}/{field_id}")
         for subfield, vectors in vo.split_vectors.items():
+            if append_splits is not None and subfield not in append_splits:
+                # We're only indexing the splits that are appended
+                continue
+
             _field_id = ids.FieldId(
                 rid=fid.rid,
                 type=fid.type,

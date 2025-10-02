@@ -32,6 +32,7 @@ from nucliadb.ingest.orm.metrics import index_message_observer as observer
 from nucliadb.ingest.orm.resource import Resource, get_file_page_positions
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import Basic, FieldID, FieldType
+from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
@@ -69,6 +70,7 @@ class IndexMessageBuilder:
         relations: bool = True,
         replace: bool = True,
         vectorset_configs: Optional[list[VectorSetConfig]] = None,
+        append_splits: Optional[list[str]] = None,
     ):
         field = await self.resource.get_field(fieldid.field, fieldid.field_type)
         extracted_text = await field.get_extracted_text()
@@ -120,6 +122,7 @@ class IndexMessageBuilder:
                     replace_field=replace_paragraphs,
                     skip_paragraphs_index=skip_paragraphs_index,
                     skip_texts_index=skip_texts_index,
+                    append_splits=append_splits,
                 )
         if vectors:
             assert vectorset_configs is not None
@@ -137,6 +140,7 @@ class IndexMessageBuilder:
                         vectorset=vectorset_config.vectorset_id,
                         replace_field=replace,
                         vector_dimension=dimension,
+                        append_splits=append_splits,
                     )
         if relations:
             await asyncio.to_thread(
@@ -214,6 +218,20 @@ class IndexMessageBuilder:
         for fieldid in fields_to_index:
             if fieldid in message.delete_fields:
                 continue
+
+            # For conversation fields, we only replace the full field if it is not an append messages operation.
+            # All other fields are always replaced upon modification.
+            replace_field = True
+            if fieldid.field_type == FieldType.CONVERSATION:
+                modified_splits = await get_bm_modified_split_ids(fieldid, message, self.resource)
+                stored_splits = await get_stored_split_ids(fieldid, self.resource)
+                is_append_messages_op = (
+                    modified_splits is not None
+                    and stored_splits is not None
+                    and len(stored_splits) > len(modified_splits)
+                )
+                replace_field = not is_append_messages_op
+
             await self._apply_field_index_data(
                 self.brain,
                 fieldid,
@@ -222,8 +240,9 @@ class IndexMessageBuilder:
                 paragraphs=needs_paragraphs_update(fieldid, message),
                 relations=needs_relations_update(fieldid, message),
                 vectors=needs_vectors_update(fieldid, message),
-                replace=True,
+                replace=replace_field,
                 vectorset_configs=vectorsets_configs,
+                append_splits=modified_splits,
             )
         return self.brain.brain
 
@@ -352,6 +371,39 @@ def needs_vectors_update(
     message: BrokerMessage,
 ) -> bool:
     return any(field_vectors.field == field_id for field_vectors in message.field_vectors)
+
+
+async def get_bm_modified_split_ids(
+    conversation_field_id: FieldID,
+    message: BrokerMessage,
+    resource: Resource,
+) -> Optional[list[str]]:
+    message_etw = next(
+        (etw for etw in message.extracted_text if etw.field == conversation_field_id), None
+    )
+    if message_etw is None:
+        return None
+    storage = resource.storage
+    if message_etw.HasField("file"):
+        raw_payload = await storage.downloadbytescf(message_etw.file)
+        message_extracted_text = ExtractedText()
+        message_extracted_text.ParseFromString(raw_payload.read())
+        raw_payload.flush()
+    else:
+        message_extracted_text = message_etw.body
+    return list(message_extracted_text.split_text.keys())
+
+
+async def get_stored_split_ids(
+    conversation_field_id: FieldID,
+    resource: Resource,
+) -> Optional[list[str]]:
+    fid = conversation_field_id
+    conv = await resource.get_field(fid.field, fid.field_type, load=False)
+    stored_extracted_text = await conv.get_extracted_text(force=False)
+    if stored_extracted_text is None:
+        return None
+    return list(stored_extracted_text.split_text.keys())
 
 
 def needs_relations_update(
