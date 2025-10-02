@@ -25,9 +25,13 @@ nidx chart
 | image | string | `"IMAGE_TO_REPLACE"` | Image name (without registry eg. nidx:latest) |
 | env | object | `{}` |  |
 | envFrom | object | `{}` |  |
+| podAnnotations | object | `{}` | Global pod annotations to add to all pods |
+| podLabels | object | `{"nidxMetrics":"enabled"}` | Global pod labels to add to all pods |
 | api.replicas | int | `2` | Number of replicas for the API deployment |
 | api.nodeSelector | object | `{}` | Node selector for the API pods |
 | api.topologySpreadConstraints | list | `[]` | Topology spread constraints for the API pods |
+| api.podAnnotations | object | `{}` | Pod annotations to add to the API pods |
+| api.podLabels | object | `{}` | Pod labels to add to the API pods |
 | api.serviceAccount | string | `"default"` | Service account name for the API pods |
 | api.affinity | object | `{}` | Affinity settings for the API pods |
 | api.tolerations | list | `[]` | Tolerations for the API pods |
@@ -37,11 +41,16 @@ nidx chart
 | api.service.type | string | `"ClusterIP"` | Service type for the API |
 | api.service.labels | object | `{}` | Additional labels for the API service |
 | api.service.annotations | object | `{}` | Annotations for the API service |
-| indexer | object | `{}` |  |
-| scheduler | object | `{}` |  |
-| worker | object | `{}` |  |
+| indexer.podAnnotations | object | `{}` | Pod annotations to add to the indexer pods |
+| indexer.podLabels | object | `{}` | Pod labels to add to the indexer pods |
+| scheduler.podAnnotations | object | `{}` | Pod annotations to add to the scheduler pods |
+| scheduler.podLabels | object | `{}` | Pod labels to add to the scheduler pods |
+| worker.podAnnotations | object | `{}` | Pod annotations to add to the worker pods |
+| worker.podLabels | object | `{}` | Pod labels to add to the worker pods |
 | searcher.replicas | int | `2` | Number of replicas for the searcher deployment |
 | searcher.nodeSelector | object | `{}` | Node selector for the searcher pods |
+| searcher.podAnnotations | object | `{}` | Pod annotations to add to the searcher pods |
+| searcher.podLabels | object | `{}` | Pod labels to add to the searcher pods |
 | searcher.topologySpreadConstraints | list | `[]` | Topology spread constraints for the searcher pods |
 | searcher.serviceAccount | string | `"default"` | Service account name for the searcher pods |
 | searcher.affinity | object | `{}` | Affinity settings for the searcher pods |
