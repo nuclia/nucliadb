@@ -257,7 +257,7 @@ class ResourceBrain:
         paragraph_pages = ParagraphPages(page_positions) if page_positions else None
         # Splits of the field
         for subfield, field_metadata in field_computed_metadata.split_metadata.items():
-            if append_splits is not None and subfield not in append_splits:
+            if replace_field is False and append_splits is not None and subfield not in append_splits:
                 # We're only indexing the splits that are appended
                 continue
             if subfield not in extracted_text.split_text:
@@ -509,7 +509,7 @@ class ResourceBrain:
     ):
         fid = ids.FieldId.from_string(f"{self.rid}/{field_id}")
         for subfield, vectors in vo.split_vectors.items():
-            if append_splits is not None and subfield not in append_splits:
+            if replace_field is False and append_splits is not None and subfield not in append_splits:
                 # We're only indexing the splits that are appended
                 continue
 
