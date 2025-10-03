@@ -21,8 +21,8 @@ spec:
       annotations:
         # do not have access to dependency chart cm this component references
         checksum/cm: {{ include (print $.Template.BasePath "/reader.cm.yaml") . | sha256sum }}
-        {{- if hasKey .Values "extra_pod_annotations" }}
-          {{ toYaml .Values.extra_pod_annotations | trim | nindent 8 }}
+        {{- with .Values.podAnnotations -}}
+          {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
         app: reader
@@ -30,6 +30,9 @@ spec:
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
+        {{- with .Values.podLabels -}}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}

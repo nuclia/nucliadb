@@ -33,6 +33,8 @@ affinity: {}
 nodeSelector: {}
 tolerations: []
 topologySpreadConstraints: []
+podLabels: {}
+podAnnotations: {}
 revisionHistoryLimit: 2
 debug: False
 resources: {}

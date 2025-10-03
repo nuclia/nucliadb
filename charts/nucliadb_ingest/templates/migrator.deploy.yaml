@@ -37,6 +37,9 @@ spec:
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
+        {{- with .Values.migrator.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       topologySpreadConstraints:
 {{ toYaml .Values.topologySpreadConstraints | indent 8 }}
