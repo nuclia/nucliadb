@@ -44,6 +44,11 @@ storage:
   s3_deadletter_bucket: XX
   s3_indexing_bucket: XX
 
+  azure_account_url: XX
+  azure_deadletter_bucket: XX
+  azure_indexing_bucket: XX
+  # azure_kb_account_url: XX
+
   upload_token_expiration: 0
 
 nuclia:
