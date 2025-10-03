@@ -257,12 +257,7 @@ class ResourceBrain:
         paragraph_pages = ParagraphPages(page_positions) if page_positions else None
         # Splits of the field
         for subfield, field_metadata in field_computed_metadata.split_metadata.items():
-            if (
-                replace_field is False  # When replacing the whole field, reindex all splits
-                and append_splits is not None
-                and subfield not in append_splits
-            ):
-                # We're only indexing the splits that are appended
+            if should_skip_split_indexing(subfield, replace_field, append_splits):
                 continue
             if subfield not in extracted_text.split_text:
                 # No extracted text for this split
@@ -513,14 +508,8 @@ class ResourceBrain:
     ):
         fid = ids.FieldId.from_string(f"{self.rid}/{field_id}")
         for subfield, vectors in vo.split_vectors.items():
-            if (
-                replace_field is False  # When replacing the whole field, reindex all splits
-                and append_splits is not None
-                and subfield not in append_splits
-            ):
-                # We're only indexing the splits that are appended
+            if should_skip_split_indexing(subfield, replace_field, append_splits):
                 continue
-
             _field_id = ids.FieldId(
                 rid=fid.rid,
                 type=fid.type,
@@ -814,3 +803,10 @@ class ParagraphPages:
             if len(self._materialized) > 0:
                 return self._materialized[-1]
             return 0
+
+
+def should_skip_split_indexing(
+    split: str, replace_field: bool, append_splits: Optional[list[str]]
+) -> bool:
+    # When replacing the whole field, reindex all splits. Otherwise, we're only indexing the splits that are appended
+    return not replace_field and append_splits is not None and split not in append_splits
