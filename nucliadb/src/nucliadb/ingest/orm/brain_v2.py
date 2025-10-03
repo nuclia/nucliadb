@@ -509,7 +509,7 @@ class ResourceBrain:
         replace_field: bool = False,
         # cut to specific dimension if specified
         vector_dimension: Optional[int] = None,
-        append_splits: Optional[list[str]],
+        append_splits: Optional[list[str]] = None,
     ):
         fid = ids.FieldId.from_string(f"{self.rid}/{field_id}")
         for subfield, vectors in vo.split_vectors.items():

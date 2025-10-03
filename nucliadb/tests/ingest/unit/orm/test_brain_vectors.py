@@ -78,3 +78,68 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
         .sentences[vector_key.full()]
     )
     assert len(vector.vector) == MATRYOSHKA_DIMENSION
+
+
+def test_apply_field_vectors_append_splits():
+    rid = uuid.uuid4().hex
+    field_id = f"u/{uuid.uuid4().hex}"
+    split = "subfield"
+    vectorset = "my-vectorset"
+    fid = ids.FieldId.from_string(f"{rid}/{field_id}/{split}")
+    vectors = utils_pb2.VectorObject(
+        split_vectors={
+            split: utils_pb2.Vectors(
+                vectors=[
+                    utils_pb2.Vector(
+                        start=0,
+                        end=10,
+                        start_paragraph=0,
+                        end_paragraph=10,
+                        vector=[1.0],
+                    )
+                ]
+            )
+        }
+    )
+    paragraph_key = ids.ParagraphId(
+        field_id=fid,
+        paragraph_start=0,
+        paragraph_end=10,
+    )
+    vector_key = ids.VectorId(
+        field_id=fid,
+        index=0,
+        vector_start=0,
+        vector_end=10,
+    )
+
+    # Without specifying append splits, all should be added to the index message
+    brain = ResourceBrain(rid=rid)
+    brain.generate_vectors(field_id, vectors, vector_dimension=1, vectorset=vectorset)
+    vector = (
+        brain.brain.paragraphs[field_id]
+        .paragraphs[paragraph_key.full()]
+        .vectorsets_sentences[vectorset]
+        .sentences[vector_key.full()]
+    )
+    assert len(vector.vector) == 1
+
+    # If specified, append splits should be respected
+    brain = ResourceBrain(rid=rid)
+    brain.generate_vectors(
+        field_id, vectors, vector_dimension=1, vectorset=vectorset, append_splits=["foo"]
+    )
+    assert field_id not in brain.brain.paragraphs
+
+    # If specified, append splits should be respected
+    brain = ResourceBrain(rid=rid)
+    brain.generate_vectors(
+        field_id, vectors, vector_dimension=1, vectorset=vectorset, append_splits=[split]
+    )
+    vector = (
+        brain.brain.paragraphs[field_id]
+        .paragraphs[paragraph_key.full()]
+        .vectorsets_sentences[vectorset]
+        .sentences[vector_key.full()]
+    )
+    assert len(vector.vector) == 1
