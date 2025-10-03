@@ -223,7 +223,7 @@ def test_apply_field_paragraphs_populates_page_number():
 
 
 def test_apply_field_paragraphs_append_splits():
-    field_key = "text1"
+    field_key = "t/text1"
     split = "subfield"
     text = "Some text here"
 
@@ -273,6 +273,20 @@ def test_apply_field_paragraphs_append_splits():
         replace_field=False,
         skip_paragraphs=False,
         append_splits=[split],
+    )
+    assert len(br.brain.paragraphs[field_key].paragraphs) == 1
+
+    # When replace=True, all splits are included anyway
+    br = ResourceBrain(rid="foo")
+    br.apply_field_paragraphs(
+        field_key,
+        field_computed_metadata=fcm,
+        page_positions={},
+        extracted_text=extracted_text,
+        user_field_metadata=None,
+        replace_field=True,
+        skip_paragraphs=False,
+        append_splits=["foo"],
     )
     assert len(br.brain.paragraphs[field_key].paragraphs) == 1
 
