@@ -217,7 +217,7 @@ class ResourceBrain:
         replace_field: bool,
         skip_paragraphs_index: Optional[bool],
         skip_texts_index: Optional[bool],
-        append_splits: Optional[list[str]],
+        append_splits: Optional[list[str]] = None,
     ) -> None:
         # We need to add the extracted text to the texts section of the Resource so that
         # the paragraphs can be indexed
@@ -248,7 +248,7 @@ class ResourceBrain:
         user_field_metadata: Optional[UserFieldMetadata],
         replace_field: bool,
         skip_paragraphs: Optional[bool],
-        append_splits: Optional[list[str]],
+        append_splits: Optional[list[str]] = None,
     ) -> None:
         if skip_paragraphs is not None:
             self.brain.skip_paragraphs = skip_paragraphs

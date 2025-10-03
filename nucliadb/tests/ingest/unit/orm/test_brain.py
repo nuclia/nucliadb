@@ -27,6 +27,7 @@ from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import (
     Basic,
     ExtractedText,
+    FieldComputedMetadata,
     FieldComputedMetadataWrapper,
     FieldID,
     FieldType,
@@ -182,16 +183,20 @@ def test_set_processing_status(new_status, previous_status, expected_brain_statu
 def test_apply_field_paragraphs_populates_page_number():
     br = ResourceBrain(rid="foo")
     field_key = "text1"
+    split = "subfield"
+    text = "Some text here"
+
+    extracted_text = ExtractedText(text=text, split_text={split: text})
 
     fcmw = FieldComputedMetadataWrapper()
     fcmw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_key))
 
-    p1 = Paragraph(start=40, end=54, start_seconds=[0], end_seconds=[10], text="Some text here")
-    p1.sentences.append(Sentence(start=40, end=54, key="test"))
+    p1 = Paragraph(start=0, end=len(text), start_seconds=[0], end_seconds=[len(text)], text=text)
+    p1.sentences.append(Sentence(start=0, end=len(text), key="test"))
     fcmw.metadata.metadata.paragraphs.append(p1)
 
     # Add it to the split too
-    fcmw.metadata.split_metadata["subfield"].paragraphs.append(p1)
+    fcmw.metadata.split_metadata[split].paragraphs.append(p1)
 
     page_positions = {
         0: (0, 20),
@@ -202,7 +207,7 @@ def test_apply_field_paragraphs_populates_page_number():
         field_key,
         fcmw.metadata,
         page_positions=page_positions,
-        extracted_text=None,
+        extracted_text=extracted_text,
         user_field_metadata=None,
         replace_field=False,
         skip_paragraphs=False,
@@ -210,11 +215,66 @@ def test_apply_field_paragraphs_populates_page_number():
 
     assert len(br.brain.paragraphs[field_key].paragraphs) == 2
     for paragraph in br.brain.paragraphs[field_key].paragraphs.values():
-        assert paragraph.metadata.position.page_number == 2
-        assert paragraph.metadata.position.start == 40
-        assert paragraph.metadata.position.end == 54
+        assert paragraph.metadata.position.page_number == 0
+        assert paragraph.metadata.position.start == 0
+        assert paragraph.metadata.position.end == len(text)
         assert paragraph.metadata.position.start_seconds == [0]
-        assert paragraph.metadata.position.end_seconds == [10]
+        assert paragraph.metadata.position.end_seconds == [len(text)]
+
+
+def test_apply_field_paragraphs_append_splits():
+    field_key = "text1"
+    split = "subfield"
+    text = "Some text here"
+
+    extracted_text = ExtractedText(split_text={split: text})
+
+    p1 = Paragraph(start=0, end=len(text), start_seconds=[0], end_seconds=[len(text)], text=text)
+    p1.sentences.append(Sentence(start=0, end=len(text)))
+
+    fcm = FieldComputedMetadata()
+    fcm.split_metadata[split].paragraphs.append(p1)
+
+    # If no append splits are passed, all splits are included in the index message
+    br = ResourceBrain(rid="foo")
+    br.apply_field_paragraphs(
+        field_key,
+        field_computed_metadata=fcm,
+        page_positions={},
+        extracted_text=extracted_text,
+        user_field_metadata=None,
+        replace_field=False,
+        skip_paragraphs=False,
+        append_splits=None,
+    )
+    assert len(br.brain.paragraphs[field_key].paragraphs) == 1
+
+    # Specifying append splits should be respected
+    br = ResourceBrain(rid="foo")
+    br.apply_field_paragraphs(
+        field_key,
+        field_computed_metadata=fcm,
+        page_positions={},
+        extracted_text=extracted_text,
+        user_field_metadata=None,
+        replace_field=False,
+        skip_paragraphs=False,
+        append_splits=["foo"],
+    )
+    assert len(br.brain.paragraphs[field_key].paragraphs) == 0
+
+    br = ResourceBrain(rid="foo")
+    br.apply_field_paragraphs(
+        field_key,
+        field_computed_metadata=fcm,
+        page_positions={},
+        extracted_text=extracted_text,
+        user_field_metadata=None,
+        replace_field=False,
+        skip_paragraphs=False,
+        append_splits=[split],
+    )
+    assert len(br.brain.paragraphs[field_key].paragraphs) == 1
 
 
 def test_generate_resource_metadata_promotes_origin_dates():
