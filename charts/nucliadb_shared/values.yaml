@@ -23,7 +23,7 @@ maindb:
   driver_pg_url:
 
 storage:
-  file_backend: azure
+  file_backend: gcs
 
   # gcs_base64_creds: XX
   gcs_bucket: nucliadb_{kbid}
