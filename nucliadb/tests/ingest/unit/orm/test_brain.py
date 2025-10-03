@@ -294,6 +294,20 @@ def test_apply_field_paragraphs_append_splits():
     assert len(br.brain.paragraphs[field_key].paragraphs) == 1
     assert br.brain.paragraphs_to_delete == [f"rid/{field_key}"]
 
+    # When replace=True, all splits are included anyway
+    br = ResourceBrain(rid="foo")
+    br.apply_field_paragraphs(
+        field_key,
+        field_computed_metadata=fcm,
+        page_positions={},
+        extracted_text=extracted_text,
+        user_field_metadata=None,
+        replace_field=True,
+        skip_paragraphs=False,
+        append_splits=["foo"],
+    )
+    assert len(br.brain.paragraphs[field_key].paragraphs) == 1
+
 
 def test_generate_resource_metadata_promotes_origin_dates():
     resource_brain = ResourceBrain("rid")
