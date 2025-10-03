@@ -49,9 +49,10 @@ message RelationNode {
 }
 
 message ExtractedText {
+    reserved 3;
+
     string text = 1;
     map<string, string> split_text = 2;
-    repeated string deleted_splits = 3;
 }
 
 
@@ -68,9 +69,10 @@ message Vectors {
 }
 
 message VectorObject {
+    reserved 3;
+    
     Vectors vectors = 1;
     map<string, Vectors> split_vectors = 2;
-    repeated string deleted_splits = 3;
 }
 
 

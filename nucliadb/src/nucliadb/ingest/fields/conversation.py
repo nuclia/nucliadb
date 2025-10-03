@@ -20,9 +20,14 @@
 import uuid
 from typing import Any, Optional
 
-from nucliadb.ingest.fields.base import Field
-from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation
+from nucliadb.ingest.fields.base import Field, FieldTypes
+from nucliadb_protos.resources_pb2 import (
+    CloudFile,
+    ExtractedTextWrapper,
+    FieldConversation,
+)
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
+from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_utils.storages.storage import StorageField
 
 PAGE_SIZE = 200
@@ -203,3 +208,75 @@ class Conversation(Field[PBConversation]):
         self.metadata = payload
         self.resource.modified = True
         self._created = False
+
+    async def set_extracted_text(self, payload: ExtractedTextWrapper) -> None:
+        metadata = await self.get_metadata()
+        current_page = metadata.pages
+        page_size = metadata.size
+        total_messages = metadata.total
+        try:
+            actual_payload = await self.get_extracted_text(force=True)
+        except KeyError:
+            # No previous extracted text found
+            actual_payload = None
+
+        remaining = len(payload.)
+
+        # Make sure to handle pagination correctly. 
+        sf = self.get_storage_field_split(FieldTypes.FIELD_TEXT, page=current_page)
+        if actual_payload is None:
+            # No previous extracted text, this is the first time we set it so we can simply upload it to storage
+            if payload.HasField("file"):
+                # Normalize the storage key if the payload is a reference to a file in storage.
+                # This is typically the case when the text is too large and we store it in a
+                # cloud file. Normalization is needed to ensure that the hybrid-onprem deployment stores
+                # the file in the correct bucket of its storage.
+                await self.storage.normalize_binary(payload.file, sf)
+            else:
+                # Directly upload the ExtractedText protobuf to storage
+                await self.storage.upload_pb(sf, payload.body)
+                self.extracted_text = payload.body
+        else:
+            if payload.HasField("file"):
+                # The extracted text coming from processing has a reference to another storage key.
+                # Download it and copy it to its ExtractedText.body field. This is typically for cases
+                # when the text is too large.
+                raw_payload = await self.storage.downloadbytescf(payload.file)
+                pb = ExtractedText()
+                pb.ParseFromString(raw_payload.read())
+                raw_payload.flush()
+                payload.body.CopyFrom(pb)
+
+            # Update or set the extracted text text for each split coming from the processing payload
+            for key, value in payload.body.split_text.items():
+                actual_payload.split_text[key] = value
+
+            # Apply any split deletions that may come in the processing payload
+            for key in payload.body.deleted_splits:
+                if key in actual_payload.split_text:
+                    del actual_payload.split_text[key]
+
+            # Finally, handle the main text body (for the cases where the text is not split)
+            if payload.body.text != "":
+                actual_payload.text = payload.body.text
+
+            # Upload the updated ExtractedText to storage
+            await self.storage.upload_pb(sf, actual_payload)
+            self.extracted_text = actual_payload
+
+    async def get_extracted_text(self, force=False) -> Optional[ExtractedText]:
+        if self.extracted_text is None or force:
+            async with self.locks["extracted_text"]:
+                # Value could have been fetched while waiting for the lock
+                if self.extracted_text is None or force:
+                    sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
+                    payload = await self.storage.download_pb(sf, ExtractedText)
+                    if payload is not None:
+                        self.extracted_text = payload
+        return self.extracted_text
+    
+    async def get_extracted_texts_of_page(self, page: int) -> Optional[ExtractedText]:
+        pass
+
+    async def set_extracted_texts_of_page(self, payload: ExtractedText, page: int) -> None:
+        pass

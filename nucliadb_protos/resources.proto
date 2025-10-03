@@ -358,9 +358,10 @@ message QuestionAnswers {
 }
 
 message FieldQuestionAnswers {
+    reserved 3;
+
     QuestionAnswers question_answers = 1;
     map<string, QuestionAnswers> split_question_answers = 2;
-    repeated string deleted_splits = 3;
 }
 
 message FieldQuestionAnswerWrapper {
@@ -383,9 +384,9 @@ message FieldAuthor {
 }
 
 message FieldComputedMetadata {
+    reserved 3;
     FieldMetadata metadata = 1;
     map<string, FieldMetadata> split_metadata = 2;
-    repeated string deleted_splits = 3;
 }
 
 message FieldComputedMetadataWrapper {
@@ -529,9 +530,10 @@ message FieldLargeMetadata {
 }
 
 message LargeComputedMetadata {
+    reserved 3;
+
     FieldLargeMetadata metadata = 1;
     map<string, FieldLargeMetadata> split_metadata = 2;
-    repeated string deleted_splits = 3;
 }
 
 message LargeComputedMetadataWrapper {
