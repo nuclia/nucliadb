@@ -226,11 +226,7 @@ class Conversation(Field[PBConversation]):
 
     async def get_splits_metadata(self) -> SplitsMetadata:
         if self._splits_metadata is None:
-<<<<<<< HEAD
             field_key = CONVERSATION_SPLITS_METADATA.format(
-=======
-            field_key = CONVERSATION_SPLIT_METADATA.format(
->>>>>>> 5f8ff6e9 (More optimal append detection)
                 kbid=self.kbid,
                 uuid=self.uuid,
                 type=self.type,
@@ -244,11 +240,7 @@ class Conversation(Field[PBConversation]):
         return self._splits_metadata
 
     async def set_splits_metadata(self, payload: SplitsMetadata) -> None:
-<<<<<<< HEAD
         key = CONVERSATION_SPLITS_METADATA.format(
-=======
-        key = CONVERSATION_SPLIT_METADATA.format(
->>>>>>> 5f8ff6e9 (More optimal append detection)
             kbid=self.kbid,
             uuid=self.uuid,
             type=self.type,
