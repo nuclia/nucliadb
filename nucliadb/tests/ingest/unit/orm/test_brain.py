@@ -236,7 +236,7 @@ def test_apply_field_paragraphs_append_splits():
     fcm.split_metadata[split].paragraphs.append(p1)
 
     # If no append splits are passed, all splits are included in the index message
-    br = ResourceBrain(rid="foo")
+    br = ResourceBrain(rid="rid")
     br.apply_field_paragraphs(
         field_key,
         field_computed_metadata=fcm,
@@ -248,9 +248,10 @@ def test_apply_field_paragraphs_append_splits():
         append_splits=None,
     )
     assert len(br.brain.paragraphs[field_key].paragraphs) == 1
+    assert br.brain.paragraphs_to_delete == []
 
     # Specifying append splits should be respected
-    br = ResourceBrain(rid="foo")
+    br = ResourceBrain(rid="rid")
     br.apply_field_paragraphs(
         field_key,
         field_computed_metadata=fcm,
@@ -262,8 +263,9 @@ def test_apply_field_paragraphs_append_splits():
         append_splits=["foo"],
     )
     assert len(br.brain.paragraphs[field_key].paragraphs) == 0
+    assert br.brain.paragraphs_to_delete == []
 
-    br = ResourceBrain(rid="foo")
+    br = ResourceBrain(rid="rid")
     br.apply_field_paragraphs(
         field_key,
         field_computed_metadata=fcm,
@@ -275,9 +277,10 @@ def test_apply_field_paragraphs_append_splits():
         append_splits=[split],
     )
     assert len(br.brain.paragraphs[field_key].paragraphs) == 1
+    assert br.brain.paragraphs_to_delete == []
 
     # When replace=True, all splits are included anyway
-    br = ResourceBrain(rid="foo")
+    br = ResourceBrain(rid="rid")
     br.apply_field_paragraphs(
         field_key,
         field_computed_metadata=fcm,
@@ -289,6 +292,7 @@ def test_apply_field_paragraphs_append_splits():
         append_splits=["foo"],
     )
     assert len(br.brain.paragraphs[field_key].paragraphs) == 1
+    assert br.brain.paragraphs_to_delete == [f"rid/{field_key}"]
 
 
 def test_generate_resource_metadata_promotes_origin_dates():
