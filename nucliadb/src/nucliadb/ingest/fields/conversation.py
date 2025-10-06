@@ -28,7 +28,7 @@ from nucliadb_utils.storages.storage import StorageField
 PAGE_SIZE = 200
 
 CONVERSATION_PAGE_VALUE = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/{page}"
-CONVERSATION_SPLIT_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/split_metadata"
+CONVERSATION_SPLITS_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/splits_metadata"
 CONVERSATION_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 
 
@@ -212,7 +212,7 @@ class Conversation(Field[PBConversation]):
 
     async def get_splits_metadata(self) -> SplitsMetadata:
         if self._splits_metadata is None:
-            field_key = CONVERSATION_SPLIT_METADATA.format(
+            field_key = CONVERSATION_SPLITS_METADATA.format(
                 kbid=self.kbid,
                 uuid=self.uuid,
                 type=self.type,
@@ -226,7 +226,7 @@ class Conversation(Field[PBConversation]):
         return self._splits_metadata
 
     async def set_splits_metadata(self, payload: SplitsMetadata) -> None:
-        key = CONVERSATION_SPLIT_METADATA.format(
+        key = CONVERSATION_SPLITS_METADATA.format(
             kbid=self.kbid,
             uuid=self.uuid,
             type=self.type,
