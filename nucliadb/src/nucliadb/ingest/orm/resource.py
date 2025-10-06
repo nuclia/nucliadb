@@ -30,7 +30,7 @@ from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
-from nucliadb.ingest.fields.conversation import Conversation
+from nucliadb.ingest.fields.conversation import Conversation, MaxConversationMessagesReached
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.generic import VALID_GENERIC_FIELDS, Generic
 from nucliadb.ingest.fields.link import Link
@@ -427,9 +427,21 @@ class Resource:
             message_updated_fields.append(fid)
 
         for field, conversation in message.conversations.items():
-            fid = FieldID(field_type=FieldType.CONVERSATION, field=field)
-            await self.set_field(fid.field_type, fid.field, conversation)
-            message_updated_fields.append(fid)
+            try:
+                fid = FieldID(field_type=FieldType.CONVERSATION, field=field)
+                await self.set_field(fid.field_type, fid.field, conversation)
+                message_updated_fields.append(fid)
+            except MaxConversationMessagesReached:
+                field_key = f"c/{field}"
+                error_message = "Conversation exceeds the maximum number of messages"
+                logger.info(
+                    error_message, extra={"kbid": self.kb.kbid, "rid": self.uuid, "field": field_key}
+                )
+                await self.add_field_error(
+                    field_key,
+                    error_message,
+                    writer_pb2.Error.Severity.ERROR,
+                )
 
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)

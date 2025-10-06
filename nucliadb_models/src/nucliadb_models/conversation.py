@@ -21,6 +21,8 @@ from pydantic import BaseModel, Field, field_validator
 from nucliadb_models.common import CloudLink, FieldRef, FileB64
 from nucliadb_models.utils import DateTime
 
+KB = 1024 * 1024
+
 # Shared classes
 
 
@@ -86,10 +88,10 @@ class FieldConversation(BaseModel):
 
 
 class InputMessageContent(BaseModel):
-    text: str
+    text: str = Field(max_length=1 * KB)
     format: MessageFormat = MessageFormat.PLAIN
-    attachments: List[FileB64] = []
-    attachments_fields: List[FieldRef] = []
+    attachments: List[FileB64] = Field(default=[], max_length=50)
+    attachments_fields: List[FieldRef] = Field(default=[], max_length=50)
 
 
 class InputMessage(BaseModel):
@@ -102,10 +104,12 @@ class InputMessage(BaseModel):
     to: List[str] = Field(
         default_factory=list,
         description="List of recipients of the message, e.g. ['assistant'] or ['user']",
+        max_length=100,
     )
     content: InputMessageContent
     ident: str = Field(
-        description="Unique identifier for the message. Must be unique within the conversation."
+        description="Unique identifier for the message. Must be unique within the conversation.",
+        max_length=128,
     )
     type_: Optional[MessageType] = Field(None, alias="type")
 
@@ -126,7 +130,8 @@ class InputMessage(BaseModel):
 class InputConversationField(BaseModel):
     messages: List[InputMessage] = Field(
         default_factory=list,
-        description="List of messages in the conversation field. Each message must have a unique ident.",
+        description="List of messages in the conversation field. Each message must have a unique ident. The maximum number of messages a conversation can have is 50.000",
+        max_length=2_000,
     )
     extract_strategy: Optional[str] = Field(
         default=None,

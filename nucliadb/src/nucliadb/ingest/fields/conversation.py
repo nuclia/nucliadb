@@ -25,10 +25,16 @@ from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_utils.storages.storage import StorageField
 
+MAX_CONVERSATION_MESSAGES = 50_000
+
 PAGE_SIZE = 200
 
 CONVERSATION_PAGE_VALUE = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/{page}"
 CONVERSATION_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
+
+
+class MaxConversationMessagesReached(Exception):
+    pass
 
 
 class PageNotFound(Exception):
@@ -97,6 +103,9 @@ class Conversation(Field[PBConversation]):
         # Increment the metadata total with the number of messages
         messages = list(payload.messages)
         metadata.total += len(messages)
+
+        if metadata.total > MAX_CONVERSATION_MESSAGES:
+            raise MaxConversationMessagesReached()
 
         # Store the messages in pages of PAGE_SIZE messages
         while True:
