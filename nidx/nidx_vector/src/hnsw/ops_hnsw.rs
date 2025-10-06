@@ -389,7 +389,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let last_layer_k = if original_query.is_some() {
             std::cmp::min(k_neighbours * 100, 2000)
         } else {
-            0
+            k_neighbours
         };
 
         let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
