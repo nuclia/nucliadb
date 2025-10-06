@@ -25,6 +25,7 @@ from typing import Optional, Sequence
 from nidx_protos.noderesources_pb2 import Resource as IndexMessage
 
 from nucliadb.common import datamanagers
+from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.brain_v2 import ResourceBrain
@@ -70,7 +71,7 @@ class IndexMessageBuilder:
         relations: bool = True,
         replace: bool = True,
         vectorset_configs: Optional[list[VectorSetConfig]] = None,
-        append_splits: Optional[list[str]] = None,
+        append_splits: Optional[set[str]] = None,
     ):
         field = await self.resource.get_field(fieldid.field, fieldid.field_type)
         extracted_text = await field.get_extracted_text()
@@ -222,14 +223,14 @@ class IndexMessageBuilder:
             # For conversation fields, we only replace the full field if it is not an append messages operation.
             # All other fields are always replaced upon modification.
             replace_field = True
-            modified_splits: Optional[list[str]] = None
+            modified_splits = None
             if fieldid.field_type == FieldType.CONVERSATION:
                 modified_splits = await get_bm_modified_split_ids(fieldid, message, self.resource)
                 stored_splits = await get_stored_split_ids(fieldid, self.resource)
                 is_append_messages_op = (
                     modified_splits is not None
                     and stored_splits is not None
-                    and len(stored_splits) > len(modified_splits)
+                    and modified_splits.issubset(stored_splits)
                 )
                 replace_field = not is_append_messages_op
 
@@ -378,7 +379,7 @@ async def get_bm_modified_split_ids(
     conversation_field_id: FieldID,
     message: BrokerMessage,
     resource: Resource,
-) -> Optional[list[str]]:
+) -> Optional[set[str]]:
     message_etw = next(
         (etw for etw in message.extracted_text if etw.field == conversation_field_id), None
     )
@@ -392,19 +393,17 @@ async def get_bm_modified_split_ids(
         raw_payload.flush()
     else:
         message_extracted_text = message_etw.body
-    return list(message_extracted_text.split_text.keys())
+    return set(message_extracted_text.split_text.keys())
 
 
 async def get_stored_split_ids(
     conversation_field_id: FieldID,
     resource: Resource,
-) -> Optional[list[str]]:
+) -> Optional[set[str]]:
     fid = conversation_field_id
-    conv = await resource.get_field(fid.field, fid.field_type, load=False)
-    stored_extracted_text = await conv.get_extracted_text(force=False)
-    if stored_extracted_text is None:
-        return None
-    return list(stored_extracted_text.split_text.keys())
+    conv: Conversation = await resource.get_field(fid.field, fid.field_type, load=False)
+    splits_metadata = await conv.get_splits_metadata()
+    return set(splits_metadata.metadata)
 
 
 def needs_relations_update(

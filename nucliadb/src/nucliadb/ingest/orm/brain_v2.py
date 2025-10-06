@@ -217,7 +217,7 @@ class ResourceBrain:
         replace_field: bool,
         skip_paragraphs_index: Optional[bool],
         skip_texts_index: Optional[bool],
-        append_splits: Optional[list[str]] = None,
+        append_splits: Optional[set[str]] = None,
     ) -> None:
         # We need to add the extracted text to the texts section of the Resource so that
         # the paragraphs can be indexed
@@ -248,7 +248,7 @@ class ResourceBrain:
         user_field_metadata: Optional[UserFieldMetadata],
         replace_field: bool,
         skip_paragraphs: Optional[bool],
-        append_splits: Optional[list[str]] = None,
+        append_splits: Optional[set[str]] = None,
     ) -> None:
         if skip_paragraphs is not None:
             self.brain.skip_paragraphs = skip_paragraphs
@@ -504,7 +504,7 @@ class ResourceBrain:
         replace_field: bool = False,
         # cut to specific dimension if specified
         vector_dimension: Optional[int] = None,
-        append_splits: Optional[list[str]] = None,
+        append_splits: Optional[set[str]] = None,
     ):
         fid = ids.FieldId.from_string(f"{self.rid}/{field_id}")
         for subfield, vectors in vo.split_vectors.items():
@@ -806,7 +806,7 @@ class ParagraphPages:
 
 
 def should_skip_split_indexing(
-    split: str, replace_field: bool, append_splits: Optional[list[str]]
+    split: str, replace_field: bool, append_splits: Optional[set[str]]
 ) -> bool:
     # When replacing the whole field, reindex all splits. Otherwise, we're only indexing the splits that are appended
     return not replace_field and append_splits is not None and split not in append_splits

@@ -21,13 +21,14 @@ import uuid
 from typing import Any, Optional
 
 from nucliadb.ingest.fields.base import Field
-from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation
+from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation, SplitMetadata, SplitsMetadata
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_utils.storages.storage import StorageField
 
 PAGE_SIZE = 200
 
 CONVERSATION_PAGE_VALUE = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/{page}"
+CONVERSATION_SPLIT_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/split_metadata"
 CONVERSATION_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 
 
@@ -52,6 +53,7 @@ class Conversation(Field[PBConversation]):
     ):
         super(Conversation, self).__init__(id, resource, pb, value)
         self.value = {}
+        self._splits_metadata: Optional[SplitsMetadata] = None
         self.metadata = None
 
     async def set_value(self, payload: PBConversation):
@@ -70,10 +72,13 @@ class Conversation(Field[PBConversation]):
             last_page = PBConversation()
             metadata.pages += 1
 
+        self._splits_metadata = await self.get_splits_metadata()
+
         # Make sure message attachment files are on our region. This is needed
         # to support the hybrid-onprem deployment as the attachments must be stored
         # at the storage services of the client's premises.
         for message in payload.messages:
+            self._splits_metadata.metadata.setdefault(message.ident, SplitMetadata())
             new_message_files = []
             for idx, file in enumerate(message.content.attachments):
                 if self.storage.needs_move(file, self.kbid):
@@ -117,6 +122,7 @@ class Conversation(Field[PBConversation]):
 
         # Finally, set the metadata
         await self.db_set_metadata(metadata)
+        await self.set_splits_metadata(self._splits_metadata)
 
     async def get_value(self, page: Optional[int] = None) -> Optional[PBConversation]:
         # If no page was requested, force fetch of metadata
@@ -203,3 +209,29 @@ class Conversation(Field[PBConversation]):
         self.metadata = payload
         self.resource.modified = True
         self._created = False
+
+    async def get_splits_metadata(self) -> SplitsMetadata:
+        if self._splits_metadata is None:
+            field_key = CONVERSATION_SPLIT_METADATA.format(
+                kbid=self.kbid,
+                uuid=self.uuid,
+                type=self.type,
+                field=self.id,
+            )
+            payload = await self.resource.txn.get(field_key)
+            if payload is None:
+                return SplitsMetadata()
+            self._splits_metadata = SplitsMetadata()
+            self._splits_metadata.ParseFromString(payload)
+        return self._splits_metadata
+
+    async def set_splits_metadata(self, payload: SplitsMetadata) -> None:
+        key = CONVERSATION_SPLIT_METADATA.format(
+            kbid=self.kbid,
+            uuid=self.uuid,
+            type=self.type,
+            field=self.id,
+        )
+        await self.resource.txn.set(key, payload.SerializeToString())
+        self._split_metadata = payload
+        self.resource.modified = True

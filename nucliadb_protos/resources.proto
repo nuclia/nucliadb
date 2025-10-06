@@ -169,6 +169,12 @@ message FieldConversation {
     string split_strategy = 5;
 }
 
+message SplitMetadata {}
+
+message SplitsMetadata {
+    map<string, SplitMetadata> metadata = 1;
+}
+
 message NestedPosition {
     int64 start = 1;
     int64 end = 2;
