@@ -42,7 +42,7 @@ class Settings(BaseSettings):
         description="Maximum number of paragraphs to target per shard",
     )
     max_resource_paragraphs: int = Field(
-        default=50_000,
+        default=300_000,
         title="Max paragraphs per resource",
         description="Maximum number of paragraphs allowed on a single resource",
     )

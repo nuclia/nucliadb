@@ -21,13 +21,14 @@ import dataclasses
 from datetime import datetime
 from typing import Optional, Union
 
+from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
 
 import nucliadb_models as models
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.models_utils import from_proto, to_proto
-from nucliadb.ingest.fields.conversation import Conversation
+from nucliadb.ingest.fields.conversation import MAX_CONVERSATION_MESSAGES, Conversation
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.models.internal import processing as processing_models
 from nucliadb.models.internal.processing import ClassificationLabel, PushConversation, PushPayload
@@ -431,6 +432,15 @@ async def parse_conversation_field(
     uuid: str,
     resource_classifications: ResourceClassifications,
 ) -> None:
+    # Make sure that the max number of messages is not exceeded
+    breakpoint()
+    current_message_count = await get_current_conversation_message_count(kbid, uuid, key)
+    if len(conversation_field.messages) + current_message_count > MAX_CONVERSATION_MESSAGES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Conversation fields cannot have more than {MAX_CONVERSATION_MESSAGES} messages.",
+        )
+
     classif_labels = resource_classifications.for_field(key, resources_pb2.FieldType.CONVERSATION)
     storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
@@ -543,3 +553,15 @@ async def get_stored_resource_classifications(
             classif = ClassificationLabel(labelset=f_classif.labelset, label=f_classif.label)
             rc.field_level.setdefault(fid, set()).add(classif)
     return rc
+
+
+async def get_current_conversation_message_count(kbid: str, rid: str, field_id: str) -> int:
+    async with datamanagers.with_ro_transaction() as txn:
+        resource_obj = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
+        if resource_obj is None:
+            return 0
+        field_obj: Conversation = await resource_obj.get_field(
+            field_id, resources_pb2.FieldType.CONVERSATION, load=False
+        )
+        metadata = await field_obj.get_metadata()
+        return metadata.total

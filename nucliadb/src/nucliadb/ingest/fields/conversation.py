@@ -33,10 +33,6 @@ CONVERSATION_PAGE_VALUE = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/{page}"
 CONVERSATION_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 
 
-class MaxConversationMessagesReached(Exception):
-    pass
-
-
 class PageNotFound(Exception):
     pass
 
@@ -103,9 +99,6 @@ class Conversation(Field[PBConversation]):
         # Increment the metadata total with the number of messages
         messages = list(payload.messages)
         metadata.total += len(messages)
-
-        if metadata.total > MAX_CONVERSATION_MESSAGES:
-            raise MaxConversationMessagesReached()
 
         # Store the messages in pages of PAGE_SIZE messages
         while True:
