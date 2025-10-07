@@ -19,6 +19,7 @@
 #
 from datetime import datetime
 from typing import Optional
+from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
@@ -599,3 +600,64 @@ async def test_conversation_field_empty_create(
     msgs = field_resp.value["messages"]  # type: ignore
     assert len(msgs) == 1
     assert msgs[0]["ident"] == "1"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_conversation_limits(
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+    slug = "myresource"
+
+    with patch("nucliadb.writer.resource.field.MAX_CONVERSATION_MESSAGES", 2):
+        # Create a conversation field
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/resources",
+            json={
+                "slug": slug,
+                "title": "My Resource",
+                "conversations": {
+                    "faq": {
+                        "messages": [
+                            {
+                                "to": ["computer"],
+                                "who": "person",
+                                "timestamp": datetime.now().isoformat(),
+                                "content": {"text": "foo"},
+                                "ident": "1",
+                                "type": MessageType.QUESTION.value,
+                            }
+                        ]
+                    },
+                },
+            },
+        )
+        resp.raise_for_status()
+
+        # Now append a couple of messages so it exceeds the maximum allowed
+        resp = await nucliadb_writer.put(
+            f"/kb/{kbid}/slug/{slug}/conversation/faq",
+            json={
+                "messages": [
+                    {
+                        "to": ["computer"],
+                        "who": "person",
+                        "timestamp": datetime.now().isoformat(),
+                        "content": {"text": "bar"},
+                        "ident": "2",
+                        "type": MessageType.QUESTION.value,
+                    },
+                    {
+                        "to": ["person"],
+                        "who": "computer",
+                        "timestamp": datetime.now().isoformat(),
+                        "content": {"text": "baz"},
+                        "ident": "3",
+                        "type": MessageType.ANSWER.value,
+                    },
+                ]
+            },
+        )
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == "Conversation fields cannot have more than 2 messages."
