@@ -352,14 +352,14 @@ impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
         }
     }
 
-    fn similarity_upper_bound(&self, x: VectorAddr, y: &SearchVector) -> f32 {
+    fn similarity_upper_bound(&self, x: VectorAddr, y: &SearchVector) -> ScoreBound {
         match y {
             SearchVector::RabitQ(query) => {
                 let x = self.data_store.get_quantized_vector(x);
                 let (est, err) = query.similarity(x);
-                est + err
+                ScoreBound::new_with_error(est, err)
             }
-            _ => self.similarity(x, y),
+            _ => ScoreBound::new_exact(self.similarity(x, y)),
         }
     }
 
@@ -492,16 +492,16 @@ impl OpenSegment {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn _search<DS: DataStore>(
-        &self,
-        data_store: &DS,
+    fn _search<'a, DS: DataStore>(
+        &'a self,
+        data_store: &'a DS,
         query: &[f32],
         filter: &Formula,
         with_duplicates: bool,
         results: usize,
         config: &VectorConfig,
         min_score: f32,
-    ) -> Box<dyn Iterator<Item = ScoredVector<'_>> + '_> {
+    ) -> Box<dyn Iterator<Item = ScoredVector<'a>> + '_> {
         let raw_query = SearchVector::Query(config.vector_type.encode(query));
         let rabitq = data_store.has_quantized() && !config.flags.contains(&flags::DISABLE_RABITQ_SEARCH.to_string());
         let encoded_query = if rabitq {
@@ -539,49 +539,50 @@ impl OpenSegment {
         }
     }
 
-    fn brute_force_search<DS: DataStore>(
-        &self,
+    fn brute_force_search<'a, DS: DataStore>(
+        &'a self,
         bitset: &FilterBitSet,
         results: usize,
-        retriever: Retriever<DS>,
+        retriever: Retriever<'a, DS>,
         encoded_query: &SearchVector,
         raw_query: &SearchVector,
-    ) -> Box<dyn Iterator<Item = ScoredVector<'_>> + '_> {
+    ) -> Box<dyn Iterator<Item = ScoredVector<'a>> + '_> {
         let mut scored_results = Vec::new();
         for paragraph_addr in bitset.iter() {
             let paragraph = retriever.data_store.get_paragraph(paragraph_addr);
 
-            // Only return the best vector match per paragraph
+            // Only return the best vector match per paragraph (only relevant with multi-vectors)
             let best_vector_score = paragraph
                 .vectors(&paragraph_addr)
                 .map(|va| {
                     let score = retriever.similarity_upper_bound(va, encoded_query);
-                    Cnx(va, score)
+                    (va, score)
                 })
-                .max_by(|v, w| v.1.total_cmp(&w.1))
+                .max_by(|v, w| v.1.score.total_cmp(&w.1.score))
                 .unwrap();
 
-            if best_vector_score.1 >= retriever.min_score {
-                scored_results.push(Reverse(best_vector_score));
+            if best_vector_score.1.upper_bound >= retriever.min_score {
+                scored_results.push(best_vector_score);
             }
         }
-        scored_results.sort_unstable();
-        // If using RabitQ, rerank top results using the raw vectors
-        if matches!(encoded_query, SearchVector::RabitQ(_)) {
-            scored_results = scored_results
-                .into_iter()
-                .take(std::cmp::min(results * 100, 2000))
-                .map(|Reverse(Cnx(addr, _))| Reverse(Cnx(addr, retriever.similarity(addr, raw_query))))
-                .collect();
-            scored_results.sort_unstable();
-        }
 
-        Box::new(
-            scored_results
-                .into_iter()
-                .map(|Reverse(a)| ScoredVector::new(a.0, self.data_store.as_ref(), a.1))
-                .take(results),
-        )
+        if matches!(encoded_query, SearchVector::RabitQ(_)) {
+            // If using RabitQ, rerank top results using the raw vectors
+            Box::new(
+                rabitq::rerank_top(scored_results, results, &retriever, raw_query)
+                    .into_iter()
+                    .map(|Reverse(Cnx(addr, score))| ScoredVector::new(addr, self.data_store.as_ref(), score)),
+            )
+        } else {
+            // If using raw vectors, sort by score and take top_k
+            scored_results.sort_unstable_by(|a, b| b.1.score.total_cmp(&a.1.score));
+            Box::new(
+                scored_results
+                    .into_iter()
+                    .map(|a| ScoredVector::new(a.0, self.data_store.as_ref(), a.1.score))
+                    .take(results),
+            )
+        }
     }
 }
 
