@@ -412,13 +412,13 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             vec_counter: RepCounter::new(!with_duplicates),
         };
         let layer_zero = hnsw.get_layer(0);
-        let entry_points: Vec<_> = neighbors.into_iter().map(|(node, _)| node).collect();
+        let entry_points: Vec<_> = neighbors.into_iter().take(k_neighbours).map(|(node, _)| node).collect();
 
         let mut filtered_result = self.closest_up_nodes(
             entry_points,
             original_query.unwrap_or(query),
             layer_zero,
-            k_neighbours * 10,
+            k_neighbours,
             filter,
         );
 
