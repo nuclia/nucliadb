@@ -18,11 +18,27 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::{cmp::Reverse, collections::BinaryHeap};
+
 use simsimd::SpatialSimilarity;
 
-use crate::config::VectorType;
+use crate::{
+    VectorAddr,
+    config::VectorType,
+    hnsw::{Cnx, DataRetriever, EstimatedScore, SearchVector},
+};
 
+/// Constant to adjust the error bound of the estimated similarity.
+// The paper recommends 1.9, reasonable values are from 0.0 to 4.0
+// Higher numbers give more error bound so we need to load more raw
+// vectors but provide slightly better recall.
 const EPSILON: f32 = 1.9;
+
+/// How many vectors to evaluate per each expected result.
+/// This is multiplied by top_k to get the number of vectors to search for.
+pub const RERANKING_FACTOR: usize = 100;
+/// The maximum number of vectors to evaluate during reranking.
+pub const RERANKING_LIMIT: usize = 2000;
 
 pub struct EncodedVector<'a> {
     data: &'a [u8],
@@ -205,6 +221,31 @@ impl QueryVector {
 
         (estimate, error)
     }
+}
+
+/// Rerank results from RabitQ search using the raw vectors. Uses the error bound to know when to stop reranking
+pub fn rerank_top(
+    candidates: Vec<(VectorAddr, EstimatedScore)>,
+    top_k: usize,
+    retriever: &impl DataRetriever,
+    query: &SearchVector,
+) -> BinaryHeap<Reverse<Cnx>> {
+    let mut best = BinaryHeap::new();
+    let mut best_k = 0.0;
+    for (addr, EstimatedScore { upper_bound, .. }) in candidates {
+        if best.len() < top_k || best_k < upper_bound {
+            // If the candidate score could be better than what we have so far, calculate the accurate similarity
+            let real_score = retriever.similarity(addr, query);
+            if best.len() < top_k || best_k < real_score {
+                best.push(Reverse(Cnx(addr, real_score)));
+                if best.len() > top_k {
+                    best.pop();
+                }
+                best_k = best.peek().unwrap().0.1;
+            }
+        }
+    }
+    best
 }
 
 #[cfg(test)]
