@@ -352,14 +352,14 @@ impl<DS: DataStore> DataRetriever for Retriever<'_, DS> {
         }
     }
 
-    fn similarity_upper_bound(&self, x: VectorAddr, y: &SearchVector) -> ScoreBound {
+    fn similarity_upper_bound(&self, x: VectorAddr, y: &SearchVector) -> EstimatedScore {
         match y {
             SearchVector::RabitQ(query) => {
                 let x = self.data_store.get_quantized_vector(x);
                 let (est, err) = query.similarity(x);
-                ScoreBound::new_with_error(est, err)
+                EstimatedScore::new_with_error(est, err)
             }
-            _ => ScoreBound::new_exact(self.similarity(x, y)),
+            _ => EstimatedScore::new_exact(self.similarity(x, y)),
         }
     }
 

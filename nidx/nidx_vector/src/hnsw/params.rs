@@ -23,11 +23,11 @@
 
 /// Factor by which the layer distribution should deviate.
 pub fn level_factor() -> f64 {
-    1.0 / (m() as f64).ln()
+    1.0 / (M as f64).ln()
 }
 
 pub const fn m_max_for_layer(layer: usize) -> usize {
-    if layer == 0 { m_max0() } else { m_max() }
+    if layer == 0 { M_MAX_0 } else { M_MAX }
 }
 
 /// M to use when pruning neighbours
@@ -36,21 +36,13 @@ pub const fn prune_m(m: usize) -> usize {
 }
 
 /// Upper limit to the number of out-edges a embedding can have.
-pub const fn m_max0() -> usize {
-    60
-}
+pub const M_MAX_0: usize = 60;
 
 /// Upper limit to the number of out-edges a embedding can have.
-pub const fn m_max() -> usize {
-    30
-}
+pub const M_MAX: usize = 30;
 
 /// Number of bi-directional links created for every new element.
-pub const fn m() -> usize {
-    30
-}
+pub const M: usize = 30;
 
 /// Number of neighbours that are searched for before adding a new embedding.
-pub const fn ef_construction() -> usize {
-    100
-}
+pub const EF_CONSTRUCTION: usize = 100;

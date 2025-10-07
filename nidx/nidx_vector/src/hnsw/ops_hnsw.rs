@@ -37,7 +37,7 @@ use super::*;
 /// Implementors of this trait can guide the hnsw search
 pub trait DataRetriever: std::marker::Sync {
     fn similarity(&self, x: VectorAddr, y: &SearchVector) -> f32;
-    fn similarity_upper_bound(&self, x: VectorAddr, y: &SearchVector) -> ScoreBound;
+    fn similarity_upper_bound(&self, x: VectorAddr, y: &SearchVector) -> EstimatedScore;
     fn paragraph(&self, x: VectorAddr) -> ParagraphAddr;
     fn get_vector(&self, x: VectorAddr) -> &[u8];
     /// Embeddings with smaller similarity should not be considered.
@@ -68,12 +68,12 @@ pub trait Hnsw {
 }
 
 #[derive(Clone, Copy)]
-pub struct ScoreBound {
+pub struct EstimatedScore {
     pub score: f32,
     pub upper_bound: f32,
 }
 
-impl ScoreBound {
+impl EstimatedScore {
     pub fn new_with_error(score: f32, error: f32) -> Self {
         Self {
             score,
@@ -112,7 +112,7 @@ impl PartialOrd for Cnx {
 }
 
 #[derive(Clone, Copy)]
-pub struct CnxWithBound(VectorAddr, ScoreBound);
+pub struct CnxWithBound(VectorAddr, EstimatedScore);
 impl Eq for CnxWithBound {}
 impl Ord for CnxWithBound {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -284,7 +284,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         layer: L,
         k_neighbours: usize,
         entry_points: &[VectorAddr],
-    ) -> impl Iterator<Item = (VectorAddr, ScoreBound)> {
+    ) -> impl Iterator<Item = (VectorAddr, EstimatedScore)> {
         // Nodes already visited
         let mut visited = FxHashSet::default();
         // Nodes to visit
@@ -306,8 +306,8 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 (None, _) => break,
                 // Candidate is worse than worse result, done
                 (
-                    Some(CnxWithBound(_, ScoreBound { score: cs, .. })),
-                    Some(Reverse(CnxWithBound(_, ScoreBound { score: ws, .. }))),
+                    Some(CnxWithBound(_, EstimatedScore { score: cs, .. })),
+                    Some(Reverse(CnxWithBound(_, EstimatedScore { score: ws, .. }))),
                 ) if cs < ws => {
                     break;
                 }
@@ -348,10 +348,10 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     ) -> Vec<VectorAddr> {
         use params::*;
         let search_neighbours = self
-            .layer_search::<&RAMLayer>(&SearchVector::Stored(x), layer, ef_construction(), entry_points)
+            .layer_search::<&RAMLayer>(&SearchVector::Stored(x), layer, EF_CONSTRUCTION, entry_points)
             .map(|(addr, score)| (addr, score.score))
             .collect();
-        let neighbours = self.select_neighbours_heuristic(m(), search_neighbours, layer);
+        let neighbours = self.select_neighbours_heuristic(M, search_neighbours, layer);
         let mut needs_repair = HashSet::new();
         let mut result = Vec::with_capacity(neighbours.len());
         layer.add_node(x);

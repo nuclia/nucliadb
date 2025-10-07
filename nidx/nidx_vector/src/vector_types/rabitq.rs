@@ -25,7 +25,7 @@ use simsimd::SpatialSimilarity;
 use crate::{
     VectorAddr,
     config::VectorType,
-    hnsw::{Cnx, DataRetriever, ScoreBound, SearchVector},
+    hnsw::{Cnx, DataRetriever, EstimatedScore, SearchVector},
 };
 
 /// Constant to adjust the error bound of the estimated similarity.
@@ -225,14 +225,14 @@ impl QueryVector {
 
 /// Rerank results from RabitQ search using the raw vectors. Uses the error bound to know when to stop reranking
 pub fn rerank_top(
-    candidates: Vec<(VectorAddr, ScoreBound)>,
+    candidates: Vec<(VectorAddr, EstimatedScore)>,
     top_k: usize,
     retriever: &impl DataRetriever,
     query: &SearchVector,
 ) -> BinaryHeap<Reverse<Cnx>> {
     let mut best = BinaryHeap::new();
     let mut best_k = 0.0;
-    for (addr, ScoreBound { upper_bound, .. }) in candidates {
+    for (addr, EstimatedScore { upper_bound, .. }) in candidates {
         if best.len() < top_k || best_k < upper_bound {
             // If the candidate score could be better than what we have so far, calculate the accurate similarity
             let real_score = retriever.similarity(addr, query);
