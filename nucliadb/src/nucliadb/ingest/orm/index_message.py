@@ -231,6 +231,7 @@ class IndexMessageBuilder:
                     modified_splits is not None
                     and stored_splits is not None
                     and modified_splits.issubset(stored_splits)
+                    and len(modified_splits) < len(stored_splits)
                 )
                 replace_field = not is_append_messages_op
 
