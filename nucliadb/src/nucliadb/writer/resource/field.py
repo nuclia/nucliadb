@@ -433,7 +433,6 @@ async def parse_conversation_field(
     resource_classifications: ResourceClassifications,
 ) -> None:
     # Make sure that the max number of messages is not exceeded
-    breakpoint()
     current_message_count = await get_current_conversation_message_count(kbid, uuid, key)
     if len(conversation_field.messages) + current_message_count > MAX_CONVERSATION_MESSAGES:
         raise HTTPException(
