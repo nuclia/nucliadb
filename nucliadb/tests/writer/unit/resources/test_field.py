@@ -110,7 +110,7 @@ def get_message(id, who, to, text, attachments=None):
 
 @pytest.fixture()
 def conversation_checks():
-    with mock.patch(f"{FIELD_MODULE}._conversation_checks", return_value=None):
+    with mock.patch(f"{FIELD_MODULE}._conversation_append_checks", return_value=None):
         yield
 
 

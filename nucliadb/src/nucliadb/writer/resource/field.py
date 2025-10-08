@@ -228,6 +228,7 @@ async def parse_fields(
             kbid,
             uuid,
             resource_classifications,
+            append_messages=False,
         )
 
 
@@ -431,12 +432,14 @@ async def parse_conversation_field(
     kbid: str,
     uuid: str,
     resource_classifications: ResourceClassifications,
+    append_messages: bool,
 ) -> None:
-    await _conversation_checks(kbid, uuid, key, conversation_field)
+    if append_messages:
+        await _conversation_append_checks(kbid, uuid, key, conversation_field)
     classif_labels = resource_classifications.for_field(key, resources_pb2.FieldType.CONVERSATION)
     storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
-    field_value = resources_pb2.Conversation()
+    field_value = resources_pb2.Conversation(is_append_op=append_messages)
     convs = processing_models.PushConversation()
     for message in conversation_field.messages:
         cm = resources_pb2.Message()
@@ -547,7 +550,9 @@ async def get_stored_resource_classifications(
     return rc
 
 
-async def _conversation_checks(kbid: str, rid: str, field_id: str, input: models.InputConversationField):
+async def _conversation_append_checks(
+    kbid: str, rid: str, field_id: str, input: models.InputConversationField
+):
     async with datamanagers.with_ro_transaction() as txn:
         resource_obj = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
         if resource_obj is None:

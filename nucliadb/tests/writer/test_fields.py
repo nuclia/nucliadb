@@ -78,14 +78,13 @@ TEST_EXTERNAL_FILE_PAYLOAD = {
 TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD = [
     {
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "who": "Bob",
-        "to": ["Alice", "Charlie"],
+        "who": "Alice",
+        "to": ["Bob"],
         "content": {
-            "text": "Hi people!",
+            "text": "Hi Bob!",
             "format": "PLAIN",
-            "attachments": [load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpeg")],
         },
-        "ident": "message_id_001",
+        "ident": "message_id_002",
     }
 ]
 

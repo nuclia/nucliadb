@@ -156,6 +156,11 @@ message Conversation {
     repeated Message messages = 1;
     string extract_strategy = 2;
     string split_strategy = 3;
+
+    // The same message is used for both replacing and appending messages to an existing conversation. 
+    // We need this boolean flag to disambiguate at the ingestion of writer messages to know if new pages
+    // need to be created or if we need to replace existing ones.
+    bool is_append_op = 4;
 }
 
 message FieldConversation {
