@@ -659,3 +659,55 @@ async def test_conversation_limits(
         )
         assert resp.status_code == 422
         assert resp.json()["detail"] == "Conversation fields cannot have more than 2 messages."
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_conversation_duplicate_message_idents(
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+    slug = "myresource"
+
+    # Create a conversation field
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": slug,
+            "title": "My Resource",
+            "conversations": {
+                "faq": {
+                    "messages": [
+                        {
+                            "to": ["computer"],
+                            "who": "person",
+                            "timestamp": datetime.now().isoformat(),
+                            "content": {"text": "foo"},
+                            "ident": "1",
+                            "type": MessageType.QUESTION.value,
+                        }
+                    ]
+                },
+            },
+        },
+    )
+    resp.raise_for_status()
+
+    # Now append a message with a duplicate ident
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/slug/{slug}/conversation/faq",
+        json={
+            "messages": [
+                {
+                    "to": ["computer"],
+                    "who": "person",
+                    "timestamp": datetime.now().isoformat(),
+                    "content": {"text": "bar"},
+                    "ident": "1",
+                    "type": MessageType.QUESTION.value,
+                },
+            ]
+        },
+    )
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "Message identifiers must be unique field=faq: ['1']"
