@@ -59,9 +59,7 @@ from nucliadb_utils.utilities import (
     clear_global_cache,
     get_utility,
     set_utility,
-    start_nats_manager,
     start_transaction_utility,
-    stop_nats_manager,
     stop_transaction_utility,
 )
 
@@ -224,13 +222,6 @@ async def dummy_nidx_utility():
 
     with patch.dict(MAIN, values={Utility.NIDX: fake}, clear=False):
         yield fake
-
-
-@pytest.fixture(scope="function")
-async def nats_manager(nats_server: str) -> AsyncIterator[NatsConnectionManager]:
-    ncm = await start_nats_manager("nucliadb_tests", [nats_server], None)
-    yield ncm
-    await stop_nats_manager()
 
 
 @pytest.fixture(scope="function")
