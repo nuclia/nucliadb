@@ -52,8 +52,6 @@ from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
-    MAIN,
-    Utility,
     clear_global_cache,
     start_transaction_utility,
     stop_transaction_utility,
@@ -167,21 +165,6 @@ async def indexing_utility(
 @pytest.fixture(scope="function")
 async def nats_indexing_utility(nats_server: str, _clean_natsd) -> AsyncIterator[None]:
     yield
-
-
-@pytest.fixture(scope="function")
-async def dummy_nidx_utility():
-    class FakeNidx:
-        api_client = AsyncMock()
-        searcher_client = AsyncMock()
-        index = AsyncMock()
-        finalize = AsyncMock()
-
-    fake = FakeNidx()
-    fake.api_client.NewShard.return_value.id = "00000"
-
-    with patch.dict(MAIN, values={Utility.NIDX: fake}, clear=False):
-        yield fake
 
 
 @pytest.fixture(scope="function")
