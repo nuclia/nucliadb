@@ -45,7 +45,6 @@ from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata, VectorSetConfig
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
-from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import indexing_settings, nuclia_settings, transaction_settings
@@ -55,10 +54,7 @@ from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
     MAIN,
     Utility,
-    clean_utility,
     clear_global_cache,
-    get_utility,
-    set_utility,
     start_transaction_utility,
     stop_transaction_utility,
 )
@@ -118,20 +114,6 @@ async def ingest_processed_consumer(
 
     await ingest_consumer_finalizer()
     clear_global_cache()
-
-
-@pytest.fixture(scope="function")
-async def pubsub(nats_server: str) -> AsyncIterator[PubSubDriver]:
-    pubsub = get_utility(Utility.PUBSUB)
-    assert pubsub is None, "No pubsub is expected to be already set"
-    pubsub = NatsPubsub(hosts=[nats_server])
-    await pubsub.initialize()
-    set_utility(Utility.PUBSUB, pubsub)
-
-    yield pubsub
-
-    clean_utility(Utility.PUBSUB)
-    await pubsub.finalize()
 
 
 @pytest.fixture(scope="function")
