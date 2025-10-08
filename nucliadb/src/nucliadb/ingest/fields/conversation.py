@@ -67,7 +67,7 @@ class Conversation(Field[PBConversation]):
         self.value.clear()
 
     async def set_value(self, payload: PBConversation):
-        if not payload.is_append_op:
+        if payload.replace_field:
             # As we need to overwrite the value of the conversation, first delete any previous data.
             await self.delete_value()
 

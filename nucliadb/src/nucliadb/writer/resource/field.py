@@ -228,7 +228,7 @@ async def parse_fields(
             kbid,
             uuid,
             resource_classifications,
-            append_messages=False,
+            replace_field=True,
         )
 
 
@@ -432,14 +432,15 @@ async def parse_conversation_field(
     kbid: str,
     uuid: str,
     resource_classifications: ResourceClassifications,
-    append_messages: bool,
+    replace_field: bool,
 ) -> None:
-    if append_messages:
+    if not replace_field:
+        # Appending messages to conversation
         await _conversation_append_checks(kbid, uuid, key, conversation_field)
     classif_labels = resource_classifications.for_field(key, resources_pb2.FieldType.CONVERSATION)
     storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
-    field_value = resources_pb2.Conversation(is_append_op=append_messages)
+    field_value = resources_pb2.Conversation(replace_field=replace_field)
     convs = processing_models.PushConversation()
     for message in conversation_field.messages:
         cm = resources_pb2.Message()

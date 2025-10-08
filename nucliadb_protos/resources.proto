@@ -159,8 +159,8 @@ message Conversation {
 
     // The same message is used for both replacing and appending messages to an existing conversation. 
     // We need this boolean flag to disambiguate at the ingestion of writer messages to know if new pages
-    // need to be created or if we need to replace existing ones.
-    bool is_append_op = 4;
+    // need to be created or if we need to replace existing ones. replace_field will be false on append operations.
+    bool replace_field = 4;
 }
 
 message FieldConversation {
