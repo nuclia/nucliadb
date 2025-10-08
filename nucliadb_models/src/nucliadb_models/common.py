@@ -203,6 +203,15 @@ class FieldTypeName(str, Enum):
             "a": FieldTypeName.GENERIC,
         }[abbr]
 
+    def abbreviation(self) -> str:
+        return {
+            FieldTypeName.TEXT: "t",
+            FieldTypeName.FILE: "f",
+            FieldTypeName.LINK: "u",
+            FieldTypeName.CONVERSATION: "c",
+            FieldTypeName.GENERIC: "a",
+        }[self]
+
 
 class FieldRef(BaseModel):
     field_type: FieldTypeName
