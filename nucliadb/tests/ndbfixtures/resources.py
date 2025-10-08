@@ -55,6 +55,11 @@ async def knowledgebox(
     maindb_driver: Driver,
     shard_manager: KBShardManager,
 ):
+    """Knowledgebox created through the ORM. This is what ingest gRPC ends up
+    calling when backend creates a hosted KB and what the standalone API ends up
+    calling for onprem KBs.
+
+    """
     kbid = KnowledgeBox.new_unique_kbid()
     kbslug = "slug-" + str(uuid.uuid4())
     model = SemanticModelMetadata(
@@ -72,7 +77,17 @@ async def knowledgebox(
 
 @pytest.fixture(scope="function")
 async def standalone_knowledgebox(nucliadb_writer_manager: AsyncClient):
-    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": "knowledgebox"})
+    """Knowledgebox created through the /kbs endpoint, only accessible for
+    onprem (standalone) deployments
+
+    """
+    resp = await nucliadb_writer_manager.post(
+        f"/{KBS_PREFIX}",
+        json={
+            "title": "Standalone test KB",
+            "slug": "knowledgebox",
+        },
+    )
     assert resp.status_code == 201
     uuid = resp.json().get("uuid")
 
@@ -80,37 +95,6 @@ async def standalone_knowledgebox(nucliadb_writer_manager: AsyncClient):
 
     resp = await nucliadb_writer_manager.delete(f"/kb/{uuid}")
     assert resp.status_code == 200
-
-
-# FIXME: this is a weird situation, we can use a hosted-like nucliadb while this
-# creates a KB as it was onprem. The end result should not change much but still, is
-# something we may want to fix
-@pytest.fixture(scope="function")
-async def knowledgebox_by_api(nucliadb_writer_manager: AsyncClient):
-    kbslug = "slug-" + str(uuid.uuid4())
-    resp = await nucliadb_writer_manager.post(
-        f"/{KBS_PREFIX}",
-        json={
-            "slug": kbslug,
-            "title": "My Test Knowledge Box",
-        },
-    )
-    assert resp.status_code == 201
-    kbid = resp.json().get("uuid")
-    assert kbid is not None
-
-    yield kbid
-
-    resp = await nucliadb_writer_manager.delete(
-        f"/{KB_PREFIX}/{kbid}",
-    )
-    assert resp.status_code == 200
-
-
-# Used by: nucliadb standalone tests
-@pytest.fixture(scope="function")
-async def knowledgebox_one(knowledgebox_by_api: str):
-    yield knowledgebox_by_api
 
 
 @pytest.fixture(scope="function")
