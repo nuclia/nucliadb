@@ -39,10 +39,10 @@ from nucliadb_protos.writer_pb2 import (
 
 @pytest.mark.deploy_modes("component")
 async def test_list_paragraphs(
-    nucliadb_train_grpc: TrainStub, knowledgebox_ingest: str, test_pagination_resources
+    nucliadb_train_grpc: TrainStub, knowledgebox: str, test_pagination_resources
 ) -> None:
     req = GetParagraphsRequest()
-    req.kb.uuid = knowledgebox_ingest
+    req.kb.uuid = knowledgebox
     req.metadata.entities = True
     req.metadata.labels = True
     req.metadata.text = True
@@ -56,10 +56,10 @@ async def test_list_paragraphs(
 
 @pytest.mark.deploy_modes("component")
 async def test_list_paragraphs_shows_ners_with_positions(
-    nucliadb_train_grpc: TrainStub, knowledgebox_ingest: str, test_pagination_resources
+    nucliadb_train_grpc: TrainStub, knowledgebox: str, test_pagination_resources
 ) -> None:
     req = GetParagraphsRequest()
-    req.kb.uuid = knowledgebox_ingest
+    req.kb.uuid = knowledgebox
     req.metadata.entities = True
     req.metadata.labels = True
     req.metadata.text = True
@@ -88,7 +88,7 @@ async def test_list_paragraphs_shows_ners_with_positions(
     assert found_manresa and found_barcelona
 
 
-async def test_iterate_paragraphs(storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str):
+async def test_iterate_paragraphs(storage, txn, cache, dummy_nidx_utility, knowledgebox: str):
     # Create a resource
     basic = PBBasic(
         icon="text/plain",
@@ -102,7 +102,7 @@ async def test_iterate_paragraphs(storage, txn, cache, dummy_nidx_utility, knowl
     basic.metadata.status = PBMetadata.Status.PROCESSED
 
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
     assert r is not None
 

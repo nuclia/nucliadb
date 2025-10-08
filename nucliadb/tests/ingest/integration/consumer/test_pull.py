@@ -168,11 +168,11 @@ async def test_pull_v2(
     dummy_nidx_utility,
     pull_v2_worker: PullV2Worker,
     pull_processor_api: PullProcessorAPI,
-    knowledgebox_ingest: str,
+    knowledgebox: str,
     nats_manager: NatsConnectionManager,
 ):
     # add message that should go to first consumer
-    bm = create_broker_message(knowledgebox_ingest)
+    bm = create_broker_message(knowledgebox)
     pull_processor_api.messages.append(bm)
 
     for i in range(50):

@@ -52,16 +52,16 @@ def flatten_field_relations(r: noderesources_pb2.Resource):
 
 
 async def test_for_writer_bm_with_prefilter_update(
-    storage, maindb_driver: Driver, dummy_nidx_utility, knowledgebox_ingest: str
+    storage, maindb_driver: Driver, dummy_nidx_utility, knowledgebox: str
 ):
-    full_resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
+    full_resource = await create_resource(storage, maindb_driver, knowledgebox)
 
     async with maindb_driver.ro_transaction() as txn:
-        kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+        kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
         resource = await kb_obj.get(full_resource.uuid)
         assert resource is not None
         writer_bm = BrokerMessage(
-            kbid=knowledgebox_ingest,
+            kbid=knowledgebox,
             uuid=resource.uuid,
             reindex=True,
         )

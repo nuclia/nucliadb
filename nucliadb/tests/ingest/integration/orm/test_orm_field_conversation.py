@@ -29,10 +29,10 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def test_create_resource_orm_field_conversation(
-    storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str
+    storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 
@@ -69,10 +69,10 @@ async def test_create_resource_orm_field_conversation(
 
 
 async def test_create_resource_orm_field_conversation_file(
-    local_files, storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str
+    local_files, storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 

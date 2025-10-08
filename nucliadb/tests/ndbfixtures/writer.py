@@ -38,8 +38,6 @@ from tests.utils.dirty_index import mark_dirty
 
 from .utils import create_api_client_factory
 
-# TODO: replace knowledgebox_ingest for knowledgebox
-
 # Main fixtures
 
 

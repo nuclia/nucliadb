@@ -47,10 +47,10 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def test_create_resource_orm_vector(
-    storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str
+    storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
     vectorset_id = "my-semantic-model"
@@ -71,10 +71,10 @@ async def test_create_resource_orm_vector(
 
 
 async def test_create_resource_orm_vector_file(
-    local_files, storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str
+    local_files, storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
     vectorset_id = "my-semantic-model"
@@ -109,10 +109,10 @@ async def test_create_resource_orm_vector_file(
 
 
 async def test_create_resource_orm_vector_split(
-    storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str
+    storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
     vectorset_id = "my-semantic-model"
@@ -184,10 +184,10 @@ async def test_create_resource_with_cloud_file_vectors(
     storage: Storage,
     txn,
     dummy_nidx_utility,
-    knowledgebox_ingest: str,
+    knowledgebox: str,
 ):
     vectorset_id = "en-2024-04-24"
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
 
     rid = str(uuid4())
     resource = await kb_obj.add_resource(uuid=rid, slug="slug")
@@ -195,8 +195,8 @@ async def test_create_resource_with_cloud_file_vectors(
 
     field_id = "my-text"
 
-    cf_uri = cf_uri.format(kbid=knowledgebox_ingest, rid=rid, field_id=field_id)
-    destination_path = destination_path.format(kbid=knowledgebox_ingest, rid=rid, field_id=field_id)
+    cf_uri = cf_uri.format(kbid=knowledgebox, rid=rid, field_id=field_id)
+    destination_path = destination_path.format(kbid=knowledgebox, rid=rid, field_id=field_id)
 
     evw = ExtractedVectorsWrapper()
     evw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_id))
@@ -226,14 +226,14 @@ async def test_create_resource_with_cloud_file_vectors_already_moved(
     storage: Storage,
     txn,
     dummy_nidx_utility,
-    knowledgebox_ingest: str,
+    knowledgebox: str,
 ):
     vectorset_id = "en-2024-04-24"
     cf_uri = "/kbs/{kbid}/r/{rid}/e/t/{field_id}/en-2024-04-24/extracted_vectors"
     storage_key_kind = VectorSetConfig.StorageKeyKind.LEGACY
     destination_path = "kbs/{kbid}/r/{rid}/e/t/{field_id}/extracted_vectors"
 
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
 
     rid = str(uuid4())
     resource = await kb_obj.add_resource(uuid=rid, slug="slug")
@@ -241,8 +241,8 @@ async def test_create_resource_with_cloud_file_vectors_already_moved(
 
     field_id = "my-text"
 
-    cf_uri = cf_uri.format(kbid=knowledgebox_ingest, rid=rid, field_id=field_id)
-    destination_path = destination_path.format(kbid=knowledgebox_ingest, rid=rid, field_id=field_id)
+    cf_uri = cf_uri.format(kbid=knowledgebox, rid=rid, field_id=field_id)
+    destination_path = destination_path.format(kbid=knowledgebox, rid=rid, field_id=field_id)
 
     evw = ExtractedVectorsWrapper()
     evw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_id))

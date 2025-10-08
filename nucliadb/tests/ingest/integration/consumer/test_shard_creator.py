@@ -30,7 +30,7 @@ async def test_shard_auto_create(
     pubsub,
     storage,
     dummy_nidx_utility,
-    knowledgebox_ingest,
+    knowledgebox,
 ):
     from nucliadb.common.cluster.settings import settings
 
@@ -45,12 +45,12 @@ async def test_shard_auto_create(
     )
     await sc.initialize()
 
-    original_kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(knowledgebox_ingest)
+    original_kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(knowledgebox)
 
     await pubsub.publish(
-        const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=knowledgebox_ingest),
+        const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=knowledgebox),
         writer_pb2.Notification(
-            kbid=knowledgebox_ingest,
+            kbid=knowledgebox,
             action=writer_pb2.Notification.Action.INDEXED,
         ).SerializeToString(),
     )
@@ -59,5 +59,5 @@ async def test_shard_auto_create(
 
     await sc.finalize()
 
-    kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(knowledgebox_ingest)
+    kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(knowledgebox)
     assert len(kb_shards.shards) == len(original_kb_shards.shards) + 1

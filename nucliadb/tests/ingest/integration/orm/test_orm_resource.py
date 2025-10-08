@@ -48,7 +48,7 @@ from tests.ingest.fixtures import create_resource
 
 
 async def test_create_resource_orm_with_basic(
-    storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str
+    storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     basic = PBBasic(
         icon="text/plain",
@@ -71,7 +71,7 @@ async def test_create_resource_orm_with_basic(
 
     basic.fieldmetadata.append(ufm1)
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
     assert r is not None
 
@@ -94,7 +94,7 @@ async def test_create_resource_orm_with_basic(
     assert o2.source_id == "My Source"
 
 
-async def test_paragraphs_with_page(storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str):
+async def test_paragraphs_with_page(storage, txn, cache, dummy_nidx_utility, knowledgebox: str):
     # Create a resource
     basic = PBBasic(
         icon="text/plain",
@@ -108,7 +108,7 @@ async def test_paragraphs_with_page(storage, txn, cache, dummy_nidx_utility, kno
     basic.metadata.status = PBMetadata.Status.PROCESSED
 
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
     assert r is not None
 
@@ -153,7 +153,7 @@ async def test_paragraphs_with_page(storage, txn, cache, dummy_nidx_utility, kno
 
 
 async def test_vector_duplicate_fields(
-    maindb_driver, storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str
+    maindb_driver, storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     basic = PBBasic(title="My title", summary="My summary")
     basic.metadata.status = PBMetadata.Status.PROCESSED
@@ -239,14 +239,14 @@ async def test_vector_duplicate_fields(
 
 
 async def test_generate_broker_message(
-    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox_ingest: str
+    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox: str
 ):
     # Create a resource with all possible metadata in it
-    full_resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
+    full_resource = await create_resource(storage, maindb_driver, knowledgebox)
 
     # Now fetch it
     async with maindb_driver.ro_transaction() as txn:
-        kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+        kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
         resource = await kb_obj.get(full_resource.uuid)
         assert resource is not None
 
@@ -377,10 +377,10 @@ async def test_generate_broker_message(
 
 
 async def test_generate_index_message_contains_all_metadata(
-    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox_ingest: str
+    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox: str
 ):
     # Create a resource with all possible metadata in it
-    resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
+    resource = await create_resource(storage, maindb_driver, knowledgebox)
     resource.disable_vectors = False
 
     async with maindb_driver.ro_transaction() as txn:

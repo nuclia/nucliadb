@@ -62,7 +62,7 @@ async def test_materialize_kb_data(
     pubsub,
     storage,
     dummy_nidx_utility,
-    knowledgebox_ingest,
+    knowledgebox,
     audit_storage,
 ):
     count = 10
@@ -70,7 +70,7 @@ async def test_materialize_kb_data(
         await create_resource(
             storage=storage,
             driver=maindb_driver,
-            knowledgebox_ingest=knowledgebox_ingest,
+            knowledgebox=knowledgebox,
         )
 
     mz = materializer.MaterializerHandler(
@@ -82,16 +82,15 @@ async def test_materialize_kb_data(
     await mz.initialize()
 
     async with datamanagers.with_transaction() as txn:
-        assert await datamanagers.resources.get_number_of_resources(txn, kbid=knowledgebox_ingest) == -1
+        assert await datamanagers.resources.get_number_of_resources(txn, kbid=knowledgebox) == -1
         assert (
-            await datamanagers.resources.calculate_number_of_resources(txn, kbid=knowledgebox_ingest)
-            == count
+            await datamanagers.resources.calculate_number_of_resources(txn, kbid=knowledgebox) == count
         )
 
     await pubsub.publish(
-        const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=knowledgebox_ingest),
+        const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=knowledgebox),
         writer_pb2.Notification(
-            kbid=knowledgebox_ingest,
+            kbid=knowledgebox,
             action=writer_pb2.Notification.Action.COMMIT,
         ).SerializeToString(),
     )
@@ -99,9 +98,7 @@ async def test_materialize_kb_data(
     await asyncio.sleep(0.2)
 
     async with datamanagers.with_transaction() as txn:
-        assert (
-            await datamanagers.resources.get_number_of_resources(txn, kbid=knowledgebox_ingest) == count
-        )
+        assert await datamanagers.resources.get_number_of_resources(txn, kbid=knowledgebox) == count
 
     await mz.finalize()
     assert audit_storage.js.publish.call_count == 1
@@ -110,4 +107,4 @@ async def test_materialize_kb_data(
     pb.ParseFromString(audit_storage.js.publish.call_args[0][1])
     assert pb.storage.resources == count
     assert pb.service == Service.NUCLIA_DB
-    assert pb.kb_id == knowledgebox_ingest
+    assert pb.kb_id == knowledgebox

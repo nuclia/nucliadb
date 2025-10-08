@@ -234,10 +234,10 @@ async def test_knowledgebox_delete_all_kb_keys(
     cache,
     dummy_nidx_utility,
     maindb_driver,
-    knowledgebox_ingest: str,
+    knowledgebox: str,
 ):
     async with maindb_driver.rw_transaction() as txn:
-        kbid = knowledgebox_ingest
+        kbid = knowledgebox
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
 
         # Create some resources in the KB

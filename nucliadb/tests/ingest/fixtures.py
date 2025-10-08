@@ -144,25 +144,6 @@ def learning_config():
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_ingest(storage: Storage, maindb_driver: Driver, shard_manager, learning_config):
-    kbid = KnowledgeBox.new_unique_kbid()
-    kbslug = "slug-" + str(uuid.uuid4())
-    model = SemanticModelMetadata(
-        similarity_function=upb.VectorSimilarity.COSINE, vector_dimension=len(V1)
-    )
-    await KnowledgeBox.create(
-        maindb_driver,
-        kbid=kbid,
-        slug=kbslug,
-        semantic_models={"my-semantic-model": model},
-    )
-
-    yield kbid
-
-    await KnowledgeBox.delete(maindb_driver, kbid)
-
-
-@pytest.fixture(scope="function")
 async def knowledgebox_with_vectorsets(
     storage: Storage, maindb_driver: Driver, shard_manager, learning_config
 ):
@@ -433,14 +414,14 @@ def make_extracted_vectors(
 
 
 @pytest.fixture(scope="function")
-async def test_resource(storage: Storage, maindb_driver: Driver, knowledgebox_ingest: str):
+async def test_resource(storage: Storage, maindb_driver: Driver, knowledgebox: str):
     """
     Create a resource that has every possible bit of information
     """
     resource = await create_resource(
         storage=storage,
         driver=maindb_driver,
-        knowledgebox_ingest=knowledgebox_ingest,
+        knowledgebox=knowledgebox,
     )
     yield resource
     resource.clean()
@@ -562,10 +543,10 @@ def broker_resource(
     return message1
 
 
-async def create_resource(storage: Storage, driver: Driver, knowledgebox_ingest: str) -> Resource:
+async def create_resource(storage: Storage, driver: Driver, knowledgebox: str) -> Resource:
     async with driver.rw_transaction() as txn:
         rid = str(uuid.uuid4())
-        kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+        kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
         test_resource = await kb_obj.add_resource(uuid=rid, slug="slug")
         await test_resource.set_slug()
 

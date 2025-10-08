@@ -114,7 +114,7 @@ async def full_resource(
     resource = await create_resource(
         storage=storage,
         driver=maindb_driver,
-        knowledgebox_ingest=knowledgebox,
+        knowledgebox=knowledgebox,
     )
     yield resource
     resource.clean()

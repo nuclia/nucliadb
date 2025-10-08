@@ -44,7 +44,7 @@ async def entities_manager_mock():
 @pytest.mark.deploy_modes("component")
 async def test_get_entities(
     nucliadb_train_grpc: TrainStub,
-    knowledgebox_ingest: str,
+    knowledgebox: str,
     entities_manager_mock: Mock,
 ) -> None:
     def get_entities_mock(response):
@@ -53,7 +53,7 @@ async def test_get_entities(
     entities_manager_mock.get_entities = AsyncMock(side_effect=get_entities_mock)
 
     req = GetEntitiesRequest()
-    req.kb.uuid = knowledgebox_ingest
+    req.kb.uuid = knowledgebox
     entities: GetEntitiesResponse = await nucliadb_train_grpc.GetEntities(req)  # type: ignore
 
     assert entities.groups["group1"].entities["entity1"].value == "PERSON"
@@ -69,11 +69,11 @@ async def test_get_entities_kb_not_found(nucliadb_train_grpc: TrainStub) -> None
 
 @pytest.mark.deploy_modes("component")
 async def test_get_entities_error(
-    nucliadb_train_grpc: TrainStub, knowledgebox_ingest: str, entities_manager_mock
+    nucliadb_train_grpc: TrainStub, knowledgebox: str, entities_manager_mock
 ) -> None:
     entities_manager_mock.get_entities = AsyncMock(side_effect=Exception("Testing exception on ingest"))
 
     req = GetEntitiesRequest()
-    req.kb.uuid = knowledgebox_ingest
+    req.kb.uuid = knowledgebox
     entities: GetEntitiesResponse = await nucliadb_train_grpc.GetEntities(req)  # type: ignore
     assert entities.status == GetEntitiesResponse.Status.ERROR
