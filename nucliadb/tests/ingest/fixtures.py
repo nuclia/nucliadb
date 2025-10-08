@@ -66,6 +66,10 @@ def processor(maindb_driver: Driver, storage: Storage, pubsub: PubSubDriver) -> 
     yield proc
 
 
+# TODO: this is one of the controversial fixtures. Some test rely on this for
+# the local storage to get the correct path of files that we upload in tests.
+# However, this fixture is duplicated in ndbfixtures as the reader is also doing
+# the same trick, making them incompatible.
 @pytest.fixture(scope="function")
 def local_files():
     with patch.object(storage_settings, "local_testing_files", f"{dirname(__file__)}"):
