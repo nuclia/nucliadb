@@ -109,12 +109,12 @@ def get_message(id, who, to, text, attachments=None):
 
 
 @pytest.fixture()
-def conv_messages_count():
-    with mock.patch(f"{FIELD_MODULE}.get_current_conversation_message_count", return_value=0):
+def conversation_checks():
+    with mock.patch(f"{FIELD_MODULE}._conversation_checks", return_value=None):
         yield
 
 
-async def test_parse_conversation_field(storage_mock, processing_mock, conv_messages_count):
+async def test_parse_conversation_field(storage_mock, processing_mock, conversation_checks):
     key = "conv"
     kbid = "kbid"
     uuid = "uuid"
