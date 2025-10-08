@@ -432,14 +432,7 @@ async def parse_conversation_field(
     uuid: str,
     resource_classifications: ResourceClassifications,
 ) -> None:
-    # Make sure that the max number of messages is not exceeded
-    current_message_count = await get_current_conversation_message_count(kbid, uuid, key)
-    if len(conversation_field.messages) + current_message_count > MAX_CONVERSATION_MESSAGES:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Conversation fields cannot have more than {MAX_CONVERSATION_MESSAGES} messages.",
-        )
-
+    await conversation_checks(kbid, uuid, key, conversation_field)
     classif_labels = resource_classifications.for_field(key, resources_pb2.FieldType.CONVERSATION)
     storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
@@ -554,13 +547,29 @@ async def get_stored_resource_classifications(
     return rc
 
 
-async def get_current_conversation_message_count(kbid: str, rid: str, field_id: str) -> int:
+async def conversation_checks(kbid: str, rid: str, field_id: str, input: models.InputConversationField):
     async with datamanagers.with_ro_transaction() as txn:
         resource_obj = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
         if resource_obj is None:
-            return 0
-        field_obj: Conversation = await resource_obj.get_field(
+            return
+        conv: Conversation = await resource_obj.get_field(
             field_id, resources_pb2.FieldType.CONVERSATION, load=False
         )
-        metadata = await field_obj.get_metadata()
-        return metadata.total
+
+        # Make sure that the max number of messages is not exceeded
+        current_message_count = (await conv.get_metadata()).total
+        if len(input.messages) + current_message_count > MAX_CONVERSATION_MESSAGES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Conversation fields cannot have more than {MAX_CONVERSATION_MESSAGES} messages.",
+            )
+
+        existing_message_ids = set((await conv.get_splits_metadata()).metadata.keys())
+        input_message_ids = {message.ident for message in input.messages}
+        intersection = input_message_ids.intersection(existing_message_ids)
+        if intersection != set():
+            raise HTTPException(
+                status_code=422,
+                detail=f"Conversation field {field_id} has duplicated message identifiers: {list(intersection)}"
+            )
+
