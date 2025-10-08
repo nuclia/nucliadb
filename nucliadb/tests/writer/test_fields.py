@@ -91,8 +91,8 @@ TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD = [
 
 
 @pytest.mark.deploy_modes("component")
-async def test_resource_field_add(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
-    kbid = knowledgebox_writer
+async def test_resource_field_add(nucliadb_writer: AsyncClient, knowledgebox: str):
+    kbid = knowledgebox
 
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
@@ -162,8 +162,8 @@ async def test_resource_field_add(nucliadb_writer: AsyncClient, knowledgebox_wri
 
 
 @pytest.mark.deploy_modes("component")
-async def test_resource_field_append_extra(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
-    kbid = knowledgebox_writer
+async def test_resource_field_append_extra(nucliadb_writer: AsyncClient, knowledgebox: str):
+    kbid = knowledgebox
 
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
@@ -190,8 +190,8 @@ async def test_resource_field_append_extra(nucliadb_writer: AsyncClient, knowled
 
 
 @pytest.mark.deploy_modes("component")
-async def test_resource_field_delete(nucliadb_writer: AsyncClient, knowledgebox_writer):
-    kbid = knowledgebox_writer
+async def test_resource_field_delete(nucliadb_writer: AsyncClient, knowledgebox):
+    kbid = knowledgebox
 
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
@@ -238,8 +238,8 @@ async def test_resource_field_delete(nucliadb_writer: AsyncClient, knowledgebox_
     ],
 )
 @pytest.mark.deploy_modes("component")
-async def test_sync_ops(nucliadb_writer: AsyncClient, knowledgebox_writer, endpoint, payload):
-    kbid = knowledgebox_writer
+async def test_sync_ops(nucliadb_writer: AsyncClient, knowledgebox, endpoint, payload):
+    kbid = knowledgebox
 
     # Create a resource
     resp = await nucliadb_writer.post(
@@ -263,8 +263,8 @@ async def test_sync_ops(nucliadb_writer: AsyncClient, knowledgebox_writer, endpo
 
 
 @pytest.mark.deploy_modes("component")
-async def test_external_file_field(nucliadb_writer: AsyncClient, knowledgebox_writer):
-    kbid = knowledgebox_writer
+async def test_external_file_field(nucliadb_writer: AsyncClient, knowledgebox):
+    kbid = knowledgebox
 
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
@@ -282,8 +282,8 @@ async def test_external_file_field(nucliadb_writer: AsyncClient, knowledgebox_wr
 
 
 @pytest.mark.deploy_modes("component")
-async def test_file_field_validation(nucliadb_writer: AsyncClient, knowledgebox_writer):
-    kbid = knowledgebox_writer
+async def test_file_field_validation(nucliadb_writer: AsyncClient, knowledgebox):
+    kbid = knowledgebox
 
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",

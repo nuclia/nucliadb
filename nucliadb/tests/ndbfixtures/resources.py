@@ -113,12 +113,6 @@ async def knowledgebox_one(knowledgebox_by_api: str):
     yield knowledgebox_by_api
 
 
-# Used by: nucliadb writer tests
-@pytest.fixture(scope="function")
-async def knowledgebox_writer(knowledgebox_by_api: str):
-    yield knowledgebox_by_api
-
-
 @pytest.fixture(scope="function")
 async def full_resource(
     storage: Storage,
@@ -144,9 +138,9 @@ async def full_resource(
 
 # Used by: nucliadb writer tests
 @pytest.fixture(scope="function")
-async def resource(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
+async def resource(nucliadb_writer: AsyncClient, knowledgebox: str):
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox_writer}/resources",
+        f"/{KB_PREFIX}/{knowledgebox}/resources",
         json={
             "slug": "resource1",
             "title": "Resource 1",

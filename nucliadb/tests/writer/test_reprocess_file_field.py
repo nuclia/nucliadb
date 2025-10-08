@@ -44,9 +44,9 @@ def processing_mock(mocker):
 
 @pytest.fixture(scope="function")
 async def file_field(
-    nucliadb_writer: AsyncClient, knowledgebox_writer: str
+    nucliadb_writer: AsyncClient, knowledgebox: str
 ) -> AsyncIterator[tuple[str, str, str]]:
-    kbid = knowledgebox_writer
+    kbid = knowledgebox
     field_id = "myfile"
 
     resp = await nucliadb_writer.post(
@@ -78,9 +78,9 @@ async def file_field(
 
 @pytest.mark.deploy_modes("component")
 async def test_reprocess_nonexistent_file_field(
-    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource: str
+    nucliadb_writer: AsyncClient, knowledgebox: str, resource: str
 ):
-    kbid = knowledgebox_writer
+    kbid = knowledgebox
     rid = resource
     field_id = "nonexistent-field"
 

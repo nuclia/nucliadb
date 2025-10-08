@@ -30,9 +30,9 @@ from nucliadb_utils.utilities import get_ingest
 
 @pytest.mark.deploy_modes("component")
 async def test_service_lifecycle_entities(
-    nucliadb_writer: AsyncClient, knowledgebox_writer: str, entities_manager_mock
+    nucliadb_writer: AsyncClient, knowledgebox: str, entities_manager_mock
 ):
-    kbid = knowledgebox_writer
+    kbid = knowledgebox
 
     eg = CreateEntitiesGroupPayload(
         group="0",
@@ -69,7 +69,7 @@ async def test_service_lifecycle_entities(
 
 @pytest.mark.deploy_modes("component")
 async def test_entities_custom_field_for_user_defined_groups(
-    nucliadb_writer: AsyncClient, knowledgebox_writer: str, entities_manager_mock
+    nucliadb_writer: AsyncClient, knowledgebox: str, entities_manager_mock
 ):
     """
     Test description:
@@ -77,7 +77,7 @@ async def test_entities_custom_field_for_user_defined_groups(
     - Create an entity group and check that the default value for the `custom`
       field is True
     """
-    kbid = knowledgebox_writer
+    kbid = knowledgebox
 
     eg = CreateEntitiesGroupPayload(group="0")
     resp = await nucliadb_writer.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.model_dump())
@@ -91,8 +91,8 @@ async def test_entities_custom_field_for_user_defined_groups(
 
 
 @pytest.mark.deploy_modes("component")
-async def test_service_lifecycle_labels(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
-    kbid = knowledgebox_writer
+async def test_service_lifecycle_labels(nucliadb_writer: AsyncClient, knowledgebox: str):
+    kbid = knowledgebox
 
     ls = LabelSet(title="My labelset", color="#0000000", multiple=False, kind=[LabelSetKind.RESOURCES])
     ls.labels.append(Label(title="asd"))
