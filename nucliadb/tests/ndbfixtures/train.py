@@ -34,6 +34,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
@@ -109,9 +110,8 @@ async def standalone_nucliadb_train(
 @pytest.fixture(scope="function")
 async def train_grpc_server(
     storage_settings,
-    dummy_nidx_utility,
+    dummy_nidx_utility: NidxUtility,
     maindb_driver: Driver,
-    local_files,
 ) -> AsyncIterator[TrainGrpcServer]:
     with (
         patch.object(running_settings, "debug", False),
