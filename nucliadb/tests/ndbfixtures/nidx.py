@@ -22,6 +22,7 @@ import logging
 import os
 import platform
 import sys
+from typing import Iterator
 from unittest.mock import AsyncMock
 
 import nats
@@ -31,6 +32,7 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb.common.nidx import NidxUtility
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.tests.fixtures import get_testing_storage_backend
 from nucliadb_utils.utilities import Utility
@@ -206,12 +208,14 @@ async def nidx(natsd, nidx_storage, pg):
 
 
 @pytest.fixture(scope="function")
-async def dummy_nidx_utility():
-    class FakeNidx:
+def dummy_nidx_utility() -> Iterator[NidxUtility]:
+    class FakeNidx(NidxUtility):
         api_client = AsyncMock()
         searcher_client = AsyncMock()
-        index = AsyncMock()
+        # methods
+        initialize = AsyncMock()
         finalize = AsyncMock()
+        index = AsyncMock()
 
     fake = FakeNidx()
     fake.api_client.NewShard.return_value.id = "00000"
