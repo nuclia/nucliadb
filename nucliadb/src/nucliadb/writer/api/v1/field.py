@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from inspect import iscoroutinefunction
-from typing import TYPE_CHECKING, Annotated, Callable, Optional, Type, Union
+from typing import TYPE_CHECKING, Annotated, Callable, List, Optional, Type, Union
 
 import pydantic
 from fastapi import HTTPException, Query, Response
@@ -460,7 +460,7 @@ async def append_messages_to_conversation_field_rslug_prefix(
     kbid: str,
     rslug: str,
     field_id: FieldIdString,
-    messages: list[models.InputMessage],
+    messages: List[models.InputMessage],
 ) -> ResourceFieldAdded:
     try:
         field = models.InputConversationField(messages=messages)
@@ -483,7 +483,7 @@ async def append_messages_to_conversation_field_rid_prefix(
     kbid: str,
     rid: str,
     field_id: FieldIdString,
-    messages: list[models.InputMessage],
+    messages: List[models.InputMessage],
 ) -> ResourceFieldAdded:
     try:
         field = models.InputConversationField(messages=messages)

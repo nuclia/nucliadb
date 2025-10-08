@@ -86,10 +86,10 @@ class FieldConversation(BaseModel):
 
 
 class InputMessageContent(BaseModel):
-    text: str
+    text: str = Field(max_length=1024)
     format: MessageFormat = MessageFormat.PLAIN
-    attachments: List[FileB64] = []
-    attachments_fields: List[FieldRef] = []
+    attachments: List[FileB64] = Field(default=[], max_length=50)
+    attachments_fields: List[FieldRef] = Field(default=[], max_length=50)
 
 
 class InputMessage(BaseModel):
@@ -102,10 +102,12 @@ class InputMessage(BaseModel):
     to: List[str] = Field(
         default_factory=list,
         description="List of recipients of the message, e.g. ['assistant'] or ['user']",
+        max_length=100,
     )
     content: InputMessageContent
     ident: str = Field(
-        description="Unique identifier for the message. Must be unique within the conversation."
+        description="Unique identifier for the message. Must be unique within the conversation.",
+        max_length=128,
     )
     type_: Optional[MessageType] = Field(None, alias="type")
 
@@ -126,7 +128,8 @@ class InputMessage(BaseModel):
 class InputConversationField(BaseModel):
     messages: List[InputMessage] = Field(
         default_factory=list,
-        description="List of messages in the conversation field. Each message must have a unique ident.",
+        description="List of messages in the conversation field. Each message must have a unique ident. A single conversation can contain up to 51,200 messages. You can add up to 2,048 messages per request.",
+        max_length=2048,
     )
     extract_strategy: Optional[str] = Field(
         default=None,

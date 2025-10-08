@@ -24,8 +24,5 @@ mod params;
 mod ram_hnsw;
 
 pub use disk_hnsw::DiskHnsw;
-pub use ops_hnsw::Cnx;
-pub use ops_hnsw::DataRetriever;
-pub use ops_hnsw::HnswOps;
-pub use ops_hnsw::SearchVector;
+pub use ops_hnsw::{Cnx, DataRetriever, EstimatedScore, HnswOps, SearchVector};
 pub use ram_hnsw::RAMHnsw;
