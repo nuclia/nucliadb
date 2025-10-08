@@ -432,7 +432,7 @@ async def parse_conversation_field(
     uuid: str,
     resource_classifications: ResourceClassifications,
 ) -> None:
-    await conversation_checks(kbid, uuid, key, conversation_field)
+    await _conversation_checks(kbid, uuid, key, conversation_field)
     classif_labels = resource_classifications.for_field(key, resources_pb2.FieldType.CONVERSATION)
     storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
@@ -547,7 +547,7 @@ async def get_stored_resource_classifications(
     return rc
 
 
-async def conversation_checks(kbid: str, rid: str, field_id: str, input: models.InputConversationField):
+async def _conversation_checks(kbid: str, rid: str, field_id: str, input: models.InputConversationField):
     async with datamanagers.with_ro_transaction() as txn:
         resource_obj = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
         if resource_obj is None:
@@ -564,12 +564,12 @@ async def conversation_checks(kbid: str, rid: str, field_id: str, input: models.
                 detail=f"Conversation fields cannot have more than {MAX_CONVERSATION_MESSAGES} messages.",
             )
 
+        # Make sure input messages use unique idents
         existing_message_ids = set((await conv.get_splits_metadata()).metadata.keys())
         input_message_ids = {message.ident for message in input.messages}
         intersection = input_message_ids.intersection(existing_message_ids)
         if intersection != set():
             raise HTTPException(
                 status_code=422,
-                detail=f"Conversation field {field_id} has duplicated message identifiers: {list(intersection)}"
+                detail=f"Message identifiers must be unique field={field_id}: {list(intersection)[:50]}",
             )
-
