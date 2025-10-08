@@ -47,11 +47,11 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     BATCH_SIZE = 100
-    async with context.kv_driver.rw_transaction() as txn:
-        txn = cast(PGTransaction, txn)
-        start = ""
-        while True:
-            to_fix: list[tuple[str, str]] = []
+    start = ""
+    while True:
+        to_fix: list[tuple[str, str]] = []
+        async with context.kv_driver.rw_transaction() as txn:
+            txn = cast(PGTransaction, txn)
             async with txn.connection.cursor() as cur:
                 # Retrieve a bunch of conversation fields
                 await cur.execute(
@@ -73,17 +73,16 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                     field_id = key.split("/")[7]
                     to_fix.append((rid, field_id))
 
-            if to_fix:
-                for rid, field_id in to_fix:
-                    async with context.kv_driver.rw_transaction() as txn2:
-                        splits_metadata = await build_splits_metadata(
-                            txn2, context.blob_storage, kbid, rid, field_id
-                        )
-                        splits_metadata_key = CONVERSATION_SPLITS_METADATA.format(
-                            kbid=kbid, uuid=rid, type="c", field=field_id
-                        )
-                        await txn2.set(splits_metadata_key, splits_metadata.SerializeToString())
-                        await txn2.commit()
+        for rid, field_id in to_fix:
+            async with context.kv_driver.rw_transaction() as txn2:
+                splits_metadata = await build_splits_metadata(
+                    txn2, context.blob_storage, kbid, rid, field_id
+                )
+                splits_metadata_key = CONVERSATION_SPLITS_METADATA.format(
+                    kbid=kbid, uuid=rid, type="c", field=field_id
+                )
+                await txn2.set(splits_metadata_key, splits_metadata.SerializeToString())
+                await txn2.commit()
 
 
 async def build_splits_metadata(
