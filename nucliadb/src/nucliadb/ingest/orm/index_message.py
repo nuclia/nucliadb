@@ -227,12 +227,9 @@ class IndexMessageBuilder:
             if fieldid.field_type == FieldType.CONVERSATION:
                 modified_splits = await get_bm_modified_split_ids(fieldid, message, self.resource)
                 stored_splits = await get_stored_split_ids(fieldid, self.resource)
-                is_append_messages_op = (
-                    modified_splits is not None
-                    and stored_splits is not None
-                    and modified_splits.issubset(stored_splits)
-                    and len(modified_splits) < len(stored_splits)
-                )
+                is_append_messages_op = modified_splits.issubset(stored_splits) and 0 < len(
+                    modified_splits
+                ) < len(stored_splits)
                 replace_field = not is_append_messages_op
 
             await self._apply_field_index_data(
@@ -380,12 +377,12 @@ async def get_bm_modified_split_ids(
     conversation_field_id: FieldID,
     message: BrokerMessage,
     resource: Resource,
-) -> Optional[set[str]]:
+) -> set[str]:
     message_etw = next(
         (etw for etw in message.extracted_text if etw.field == conversation_field_id), None
     )
     if message_etw is None:
-        return None
+        return set()
     storage = resource.storage
     if message_etw.HasField("file"):
         raw_payload = await storage.downloadbytescf(message_etw.file)
@@ -400,7 +397,7 @@ async def get_bm_modified_split_ids(
 async def get_stored_split_ids(
     conversation_field_id: FieldID,
     resource: Resource,
-) -> Optional[set[str]]:
+) -> set[str]:
     fid = conversation_field_id
     conv: Conversation = await resource.get_field(fid.field, fid.field_type, load=False)
     splits_metadata = await conv.get_splits_metadata()
