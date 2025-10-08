@@ -133,7 +133,7 @@ async def test_parse_conversation_field(storage_mock, processing_mock, conversat
     conversation_field = InputConversationField(messages=[m1, m2])
 
     await parse_conversation_field(
-        key, conversation_field, bm, pp, kbid, uuid, ResourceClassifications()
+        key, conversation_field, bm, pp, kbid, uuid, ResourceClassifications(), replace_field=True
     )
 
     # Check push payload
