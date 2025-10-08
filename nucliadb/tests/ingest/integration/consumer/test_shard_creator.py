@@ -19,45 +19,51 @@
 #
 
 import asyncio
+from unittest.mock import patch
 
+from nucliadb.common.cluster.settings import settings
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.consumer import shard_creator
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
+from nucliadb_utils.cache.pubsub import PubSubDriver
+from nucliadb_utils.storages.storage import Storage
 
 
 async def test_shard_auto_create(
-    maindb_driver,
-    pubsub,
-    storage,
-    dummy_nidx_utility,
-    knowledgebox,
+    maindb_driver: Driver,
+    pubsub: PubSubDriver,
+    storage: Storage,
+    dummy_nidx_utility: NidxUtility,
+    knowledgebox: str,
 ):
-    from nucliadb.common.cluster.settings import settings
+    with (
+        patch.object(settings, "max_shard_paragraphs", 1),
+    ):
+        dummy_nidx_utility.api_client.GetShard.return_value.paragraphs = 2
 
-    settings.max_shard_paragraphs = 1
-    dummy_nidx_utility.api_client.GetShard.return_value.paragraphs = 2
+        sc = shard_creator.ShardCreatorHandler(
+            driver=maindb_driver,
+            storage=storage,
+            pubsub=pubsub,
+            check_delay=0.05,
+        )
+        await sc.initialize()
 
-    sc = shard_creator.ShardCreatorHandler(
-        driver=maindb_driver,
-        storage=storage,
-        pubsub=pubsub,
-        check_delay=0.05,
-    )
-    await sc.initialize()
+        original_kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(knowledgebox)
 
-    original_kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(knowledgebox)
+        await pubsub.publish(
+            const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=knowledgebox),
+            writer_pb2.Notification(
+                kbid=knowledgebox,
+                action=writer_pb2.Notification.Action.INDEXED,
+            ).SerializeToString(),
+        )
 
-    await pubsub.publish(
-        const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=knowledgebox),
-        writer_pb2.Notification(
-            kbid=knowledgebox,
-            action=writer_pb2.Notification.Action.INDEXED,
-        ).SerializeToString(),
-    )
+        await asyncio.sleep(0.2)
 
-    await asyncio.sleep(0.2)
+        await sc.finalize()
 
-    await sc.finalize()
-
-    kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(knowledgebox)
-    assert len(kb_shards.shards) == len(original_kb_shards.shards) + 1
+        kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(knowledgebox)
+        assert len(kb_shards.shards) == len(original_kb_shards.shards) + 1

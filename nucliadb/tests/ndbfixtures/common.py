@@ -32,16 +32,10 @@ from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.settings import (
-    audit_settings,
-    nuclia_settings,
-)
+from nucliadb_utils.settings import audit_settings, nuclia_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import (
-    Utility,
-    get_utility,
-)
+from nucliadb_utils.utilities import Utility, get_utility
 from tests.ndbfixtures.utils import global_utility
 
 # Audit
