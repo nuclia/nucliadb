@@ -19,6 +19,12 @@ from pydantic_core import ValidationError
 from nucliadb_models import common
 
 
+def test_file_type_name_abbreviations():
+    for field_type in common.FieldTypeName:
+        abbrev = field_type.abbreviation()
+        assert common.FieldTypeName.from_abbreviation(abbrev) == field_type
+
+
 def test_file_model_validator():
     common.File(uri="asdf")
 
