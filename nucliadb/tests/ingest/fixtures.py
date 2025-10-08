@@ -48,7 +48,7 @@ from nucliadb_utils import const
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import NatsConnectionManager
-from nucliadb_utils.settings import indexing_settings, transaction_settings
+from nucliadb_utils.settings import indexing_settings, nuclia_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.transaction import TransactionUtility
@@ -74,7 +74,8 @@ def processor(maindb_driver: Driver, storage: Storage, pubsub: PubSubDriver) -> 
 
 @pytest.fixture(scope="function")
 def local_files():
-    storage_settings.local_testing_files = f"{dirname(__file__)}"
+    with patch.object(storage_settings, "local_testing_files", f"{dirname(__file__)}"):
+        yield
 
 
 @dataclass
@@ -133,14 +134,10 @@ async def pubsub(nats_server: str) -> AsyncIterator[PubSubDriver]:
     await pubsub.finalize()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="function")
 def learning_config():
-    from nucliadb_utils.settings import nuclia_settings
-
-    original = nuclia_settings.dummy_learning_services
-    nuclia_settings.dummy_learning_services = True
-    yield AsyncMock()
-    nuclia_settings.dummy_learning_services = original
+    with patch.object(nuclia_settings, "dummy_learning_services", True):
+        yield
 
 
 @pytest.fixture(scope="function")
