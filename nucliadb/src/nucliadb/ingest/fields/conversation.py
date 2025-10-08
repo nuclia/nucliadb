@@ -18,10 +18,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Optional
 
 from nucliadb.ingest.fields.base import Field
-from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation, SplitMetadata, SplitsMetadata
+from nucliadb_protos.resources_pb2 import (
+    CloudFile,
+    FieldConversation,
+    Message,
+    SplitMetadata,
+    SplitsMetadata,
+)
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_utils.storages.storage import StorageField
 
@@ -249,3 +255,12 @@ class Conversation(Field[PBConversation]):
         await self.resource.txn.set(key, payload.SerializeToString())
         self._split_metadata = payload
         self.resource.modified = True
+
+    async def iter_messages(self) -> AsyncIterator[Message]:
+        metadata = await self.get_metadata()
+        for page_number in range(1, metadata.pages + 1):
+            page = await self.get_value(page_number)
+            if page is None:
+                continue
+            for message in page.messages:
+                yield message

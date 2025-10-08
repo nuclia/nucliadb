@@ -20,7 +20,7 @@
 import asyncio
 import contextlib
 from time import time
-from typing import Annotated, Optional
+from typing import Annotated, AsyncIterator, Optional
 from uuid import uuid4
 
 from fastapi import HTTPException, Query, Response
@@ -33,9 +33,9 @@ from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal.processing import ProcessingInfo, PushPayload, Source
-from nucliadb.writer import SERVICE_NAME, logger
+from nucliadb.writer import logger
 from nucliadb.writer.api.constants import X_NUCLIADB_USER, X_SKIP_STORE
 from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.router import (
@@ -77,7 +77,6 @@ from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.utilities import (
     get_ingest,
     get_partitioning,
-    get_storage,
 )
 
 
@@ -442,51 +441,58 @@ async def _reprocess_resource(
     await maybe_back_pressure(kbid, resource_uuid=rid)
 
     partitioning = get_partitioning()
-
     partition = partitioning.generate_partition(kbid, rid)
 
-    toprocess = PushPayload(
-        uuid=rid,
-        kbid=kbid,
-        partition=partition,
-        userid=x_nucliadb_user,
-    )
-
-    toprocess.kbid = kbid
-    toprocess.uuid = rid
-    toprocess.source = Source.HTTP
-
-    storage = await get_storage(service_name=SERVICE_NAME)
-    driver = get_driver()
-
-    writer = BrokerMessage()
-    async with driver.ro_transaction() as txn:
-        kb = KnowledgeBox(txn, storage, kbid)
-
-        resource = await kb.get(rid)
+    async with get_driver().ro_transaction() as txn:
+        resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
         if resource is None:
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
-        await extract_fields(resource=resource, toprocess=toprocess)
-        for field_type, field_id in resource.fields.keys():
-            writer.field_statuses.append(
-                FieldIDStatus(
-                    id=FieldID(field_type=field_type, field=field_id),
-                    status=FieldStatus.Status.PENDING,
-                )
-            )
+        # Send message to ingest statefulset
+        writer_bm = await _reprocess_writer_bm(resource, reset_title)
+        await transaction.commit(writer_bm, partition, wait=False)
 
-    writer.kbid = kbid
-    writer.uuid = rid
-    writer.source = BrokerMessage.MessageSource.WRITER
+        # Send processing request(s)
+        seqid = None
+        async for toprocess in _reprocess_payloads(resource, partition, x_nucliadb_user):
+            processing_info = await send_to_process(toprocess, partition)
+            seqid = processing_info.seqid
+
+    return ResourceUpdated(seqid=seqid)
+
+
+async def _reprocess_writer_bm(resource: Resource, reset_title: bool) -> BrokerMessage:
+    writer = BrokerMessage(
+        kbid=resource.kb.kbid,
+        uuid=resource.uuid,
+        source=BrokerMessage.MessageSource.WRITER,
+    )
+    for field_type, field_id in (await resource.get_fields()).keys():
+        writer.field_statuses.append(
+            FieldIDStatus(
+                id=FieldID(field_type=field_type, field=field_id),
+                status=FieldStatus.Status.PENDING,
+            )
+        )
     if reset_title:
         writer.basic.reset_title = True
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
-    await transaction.commit(writer, partition, wait=False)
-    processing_info = await send_to_process(toprocess, partition)
+    return writer
 
-    return ResourceUpdated(seqid=processing_info.seqid)
+
+async def _reprocess_payloads(
+    resource: Resource, partition: int, userid: str
+) -> AsyncIterator[PushPayload]:
+    toprocess = PushPayload(
+        uuid=resource.uuid,
+        kbid=resource.kb.kbid,
+        partition=partition,
+        userid=userid,
+        source=Source.HTTP,
+    )
+    async for toprocess in extract_fields(resource, toprocess):
+        yield toprocess
 
 
 @api.delete(

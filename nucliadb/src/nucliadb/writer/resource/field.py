@@ -19,7 +19,7 @@
 #
 import dataclasses
 from datetime import datetime
-from typing import Optional, Union
+from typing import Any, AsyncGenerator, AsyncIterator, Optional, Union
 
 from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
@@ -103,18 +103,19 @@ async def extract_file_field(
     toprocess.filefield[field_id] = await extract_file_field_from_pb(field_pb, classif_labels)
 
 
-async def extract_fields(resource: ORMResource, toprocess: PushPayload):
+async def extract_fields(resource: ORMResource, base: PushPayload) -> AsyncIterator[PushPayload]:
+    toprocess = base.model_copy()
     processing = get_processing()
     storage = await get_storage(service_name=SERVICE_NAME)
-    await resource.get_fields()
-
+    resource_fields = await resource.get_fields()
     resource_classifications = await atomic_get_stored_resource_classifications(
-        kbid=toprocess.kbid,
-        rid=toprocess.uuid,
+        kbid=base.kbid,
+        rid=base.uuid,
     )
-    for (field_type, field_id), field in resource.fields.items():
-        field_type_name = from_proto.field_type_name(field_type)
 
+    conversation_fields = []
+    for (field_type, field_id), field in resource_fields.items():
+        field_type_name = from_proto.field_type_name(field_type)
         if field_type_name not in {
             FieldTypeName.TEXT,
             FieldTypeName.FILE,
@@ -122,6 +123,10 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
             FieldTypeName.LINK,
         }:
             continue
+
+        if field_type_name == FieldTypeName.CONVERSATION:
+            # Conversations are handled last
+            conversation_fields.append(((field_type, field_id), field))
 
         field_pb = await field.get_value()
         classif_labels = resource_classifications.for_field(field_id, field_type)
@@ -149,17 +154,16 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
             toprocess.textfield[field_id].classification_labels = classif_labels
 
         if field_type_name is FieldTypeName.CONVERSATION and isinstance(field, Conversation):
-            metadata = await field.get_metadata()
-            if metadata.pages == 0:
-                continue
+            batch_idx = 0
+            async for message_batch in batchify(field.iter_messages(), 2048):
+                if batch_idx > 0:
+                    # If there are more than one batch of conversation messages, yield the current payload
+                    # and continue with a new one so we make sure we don't send too much data to process at once.
+                    yield toprocess
+                    toprocess = base.model_copy()
 
-            full_conversation = PushConversation(messages=[])
-            for page in range(0, metadata.pages):
-                conversation_pb = await field.get_value(page + 1)
-                if conversation_pb is None:
-                    continue
-
-                for message in conversation_pb.messages:
+                conversation = PushConversation(messages=[])
+                for message in message_batch:
                     parsed_message = MessageToDict(
                         message,
                         preserving_proto_field_name=True,
@@ -175,9 +179,23 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
                     parsed_message["content"]["format"] = resources_pb2.MessageContent.Format.Value(
                         parsed_message["content"]["format"]
                     )
-                    full_conversation.messages.append(processing_models.PushMessage(**parsed_message))
-            toprocess.conversationfield[field_id] = full_conversation
-            toprocess.conversationfield[field_id].classification_labels = classif_labels
+                    conversation.messages.append(processing_models.PushMessage(**parsed_message))
+                toprocess.conversationfield[field_id] = conversation
+                toprocess.conversationfield[field_id].classification_labels = classif_labels
+                batch_idx += 1
+        yield toprocess
+
+
+async def batchify(producer: AsyncIterator[Any], size: int) -> AsyncGenerator[list[Any], None]:
+    batch = []
+    async for item in producer:
+        batch.append(item)
+        if len(batch) == size:
+            yield batch
+            batch = []
+
+    if len(batch):
+        yield batch
 
 
 async def parse_fields(
