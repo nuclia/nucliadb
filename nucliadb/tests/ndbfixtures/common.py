@@ -86,8 +86,9 @@ async def stream_audit(nats_server: str, mocker: MockerFixture) -> AsyncIterator
 
 
 @pytest.fixture(scope="function")
-async def local_files():
-    storage_settings.local_testing_files = f"{dirname(__file__)}"
+def local_files():
+    with patch.object(storage_settings, "local_testing_files", f"{dirname(__file__)}"):
+        yield
 
 
 # Predict
