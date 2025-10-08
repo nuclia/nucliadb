@@ -509,9 +509,7 @@ async def test_conversation_field_indexing(
 
     # Check counters after appending the message
     counters = await get_counters()
-    assert (
-        counters.sentences == 2 + 1
-    )  # One for each message (the title does not have a vector) + the initial message that has been marked as deleted but not yet merged
+    assert counters.sentences == 2  # One for each message (the title does not have a vector)
     assert counters.paragraphs == 3  # One for each message + the title paragraph
     assert counters.fields == 2  # One conversation field + the title field
     assert counters.resources == 1
@@ -537,7 +535,7 @@ async def test_conversation_field_indexing(
     # Make sure the messages are not searchable anymore
     counters = await get_counters()
     assert (
-        counters.sentences == 3
+        counters.sentences == 2
     )  # The messages are not indexed anymore, but deleted messages still count
     assert counters.paragraphs == 1  # the title
     assert counters.fields == 1  # the title
