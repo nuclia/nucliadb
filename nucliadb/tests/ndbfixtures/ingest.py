@@ -72,7 +72,9 @@ async def standalone_nucliadb_ingest_grpc(nucliadb: Settings) -> AsyncIterator[W
 
 # alias to ease migration to new ndbfixtures
 @pytest.fixture(scope="function")
-async def standalone_nucliadb_grpc(standalone_nucliadb_ingest_grpc):
+async def standalone_nucliadb_grpc(
+    standalone_nucliadb_ingest_grpc: WriterStub,
+) -> AsyncIterator[WriterStub]:
     yield standalone_nucliadb_ingest_grpc
 
 
