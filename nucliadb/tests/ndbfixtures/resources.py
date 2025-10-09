@@ -54,7 +54,7 @@ async def knowledgebox(
     storage: Storage,
     maindb_driver: Driver,
     shard_manager: KBShardManager,
-):
+) -> AsyncIterator[str]:
     """Knowledgebox created through the ORM. This is what ingest gRPC ends up
     calling when backend creates a hosted KB and what the standalone API ends up
     calling for onprem KBs.
@@ -76,9 +76,12 @@ async def knowledgebox(
 
 
 @pytest.fixture(scope="function")
-async def standalone_knowledgebox(nucliadb_writer_manager: AsyncClient):
+async def standalone_knowledgebox(nucliadb_writer_manager: AsyncClient) -> AsyncIterator[str]:
     """Knowledgebox created through the /kbs endpoint, only accessible for
-    onprem (standalone) deployments
+    onprem (standalone) deployments.
+
+    This fixture requires the test using it to be decorated with a
+    @pytest.mark.deploy_modes(...)
 
     """
     resp = await nucliadb_writer_manager.post(
@@ -89,11 +92,11 @@ async def standalone_knowledgebox(nucliadb_writer_manager: AsyncClient):
         },
     )
     assert resp.status_code == 201
-    uuid = resp.json().get("uuid")
+    kbid = resp.json().get("uuid")
 
-    yield uuid
+    yield kbid
 
-    resp = await nucliadb_writer_manager.delete(f"/kb/{uuid}")
+    resp = await nucliadb_writer_manager.delete(f"/{KB_PREFIX}/{kbid}")
     assert resp.status_code == 200
 
 
