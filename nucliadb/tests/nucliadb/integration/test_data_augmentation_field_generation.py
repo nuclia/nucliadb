@@ -89,13 +89,13 @@ def partition_utility() -> Iterable[PartitionUtility]:
 
 async def test_send_to_process_generated_fields(
     dummy_nidx_utility,
-    knowledgebox_ingest: str,
+    knowledgebox: str,
     processor: Processor,
     partition_utility: PartitionUtility,
     processing_utility: DummyProcessingEngine,
     mocker: MockerFixture,
 ):
-    kbid = knowledgebox_ingest
+    kbid = knowledgebox
     rid = uuid.uuid4().hex
 
     # Resource creation (from writer)

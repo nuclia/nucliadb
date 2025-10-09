@@ -35,7 +35,7 @@ from nucliadb_protos import resources_pb2, utils_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig, VectorSetPurge
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.storages.storage import Storage
-from tests.ingest.fixtures import make_extracted_text
+from tests.ndbfixtures.ingest import make_extracted_text
 from tests.utils import inject_message
 
 

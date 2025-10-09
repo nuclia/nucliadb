@@ -28,11 +28,11 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def test_create_resource_orm_field_link(
-    storage: Storage, cache, dummy_nidx_utility, knowledgebox_ingest: str, maindb_driver
+    storage: Storage, cache, dummy_nidx_utility, knowledgebox: str, maindb_driver
 ):
     async with maindb_driver.rw_transaction() as txn:
         uuid = str(uuid4())
-        kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+        kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
         r = await kb_obj.add_resource(uuid=uuid, slug="slug")
         assert r is not None
         await txn.commit()

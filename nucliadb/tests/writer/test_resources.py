@@ -45,8 +45,8 @@ from tests.writer.test_fields import (
 
 
 @pytest.mark.deploy_modes("component")
-async def test_resource_crud(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
-    kbid = knowledgebox_writer
+async def test_resource_crud(nucliadb_writer: AsyncClient, knowledgebox: str):
+    kbid = knowledgebox
     # Test create resource
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
@@ -128,8 +128,8 @@ async def test_resource_crud(nucliadb_writer: AsyncClient, knowledgebox_writer: 
 
 
 @pytest.mark.deploy_modes("component")
-async def test_resource_crud_sync(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
-    kbid = knowledgebox_writer
+async def test_resource_crud_sync(nucliadb_writer: AsyncClient, knowledgebox: str):
+    kbid = knowledgebox
 
     # Test create resource
     resp = await nucliadb_writer.post(
@@ -219,11 +219,11 @@ async def test_resource_crud_sync(nucliadb_writer: AsyncClient, knowledgebox_wri
 @pytest.mark.deploy_modes("component")
 async def test_create_resource_async(
     nucliadb_writer: AsyncClient,
-    knowledgebox_writer: str,
+    knowledgebox: str,
     mocker: MockerFixture,
 ):
     """Create a resoure and don't wait for it"""
-    kbid = knowledgebox_writer
+    kbid = knowledgebox
 
     from nucliadb.writer.api.v1.resource import transaction
 
@@ -410,8 +410,8 @@ async def test_reindex(nucliadb_writer: AsyncClient, full_resource: Resource):
 
 
 @pytest.mark.deploy_modes("component")
-async def test_paragraph_annotations(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
-    kbid = knowledgebox_writer
+async def test_paragraph_annotations(nucliadb_writer: AsyncClient, knowledgebox: str):
+    kbid = knowledgebox
     # Must have at least one classification
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{kbid}/resources",
@@ -482,9 +482,9 @@ async def test_paragraph_annotations(nucliadb_writer: AsyncClient, knowledgebox_
 async def test_hide_on_creation(
     nucliadb_writer: AsyncClient,
     nucliadb_writer_manager: AsyncClient,
-    knowledgebox_writer: str,
+    knowledgebox: str,
 ):
-    kbid = knowledgebox_writer
+    kbid = knowledgebox
 
     # Create new resource (default = visible)
     resp = await nucliadb_writer.post(

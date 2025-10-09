@@ -107,9 +107,9 @@ def kbid(
     shard_manager,
     dummy_nidx_utility,
     processor,
-    knowledgebox_ingest,
+    knowledgebox,
 ):
-    yield knowledgebox_ingest
+    yield knowledgebox
 
 
 async def test_ingest_messages_autocommit(kbid: str, processor, dummy_nidx_utility):
@@ -258,11 +258,11 @@ async def test_ingest_messages_origin(
     shard_manager,
     dummy_nidx_utility,
     processor,
-    knowledgebox_ingest,
+    knowledgebox,
 ):
     rid = "43ece3e4-b706-4c74-b41b-3637f6d28197"
     message1: BrokerMessage = BrokerMessage(
-        kbid=knowledgebox_ingest,
+        kbid=knowledgebox,
         uuid=rid,
         slug="slug1",
         type=BrokerMessage.AUTOCOMMIT,
@@ -272,7 +272,7 @@ async def test_ingest_messages_origin(
 
     async with processor.driver.ro_transaction() as txn:
         storage = await get_storage(service_name=SERVICE_NAME)
-        kb = KnowledgeBox(txn, storage, knowledgebox_ingest)
+        kb = KnowledgeBox(txn, storage, knowledgebox)
         res = Resource(txn, storage, kb, rid)
         origin = await res.get_origin()
 
@@ -290,7 +290,7 @@ async def test_ingest_messages_origin(
     await processor.process(message=message1, seqid=2)
 
     async with processor.driver.ro_transaction() as txn:
-        kb = KnowledgeBox(txn, storage, knowledgebox_ingest)
+        kb = KnowledgeBox(txn, storage, knowledgebox)
         res = Resource(txn, storage, kb, rid)
         origin = await res.get_origin()
 
@@ -360,7 +360,7 @@ async def test_ingest_audit_stream_files_only(
     txn,
     cache,
     dummy_nidx_utility,
-    knowledgebox_ingest,
+    knowledgebox,
     processor,
     stream_audit: StreamAuditStorage,
     maindb_driver: Driver,
@@ -368,7 +368,7 @@ async def test_ingest_audit_stream_files_only(
     from nucliadb_utils.settings import audit_settings
 
     # Prepare a test audit stream to receive our messages
-    partition = stream_audit.get_partition(knowledgebox_ingest)
+    partition = stream_audit.get_partition(knowledgebox)
     client: Client = await nats.connect(stream_audit.nats_servers)
     jetstream: JetStreamContext = client.jetstream()
     if audit_settings.audit_jetstream_target is None:
@@ -391,7 +391,7 @@ async def test_ingest_audit_stream_files_only(
     #
     # Test 1: add a resource with some files
     #
-    message = make_message(knowledgebox_ingest, rid)
+    message = make_message(knowledgebox, rid)
     add_filefields(
         message,
         [("file_1", "file.png"), ("file_2", "text.pb"), ("file_3", "vectors.pb")],
@@ -404,7 +404,7 @@ async def test_ingest_audit_stream_files_only(
     # gets from the sidecar to the audit report when adding or modifying a resource
     # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreq.kbid == knowledgebox_ingest
+    assert auditreq.kbid == knowledgebox
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.NEW
 
@@ -436,7 +436,7 @@ async def test_ingest_audit_stream_files_only(
     # gets from the sidecar to the audit report when adding or modifying a resource
     # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreq.kbid == knowledgebox_ingest
+    assert auditreq.kbid == knowledgebox
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
 
@@ -444,7 +444,7 @@ async def test_ingest_audit_stream_files_only(
     # Test 3: modify a file while adding and deleting other files
     #
 
-    message = make_message(knowledgebox_ingest, rid)
+    message = make_message(knowledgebox, rid)
     add_filefields(message, [("file_2", "file.png"), ("file_4", "text.pb")])
     fieldid = FieldID(field="file_3", field_type=FieldType.FILE)
     message.delete_fields.append(fieldid)
@@ -456,7 +456,7 @@ async def test_ingest_audit_stream_files_only(
     # gets from the sidecar to the audit report when adding or modifying a resource
     # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreq.kbid == knowledgebox_ingest
+    assert auditreq.kbid == knowledgebox
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
 
@@ -472,14 +472,14 @@ async def test_ingest_audit_stream_files_only(
     # Test 4: delete resource
     #
 
-    message = make_message(knowledgebox_ingest, rid, message_type=BrokerMessage.MessageType.DELETE)
+    message = make_message(knowledgebox, rid, message_type=BrokerMessage.MessageType.DELETE)
     await processor.process(message=message, seqid=4)
     auditreq = await get_audit_messages(psub)
 
     assert auditreq.type == AuditRequest.AuditType.DELETED
 
     # Test 5: Delete knowledgebox
-    await KnowledgeBox.delete(maindb_driver, knowledgebox_ingest)
+    await KnowledgeBox.delete(maindb_driver, knowledgebox)
 
     await client.drain()
     await client.close()
@@ -672,8 +672,8 @@ async def test_ingest_autocommit_deadletter_marks_resource(
     assert resource.basic.metadata.status == PBMetadata.Status.ERROR  # type: ignore
 
 
-def message_resource_with_vectors(knowledgebox_ingest: str, rid: str):
-    message = make_message(knowledgebox_ingest, rid, source=BrokerMessage.MessageSource.PROCESSOR)
+def message_resource_with_vectors(knowledgebox: str, rid: str):
+    message = make_message(knowledgebox, rid, source=BrokerMessage.MessageSource.PROCESSOR)
     add_filefields(message, [("some_text", "file.png")])
     message.extracted_text.append(
         ExtractedTextWrapper(
@@ -727,7 +727,7 @@ async def test_ingest_delete_field(
     txn,
     cache,
     dummy_nidx_utility,
-    knowledgebox_ingest,
+    knowledgebox,
     processor,
     stream_audit: StreamAuditStorage,
     maindb_driver: Driver,
@@ -744,14 +744,14 @@ async def test_ingest_delete_field(
 
     rid = str(uuid.uuid4())
 
-    message = make_message(knowledgebox_ingest, rid)
+    message = make_message(knowledgebox, rid)
     await processor.process(message=message, seqid=0)
 
     # Create a resource
     with patch.object(processor, "index_resource") as mock_index_resource:
         brain_mock = brain_extractor_mock(mock_index_resource)
 
-        message = message_resource_with_vectors(knowledgebox_ingest, rid)
+        message = message_resource_with_vectors(knowledgebox, rid)
         await processor.process(message=message, seqid=1)
 
         brain_mock.assert_called_once()
@@ -763,7 +763,7 @@ async def test_ingest_delete_field(
     with patch.object(processor, "index_resource") as mock_index_resource:
         brain_mock = brain_extractor_mock(mock_index_resource)
 
-        message = make_message(knowledgebox_ingest, rid)
+        message = make_message(knowledgebox, rid)
         message.delete_fields.append(FieldID(field="some_text"))
         await processor.process(message=message, seqid=2)
 
@@ -781,7 +781,7 @@ async def test_ingest_update_labels(
     txn,
     cache,
     dummy_nidx_utility,
-    knowledgebox_ingest,
+    knowledgebox,
     processor,
     stream_audit: StreamAuditStorage,
     maindb_driver: Driver,
@@ -798,14 +798,14 @@ async def test_ingest_update_labels(
 
     rid = str(uuid.uuid4())
 
-    message = make_message(knowledgebox_ingest, rid)
+    message = make_message(knowledgebox, rid)
     await processor.process(message=message, seqid=0)
 
     # Create a resource
     with patch.object(processor, "index_resource") as mock_index_resource:
         brain_mock = brain_extractor_mock(mock_index_resource)
 
-        message = message_resource_with_vectors(knowledgebox_ingest, rid)
+        message = message_resource_with_vectors(knowledgebox, rid)
         await processor.process(message=message, seqid=1)
 
         brain_mock.assert_called_once()
@@ -817,7 +817,7 @@ async def test_ingest_update_labels(
     with patch.object(processor, "index_resource") as mock_index_resource:
         brain_mock = brain_extractor_mock(mock_index_resource)
 
-        message = make_message(knowledgebox_ingest, rid)
+        message = make_message(knowledgebox, rid)
         message.basic.usermetadata.classifications.append(Classification(labelset="names", label="john"))
         message.reindex = True
         await processor.process(message=message, seqid=2)

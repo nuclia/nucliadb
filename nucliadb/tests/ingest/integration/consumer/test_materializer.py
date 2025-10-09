@@ -19,58 +19,35 @@
 #
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 from nucliadb.common import datamanagers
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.consumer import materializer
 from nucliadb_protos import writer_pb2
 from nucliadb_protos.kb_usage_pb2 import KbUsage, Service
 from nucliadb_utils import const
 from nucliadb_utils.audit.stream import StreamAuditStorage
-from nucliadb_utils.utilities import Utility, clean_utility, set_utility
-from tests.ingest.fixtures import create_resource
-
-
-@pytest.fixture()
-def nats():
-    mock = AsyncMock()
-    mock.jetstream = MagicMock(return_value=AsyncMock())
-    yield mock
-
-
-@pytest.fixture()
-async def audit_storage(nats):
-    with patch("nucliadb_utils.audit.stream.nats.connect", return_value=nats):
-        aud = StreamAuditStorage(
-            nats_servers=["nats://localhost:4222"],
-            nats_target="test",
-            partitions=1,
-            seed=1,
-            nats_creds="nats_creds",
-        )
-        await aud.initialize()
-        set_utility(Utility.AUDIT, aud)
-        yield aud
-        clean_utility(Utility.AUDIT)
-        await aud.finalize()
+from nucliadb_utils.cache.pubsub import PubSubDriver
+from tests.ndbfixtures.ingest import create_resource
 
 
 async def test_materialize_kb_data(
-    maindb_driver,
-    pubsub,
+    maindb_driver: Driver,
+    pubsub: PubSubDriver,
     storage,
-    dummy_nidx_utility,
-    knowledgebox_ingest,
-    audit_storage,
+    dummy_nidx_utility: NidxUtility,
+    knowledgebox: str,
+    stream_audit: StreamAuditStorage,
 ):
+    audit_storage = stream_audit
+
     count = 10
     for _ in range(count):
         await create_resource(
             storage=storage,
             driver=maindb_driver,
-            knowledgebox_ingest=knowledgebox_ingest,
+            knowledgebox=knowledgebox,
         )
 
     mz = materializer.MaterializerHandler(
@@ -82,16 +59,15 @@ async def test_materialize_kb_data(
     await mz.initialize()
 
     async with datamanagers.with_transaction() as txn:
-        assert await datamanagers.resources.get_number_of_resources(txn, kbid=knowledgebox_ingest) == -1
+        assert await datamanagers.resources.get_number_of_resources(txn, kbid=knowledgebox) == -1
         assert (
-            await datamanagers.resources.calculate_number_of_resources(txn, kbid=knowledgebox_ingest)
-            == count
+            await datamanagers.resources.calculate_number_of_resources(txn, kbid=knowledgebox) == count
         )
 
     await pubsub.publish(
-        const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=knowledgebox_ingest),
+        const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=knowledgebox),
         writer_pb2.Notification(
-            kbid=knowledgebox_ingest,
+            kbid=knowledgebox,
             action=writer_pb2.Notification.Action.COMMIT,
         ).SerializeToString(),
     )
@@ -99,9 +75,7 @@ async def test_materialize_kb_data(
     await asyncio.sleep(0.2)
 
     async with datamanagers.with_transaction() as txn:
-        assert (
-            await datamanagers.resources.get_number_of_resources(txn, kbid=knowledgebox_ingest) == count
-        )
+        assert await datamanagers.resources.get_number_of_resources(txn, kbid=knowledgebox) == count
 
     await mz.finalize()
     assert audit_storage.js.publish.call_count == 1
@@ -110,4 +84,4 @@ async def test_materialize_kb_data(
     pb.ParseFromString(audit_storage.js.publish.call_args[0][1])
     assert pb.storage.resources == count
     assert pb.service == Service.NUCLIA_DB
-    assert pb.kb_id == knowledgebox_ingest
+    assert pb.kb_id == knowledgebox

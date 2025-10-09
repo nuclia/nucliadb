@@ -26,10 +26,10 @@ from nucliadb_protos.train_pb2_grpc import TrainStub
 
 @pytest.mark.deploy_modes("component")
 async def test_list_resource(
-    nucliadb_train_grpc: TrainStub, knowledgebox_ingest: str, test_pagination_resources
+    nucliadb_train_grpc: TrainStub, knowledgebox: str, test_pagination_resources
 ) -> None:
     req = GetResourcesRequest()
-    req.kb.uuid = knowledgebox_ingest
+    req.kb.uuid = knowledgebox
     req.metadata.entities = True
     req.metadata.labels = True
     req.metadata.text = True

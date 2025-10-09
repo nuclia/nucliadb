@@ -31,7 +31,7 @@ from nucliadb_protos import knowledgebox_pb2, utils_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
-from tests.ingest.fixtures import broker_resource
+from tests.ndbfixtures.ingest import broker_resource
 
 
 @pytest.fixture(scope="function")
@@ -234,10 +234,10 @@ async def test_knowledgebox_delete_all_kb_keys(
     cache,
     dummy_nidx_utility,
     maindb_driver,
-    knowledgebox_ingest: str,
+    knowledgebox: str,
 ):
     async with maindb_driver.rw_transaction() as txn:
-        kbid = knowledgebox_ingest
+        kbid = knowledgebox
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
 
         # Create some resources in the KB

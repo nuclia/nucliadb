@@ -18,11 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import socket
+from typing import AsyncIterator
 
 import nats
 import pytest
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
+
+from nucliadb_utils.nats import NatsConnectionManager
+from nucliadb_utils.utilities import start_nats_manager, stop_nats_manager
 
 images.settings["nats"] = {
     "image": "nats",
@@ -63,3 +67,10 @@ async def nats_server(natsd: str):
     nc = await nats.connect(servers=[natsd])
     await nc.drain()
     await nc.close()
+
+
+@pytest.fixture(scope="function")
+async def nats_manager(nats_server: str) -> AsyncIterator[NatsConnectionManager]:
+    ncm = await start_nats_manager("nucliadb_tests", [nats_server], None)
+    yield ncm
+    await stop_nats_manager()

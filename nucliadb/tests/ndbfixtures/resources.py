@@ -54,7 +54,12 @@ async def knowledgebox(
     storage: Storage,
     maindb_driver: Driver,
     shard_manager: KBShardManager,
-):
+) -> AsyncIterator[str]:
+    """Knowledgebox created through the ORM. This is what ingest gRPC ends up
+    calling when backend creates a hosted KB and what the standalone API ends up
+    calling for onprem KBs.
+
+    """
     kbid = KnowledgeBox.new_unique_kbid()
     kbslug = "slug-" + str(uuid.uuid4())
     model = SemanticModelMetadata(
@@ -71,52 +76,28 @@ async def knowledgebox(
 
 
 @pytest.fixture(scope="function")
-async def standalone_knowledgebox(nucliadb_writer_manager: AsyncClient):
-    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": "knowledgebox"})
-    assert resp.status_code == 201
-    uuid = resp.json().get("uuid")
+async def standalone_knowledgebox(nucliadb_writer_manager: AsyncClient) -> AsyncIterator[str]:
+    """Knowledgebox created through the /kbs endpoint, only accessible for
+    onprem (standalone) deployments.
 
-    yield uuid
+    This fixture requires the test using it to be decorated with a
+    @pytest.mark.deploy_modes(...)
 
-    resp = await nucliadb_writer_manager.delete(f"/kb/{uuid}")
-    assert resp.status_code == 200
-
-
-# FIXME: this is a weird situation, we can use a hosted-like nucliadb while this
-# creates a KB as it was onprem. The end result should not change much but still, is
-# something we may want to fix
-@pytest.fixture(scope="function")
-async def knowledgebox_by_api(nucliadb_writer_manager: AsyncClient):
-    kbslug = "slug-" + str(uuid.uuid4())
+    """
     resp = await nucliadb_writer_manager.post(
         f"/{KBS_PREFIX}",
         json={
-            "slug": kbslug,
-            "title": "My Test Knowledge Box",
+            "title": "Standalone test KB",
+            "slug": "knowledgebox",
         },
     )
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
-    assert kbid is not None
 
     yield kbid
 
-    resp = await nucliadb_writer_manager.delete(
-        f"/{KB_PREFIX}/{kbid}",
-    )
+    resp = await nucliadb_writer_manager.delete(f"/{KB_PREFIX}/{kbid}")
     assert resp.status_code == 200
-
-
-# Used by: nucliadb standalone tests
-@pytest.fixture(scope="function")
-async def knowledgebox_one(knowledgebox_by_api: str):
-    yield knowledgebox_by_api
-
-
-# Used by: nucliadb writer tests
-@pytest.fixture(scope="function")
-async def knowledgebox_writer(knowledgebox_by_api: str):
-    yield knowledgebox_by_api
 
 
 @pytest.fixture(scope="function")
@@ -131,12 +112,12 @@ async def full_resource(
     **not** contains every possible bit of information.
 
     """
-    from tests.ingest.fixtures import create_resource
+    from tests.ndbfixtures.ingest import create_resource
 
     resource = await create_resource(
         storage=storage,
         driver=maindb_driver,
-        knowledgebox_ingest=knowledgebox,
+        knowledgebox=knowledgebox,
     )
     yield resource
     resource.clean()
@@ -144,9 +125,9 @@ async def full_resource(
 
 # Used by: nucliadb writer tests
 @pytest.fixture(scope="function")
-async def resource(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
+async def resource(nucliadb_writer: AsyncClient, knowledgebox: str):
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox_writer}/resources",
+        f"/{KB_PREFIX}/{knowledgebox}/resources",
         json={
             "slug": "resource1",
             "title": "Resource 1",

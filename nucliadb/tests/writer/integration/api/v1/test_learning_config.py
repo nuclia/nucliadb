@@ -43,9 +43,9 @@ def learning_config_proxy_mock():
 
 @pytest.mark.deploy_modes("component")
 async def test_api(
-    nucliadb_writer: AsyncClient, knowledgebox_ingest: str, learning_config_proxy_mock: MockProxy
+    nucliadb_writer: AsyncClient, knowledgebox: str, learning_config_proxy_mock: MockProxy
 ):
-    kbid = knowledgebox_ingest
+    kbid = knowledgebox
 
     # post configuration
     resp = await nucliadb_writer.post(f"/kb/{kbid}/configuration", json={"some": "data"})

@@ -36,13 +36,13 @@ from nucliadb_protos import (
     writer_pb2,
 )
 from nucliadb_utils.utilities import get_storage
-from tests.ingest.fixtures import make_extracted_text
+from tests.ndbfixtures.ingest import make_extracted_text
 
 
 async def test_ingest_broker_message_with_vectorsets(
     dummy_nidx_utility,
     storage,
-    knowledgebox_ingest: str,
+    knowledgebox: str,
     processor: Processor,
     maindb_driver: Driver,
 ):
@@ -50,7 +50,7 @@ async def test_ingest_broker_message_with_vectorsets(
     vectors index and an additional vectorset.
 
     """
-    kbid = knowledgebox_ingest
+    kbid = knowledgebox
     rid = uuid.uuid4().hex
     field_id = "my-text-field"
     default_vectorset_id = "my-semantic-model"

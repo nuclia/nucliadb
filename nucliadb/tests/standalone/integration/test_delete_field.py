@@ -29,10 +29,12 @@ from tests.writer.test_fields import TEST_TEXT_PAYLOAD
 async def test_delete_field(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox_one: str,
+    standalone_knowledgebox: str,
 ) -> None:
+    kbid = standalone_knowledgebox
+
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resources",
+        f"/{KB_PREFIX}/{kbid}/resources",
         json={
             "slug": "resource1",
             "title": "Resource 1",
@@ -43,19 +45,19 @@ async def test_delete_field(
     uuid = resp.json()["uuid"]
 
     resp1 = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}?show=values",
+        f"/{KB_PREFIX}/{kbid}/resource/{uuid}?show=values",
     )
     assert resp1.status_code == 200
 
     assert "text1" in resp1.json()["data"]["texts"]
 
     resp = await nucliadb_writer.delete(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}/text/text1",
+        f"/{KB_PREFIX}/{kbid}/resource/{uuid}/text/text1",
     )
     assert resp.status_code == 204
 
     resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}?show=values",
+        f"/{KB_PREFIX}/{kbid}/resource/{uuid}?show=values",
     )
 
     assert "text1" not in resp.json()["data"]["texts"]

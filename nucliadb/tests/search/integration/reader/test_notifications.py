@@ -36,7 +36,7 @@ from nucliadb_models.notifications import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.utilities import MAIN, Utility
-from tests.ingest.fixtures import broker_resource
+from tests.ndbfixtures.ingest import broker_resource
 
 
 # `reader_api_server` depends on the dummy_nidx_utility fixture
@@ -79,11 +79,11 @@ async def nucliadb_stream_reader(nidx_reader_api_server):
 # However, it sits here with search components for practical reasons:
 # it requires the nidx image which is only compiled for search tests on CI
 @pytest.mark.deploy_modes("component")
-async def test_notification_stream(nucliadb_stream_reader, knowledgebox_ingest, processor):
+async def test_notification_stream(nucliadb_stream_reader, knowledgebox, processor):
     async def delayed_create_resource():
         await asyncio.sleep(0.1)
 
-        message1 = broker_resource(knowledgebox_ingest, rid="68b6e3b747864293b71925b7bacaee7c")
+        message1 = broker_resource(knowledgebox, rid="68b6e3b747864293b71925b7bacaee7c")
         await processor.process(message1, seqid=1)
 
         # Some time to allow nidx to process
@@ -101,7 +101,7 @@ async def test_notification_stream(nucliadb_stream_reader, knowledgebox_ingest, 
     try:
         async with nucliadb_stream_reader.stream(
             method="GET",
-            url=f"/{KB_PREFIX}/{knowledgebox_ingest}/notifications",
+            url=f"/{KB_PREFIX}/{knowledgebox}/notifications",
             timeout=5,
         ) as resp:
             assert resp.status_code == 200

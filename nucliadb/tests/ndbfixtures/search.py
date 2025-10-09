@@ -46,7 +46,7 @@ from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
     clear_global_cache,
 )
-from tests.ingest.fixtures import broker_resource
+from tests.ndbfixtures.ingest import broker_resource
 from tests.ndbfixtures.utils import create_api_client_factory
 
 # Main fixtures
@@ -87,24 +87,22 @@ async def cluster_nucliadb_search(
 @pytest.fixture(scope="function")
 async def test_search_resource(
     processor,
-    knowledgebox_ingest,
+    knowledgebox,
 ):
     """
     Create a resource that has every possible bit of information
     """
-    message1 = broker_resource(
-        knowledgebox_ingest, rid="68b6e3b747864293b71925b7bacaee7c", slug="foobar-slug"
-    )
-    kbid = await inject_message(processor, knowledgebox_ingest, message1)
+    message1 = broker_resource(knowledgebox, rid="68b6e3b747864293b71925b7bacaee7c", slug="foobar-slug")
+    kbid = await inject_message(processor, knowledgebox, message1)
     resource_field_count = 3
-    await wait_for_shard(knowledgebox_ingest, resource_field_count)
+    await wait_for_shard(knowledgebox, resource_field_count)
     yield kbid
 
 
 @pytest.fixture(scope="function")
 async def multiple_search_resource(
     processor,
-    knowledgebox_ingest,
+    knowledgebox,
 ):
     """
     Create 25 resources that have every possible bit of information
@@ -112,30 +110,30 @@ async def multiple_search_resource(
     n_resources = 25
     fields_per_resource = 3
     for count in range(1, n_resources + 1):
-        message = broker_resource(knowledgebox_ingest)
+        message = broker_resource(knowledgebox)
         await processor.process(message=message, seqid=count)
 
-    await wait_for_shard(knowledgebox_ingest, n_resources * fields_per_resource)
-    return knowledgebox_ingest
+    await wait_for_shard(knowledgebox, n_resources * fields_per_resource)
+    return knowledgebox
 
 
 async def inject_message(
-    processor: Processor, knowledgebox_ingest: str, message: BrokerMessage, count: int = 1
+    processor: Processor, knowledgebox: str, message: BrokerMessage, count: int = 1
 ) -> str:
     message_writer = get_writer_bm(message)
     await processor.process(message=message_writer, seqid=count, transaction_check=False)
     message_processor = get_processor_bm(message)
     await processor.process(message=message_processor, seqid=count, transaction_check=False)
-    await wait_for_shard(knowledgebox_ingest, count)
-    return knowledgebox_ingest
+    await wait_for_shard(knowledgebox, count)
+    return knowledgebox
 
 
-async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
+async def wait_for_shard(knowledgebox: str, count: int) -> str:
     # Make sure is indexed
     driver = get_driver()
     async with driver.ro_transaction() as txn:
         shard_manager = KBShardManager()
-        shard = await shard_manager.get_current_active_shard(txn, knowledgebox_ingest)
+        shard = await shard_manager.get_current_active_shard(txn, knowledgebox)
         if shard is None:
             raise Exception("Could not find shard")
         await txn.abort()
@@ -150,4 +148,4 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
         await asyncio.sleep(1)
     # Wait an extra couple of seconds for reader/searcher to catch up
     await asyncio.sleep(2)
-    return knowledgebox_ingest
+    return knowledgebox

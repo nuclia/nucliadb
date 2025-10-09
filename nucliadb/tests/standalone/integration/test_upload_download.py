@@ -65,8 +65,10 @@ async def test_file_tus_upload_and_download(
     configure_redis_dm,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox_one: str,
+    standalone_knowledgebox: str,
 ):
+    kbid = standalone_knowledgebox
+
     language = "ca"
     filename = "image.jpeg"
     md5 = "7af0916dba8b70e29d99e72941923529"
@@ -75,7 +77,7 @@ async def test_file_tus_upload_and_download(
     content_type = "image/jpeg+aitable"
 
     # Create a resource
-    kb_path = f"/{KB_PREFIX}/{knowledgebox_one}"
+    kb_path = f"/{KB_PREFIX}/{kbid}"
     resp = await nucliadb_writer.post(
         f"{kb_path}/{RESOURCES_PREFIX}",
         json={
@@ -223,8 +225,10 @@ async def test_file_tus_supports_empty_files(
     configure_redis_dm,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox_one: str,
+    standalone_knowledgebox: str,
 ):
+    kbid = standalone_knowledgebox
+
     language = "ca"
     filename = "image.jpeg"
     content_type = "image/jpeg"
@@ -236,7 +240,7 @@ async def test_file_tus_supports_empty_files(
     )
     # First test with deferred length
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox_one}/tusupload",
+        f"/kb/{kbid}/tusupload",
         headers={
             "tus-resumable": "1.0.0",
             "upload-metadata": upload_metadata,
@@ -260,7 +264,7 @@ async def test_file_tus_supports_empty_files(
 
     # Now test without deferred length
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox_one}/tusupload",
+        f"/kb/{kbid}/tusupload",
         headers={
             "tus-resumable": "1.0.0",
             "upload-metadata": upload_metadata,
@@ -288,9 +292,10 @@ async def test_tus_upload_handles_unknown_upload_ids(
     configure_redis_dm,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox_one: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox_one
+    kbid = standalone_knowledgebox
+
     resp = await nucliadb_writer.patch(
         f"/kb/{kbid}/{TUSUPLOAD}/foobarid",
         headers={},
@@ -314,14 +319,16 @@ async def test_content_type_validation(
     configure_redis_dm,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox_one: str,
+    standalone_knowledgebox: str,
 ):
+    kbid = standalone_knowledgebox
+
     language = "ca"
     filename = "image.jpg"
     md5 = "7af0916dba8b70e29d99e72941923529"
 
     # Create a resource
-    kb_path = f"/{KB_PREFIX}/{knowledgebox_one}"
+    kb_path = f"/{KB_PREFIX}/{kbid}"
     resp = await nucliadb_writer.post(
         f"{kb_path}/{RESOURCES_PREFIX}",
         json={

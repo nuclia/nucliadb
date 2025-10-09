@@ -28,10 +28,12 @@ from nucliadb.search.api.v1.router import KB_PREFIX
 async def test_basic_patch_thumbnail_sc_2390(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox_one: str,
+    standalone_knowledgebox: str,
 ) -> None:
+    kbid = standalone_knowledgebox
+
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resources",
+        f"/{KB_PREFIX}/{kbid}/resources",
         json={
             "title": "Resource title",
             "summary": "A simple summary",
@@ -42,7 +44,7 @@ async def test_basic_patch_thumbnail_sc_2390(
     rid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+        f"/{KB_PREFIX}/{kbid}/resource/{rid}",
     )
     assert resp.status_code == 200
 
@@ -50,13 +52,13 @@ async def test_basic_patch_thumbnail_sc_2390(
     assert resource["thumbnail"] == "thumbnail-on-creation"
 
     resp = await nucliadb_writer.patch(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+        f"/{KB_PREFIX}/{kbid}/resource/{rid}",
         json={"thumbnail": "thumbnail-modified"},
     )
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+        f"/{KB_PREFIX}/{kbid}/resource/{rid}",
     )
     assert resp.status_code == 200
 

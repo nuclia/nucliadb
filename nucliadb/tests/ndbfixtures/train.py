@@ -34,6 +34,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
@@ -109,9 +110,8 @@ async def standalone_nucliadb_train(
 @pytest.fixture(scope="function")
 async def train_grpc_server(
     storage_settings,
-    dummy_nidx_utility,
+    dummy_nidx_utility: NidxUtility,
     maindb_driver: Driver,
-    local_files,
 ) -> AsyncIterator[TrainGrpcServer]:
     with (
         patch.object(running_settings, "debug", False),
@@ -299,7 +299,7 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
 
 
 @pytest.fixture(scope="function")
-async def test_pagination_resources(processor: Processor, knowledgebox_ingest: str):
+async def test_pagination_resources(processor: Processor, knowledgebox: str):
     """
     Create a set of resources with only basic information to test pagination
     """
@@ -307,10 +307,10 @@ async def test_pagination_resources(processor: Processor, knowledgebox_ingest: s
 
     # Create resources
     for i in range(1, amount + 1):
-        message = broker_simple_resource(knowledgebox_ingest, i)
+        message = broker_simple_resource(knowledgebox, i)
         await processor.process(message=message, seqid=-1, transaction_check=False)
 
-        message = broker_processed_resource(knowledgebox_ingest, i, message.uuid)
+        message = broker_processed_resource(knowledgebox, i, message.uuid)
         await processor.process(message=message, seqid=-1, transaction_check=False)
         # Give processed data some time to reach the node
 
@@ -321,7 +321,7 @@ async def test_pagination_resources(processor: Processor, knowledgebox_ingest: s
     while time() - t0 < 30:  # wait max 30 seconds for it
         async with driver.ro_transaction() as txn:
             count = 0
-            async for key in txn.keys(match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox_ingest)):
+            async for key in txn.keys(match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox)):
                 count += 1
 
         if count == amount:
@@ -332,7 +332,7 @@ async def test_pagination_resources(processor: Processor, knowledgebox_ingest: s
     # Add entities
     storage = await get_storage()
     async with driver.rw_transaction() as txn:
-        kb = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+        kb = KnowledgeBox(txn, storage, kbid=knowledgebox)
         entities_manager = EntitiesManager(kb, txn)
         entities = EntitiesGroup()
         entities.entities["entity1"].value = "PERSON"
@@ -346,8 +346,6 @@ async def test_pagination_resources(processor: Processor, knowledgebox_ingest: s
     label_title = "label1"
     label.title = label_title
     labelset.labels.append(label)
-    await datamanagers.atomic.labelset.set(
-        kbid=knowledgebox_ingest, labelset_id="ls1", labelset=labelset
-    )
+    await datamanagers.atomic.labelset.set(kbid=knowledgebox, labelset_id="ls1", labelset=labelset)
 
-    yield knowledgebox_ingest
+    yield knowledgebox

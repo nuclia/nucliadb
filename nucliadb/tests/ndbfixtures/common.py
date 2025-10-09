@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from os.path import dirname
 from typing import AsyncIterable, AsyncIterator, Iterator
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -30,15 +29,13 @@ from nucliadb.search.predict import DummyPredictEngine
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
-from nucliadb_utils.settings import (
-    audit_settings,
-    nuclia_settings,
-)
+from nucliadb_utils.cache.nats import NatsPubsub
+from nucliadb_utils.cache.pubsub import PubSubDriver
+from nucliadb_utils.settings import audit_settings, nuclia_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import (
-    Utility,
-)
+from nucliadb_utils.utilities import Utility, get_utility
+from tests.ndbfixtures.ingest import INGEST_TESTS_DIR
 from tests.ndbfixtures.utils import global_utility
 
 # Audit
@@ -83,8 +80,14 @@ async def stream_audit(nats_server: str, mocker: MockerFixture) -> AsyncIterator
 
 
 @pytest.fixture(scope="function")
-async def local_files():
-    storage_settings.local_testing_files = f"{dirname(__file__)}"
+def local_files():
+    """Configure NucliaDB with a specific path for the local storage. This is
+    required for tests operating with local storage, so it knows where do we
+    expect the files to be and can access them.
+
+    """
+    with patch.object(storage_settings, "local_testing_files", INGEST_TESTS_DIR):
+        yield
 
 
 # Predict
@@ -108,6 +111,20 @@ async def dummy_predict() -> AsyncIterable[DummyPredictEngine]:
 
         with global_utility(Utility.PREDICT, predict_util):
             yield predict_util
+
+
+# PubSub
+
+
+@pytest.fixture(scope="function")
+async def pubsub(nats_server: str) -> AsyncIterator[PubSubDriver]:
+    assert get_utility(Utility.PUBSUB) is None, "No pubsub is expected to be already set"
+
+    pubsub = NatsPubsub(hosts=[nats_server])
+    await pubsub.initialize()
+    with global_utility(Utility.PUBSUB, pubsub):
+        yield pubsub
+    await pubsub.finalize()
 
 
 # Shard manager

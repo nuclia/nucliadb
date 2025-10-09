@@ -38,8 +38,8 @@ ASSETS_PATH = os.path.dirname(__file__) + "/assets"
 
 
 @pytest.mark.deploy_modes("component")
-async def test_knowledgebox_file_tus_options(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
-    kbid = knowledgebox_writer
+async def test_knowledgebox_file_tus_options(nucliadb_writer: AsyncClient, knowledgebox: str):
+    kbid = knowledgebox
 
     resp = await nucliadb_writer.options(f"/{KB_PREFIX}/{kbid}/resource/xxx/file/xxx/{TUSUPLOAD}/xxx")
     assert resp.status_code == 204
@@ -67,8 +67,8 @@ async def test_knowledgebox_file_tus_options(nucliadb_writer: AsyncClient, knowl
 
 
 @pytest.mark.deploy_modes("component")
-async def test_knowledgebox_file_tus_upload_root(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
-    kbid = knowledgebox_writer
+async def test_knowledgebox_file_tus_upload_root(nucliadb_writer: AsyncClient, knowledgebox: str):
+    kbid = knowledgebox
 
     language = base64.b64encode(b"ca").decode()
     filename = base64.b64encode(b"image.jpg").decode()
@@ -159,9 +159,9 @@ async def test_knowledgebox_file_tus_upload_root(nucliadb_writer: AsyncClient, k
 @pytest.mark.deploy_modes("component")
 async def test_knowledgebox_file_upload_root(
     nucliadb_writer: AsyncClient,
-    knowledgebox_writer: str,
+    knowledgebox: str,
 ):
-    kbid = knowledgebox_writer
+    kbid = knowledgebox
 
     with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
         resp = await nucliadb_writer.post(
@@ -213,9 +213,9 @@ async def test_knowledgebox_file_upload_root(
 @pytest.mark.deploy_modes("component")
 async def test_knowledgebox_file_upload_root_headers(
     nucliadb_writer: AsyncClient,
-    knowledgebox_writer: str,
+    knowledgebox: str,
 ):
-    kbid = knowledgebox_writer
+    kbid = knowledgebox
 
     filename = base64.b64encode(b"image.jpg").decode()
     with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
@@ -259,9 +259,9 @@ async def test_knowledgebox_file_upload_root_headers(
 
 @pytest.mark.deploy_modes("component")
 async def test_knowledgebox_file_tus_upload_field(
-    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource
+    nucliadb_writer: AsyncClient, knowledgebox: str, resource
 ):
-    kbid = knowledgebox_writer
+    kbid = knowledgebox
 
     language = base64.b64encode(b"ca").decode()
     filename = base64.b64encode(b"image.jpg").decode()
@@ -353,9 +353,9 @@ async def test_knowledgebox_file_tus_upload_field(
 
 @pytest.mark.deploy_modes("component")
 async def test_knowledgebox_file_upload_field_headers(
-    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource
+    nucliadb_writer: AsyncClient, knowledgebox: str, resource
 ):
-    kbid = knowledgebox_writer
+    kbid = knowledgebox
     filename = "image.jpg"
     encoded_filename = base64.b64encode(filename.encode()).decode()
     with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
@@ -399,9 +399,9 @@ async def test_knowledgebox_file_upload_field_headers(
 
 @pytest.mark.deploy_modes("component")
 async def test_knowledgebox_file_upload_field_sync(
-    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource
+    nucliadb_writer: AsyncClient, knowledgebox: str, resource
 ):
-    kbid = knowledgebox_writer
+    kbid = knowledgebox
     filename = "image.jpg"
     with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
         resp = await nucliadb_writer.post(
@@ -428,10 +428,8 @@ async def test_knowledgebox_file_upload_field_sync(
 
 
 @pytest.mark.deploy_modes("component")
-async def test_file_tus_upload_field_by_slug(
-    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource
-):
-    kbid = knowledgebox_writer
+async def test_file_tus_upload_field_by_slug(nucliadb_writer: AsyncClient, knowledgebox: str, resource):
+    kbid = knowledgebox
     rslug = "resource1"
 
     language = base64.b64encode(b"ca").decode()
@@ -521,9 +519,9 @@ async def test_file_tus_upload_field_by_slug(
 
 @pytest.mark.deploy_modes("component")
 async def test_file_tus_upload_urls_field_by_resource_id(
-    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource
+    nucliadb_writer: AsyncClient, knowledgebox: str, resource
 ):
-    kbid = knowledgebox_writer
+    kbid = knowledgebox
     language = base64.b64encode(b"ca").decode()
     filename = base64.b64encode(b"image.jpg").decode()
     md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
@@ -559,10 +557,8 @@ async def test_file_tus_upload_urls_field_by_resource_id(
 
 
 @pytest.mark.deploy_modes("component")
-async def test_multiple_tus_file_upload_tries(
-    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource
-):
-    kbid = knowledgebox_writer
+async def test_multiple_tus_file_upload_tries(nucliadb_writer: AsyncClient, knowledgebox: str, resource):
+    kbid = knowledgebox
     rslug = "resource1"
 
     headers = {
@@ -618,8 +614,8 @@ async def test_multiple_tus_file_upload_tries(
 
 
 @pytest.mark.deploy_modes("component")
-async def test_file_upload_by_slug(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
-    kbid = knowledgebox_writer
+async def test_file_upload_by_slug(nucliadb_writer: AsyncClient, knowledgebox: str):
+    kbid = knowledgebox
     rslug = "myslug"
 
     resp = await nucliadb_writer.post(
@@ -677,10 +673,8 @@ def test_maybe_b64decode():
 
 
 @pytest.mark.deploy_modes("component")
-async def test_tus_validates_intermediate_chunks_length(
-    nucliadb_writer: AsyncClient, knowledgebox_writer: str
-):
-    kbid = knowledgebox_writer
+async def test_tus_validates_intermediate_chunks_length(nucliadb_writer: AsyncClient, knowledgebox: str):
+    kbid = knowledgebox
     language = base64.b64encode(b"ca").decode()
     filename = base64.b64encode(b"image.jpg").decode()
     md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
