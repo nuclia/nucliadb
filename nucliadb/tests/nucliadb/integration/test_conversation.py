@@ -95,7 +95,6 @@ async def resource_with_conversation(
         ).model_dump_json(by_alias=True)
         + "]",
     )
-
     assert resp.status_code == 200
 
     # Inject synthetic extracted data for the conversation
@@ -499,6 +498,7 @@ async def test_conversation_field_indexing(
             }
         ],
     )
+    resp.raise_for_status()
 
     await inject_message(
         nucliadb_ingest_grpc, _broker_message(split="2", text=answer, vector=vectors[answer])
@@ -635,27 +635,146 @@ async def test_conversation_limits(
 
         # Now append a couple of messages so it exceeds the maximum allowed
         resp = await nucliadb_writer.put(
-            f"/kb/{kbid}/slug/{slug}/conversation/faq",
-            json={
-                "messages": [
-                    {
-                        "to": ["computer"],
-                        "who": "person",
-                        "timestamp": datetime.now().isoformat(),
-                        "content": {"text": "bar"},
-                        "ident": "2",
-                        "type": MessageType.QUESTION.value,
-                    },
-                    {
-                        "to": ["person"],
-                        "who": "computer",
-                        "timestamp": datetime.now().isoformat(),
-                        "content": {"text": "baz"},
-                        "ident": "3",
-                        "type": MessageType.ANSWER.value,
-                    },
-                ]
-            },
+            f"/kb/{kbid}/slug/{slug}/conversation/faq/messages",
+            json=[
+                {
+                    "to": ["computer"],
+                    "who": "person",
+                    "timestamp": datetime.now().isoformat(),
+                    "content": {"text": "bar"},
+                    "ident": "2",
+                    "type": MessageType.QUESTION.value,
+                },
+                {
+                    "to": ["person"],
+                    "who": "computer",
+                    "timestamp": datetime.now().isoformat(),
+                    "content": {"text": "baz"},
+                    "ident": "3",
+                    "type": MessageType.ANSWER.value,
+                },
+            ],
         )
         assert resp.status_code == 422
         assert resp.json()["detail"] == "Conversation fields cannot have more than 2 messages."
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_conversation_duplicate_message_idents(
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+    slug = "myresource"
+
+    # Create a conversation field
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": slug,
+            "title": "My Resource",
+            "conversations": {
+                "faq": {
+                    "messages": [
+                        {
+                            "to": ["computer"],
+                            "who": "person",
+                            "timestamp": datetime.now().isoformat(),
+                            "content": {"text": "foo"},
+                            "ident": "1",
+                            "type": MessageType.QUESTION.value,
+                        }
+                    ]
+                },
+            },
+        },
+    )
+    resp.raise_for_status()
+
+    # Now append a message with a duplicate ident
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/slug/{slug}/conversation/faq/messages",
+        json=[
+            {
+                "to": ["computer"],
+                "who": "person",
+                "timestamp": datetime.now().isoformat(),
+                "content": {"text": "bar"},
+                "ident": "1",
+                "type": MessageType.QUESTION.value,
+            },
+        ],
+    )
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "Message identifiers must be unique field=faq: ['1']"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_replace_conversation_with_put_endpoint_deletes_previous_pages(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+    slug = "myresource"
+
+    # Create a conversation field
+    message1 = {
+        "to": ["computer"],
+        "who": "person",
+        "timestamp": datetime.now().isoformat(),
+        "content": {"text": "foo"},
+        "ident": "1",
+        "type": MessageType.QUESTION.value,
+    }
+    message2 = {
+        "to": ["person"],
+        "who": "computer",
+        "timestamp": datetime.now().isoformat(),
+        "content": {"text": "bar"},
+        "ident": "2",
+        "type": MessageType.ANSWER.value,
+    }
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": slug,
+            "title": "My Resource",
+            "conversations": {"faq": {"messages": [message1, message2]}},
+        },
+    )
+    resp.raise_for_status()
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/slug/{slug}/conversation/faq", params={"show": ["value"]}
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    assert len(body["value"]["messages"]) == 2
+    assert body["value"]["messages"][0]["ident"] == "1"
+    assert body["value"]["messages"][1]["ident"] == "2"
+
+    # Now replace the conversation with a put
+    message3 = {
+        "to": ["person"],
+        "who": "computer",
+        "timestamp": datetime.now().isoformat(),
+        "content": {"text": "foo"},
+        "ident": "x",
+        "type": MessageType.ANSWER.value,
+    }
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/slug/{slug}/conversation/faq",
+        json={"messages": [message3]},
+    )
+    assert resp.status_code == 201
+
+    # Make sure that the previous value has been deleted
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/slug/{slug}/conversation/faq", params={"show": ["value"]}
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    assert len(body["value"]["messages"]) == 1
+    assert body["value"]["messages"][0]["ident"] == "x"

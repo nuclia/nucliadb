@@ -228,6 +228,7 @@ async def parse_fields(
             kbid,
             uuid,
             resource_classifications,
+            replace_field=True,
         )
 
 
@@ -431,19 +432,15 @@ async def parse_conversation_field(
     kbid: str,
     uuid: str,
     resource_classifications: ResourceClassifications,
+    replace_field: bool,
 ) -> None:
-    # Make sure that the max number of messages is not exceeded
-    current_message_count = await get_current_conversation_message_count(kbid, uuid, key)
-    if len(conversation_field.messages) + current_message_count > MAX_CONVERSATION_MESSAGES:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Conversation fields cannot have more than {MAX_CONVERSATION_MESSAGES} messages.",
-        )
-
+    if not replace_field:
+        # Appending messages to conversation
+        await _conversation_append_checks(kbid, uuid, key, conversation_field)
     classif_labels = resource_classifications.for_field(key, resources_pb2.FieldType.CONVERSATION)
     storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
-    field_value = resources_pb2.Conversation()
+    field_value = resources_pb2.Conversation(replace_field=replace_field)
     convs = processing_models.PushConversation()
     for message in conversation_field.messages:
         cm = resources_pb2.Message()
@@ -554,13 +551,31 @@ async def get_stored_resource_classifications(
     return rc
 
 
-async def get_current_conversation_message_count(kbid: str, rid: str, field_id: str) -> int:
+async def _conversation_append_checks(
+    kbid: str, rid: str, field_id: str, input: models.InputConversationField
+):
     async with datamanagers.with_ro_transaction() as txn:
         resource_obj = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
         if resource_obj is None:
-            return 0
-        field_obj: Conversation = await resource_obj.get_field(
+            return
+        conv: Conversation = await resource_obj.get_field(
             field_id, resources_pb2.FieldType.CONVERSATION, load=False
         )
-        metadata = await field_obj.get_metadata()
-        return metadata.total
+
+        # Make sure that the max number of messages is not exceeded
+        current_message_count = (await conv.get_metadata()).total
+        if len(input.messages) + current_message_count > MAX_CONVERSATION_MESSAGES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Conversation fields cannot have more than {MAX_CONVERSATION_MESSAGES} messages.",
+            )
+
+        # Make sure input messages use unique idents
+        existing_message_ids = set((await conv.get_splits_metadata()).metadata.keys())
+        input_message_ids = {message.ident for message in input.messages}
+        intersection = input_message_ids.intersection(existing_message_ids)
+        if intersection != set():
+            raise HTTPException(
+                status_code=422,
+                detail=f"Message identifiers must be unique field={field_id}: {list(intersection)[:50]}",
+            )

@@ -58,7 +58,19 @@ class Conversation(Field[PBConversation]):
         self._splits_metadata: Optional[SplitsMetadata] = None
         self.metadata = None
 
+    async def delete_value(self):
+        await self.resource.txn.delete_by_prefix(
+            CONVERSATION_METADATA.format(kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id)
+        )
+        self._split_metadata = None
+        self.metadata = None
+        self.value.clear()
+
     async def set_value(self, payload: PBConversation):
+        if payload.replace_field:
+            # As we need to overwrite the value of the conversation, first delete any previous data.
+            await self.delete_value()
+
         metadata = await self.get_metadata()
         metadata.extract_strategy = payload.extract_strategy
         metadata.split_strategy = payload.split_strategy

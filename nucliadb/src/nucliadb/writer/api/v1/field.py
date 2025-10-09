@@ -249,9 +249,10 @@ async def parse_conversation_field_adapter(
     writer: BrokerMessage,
     toprocess: PushPayload,
     resource_classifications: ResourceClassifications,
+    replace_field: bool = False,
 ):
     return await parse_conversation_field(
-        field_id, field_payload, writer, toprocess, kbid, rid, resource_classifications
+        field_id, field_payload, writer, toprocess, kbid, rid, resource_classifications, replace_field
     )
 
 
@@ -380,7 +381,9 @@ async def add_resource_field_conversation_rslug_prefix(
     field_id: FieldIdString,
     field_payload: models.InputConversationField,
 ) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, field_payload)
+    return await add_field_to_resource_by_slug(
+        request, kbid, rslug, field_id, field_payload, replace_field=True
+    )
 
 
 @api.put(
@@ -399,7 +402,7 @@ async def add_resource_field_conversation_rid_prefix(
     field_id: FieldIdString,
     field_payload: models.InputConversationField,
 ) -> ResourceFieldAdded:
-    return await add_field_to_resource(request, kbid, rid, field_id, field_payload)
+    return await add_field_to_resource(request, kbid, rid, field_id, field_payload, replace_field=True)
 
 
 @api.put(
@@ -466,7 +469,9 @@ async def append_messages_to_conversation_field_rslug_prefix(
         field = models.InputConversationField(messages=messages)
     except pydantic.ValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, field)
+    return await add_field_to_resource_by_slug(
+        request, kbid, rslug, field_id, field, replace_field=False
+    )
 
 
 @api.put(
@@ -489,7 +494,7 @@ async def append_messages_to_conversation_field_rid_prefix(
         field = models.InputConversationField(messages=messages)
     except pydantic.ValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    return await add_field_to_resource(request, kbid, rid, field_id, field)
+    return await add_field_to_resource(request, kbid, rid, field_id, field, replace_field=False)
 
 
 @api.delete(
