@@ -36,7 +36,6 @@ from nucliadb.common.datamanagers.resources import (
     KB_RESOURCE_SLUG_BASE,
 )
 from nucliadb.common.external_index_providers.base import VectorsetExternalIndex
-from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.common.nidx import get_nidx_api_client
@@ -53,7 +52,6 @@ from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
-    ExternalIndexProviderType,
     KnowledgeBoxConfig,
     SemanticModelMetadata,
     StoredExternalIndexProviderMetadata,
@@ -535,10 +533,7 @@ class KnowledgeBox:
         request: CreateExternalIndexProviderMetadata,
         indexes: list[VectorsetExternalIndex],
     ) -> StoredExternalIndexProviderMetadata:
-        if request.type != ExternalIndexProviderType.PINECONE:
-            return StoredExternalIndexProviderMetadata(type=request.type)
-        # Only pinecone is supported for now
-        return await PineconeIndexManager.create_indexes(kbid, request, indexes)
+        return StoredExternalIndexProviderMetadata(type=request.type)
 
     @classmethod
     async def _maybe_delete_external_indexes(
@@ -546,10 +541,7 @@ class KnowledgeBox:
         kbid: str,
         stored: StoredExternalIndexProviderMetadata,
     ) -> None:
-        if stored.type != ExternalIndexProviderType.PINECONE:
-            return
-        # Only pinecone is supported for now
-        await PineconeIndexManager.delete_indexes(kbid, stored)
+        return
 
 
 def chunker(seq: Sequence, size: int):

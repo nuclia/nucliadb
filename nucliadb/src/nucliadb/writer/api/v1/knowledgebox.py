@@ -36,10 +36,6 @@ from nucliadb.writer import logger
 from nucliadb.writer.api.utils import only_for_onprem
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb.writer.utilities import get_processing
-from nucliadb_models.external_index_providers import (
-    ExternalIndexProviderType,
-    PineconeServerlessCloud,
-)
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxObj,
@@ -118,20 +114,6 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
     external_index_provider = knowledgebox_pb2.CreateExternalIndexProviderMetadata(
         type=knowledgebox_pb2.ExternalIndexProviderType.UNSET,
     )
-    if (
-        item.external_index_provider
-        and item.external_index_provider.type == ExternalIndexProviderType.PINECONE
-    ):
-        pinecone_api_key = item.external_index_provider.api_key
-        serverless_pb = to_pinecone_serverless_cloud_pb(item.external_index_provider.serverless_cloud)
-        external_index_provider = knowledgebox_pb2.CreateExternalIndexProviderMetadata(
-            type=knowledgebox_pb2.ExternalIndexProviderType.PINECONE,
-            pinecone_config=knowledgebox_pb2.CreatePineconeConfig(
-                api_key=pinecone_api_key,
-                serverless_cloud=serverless_pb,
-            ),
-        )
-
     try:
         (kbid, slug) = await KnowledgeBox.create(
             driver,
@@ -236,15 +218,3 @@ async def delete_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
     asyncio.create_task(processing.delete_from_processing(kbid=kbid))
 
     return KnowledgeBoxObj(uuid=kbid)
-
-
-def to_pinecone_serverless_cloud_pb(
-    serverless: PineconeServerlessCloud,
-) -> knowledgebox_pb2.PineconeServerlessCloud.ValueType:
-    return {
-        PineconeServerlessCloud.AWS_EU_WEST_1: knowledgebox_pb2.PineconeServerlessCloud.AWS_EU_WEST_1,
-        PineconeServerlessCloud.AWS_US_EAST_1: knowledgebox_pb2.PineconeServerlessCloud.AWS_US_EAST_1,
-        PineconeServerlessCloud.AWS_US_WEST_2: knowledgebox_pb2.PineconeServerlessCloud.AWS_US_WEST_2,
-        PineconeServerlessCloud.AZURE_EASTUS2: knowledgebox_pb2.PineconeServerlessCloud.AZURE_EASTUS2,
-        PineconeServerlessCloud.GCP_US_CENTRAL1: knowledgebox_pb2.PineconeServerlessCloud.GCP_US_CENTRAL1,
-    }[serverless]

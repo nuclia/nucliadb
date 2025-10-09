@@ -17,36 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
-class ExternalIndexProvidersSettings(BaseSettings):
-    pinecone_upsert_parallelism: int = Field(
-        default=3,
-        title="Pinecone upsert parallelism",
-        description="Number of parallel upserts to Pinecone on each set resource operation",
-    )
-    pinecone_delete_parallelism: int = Field(
-        default=2,
-        title="Pinecone delete parallelism",
-        description="Number of parallel deletes to Pinecone on each delete resource operation",
-    )
-    pinecone_upsert_timeout: float = Field(
-        default=10.0,
-        title="Pinecone upsert timeout",
-        description="Timeout in seconds for each upsert operation to Pinecone",
-    )
-    pinecone_delete_timeout: float = Field(
-        default=10.0,
-        title="Pinecone delete timeout",
-        description="Timeout in seconds for each delete operation to Pinecone",
-    )
-    pinecone_query_timeout: float = Field(
-        default=10.0,
-        title="Pinecone query timeout",
-        description="Timeout in seconds for each query operation to Pinecone",
-    )
+class ExternalIndexProvidersSettings(BaseSettings): ...
 
 
 settings = ExternalIndexProvidersSettings()

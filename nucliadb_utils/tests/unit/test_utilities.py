@@ -25,7 +25,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from nucliadb_utils import featureflagging, utilities
-from nucliadb_utils.aiopynecone.client import PineconeSession
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.settings import FileBackendConfig
 
@@ -182,14 +181,3 @@ def test_get_endecryptor_errors():
     settings.encryption_secret_key = "foobar"
     with pytest.raises(ConfigurationError):
         utilities.get_endecryptor()
-
-
-def test_pinecone_session():
-    assert utilities.MAIN.get(utilities.Utility.PINECONE_SESSION) is None
-
-    session = utilities.get_pinecone()
-    assert isinstance(session, PineconeSession)
-
-    assert utilities.MAIN.get(utilities.Utility.PINECONE_SESSION) is session
-
-    assert utilities.get_pinecone() is session
