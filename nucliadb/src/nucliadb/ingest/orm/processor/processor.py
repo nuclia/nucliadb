@@ -354,9 +354,11 @@ class Processor:
                             e.field_id, e.message, writer_pb2.Error.Severity.ERROR
                         )
                         # Catalog takes status from index message labels, override it to error
-                        current_status = [x for x in resource_indexed_labels if x.startswith("/n/s/")]
+                        current_status = next(
+                            (x for x in resource_indexed_labels if x.startswith("/n/s/")), None
+                        )
                         if current_status and current_status != "/n/s/ERROR":
-                            resource_indexed_labels.remove(current_status[0])
+                            resource_indexed_labels.remove(current_status)
                             resource_indexed_labels.append("/n/s/ERROR")
 
                     resource_data = build_catalog_resource_data(resource, resource_indexed_labels)

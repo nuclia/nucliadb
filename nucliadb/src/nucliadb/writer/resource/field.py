@@ -33,6 +33,7 @@ from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.models.internal import processing as processing_models
 from nucliadb.models.internal.processing import ClassificationLabel, PushConversation, PushPayload
 from nucliadb.writer import SERVICE_NAME
+from nucliadb.writer.settings import settings
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
@@ -104,7 +105,7 @@ async def extract_file_field(
 
 
 async def extract_fields(resource: ORMResource, base: PushPayload) -> AsyncIterator[PushPayload]:
-    toprocess = base.model_copy()
+    toprocess = base.model_copy(deep=True)
     processing = get_processing()
     storage = await get_storage(service_name=SERVICE_NAME)
     resource_fields = await resource.get_fields()
@@ -113,7 +114,6 @@ async def extract_fields(resource: ORMResource, base: PushPayload) -> AsyncItera
         rid=base.uuid,
     )
 
-    conversation_fields = []
     for (field_type, field_id), field in resource_fields.items():
         field_type_name = from_proto.field_type_name(field_type)
         if field_type_name not in {
@@ -123,10 +123,6 @@ async def extract_fields(resource: ORMResource, base: PushPayload) -> AsyncItera
             FieldTypeName.LINK,
         }:
             continue
-
-        if field_type_name == FieldTypeName.CONVERSATION:
-            # Conversations are handled last
-            conversation_fields.append(((field_type, field_id), field))
 
         field_pb = await field.get_value()
         classif_labels = resource_classifications.for_field(field_id, field_type)
@@ -143,7 +139,7 @@ async def extract_fields(resource: ORMResource, base: PushPayload) -> AsyncItera
             toprocess.linkfield[field_id] = processing_models.LinkUpload(**parsed_link)
             toprocess.linkfield[field_id].classification_labels = classif_labels
 
-        if field_type_name is FieldTypeName.TEXT:
+        elif field_type_name is FieldTypeName.TEXT:
             parsed_text = MessageToDict(
                 field_pb,
                 preserving_proto_field_name=True,
@@ -153,14 +149,16 @@ async def extract_fields(resource: ORMResource, base: PushPayload) -> AsyncItera
             toprocess.textfield[field_id] = processing_models.Text(**parsed_text)
             toprocess.textfield[field_id].classification_labels = classif_labels
 
-        if field_type_name is FieldTypeName.CONVERSATION and isinstance(field, Conversation):
+        elif field_type_name is FieldTypeName.CONVERSATION and isinstance(field, Conversation):
             batch_idx = 0
-            async for message_batch in batchify(field.iter_messages(), 2048):
+            async for message_batch in batchify(
+                field.iter_messages(), size=settings.reprocess_conversation_messages_batch
+            ):
                 if batch_idx > 0:
                     # If there are more than one batch of conversation messages, yield the current payload
                     # and continue with a new one so we make sure we don't send too much data to process at once.
                     yield toprocess
-                    toprocess = base.model_copy()
+                    toprocess = base.model_copy(deep=True)
 
                 conversation = PushConversation(messages=[])
                 for message in message_batch:
@@ -183,7 +181,7 @@ async def extract_fields(resource: ORMResource, base: PushPayload) -> AsyncItera
                 toprocess.conversationfield[field_id] = conversation
                 toprocess.conversationfield[field_id].classification_labels = classif_labels
                 batch_idx += 1
-        yield toprocess
+    yield toprocess
 
 
 async def batchify(producer: AsyncIterator[Any], size: int) -> AsyncGenerator[list[Any], None]:

@@ -19,12 +19,15 @@
 #
 from datetime import datetime
 from typing import Optional
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.ingest.processing import DummyProcessingEngine
+from nucliadb.models.internal.processing import PushPayload
 from nucliadb.reader.api.models import ResourceField
+from nucliadb.writer.utilities import get_processing
 from nucliadb_models.conversation import (
     InputConversationField,
     InputMessage,
@@ -778,3 +781,68 @@ async def test_replace_conversation_with_put_endpoint_deletes_previous_pages(
     body = resp.json()
     assert len(body["value"]["messages"]) == 1
     assert body["value"]["messages"][0]["ident"] == "x"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_conversation_reprocess_in_batches(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+    slug = "myresource"
+
+    # Create a conversation field with 4 messages
+    messages = [
+        {
+            "to": ["computer"],
+            "who": "person",
+            "timestamp": datetime.now().isoformat(),
+            "content": {"text": "foo"},
+            "ident": f"{i + 1}",
+            "type": MessageType.QUESTION.value,
+        }
+        for i in range(4)
+    ]
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": slug,
+            "title": "My Resource",
+            "texts": {"text": {"body": "foo"}},
+            "conversations": {"faq": {"messages": messages}},
+        },
+    )
+    resp.raise_for_status()
+    rid = resp.json()["uuid"]
+
+    processing = get_processing()
+    assert isinstance(processing, DummyProcessingEngine)
+    processing.calls.clear()
+    processing.values.clear()
+
+    with patch("nucliadb.writer.resource.field.settings", Mock(reprocess_conversation_messages_batch=2)):
+        # Now reprocess the resource and make sure that two processing requests were sent
+        resp = await nucliadb_writer.post(f"/kb/{kbid}/resource/{rid}/reprocess")
+        resp.raise_for_status()
+
+    # One has the text field and a first batch of messages
+    assert len(processing.calls) == 2
+    push_payload1: PushPayload = next(
+        call[0]
+        for call in processing.calls
+        if len(call[0].textfield) == 1 and len(call[0].conversationfield) == 1
+    )
+    assert push_payload1.textfield["text"] is not None
+    assert push_payload1.conversationfield["faq"] is not None
+    assert len(push_payload1.conversationfield["faq"].messages) == 2
+
+    # The other one has the second batch of messages
+    push_payload2: PushPayload = next(
+        call[0]
+        for call in processing.calls
+        if len(call[0].textfield) == 0 and len(call[0].conversationfield) == 1
+    )
+    assert push_payload2.textfield.get("text") is None
+    assert push_payload2.conversationfield["faq"] is not None
+    assert len(push_payload2.conversationfield["faq"].messages) == 2

@@ -19,6 +19,7 @@
 #
 from typing import Optional
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -26,6 +27,11 @@ class Settings(BaseSettings):
     dm_enabled: bool = True
     dm_redis_host: Optional[str] = None
     dm_redis_port: Optional[int] = None
+
+    reprocess_conversation_messages_batch: int = Field(
+        default=20_480,
+        description="Maximum number of messages that are sent in a processing request. If there are more messages, multiple request are sent with subsequent batches.",  # noqa
+    )
 
 
 settings = Settings()
