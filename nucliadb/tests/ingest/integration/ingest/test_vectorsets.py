@@ -36,7 +36,7 @@ from nucliadb_protos import (
     writer_pb2,
 )
 from nucliadb_utils.utilities import get_storage
-from tests.ingest.fixtures import make_extracted_text
+from tests.ndbfixtures.ingest import make_extracted_text
 
 
 async def test_ingest_broker_message_with_vectorsets(

@@ -112,7 +112,7 @@ async def full_resource(
     **not** contains every possible bit of information.
 
     """
-    from tests.ingest.fixtures import create_resource
+    from tests.ndbfixtures.ingest import create_resource
 
     resource = await create_resource(
         storage=storage,

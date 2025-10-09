@@ -36,7 +36,7 @@ from nucliadb_models.notifications import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.utilities import MAIN, Utility
-from tests.ingest.fixtures import broker_resource
+from tests.ndbfixtures.ingest import broker_resource
 
 
 # `reader_api_server` depends on the dummy_nidx_utility fixture

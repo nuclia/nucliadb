@@ -51,7 +51,7 @@ from nucliadb_utils.utilities import (
     clean_utility,
     set_utility,
 )
-from tests.ingest.fixtures import make_extracted_text
+from tests.ndbfixtures.ingest import make_extracted_text
 from tests.nucliadb.knowledgeboxes.vectorsets import KbSpecs
 from tests.utils import inject_message
 from tests.utils.dirty_index import wait_for_sync

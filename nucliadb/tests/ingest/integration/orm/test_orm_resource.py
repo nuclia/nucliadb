@@ -44,7 +44,7 @@ from nucliadb_protos.writer_pb2 import (
     FieldID,
     Paragraph,
 )
-from tests.ingest.fixtures import create_resource
+from tests.ndbfixtures.ingest import create_resource
 
 
 async def test_create_resource_orm_with_basic(

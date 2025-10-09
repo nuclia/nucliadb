@@ -24,7 +24,7 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.index_message import IndexMessageBuilder
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from tests.ingest.fixtures import create_resource
+from tests.ndbfixtures.ingest import create_resource
 
 
 def flatten_field_relations(r: noderesources_pb2.Resource):

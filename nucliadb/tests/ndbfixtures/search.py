@@ -46,7 +46,7 @@ from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
     clear_global_cache,
 )
-from tests.ingest.fixtures import broker_resource
+from tests.ndbfixtures.ingest import broker_resource
 from tests.ndbfixtures.utils import create_api_client_factory
 
 # Main fixtures

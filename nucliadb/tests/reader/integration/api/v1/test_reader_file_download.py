@@ -17,17 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import os
 
 import pytest
 from httpx import AsyncClient
 
-import tests.ingest.fixtures
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.reader.api.v1.download import parse_media_range, safe_http_header_encode
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb_protos.resources_pb2 import FieldType
-from tests.ingest.fixtures import TEST_CLOUDFILE, THUMBNAIL
+from tests.ndbfixtures.ingest import INGEST_TESTS_DIR, TEST_CLOUDFILE, THUMBNAIL
 
 
 @pytest.mark.deploy_modes("component")
@@ -48,9 +46,7 @@ async def test_resource_download_extracted_file(
         f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}/download/{download_type}/{download_field}",  # noqa
     )
     assert resp.status_code == 200
-    filename = (
-        f"{os.path.dirname(tests.ingest.fixtures.__file__)}{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"
-    )
+    filename = f"{INGEST_TESTS_DIR}{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"
 
     open(filename, "rb").read() == resp.content
 
@@ -94,7 +90,7 @@ async def test_resource_download_field_file(
     assert resp.status_code == 206
     assert resp.headers["Content-Disposition"]
 
-    filename = f"{os.path.dirname(tests.ingest.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
+    filename = f"{INGEST_TESTS_DIR}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
 
     open(filename, "rb").read() == resp.content
 
@@ -125,9 +121,7 @@ async def test_resource_download_field_conversation(
         f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/conversation/{field_id}/download/field/{msg_id}/{file_id}",
     )
     assert resp.status_code == 200
-    filename = (
-        f"{os.path.dirname(tests.ingest.fixtures.__file__)}/{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"  # noqa
-    )
+    filename = f"{INGEST_TESTS_DIR}/{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"  # noqa
     assert open(filename, "rb").read() == resp.content
 
 
