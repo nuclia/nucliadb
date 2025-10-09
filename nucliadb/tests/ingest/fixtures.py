@@ -48,7 +48,6 @@ from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import indexing_settings, nuclia_settings, transaction_settings
-from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
@@ -64,16 +63,6 @@ logger = logging.getLogger(__name__)
 def processor(maindb_driver: Driver, storage: Storage, pubsub: PubSubDriver) -> Iterable[Processor]:
     proc = Processor(maindb_driver, storage, pubsub, partition="1")
     yield proc
-
-
-# TODO: this is one of the controversial fixtures. Some test rely on this for
-# the local storage to get the correct path of files that we upload in tests.
-# However, this fixture is duplicated in ndbfixtures as the reader is also doing
-# the same trick, making them incompatible.
-@pytest.fixture(scope="function")
-def local_files():
-    with patch.object(storage_settings, "local_testing_files", f"{dirname(__file__)}"):
-        yield
 
 
 @dataclass

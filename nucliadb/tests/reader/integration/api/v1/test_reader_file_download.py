@@ -29,13 +29,10 @@ from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREF
 from nucliadb_protos.resources_pb2 import FieldType
 from tests.ingest.fixtures import TEST_CLOUDFILE, THUMBNAIL
 
-BASE = ("field_id", "field_type")
-VALUE = ("value",)
-EXTRACTED = ("extracted",)
-
 
 @pytest.mark.deploy_modes("component")
 async def test_resource_download_extracted_file(
+    local_files,
     nucliadb_reader: AsyncClient,
     full_resource: Resource,
 ) -> None:
@@ -60,6 +57,7 @@ async def test_resource_download_extracted_file(
 
 @pytest.mark.deploy_modes("component")
 async def test_resource_download_field_file(
+    local_files,
     nucliadb_reader: AsyncClient,
     test_resource: Resource,
 ) -> None:
@@ -114,7 +112,7 @@ async def test_resource_download_field_file(
 
 @pytest.mark.deploy_modes("component")
 async def test_resource_download_field_conversation(
-    nucliadb_reader: AsyncClient, test_resource: Resource
+    local_files, nucliadb_reader: AsyncClient, test_resource: Resource
 ) -> None:
     rsc = test_resource
     kbid = rsc.kb.kbid
@@ -149,7 +147,7 @@ async def test_resource_download_field_conversation(
 )
 @pytest.mark.deploy_modes("component")
 async def test_download_fields_by_resource_slug(
-    nucliadb_reader: AsyncClient, test_resource, endpoint_part, endpoint_params
+    local_files, nucliadb_reader: AsyncClient, test_resource, endpoint_part, endpoint_params
 ):
     rsc = test_resource
     kbid = rsc.kb.kbid
@@ -218,7 +216,7 @@ def test_parse_media_range(range_request, filesize, start, end, range_size, exce
 
 @pytest.mark.deploy_modes("component")
 async def test_resource_download_field_file_content_disposition(
-    nucliadb_reader: AsyncClient, test_resource: Resource
+    local_files, nucliadb_reader: AsyncClient, test_resource: Resource
 ) -> None:
     rsc = test_resource
     kbid = rsc.kb.kbid
@@ -244,6 +242,7 @@ def test_safe_http_header_encode(text):
 
 @pytest.mark.deploy_modes("component")
 async def test_resource_download_field_file_first_byte(
+    local_files,
     nucliadb_reader: AsyncClient,
     test_resource: Resource,
 ) -> None:
