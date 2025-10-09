@@ -25,15 +25,15 @@ class ExternalIndexProviderType(str, Enum):
     For now only Pinecone is supported, but we may add more in the future.
     """
 
-    PINECONE = "pinecone"
+    UNSET = "unset"
 
 
 class ExternalIndexProviderBase(BaseModel):
     type: ExternalIndexProviderType
 
 
-class PineconeIndexProvider(ExternalIndexProviderBase):
-    type: ExternalIndexProviderType = ExternalIndexProviderType.PINECONE
+class DummyIndexProvider(ExternalIndexProviderBase):
+    type: ExternalIndexProviderType = ExternalIndexProviderType.UNSET
 
 
-ExternalIndexProvider = Union[PineconeIndexProvider,]
+ExternalIndexProvider = Union[DummyIndexProvider,]

@@ -200,7 +200,7 @@ class TestWriterServicer:
         self, writer: WriterServicer, knowledgebox_class
     ):
         request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
-        knowledgebox_class.create.side_effect = ExternalIndexCreationError("pinecone", "foo")
+        knowledgebox_class.create.side_effect = ExternalIndexCreationError("unset", "foo")
 
         resp = await writer.NewKnowledgeBoxV2(request)
 
