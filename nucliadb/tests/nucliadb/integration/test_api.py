@@ -1894,14 +1894,14 @@ async def test_origin_limits():
     )
     with pytest.raises(pydantic.ValidationError):
         metadata.InputOrigin(
-            tags=[str(i) for i in range(301)],
+            tags=[str(i) for i in range(300 + 1)],
         )
 
     # Tag is too long
     metadata.InputOrigin(
-        tags=["a" * 1024],
+        tags=["a" * 512],
     )
     with pytest.raises(pydantic.ValidationError):
         metadata.InputOrigin(
-            tags=["a" * 1025],
+            tags=["a" * 512 + 1],
         )
