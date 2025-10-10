@@ -20,7 +20,7 @@
 use std::{collections::HashSet, fs::File, io::BufWriter, path::Path, sync::Arc};
 
 use fst::{Automaton, IntoStreamer, Map, Streamer};
-use memmap2::Mmap;
+use memmap2::{Mmap, MmapOptions};
 
 use crate::VectorR;
 
@@ -59,9 +59,14 @@ pub struct FstIndexReader {
 }
 
 impl FstIndexReader {
-    pub fn open(path: &Path, map_reader: Arc<InvertedMapReader>) -> VectorR<Self> {
+    pub fn open(path: &Path, map_reader: Arc<InvertedMapReader>, prewarm: bool) -> VectorR<Self> {
+        let mut options = MmapOptions::new();
+        if prewarm {
+            options.populate();
+        }
+
         Ok(Self {
-            fst: Map::new(unsafe { Mmap::map(&File::open(path)?)? })?,
+            fst: Map::new(unsafe { options.map(&File::open(path)?)? })?,
             map_reader,
         })
     }
@@ -132,8 +137,8 @@ mod tests {
         map_writer.finish()?;
 
         // Check the map has the same contents we initialized
-        let map_reader = Arc::new(InvertedMapReader::open(tmp_map.path())?);
-        let reader = FstIndexReader::open(tmp.path(), map_reader)?;
+        let map_reader = Arc::new(InvertedMapReader::open(tmp_map.path(), false)?);
+        let reader = FstIndexReader::open(tmp.path(), map_reader, false)?;
 
         for (key, value) in entries {
             let indexed = reader.get(&key);

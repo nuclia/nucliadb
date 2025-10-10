@@ -24,13 +24,13 @@ mod tests;
 use crate::config::{VectorConfig, flags};
 use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, ParagraphRef, VectorRef};
 use crate::formula::Formula;
-use crate::hnsw::*;
 use crate::inverted_index::{FilterBitSet, InvertedIndexes, build_indexes};
 use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
+use crate::{hnsw::*, inverted_index};
 use core::f32;
 use io::{BufWriter, Write};
-use memmap2::Mmap;
+use memmap2::{Mmap, MmapOptions};
 use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::fs::File;
@@ -66,9 +66,16 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         }
         Box::new(data_store)
     };
-    let hnsw_file = File::open(path.join(file_names::HNSW))?;
 
-    let index = unsafe { Mmap::map(&hnsw_file)? };
+    // TODO: we should get this flag from the VectorConfig or some other place
+    let prewarm = false;
+
+    let hnsw_file = File::open(path.join(file_names::HNSW))?;
+    let mut index_options = MmapOptions::new();
+    if prewarm {
+        index_options.populate();
+    }
+    let index = unsafe { index_options.map(&hnsw_file)? };
 
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
@@ -77,7 +84,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         index.advise(memmap2::Advice::WillNeed)?;
     }
 
-    let inverted_indexes = InvertedIndexes::open(path, metadata.records)?;
+    let inverted_indexes = InvertedIndexes::open(path, metadata.records, inverted_index::OpenOptions { prewarm })?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
@@ -189,7 +196,11 @@ fn merge_indexes<DS: DataStore + 'static>(
     };
 
     build_indexes(segment_path, &data_store)?;
-    let inverted_indexes = InvertedIndexes::open(segment_path, merged_vectors_count as usize)?;
+    let inverted_indexes = InvertedIndexes::open(
+        segment_path,
+        merged_vectors_count as usize,
+        inverted_index::OpenOptions { prewarm: false },
+    )?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
@@ -289,7 +300,11 @@ fn create_indexes<DS: DataStore + 'static>(
     };
 
     build_indexes(path, &data_store)?;
-    let inverted_indexes = InvertedIndexes::open(path, vector_count as usize)?;
+    let inverted_indexes = InvertedIndexes::open(
+        path,
+        vector_count as usize,
+        inverted_index::OpenOptions { prewarm: false },
+    )?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
