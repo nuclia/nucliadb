@@ -17,7 +17,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Self
 
 from nucliadb_models.utils import DateTime
@@ -242,12 +242,24 @@ class InputOrigin(BaseModel):
         max_length=2048,
     )
 
+    @field_validator("tags", each_item=True)
+    def validate_tag_length(cls, tag):
+        if len(tag) > 1024:
+            raise ValueError("Each tag must be at most 1024 characters long")
+        return tag
+
 
 class Origin(InputOrigin):
     # Created and modified are redefined to
     # use native datetime objects and skip validation
     created: Optional[datetime] = None
     modified: Optional[datetime] = None
+
+    tags: List[str] = Field(
+        default=[],
+        title="Tags",
+        description="Resource tags about the origin system. It can later be used for filtering on search endpoints with '/origin.tags/{tag}'",
+    )
 
     class Source(Enum):
         WEB = "WEB"
