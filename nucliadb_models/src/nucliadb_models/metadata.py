@@ -17,7 +17,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Self
 
 from nucliadb_models.utils import DateTime
@@ -231,14 +231,23 @@ class InputOrigin(BaseModel):
         default=[],
         title="Tags",
         description="Resource tags about the origin system. It can later be used for filtering on search endpoints with '/origin.tags/{tag}'",
+        max_length=300,
     )
-    collaborators: List[str] = []
+    collaborators: List[str] = Field(default=[], max_length=100)
     filename: Optional[str] = None
-    related: List[str] = []
+    related: List[str] = Field(default=[], max_length=100)
     path: Optional[str] = Field(
         default=None,
         description="Path of the original resource. Typically used to store folder structure information of the resource at the origin system. It can be later used for filtering on search endpoints with '/origin.path/{path}'",
+        max_length=2048,
     )
+
+    @field_validator("tags")
+    def validate_tag_length(cls, tags):
+        for tag in tags:
+            if len(tag) > 512:
+                raise ValueError("Each tag must be at most 1024 characters long")
+        return tags
 
 
 class Origin(InputOrigin):
@@ -246,6 +255,12 @@ class Origin(InputOrigin):
     # use native datetime objects and skip validation
     created: Optional[datetime] = None
     modified: Optional[datetime] = None
+
+    tags: List[str] = Field(
+        default=[],
+        title="Tags",
+        description="Resource tags about the origin system. It can later be used for filtering on search endpoints with '/origin.tags/{tag}'",
+    )
 
     class Source(Enum):
         WEB = "WEB"
