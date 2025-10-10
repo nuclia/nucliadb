@@ -231,13 +231,15 @@ class InputOrigin(BaseModel):
         default=[],
         title="Tags",
         description="Resource tags about the origin system. It can later be used for filtering on search endpoints with '/origin.tags/{tag}'",
+        max_length=100,
     )
-    collaborators: List[str] = []
+    collaborators: List[str] = Field(default=[], max_length=100)
     filename: Optional[str] = None
-    related: List[str] = []
+    related: List[str] = Field(default=[], max_length=100)
     path: Optional[str] = Field(
         default=None,
         description="Path of the original resource. Typically used to store folder structure information of the resource at the origin system. It can be later used for filtering on search endpoints with '/origin.path/{path}'",
+        max_length=2048,
     )
 
 
