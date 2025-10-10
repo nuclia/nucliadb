@@ -242,11 +242,12 @@ class InputOrigin(BaseModel):
         max_length=2048,
     )
 
-    @field_validator("tags", each_item=True)
-    def validate_tag_length(cls, tag):
-        if len(tag) > 1024:
-            raise ValueError("Each tag must be at most 1024 characters long")
-        return tag
+    @field_validator("tags")
+    def validate_tag_length(cls, tags):
+        for tag in tags:
+            if len(tag) > 1024:
+                raise ValueError("Each tag must be at most 1024 characters long")
+        return tags
 
 
 class Origin(InputOrigin):

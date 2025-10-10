@@ -22,6 +22,7 @@ import json
 from typing import Optional, cast
 from unittest.mock import AsyncMock, patch
 
+import pydantic
 import pytest
 from httpx import AsyncClient
 
@@ -1884,3 +1885,23 @@ async def test_deletions_on_text_index(
     counters = await kb_counters(kbid)
     assert counters.resources == 0
     assert counters.fields == 0
+
+
+async def test_origin_limits():
+    # Too many tags
+    metadata.InputOrigin(
+        tags=[str(i) for i in range(300)],
+    )
+    with pytest.raises(pydantic.ValidationError):
+        metadata.InputOrigin(
+            tags=[str(i) for i in range(301)],
+        )
+
+    # Tag is too long
+    metadata.InputOrigin(
+        tags=["a" * 1024],
+    )
+    with pytest.raises(pydantic.ValidationError):
+        metadata.InputOrigin(
+            tags=["a" * 1025],
+        )
