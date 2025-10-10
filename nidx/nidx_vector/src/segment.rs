@@ -48,9 +48,12 @@ mod file_names {
 }
 
 pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<OpenSegment> {
+    // TODO: we should get this flag from the VectorConfig or some other place
+    let prewarm = false;
+
     let path = &metadata.path;
     let data_store: Box<dyn DataStore> = if DataStoreV1::exists(path)? {
-        let data_store = DataStoreV1::open(path, &config.vector_type, OpenReason::Search)?;
+        let data_store = DataStoreV1::open(path, &config.vector_type, OpenReason::Search { prewarm })?;
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
         if !InvertedIndexes::exists(path) {
@@ -58,7 +61,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         }
         Box::new(data_store)
     } else {
-        let data_store = DataStoreV2::open(path, &config.vector_type, OpenReason::Search)?;
+        let data_store = DataStoreV2::open(path, &config.vector_type, OpenReason::Search { prewarm })?;
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
         if !InvertedIndexes::exists(path) {
@@ -66,9 +69,6 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         }
         Box::new(data_store)
     };
-
-    // TODO: we should get this flag from the VectorConfig or some other place
-    let prewarm = false;
 
     let hnsw_file = File::open(path.join(file_names::HNSW))?;
     let mut index_options = MmapOptions::new();
