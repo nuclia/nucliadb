@@ -1903,5 +1903,5 @@ async def test_origin_limits():
     )
     with pytest.raises(pydantic.ValidationError):
         metadata.InputOrigin(
-            tags=["a" * 512 + 1],
+            tags=["a" * (512 + 1)],
         )
