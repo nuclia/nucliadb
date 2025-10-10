@@ -23,13 +23,9 @@ import async_lru
 
 from nucliadb.common import datamanagers
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
-from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager
-from nucliadb.common.external_index_providers.settings import settings
 from nucliadb_protos.knowledgebox_pb2 import (
-    ExternalIndexProviderType,
     StoredExternalIndexProviderMetadata,
 )
-from nucliadb_utils.utilities import get_endecryptor
 
 
 async def get_external_index_manager(
@@ -39,31 +35,7 @@ async def get_external_index_manager(
     Returns an ExternalIndexManager for the given kbid.
     If for_rollover is True, the ExternalIndexManager returned will include the rollover indexes (if any).
     """
-    metadata = await get_external_index_metadata(kbid)
-    if metadata is None or metadata.type != ExternalIndexProviderType.PINECONE:
-        # Only Pinecone is supported for now
-        return None
-
-    api_key = get_endecryptor().decrypt(metadata.pinecone_config.encrypted_api_key)
-    default_vectorset = await get_default_vectorset_id(kbid)
-
-    rollover_indexes = None
-    if for_rollover:
-        rollover_metadata = await get_rollover_external_index_metadata(kbid)
-        if rollover_metadata is not None:
-            rollover_indexes = dict(rollover_metadata.pinecone_config.indexes)
-
-    return PineconeIndexManager(
-        kbid=kbid,
-        api_key=api_key,
-        indexes=dict(metadata.pinecone_config.indexes),
-        upsert_parallelism=settings.pinecone_upsert_parallelism,
-        delete_parallelism=settings.pinecone_delete_parallelism,
-        upsert_timeout=settings.pinecone_upsert_timeout,
-        delete_timeout=settings.pinecone_delete_timeout,
-        default_vectorset=default_vectorset,
-        rollover_indexes=rollover_indexes,
-    )
+    return None
 
 
 @async_lru.alru_cache(maxsize=None)

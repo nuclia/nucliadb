@@ -22,32 +22,18 @@ from pydantic import BaseModel
 class ExternalIndexProviderType(str, Enum):
     """
     Enum for the different external index providers.
-    For now only Pinecone is supported, but we may add more in the future.
+    For now none are supported, but we may add some in the future.
     """
 
-    PINECONE = "pinecone"
+    UNSET = "unset"
 
 
 class ExternalIndexProviderBase(BaseModel):
     type: ExternalIndexProviderType
 
 
-class PineconeServerlessCloud(str, Enum):
-    """
-    List of cloud providers supported by Pinecone serverless vector database.
-    """
-
-    AWS_US_EAST_1 = "aws_us_east_1"
-    AWS_US_WEST_2 = "aws_us_west_2"
-    AWS_EU_WEST_1 = "aws_eu_west_1"
-    GCP_US_CENTRAL1 = "gcp_us_central1"
-    AZURE_EASTUS2 = "azure_eastus2"
+class DummyIndexProvider(ExternalIndexProviderBase):
+    type: ExternalIndexProviderType = ExternalIndexProviderType.UNSET
 
 
-class PineconeIndexProvider(ExternalIndexProviderBase):
-    type: ExternalIndexProviderType = ExternalIndexProviderType.PINECONE
-    api_key: str
-    serverless_cloud: PineconeServerlessCloud
-
-
-ExternalIndexProvider = Union[PineconeIndexProvider,]
+ExternalIndexProvider = Union[DummyIndexProvider,]

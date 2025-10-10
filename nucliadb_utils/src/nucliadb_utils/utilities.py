@@ -29,7 +29,6 @@ from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import featureflagging
-from nucliadb_utils.aiopynecone.client import PineconeSession
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
@@ -85,7 +84,6 @@ class Utility(str, Enum):
     MAINDB_DRIVER = "driver"
     USAGE = "usage"
     ENDECRYPTOR = "endecryptor"
-    PINECONE_SESSION = "pinecone_session"
     NIDX = "nidx"
 
 
@@ -439,16 +437,3 @@ def get_endecryptor() -> EndecryptorUtility:
         ) from ex
     set_utility(Utility.ENDECRYPTOR, util)
     return util
-
-
-def get_pinecone() -> PineconeSession:
-    util = get_utility(Utility.PINECONE_SESSION)
-    if util is not None:
-        return util
-    util = PineconeSession()
-    set_utility(Utility.PINECONE_SESSION, util)
-    return util
-
-
-def clean_pinecone():
-    clean_utility(Utility.PINECONE_SESSION)
