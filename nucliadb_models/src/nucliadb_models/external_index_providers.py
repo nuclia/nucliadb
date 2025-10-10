@@ -22,7 +22,7 @@ from pydantic import BaseModel
 class ExternalIndexProviderType(str, Enum):
     """
     Enum for the different external index providers.
-    For now only Pinecone is supported, but we may add more in the future.
+    For now none are supported, but we may add some in the future.
     """
 
     UNSET = "unset"
