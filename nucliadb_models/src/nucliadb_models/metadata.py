@@ -231,7 +231,7 @@ class InputOrigin(BaseModel):
         default=[],
         title="Tags",
         description="Resource tags about the origin system. It can later be used for filtering on search endpoints with '/origin.tags/{tag}'",
-        max_length=100,
+        max_length=300,
     )
     collaborators: List[str] = Field(default=[], max_length=100)
     filename: Optional[str] = None
