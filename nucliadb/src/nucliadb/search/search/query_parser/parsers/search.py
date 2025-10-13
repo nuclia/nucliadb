@@ -51,7 +51,6 @@ from .common import (
     parse_semantic_query,
     parse_top_k,
     should_disable_vector_search,
-    validate_query_syntax,
 )
 
 INDEX_SORTABLE_FIELDS = [
@@ -128,8 +127,6 @@ class _SearchParser:
         return retrieval
 
     def _validate_request(self):
-        validate_query_syntax(self.item.query)
-
         # synonyms are not compatible with vector/graph search
         if (
             self.item.with_synonyms
