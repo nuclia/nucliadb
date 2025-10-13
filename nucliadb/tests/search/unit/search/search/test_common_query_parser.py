@@ -88,7 +88,7 @@ def test_should_disable_vectors(item, disable_vectors):
     "query,expected",
     [
         ("this is valid", "this is valid"),
-        ("invalid, so empty -* results", "invalid, so empty -* results"),
+        ("fixed -*", "fixed - "),
         ("fixed - *", "fixed - "),
         ("fixed -       *", "fixed - "),
     ],

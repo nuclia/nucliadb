@@ -37,9 +37,10 @@ def validate_query_syntax(query: str) -> str:
 
     # -* is an invalid query in tantivy and it won't return results but if you add some whitespaces
     # between - and *, it will actually trigger a tantivy bug and panic
-    INVALID_QUERY = re.compile(r"- +\*")
+    INVALID_QUERY = re.compile(r"- *\*")
     if INVALID_QUERY.search(query):
-        # remove the * and extra spaces, as it's probably what doesn't have meaning
+        # remove the * and extra spaces, as it's probably what doesn't have
+        # meaning in both cases: -* and - *
         fixed = re.sub(INVALID_QUERY, "- ", query)
         query = fixed
 
