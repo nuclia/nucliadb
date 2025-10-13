@@ -22,6 +22,8 @@ import dataclasses
 import logging
 from typing import Optional
 
+from grpc import StatusCode
+from grpc.aio import AioRpcError
 from nidx_protos import nodereader_pb2, noderesources_pb2
 
 from nucliadb.common import datamanagers, locking
@@ -54,16 +56,9 @@ async def get_shards_paragraphs(kbid: str) -> list[tuple[str, int]]:
     kb_shards = await get_kb_shards(kbid)
     if kb_shards is None:
         return []
-
     results = {}
     for shard_meta in kb_shards.shards:
-        shard_data: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
-            nodereader_pb2.GetShardRequest(
-                shard_id=noderesources_pb2.ShardId(id=shard_meta.nidx_shard_id)
-            )  # type: ignore
-        )
-        results[shard_meta.shard] = shard_data.paragraphs
-
+        results[shard_meta.shard] = await get_shard_paragraph_count(shard_meta.nidx_shard_id)
     return [(shard, paragraphs) for shard, paragraphs in sorted(results.items(), key=lambda x: x[1])]
 
 
@@ -71,7 +66,7 @@ async def maybe_add_shard(kbid: str) -> None:
     """
     Adds a new shard to the kb if the average count of paragraphs per shard is above 90% of the max shard paragraph.
     """
-    async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
+    async with locking.distributed_lock(locking.UPDATE_SHARDS_LOCK.format(kbid=kbid)):
         kb_shards = await get_kb_shards(kbid)
         if kb_shards is None:
             return
@@ -103,29 +98,67 @@ async def remove_empty_shards(kbid: str) -> None:
     if kb_shards is None:
         return
 
-    for idx, shard in enumerate(kb_shards.shards):
-        if idx == kb_shards.actual:
+    current_active_shard = kb_shards.shards[kb_shards.actual]
+    to_delete = []
+
+    for shard in list(kb_shards.shards):
+        if shard == current_active_shard:
             # This is the currently active shard, so we can't delete it
             continue
-
         resources_in_shard = await get_shard_resources_count(shard.nidx_shard_id)
         if resources_in_shard == 0:
-            logger.info(
-                "Deleting empty shard",
-                extra={"kbid": kbid, "shard_id": shard.shard, "nidx_shard_id": shard.nidx_shard_id},
-            )
-            await get_nidx_api_client().DeleteShard(noderesources_pb2.ShardId(id=shard.nidx_shard_id))
-            async with datamanagers.with_rw_transaction() as txn:
+            to_delete.append(shard)
+
+    if to_delete:
+        async with locking.distributed_lock(locking.UPDATE_SHARDS_LOCK.format(kbid=kbid)):
+            # Delete shards from nidx
+            for shard in to_delete:
+                logger.info(
+                    "Deleting empty shard",
+                    extra={"kbid": kbid, "shard_id": shard.shard, "nidx_shard_id": shard.nidx_shard_id},
+                )
+                await get_nidx_api_client().DeleteShard(
+                    noderesources_pb2.ShardId(id=shard.nidx_shard_id)
+                )
                 kb_shards.shards.remove(shard)
                 kb_shards.actual -= 1
+                assert kb_shards.actual >= 0
+
+            async with datamanagers.with_rw_transaction() as txn:
                 await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
+                await txn.commit()
 
 
 async def get_shard_resources_count(nidx_shard_id: str) -> int:
-    shard_data: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
-        nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=nidx_shard_id))  # type: ignore
+    # Do a search on the fields (fulltext) index by title so you get unique resource ids
+    request = nodereader_pb2.SearchRequest(
+        shard=nidx_shard_id,
+        paragraph=False,
+        document=True,
+        result_per_page=0,
     )
-    return shard_data.fields
+    request.field_filter.field.field_type = "a"
+    request.field_filter.field.field_id = "title"
+    search_response: nodereader_pb2.SearchResponse = await get_nidx_searcher_client().Search(request)
+    return search_response.document.total
+
+
+async def get_shard_paragraph_count(nidx_shard_id: str) -> int:
+    # Do a search on the fields (paragraph) index
+    try:
+        request = nodereader_pb2.SearchRequest(
+            shard=nidx_shard_id,
+            paragraph=True,
+            document=False,
+            result_per_page=0,
+        )
+        search_response: nodereader_pb2.SearchResponse = await get_nidx_searcher_client().Search(request)
+        return search_response.paragraph.total
+    except AioRpcError as exc:
+        if exc.code() == StatusCode.NOT_FOUND:
+            logger.warning(f"Shard not found in nidx", extra={"nidx_shard_id": nidx_shard_id})
+            return 0
+        raise
 
 
 async def move_set_of_kb_resources(
@@ -201,17 +234,24 @@ async def move_set_of_kb_resources(
 
 
 async def rebalance_kb(context: ApplicationContext, kbid: str) -> None:
+    logger.info("Rebalance started", extra={"kbid": kbid})
+
     await maybe_add_shard(kbid)
-    await remove_empty_shards(kbid)
+    split = await split_big_shards(context, kbid)
 
-    await split_big_shards(context, kbid)
-    await merge_small_shards(context, kbid)
+    if not split:
+        await remove_empty_shards(kbid)
+        await merge_small_shards(context, kbid)
+
+    logger.info("Rebalance finished", extra={"kbid": kbid})
 
 
-async def split_big_shards(context: ApplicationContext, kbid: str):
+async def split_big_shards(context: ApplicationContext, kbid: str) -> bool:
     """
     Checks for shards that have exceeded the max number of paragraphs by 10%
     and moves resources to other shards that have space.
+
+    Returns whether some shards have been split.
     """
     shard_paragraphs = await get_shards_paragraphs(kbid)
     rebalanced_shards = set()
@@ -235,6 +275,8 @@ async def split_big_shards(context: ApplicationContext, kbid: str):
         rebalanced_shards.add(largest_shard)
 
         shard_paragraphs = await get_shards_paragraphs(kbid)
+
+    return len(rebalanced_shards) > 0
 
 
 @dataclasses.dataclass
@@ -278,10 +320,10 @@ def choose_merge_shards(candidates: list[RebalanceShard]) -> tuple[RebalanceShar
         raise NoMergeCandidatesFound("not enough candidates")
 
     # Take the smallest empty shard as source
-    def is_empty_shard(s: RebalanceShard):
-        return s.paragraphs < settings.max_shard_paragraphs * 0.3 and not s.active
+    def is_almost_empty_shard(s: RebalanceShard):
+        return (0 < s.paragraphs < settings.max_shard_paragraphs * 0.3) and not s.active
 
-    empty_shards = list(filter(is_empty_shard, candidates))
+    empty_shards = list(filter(is_almost_empty_shard, candidates))
     if not empty_shards:
         raise NoMergeCandidatesFound("no empty candidates found")
     empty_shards.sort(key=lambda x: x.paragraphs)
@@ -290,17 +332,21 @@ def choose_merge_shards(candidates: list[RebalanceShard]) -> tuple[RebalanceShar
     # We don't want to move resources out of the currenlty active shard
     assert not source.active
 
-    # Take the biggest shard with room as target
+    # If current active shard has room, prioritize it. Otherwise, take the biggest shard with room.
     def has_room(s: RebalanceShard):
         return (s.paragraphs + source.paragraphs) < (
             settings.max_shard_paragraphs * 0.95
         ) and s != source
 
-    with_room = list(filter(has_room, candidates))
-    if not with_room:
-        raise NoMergeCandidatesFound("no candidates with room found")
-    with_room.sort(key=lambda x: x.paragraphs)
-    target = with_room[-1]
+    active_shard = next(c for c in candidates if c.active)
+    if has_room(active_shard):
+        target = active_shard
+    else:
+        with_room = list(filter(has_room, candidates))
+        if not with_room:
+            raise NoMergeCandidatesFound("no candidates with room found")
+        with_room.sort(key=lambda x: x.paragraphs)
+        target = with_room[-1]
 
     # This is not possible, but just to be double sure
     assert target != source
@@ -312,35 +358,42 @@ async def merge_small_shards(context: ApplicationContext, kbid: str):
     """
     Looks for read-only shards that are almost empty and could be merged into a bigger shard
     """
-    rebalance_shards = await get_rebalance_shards(kbid)
-    try:
-        source_shard, target_shard = choose_merge_shards(rebalance_shards)
-    except NoMergeCandidatesFound:
-        return
-    logger.info(
-        "Merge candidates found!",
-        extra={
-            "kbid": kbid,
-            "empty_shard": source_shard.to_dict(),
-            "shard_with_room": target_shard.to_dict(),
-        },
-    )
-
+    emptied_shards = set()
     while True:
-        remaining = await get_shard_resources_count(source_shard.nidx_id)
-        if remaining == 0:
-            logger.info("Shard is empty! Finishing", extra={"kbid": kbid, "shard": source_shard.id})
+        rebalance_shards = await get_rebalance_shards(kbid)
+        rebalance_shards = list(filter(lambda x: x.id not in emptied_shards, rebalance_shards))
+        try:
+            source_shard, target_shard = choose_merge_shards(rebalance_shards)
+        except NoMergeCandidatesFound:
             break
 
-        target_paragraphs = next(p for s, p in await get_shards_paragraphs(kbid) if s == target_shard.id)
-        if target_paragraphs > settings.max_shard_paragraphs * 0.9:
-            logger.info(
-                "Shard with room is getting full",
-                extra={"kbid": kbid, "shard": target_shard.id, "paragraphs": target_paragraphs},
+        logger.info(
+            "Merge candidates found!",
+            extra={
+                "kbid": kbid,
+                "empty_shard": source_shard.to_dict(),
+                "shard_with_room": target_shard.to_dict(),
+            },
+        )
+
+        while True:
+            remaining = await get_shard_resources_count(source_shard.nidx_id)
+            if remaining == 0:
+                logger.info("Shard is empty! Finishing", extra={"kbid": kbid, "shard": source_shard.id})
+                emptied_shards.add(source_shard.id)
+                break
+
+            target_paragraphs = next(
+                p for s, p in await get_shards_paragraphs(kbid) if s == target_shard.id
             )
-            break
+            if target_paragraphs > settings.max_shard_paragraphs * 0.9:
+                logger.info(
+                    "Shard with room is getting full",
+                    extra={"kbid": kbid, "shard": target_shard.id, "paragraphs": target_paragraphs},
+                )
+                break
 
-        await move_set_of_kb_resources(context, kbid, source_shard.id, target_shard.id)
+            await move_set_of_kb_resources(context, kbid, source_shard.id, target_shard.id)
 
 
 async def run(context: ApplicationContext) -> None:

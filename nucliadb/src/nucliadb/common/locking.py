@@ -33,10 +33,18 @@ from .maindb.utils import get_driver
 
 logger = logging.getLogger(__name__)
 
-NEW_SHARD_LOCK = "new-shard-{kbid}"
+# To coordinate processes that modify the shards object
+UPDATE_SHARDS_LOCK = "update-shards-{kbid}"
+
+# To coordinate rebalance job with ingest processor indexing
 RESOURCE_INDEX_LOCK = "resource-index-{kbid}-{resource_id}"
+
 RESOURCE_CREATION_SLUG_LOCK = "resource-creation-{kbid}-{resource_slug}"
+
+# To coordinate rebalance and rollovers
 KB_SHARDS_LOCK = "shards-kb-{kbid}"
+
+
 MIGRATIONS_LOCK = "migration"
 
 

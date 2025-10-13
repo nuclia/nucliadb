@@ -22,8 +22,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster import rebalance
 from nucliadb.common.cluster.settings import settings
+from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
 
 
@@ -38,12 +40,13 @@ async def app_context(natsd, storage, nucliadb):
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_rebalance_kb_shards(
+async def test_rebalance_splits_kb_shards(
     app_context,
     standalone_knowledgebox,
     nucliadb_writer: AsyncClient,
     nucliadb_reader_manager: AsyncClient,
 ):
+    # Create 10 resources
     count = 10
     for i in range(count):
         resp = await nucliadb_writer.post(
@@ -68,13 +71,65 @@ async def test_rebalance_kb_shards(
 
     assert len(shards1["shards"]) == 1
 
+    # Change max shard paragraphs to be half: this should force the shard to be split in two
     with patch.object(settings, "max_shard_paragraphs", counters1["paragraphs"] / 2):
         await rebalance.rebalance_kb(app_context, standalone_knowledgebox)
 
-    shards2_resp = await nucliadb_reader_manager.get(f"/kb/{standalone_knowledgebox}/shards")
-    shards2 = shards2_resp.json()
-    assert len(shards2["shards"]) == 2
+        shards2_resp = await nucliadb_reader_manager.get(f"/kb/{standalone_knowledgebox}/shards")
+        shards2 = shards2_resp.json()
+        assert len(shards2["shards"]) == 2
 
-    # if we run it again, we should get another shard
-    with patch.object(settings, "max_shard_paragraphs", counters1["paragraphs"] / 2):
+
+@pytest.mark.deploy_modes("standalone")
+async def test_rebalance_merges_kb_shards(
+    app_context,
+    standalone_knowledgebox,
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader_manager: AsyncClient,
+):
+    # Create 10 resources that will end up in 4 different shards
+    count = 10
+    for i in range(count):
+        if i in [3, 6, 9]:
+            await create_shard_for_kb(standalone_knowledgebox)
+
+        # Each resource has 2 paragraphs (title and summary)
+        resp = await nucliadb_writer.post(
+            f"/kb/{standalone_knowledgebox}/resources",
+            json={
+                "title": f"My resource {i}",
+                "summary": f"My summary {i}",
+                "icon": "text/plain",
+            },
+        )
+        assert resp.status_code == 201
+
+    # Make sure the counts are the expected
+    resp = await nucliadb_reader_manager.get(f"/kb/{standalone_knowledgebox}/counters")
+    counters = resp.json()
+    assert counters["resources"] == 10
+    assert counters["paragraphs"] == 20
+
+    resp = await nucliadb_reader_manager.get(f"/kb/{standalone_knowledgebox}/shards")
+    shards = resp.json()
+
+    assert len(shards["shards"]) == 4
+
+    # Change max shard paragraphs to be bigger: this should force all shards to be merged into one
+    with patch.object(settings, "max_shard_paragraphs", 500):
         await rebalance.rebalance_kb(app_context, standalone_knowledgebox)
+
+        # Run again so that the cleanup of empty shards kicks-in
+        await rebalance.rebalance_kb(app_context, standalone_knowledgebox)
+
+        resp = await nucliadb_reader_manager.get(f"/kb/{standalone_knowledgebox}/shards")
+        shards = resp.json()
+
+        assert len(shards["shards"]) == 1
+
+
+async def create_shard_for_kb(kbid: str):
+    async with datamanagers.with_rw_transaction() as txn:
+        sm = get_shard_manager()
+        await sm.create_shard_by_kbid(txn, kbid)
+        await txn.commit()

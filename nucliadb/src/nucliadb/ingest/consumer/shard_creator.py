@@ -90,22 +90,18 @@ class ShardCreatorHandler:
 
     @metrics.handler_histo.wrap({"type": "shard_creator"})
     async def process_kb(self, kbid: str) -> None:
-        logger.info({"message": "Processing notification for kbid", "kbid": kbid})
-        async with self.driver.ro_transaction() as txn:
-            current_shard = await self.shard_manager.get_current_active_shard(txn, kbid)
+        async with locking.distributed_lock(locking.UPDATE_SHARDS_LOCK.format(kbid=kbid)):
+            logger.info({"message": "Processing notification for kbid", "kbid": kbid})
+            async with self.driver.ro_transaction() as txn:
+                current_shard = await self.shard_manager.get_current_active_shard(txn, kbid)
 
-        if current_shard is None:
-            logger.error(
-                "Processing a notification for KB with no current shard",
-                extra={"kbid": kbid},
-            )
-            return
+            if current_shard is None:
+                logger.error(
+                    "Processing a notification for KB with no current shard",
+                    extra={"kbid": kbid},
+                )
+                return
 
-        # TODO: when multiple shards are allowed, this should either handle the
-        # written shard or attempt to rebalance everything
-        async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
-            # remember, a lock will do at least 1+ reads and 1 write.
-            # with heavy writes, this adds some simple k/v pressure
             shard: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
                 nodereader_pb2.GetShardRequest(
                     shard_id=noderesources_pb2.ShardId(id=current_shard.nidx_shard_id)
