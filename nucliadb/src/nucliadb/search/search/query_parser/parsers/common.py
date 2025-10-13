@@ -21,7 +21,6 @@ import re
 import string
 from typing import Optional, Union
 
-from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.search import logger
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
@@ -32,15 +31,19 @@ from nucliadb_models import search as search_models
 
 DEFAULT_GENERIC_SEMANTIC_THRESHOLD = 0.7
 
-# -* is an invalid query in tantivy and it won't return results but if you add some whitespaces
-# between - and *, it will actually trigger a tantivy bug and panic
-INVALID_QUERY = re.compile(r"- +\*")
 
+def validate_query_syntax(query: str) -> str:
+    """Filter some queries that panic tantivy, better than returning the 500"""
 
-def validate_query_syntax(query: str):
-    # Filter some queries that panic tantivy, better than returning the 500
+    # -* is an invalid query in tantivy and it won't return results but if you add some whitespaces
+    # between - and *, it will actually trigger a tantivy bug and panic
+    INVALID_QUERY = re.compile(r"- +\*")
     if INVALID_QUERY.search(query):
-        raise InvalidQueryError("query", "Invalid query syntax")
+        # remove the * and extra spaces, as it's probably what doesn't have meaning
+        fixed = re.sub(INVALID_QUERY, "- ", query)
+        query = fixed
+
+    return query
 
 
 def is_empty_query(request: search_models.BaseSearchRequest) -> bool:
@@ -85,6 +88,7 @@ async def parse_keyword_query(
     fetcher: Fetcher,
 ) -> KeywordQuery:
     query = item.query
+
     # If there was a rephrase with image, we should use the rephrased query for keyword search
     rephrased_query = await fetcher.get_rephrased_query()
     if item.query_image is not None and rephrased_query is not None:
@@ -97,6 +101,10 @@ async def parse_keyword_query(
         if synonyms_query is not None:
             query = synonyms_query
             is_synonyms_query = True
+
+    # after all query transformations, pass a validator that can fix some
+    # queries that trigger a panic on the index
+    query = validate_query_syntax(query)
 
     min_score = parse_keyword_min_score(item.min_score)
 
