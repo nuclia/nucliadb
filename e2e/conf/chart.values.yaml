@@ -16,7 +16,7 @@ env:
   NUCLIA_PUBLIC_URL: https://{zone}.stashify.cloud
   NUCLIADB_DISABLE_ANALYTICS: "True"
   ENVIRONMENT: "stage"
-  FLAG_SETTINGS_URL: https://raw.githubusercontent.com/nuclia/status/main/features-v2.json
+  FLAG_SETTINGS_URL: https://cdn.rag.progress.cloud/features/features-v2.json
   DEBUG: "true"
 
 replicas: 2
