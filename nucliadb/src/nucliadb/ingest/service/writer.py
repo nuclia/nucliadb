@@ -126,6 +126,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 external_index_provider=request.external_index_provider,
                 hidden_resources_enabled=request.hidden_resources_enabled,
                 hidden_resources_hide_on_creation=request.hidden_resources_hide_on_creation,
+                prewarm_enabled=request.prewarm_enabled,
             )
 
         except KnowledgeBoxConflict:
