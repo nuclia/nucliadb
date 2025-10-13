@@ -302,6 +302,9 @@ def choose_merge_shards(candidates: list[RebalanceShard]) -> tuple[RebalanceShar
     with_room.sort(key=lambda x: x.paragraphs)
     target = with_room[-1]
 
+    # This is not possible, but just to be double sure
+    assert target != source
+
     return source, target
 
 
