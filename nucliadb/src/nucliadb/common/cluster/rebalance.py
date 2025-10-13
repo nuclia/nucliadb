@@ -239,9 +239,9 @@ async def split_big_shards(context: ApplicationContext, kbid: str):
 
 @dataclasses.dataclass
 class RebalanceShard:
-    shard_id: str
-    nidx_shard_id: str
-    active_shard: bool
+    id: str
+    nidx_id: str
+    active: bool
     paragraphs: int
 
     def to_dict(self):
@@ -260,9 +260,9 @@ async def get_rebalance_shards(kbid: str) -> list[RebalanceShard]:
 
     return [
         RebalanceShard(
-            shard_id=shard_id,
-            nidx_shard_id=get_nidx_shard_id(shard_id),
-            active_shard=shard_id == current_active_shard_id,
+            id=shard_id,
+            nidx_id=get_nidx_shard_id(shard_id),
+            active=(shard_id == current_active_shard_id),
             paragraphs=paragraphs,
         )
         for shard_id, paragraphs in await get_shards_paragraphs(kbid)
@@ -279,7 +279,7 @@ def choose_merge_shards(candidates: list[RebalanceShard]) -> tuple[RebalanceShar
 
     # Take the smallest empty shard as source
     def is_empty_shard(s: RebalanceShard):
-        return s.paragraphs < settings.max_shard_paragraphs * 0.3 and not s.active_shard
+        return s.paragraphs < settings.max_shard_paragraphs * 0.3 and not s.active
 
     empty_shards = list(filter(is_empty_shard, candidates))
     if not empty_shards:
@@ -321,24 +321,20 @@ async def merge_small_shards(context: ApplicationContext, kbid: str):
     )
 
     while True:
-        remaining = await get_shard_resources_count(source_shard.nidx_shard_id)
+        remaining = await get_shard_resources_count(source_shard.nidx_id)
         if remaining == 0:
-            logger.info(
-                "Shard is empty! Finishing", extra={"kbid": kbid, "shard": source_shard.shard_id}
-            )
+            logger.info("Shard is empty! Finishing", extra={"kbid": kbid, "shard": source_shard.id})
             break
 
-        target_paragraphs = next(
-            p for s, p in await get_shards_paragraphs(kbid) if s == target_shard.shard_id
-        )
+        target_paragraphs = next(p for s, p in await get_shards_paragraphs(kbid) if s == target_shard.id)
         if target_paragraphs > settings.max_shard_paragraphs * 0.9:
             logger.info(
                 "Shard with room is getting full",
-                extra={"kbid": kbid, "shard": target_shard.shard_id, "paragraphs": target_paragraphs},
+                extra={"kbid": kbid, "shard": target_shard.id, "paragraphs": target_paragraphs},
             )
             break
 
-        await move_set_of_kb_resources(context, kbid, source_shard.shard_id, target_shard.shard_id)
+        await move_set_of_kb_resources(context, kbid, source_shard.id, target_shard.id)
 
 
 async def run(context: ApplicationContext) -> None:

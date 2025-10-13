@@ -43,7 +43,7 @@ async def test_run_handles_locked_rebalance():
 
 
 def shard(id: str, active: bool = False, paragraphs: int = 0) -> RebalanceShard:
-    return RebalanceShard(shard_id=id, active_shard=active, nidx_shard_id="xx", paragraphs=paragraphs)
+    return RebalanceShard(id=id, active=active, nidx_id=id, paragraphs=paragraphs)
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -75,5 +75,31 @@ def test_choose_merge_shards(candidates, result: Union[NoMergeCandidatesFound, t
         assert str(ex.value) == str(result)
     else:
         chosen = choose_merge_shards(candidates)
-        assert chosen[0].shard_id == result[0]
-        assert chosen[1].shard_id == result[1]
+        assert chosen[0].id == result[0]
+        assert chosen[1].id == result[1]
+
+
+def test_choose_merge_shards_successive():
+    # Make sure it takes the smallest and merge it to the biggest, to minimize the amount of moves.
+    candidates = [
+        shard(id="s", paragraphs=10),
+        shard(id="m", paragraphs=20),
+        shard(id="l", paragraphs=50),
+    ]
+    source, target = choose_merge_shards(candidates)
+    assert source.id == "s"
+    assert target.id == "l"
+
+    candidates.remove(source)
+    candidates[-1].paragraphs += source.paragraphs
+
+    source, target = choose_merge_shards(candidates)
+
+    assert source.id == "m"
+    assert target.id == "l"
+
+    candidates.remove(source)
+    candidates[-1].paragraphs += source.paragraphs
+
+    with pytest.raises(NoMergeCandidatesFound):
+        choose_merge_shards(candidates)
