@@ -287,6 +287,9 @@ def choose_merge_shards(candidates: list[RebalanceShard]) -> tuple[RebalanceShar
     empty_shards.sort(key=lambda x: x.paragraphs)
     source = empty_shards[0]
 
+    # We don't want to move resources out of the currenlty active shard
+    assert not source.active
+
     # Take the biggest shard with room as target
     def has_room(s: RebalanceShard):
         return (s.paragraphs + source.paragraphs) < (
