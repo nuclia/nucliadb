@@ -108,6 +108,7 @@ class KnowledgeBox:
         external_index_provider: CreateExternalIndexProviderMetadata = CreateExternalIndexProviderMetadata(),
         hidden_resources_enabled: bool = False,
         hidden_resources_hide_on_creation: bool = False,
+        prewarm_enabled: bool = False,
     ) -> tuple[str, str]:
         """Creates a new knowledge box and return its id and slug."""
 
@@ -194,6 +195,7 @@ class KnowledgeBox:
                     migration_version=get_latest_version(),
                     hidden_resources_enabled=hidden_resources_enabled,
                     hidden_resources_hide_on_creation=hidden_resources_hide_on_creation,
+                    prewarm_enabled=prewarm_enabled,
                 )
                 config.external_index_provider.CopyFrom(stored_external_index_provider)
                 await datamanagers.kb.set_config(txn, kbid=kbid, config=config)
