@@ -25,6 +25,7 @@ from nucliadb.search.search.query_parser.parsers.common import (
     is_empty_query,
     is_exact_match_only_query,
     should_disable_vector_search,
+    validate_query_syntax,
 )
 from nucliadb_models.search import SearchRequest
 
@@ -81,3 +82,16 @@ def test_has_user_vectors(item, has_vectors):
 )
 def test_should_disable_vectors(item, disable_vectors):
     assert should_disable_vector_search(item) is disable_vectors
+
+
+@pytest.mark.parametrize(
+    "query,expected",
+    [
+        ("this is valid", "this is valid"),
+        ("fixed -*", "fixed - "),
+        ("fixed - *", "fixed - "),
+        ("fixed -       *", "fixed - "),
+    ],
+)
+def test_validate_query_syntax(query: str, expected: str):
+    assert validate_query_syntax(query) == expected

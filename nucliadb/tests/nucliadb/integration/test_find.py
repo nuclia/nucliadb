@@ -568,13 +568,14 @@ async def test_find_query_error(
     nucliadb_ingest_grpc: WriterStub,
     standalone_knowledgebox: str,
 ):
+    # we parse properly this - * expressions now
     resp = await nucliadb_reader.post(
         f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "# Markdown\n- **Bold**",
         },
     )
-    assert resp.status_code == 412
+    assert resp.status_code == 200
 
 
 @pytest.mark.deploy_modes("standalone")
