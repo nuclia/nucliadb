@@ -30,10 +30,10 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 @pytest.mark.parametrize("prewarm", [True, False])
 @pytest.mark.deploy_modes("component")
-async def test_create_knowledgebox_with_prewarm(
+async def test_create_and_update_knowledgebox_with_prewarm(
+    maindb_driver: Driver,
     dummy_nidx_utility: NidxUtility,
     nucliadb_ingest_grpc: WriterStub,
-    maindb_driver: Driver,
     hosted_nucliadb,
     prewarm: bool,
 ):
@@ -60,3 +60,37 @@ async def test_create_knowledgebox_with_prewarm(
         config = await datamanagers.kb.get_config(txn, kbid=kbid)
         assert config is not None
         assert config.prewarm_enabled == prewarm
+
+    # validate pre-warm flag is also forwarded to nidx
+    assert dummy_nidx_utility.api_client.NewShard.call_count == 1
+    assert dummy_nidx_utility.api_client.NewShard.call_args.args[0].prewarm_enabled == prewarm
+
+    # now update multiple times the KB and check the flag is properly updated
+    # everywhere
+
+    for updated_prewarm in [not prewarm, not prewarm, prewarm, prewarm]:
+        result = await nucliadb_ingest_grpc.UpdateKnowledgeBox(  # type: ignore
+            writer_pb2.KnowledgeBoxUpdate(
+                uuid=kbid,
+                slug=slug,
+                config=knowledgebox_pb2.KnowledgeBoxConfig(
+                    prewarm_enabled=updated_prewarm,
+                ),
+            )
+        )
+        assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+
+        async with maindb_driver.ro_transaction() as txn:
+            config = await datamanagers.kb.get_config(txn, kbid=kbid)
+            assert config is not None
+            assert config.prewarm_enabled == updated_prewarm
+
+    # validate pre-warm flag is also forwarded to nidx, only on configuration changes
+    assert dummy_nidx_utility.api_client.ConfigureShards.call_count == 2
+    calls = dummy_nidx_utility.api_client.ConfigureShards.call_args_list
+
+    for shard_config in calls[0].args[0].configs:
+        assert shard_config.prewarm_enabled == (not prewarm)
+
+    for shard_config in calls[1].args[0].configs:
+        assert shard_config.prewarm_enabled == prewarm

@@ -7,10 +7,10 @@ import "nidx_protos/nodewriter.proto";
 
 service NidxApi {
   rpc GetShard(nodereader.GetShardRequest) returns (noderesources.Shard) {}
-
   rpc NewShard(nodewriter.NewShardRequest) returns (noderesources.ShardCreated) {}
   rpc DeleteShard(noderesources.ShardId) returns (noderesources.ShardId) {}
   rpc ListShards(noderesources.EmptyQuery) returns (noderesources.ShardIds) {}
+  rpc ConfigureShards(ShardsConfig) returns (noderesources.EmptyQuery) {}
 
   rpc AddVectorSet(nodewriter.NewVectorSetRequest) returns (nodewriter.OpStatus) {}
   rpc RemoveVectorSet(noderesources.VectorSetID) returns (nodewriter.OpStatus) {}
@@ -42,4 +42,18 @@ message Notification {
         INDEXED = 2;
     }
     Action action = 6;
+}
+
+
+message ShardsConfig {
+    repeated ShardConfig configs = 1;
+}
+
+message ShardConfig {
+    string shard_id = 1;
+
+    // Pre-warm is a feature to minimize cold starts on searches. It'll keep
+    // disk data in memory to avoid IO latency, at expenses of RAM usage. Use
+    // with care.
+    bool prewarm_enabled = 2;
 }

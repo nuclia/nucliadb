@@ -170,7 +170,15 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         try:
             async with self.driver.rw_transaction() as txn:
                 kbid = await KnowledgeBoxORM.update(
-                    txn, uuid=request.uuid, slug=request.slug, config=request.config
+                    self.driver,
+                    kbid=request.uuid,
+                    slug=request.slug,
+                    title=request.config.title or None,
+                    description=request.config.description or None,
+                    external_index_provider=request.config.external_index_provider or None,
+                    hidden_resources_enabled=request.config.hidden_resources_enabled,
+                    hidden_resources_hide_on_creation=request.config.hidden_resources_hide_on_creation,
+                    prewarm_enabled=request.config.prewarm_enabled,
                 )
                 await txn.commit()
         except KnowledgeBoxNotFound:

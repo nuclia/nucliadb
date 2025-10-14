@@ -147,8 +147,6 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
 async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> KnowledgeBoxObjID:
-    driver = get_driver()
-    config = None
     if (
         item.slug
         or item.title
@@ -156,29 +154,24 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> Kn
         or item.hidden_resources_enabled
         or item.hidden_resources_hide_on_creation
     ):
-        config = knowledgebox_pb2.KnowledgeBoxConfig(
-            slug=item.slug or "",
-            title=item.title or "",
-            description=item.description or "",
-            hidden_resources_enabled=item.hidden_resources_enabled,
-            hidden_resources_hide_on_creation=item.hidden_resources_hide_on_creation,
-        )
-    try:
-        async with driver.rw_transaction() as txn:
+        try:
+            driver = get_driver()
             await KnowledgeBox.update(
-                txn,
-                uuid=kbid,
+                driver,
+                kbid=kbid,
                 slug=item.slug,
-                config=config,
+                title=item.title,
+                description=item.description,
+                hidden_resources_enabled=item.hidden_resources_enabled,
+                hidden_resources_hide_on_creation=item.hidden_resources_hide_on_creation,
             )
-            await txn.commit()
-    except datamanagers.exceptions.KnowledgeBoxNotFound:
-        raise HTTPException(status_code=404, detail="Knowledge box does not exist")
-    except Exception as exc:
-        logger.exception("Could not update KB", exc_info=exc, extra={"kbid": kbid})
-        raise HTTPException(status_code=500, detail="Error updating knowledge box")
-    else:
-        return KnowledgeBoxObjID(uuid=kbid)
+        except datamanagers.exceptions.KnowledgeBoxNotFound:
+            raise HTTPException(status_code=404, detail="Knowledge box does not exist")
+        except Exception as exc:
+            logger.exception("Could not update KB", exc_info=exc, extra={"kbid": kbid})
+            raise HTTPException(status_code=500, detail="Error updating knowledge box")
+
+    return KnowledgeBoxObjID(uuid=kbid)
 
 
 @only_for_onprem
