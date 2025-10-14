@@ -113,6 +113,8 @@ class KBShardManager:
         self,
         txn: Transaction,
         kbid: str,
+        *,
+        prewarm_enabled: bool = False,
     ) -> writer_pb2.ShardObject:
         kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=True)
         if kb_shards is None:
@@ -133,6 +135,7 @@ class KBShardManager:
             req = NewShardRequest(
                 kbid=kbid,
                 vectorsets_configs=vectorsets,
+                prewarm_enabled=prewarm_enabled,
             )
 
             resp = await nidx_api.NewShard(req)  # type: ignore
