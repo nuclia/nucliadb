@@ -91,6 +91,7 @@ def test_should_disable_vectors(item, disable_vectors):
         ("fixed -*", "fixed - "),
         ("fixed - *", "fixed - "),
         ("fixed -       *", "fixed - "),
+        ("fixed -   *****", "fixed - "),
     ],
 )
 def test_validate_query_syntax(query: str, expected: str):
