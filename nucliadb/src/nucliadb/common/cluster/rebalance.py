@@ -51,7 +51,7 @@ async def get_kb_shards(kbid: str) -> Optional[writer_pb2.Shards]:
 
 async def get_shards_paragraphs(kbid: str) -> list[tuple[str, int]]:
     """
-    Ordered shard -> num paragraph by number of paragraphs. Ordered in increasing paragraph count (smallest first).
+    List KB shards and their paragraph count, sorted by increasing paragraph count (smallest first)
     """
     kb_shards = await get_kb_shards(kbid)
     if kb_shards is None:
