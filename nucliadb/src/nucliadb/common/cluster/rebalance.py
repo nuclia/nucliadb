@@ -131,16 +131,22 @@ async def remove_empty_shards(kbid: str) -> None:
 
 async def get_shard_resources_count(nidx_shard_id: str) -> int:
     # Do a search on the fields (fulltext) index by title so you get unique resource ids
-    request = nodereader_pb2.SearchRequest(
-        shard=nidx_shard_id,
-        paragraph=False,
-        document=True,
-        result_per_page=0,
-    )
-    request.field_filter.field.field_type = "a"
-    request.field_filter.field.field_id = "title"
-    search_response: nodereader_pb2.SearchResponse = await get_nidx_searcher_client().Search(request)
-    return search_response.document.total
+    try:
+        request = nodereader_pb2.SearchRequest(
+            shard=nidx_shard_id,
+            paragraph=False,
+            document=True,
+            result_per_page=0,
+        )
+        request.field_filter.field.field_type = "a"
+        request.field_filter.field.field_id = "title"
+        search_response: nodereader_pb2.SearchResponse = await get_nidx_searcher_client().Search(request)
+        return search_response.document.total
+    except AioRpcError as exc:
+        if exc.code() == StatusCode.NOT_FOUND:
+            logger.warning(f"Shard not found in nidx", extra={"nidx_shard_id": nidx_shard_id})
+            return 0
+        raise
 
 
 async def get_shard_paragraph_count(nidx_shard_id: str) -> int:
