@@ -18,14 +18,20 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import dataclasses
 import logging
+import math
+from typing import Optional
 
+from grpc import StatusCode
+from grpc.aio import AioRpcError
 from nidx_protos import nodereader_pb2, noderesources_pb2
 
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.nidx import get_nidx_api_client, get_nidx_searcher_client
+from nucliadb_protos import writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
@@ -39,49 +45,73 @@ logger = logging.getLogger(__name__)
 REBALANCE_LOCK = "rebalance"
 
 
-async def get_shards_paragraphs(kbid: str) -> list[tuple[str, int]]:
-    """
-    Ordered shard -> num paragraph by number of paragraphs
-    """
+@dataclasses.dataclass
+class RebalanceShard:
+    id: str
+    nidx_id: str
+    active: bool
+    paragraphs: int
+
+    def to_dict(self):
+        return self.__dict__
+
+
+async def get_kb_shards(kbid: str) -> Optional[writer_pb2.Shards]:
     async with datamanagers.with_ro_transaction() as txn:
-        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        return await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+
+
+async def get_shard_resources_count(nidx_shard_id: str) -> int:
+    # Do a search on the fields (fulltext) index by title so you get unique resource ids
+    try:
+        request = nodereader_pb2.SearchRequest(
+            shard=nidx_shard_id,
+            paragraph=False,
+            document=True,
+            result_per_page=0,
+        )
+        request.field_filter.field.field_type = "a"
+        request.field_filter.field.field_id = "title"
+        search_response: nodereader_pb2.SearchResponse = await get_nidx_searcher_client().Search(request)
+        return search_response.document.total
+    except AioRpcError as exc:
+        if exc.code() == StatusCode.NOT_FOUND:
+            logger.warning(f"Shard not found in nidx", extra={"nidx_shard_id": nidx_shard_id})
+            return 0
+        raise
+
+
+async def get_shard_paragraph_count(nidx_shard_id: str) -> int:
+    # Do a search on the fields (paragraph) index
+    try:
+        request = nodereader_pb2.SearchRequest(
+            shard=nidx_shard_id,
+            paragraph=True,
+            document=False,
+            result_per_page=0,
+        )
+        search_response: nodereader_pb2.SearchResponse = await get_nidx_searcher_client().Search(request)
+        return search_response.paragraph.total
+    except AioRpcError as exc:
+        if exc.code() == StatusCode.NOT_FOUND:
+            logger.warning(f"Shard not found in nidx", extra={"nidx_shard_id": nidx_shard_id})
+            return 0
+        raise
+
+
+async def get_rebalance_shards(kbid: str) -> list[RebalanceShard]:
+    kb_shards = await get_kb_shards(kbid)
     if kb_shards is None:
         return []
-
-    results = {}
-    for shard_meta in kb_shards.shards:
-        # Rebalance using node as source of truth. But it will rebalance nidx
-        shard_data: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
-            nodereader_pb2.GetShardRequest(
-                shard_id=noderesources_pb2.ShardId(id=shard_meta.nidx_shard_id)
-            )  # type: ignore
+    return [
+        RebalanceShard(
+            id=shard.shard,
+            nidx_id=shard.nidx_shard_id,
+            active=idx == kb_shards.actual,
+            paragraphs=await get_shard_paragraph_count(shard.nidx_shard_id),
         )
-        results[shard_meta.shard] = shard_data.paragraphs
-
-    return [(shard, paragraphs) for shard, paragraphs in sorted(results.items(), key=lambda x: x[1])]
-
-
-async def maybe_add_shard(kbid: str) -> None:
-    async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
-        async with datamanagers.with_ro_transaction() as txn:
-            kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-        if kb_shards is None:
-            return
-
-        shard_paragraphs = await get_shards_paragraphs(kbid)
-        total_paragraphs = sum([c for _, c in shard_paragraphs])
-
-        if (total_paragraphs / len(kb_shards.shards)) > (
-            settings.max_shard_paragraphs * 0.9  # 90% of the max
-        ):
-            # create new shard
-            async with datamanagers.with_rw_transaction() as txn:
-                kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
-                prewarm = kb_config is not None and kb_config.prewarm_enabled
-
-                sm = get_shard_manager()
-                await sm.create_shard_by_kbid(txn, kbid, prewarm_enabled=prewarm)
-                await txn.commit()
+        for idx, shard in enumerate(kb_shards.shards)
+    ]
 
 
 async def move_set_of_kb_resources(
@@ -91,8 +121,7 @@ async def move_set_of_kb_resources(
     to_shard_id: str,
     count: int = 20,
 ) -> None:
-    async with datamanagers.with_ro_transaction() as txn:
-        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+    kb_shards = await get_kb_shards(kbid)
     if kb_shards is None:  # pragma: no cover
         logger.warning("No shards found for kb. This should not happen.", extra={"kbid": kbid})
         return
@@ -102,8 +131,8 @@ async def move_set_of_kb_resources(
         extra={"kbid": kbid, "from": from_shard_id, "to": to_shard_id, "count": count},
     )
 
-    from_shard = [s for s in kb_shards.shards if s.shard == from_shard_id][0]
-    to_shard = [s for s in kb_shards.shards if s.shard == to_shard_id][0]
+    from_shard = next(s for s in kb_shards.shards if s.shard == from_shard_id)
+    to_shard = next(s for s in kb_shards.shards if s.shard == to_shard_id)
 
     request = nodereader_pb2.SearchRequest(
         shard=from_shard.nidx_shard_id,
@@ -156,27 +185,189 @@ async def move_set_of_kb_resources(
                 )
 
 
-async def rebalance_kb(context: ApplicationContext, kbid: str) -> None:
-    await maybe_add_shard(kbid)
+async def rebalance_kb_spagetti(context: ApplicationContext, kbid: str) -> None:
+    all_shards = await get_rebalance_shards(kbid)
 
-    shard_paragraphs = await get_shards_paragraphs(kbid)
-    rebalanced_shards = set()
-    while any(paragraphs > settings.max_shard_paragraphs for _, paragraphs in shard_paragraphs):
-        # find the shard with the least/most paragraphs
-        smallest_shard = shard_paragraphs[0][0]
-        largest_shard = shard_paragraphs[-1][0]
-        assert smallest_shard != largest_shard
+    # Add a 20% margin to the configured max
+    max_shard_paragraphs = settings.max_shard_paragraphs * 1.2
 
-        if smallest_shard in rebalanced_shards:
-            # XXX This is to prevent flapping data between shards on a single pass
-            # if we already rebalanced this shard, then we can't do anything else
-            break
+    # For simplicity, skip the active shards from the rebalancing
+    non_active_shards = [s for s in all_shards if not s.active]
 
-        await move_set_of_kb_resources(context, kbid, largest_shard, smallest_shard)
+    # First off, check if any of the shards went over the max paragraphs limit
+    over_max = [s for s in non_active_shards if s.paragraphs > max_shard_paragraphs]
+    if over_max:
+        logger.info(
+            "Some shards exceed the paragraphs limit",
+            extra={"kbid": kbid, "all_shards": [s.to_dict() for s in all_shards]},
+        )
+        # Calculate the excedent of paragraphs
+        excess = sum(s.paragraphs - max_shard_paragraphs for s in over_max)
 
-        rebalanced_shards.add(largest_shard)
+        # Other shards that are not over the max limit
+        with_room = [s for s in non_active_shards if s not in over_max]
 
-        shard_paragraphs = await get_shards_paragraphs(kbid)
+        # Get remaining space in other shards
+        room = sum(max_shard_paragraphs - s.paragraphs for s in with_room)
+
+        # Calculate how many new shards are needed to rebalance the excedent paragraphs
+        if room > excess:
+            # No need to create new shards, as we can fit the excess of paragraphs in the existing shards
+            shards_needed = 0
+        else:
+            # We need to add some shards to make room for the excess.
+            shards_needed = math.ceil((excess - room) / max_shard_paragraphs)
+
+        if shards_needed > 0:
+            logger.info(
+                "We need to add more shards",
+                extra={
+                    "kbid": kbid,
+                    "shards_needed": shards_needed,
+                    "all_shards": [s.to_dict() for s in all_shards],
+                },
+            )
+            # Add new shards where to rebalance the excess of paragraphs
+            async with (
+                locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)),
+                datamanagers.with_rw_transaction() as txn,
+            ):
+                sm = get_shard_manager()
+                for _ in range(shards_needed):
+                    await sm.create_shard_by_kbid(txn, kbid)
+                await txn.commit()
+
+            # Recalculate after having created shards, the active shard is a different one
+            all_shards = await get_rebalance_shards(kbid)
+            non_active_shards = [s for s in all_shards if not s.active]
+            over_max = [s for s in non_active_shards if s.paragraphs > max_shard_paragraphs]
+            with_room = [s for s in non_active_shards if s not in over_max]
+
+        # Now move the excess of paragraphs to other shards where there is space
+        for over_max_shard in over_max:
+            logger.info(
+                "Moving excess of paragraphs to other shards",
+                extra={
+                    "kbid": kbid,
+                    "source": over_max_shard.to_dict(),
+                    "all_shards": [s.to_dict() for s in all_shards],
+                },
+            )
+            # Keep moving resoures to other shards as long as we are still over the max
+            shard_paragraphs = over_max_shard.paragraphs
+            while shard_paragraphs > max_shard_paragraphs:
+                # Get the biggest shard with some space left
+                try:
+                    target_shard = list(sorted(with_room, key=lambda x: x.paragraphs))[-1]
+                except IndexError:
+                    # No target shard found
+                    break
+
+                # Move some resources to the new shard
+                await move_set_of_kb_resources(
+                    context, kbid, from_shard_id=over_max_shard.id, to_shard_id=target_shard.id, count=20
+                )
+
+                # Recalculate counts
+                all_shards = await get_rebalance_shards(kbid)
+                shard_paragraphs = next(s.paragraphs for s in all_shards if s.id == over_max_shard.id)
+
+                non_active_shards = [s for s in all_shards if not s.active]
+                with_room = [
+                    s
+                    for s in non_active_shards
+                    if s.paragraphs < max_shard_paragraphs and s.id != over_max_shard.id
+                ]
+
+    # Now check if some shards could be merged into smaller ones
+    shards_to_delete: list[RebalanceShard] = []
+    can_merge_shards = len(non_active_shards) > (
+        sum(s.paragraphs for s in non_active_shards) / max_shard_paragraphs
+    )
+    while can_merge_shards:
+        # Take the smallest shard and move some resources to other shards until it gets empty
+        non_active_shards.sort(key=lambda x: x.paragraphs)
+        smallest_shard = non_active_shards[0]
+        logger.info(
+            "Merging smallest shard",
+            extra={
+                "kbid": kbid,
+                "smallest": smallest_shard.id,
+                "all_shards": [s.to_dict() for s in all_shards],
+            },
+        )
+        while True:
+            resources_count = await get_shard_resources_count(smallest_shard.nidx_id)
+            if resources_count == 0:
+                logger.info(
+                    "Shard is now empty",
+                    extra={
+                        "kbid": kbid,
+                        "smallest": smallest_shard.id,
+                        "all_shards": [s.to_dict() for s in all_shards],
+                    },
+                )
+                shards_to_delete.append(smallest_shard)
+                break
+
+            logger.info(
+                "Shard not yet empty",
+                extra={
+                    "kbid": kbid,
+                    "smallest": smallest_shard.id,
+                    "remaining": resources_count,
+                },
+            )
+
+            # Take the biggest shard that has some room (90% of the max, to prevent filling them completely)
+            with_room = [
+                s
+                for s in non_active_shards
+                if s.paragraphs < settings.max_shard_paragraphs * 0.9 and s.id != smallest_shard.id
+            ]
+            with_room.sort(key=lambda x: x.paragraphs)
+            try:
+                target_shard = with_room[-1]
+            except IndexError:
+                # No target shard could be found. Move on
+                break
+
+            await move_set_of_kb_resources(
+                context, kbid, from_shard_id=smallest_shard.id, to_shard_id=target_shard.id, count=20
+            )
+
+            # Recompute counts
+            all_shards = await get_rebalance_shards(kbid)
+            non_active_shards = [s for s in all_shards if not s.active]
+
+        # Recompute counts
+        all_shards = await get_rebalance_shards(kbid)
+        non_active_shards = [s for s in all_shards if not s.active]
+        can_merge_shards = len(non_active_shards) > (
+            sum(s.paragraphs for s in non_active_shards) / max_shard_paragraphs
+        )
+
+    if shards_to_delete:
+        async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
+            kb_shards = await get_kb_shards(kbid)
+            if kb_shards is not None:
+                # Delete shards from nidx
+                for shard in shards_to_delete:
+                    to_delete = next(s for s in kb_shards.shards if s.shard == shard.id)
+                    logger.info(
+                        "Deleting empty shard",
+                        extra={"kbid": kbid, "shard_id": shard.id, "nidx_shard_id": shard.nidx_id},
+                    )
+                    await get_nidx_api_client().DeleteShard(
+                        noderesources_pb2.ShardId(id=to_delete.nidx_shard_id)
+                    )
+                    kb_shards.shards.remove(to_delete)
+                    kb_shards.actual -= 1
+                    assert kb_shards.actual >= 0
+
+                async with datamanagers.with_rw_transaction() as txn:
+                    await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
+                    await txn.commit()
 
 
 async def run(context: ApplicationContext) -> None:
