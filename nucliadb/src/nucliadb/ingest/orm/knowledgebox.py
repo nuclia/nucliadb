@@ -299,12 +299,12 @@ class KnowledgeBox:
             await txn.commit()
 
         if update_nidx_prewarm is not None:
-            await cls.configure_prewarm(driver, kbid, prewarm=update_nidx_prewarm)
+            await cls.configure_shards(driver, kbid, prewarm=update_nidx_prewarm)
 
         return kbid
 
     @classmethod
-    async def configure_prewarm(cls, driver: Driver, kbid: str, *, prewarm: bool):
+    async def configure_shards(cls, driver: Driver, kbid: str, *, prewarm: bool):
         async with driver.ro_transaction() as txn:
             shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
 
