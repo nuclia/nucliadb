@@ -104,3 +104,7 @@ class synonyms:
 
 class search_configurations:
     get = ro_txn_wrap(search_configurations_dm.get)
+
+
+class cluster:
+    get_kb_shards = ro_txn_wrap(cluster_dm.get_kb_shards)
