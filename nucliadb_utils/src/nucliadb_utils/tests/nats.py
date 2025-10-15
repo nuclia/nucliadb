@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import socket
-from typing import AsyncIterator
+from typing import AsyncIterator, Iterator
 
 import nats
 import pytest
@@ -52,7 +52,7 @@ nats_image = NatsImage()
 
 
 @pytest.fixture(scope="session")
-def natsd():  # pragma: no cover
+def natsd() -> Iterator[str]:
     nats_host, nats_port = nats_image.run()
     print("Started natsd docker")
     yield f"nats://{nats_host}:{nats_port}"
@@ -60,7 +60,7 @@ def natsd():  # pragma: no cover
 
 
 @pytest.fixture(scope="function")
-async def nats_server(natsd: str):
+async def nats_server(natsd: str) -> AsyncIterator[str]:
     yield natsd
 
     # cleanup nats
