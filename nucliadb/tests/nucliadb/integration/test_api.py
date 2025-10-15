@@ -1929,3 +1929,8 @@ async def test_get_kb_by_slug_on_cloud(
     resp = await nucliadb_reader.get(f"/kb/s/{user_slug}", headers={"x-nucliadb-account": account_id})
     assert resp.status_code == 200
     assert resp.json()["uuid"] == kbid
+
+    # Passing the full slug works too
+    resp = await nucliadb_reader.get(f"/kb/s/{account_id}:{user_slug}")
+    assert resp.status_code == 200
+    assert resp.json()["uuid"] == kbid
