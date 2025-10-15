@@ -23,7 +23,7 @@ import os
 import platform
 import sys
 from typing import Iterator
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import nats
 import pytest
@@ -172,7 +172,7 @@ def nidx_storage(request) -> dict[str, str]:
 
 
 @pytest.fixture(scope="session")
-async def nidx(natsd, nidx_storage, pg):
+async def nidx(natsd: str, nidx_storage: dict[str, str], pg):
     # Create needed NATS stream/consumer
     nc = await nats.connect(servers=[natsd])
     js = nc.jetstream()
@@ -198,11 +198,13 @@ async def nidx(natsd, nidx_storage, pg):
 
     # Configure settings
 
-    cluster_settings.nidx_api_address = f"localhost:{api_port}"
-    cluster_settings.nidx_searcher_address = f"localhost:{searcher_port}"
-    indexing_settings.index_nidx_subject = "nidx"
-
-    yield
+    with (
+        patch.object(cluster_settings, "nidx_api_address", f"localhost:{api_port}"),
+        patch.object(cluster_settings, "nidx_searcher_address", f"localhost:{searcher_port}"),
+        patch.object(indexing_settings, "index_nidx_subject", "nidx"),
+        patch.object(indexing_settings, "index_jetstream_servers", [natsd]),
+    ):
+        yield
 
     image.stop()
 

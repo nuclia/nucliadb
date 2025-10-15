@@ -222,11 +222,6 @@ async def indexing_utility(
 
 
 @pytest.fixture(scope="function")
-async def nats_indexing_utility(nats_server: str, _clean_natsd) -> AsyncIterator[None]:
-    yield
-
-
-@pytest.fixture(scope="function")
 async def _clean_natsd(nats_server, nats_ingest_stream, nats_ingest_processed_stream):
     # XXX Legacy fixture that should be replaced.
     #
