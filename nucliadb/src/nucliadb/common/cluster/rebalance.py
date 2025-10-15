@@ -193,33 +193,27 @@ async def move_set_of_kb_resources(
                 )
 
 
-def should_rebalance(shard: RebalanceShard, all_shards: list[RebalanceShard]) -> bool:
-    return should_split(shard) or should_merge(shard, all_shards)
+def needs_rebalance(shard: RebalanceShard, shards: list[RebalanceShard]) -> bool:
+    return needs_split(shard) or needs_merge(shard, shards)
 
 
-def should_split(shard: RebalanceShard) -> bool:
+def needs_split(shard: RebalanceShard) -> bool:
     # We don't split shards unless they exceed the max by 20%
     return shard.paragraphs > (settings.max_shard_paragraphs * 1.2)
 
 
-def cluster_capacity(shards: list[RebalanceShard], exclude: RebalanceShard) -> float:
-    # The shard can be merged as long as the cluster has capacity. Ignore shards that are already more than 75% full.
-    non_full_shards = [
-        s for s in shards if s.id != exclude.id and s.paragraphs < settings.max_shard_paragraphs * 0.75
-    ]
-
-    # Take into account that we will never fill up a shard more than 90%
-    return sum(
-        [max(0, ((settings.max_shard_paragraphs * 0.90) - sh.paragraphs)) for sh in non_full_shards]
-    )
+def calculate_capacity(shards: list[RebalanceShard]) -> float:
+    return sum([max(0, (settings.max_shard_paragraphs - sh.paragraphs)) for sh in shards])
 
 
-def should_merge(shard: RebalanceShard, all_shards: list[RebalanceShard]) -> bool:
+def needs_merge(shard: RebalanceShard, all_shards: list[RebalanceShard]) -> bool:
     # We don't consider shards for merging if they are already more that 75% of max
-    if shard.paragraphs > settings.max_shard_paragraphs * 0.75:
+    if shard.paragraphs > (settings.max_shard_paragraphs * 0.75):
         return False
-    # The shard can be merged as long as the cluster has capacity
-    return shard.paragraphs < cluster_capacity(all_shards, exclude=shard)
+    # The shard can be merged as long as the cluster has capacity.
+    # Take into account that we will not fill shards more than 90%
+    other_shards = [s for s in all_shards if s.id != shard.id]
+    return shard.paragraphs < (calculate_capacity(other_shards) * 0.9)
 
 
 async def split_shard(
@@ -235,7 +229,8 @@ async def split_shard(
 
     # First off, calculate if the excess fits in the cluster
     excess = shard.paragraphs - settings.max_shard_paragraphs
-    capacity = cluster_capacity(shards, exclude=shard)
+    other_shards = [s for s in shards if s.id != shard.id]
+    capacity = calculate_capacity(other_shards) * 0.9
     if excess > capacity:
         shards_to_add = math.ceil((excess - capacity) / settings.max_shard_paragraphs)
         logger.info(
@@ -364,21 +359,22 @@ async def merge_shard(
 
 
 async def rebalance_kb(context: ApplicationContext, kbid: str) -> None:
+    """
+    Iterate over shards until none of them need more rebalancing.
+    Will move excess of paragraphs to other shards (potentially creating new ones), and
+    merge small shards together when possible (potentially deleting empty ones.)
+    """
     shards = await get_rebalance_shards(kbid)
-    while any(should_rebalance(shard, shards) for shard in shards):
-        shard = shards[0]
-        rebalanced = False
-
-        if should_split(shard):
+    while True:
+        try:
+            shard = next(s for s in shards if needs_rebalance(s, shards))
+        except StopIteration:
+            break
+        if needs_split(shard):
             await split_shard(context, kbid, shard, shards)
-            rebalanced = True
-
-        elif should_merge(shard, shards):
+        elif needs_merge(shard, shards):
             await merge_shard(context, kbid, shard, shards)
-            rebalanced = True
-
-        if rebalanced:
-            shards = await get_rebalance_shards(kbid)
+        shards = await get_rebalance_shards(kbid)
 
 
 async def run(context: ApplicationContext) -> None:
