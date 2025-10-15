@@ -52,13 +52,11 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import NatsConnectionManager
-from nucliadb_utils.settings import indexing_settings, nuclia_settings, transaction_settings
+from nucliadb_utils.settings import indexing_settings, nuclia_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
     clear_global_cache,
-    start_transaction_utility,
-    stop_transaction_utility,
 )
 
 logger = logging.getLogger(__name__)
@@ -303,16 +301,6 @@ async def _nats_streams_and_consumers_setup(
                 pass
 
         await nc.close()
-
-
-@pytest.fixture(scope="function")
-async def transaction_utility(
-    nats_server: str, pubsub: PubSubDriver
-) -> AsyncIterator[TransactionUtility]:
-    transaction_settings.transaction_jetstream_servers = [nats_server]
-    util = await start_transaction_utility()
-    yield util
-    await stop_transaction_utility()
 
 
 THUMBNAIL = rpb.CloudFile(
