@@ -15,6 +15,10 @@ spec:
             regex: "GET|OPTIONS"
           uri:
             regex: '^/api/v\d+/kb/[^/]+$'
+        - method:
+            regex: "GET|OPTIONS"
+          uri:
+            regex: '^/api/v\d+/kb/s/[^/]+$'
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/configuration'
           method:

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from fastapi import HTTPException
+from fastapi import Header, HTTPException
 from fastapi_versioning import version
 from starlette.requests import Request
 
@@ -85,12 +85,18 @@ async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
-async def get_kb_by_slug(request: Request, slug: str) -> KnowledgeBoxObj:
+async def get_kb_by_slug(
+    request: Request, slug: str, x_nucliadb_account: str = Header(default="", include_in_schema=False)
+) -> KnowledgeBoxObj:
     driver = get_driver()
     async with driver.ro_transaction() as txn:
-        kbid = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
+        # For cloud, the account id is prepended in order to be able to reuse the same slug in different accounts.
+        kbid = await datamanagers.kb.get_kb_uuid(txn, slug=f"{x_nucliadb_account}:{slug}")
         if kbid is None:
-            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+            # For onprem, the slug is fully controlled by the user
+            kbid = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
+            if kbid is None:
+                raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
         if kb_config is None:

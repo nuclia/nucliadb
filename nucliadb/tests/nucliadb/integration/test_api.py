@@ -1905,3 +1905,32 @@ async def test_origin_limits():
         metadata.InputOrigin(
             tags=["a" * (512 + 1)],
         )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_get_kb_by_slug_on_cloud(
+    nucliadb_writer_manager: AsyncClient,
+    nucliadb_reader: AsyncClient,
+):
+    account_id = "myaccount"
+    user_slug = "english"
+    resp = await nucliadb_writer_manager.post(
+        f"/kbs",
+        json={
+            "title": "My KB",
+            # We simulate what idp does with kb slugs so they can be reused on different accounts
+            "slug": f"{account_id}:{user_slug}",
+        },
+    )
+    assert resp.status_code == 201
+    kbid = resp.json()["uuid"]
+
+    # Check that passing hte account id as header (same like what happens on cloud deployments), the kb is found
+    resp = await nucliadb_reader.get(f"/kb/s/{user_slug}", headers={"x-nucliadb-account": account_id})
+    assert resp.status_code == 200
+    assert resp.json()["uuid"] == kbid
+
+    # Passing the full slug works too
+    resp = await nucliadb_reader.get(f"/kb/s/{account_id}:{user_slug}")
+    assert resp.status_code == 200
+    assert resp.json()["uuid"] == kbid
