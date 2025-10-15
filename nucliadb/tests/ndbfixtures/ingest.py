@@ -52,7 +52,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import NatsConnectionManager
-from nucliadb_utils.settings import indexing_settings, nuclia_settings
+from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
@@ -141,12 +141,12 @@ class IngestFixture:
 
 @pytest.fixture(scope="function")
 async def ingest_consumers(
-    maindb_driver,
+    maindb_driver: Driver,
     transaction_utility: TransactionUtility,
     storage: Storage,
     dummy_nidx_utility,
-    indexing_utility,
     nats_manager: NatsConnectionManager,
+    nats_ingest_stream,
 ):
     ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
 
@@ -158,12 +158,12 @@ async def ingest_consumers(
 
 @pytest.fixture(scope="function")
 async def ingest_processed_consumer(
-    maindb_driver,
+    maindb_driver: Driver,
     transaction_utility: TransactionUtility,
     storage: Storage,
     dummy_nidx_utility,
-    indexing_utility,
     nats_manager: NatsConnectionManager,
+    nats_ingest_processed_stream,
 ):
     ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer_v2()
 
@@ -209,27 +209,6 @@ async def knowledgebox_with_vectorsets(
     yield kbid
 
     await KnowledgeBox.delete(maindb_driver, kbid)
-
-
-@pytest.fixture(scope="function")
-async def indexing_utility(
-    # TODO: too many tests depend on this to be true.
-    # Remove when everyone asks for what they really need
-    natsd: str,
-    _clean_natsd,
-) -> AsyncIterator[None]:
-    yield
-
-
-@pytest.fixture(scope="function")
-async def _clean_natsd(nats_server, nats_ingest_stream, nats_ingest_processed_stream):
-    # XXX Legacy fixture that should be replaced.
-    #
-    # Although the name was clean, it in fact was deleting and recreating
-    # streams/consumers used in nucliadb. So, in fact, this fixture was
-    # responsible of streams/consumers creation
-    with patch.object(indexing_settings, "index_jetstream_servers", [nats_server]):
-        yield
 
 
 @pytest.fixture(scope="function")
