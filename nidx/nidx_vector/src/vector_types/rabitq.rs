@@ -229,7 +229,7 @@ pub fn rerank_top(
     top_k: usize,
     retriever: &impl DataRetriever,
     query: &SearchVector,
-) -> BinaryHeap<Reverse<Cnx>> {
+) -> Vec<Reverse<Cnx>> {
     let mut best = BinaryHeap::new();
     let mut best_k = 0.0;
     for (addr, EstimatedScore { upper_bound, .. }) in candidates {
@@ -245,7 +245,7 @@ pub fn rerank_top(
             }
         }
     }
-    best
+    best.into_sorted_vec()
 }
 
 #[cfg(test)]
