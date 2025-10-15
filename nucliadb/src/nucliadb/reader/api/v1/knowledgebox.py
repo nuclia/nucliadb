@@ -94,7 +94,7 @@ async def get_kb_by_slug(
         kbid = await datamanagers.kb.get_kb_uuid(txn, slug=f"{x_nucliadb_account}:{slug}")
         if kbid is None:
             # For onprem, the slug is fully controlled by the user
-            kbid = await datamanagers.kb.get_kb_uuid(txn, slug=slug)        
+            kbid = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
             if kbid is None:
                 raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
