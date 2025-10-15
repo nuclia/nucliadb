@@ -227,7 +227,7 @@ async def split_shard(
         },
     )
 
-    # First off, calculate if the excess fits in the cluster
+    # First off, calculate if the excess fits in the other shards
     excess = shard.paragraphs - settings.max_shard_paragraphs
     other_shards = [s for s in shards if s.id != shard.id]
     capacity = calculate_capacity(other_shards) * 0.9
@@ -254,32 +254,31 @@ async def split_shard(
         # Recalculate after having created shards, the active shard is a different one
         shards = await get_rebalance_shards(kbid)
 
-    # Keep moving resoures to other shards as long as we are still over the max
+    # Now, move resoures to other shards as long as we are still over the max
     with_room = [
         s for s in shards if s.id != shard.id and s.paragraphs < settings.max_shard_paragraphs * 0.9
     ]
     shard_paragraphs = shard.paragraphs
     i = 0
     while (shard_paragraphs > settings.max_shard_paragraphs) and i < 500:
-        # Get the biggest shard with some space left
         try:
-            target_shard = list(sorted(with_room, key=lambda x: x.paragraphs))[-1]
+            # Get the biggest shard with some space left
+            target_shard = with_room[-1]
         except IndexError:
-            # No target shard found
+            logger.warning("No target shard found for splitting", extra={"kbid": kbid})
             break
 
-        # Move some resources to the new shard
         await move_set_of_kb_resources(
             context, kbid, from_shard_id=shard.id, to_shard_id=target_shard.id, count=20
         )
 
-        # Recalculate counts
-        all_shards = await get_rebalance_shards(kbid)
-        shard_paragraphs = next(s.paragraphs for s in all_shards if s.id == shard.id)
+        # Recalculate shard paragraphs
+        shards = await get_rebalance_shards(kbid)
+        shard_paragraphs = next(s.paragraphs for s in shards if s.id == shard.id)
         with_room = [
             s for s in shards if s.id != shard.id and s.paragraphs < settings.max_shard_paragraphs * 0.9
         ]
-        i += 0
+        i += 1
 
 
 async def merge_shard(
@@ -318,11 +317,12 @@ async def merge_shard(
         )
 
         # Take the biggest shard that has some capacity (90% of the max, to prevent filling them completely)
-        with_room = [
-            s for s in shards if s.id != shard.id and s.paragraphs < settings.max_shard_paragraphs * 0.9
-        ]
-        with_room.sort(key=lambda x: x.paragraphs)
         try:
+            with_room = [
+                s
+                for s in shards
+                if s.id != shard.id and s.paragraphs < settings.max_shard_paragraphs * 0.9
+            ]
             target_shard = with_room[-1]
         except IndexError:
             # No target shard could be found. Move on
@@ -332,11 +332,12 @@ async def merge_shard(
             context, kbid, from_shard_id=shard.id, to_shard_id=target_shard.id, count=20
         )
 
-        # Recompute shards, as counts have changed
+        # Recompute state, as counts have changed
         shards = await get_rebalance_shards(kbid)
         i += 1
 
     if empty_shard:
+        # If shard was emptied, delete it
         async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
             kb_shards = await get_kb_shards(kbid)
             if kb_shards is not None:
@@ -383,7 +384,7 @@ async def run(context: ApplicationContext) -> None:
             # get all kb ids
             async with datamanagers.with_ro_transaction() as txn:
                 kbids = [kbid async for kbid, _ in datamanagers.kb.get_kbs(txn)]
-            # go through each kb and see if shards need to be reduced in size
+            # go through each kb and see if shards need to be rebalanced
             for kbid in kbids:
                 async with locking.distributed_lock(locking.KB_SHARDS_LOCK.format(kbid=kbid)):
                     await rebalance_kb(context, kbid)
