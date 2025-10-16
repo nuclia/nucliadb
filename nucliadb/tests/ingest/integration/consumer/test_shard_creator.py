@@ -45,7 +45,6 @@ async def test_shard_auto_create(
 
         sc = shard_creator.ShardCreatorHandler(
             driver=maindb_driver,
-            storage=storage,
             pubsub=pubsub,
             check_delay=0.05,
         )

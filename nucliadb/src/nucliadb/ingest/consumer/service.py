@@ -140,9 +140,8 @@ async def start_shard_creator() -> Callable[[], Awaitable[None]]:
     driver = await setup_driver()
     pubsub = await get_pubsub()
     assert pubsub is not None, "Pubsub is not configured"
-    storage = await get_storage(service_name=SERVICE_NAME)
 
-    shard_creator = ShardCreatorHandler(driver=driver, storage=storage, pubsub=pubsub)
+    shard_creator = ShardCreatorHandler(driver=driver, pubsub=pubsub)
     await shard_creator.initialize()
 
     return shard_creator.finalize
