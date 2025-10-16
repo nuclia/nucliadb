@@ -38,7 +38,7 @@ use std::io;
 use std::iter::empty;
 use std::path::Path;
 use std::time::Instant;
-use tracing::debug;
+use tracing::{debug, trace};
 
 /// How much expensive is to find a node via HNSW compared to a simple brute force scan
 const HNSW_COST_FACTOR: usize = 100;
@@ -555,12 +555,14 @@ impl OpenSegment {
     fn brute_force_search<'a, DS: DataStore>(
         &'a self,
         bitset: &FilterBitSet,
-        results: usize,
+        top_k: usize,
         retriever: Retriever<'a, DS>,
         encoded_query: &SearchVector,
         raw_query: &SearchVector,
     ) -> Box<dyn Iterator<Item = ScoredVector<'a>> + '_> {
         let mut scored_results = Vec::new();
+
+        let t = Instant::now();
         for paragraph_addr in bitset.iter() {
             let paragraph = retriever.data_store.get_paragraph(paragraph_addr);
 
@@ -578,11 +580,14 @@ impl OpenSegment {
                 scored_results.push(best_vector_score);
             }
         }
+        let time = t.elapsed();
+        trace!(?time, "Brute force search: retrieve");
 
-        if matches!(encoded_query, SearchVector::RabitQ(_)) {
+        let t = Instant::now();
+        let results: Box<dyn Iterator<Item = _>> = if matches!(encoded_query, SearchVector::RabitQ(_)) {
             // If using RabitQ, rerank top results using the raw vectors
             Box::new(
-                rabitq::rerank_top(scored_results, results, &retriever, raw_query)
+                rabitq::rerank_top(scored_results, top_k, &retriever, raw_query)
                     .into_iter()
                     .map(|Reverse(Cnx(addr, score))| ScoredVector::new(addr, self.data_store.as_ref(), score)),
             )
@@ -593,9 +598,13 @@ impl OpenSegment {
                 scored_results
                     .into_iter()
                     .map(|a| ScoredVector::new(a.0, self.data_store.as_ref(), a.1.score))
-                    .take(results),
+                    .take(top_k),
             )
-        }
+        };
+        let time = t.elapsed();
+        trace!(?time, "Brute force search: rerank");
+
+        results
     }
 }
 

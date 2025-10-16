@@ -26,6 +26,8 @@ use rand::rngs::SmallRng;
 use rustc_hash::FxHashSet;
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
+use std::time::Instant;
+use tracing::trace;
 
 use crate::inverted_index::FilterBitSet;
 use crate::vector_types::rabitq;
@@ -421,12 +423,15 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let mut entry_points = vec![entry_point.node];
 
         // Traverse upper layer finding the best match on each one
+        let t = Instant::now();
         while crnt_layer != 0 {
             let layer = hnsw.get_layer(crnt_layer);
             let layer_res = self.layer_search(query, layer, 1, &entry_points);
             entry_points = layer_res.map(|(addr, _)| addr).collect();
             crnt_layer -= 1;
         }
+        let time = t.elapsed();
+        trace!(?time, "HNSW search: upper layers");
 
         // If using RabitQ, request more vectors to rerank later
         let original_query = if let SearchVector::RabitQ(rq) = query {
@@ -441,9 +446,13 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         };
 
         // Find the best k nodes in the last layer
+        let t = Instant::now();
         let layer = hnsw.get_layer(crnt_layer);
         let neighbours = self.layer_search(query, layer, last_layer_k, &entry_points);
+        let time = t.elapsed();
+        trace!(?time, "HNSW search: last layer");
 
+        let t = Instant::now();
         let entry_points = if let Some(query) = original_query {
             // If using RabitQ, rerank using the original vectors
             rabitq::rerank_top(neighbours.collect(), k_neighbours, self.retriever, query)
@@ -453,6 +462,8 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         } else {
             neighbours.map(|(addr, _)| addr).collect()
         };
+        let time = t.elapsed();
+        trace!(?time, "HNSW search: reranking");
 
         let filter = NodeFilter {
             filter: with_filter,
@@ -463,6 +474,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let layer_zero = hnsw.get_layer(0);
 
         // Find k nodes that match the filter in the last layer
+        let t = Instant::now();
         let mut filtered_result = self.closest_up_nodes(
             entry_points,
             original_query.unwrap_or(query),
@@ -470,6 +482,8 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             k_neighbours,
             filter,
         );
+        let time = t.elapsed();
+        trace!(?time, "HNSW search: closest nodes");
 
         // order may be lost
         filtered_result.sort_by(|a, b| b.1.total_cmp(&a.1));
