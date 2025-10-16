@@ -42,6 +42,7 @@ from typing_extensions import Concatenate, ParamSpec
 
 from nucliadb.common.maindb.driver import Transaction
 
+from . import cluster as cluster_dm
 from . import kb as kb_dm
 from . import labels as labels_dm
 from . import resources as resources_dm
@@ -71,6 +72,10 @@ def rw_txn_wrap(fun: Callable[Concatenate[Transaction, P], Awaitable[T]]) -> Cal
             return result
 
     return wrapper
+
+
+class cluster:
+    get_kb_shards = ro_txn_wrap(cluster_dm.get_kb_shards)
 
 
 class kb:
