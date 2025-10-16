@@ -108,7 +108,6 @@ fn blocking_search(
     text_searcher: Option<&TextSearcher>,
     vector_searcher: Option<&VectorSearcher>,
 ) -> anyhow::Result<SearchResponse> {
-    let search_id = uuid::Uuid::new_v4().to_string();
     let mut index_queries = query_plan.index_queries;
 
     // Apply pre-filtering to the query plan
@@ -118,25 +117,22 @@ fn blocking_search(
     }
 
     // Run the rest of the plan
-    let text_task = index_queries.texts_request.map(|mut request| {
-        request.id = search_id.clone();
-        move || text_searcher.unwrap().search(&request)
-    });
+    let text_task = index_queries
+        .texts_request
+        .map(|request| move || text_searcher.unwrap().search(&request));
 
     let prefilter = &index_queries.prefilter_results;
-    let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
-        request.id = search_id.clone();
-        move || paragraph_searcher.unwrap().search(&request, prefilter)
-    });
+    let paragraph_task = index_queries
+        .paragraphs_request
+        .map(|request| move || paragraph_searcher.unwrap().search(&request, prefilter));
 
     let relation_task = index_queries
         .relations_request
         .map(|request| move || relation_searcher.unwrap().graph_search(&request, prefilter));
 
-    let vector_task = index_queries.vectors_request.map(|mut request| {
-        request.id = search_id.clone();
-        move || vector_searcher.unwrap().search(&request, prefilter)
-    });
+    let vector_task = index_queries
+        .vectors_request
+        .map(|request| move || vector_searcher.unwrap().search(&request, prefilter));
 
     let mut rtext = None;
     let mut rparagraph = None;

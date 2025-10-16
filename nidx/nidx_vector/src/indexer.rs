@@ -58,10 +58,6 @@ impl<'a> ResourceWrapper<'a> {
         }
     }
 
-    pub fn id(&self) -> &String {
-        &self.resource.shard_id
-    }
-
     pub fn labels(&self) -> &[String] {
         &self.resource.labels
     }
@@ -108,10 +104,9 @@ pub fn index_resource(
 ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
     let time = Instant::now();
 
-    let id = resource.id();
-    debug!("{id:?} - Updating main index");
+    debug!("Updating main index");
     let v = time.elapsed().as_millis();
-    debug!("{id:?} - Creating elements for the main index: starts {v} ms");
+    debug!("Creating elements for the main index: starts {v} ms");
 
     let mut elems = Vec::new();
     let normalize_vectors = config.normalize_vectors;
@@ -142,10 +137,10 @@ pub fn index_resource(
         }
     }
     let v = time.elapsed().as_millis();
-    debug!("{id:?} - Creating elements for the main index: ends {v} ms");
+    debug!("Creating elements for the main index: ends {v} ms");
 
     let v = time.elapsed().as_millis();
-    debug!("{id:?} - Main index set resource: starts {v} ms");
+    debug!("Main index set resource: starts {v} ms");
 
     if elems.is_empty() {
         return Ok(None);
@@ -160,7 +155,7 @@ pub fn index_resource(
     let segment = segment::create(output_path, elems, config, tags)?;
 
     let v = time.elapsed().as_millis();
-    debug!("{id:?} - Main index set resource: ends {v} ms");
+    debug!("Main index set resource: ends {v} ms");
 
     Ok(Some(segment.into_metadata()))
 }

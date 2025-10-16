@@ -112,7 +112,6 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> anyhow::Result<
         with_duplicates: search_request.with_duplicates,
         only_faceted: search_request.only_faceted,
         advanced_query: search_request.advanced_query.clone(),
-        id: String::default(),
         min_score: search_request.min_score_bm25,
         security: search_request.security.clone(),
         filtering_formula: search_request
@@ -130,7 +129,6 @@ fn compute_texts_request(search_request: &SearchRequest) -> Option<DocumentSearc
     }
 
     Some(DocumentSearchRequest {
-        id: search_request.shard.clone(),
         body: search_request.body.clone(),
         order: search_request.order.clone(),
         faceted: search_request.faceted.clone(),
@@ -153,7 +151,6 @@ fn compute_vectors_request(search_request: &SearchRequest) -> anyhow::Result<Opt
         .and_then(|f| extract_label_filters(f, SEGMENT_TAGS));
 
     Ok(Some(VectorSearchRequest {
-        id: search_request.shard.clone(),
         vector_set: search_request.vectorset.clone(),
         vector: search_request.vector.clone(),
         result_per_page: search_request.result_per_page,

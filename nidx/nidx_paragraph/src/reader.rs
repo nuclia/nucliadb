@@ -113,16 +113,11 @@ impl ParagraphReaderService {
     ) -> anyhow::Result<ParagraphSearchResponse> {
         let mut time_tracker = TimeTracker::start();
 
-        let shard_id = &request.id;
         let text = &request.body;
         let results = request.result_per_page as usize;
         let (keyword_query, termc, fuzzy_query) = search_query(request, prefilter, &self.index, &self.schema);
         let facets = request.facets();
-        trace!(
-            shard_id,
-            "Query parsing took {}µs",
-            time_tracker.checkpoint().as_micros()
-        );
+        debug!("Query parsing took {}µs", time_tracker.checkpoint().as_micros());
 
         let searcher = Searcher {
             request,
@@ -133,22 +128,14 @@ impl ParagraphReaderService {
         };
         // println!("Regular search with query: {:#?}", keyword_query);
         let mut response = searcher.do_search(termc.clone(), keyword_query, self, request.min_score)?;
-        trace!(
-            shard_id,
-            "Keyword search took {}µs",
-            time_tracker.checkpoint().as_micros()
-        );
+        debug!("Keyword search took {}µs", time_tracker.checkpoint().as_micros());
 
         if response.results.is_empty() && request.result_per_page > 0 && request.min_score == 0 as f32 {
             // println!("Fuzzy search with query: {:#?}", fuzzy_query);
             let fuzzied = searcher.do_search(termc, fuzzy_query, self, request.min_score)?;
             response = fuzzied;
             response.fuzzy_distance = FUZZY_DISTANCE as i32;
-            trace!(
-                shard_id,
-                "Fallback fuzzy query took {}µs",
-                time_tracker.checkpoint().as_micros()
-            );
+            debug!("Fallback fuzzy query took {}µs", time_tracker.checkpoint().as_micros());
         }
 
         let total = response.results.len() as f32;
@@ -175,16 +162,8 @@ impl ParagraphReaderService {
             response.next_page = false;
         }
 
-        trace!(
-            shard_id,
-            "Result processing took {}µs",
-            time_tracker.checkpoint().as_micros()
-        );
-        trace!(
-            shard_id,
-            "Paragraph search took {}µs",
-            time_tracker.elapsed().as_micros()
-        );
+        debug!("Result processing took {}µs", time_tracker.checkpoint().as_micros());
+        debug!("Paragraph search took {}µs", time_tracker.elapsed().as_micros());
 
         Ok(response)
     }

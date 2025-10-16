@@ -38,7 +38,6 @@ fn test_search_queries() {
     fn query(reader: &TextSearcher, query: impl Into<String>, expected: i32) {
         let query = query.into();
         let request = DocumentSearchRequest {
-            id: "shard".to_string(),
             body: query.clone(),
             result_per_page: 20,
             ..Default::default()
@@ -192,7 +191,6 @@ fn test_filtered_search() {
     fn query(reader: &TextSearcher, query: impl Into<String>, expression: FilterExpression, expected: i32) {
         let query = query.into();
         let request = DocumentSearchRequest {
-            id: "shard".to_string(),
             body: query.clone(),
             result_per_page: 20,
             filter_expression: Some(expression),
@@ -245,7 +243,6 @@ fn test_search_by_field() {
     let reader = common::test_reader();
 
     let request = DocumentSearchRequest {
-        id: "shard".to_string(),
         body: "".to_string(),
         result_per_page: 20,
         filter_expression: Some(FilterExpression {
@@ -268,7 +265,6 @@ fn test_faceted_search() {
     fn query(reader: &TextSearcher, query: impl Into<String>, facets: Faceted, expected: i32) {
         let query = query.into();
         let request = DocumentSearchRequest {
-            id: "shard".to_string(),
             body: "".to_string(),
             result_per_page: 20,
             faceted: Some(facets.clone()),
@@ -302,7 +298,6 @@ fn test_faceted_search() {
 fn test_quote_fixing() {
     fn query(reader: &TextSearcher, query: impl Into<String>) {
         let request = DocumentSearchRequest {
-            id: "shard".to_string(),
             body: query.into(),
             result_per_page: 20,
             ..Default::default()
@@ -324,7 +319,6 @@ fn test_search_with_min_score() {
     fn query(reader: &TextSearcher, query: impl Into<String>, min_score: f32, expected: i32) {
         let query = query.into();
         let request = DocumentSearchRequest {
-            id: "shard".to_string(),
             body: query.clone(),
             result_per_page: 20,
             min_score,
@@ -348,7 +342,6 @@ fn test_int_order_pagination() {
     let reader = common::test_reader();
 
     let request = DocumentSearchRequest {
-        id: "shard".to_string(),
         body: "".to_string(),
         result_per_page: 1,
         order: Some(OrderBy {
@@ -381,7 +374,6 @@ fn test_timestamp_filtering() {
 
     let search = |date_range| {
         let request = DocumentSearchRequest {
-            id: "shard".to_string(),
             body: "".to_string(),
             result_per_page: 10,
             min_score: f32::MIN,
@@ -420,7 +412,6 @@ fn test_key_filtering() {
     let reader = common::test_reader();
 
     let request = DocumentSearchRequest {
-        id: "shard".to_string(),
         body: "".to_string(),
         result_per_page: 1,
         min_score: f32::MIN,
@@ -431,7 +422,6 @@ fn test_key_filtering() {
 
     let search = |resource| {
         let request = DocumentSearchRequest {
-            id: "shard".to_string(),
             body: "".to_string(),
             result_per_page: 10,
             min_score: f32::MIN,

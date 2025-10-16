@@ -290,8 +290,6 @@ impl Searcher {
     ) -> anyhow::Result<VectorSearchResponse> {
         let time = Instant::now();
 
-        let id = Some(&request.id);
-
         let mut formula = Formula::new();
 
         if let PrefilterResult::Some(valid_fields) = prefilter {
@@ -313,7 +311,7 @@ impl Searcher {
         }
 
         let v = time.elapsed().as_millis();
-        debug!("{id:?} - Searching: starts at {v} ms");
+        debug!("Searching: starts at {v} ms");
         let search_request = &SearchRequest { request, formula };
         let result = match self.config.vector_cardinality {
             VectorCardinality::Single => self._search(search_request, &request.segment_filtering_formula)?,
@@ -321,9 +319,9 @@ impl Searcher {
         };
 
         let v = time.elapsed().as_millis();
-        debug!("{id:?} - Searching: ends at {v} ms");
+        debug!("Searching: ends at {v} ms");
 
-        debug!("{id:?} - Creating results: starts at {v} ms");
+        debug!("Creating results: starts at {v} ms");
 
         let documents = result
             .into_iter()
@@ -331,10 +329,10 @@ impl Searcher {
             .collect::<Vec<_>>();
         let v = time.elapsed().as_millis();
 
-        debug!("{id:?} - Creating results: ends at {v} ms");
+        debug!("Creating results: ends at {v} ms");
 
         let took = time.elapsed().as_secs_f64();
-        debug!("{id:?} - Ending at {took} ms");
+        debug!("Ending at {took} ms");
 
         Ok(VectorSearchResponse {
             documents,
@@ -479,7 +477,6 @@ mod tests {
 
         let searcher = Searcher::open(vec![segment::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
-            id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
             result_per_page: 20,
@@ -575,7 +572,6 @@ mod tests {
 
         let searcher = Searcher::open(vec![segment::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
-            id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
             result_per_page: 20,
@@ -586,7 +582,6 @@ mod tests {
         assert_eq!(result.documents.len(), 4);
 
         let request = VectorSearchRequest {
-            id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
             result_per_page: 20,
@@ -598,7 +593,6 @@ mod tests {
 
         // Check that min_score works
         let request = VectorSearchRequest {
-            id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
             result_per_page: 20,
@@ -610,7 +604,6 @@ mod tests {
         assert_eq!(result.documents.len(), 0);
 
         let bad_request = VectorSearchRequest {
-            id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0],
             result_per_page: 20,
@@ -685,7 +678,6 @@ mod tests {
 
         let searcher = Searcher::open(vec![segment::open(segment, &vsc)?], vsc).unwrap();
         let request = VectorSearchRequest {
-            id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
             result_per_page: 20,
@@ -696,7 +688,6 @@ mod tests {
         assert_eq!(result.documents.len(), 2);
 
         let request = VectorSearchRequest {
-            id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
             result_per_page: 20,
