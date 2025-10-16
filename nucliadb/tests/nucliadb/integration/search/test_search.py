@@ -46,7 +46,6 @@ from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
-    get_storage,
     set_utility,
 )
 from tests.utils import broker_resource, inject_message
@@ -1017,7 +1016,6 @@ async def kb_with_two_logic_shards(
 ):
     sc = shard_creator.ShardCreatorHandler(
         driver=get_driver(),
-        storage=await get_storage(),
         pubsub=None,  # type: ignore
     )
     resp = await nucliadb_writer_manager.post("/kbs", json={})

@@ -33,7 +33,6 @@ from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.storages.storage import Storage
 
 from . import metrics
 from .utils import DelayedTaskHandler
@@ -53,12 +52,10 @@ class ShardCreatorHandler:
         self,
         *,
         driver: Driver,
-        storage: Storage,
         pubsub: PubSubDriver,
         check_delay: float = 10.0,
     ):
         self.driver = driver
-        self.storage = storage
         self.pubsub = pubsub
         self.shard_manager = get_shard_manager()
         self.task_handler = DelayedTaskHandler(check_delay)
