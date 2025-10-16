@@ -31,10 +31,20 @@ from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.settings import audit_settings, nuclia_settings
+from nucliadb_utils.settings import (
+    audit_settings,
+    nuclia_settings,
+    transaction_settings,
+)
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, get_utility
+from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
+from nucliadb_utils.utilities import (
+    Utility,
+    get_utility,
+    start_transaction_utility,
+    stop_transaction_utility,
+)
 from tests.ndbfixtures.ingest import INGEST_TESTS_DIR
 from tests.ndbfixtures.utils import global_utility
 
@@ -135,3 +145,33 @@ async def shard_manager(storage: Storage, maindb_driver: Driver) -> AsyncIterato
     sm = KBShardManager()
     with global_utility(Utility.SHARD_MANAGER, sm):
         yield sm
+
+
+# Transaction
+
+
+@pytest.fixture(scope="function")
+async def transaction_utility(
+    nats_transaction_utility: TransactionUtility,
+) -> AsyncIterator[TransactionUtility]:
+    yield nats_transaction_utility
+
+
+@pytest.fixture(scope="function")
+async def local_transaction_utility() -> AsyncIterator[LocalTransactionUtility]:
+    with patch.object(transaction_settings, "transaction_local", True):
+        util = await start_transaction_utility()
+        assert isinstance(util, LocalTransactionUtility)
+        yield util
+        await stop_transaction_utility()
+
+
+@pytest.fixture(scope="function")
+async def nats_transaction_utility(
+    nats_server: str, pubsub: PubSubDriver
+) -> AsyncIterator[TransactionUtility]:
+    with patch.object(transaction_settings, "transaction_jetstream_servers", [nats_server]):
+        util = await start_transaction_utility()
+        assert isinstance(util, TransactionUtility)
+        yield util
+        await stop_transaction_utility()

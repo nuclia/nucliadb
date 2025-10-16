@@ -145,15 +145,8 @@ def set_standalone_mode_settings(standalone: bool):
         yield
 
 
-@pytest.fixture(scope="function")
-def standalone_nucliadb():
-    with set_standalone_mode_settings(True):
-        yield
-
-
 @pytest.mark.deploy_modes("standalone")
 async def test_on_standalone_nucliadb(
-    standalone_nucliadb,
     natsd,
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -262,7 +255,6 @@ async def _test_export_import_kb_api(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_export_and_create_kb_from_import_api(
-    standalone_nucliadb,
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     src_kb: str,

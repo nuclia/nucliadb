@@ -365,6 +365,11 @@ async def stop_audit_utility():
 async def start_nats_manager(
     service_name: str, nats_servers: list[str], nats_creds: Optional[str] = None
 ) -> NatsConnectionManager:
+    util = get_utility(Utility.NATS_MANAGER)
+    if util is not None:
+        logger.warning("Warning, nats manager utility was already set, ignoring")
+        return util
+
     nats_manager = NatsConnectionManager(
         service_name=service_name,
         nats_servers=nats_servers,

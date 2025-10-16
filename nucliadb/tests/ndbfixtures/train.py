@@ -94,12 +94,10 @@ async def standalone_nucliadb_train_grpc(nucliadb: Settings) -> AsyncIterator[Tr
 
 
 @pytest.fixture(scope="function")
-async def standalone_nucliadb_train(
-    nucliadb: Settings,
-):
+async def standalone_nucliadb_train(standalone_nucliadb: Settings):
     async with aiohttp.ClientSession(
         headers={"X-NUCLIADB-ROLES": "READER"},
-        base_url=f"http://localhost:{nucliadb.http_port}",
+        base_url=f"http://localhost:{standalone_nucliadb.http_port}",
     ) as client:
         yield client
 
