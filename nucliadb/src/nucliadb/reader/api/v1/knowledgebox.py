@@ -44,12 +44,20 @@ from nucliadb_utils.authentication import requires, requires_one
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
-async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
+async def get_kbs(
+    request: Request,
+    prefix: str = "",
+    x_nucliadb_account: str = Header(default="", include_in_schema=False),
+) -> KnowledgeBoxList:
     driver = get_driver()
     async with driver.ro_transaction() as txn:
         response = KnowledgeBoxList()
         async for kbid, slug in datamanagers.kb.get_kbs(txn, prefix=prefix):
-            response.kbs.append(KnowledgeBoxObjSummary(slug=slug or None, uuid=kbid))
+            response.kbs.append(
+                KnowledgeBoxObjSummary(
+                    slug=user_kb_slug(slug, account_id=x_nucliadb_account) or None, uuid=kbid
+                )
+            )
         return response
 
 
@@ -62,7 +70,9 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
-async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
+async def get_kb(
+    request: Request, kbid: str, x_nucliadb_account: str = Header(default="", include_in_schema=False)
+) -> KnowledgeBoxObj:
     driver = get_driver()
     async with driver.ro_transaction() as txn:
         kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
@@ -71,7 +81,7 @@ async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
 
         return KnowledgeBoxObj(
             uuid=kbid,
-            slug=kb_config.slug,
+            slug=user_kb_slug(kb_config.slug, account_id=x_nucliadb_account),
             config=from_proto.knowledgebox_config(kb_config),
         )
 
@@ -104,6 +114,13 @@ async def get_kb_by_slug(
 
         return KnowledgeBoxObj(
             uuid=kbid,
-            slug=kb_config.slug,
+            slug=user_kb_slug(kb_config.slug, account_id=x_nucliadb_account),
             config=from_proto.knowledgebox_config(kb_config),
         )
+
+
+def user_kb_slug(stored_slug: str, account_id: str) -> str:
+    # On cloud deployments, backend prepends the account id to the user-defined slug.
+    # This is required to make kb slugs reused across different accounts using the same nucliadb.
+    # We strip it so the user does not see it.
+    return stored_slug.split(f"{account_id}:")[-1]
