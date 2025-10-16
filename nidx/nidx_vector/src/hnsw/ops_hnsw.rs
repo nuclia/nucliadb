@@ -452,18 +452,19 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let time = t.elapsed();
         trace!(?time, "HNSW search: last layer");
 
-        let t = Instant::now();
         let entry_points = if let Some(query) = original_query {
             // If using RabitQ, rerank using the original vectors
-            rabitq::rerank_top(neighbours.collect(), k_neighbours, self.retriever, query)
+            let t = Instant::now();
+            let reranked = rabitq::rerank_top(neighbours.collect(), k_neighbours, self.retriever, query)
                 .into_iter()
                 .map(|Reverse(Cnx(addr, _))| addr)
-                .collect()
+                .collect();
+            let time = t.elapsed();
+            trace!(?time, "HNSW search: reranking");
+            reranked
         } else {
             neighbours.map(|(addr, _)| addr).collect()
         };
-        let time = t.elapsed();
-        trace!(?time, "HNSW search: reranking");
 
         let filter = NodeFilter {
             filter: with_filter,
