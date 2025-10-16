@@ -43,8 +43,6 @@ from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils.utilities import get_storage
 
-from .settings import settings
-
 logger = logging.getLogger(__name__)
 
 
@@ -234,23 +232,6 @@ class KBShardManager:
 
         indexpb.shard = shard.nidx_shard_id
         await nidx.index(indexpb)
-
-    def should_create_new_shard(self, num_paragraphs: int) -> bool:
-        return num_paragraphs > settings.max_shard_paragraphs
-
-    async def maybe_create_new_shard(
-        self,
-        kbid: str,
-        num_paragraphs: int,
-    ):
-        if not self.should_create_new_shard(num_paragraphs):
-            return
-
-        logger.info({"message": "Adding shard", "kbid": kbid})
-
-        async with datamanagers.with_transaction() as txn:
-            await self.create_shard_by_kbid(txn, kbid)
-            await txn.commit()
 
     async def create_vectorset(self, kbid: str, config: knowledgebox_pb2.VectorSetConfig):
         """Create a new vectorset in all KB shards."""

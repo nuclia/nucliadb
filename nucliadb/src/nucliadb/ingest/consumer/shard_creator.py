@@ -25,7 +25,8 @@ from typing import Any
 
 from nidx_protos import nodereader_pb2, noderesources_pb2
 
-from nucliadb.common import locking
+from nucliadb.common import datamanagers, locking
+from nucliadb.common.cluster.settings import settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.nidx import get_nidx_api_client
@@ -111,4 +112,16 @@ class ShardCreatorHandler:
                     shard_id=noderesources_pb2.ShardId(id=current_shard.nidx_shard_id)
                 )  # type: ignore
             )
-            await self.shard_manager.maybe_create_new_shard(kbid, shard.paragraphs)
+
+            if not should_create_new_shard(shard.paragraphs):
+                return
+
+            logger.info({"message": "Adding shard", "kbid": kbid})
+            async with datamanagers.with_rw_transaction() as txn:
+                # TODO: check prewarm and use it
+                await self.shard_manager.create_shard_by_kbid(txn, kbid)
+                await txn.commit()
+
+
+def should_create_new_shard(num_paragraphs: int) -> bool:
+    return num_paragraphs > settings.max_shard_paragraphs

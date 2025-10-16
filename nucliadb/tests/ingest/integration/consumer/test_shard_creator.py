@@ -67,3 +67,14 @@ async def test_shard_auto_create(
 
         kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(knowledgebox)
         assert len(kb_shards.shards) == len(original_kb_shards.shards) + 1
+
+
+def test_should_create_new_shard():
+    low_para_counter = {
+        "num_paragraphs": settings.max_shard_paragraphs - 1,
+    }
+    high_para_counter = {
+        "num_paragraphs": settings.max_shard_paragraphs + 1,
+    }
+    assert shard_creator.should_create_new_shard(**low_para_counter) is False
+    assert shard_creator.should_create_new_shard(**high_para_counter) is True

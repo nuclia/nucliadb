@@ -23,21 +23,8 @@ import pytest
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.settings import settings
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import writer_pb2
-
-
-def test_should_create_new_shard():
-    sm = manager.KBShardManager()
-    low_para_counter = {
-        "num_paragraphs": settings.max_shard_paragraphs - 1,
-    }
-    high_para_counter = {
-        "num_paragraphs": settings.max_shard_paragraphs + 1,
-    }
-    assert sm.should_create_new_shard(**low_para_counter) is False
-    assert sm.should_create_new_shard(**high_para_counter) is True
 
 
 async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
