@@ -97,21 +97,31 @@ async def test_rollover_kb_index_with_prewarm(
 ):
     kbid = standalone_knowledgebox
 
-    # TODO: remove this patch when we implemente configure shards in nidx binding
-    with mocker.patch.object(nidx_utility.api_client, "ConfigureShards", new=AsyncMock()):
-        # enable pre-warm for this KB
-        await KnowledgeBox.update(maindb_driver, kbid, prewarm_enabled=True)
+    async def nidx_shard_ids(kbid: str) -> set[str]:
+        kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=kbid)
+        assert kb_shards is not None
+        shard_ids = [shard.nidx_shard_id for shard in kb_shards.shards]
+        assert len(shard_ids) == len(set(shard_ids))
+        return set(shard_ids)
 
-    # TODO: use a spy instead of a mock once it is implemented on nidx
-    # spy = mocker.spy(nidx_utility.api_client, "ConfigureShards")
-    with mocker.patch.object(nidx_utility.api_client, "ConfigureShards", new=AsyncMock()):
-        await _test_rollover_kb_index(
-            app_context, kbid, nucliadb_writer, nucliadb_reader, nucliadb_reader_manager
-        )
+    # enable pre-warm for this KB
+    await KnowledgeBox.update(maindb_driver, kbid, prewarm_enabled=True)
 
-        assert nidx_utility.api_client.ConfigureShards.call_count == 1
-        for shard_config in nidx_utility.api_client.ConfigureShards.call_args.args[0].configs:
-            assert shard_config.prewarm_enabled is True
+    shard_ids = await nidx_shard_ids(kbid)
+
+    spy = mocker.spy(nidx_utility.api_client, "ConfigureShards")
+    await _test_rollover_kb_index(
+        app_context, kbid, nucliadb_writer, nucliadb_reader, nucliadb_reader_manager
+    )
+
+    new_shard_ids = await nidx_shard_ids(kbid)
+    assert shard_ids.isdisjoint(new_shard_ids)
+
+    # validate pre-warm is reactivated for the new shards
+    assert spy.call_count == 1
+    for shard_config in spy.call_args.args[0].configs:
+        assert shard_config.shard_id in new_shard_ids
+        assert shard_config.prewarm_enabled is True
 
 
 async def _test_rollover_kb_index(
