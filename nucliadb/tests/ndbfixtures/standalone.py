@@ -21,7 +21,7 @@ import base64
 import logging
 import os
 from pathlib import Path
-from typing import AsyncIterator
+from typing import AsyncIterator, Iterator
 from unittest.mock import patch
 
 import pytest
@@ -101,7 +101,9 @@ async def standalone_nucliadb(
 
 
 # Old fixture name for bw/c while migrating. TODO: remove once everything has been migrated
-nucliadb = standalone_nucliadb
+@pytest.fixture(scope="function")
+def nucliadb(standalone_nucliadb: Settings) -> Iterator[Settings]:
+    yield standalone_nucliadb
 
 
 @pytest.fixture(scope="function", autouse=True)
