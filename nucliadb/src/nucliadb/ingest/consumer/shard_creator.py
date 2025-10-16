@@ -115,8 +115,9 @@ class ShardCreatorHandler:
 
             logger.info({"message": "Adding shard", "kbid": kbid})
             async with datamanagers.with_rw_transaction() as txn:
-                # TODO: check prewarm and use it
-                await self.shard_manager.create_shard_by_kbid(txn, kbid)
+                kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
+                prewarm = kb_config is not None and kb_config.prewarm_enabled
+                await self.shard_manager.create_shard_by_kbid(txn, kbid, prewarm_enabled=prewarm)
                 await txn.commit()
 
 
