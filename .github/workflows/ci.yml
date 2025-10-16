@@ -232,6 +232,10 @@ jobs:
           python-version: "3.13.4"
       - name: Install uv
         uses: astral-sh/setup-uv@v5
+
+      - name: Check uv.lock
+        run: uv lock --check
+
       # Needed for nidx_protos (rust)
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
