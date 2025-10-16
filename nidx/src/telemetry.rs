@@ -97,7 +97,7 @@ pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
         Some(
             tracing_opentelemetry::layer()
                 .with_tracer(tracer_otlp)
-                .with_filter(EnvFilter::from_default_env())
+                .with_filter(ENV_FILTER.deref())
                 .with_filter(FilterFn::new(nidx_filter)),
         )
     } else {
