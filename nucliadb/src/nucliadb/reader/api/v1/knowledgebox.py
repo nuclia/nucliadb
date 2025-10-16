@@ -120,7 +120,12 @@ async def get_kb_by_slug(
 
 
 def user_kb_slug(stored_slug: str, account_id: str) -> str:
-    # On cloud deployments, backend prepends the account id to the user-defined slug.
-    # This is required to make kb slugs reused across different accounts using the same nucliadb.
-    # We strip it so the user does not see it.
-    return stored_slug.split(f"{account_id}:")[-1]
+    if account_id != "":
+        # On cloud deployments, backend prepends the account id to the user-defined slug.
+        # This is required to make kb slugs reused across different accounts using the same nucliadb.
+        # We strip it so the user does not see it.
+        return stored_slug.split(f"{account_id}:")[-1]
+    else:
+        # On on-prem deployments, the account_id is set to "" by default and we don't need to strip
+        # anything as the backend is not invovled in the kb creation process.
+        return stored_slug
