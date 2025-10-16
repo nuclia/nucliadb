@@ -1027,8 +1027,8 @@ async def kb_with_two_logic_shards(
     await create_dummy_resources(nucliadb_writer, nucliadb_ingest_grpc, kbid, n=8)
 
     # trigger creating new shard manually here
-    sc.shard_manager.should_create_new_shard = Mock(return_value=True)  # type: ignore
-    await sc.process_kb(kbid)
+    with patch("nucliadb.ingest.consumer.shard_creator.should_create_new_shard", return_value=True):
+        await sc.process_kb(kbid)
 
     await create_dummy_resources(nucliadb_writer, nucliadb_ingest_grpc, kbid, n=10, start=8)
 
