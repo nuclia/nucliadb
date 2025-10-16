@@ -22,8 +22,8 @@ import logging
 import os
 import platform
 import sys
-from typing import Iterator
-from unittest.mock import AsyncMock
+from typing import AsyncIterator, Iterator
+from unittest.mock import AsyncMock, patch
 
 import nats
 import pytest
@@ -32,7 +32,7 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
-from nucliadb.common.nidx import NidxUtility
+from nucliadb.common.nidx import NidxUtility, start_nidx_utility, stop_nidx_utility
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.tests.fixtures import get_testing_storage_backend
 from nucliadb_utils.utilities import Utility
@@ -172,7 +172,7 @@ def nidx_storage(request) -> dict[str, str]:
 
 
 @pytest.fixture(scope="session")
-async def nidx(natsd, nidx_storage, pg):
+async def nidx(natsd: str, nidx_storage: dict[str, str], pg):
     # Create needed NATS stream/consumer
     nc = await nats.connect(servers=[natsd])
     js = nc.jetstream()
@@ -198,13 +198,22 @@ async def nidx(natsd, nidx_storage, pg):
 
     # Configure settings
 
-    cluster_settings.nidx_api_address = f"localhost:{api_port}"
-    cluster_settings.nidx_searcher_address = f"localhost:{searcher_port}"
-    indexing_settings.index_nidx_subject = "nidx"
-
-    yield
+    with (
+        patch.object(cluster_settings, "nidx_api_address", f"localhost:{api_port}"),
+        patch.object(cluster_settings, "nidx_searcher_address", f"localhost:{searcher_port}"),
+        patch.object(indexing_settings, "index_nidx_subject", "nidx"),
+        patch.object(indexing_settings, "index_jetstream_servers", [natsd]),
+    ):
+        yield
 
     image.stop()
+
+
+@pytest.fixture(scope="function")
+async def nidx_utility(nidx) -> AsyncIterator[NidxUtility]:
+    utility = await start_nidx_utility()
+    yield utility
+    await stop_nidx_utility()
 
 
 @pytest.fixture(scope="function")

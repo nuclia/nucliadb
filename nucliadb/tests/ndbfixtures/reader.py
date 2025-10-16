@@ -29,7 +29,11 @@ from nucliadb.reader.app import create_application
 from nucliadb.standalone.settings import Settings
 from nucliadb.writer import API_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.settings import running_settings, transaction_settings
+from nucliadb_utils.nats import NatsConnectionManager
+from nucliadb_utils.settings import (
+    running_settings,
+    transaction_settings,
+)
 from nucliadb_utils.storages.storage import Storage
 from tests.utils.dirty_index import wait_for_sync
 
@@ -47,10 +51,10 @@ async def component_nucliadb_reader(reader_api_server: FastAPI) -> AsyncIterator
 
 
 @pytest.fixture(scope="function")
-async def standalone_nucliadb_reader(nucliadb: Settings) -> AsyncIterator[AsyncClient]:
+async def standalone_nucliadb_reader(standalone_nucliadb: Settings) -> AsyncIterator[AsyncClient]:
     async with AsyncClient(
         headers={"X-NUCLIADB-ROLES": "READER"},
-        base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
+        base_url=f"http://localhost:{standalone_nucliadb.http_port}/{API_PREFIX}/v1",
         timeout=None,
         event_hooks={"request": [wait_for_sync]},
     ) as client:
@@ -76,11 +80,7 @@ async def nucliadb_reader_manager(
 async def reader_api_server(
     storage: Storage,
     maindb_driver: Driver,
-    # XXX: there's some weird dependency with `local_files` fixtures. Without
-    # it, download tests fail only if they are run after a test without using
-    # this fixture. This should be fixed or explained
-    local_files,
-    indexing_utility,
+    nats_manager: NatsConnectionManager,
     dummy_nidx_utility,
 ) -> AsyncIterator[FastAPI]:
     application = create_application()

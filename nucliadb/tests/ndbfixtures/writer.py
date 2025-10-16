@@ -51,10 +51,12 @@ async def component_nucliadb_writer(
 
 
 @pytest.fixture(scope="function")
-async def standalone_nucliadb_writer(nucliadb: Settings):
+async def standalone_nucliadb_writer(
+    standalone_nucliadb: Settings,
+) -> AsyncIterator[AsyncClient]:
     async with AsyncClient(
         headers={"X-NUCLIADB-ROLES": "WRITER"},
-        base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
+        base_url=f"http://localhost:{standalone_nucliadb.http_port}/{API_PREFIX}/v1",
         timeout=None,
         event_hooks={"request": [mark_dirty]},
     ) as client:

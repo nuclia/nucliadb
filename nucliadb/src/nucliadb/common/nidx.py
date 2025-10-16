@@ -216,7 +216,7 @@ class NidxServiceUtility(NidxUtility):
         return await self.indexer.index(writer)
 
 
-async def start_nidx_utility(service_name: str = "nucliadb.nidx") -> Optional[NidxUtility]:
+async def start_nidx_utility(service_name: str = "nucliadb.nidx") -> NidxUtility:
     nidx = get_utility(Utility.NIDX)
     if nidx:
         return nidx

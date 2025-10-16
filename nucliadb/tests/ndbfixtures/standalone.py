@@ -21,6 +21,7 @@ import base64
 import logging
 import os
 from pathlib import Path
+from typing import AsyncIterator, Iterator
 from unittest.mock import patch
 
 import pytest
@@ -48,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
-async def nucliadb(
+async def standalone_nucliadb(
     endecryptor_settings,
     dummy_processing,
     analytics_disabled,
@@ -57,7 +58,7 @@ async def nucliadb(
     storage_settings,
     tmp_path: Path,
     learning_config,
-):
+) -> AsyncIterator[Settings]:
     # we need to force DATA_PATH updates to run every test on the proper
     # temporary directory
     data_path = str((tmp_path / "node").absolute())
@@ -97,6 +98,12 @@ async def nucliadb(
 
         reset_config()
         await server.shutdown()
+
+
+# Old fixture name for bw/c while migrating. TODO: remove once everything has been migrated
+@pytest.fixture(scope="function")
+def nucliadb(standalone_nucliadb: Settings) -> Iterator[Settings]:
+    yield standalone_nucliadb
 
 
 @pytest.fixture(scope="function", autouse=True)
