@@ -446,22 +446,23 @@ class Processor:
             # a resource was move to another shard while it was being indexed
             shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
 
-        shard = None
-        if shard_id is not None:
-            # Resource already has a shard assigned
-            shard = await kb.get_resource_shard(shard_id)
-            if shard is None:
-                raise AttributeError("Shard not available")
-        else:
-            # It's a new resource, get KB's current active shard to place new resource on
-            shard = await self.index_node_shard_manager.get_current_active_shard(txn, kbid)
-            if shard is None:
-                # No current shard available, create a new one
-                shard = await self.index_node_shard_manager.create_shard_by_kbid(txn, kbid)
-            await datamanagers.resources.set_resource_shard_id(
-                txn, kbid=kbid, rid=uuid, shard=shard.shard
-            )
-        return shard
+            shard = None
+            if shard_id is not None:
+                # Resource already has a shard assigned
+                shard = await kb.get_resource_shard(shard_id)
+                if shard is None:
+                    raise AttributeError("Shard not available")
+            else:
+                # It's a new resource, get KB's current active shard to place new resource on
+                shard = await self.index_node_shard_manager.get_current_active_shard(txn, kbid)
+                if shard is None:
+                    # No current shard available, create a new one
+                    async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
+                        shard = await self.index_node_shard_manager.create_shard_by_kbid(txn, kbid)
+                await datamanagers.resources.set_resource_shard_id(
+                    txn, kbid=kbid, rid=uuid, shard=shard.shard
+                )
+            return shard
 
     @processor_observer.wrap({"type": "index_resource"})
     async def index_resource(
