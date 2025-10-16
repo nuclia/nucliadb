@@ -37,6 +37,8 @@ use std::fs::File;
 use std::io;
 use std::iter::empty;
 use std::path::Path;
+use std::time::Instant;
+use tracing::{debug, trace};
 
 /// How much expensive is to find a node via HNSW compared to a simple brute force scan
 const HNSW_COST_FACTOR: usize = 100;
@@ -498,7 +500,7 @@ impl OpenSegment {
         query: &[f32],
         filter: &Formula,
         with_duplicates: bool,
-        results: usize,
+        top_k: usize,
         config: &VectorConfig,
         min_score: f32,
     ) -> Box<dyn Iterator<Item = ScoredVector<'a>> + '_> {
@@ -519,35 +521,48 @@ impl OpenSegment {
         // If we have no filters, just the deletions
         let bitset = filter_bitset.as_ref().unwrap_or(&self.alive_bitset);
 
-        let count = bitset.iter().count();
-        if count == 0 {
+        let matching = bitset.iter().count();
+        if matching == 0 {
             return Box::new(empty());
         }
-        let expected_traversal_scan = results * self.metadata.records / count;
+        let expected_traversal_scan = top_k * self.metadata.records / matching;
 
-        if count < expected_traversal_scan * HNSW_COST_FACTOR {
-            self.brute_force_search(bitset, results, retriever, encoded_query, &raw_query)
+        let t = Instant::now();
+        let method;
+        let results = if matching < expected_traversal_scan * HNSW_COST_FACTOR {
+            method = "brute force";
+            self.brute_force_search(bitset, top_k, retriever, encoded_query, &raw_query)
         } else {
+            method = "hnsw";
             let ops = HnswOps::new(&retriever, true);
-            let neighbours = ops.search(encoded_query, self.index.as_ref(), results, bitset, with_duplicates);
+            let neighbours = ops.search(encoded_query, self.index.as_ref(), top_k, bitset, with_duplicates);
             Box::new(
                 neighbours
                     .into_iter()
                     .map(|(address, dist)| ScoredVector::new(address, self.data_store.as_ref(), dist))
-                    .take(results),
+                    .take(top_k),
             )
-        }
+        };
+
+        let time = t.elapsed();
+        let segment_path = &self.metadata.path;
+        let records = self.metadata.records;
+        debug!(?time, ?segment_path, records, matching, "Segment search using {method}");
+
+        results
     }
 
     fn brute_force_search<'a, DS: DataStore>(
         &'a self,
         bitset: &FilterBitSet,
-        results: usize,
+        top_k: usize,
         retriever: Retriever<'a, DS>,
         encoded_query: &SearchVector,
         raw_query: &SearchVector,
     ) -> Box<dyn Iterator<Item = ScoredVector<'a>> + '_> {
         let mut scored_results = Vec::new();
+
+        let t = Instant::now();
         for paragraph_addr in bitset.iter() {
             let paragraph = retriever.data_store.get_paragraph(paragraph_addr);
 
@@ -565,11 +580,14 @@ impl OpenSegment {
                 scored_results.push(best_vector_score);
             }
         }
+        let time = t.elapsed();
+        trace!(?time, "Brute force search: retrieve");
 
-        if matches!(encoded_query, SearchVector::RabitQ(_)) {
+        let t = Instant::now();
+        let results: Box<dyn Iterator<Item = _>> = if matches!(encoded_query, SearchVector::RabitQ(_)) {
             // If using RabitQ, rerank top results using the raw vectors
             Box::new(
-                rabitq::rerank_top(scored_results, results, &retriever, raw_query)
+                rabitq::rerank_top(scored_results, top_k, &retriever, raw_query)
                     .into_iter()
                     .map(|Reverse(Cnx(addr, score))| ScoredVector::new(addr, self.data_store.as_ref(), score)),
             )
@@ -580,9 +598,13 @@ impl OpenSegment {
                 scored_results
                     .into_iter()
                     .map(|a| ScoredVector::new(a.0, self.data_store.as_ref(), a.1.score))
-                    .take(results),
+                    .take(top_k),
             )
-        }
+        };
+        let time = t.elapsed();
+        trace!(?time, "Brute force search: rerank");
+
+        results
     }
 }
 

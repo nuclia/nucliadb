@@ -23,7 +23,6 @@ use tantivy::schema::Facet;
 
 #[derive(Clone, Default)]
 pub struct ParagraphSearchRequest {
-    pub id: String,
     pub uuid: String,
     pub body: String,
     pub order: Option<nidx_protos::OrderBy>,

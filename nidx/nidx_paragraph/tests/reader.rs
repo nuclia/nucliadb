@@ -175,7 +175,6 @@ fn test_total_number_of_results() -> anyhow::Result<()> {
     let paragraph_reader_service = test_reader(&resource);
 
     let mut request = ParagraphSearchRequest {
-        id: shard_id,
         uuid: rid,
         ..Default::default()
     };
@@ -205,7 +204,6 @@ fn test_filtering_formula() -> anyhow::Result<()> {
 
     // Only one paragraph matches
     let mut request = ParagraphSearchRequest {
-        id: shard_id,
         uuid: rid,
         body: "".to_string(),
         faceted: None,
@@ -259,7 +257,6 @@ fn test_keyword_and_fuzzy_queries() -> anyhow::Result<()> {
 
     let paragraph_search = |query: &str| {
         let request = ParagraphSearchRequest {
-            id: shard_id.clone(),
             uuid: rid.clone(),
             body: query.to_string(),
             faceted: None,
@@ -327,7 +324,6 @@ fn test_min_score_filter() -> anyhow::Result<()> {
     let paragraph_reader_service = test_reader(&resource);
 
     let mut request = ParagraphSearchRequest {
-        id: shard_id,
         uuid: rid,
         result_per_page: 20,
         ..Default::default()
@@ -361,7 +357,6 @@ fn test_faceted_search() -> anyhow::Result<()> {
 
     // Filter with facets and order
     let request = ParagraphSearchRequest {
-        id: shard_id,
         uuid: rid,
         faceted: Some(faceted.clone()),
         result_per_page: 20,
@@ -395,7 +390,6 @@ fn test_order_by() -> anyhow::Result<()> {
 
     // Use a sort order
     let request = ParagraphSearchRequest {
-        id: "shard1".to_string(),
         uuid: "".to_string(),
         body: "this is the".to_string(),
         order: Some(order),
@@ -440,7 +434,6 @@ fn test_query_parsing() -> anyhow::Result<()> {
 
     // Only one paragraph  matches
     let mut search = ParagraphSearchRequest {
-        id: shard_id,
         uuid: rid,
         body: "".to_string(),
         faceted: None,
@@ -468,7 +461,6 @@ fn test_query_parsing_weird_stuff() -> anyhow::Result<()> {
     let paragraph_reader_service = test_reader(&resource);
 
     let mut search = ParagraphSearchRequest {
-        id: shard_id,
         uuid: rid,
         body: "".to_string(),
         faceted: None,

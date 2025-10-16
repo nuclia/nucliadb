@@ -87,6 +87,7 @@ where
             // Common fields
             serializer.serialize_entry("timestamp", &timestamp)?;
             serializer.serialize_entry("level", &meta.level().as_serde())?;
+            serializer.serialize_entry("target", &meta.target())?;
 
             // Event fields, flattened to the top-level
             let mut visitor = tracing_serde::SerdeMapVisitor::new(serializer);

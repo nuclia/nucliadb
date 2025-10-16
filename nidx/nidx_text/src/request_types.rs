@@ -22,7 +22,6 @@ use nidx_protos::FilterExpression;
 
 #[derive(Clone, Default)]
 pub struct DocumentSearchRequest {
-    pub id: String,
     pub body: String,
     pub order: Option<nidx_protos::OrderBy>,
     pub faceted: Option<nidx_protos::Faceted>,

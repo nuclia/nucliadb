@@ -22,8 +22,6 @@ use nidx_types::query_language::BooleanExpression;
 
 #[derive(Clone, Default)]
 pub struct VectorSearchRequest {
-    /// Shard ID
-    pub id: String,
     /// Embedded vector search.
     pub vector: Vec<f32>,
     /// How many results are in this page.

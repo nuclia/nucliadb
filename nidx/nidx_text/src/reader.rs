@@ -219,12 +219,11 @@ impl TextReaderService {
     }
 
     fn count(&self) -> anyhow::Result<usize> {
-        let id: Option<String> = None;
         let time = Instant::now();
         let searcher = self.reader.searcher();
         let count = searcher.search(&AllQuery, &Count)?;
         let v = time.elapsed().as_millis();
-        debug!("{id:?} - Ending at: {v} ms");
+        debug!("Ending at: {v} ms");
 
         Ok(count)
     }
@@ -393,11 +392,10 @@ impl TextReaderService {
 
     fn do_search(&self, request: &DocumentSearchRequest) -> anyhow::Result<DocumentSearchResponse> {
         use crate::search_query::create_query;
-        let id = Some(&request.id);
         let time = Instant::now();
 
         let v = time.elapsed().as_millis();
-        debug!("{id:?} - Creating query: starts at {v} ms");
+        debug!("Creating query: starts at {v} ms");
 
         let query_parser = {
             let mut query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
@@ -428,14 +426,14 @@ impl TextReaderService {
             facet_collector.add_facet(Facet::from(facet));
         }
         let v = time.elapsed().as_millis();
-        debug!("{id:?} - Creating query: ends at {v} ms");
+        debug!("Creating query: ends at {v} ms");
 
         let v = time.elapsed().as_millis();
-        debug!("{id:?} - Searching: starts at {v} ms");
+        debug!("Searching: starts at {v} ms");
 
         let searcher = self.reader.searcher();
         let v = time.elapsed().as_millis();
-        debug!("{id:?} - Searching: ends at {v} ms");
+        debug!("Searching: ends at {v} ms");
 
         match maybe_order {
             _ if request.only_faceted => {
