@@ -112,7 +112,7 @@ class KBShardManager:
         txn: Transaction,
         kbid: str,
         *,
-        prewarm_enabled: bool = False,
+        prewarm_enabled: bool,
     ) -> writer_pb2.ShardObject:
         kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=True)
         if kb_shards is None:
