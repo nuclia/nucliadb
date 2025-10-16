@@ -38,6 +38,10 @@ jobs:
 
     - run: python bump.py --sem=${{ inputs.semType }}
 
+    # we update the lock to reflect the newly updated versions of our packages
+    - name: Update uv.lock
+      run: uv lock
+
     - name: Commit & Push changes
       uses: actions-js/push@master
       with:
