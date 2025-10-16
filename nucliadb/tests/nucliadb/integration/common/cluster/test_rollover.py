@@ -23,26 +23,41 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from httpx import AsyncClient
+from pytest_mock import MockerFixture
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.nidx import NidxUtility
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.standalone.settings import Settings
 
 
-@pytest.fixture()
-async def app_context(natsd, storage, nucliadb):
+@pytest.fixture(scope="function")
+async def app_context(
+    # we use nucliadb fixture here to make sure everything is prepared for
+    # standalone, but we need maindb_driver or we'll initialize it an no one
+    # else will be able to require the fixture and get the proper driver. Too
+    # hacky...
+    maindb_driver: Driver,
+    standalone_nucliadb: Settings,
+):
     ctx = ApplicationContext()
     await ctx.initialize()
+
     ctx._nats_manager = MagicMock()
     ctx._nats_manager.js.consumer_info = AsyncMock(return_value=MagicMock(num_pending=1))
+
     yield ctx
+
     await ctx.finalize()
 
 
 @pytest.mark.deploy_modes("standalone")
 async def test_rollover_kb_index(
     app_context: ApplicationContext,
-    standalone_knowledgebox,
+    standalone_knowledgebox: str,
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     nucliadb_reader_manager: AsyncClient,
@@ -67,6 +82,36 @@ async def test_rollover_kb_index_with_vectorsets(
         nucliadb_reader,
         nucliadb_reader_manager,
     )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_rollover_kb_index_with_prewarm(
+    app_context: ApplicationContext,
+    maindb_driver: Driver,
+    nidx_utility: NidxUtility,
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_reader_manager: AsyncClient,
+    standalone_knowledgebox: str,
+    mocker: MockerFixture,
+):
+    kbid = standalone_knowledgebox
+
+    # TODO: remove this patch when we implemente configure shards in nidx binding
+    with mocker.patch.object(nidx_utility.api_client, "ConfigureShards", new=AsyncMock()):
+        # enable pre-warm for this KB
+        await KnowledgeBox.update(maindb_driver, kbid, prewarm_enabled=True)
+
+    # TODO: use a spy instead of a mock once it is implemented on nidx
+    # spy = mocker.spy(nidx_utility.api_client, "ConfigureShards")
+    with mocker.patch.object(nidx_utility.api_client, "ConfigureShards", new=AsyncMock()):
+        await _test_rollover_kb_index(
+            app_context, kbid, nucliadb_writer, nucliadb_reader, nucliadb_reader_manager
+        )
+
+        assert nidx_utility.api_client.ConfigureShards.call_count == 1
+        for shard_config in nidx_utility.api_client.ConfigureShards.call_args.args[0].configs:
+            assert shard_config.prewarm_enabled is True
 
 
 async def _test_rollover_kb_index(

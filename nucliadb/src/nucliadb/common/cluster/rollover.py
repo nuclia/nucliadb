@@ -34,8 +34,10 @@ from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import (
     get_external_index_manager,
 )
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.common.vector_index_config import nucliadb_index_config_to_nidx
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.migrator.settings import settings
 from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_telemetry import errors
@@ -414,6 +416,15 @@ async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
         await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
 
         await txn.commit()
+
+    # For KBs with pre-warm enabled, we must configure the new shards. There may
+    # be some small delay between this call and the shards being actually
+    # prewarmed, but rollovers are quite unusual and we prefer this rather than
+    # prewarming old and new shards at the same time
+    kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
+    if kb_config is not None and kb_config.prewarm_enabled:
+        driver = get_driver()
+        await KnowledgeBox.configure_shards(driver, kbid, prewarm=True)
 
 
 async def validate_indexed_data(
