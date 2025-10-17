@@ -91,3 +91,47 @@ pub async fn delete_vectorset(meta: &NidxMetadata, shard_id: Uuid, vectorset: &s
 
     Ok(())
 }
+
+/// Configure pre-warm for multiple shards. If at some point we have more things
+/// to configure, don't hesitate to replace the bool for a struct and rename
+/// this to configure_shards or whatever
+pub async fn configure_prewarm(meta: &NidxMetadata, shard_configs: HashMap<Uuid, bool>) -> NidxResult<()> {
+    // REVIEW: accessing the JSON value here breaks an abstraction, but
+    // using a transaction and one update per index is costly. We prefer the
+    // slow query rather than breaking the abstraction although there's
+    // probably a better way
+
+    let mut tx = meta.transaction().await.map_err(NidxError::from)?;
+
+    let shard_ids: Vec<Uuid> = shard_configs.keys().cloned().collect();
+    let kind = IndexKind::Vector;
+    let indexes: Vec<Index> = sqlx::query_as!(
+        Index,
+        r#"SELECT indexes.id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at, indexes.deleted_at
+               FROM indexes
+               JOIN shards ON indexes.shard_id = shards.id
+               WHERE shard_id = ANY($1) AND indexes.kind = $2
+               FOR UPDATE
+            "#,
+        &shard_ids,
+        kind as IndexKind,
+    )
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(NidxError::from)?;
+
+    for index in indexes {
+        let prewarm = *shard_configs.get(&index.shard_id).unwrap();
+        let mut config = index.config::<VectorConfig>().unwrap();
+        if prewarm != config.prewarm {
+            config.prewarm = prewarm;
+            Index::update_config(&mut *tx, &index.id, IndexConfig::from(config))
+                .await
+                .map_err(NidxError::from)?;
+        }
+    }
+
+    tx.commit().await.map_err(NidxError::from)?;
+
+    Ok(())
+}
