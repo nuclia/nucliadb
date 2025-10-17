@@ -156,11 +156,10 @@ impl<'a> Fssc<'a> {
             buff: HashSet::with_capacity(size),
         }
     }
-    fn add(&mut self, candidate: ScoredParagraph<'a>, vector: &[u8]) {
-        if !self.with_duplicates && self.seen.contains(vector) {
+    fn add(&mut self, candidate: ScoredParagraph<'a>, vector: Vec<u8>) {
+        if !self.with_duplicates && self.seen.contains(&vector) {
             return;
         } else if !self.with_duplicates {
-            let vector = vector.to_vec();
             self.seen.insert(vector);
         }
 
@@ -261,23 +260,35 @@ impl Searcher {
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
 
-        for open_segment in &self.open_segments {
-            // Skip this segment if it doesn't match the segment filter
-            if !segment_filter
-                .as_ref()
-                .is_none_or(|f| segment_matches(f, open_segment.tags()))
-            {
-                continue;
-            }
-            let partial_solution =
-                open_segment.search(query, filter, with_duplicates, no_results, &self.config, min_score);
+        let results: Vec<_> = self
+            .open_segments
+            .par_iter()
+            .flat_map(|open_segment| {
+                // Skip this segment if it doesn't match the segment filter
+                if !segment_filter
+                    .as_ref()
+                    .is_none_or(|f| segment_matches(f, open_segment.tags()))
+                {
+                    return vec![];
+                }
+                let partial_solution =
+                    open_segment.search(query, filter, with_duplicates, no_results, &self.config, min_score);
 
-            for candidate in partial_solution {
-                let addr = candidate.paragraph();
-                let paragraph = open_segment.get_paragraph(addr);
-                let scored_paragraph = ScoredParagraph::new(open_segment, addr, paragraph, candidate.score());
-                ffsv.add(scored_paragraph, candidate.vector());
-            }
+                partial_solution
+                    .map(|candidate| {
+                        let addr = candidate.paragraph();
+                        let paragraph = open_segment.get_paragraph(addr);
+                        (
+                            ScoredParagraph::new(open_segment, addr, paragraph, candidate.score()),
+                            candidate.vector().to_vec(),
+                        )
+                    })
+                    .collect()
+            })
+            .collect();
+
+        for (paragraph, vector) in results {
+            ffsv.add(paragraph, vector);
         }
 
         Ok(ffsv.into())
