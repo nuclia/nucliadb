@@ -147,7 +147,57 @@ impl NidxApi for ApiServer {
         }))
     }
 
-    async fn configure_shards(&self, _request: Request<ShardsConfig>) -> Result<Response<EmptyQuery>> {
+    async fn configure_shards(&self, request: Request<ShardsConfig>) -> Result<Response<EmptyQuery>> {
+        let request = request.into_inner();
+
+        let mut shard_configs = HashMap::new();
+        for config in request.configs {
+            let shard_id = Uuid::from_str(&config.shard_id).map_err(NidxError::from)?;
+            shard_configs.insert(shard_id, config.prewarm_enabled);
+        }
+
+        // REVIEW: accessing the JSON value here breaks an abstraction, but
+        // using a transaction and one update per index is costly. We prefer the
+        // slow query rather than breaking the abstraction although there's
+        // probably a better way
+
+        let mut tx = self.meta.transaction().await.map_err(NidxError::from)?;
+
+        let shard_ids: Vec<Uuid> = shard_configs.keys().cloned().collect();
+        let kind = IndexKind::Vector;
+        let indexes: Vec<Index> = sqlx::query_as!(
+            Index,
+            r#"SELECT indexes.id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at, indexes.deleted_at
+               FROM indexes
+               JOIN shards ON indexes.shard_id = shards.id
+               WHERE shard_id = ANY($1) AND indexes.kind = $2
+               FOR UPDATE
+            "#,
+            &shard_ids,
+            kind as IndexKind,
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(NidxError::from)?;
+
+        for index in indexes {
+            let prewarm = *shard_configs.get(&index.shard_id).unwrap();
+            let mut config = index.config::<VectorConfig>().unwrap();
+            if prewarm != config.prewarm {
+                config.prewarm = prewarm;
+                sqlx::query!(
+                    "UPDATE indexes SET configuration = $1 WHERE indexes.id = $2",
+                    index.configuration,
+                    index.id as IndexId,
+                )
+                .execute(&mut *tx)
+                .await
+                .map_err(NidxError::from)?;
+            }
+        }
+
+        tx.commit().await.map_err(NidxError::from)?;
+
         Ok(Response::new(EmptyQuery {}))
     }
 
