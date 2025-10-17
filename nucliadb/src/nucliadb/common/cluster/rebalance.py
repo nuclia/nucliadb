@@ -75,7 +75,7 @@ async def maybe_add_shard(kbid: str) -> None:
             settings.max_shard_paragraphs * 0.9  # 90% of the max
         ):
             # create new shard
-            async with datamanagers.with_transaction() as txn:
+            async with datamanagers.with_rw_transaction() as txn:
                 kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
                 prewarm = kb_config is not None and kb_config.prewarm_enabled
 

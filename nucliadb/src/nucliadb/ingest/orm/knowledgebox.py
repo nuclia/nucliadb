@@ -308,9 +308,7 @@ class KnowledgeBox:
 
     @classmethod
     async def configure_shards(cls, driver: Driver, kbid: str, *, prewarm: bool):
-        async with driver.ro_transaction() as txn:
-            shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-
+        shards_obj = await datamanagers.atomic.cluster.get_kb_shards(kbid=kbid)
         if shards_obj is None:
             logger.warning(f"Shards not found for KB while updating pre-warm flag", extra={"kbid": kbid})
             return
