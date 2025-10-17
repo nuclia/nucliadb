@@ -19,12 +19,15 @@
 #
 
 import asyncio
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from nucliadb.common.cluster.settings import settings
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.consumer import shard_creator
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -45,7 +48,6 @@ async def test_shard_auto_create(
 
         sc = shard_creator.ShardCreatorHandler(
             driver=maindb_driver,
-            storage=storage,
             pubsub=pubsub,
             check_delay=0.05,
         )
@@ -67,3 +69,44 @@ async def test_shard_auto_create(
 
         kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(knowledgebox)
         assert len(kb_shards.shards) == len(original_kb_shards.shards) + 1
+
+
+def test_should_create_new_shard():
+    low_para_counter = {
+        "num_paragraphs": settings.max_shard_paragraphs - 1,
+    }
+    high_para_counter = {
+        "num_paragraphs": settings.max_shard_paragraphs + 1,
+    }
+    assert shard_creator.should_create_new_shard(**low_para_counter) is False
+    assert shard_creator.should_create_new_shard(**high_para_counter) is True
+
+
+@pytest.mark.parametrize("prewarm", [True, False])
+async def test_shard_creator_uses_kb_prewarm_configuration(
+    maindb_driver: Driver,
+    pubsub: PubSubDriver,
+    storage: Storage,
+    dummy_nidx_utility: NidxUtility,
+    knowledgebox: str,
+    prewarm: bool,
+):
+    kbid = knowledgebox
+
+    sc = shard_creator.ShardCreatorHandler(
+        driver=maindb_driver,
+        pubsub=AsyncMock(),
+    )
+
+    # configure pre-warm for this KB
+    await KnowledgeBox.update(maindb_driver, kbid, prewarm_enabled=prewarm)
+
+    with (
+        patch.object(shard_creator, "should_create_new_shard", return_value=True),
+        patch.object(sc.shard_manager, "create_shard_by_kbid") as create_shard_by_kbid,
+    ):
+        await sc.process_kb(kbid)
+
+        # validate we are creating new shards with that configuration
+        assert create_shard_by_kbid.call_count == 1
+        assert create_shard_by_kbid.call_args.kwargs["prewarm_enabled"] == prewarm

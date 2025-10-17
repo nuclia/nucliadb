@@ -77,13 +77,7 @@ class MigrationsDataManager:
         return KnowledgeBoxInfo(current_version=kb_config.migration_version)
 
     async def update_kb_info(self, *, kbid: str, current_version: int) -> None:
-        async with self.driver.rw_transaction() as txn:
-            kb_config = await datamanagers.kb.get_config(txn, kbid=kbid, for_update=True)
-            if kb_config is None:
-                raise Exception(f"KB {kbid} does not exist")
-            kb_config.migration_version = current_version
-            await KnowledgeBoxORM.update(txn, kbid, config=kb_config)
-            await txn.commit()
+        await KnowledgeBoxORM.update(self.driver, kbid, migration_version=current_version)
 
     async def get_global_info(self) -> GlobalInfo:
         async with self.driver.ro_transaction() as txn:

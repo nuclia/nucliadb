@@ -23,7 +23,7 @@ use std::{
     path::Path,
 };
 
-use memmap2::Mmap;
+use memmap2::{Mmap, MmapOptions};
 use stream_vbyte::{decode::decode, encode::encode, scalar::Scalar};
 
 use crate::VectorR;
@@ -67,9 +67,14 @@ pub struct InvertedMapReader {
 }
 
 impl InvertedMapReader {
-    pub fn open(path: &Path) -> VectorR<Self> {
+    pub fn open(path: &Path, prewarm: bool) -> VectorR<Self> {
+        let mut options = MmapOptions::new();
+        if prewarm {
+            options.populate();
+        }
+
         Ok(Self {
-            data: unsafe { Mmap::map(&File::open(path)?)? },
+            data: unsafe { options.map(&File::open(path)?)? },
         })
     }
 
@@ -120,7 +125,7 @@ mod tests {
         writer.finish()?;
 
         // Check the map has the same contents we initialized
-        let reader = InvertedMapReader::open(tmp.path())?;
+        let reader = InvertedMapReader::open(tmp.path(), false)?;
         for i in 0..20 {
             let indexed = reader.get(indexes[i]);
             assert_eq!(indexed, entries[i]);

@@ -151,6 +151,10 @@ pub fn build_indexes(work_path: &Path, data_store: &impl DataStore) -> VectorR<(
     Ok(())
 }
 
+pub struct OpenOptions {
+    pub prewarm: bool,
+}
+
 pub struct InvertedIndexes {
     field_index: FstIndexReader,
     label_index: FstIndexReader,
@@ -166,10 +170,13 @@ impl InvertedIndexes {
         path.join(file::INDEX_MAP).exists()
     }
 
-    pub fn open(work_path: &Path, records: usize) -> VectorR<Self> {
-        let map = Arc::new(InvertedMapReader::open(&work_path.join(file::INDEX_MAP))?);
-        let field_index = FstIndexReader::open(&work_path.join(file::FIELD_INDEX), map.clone())?;
-        let label_index = FstIndexReader::open(&work_path.join(file::LABEL_INDEX), map)?;
+    pub fn open(work_path: &Path, records: usize, options: OpenOptions) -> VectorR<Self> {
+        let map = Arc::new(InvertedMapReader::open(
+            &work_path.join(file::INDEX_MAP),
+            options.prewarm,
+        )?);
+        let field_index = FstIndexReader::open(&work_path.join(file::FIELD_INDEX), map.clone(), options.prewarm)?;
+        let label_index = FstIndexReader::open(&work_path.join(file::LABEL_INDEX), map, options.prewarm)?;
 
         Ok(Self {
             field_index,

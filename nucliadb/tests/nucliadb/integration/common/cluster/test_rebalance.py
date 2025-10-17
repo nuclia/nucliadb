@@ -78,3 +78,6 @@ async def test_rebalance_kb_shards(
     # if we run it again, we should get another shard
     with patch.object(settings, "max_shard_paragraphs", counters1["paragraphs"] / 2):
         await rebalance.rebalance_kb(app_context, standalone_knowledgebox)
+
+
+# TODO: test rebalance uses KB pre-warm config

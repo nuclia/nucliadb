@@ -89,6 +89,11 @@ message KnowledgeBoxConfig {
 
     bool hidden_resources_enabled = 10;
     bool hidden_resources_hide_on_creation = 11;
+
+    // whether to enable prewarm of data for faster search or not. Activating
+    // this flag allow faster searches (with less cold start) but it is
+    // expensive on the infrastructure
+    bool prewarm_enabled = 12;
 }
 
 // UPDATE
