@@ -260,32 +260,34 @@ impl Searcher {
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
 
-        let results: Vec<_> = self
-            .open_segments
-            .par_iter()
-            .flat_map(|open_segment| {
-                // Skip this segment if it doesn't match the segment filter
-                if !segment_filter
-                    .as_ref()
-                    .is_none_or(|f| segment_matches(f, open_segment.tags()))
-                {
-                    return vec![];
-                }
-                let partial_solution =
-                    open_segment.search(query, filter, with_duplicates, no_results, &self.config, min_score);
+        let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
+        let results: Vec<_> = pool.install(|| {
+            self.open_segments
+                .par_iter()
+                .flat_map(|open_segment| {
+                    // Skip this segment if it doesn't match the segment filter
+                    if !segment_filter
+                        .as_ref()
+                        .is_none_or(|f| segment_matches(f, open_segment.tags()))
+                    {
+                        return vec![];
+                    }
+                    let partial_solution =
+                        open_segment.search(query, filter, with_duplicates, no_results, &self.config, min_score);
 
-                partial_solution
-                    .map(|candidate| {
-                        let addr = candidate.paragraph();
-                        let paragraph = open_segment.get_paragraph(addr);
-                        (
-                            ScoredParagraph::new(open_segment, addr, paragraph, candidate.score()),
-                            candidate.vector().to_vec(),
-                        )
-                    })
-                    .collect()
-            })
-            .collect();
+                    partial_solution
+                        .map(|candidate| {
+                            let addr = candidate.paragraph();
+                            let paragraph = open_segment.get_paragraph(addr);
+                            (
+                                ScoredParagraph::new(open_segment, addr, paragraph, candidate.score()),
+                                candidate.vector().to_vec(),
+                            )
+                        })
+                        .collect()
+                })
+                .collect()
+        });
 
         for (paragraph, vector) in results {
             ffsv.add(paragraph, vector);
