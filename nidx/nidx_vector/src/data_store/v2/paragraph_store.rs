@@ -90,7 +90,7 @@ impl ParagraphStore {
             pos.advise(memmap2::Advice::WillNeed)?;
             let advice = match reason {
                 OpenReason::Create => memmap2::Advice::Sequential,
-                OpenReason::Search { prewarm: _ } => memmap2::Advice::Random,
+                OpenReason::Search { .. } => memmap2::Advice::Random,
             };
             data.advise(advice)?;
         }
