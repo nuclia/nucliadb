@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE indexes SET configuration = $1 WHERE indexes.id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Json",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a0f4e9c42d6ecf317775621c4804c69431c7eff296f7643b0f9b3f98df5d5b65"
+}
