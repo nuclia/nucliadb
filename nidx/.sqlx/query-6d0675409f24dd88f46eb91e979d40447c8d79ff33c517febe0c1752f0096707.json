@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE indexes SET configuration = $1 WHERE indexes.id = $2",
+  "query": "UPDATE indexes SET configuration = $1, updated_at = NOW() WHERE id = $2",
   "describe": {
     "columns": [],
     "parameters": {
@@ -11,5 +11,5 @@
     },
     "nullable": []
   },
-  "hash": "a0f4e9c42d6ecf317775621c4804c69431c7eff296f7643b0f9b3f98df5d5b65"
+  "hash": "6d0675409f24dd88f46eb91e979d40447c8d79ff33c517febe0c1752f0096707"
 }

@@ -199,6 +199,22 @@ impl Index {
         Ok(())
     }
 
+    pub async fn update_config(
+        meta: impl Executor<'_, Database = Postgres>,
+        index_id: &IndexId,
+        config: IndexConfig,
+    ) -> Result<(), anyhow::Error> {
+        let json_config = serde_json::to_value(&config)?;
+        sqlx::query!(
+            "UPDATE indexes SET configuration = $1, updated_at = NOW() WHERE id = $2",
+            json_config,
+            index_id as &IndexId,
+        )
+        .execute(meta)
+        .await?;
+        Ok(())
+    }
+
     pub async fn recently_updated(
         meta: impl Executor<'_, Database = Postgres>,
         shards: &Vec<Uuid>,

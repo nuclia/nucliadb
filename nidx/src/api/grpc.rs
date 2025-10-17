@@ -39,7 +39,7 @@ use uuid::Uuid;
 
 use crate::api::shards;
 use crate::errors::NidxError;
-use crate::metadata::{Index, IndexId, IndexKind, Shard};
+use crate::metadata::{Index, IndexConfig, IndexId, IndexKind, Shard};
 use crate::{NidxMetadata, Settings, import_export};
 
 #[derive(Clone)]
@@ -185,14 +185,9 @@ impl NidxApi for ApiServer {
             let mut config = index.config::<VectorConfig>().unwrap();
             if prewarm != config.prewarm {
                 config.prewarm = prewarm;
-                sqlx::query!(
-                    "UPDATE indexes SET configuration = $1 WHERE indexes.id = $2",
-                    index.configuration,
-                    index.id as IndexId,
-                )
-                .execute(&mut *tx)
-                .await
-                .map_err(NidxError::from)?;
+                Index::update_config(&mut *tx, &index.id, IndexConfig::from(config))
+                    .await
+                    .map_err(NidxError::from)?;
             }
         }
 
