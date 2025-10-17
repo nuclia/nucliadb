@@ -275,6 +275,9 @@ class KnowledgeBox:
             if description is not None:
                 stored.description = description
 
+            if migration_version is not None:
+                stored.migration_version = migration_version
+
             if external_index_provider is not None:
                 stored.external_index_provider.MergeFrom(external_index_provider)
 

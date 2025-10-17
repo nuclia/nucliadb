@@ -27,7 +27,7 @@ from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb_protos import writer_pb2
-from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
+from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata, StoredExternalIndexProviderMetadata
 from nucliadb_protos.resources_pb2 import FieldText
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_utils.utilities import Utility, clean_utility, set_utility
@@ -215,9 +215,17 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
         assert knowledgebox_class.update.call_count == 1
-        assert knowledgebox_class.update.call_args.kwargs["uuid"] == request.uuid
+        assert knowledgebox_class.update.call_args.kwargs["kbid"] == request.uuid
         assert knowledgebox_class.update.call_args.kwargs["slug"] == request.slug
-        assert knowledgebox_class.update.call_args.kwargs["config"] == request.config
+        assert knowledgebox_class.update.call_args.kwargs["title"] is None
+        assert knowledgebox_class.update.call_args.kwargs["description"] is None
+        assert (
+            knowledgebox_class.update.call_args.kwargs["external_index_provider"]
+            == StoredExternalIndexProviderMetadata()
+        )
+        assert knowledgebox_class.update.call_args.kwargs["hidden_resources_enabled"] is False
+        assert knowledgebox_class.update.call_args.kwargs["hidden_resources_hide_on_creation"] is False
+        assert knowledgebox_class.update.call_args.kwargs["prewarm_enabled"] is False
 
     async def test_UpdateKnowledgeBox_not_found(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug", uuid="uuid")
