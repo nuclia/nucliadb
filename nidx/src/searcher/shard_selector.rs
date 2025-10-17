@@ -215,23 +215,21 @@ impl ShardSelector {
             .collect()
     }
 
-    /// List the nodes that contain a shard. If the local node is in the list, it will always be returned first
+    /// List the nodes that contain a shard in order of preference.
+    /// This way we preferentially send all requests for a shard to the same node to improve caching.
     pub fn nodes_for_shard(&self, shard: &Uuid) -> Vec<SearcherNode> {
         let nodes = self._nodes_for_shard(self.nodes.list_nodes(), shard);
-        // See if some of this nodes are me, and put them first
-        let mut searcher_nodes = Vec::new();
-        let mut has_this_node = false;
-        for node in nodes {
-            if node == self.nodes.this_node() {
-                has_this_node = true;
-            } else {
-                searcher_nodes.push(SearcherNode::Remote(node));
-            }
-        }
-        if has_this_node {
-            searcher_nodes.insert(0, SearcherNode::This);
-        }
-        searcher_nodes
+
+        nodes
+            .into_iter()
+            .map(|n| {
+                if n == self.nodes.this_node() {
+                    SearcherNode::This
+                } else {
+                    SearcherNode::Remote(n)
+                }
+            })
+            .collect()
     }
 
     fn _nodes_for_shard(&self, mut nodes: Vec<String>, shard: &Uuid) -> Vec<String> {
