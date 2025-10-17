@@ -10,7 +10,7 @@ build-backend = "pdm.backend"
 
 [project]
 name = "nucliadb_protos"
-version = "6.9.0"
+version = "6.9.1"
 license = "Apache-2.0"
 description = "Protobuf definitions for nucliadb"
 authors = [{ name = "Nuclia", email = "nucliadb@nuclia.com" }]
