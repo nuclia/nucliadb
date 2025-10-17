@@ -112,6 +112,15 @@ pub struct VectorConfig {
     pub vector_type: VectorType,
     #[serde(default)]
     pub vector_cardinality: VectorCardinality,
+
+    /// Pre-warming enabled will try to maintain the indexes (HNSW, FST and
+    /// inverted index) and quantized vectors always in memory, in order to
+    /// minimize cold searches.
+    ///
+    /// This is an expensive flag, as it'll consume memory and refreshing time.
+    #[serde(default)]
+    pub prewarm: bool,
+
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub flags: Vec<String>,
     #[serde(default)]
@@ -202,6 +211,7 @@ impl VectorConfig {
             similarity: proto.similarity().into(),
             normalize_vectors: proto.normalize_vectors,
             vector_type,
+            prewarm: false,
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
             entity,
