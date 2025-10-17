@@ -44,7 +44,7 @@ def _model_fields(model: type[BaseModel], skip: list[str]) -> dict[str, Any]:
     }
 
 
-# FindConfig is a FindConfig without `search_configuration`
+# FindConfig is a FindRequest without `search_configuration`
 FindConfig = create_model("FindConfig", **_model_fields(FindRequest, skip=["search_configuration"]))
 
 
