@@ -38,6 +38,14 @@ jobs:
 
     - run: python bump.py --sem=${{ inputs.semType }}
 
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13.4"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
     # we update the lock to reflect the newly updated versions of our packages
     - name: Update uv.lock
       run: uv lock
