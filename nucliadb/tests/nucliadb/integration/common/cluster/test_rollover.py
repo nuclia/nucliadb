@@ -29,7 +29,6 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.standalone.settings import Settings
 
@@ -88,7 +87,6 @@ async def test_rollover_kb_index_with_vectorsets(
 async def test_rollover_kb_index_with_prewarm(
     app_context: ApplicationContext,
     maindb_driver: Driver,
-    nidx_utility: NidxUtility,
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     nucliadb_reader_manager: AsyncClient,
@@ -96,6 +94,7 @@ async def test_rollover_kb_index_with_prewarm(
     mocker: MockerFixture,
 ):
     kbid = standalone_knowledgebox
+    nidx_utility = app_context.nidx
 
     async def nidx_shard_ids(kbid: str) -> set[str]:
         kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=kbid)
