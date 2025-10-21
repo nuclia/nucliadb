@@ -33,9 +33,7 @@ from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
 )
-from nucliadb.search.search.metrics import (
-    Metrics,
-)
+from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import legacy_convert_retrieval_to_proto
