@@ -23,8 +23,6 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.search.search.metrics import Metrics
-from nucliadb.search.search.query_parser.models import ParsedQuery
-from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb_models.search import (
     FindRequest,
     KnowledgeboxFindResults,
@@ -41,7 +39,7 @@ async def find(
     x_forwarded_for: str,
     # XXX: we are losing track of metrics ignoring this. Do we care?
     metrics: Metrics,
-) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
+) -> tuple[KnowledgeboxFindResults, bool]:
     """RPC to /find endpoint making it look as an internal call."""
 
     async with AsyncClient(
@@ -69,7 +67,4 @@ async def find(
 
         find_results = KnowledgeboxFindResults.model_validate(resp.json())
 
-        # TODO: remove this, we only need it for compat
-        parsed_query = await parse_find(kbid, item)
-
-    return find_results, incomplete, parsed_query
+    return find_results, incomplete
