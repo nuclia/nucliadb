@@ -66,8 +66,7 @@ from nucliadb.search.search.exceptions import (
 )
 from nucliadb.search.search.graph_strategy import get_graph_results
 from nucliadb.search.search.metrics import AskMetrics, Metrics
-from nucliadb.search.search.query_parser.fetcher import Fetcher
-from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask, parse_reranker
+from nucliadb.search.search.query_parser.parsers.ask import parse_ask, parse_reranker
 from nucliadb.search.search.rank_fusion import WeightedCombSum
 from nucliadb.search.search.rerankers import (
     get_reranker,
@@ -130,7 +129,6 @@ class RetrievalMatch:
 @dataclasses.dataclass
 class RetrievalResults:
     main_query: KnowledgeboxFindResults
-    fetcher: Fetcher
     main_query_weight: float
     prequeries: Optional[list[PreQueryResult]] = None
     best_matches: list[RetrievalMatch] = dataclasses.field(default_factory=list)
@@ -621,9 +619,7 @@ async def ask(
             prequeries_results=err.prequeries,
         )
 
-    # parse ask request generation parameters reusing the same fetcher as
-    # retrieval, to avoid multiple round trips to Predict API
-    generation = await parse_ask(kbid, ask_request, fetcher=retrieval_results.fetcher)
+    generation = await parse_ask(kbid, ask_request)
 
     # Now we build the prompt context
     with metrics.time("context_building"):
@@ -875,7 +871,6 @@ async def retrieval_in_kb(
     return RetrievalResults(
         main_query=main_results,
         prequeries=prequeries_results,
-        fetcher=fetcher_for_ask(kbid, ask_request),
         main_query_weight=main_query_weight,
         best_matches=best_matches,
     )
@@ -896,7 +891,6 @@ async def retrieval_in_resource(
         return RetrievalResults(
             main_query=KnowledgeboxFindResults(resources={}, min_score=None),
             prequeries=None,
-            fetcher=fetcher_for_ask(kbid, ask_request),
             main_query_weight=1.0,
         )
 
@@ -938,7 +932,6 @@ async def retrieval_in_resource(
     return RetrievalResults(
         main_query=main_results,
         prequeries=prequeries_results,
-        fetcher=fetcher_for_ask(kbid, ask_request),
         main_query_weight=main_query_weight,
         best_matches=best_matches,
     )
