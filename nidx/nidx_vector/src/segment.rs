@@ -180,8 +180,6 @@ fn merge_indexes<DS: DataStore + 'static>(
         index.advise(memmap2::Advice::Random)?;
     }
 
-    build_indexes(segment_path, &data_store)?;
-
     let metadata = VectorSegmentMetadata {
         path: segment_path.to_path_buf(),
         records: data_store.stored_paragraph_count() as usize,
