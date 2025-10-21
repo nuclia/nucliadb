@@ -54,6 +54,7 @@ class RebalanceShard:
     id: str
     nidx_id: str
     paragraphs: int
+    active: bool
 
     def to_dict(self):
         return self.__dict__
@@ -69,8 +70,6 @@ class Rebalancer:
     async def get_rebalance_shards(self) -> list[RebalanceShard]:
         """
         Return the sorted list of shards by increasing paragraph count.
-        The current active shard is excluded from the rebalance operations,
-        to avoid conflicts with ingestion.
         """
         self.kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=self.kbid)
         if self.kb_shards is None:
@@ -82,18 +81,15 @@ class Rebalancer:
                         id=shard.shard,
                         nidx_id=shard.nidx_shard_id,
                         paragraphs=await get_shard_paragraph_count(shard.nidx_shard_id),
+                        active=(idx == self.kb_shards.actual),
                     )
                     for idx, shard in enumerate(self.kb_shards.shards)
-                    if idx != self.kb_shards.actual  # Skip current active shard
                 ],
                 key=lambda x: x.paragraphs,
             )
         )
 
     async def build_shard_resources_index(self):
-        """
-        Builds the shard to resources index.
-        """
         rids = [rid async for rid in datamanagers.resources.iterate_resource_ids(kbid=self.kbid)]
         async with datamanagers.with_ro_transaction() as txn:
             for resources_batch in batchify(rids, n=100):
@@ -150,7 +146,6 @@ class Rebalancer:
         Will move excess of paragraphs to other shards (potentially creating new ones), and
         merge small shards together when possible (potentially deleting empty ones.)
         """
-        breakpoint()
         await self.build_shard_resources_index()
         while True:
             await self.wait_for_indexing()
@@ -173,7 +168,7 @@ class Rebalancer:
             },
         )
 
-        # First off, calculate if the excess fits in the other shards
+        # First off, calculate if the excess fits in the other shards or we need to add a new shard
         excess = shard.paragraphs - settings.max_shard_paragraphs
         other_shards = [s for s in shards if s.id != shard.id]
         capacity = calculate_capacity(other_shards) * 0.9
@@ -200,22 +195,26 @@ class Rebalancer:
             # Recalculate after having created shards, the active shard is a different one
             shards = await self.get_rebalance_shards()
 
-        # Now, move resoures to other shards as long as we are still over the max
+        # Now, move resources to other shards as long as we are still over the max
         for _ in range(MAX_MOVES_PER_SHARD):
             shard_paragraphs = next(s.paragraphs for s in shards if s.id == shard.id)
             if shard_paragraphs <= settings.max_shard_paragraphs:
-                # Shard is already rebalanced
+                logger.info(
+                    "Shard rebalanced successfuly", extra={"kbid": self.kbid, "shard": shard.to_dict()}
+                )
                 break
-
-            # Get the biggest shard with enough capacity
-            with_room = [
-                s
-                for s in shards
-                if s.id != shard.id and s.paragraphs < settings.max_shard_paragraphs * 0.9
-            ]
             try:
-                target_shard = with_room[-1]
-            except IndexError:
+                # Get the biggest shard with enough capacity
+                target_shard: RebalanceShard = next(
+                    reversed(
+                        [
+                            s
+                            for s in shards
+                            if s.id != shard.id and s.paragraphs < settings.max_shard_paragraphs * 0.9
+                        ]
+                    )
+                )
+            except StopIteration:
                 logger.warning("No target shard found for splitting", extra={"kbid": self.kbid})
                 break
 
@@ -231,6 +230,8 @@ class Rebalancer:
             # Update shard paragraph counts
             shard.paragraphs -= moved_paragraphs
             target_shard.paragraphs += moved_paragraphs
+            shards.sort(key=lambda x: x.paragraphs)
+
             await self.wait_for_indexing()
 
     async def merge_shard(self, shard: RebalanceShard, shards: list[RebalanceShard]):
@@ -265,40 +266,48 @@ class Rebalancer:
                 },
             )
 
-            # Take the biggest shard that has some capacity (90% of the max, to prevent filling them completely)
             try:
-                with_room = [
-                    s
-                    for s in shards
-                    if s.id != shard.id and s.paragraphs < (settings.max_shard_paragraphs * 0.9)
-                ]
-                target_shard = with_room[-1]
-            except IndexError:
-                # No target shard could be found. Move on
+                # Get the biggest shard with enough capacity
+                target_shard: RebalanceShard = next(
+                    reversed(
+                        [
+                            s
+                            for s in shards
+                            if s.id != shard.id and s.paragraphs < (settings.max_shard_paragraphs * 0.9)
+                        ]
+                    )
+                )
+            except StopIteration:
+                logger.warning(
+                    "No target shard could be found for merging. Moving on",
+                    extra={"kbid": self.kbid, "shard": shard.to_dict()},
+                )
                 break
 
             target_shard_capacity = max(
                 0, (settings.max_shard_paragraphs * 0.9) - target_shard.paragraphs
             )
-            if target_shard_capacity > 0:
-                moved_paragraphs = await self.move_paragraphs(
-                    from_shard=shard, to_shard=target_shard, max_paragraphs=int(target_shard_capacity)
-                )
-                # Update shard paragraph counts
-                shard.paragraphs -= moved_paragraphs
-                target_shard.paragraphs += moved_paragraphs
-                await self.wait_for_indexing()
+            moved_paragraphs = await self.move_paragraphs(
+                from_shard=shard, to_shard=target_shard, max_paragraphs=int(target_shard_capacity)
+            )
+            # Update shard paragraph counts
+            shard.paragraphs -= moved_paragraphs
+            target_shard.paragraphs += moved_paragraphs
+            shards.sort(key=lambda x: x.paragraphs)
+
+            await self.wait_for_indexing()
 
         if empty_shard:
             # Build the index again, and make sure there is no resource assigned to this shard
             await self.build_shard_resources_index()
-            if len(self.index[shard.id]) > 0:
+            shard_resources = self.index.get(shard.id, set())
+            if len(shard_resources) > 0:
                 logger.error(
                     f"Shard expected to be empty, but it isn't. Won't be deleted.",
                     extra={
                         "kbid": self.kbid,
                         "shard": shard.id,
-                        "resources": list(self.index.get(shard.id, []))[:30],
+                        "resources": list(shard_resources)[:30],
                     },
                 )
                 return
@@ -450,7 +459,8 @@ async def move_set_of_kb_resources(
 
 
 def needs_rebalance(shard: RebalanceShard, shards: list[RebalanceShard]) -> bool:
-    return needs_split(shard) or needs_merge(shard, shards)
+    # Current active shard is excluded from rebalancing
+    return not shard.active and (needs_split(shard) or needs_merge(shard, shards))
 
 
 def needs_split(shard: RebalanceShard) -> bool:
@@ -468,7 +478,8 @@ def needs_merge(shard: RebalanceShard, all_shards: list[RebalanceShard]) -> bool
         return False
     # The shard can be merged as long as the cluster has capacity.
     # Take into account that we will not fill shards more than 90%
-    other_shards = [s for s in all_shards if s.id != shard.id]
+    # We don't want to merge onto the current active shard
+    other_shards = [s for s in all_shards if s.id != shard.id and not s.active]
     return shard.paragraphs < (calculate_capacity(other_shards) * 0.9)
 
 

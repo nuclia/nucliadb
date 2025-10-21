@@ -22,9 +22,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster import rebalance
 from nucliadb.common.cluster.settings import settings
+from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
+from nucliadb.common.datamanagers.resources import KB_RESOURCE_SHARD
 
 
 @pytest.fixture()
@@ -38,14 +41,15 @@ async def app_context(natsd, storage, nucliadb):
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_rebalance_kb_shards(
+async def test_rebalance_splits_kb_shards(
     app_context,
     standalone_knowledgebox,
     nucliadb_writer: AsyncClient,
     nucliadb_reader_manager: AsyncClient,
 ):
-    count = 10
-    for i in range(count):
+    total_resources = 10
+    total_paragraphs = 2 * total_resources
+    for i in range(total_resources):
         resp = await nucliadb_writer.post(
             f"/kb/{standalone_knowledgebox}/resources",
             json={
@@ -53,31 +57,88 @@ async def test_rebalance_kb_shards(
                 "title": f"My Title {i}",
                 "summary": f"My summary {i}",
                 "icon": "text/plain",
-                "texts": {
-                    "textfield1": {"body": f"Some text {i}", "format": "PLAIN"},
-                    "textfield2": {"body": f"Some other text {i}", "format": "PLAIN"},
-                },
             },
         )
         assert resp.status_code == 201
 
-    counters1_resp = await nucliadb_reader_manager.get(f"/kb/{standalone_knowledgebox}/counters")
-    shards1_resp = await nucliadb_reader_manager.get(f"/kb/{standalone_knowledgebox}/shards")
-    counters1 = counters1_resp.json()
-    shards1 = shards1_resp.json()
+    # Create another shard so that the previous one gets the excess of shards moved to the new shard
+    await create_shard_for_kb(standalone_knowledgebox)
 
-    assert len(shards1["shards"]) == 1
+    shards_to_resources = await build_shard_resources_index(standalone_knowledgebox)
+    assert len(shards_to_resources) == 1
+    assert {len(resources) for resources in shards_to_resources.values()} == {10}
 
-    with patch.object(settings, "max_shard_paragraphs", counters1["paragraphs"] / 2):
+    # Change max shard paragraphs to be half: this should force the shard to be split in two
+    with patch.object(settings, "max_shard_paragraphs", total_paragraphs * 0.75):
         await rebalance.rebalance_kb(app_context, standalone_knowledgebox)
 
-    shards2_resp = await nucliadb_reader_manager.get(f"/kb/{standalone_knowledgebox}/shards")
-    shards2 = shards2_resp.json()
-    assert len(shards2["shards"]) == 2
+        # Make sure that the paragraphs are properly balanced across shards
+        shards_to_resources = await build_shard_resources_index(standalone_knowledgebox)
+        assert len(shards_to_resources) == 2
+        assert {len(resources) for resources in shards_to_resources.values()} == {7, 3}
 
-    # if we run it again, we should get another shard
-    with patch.object(settings, "max_shard_paragraphs", counters1["paragraphs"] / 2):
+
+@pytest.mark.deploy_modes("standalone")
+async def test_rebalance_merges_kb_shards(
+    app_context,
+    standalone_knowledgebox,
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader_manager: AsyncClient,
+):
+    total_resources = 10
+    # Each resource has 2 paragraphs (title and summary)
+    total_paragraphs = total_resources * 2
+    for i in range(total_resources):
+        if i in [3, 6, 9]:
+            await create_shard_for_kb(standalone_knowledgebox)
+        resp = await nucliadb_writer.post(
+            f"/kb/{standalone_knowledgebox}/resources",
+            json={
+                "title": f"My resource {i}",
+                "summary": f"My summary {i}",
+                "icon": "text/plain",
+            },
+        )
+        assert resp.status_code == 201
+
+    # Make sure the counts are the expected
+    resp = await nucliadb_reader_manager.get(f"/kb/{standalone_knowledgebox}/counters")
+    counters = resp.json()
+    assert counters["resources"] == total_resources
+    assert counters["paragraphs"] == total_paragraphs
+
+    shards_to_resources = await build_shard_resources_index(standalone_knowledgebox)
+    assert len(shards_to_resources) == 4
+    assert {len(resources) for resources in shards_to_resources.values()} == {3, 1, 3, 3}
+
+    # Change max shard paragraphs to be bigger: this should force all shards to be merged into one (plus the current active shard)
+    with patch.object(settings, "max_shard_paragraphs", total_paragraphs * 5):
         await rebalance.rebalance_kb(app_context, standalone_knowledgebox)
 
+        shards_to_resources = await build_shard_resources_index(standalone_knowledgebox)
+        assert len(shards_to_resources) == 2
+        assert {len(resources) for resources in shards_to_resources.values()} == {1, 9}
 
-# TODO: test rebalance uses KB pre-warm config
+
+async def create_shard_for_kb(kbid: str):
+    async with datamanagers.with_rw_transaction() as txn:
+        sm = get_shard_manager()
+        await sm.create_shard_by_kbid(txn, kbid)
+        await txn.commit()
+
+
+async def build_shard_resources_index(kbid: str) -> dict[str, set[str]]:
+    """
+    Builds the shard to resources index.
+    """
+    index: dict[str, set[str]] = {}
+    rids = [rid async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid)]
+    async with datamanagers.with_ro_transaction() as txn:
+        shards = await txn.batch_get(
+            keys=[KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid) for rid in rids],
+            for_update=False,
+        )
+        for rid, shard_bytes in zip(rids, shards):
+            if shard_bytes is not None:
+                index.setdefault(shard_bytes.decode(), set()).add(rid)
+    return index
