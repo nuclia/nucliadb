@@ -27,10 +27,10 @@ from starlette.responses import StreamingResponse
 
 from nucliadb.common import datamanagers
 from nucliadb.models.responses import HTTPClientError
+from nucliadb.rao.chat.ask import AskResult, ask, handled_ask_exceptions
 from nucliadb.search.api.rao.router import api
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.search.search import cache
-from nucliadb.search.search.chat.ask import AskResult, ask, handled_ask_exceptions
 from nucliadb.search.search.chat.exceptions import AnswerJsonSchemaTooLong
 from nucliadb.search.search.utils import maybe_log_request_payload
 from nucliadb_models.configuration import AskConfig
