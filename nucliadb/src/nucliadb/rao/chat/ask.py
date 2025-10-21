@@ -67,7 +67,7 @@ from nucliadb.search.search.exceptions import (
 from nucliadb.search.search.graph_strategy import get_graph_results
 from nucliadb.search.search.metrics import AskMetrics, Metrics
 from nucliadb.search.search.query_parser.fetcher import Fetcher
-from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
+from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask, parse_reranker
 from nucliadb.search.search.rank_fusion import WeightedCombSum
 from nucliadb.search.search.rerankers import (
     get_reranker,
@@ -830,7 +830,7 @@ async def retrieval_in_kb(
 ) -> RetrievalResults:
     prequeries = parse_prequeries(ask_request)
     graph_strategy = parse_graph_strategy(ask_request)
-    main_results, prequeries_results, parsed_query = await get_find_results(
+    main_results, prequeries_results = await get_find_results(
         kbid=kbid,
         query=main_query,
         item=ask_request,
@@ -842,10 +842,7 @@ async def retrieval_in_kb(
     )
 
     if graph_strategy is not None:
-        assert parsed_query.retrieval.reranker is not None, (
-            "find parser must provide a reranking algorithm"
-        )
-        reranker = get_reranker(parsed_query.retrieval.reranker)
+        reranker = get_reranker(parse_reranker(ask_request))
         graph_results, graph_request = await get_graph_results(
             kbid=kbid,
             query=main_query,
@@ -878,7 +875,7 @@ async def retrieval_in_kb(
     return RetrievalResults(
         main_query=main_results,
         prequeries=prequeries_results,
-        fetcher=parsed_query.fetcher,
+        fetcher=fetcher_for_ask(kbid, ask_request),
         main_query_weight=main_query_weight,
         best_matches=best_matches,
     )
@@ -918,7 +915,7 @@ async def retrieval_in_resource(
                 )
             add_resource_filter(prequery.request, [resource])
 
-    main_results, prequeries_results, parsed_query = await get_find_results(
+    main_results, prequeries_results = await get_find_results(
         kbid=kbid,
         query=main_query,
         item=ask_request,
@@ -941,7 +938,7 @@ async def retrieval_in_resource(
     return RetrievalResults(
         main_query=main_results,
         prequeries=prequeries_results,
-        fetcher=parsed_query.fetcher,
+        fetcher=fetcher_for_ask(kbid, ask_request),
         main_query_weight=main_query_weight,
         best_matches=best_matches,
     )
