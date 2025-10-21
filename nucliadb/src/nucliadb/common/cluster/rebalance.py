@@ -423,41 +423,6 @@ async def move_resource_to_shard(
         return False
 
 
-async def move_set_of_kb_resources(
-    context: ApplicationContext,
-    kbid: str,
-    from_shard_id: str,
-    to_shard_id: str,
-    count: int = 20,
-) -> None:
-    kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=kbid)
-    if kb_shards is None:  # pragma: no cover
-        logger.warning("No shards found for kb. This should not happen.", extra={"kbid": kbid})
-        return
-
-    logger.info(
-        "Rebalancing kb shards",
-        extra={"kbid": kbid, "from": from_shard_id, "to": to_shard_id, "count": count},
-    )
-
-    from_shard = next(s for s in kb_shards.shards if s.shard == from_shard_id)
-    to_shard = next(s for s in kb_shards.shards if s.shard == to_shard_id)
-
-    request = nodereader_pb2.SearchRequest(
-        shard=from_shard.nidx_shard_id,
-        paragraph=False,
-        document=True,
-        result_per_page=count,
-    )
-    request.field_filter.field.field_type = "a"
-    request.field_filter.field.field_id = "title"
-    search_response: nodereader_pb2.SearchResponse = await get_nidx_searcher_client().Search(request)
-
-    for result in search_response.document.results:
-        resource_id = result.uuid
-        await move_resource_to_shard(context, kbid, resource_id, from_shard, to_shard)
-
-
 def needs_rebalance(shard: RebalanceShard, shards: list[RebalanceShard]) -> bool:
     # Current active shard is excluded from rebalancing
     return not shard.active and (needs_split(shard) or needs_merge(shard, shards))
