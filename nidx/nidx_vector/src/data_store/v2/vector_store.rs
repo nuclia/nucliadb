@@ -22,7 +22,7 @@ use lazy_static::lazy_static;
 use memmap2::Mmap;
 use std::{
     fs::File,
-    io::{Seek, SeekFrom, Write as _},
+    io::{BufWriter, Seek, SeekFrom, Write as _},
     path::Path,
 };
 
@@ -119,7 +119,7 @@ impl VectorStore {
 }
 
 pub struct VectorStoreWriter {
-    output: File,
+    output: BufWriter<File>,
     addr: u32,
     padding_bytes: usize,
 }
@@ -127,7 +127,7 @@ pub struct VectorStoreWriter {
 impl VectorStoreWriter {
     pub fn new(path: &Path, vector_type: &VectorType) -> std::io::Result<Self> {
         Ok(Self {
-            output: File::create(path.join(FILENAME))?,
+            output: BufWriter::new(File::create(path.join(FILENAME))?),
             addr: 0,
             padding_bytes: padding_bytes(vector_type),
         })
@@ -151,7 +151,7 @@ impl VectorStoreWriter {
         Ok((first_addr, last_addr))
     }
 
-    pub fn close(self) -> std::io::Result<()> {
-        self.output.sync_all()
+    pub fn close(mut self) -> std::io::Result<()> {
+        self.output.flush()
     }
 }
