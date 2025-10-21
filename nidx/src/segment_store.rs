@@ -107,6 +107,7 @@ pub async fn download_segment(
 
     let temp_dir2 = temp_dir.clone();
     let mut tar = tar::Archive::new(reader);
+    tar.set_preserve_mtime(false); // We don't care about metadata and we can save a few syscalls
     let result = tokio::task::spawn_blocking(move || tar.unpack(temp_dir2)).await?;
 
     if let Err(e) = result {
