@@ -128,9 +128,6 @@ async def create_shard_for_kb(kbid: str):
 
 
 async def build_shard_resources_index(kbid: str) -> dict[str, set[str]]:
-    """
-    Builds the shard to resources index.
-    """
     index: dict[str, set[str]] = {}
     rids = [rid async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid)]
     async with datamanagers.with_ro_transaction() as txn:
