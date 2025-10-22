@@ -28,7 +28,8 @@ from nucliadb.search.api.v1.resource.utils import get_resource_uuid_by_slug
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_SLUG_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import AskRequest, NucliaDBClientType, SyncAskResponse
-from nucliadb_utils.authentication import requires
+from nucliadb_models.security import RequestSecurity
+from nucliadb_utils.authentication import NucliaUser, requires
 
 from ..ask import create_ask_response
 
@@ -58,6 +59,15 @@ async def resource_ask_endpoint_by_uuid(
         "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
+    current_user: NucliaUser = request.user
+    # If present, security groups from AuthorizationBackend overrides any
+    # security group of the payload
+    if current_user.security_groups:
+        if item.security is None:
+            item.security = RequestSecurity(groups=current_user.security_groups)
+        else:
+            item.security.groups = current_user.security_groups
+
     return await create_ask_response(
         kbid=kbid,
         ask_request=item,
@@ -98,6 +108,16 @@ async def resource_ask_endpoint_by_slug(
     resource_id = await get_resource_uuid_by_slug(kbid, slug)
     if resource_id is None:
         return HTTPClientError(status_code=404, detail="Resource not found")
+
+    current_user: NucliaUser = request.user
+    # If present, security groups from AuthorizationBackend overrides any
+    # security group of the payload
+    if current_user.security_groups:
+        if item.security is None:
+            item.security = RequestSecurity(groups=current_user.security_groups)
+        else:
+            item.security.groups = current_user.security_groups
+
     return await create_ask_response(
         kbid=kbid,
         ask_request=item,

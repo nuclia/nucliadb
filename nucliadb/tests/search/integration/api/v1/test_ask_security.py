@@ -18,27 +18,41 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import pytest
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
 
-from nucliadb.search.api.v1.router import KB_PREFIX
 
-
+@pytest.mark.parametrize(
+    "endpoint,ask_module",
+    [
+        (f"/kb/{{kbid}}/ask", "kb_ask"),
+        # These slugs and ids are harcoded on the test_search_resource fixture
+        (f"/kb/{{kbid}}/slug/foobar-slug/ask", "resource_ask"),
+        (f"/kb/{{kbid}}/resource/68b6e3b747864293b71925b7bacaee7/ask", "resource_ask"),
+    ],
+)
 async def test_ask_receives_injected_security_groups(
     cluster_nucliadb_search: AsyncClient,
     test_search_resource: str,
     mocker: MockerFixture,
+    endpoint: str,
+    ask_module: str,
 ) -> None:
     from nucliadb.search.api.v1 import ask
+    from nucliadb.search.api.v1.resource import ask as resource_ask
     from nucliadb_models.search import AskRequest
 
     kbid = test_search_resource
 
-    spy = mocker.spy(ask, "create_ask_response")
+    target_module = ask if ask_module == "kb_ask" else resource_ask
+    spy = mocker.spy(target_module, "create_ask_response")
+
+    url = endpoint.format(kbid=kbid)
 
     # Test security groups only on authorizer headers
     resp = await cluster_nucliadb_search.post(
-        f"/{KB_PREFIX}/{kbid}/ask",
+        url,
         json={"query": "title"},
         headers={"x-nucliadb-security-groups": "group1;group2"},
     )
@@ -52,7 +66,7 @@ async def test_ask_receives_injected_security_groups(
 
     # Test security groups only on payload
     resp = await cluster_nucliadb_search.post(
-        f"/{KB_PREFIX}/{kbid}/ask",
+        url,
         json={"query": "title", "security": {"groups": ["group1", "group2"]}},
     )
     assert resp.status_code == 200
@@ -65,7 +79,7 @@ async def test_ask_receives_injected_security_groups(
 
     # Test security groups on headers override payload
     resp = await cluster_nucliadb_search.post(
-        f"/{KB_PREFIX}/{kbid}/ask",
+        url,
         headers={"x-nucliadb-security-groups": "group1;group2"},
         json={"query": "title", "security": {"groups": ["group3", "group4"]}},
     )
@@ -79,7 +93,7 @@ async def test_ask_receives_injected_security_groups(
 
     # Test no security groups
     resp = await cluster_nucliadb_search.post(
-        f"/{KB_PREFIX}/{kbid}/ask",
+        url,
         json={"query": "title"},
     )
     assert resp.status_code == 200

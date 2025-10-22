@@ -56,3 +56,6 @@ debug-run-nucliadb-redis:
 
 build-nucliadb-local:
 	docker build -t nuclia/nucliadb:latest . -f Dockerfile.withbinding
+
+build-nidx:
+	docker build -t nidx:latest . -f Dockerfile.nidx
