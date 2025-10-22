@@ -24,6 +24,7 @@ import math
 import random
 from typing import Optional
 
+import aioitertools
 from grpc import StatusCode
 from grpc.aio import AioRpcError
 from nidx_protos import nodereader_pb2, noderesources_pb2
@@ -40,7 +41,7 @@ from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 
 from .settings import settings
-from .utils import batchify, delete_resource_from_shard, index_resource_to_shard, wait_for_nidx
+from .utils import delete_resource_from_shard, index_resource_to_shard, wait_for_nidx
 
 logger = logging.getLogger(__name__)
 
@@ -90,9 +91,9 @@ class Rebalancer:
         )
 
     async def build_shard_resources_index(self):
-        rids = [rid async for rid in datamanagers.resources.iterate_resource_ids(kbid=self.kbid)]
         async with datamanagers.with_ro_transaction() as txn:
-            for resources_batch in batchify(rids, n=100):
+            iterable = datamanagers.resources.iterate_resource_ids(kbid=self.kbid)
+            async for resources_batch in aioitertools.batched(iterable, n=200):
                 shards = await txn.batch_get(
                     keys=[KB_RESOURCE_SHARD.format(kbid=self.kbid, uuid=rid) for rid in resources_batch],
                     for_update=False,
@@ -127,6 +128,7 @@ class Rebalancer:
             )
             if moved:
                 self.index[from_shard.id].remove(resource_id)
+                self.index[to_shard.id].add(resource_id)
                 moved_paragraphs += paragraphs_count
 
         return moved_paragraphs
@@ -139,7 +141,7 @@ class Rebalancer:
             return
         while True:
             try:
-                await wait_for_nidx(self.context.nats_manager, max_wait_seconds=60, max_pending=10)
+                await wait_for_nidx(self.context.nats_manager, max_wait_seconds=60, max_pending=1000)
                 return
             except asyncio.TimeoutError:
                 logger.warning("Nidx is behind. Backing off rebalancing.", extra={"kbid": self.kbid})
@@ -272,13 +274,15 @@ class Rebalancer:
             )
 
             try:
-                # Get the biggest shard with enough capacity
+                # Get the biggest shard with enough capacity. Exclude the active shards
                 target_shard: RebalanceShard = next(
                     reversed(
                         [
                             s
                             for s in shards
-                            if s.id != shard.id and s.paragraphs < (settings.max_shard_paragraphs * 0.9)
+                            if s.id != shard.id
+                            and s.paragraphs < (settings.max_shard_paragraphs * 0.9)
+                            and not s.active
                         ]
                     )
                 )
@@ -319,25 +323,34 @@ class Rebalancer:
 
             # If shard was emptied, delete it
             async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=self.kbid)):
-                kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=self.kbid)
-                if kb_shards is not None:
-                    # Delete shard from nidx
-                    to_delete = next(s for s in kb_shards.shards if s.shard == shard.id)
-                    logger.info(
-                        "Deleting empty shard",
-                        extra={"kbid": self.kbid, "shard_id": shard.id, "nidx_shard_id": shard.nidx_id},
+                async with datamanagers.with_rw_transaction() as txn:
+                    kb_shards = await datamanagers.cluster.get_kb_shards(
+                        txn, kbid=self.kbid, for_update=True
                     )
-                    kb_shards.shards.remove(to_delete)
-                    kb_shards.actual -= 1
-                    assert kb_shards.actual >= 0
-                    await get_nidx_api_client().DeleteShard(
-                        noderesources_pb2.ShardId(id=to_delete.nidx_shard_id)
-                    )
-                    async with datamanagers.with_rw_transaction() as txn:
+                    if kb_shards is not None:
+                        logger.info(
+                            "Deleting empty shard",
+                            extra={
+                                "kbid": self.kbid,
+                                "shard_id": shard.id,
+                                "nidx_shard_id": shard.nidx_id,
+                            },
+                        )
+
+                        # Delete shards from kb shards in maindb
+                        to_delete = next(s for s in kb_shards.shards if s.shard == shard.id)
+                        kb_shards.shards.remove(to_delete)
+                        kb_shards.actual -= 1
+                        assert kb_shards.actual >= 0
                         await datamanagers.cluster.update_kb_shards(
                             txn, kbid=self.kbid, shards=kb_shards
                         )
                         await txn.commit()
+
+                # Delete shard from nidx
+                await get_nidx_api_client().DeleteShard(
+                    noderesources_pb2.ShardId(id=to_delete.nidx_shard_id)
+                )
 
 
 async def get_resource_paragraphs_count(resource_id: str, nidx_shard_id: str) -> int:

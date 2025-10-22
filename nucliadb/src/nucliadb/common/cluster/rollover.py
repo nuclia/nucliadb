@@ -272,7 +272,7 @@ async def wait_for_indexing_to_catch_up(app_context: ApplicationContext):
     except AssertionError:
         logger.warning("Nats manager not initialized. Cannot wait for indexing to catch up")
         return
-    max_pending = 30
+    max_pending = 1000
     while True:
         try:
             await wait_for_nidx(app_context.nats_manager, max_wait_seconds=60, max_pending=max_pending)

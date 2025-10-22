@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import asyncio
 import logging
-from asyncio.timeouts import Timeout  # type: ignore
 from typing import TYPE_CHECKING, Optional, Union
 
 import backoff
@@ -129,12 +128,6 @@ async def delete_resource_from_shard(
     await sm.delete_resource(shard, resource_id, 0, str(partition), kbid)
 
 
-def batchify(iterable, n=1):
-    """Yield successive n-sized chunks from iterable."""
-    for i in range(0, len(iterable), n):
-        yield iterable[i : i + n]
-
-
 async def get_nats_consumer_pending_messages(
     nats_manager: NatsConnectionManager, *, stream: str, consumer: str
 ) -> int:
@@ -150,8 +143,7 @@ async def wait_for_nidx(
     poll_interval_seconds: int = 5,
     max_wait_seconds: int = 60,
 ):
-    now = asyncio.get_event_loop().time()
-    async with Timeout(now + max_wait_seconds):
+    async with asyncio.timeout(max_wait_seconds):  # type: ignore
         while True:
             pending = await get_nats_consumer_pending_messages(
                 nats_manager, stream="nidx", consumer="nidx"
