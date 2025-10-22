@@ -30,6 +30,10 @@ logger = logging.getLogger("fixtures.magic")
 DEPLOY_MODE_MARK_NAME = "deploy_modes"
 
 DEPLOY_MODE_FIXTURES = {
+    "nucliadb_search": [
+        "cluster",
+        "standalone",
+    ],
     "nucliadb_reader": [
         "component",
         "standalone",
@@ -108,6 +112,7 @@ async def _generic_injected_fixture(request: FixtureRequest):
         ) from exc
 
 
+nucliadb_search = pytest.fixture(_generic_injected_fixture, scope="function")
 nucliadb_reader = pytest.fixture(_generic_injected_fixture, scope="function")
 nucliadb_writer = pytest.fixture(_generic_injected_fixture, scope="function")
 nucliadb_train = pytest.fixture(_generic_injected_fixture, scope="function")

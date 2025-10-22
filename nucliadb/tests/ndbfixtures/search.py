@@ -18,9 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+from typing import AsyncIterator
 from unittest.mock import patch
 
 import pytest
+from httpx import AsyncClient
 from nidx_protos.nodereader_pb2 import GetShardRequest
 from nidx_protos.noderesources_pb2 import Shard
 
@@ -32,6 +34,8 @@ from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.ingest.orm.processor.processor import Processor
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.search.app import application
+from nucliadb.standalone.settings import Settings
+from nucliadb.writer import API_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.cache.settings import settings as cache_settings
@@ -48,6 +52,7 @@ from nucliadb_utils.utilities import (
 )
 from tests.ndbfixtures.ingest import broker_resource
 from tests.ndbfixtures.utils import create_api_client_factory
+from tests.utils.dirty_index import wait_for_sync
 
 # Main fixtures
 
@@ -59,7 +64,7 @@ async def cluster_nucliadb_search(
     nidx,
     maindb_driver: Driver,
     transaction_utility: TransactionUtility,
-):
+) -> AsyncIterator[AsyncClient]:
     with (
         patch.object(cache_settings, "cache_pubsub_nats_url", [nats_server]),
         patch.object(running_settings, "debug", False),
@@ -78,6 +83,20 @@ async def cluster_nucliadb_search(
 
         # TODO: fix this awful global state manipulation
         clear_global_cache()
+
+
+@pytest.fixture(scope="function")
+async def standalone_nucliadb_search(standalone_nucliadb: Settings) -> AsyncIterator[AsyncClient]:
+    async with AsyncClient(
+        base_url=f"http://localhost:{standalone_nucliadb.http_port}/{API_PREFIX}/v1",
+        headers={
+            "X-NUCLIADB-ROLES": "READER",
+            "X-NUCLIADB-USER": "ndbtests",
+        },
+        timeout=None,
+        event_hooks={"request": [wait_for_sync]},
+    ) as client:
+        yield client
 
 
 # Rest, TODO keep cleaning
