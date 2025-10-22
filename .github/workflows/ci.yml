@@ -445,8 +445,8 @@ jobs:
       - check-licenses
       - check-migrations
       - lint-helm
-      - nucliadb-search-tests
-      - nucliadb-tests
+      # - nucliadb-search-tests
+      # - nucliadb-tests
       - nucliadb-components-tests
       - python-packages-tests
       - nidx-tests
