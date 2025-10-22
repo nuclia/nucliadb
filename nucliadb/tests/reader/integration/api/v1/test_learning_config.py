@@ -109,6 +109,15 @@ async def test_api(
     assert resp.status_code == 200
     assert learning_config_proxy_mock.calls[-1][1:] == ("GET", "/schema", None)
 
+    # Get models grouped by providers
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/providers", headers={"x-nucliadb-account": "account"})
+    assert resp.status_code == 200
+    assert learning_config_proxy_mock.calls[-1][1:] == (
+        "GET",
+        f"/{kbid}/providers",
+        {"account-id": "account"},
+    )
+
 
 @pytest.mark.deploy_modes("component")
 async def test_api_restricted_for_hosted(nucliadb_reader: AsyncClient, hosted_nucliadb):

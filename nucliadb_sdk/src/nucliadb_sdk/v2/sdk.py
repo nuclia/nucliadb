@@ -437,6 +437,12 @@ SDK_DEFINITION = {
         method="GET",
         path_params=("kbid",),
     ),
+    # Learning config models by providers
+    "get_configuration_schema": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/providers",
+        method="GET",
+        path_params=("kbid",),
+    ),
     # Custom synonyms
     "set_custom_synonyms": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/custom-synonyms",
