@@ -36,7 +36,7 @@ async def get_audit_messages(sub):
     return auditreq
 
 
-@pytest.mark.deploy_modes("cluster")
+@pytest.mark.deploy_modes("standalone")
 async def test_ask_sends_only_one_audit(
     nucliadb_search: AsyncClient, test_search_resource: str, stream_audit
 ) -> None:
