@@ -22,7 +22,7 @@ import logging
 import os
 import platform
 import sys
-from typing import AsyncIterator, Iterator
+from typing import Iterator
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -32,7 +32,7 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
-from nucliadb.common.nidx import NidxUtility, start_nidx_utility, stop_nidx_utility
+from nucliadb.common.nidx import NidxUtility
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.tests.fixtures import get_testing_storage_backend
 from nucliadb_utils.utilities import Utility
@@ -207,13 +207,6 @@ async def nidx(natsd: str, nidx_storage: dict[str, str], pg):
         yield
 
     image.stop()
-
-
-@pytest.fixture(scope="function")
-async def nidx_utility(nidx) -> AsyncIterator[NidxUtility]:
-    utility = await start_nidx_utility()
-    yield utility
-    await stop_nidx_utility()
 
 
 @pytest.fixture(scope="function")
