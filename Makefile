@@ -40,5 +40,5 @@ debug-test-nucliadb:
 build-nucliadb-local:
 	docker build -t nuclia/nucliadb:latest . -f Dockerfile.withbinding
 
-build-nidx-docker: # Required for tests
-	docker build -t nidx -f Dockerfile.nidx .
+build-nidx: # Required for tests
+	docker build -t nidx:latest . -f Dockerfile.nidx
