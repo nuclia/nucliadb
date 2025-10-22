@@ -59,9 +59,9 @@ from tests.utils.dirty_index import wait_for_sync
 
 @pytest.fixture(scope="function")
 async def cluster_nucliadb_search(
+    nidx,
     storage: Storage,
     nats_server: str,
-    nidx,
     maindb_driver: Driver,
     transaction_utility: TransactionUtility,
 ) -> AsyncIterator[AsyncClient]:
