@@ -18,15 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import pytest
 from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 
 
-async def test_find(cluster_nucliadb_search: AsyncClient, multiple_search_resource: str) -> None:
+@pytest.mark.deploy_modes("cluster")
+async def test_find(nucliadb_search: AsyncClient, multiple_search_resource: str) -> None:
     kbid = multiple_search_resource
 
-    resp = await cluster_nucliadb_search.get(
+    resp = await nucliadb_search.get(
         f"/{KB_PREFIX}/{kbid}/find?query=own+text",
     )
     assert resp.status_code == 200

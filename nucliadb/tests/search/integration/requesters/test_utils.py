@@ -35,9 +35,8 @@ from nucliadb_models.search import (
 
 
 @pytest.mark.xfail  # pulling start/end position for vectors results needs to be fixed
-async def test_vector_result_metadata(
-    cluster_nucliadb_search: AsyncClient, test_search_resource: str
-) -> None:
+@pytest.mark.deploy_modes("cluster")
+async def test_vector_result_metadata(nucliadb_search: AsyncClient, test_search_resource: str) -> None:
     kbid = test_search_resource
 
     parsed = await parse_search(

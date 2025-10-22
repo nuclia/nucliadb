@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import pytest
 from httpx import AsyncClient
 from nidx_protos.nodereader_pb2 import GetShardRequest, SuggestFeatures, SuggestRequest
 from nidx_protos.noderesources_pb2 import ShardId
@@ -29,13 +30,11 @@ from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 
-# @pytest.mark.flaky(reruns=5)
-async def test_suggest_resource_all(
-    cluster_nucliadb_search: AsyncClient, test_search_resource: str
-) -> None:
+@pytest.mark.deploy_modes("cluster")
+async def test_suggest_resource_all(nucliadb_search: AsyncClient, test_search_resource: str) -> None:
     kbid = test_search_resource
 
-    resp = await cluster_nucliadb_search.get(
+    resp = await nucliadb_search.get(
         f"/{KB_PREFIX}/{kbid}/suggest?query=own+text",
     )
     assert resp.status_code == 200
