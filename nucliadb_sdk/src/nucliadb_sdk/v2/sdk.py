@@ -88,6 +88,7 @@ from nucliadb_models.search import (
     ErrorAskResponseItem,
     FeedbackRequest,
     FindRequest,
+    FootnoteCitationsAskResponseItem,
     JSONAskResponseItem,
     KnowledgeboxFindResults,
     KnowledgeboxSearchResults,
@@ -489,6 +490,7 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
     relations = None
     learning_id = response.headers.get("NUCLIA-LEARNING-ID")
     citations: dict[str, Any] = {}
+    citation_footnote_to_context: dict[str, str] = {}
     tokens = None
     timings = None
     error: Optional[str] = None
@@ -519,6 +521,8 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
                 timings = item.timings
             elif isinstance(item, CitationsAskResponseItem):
                 citations = item.citations
+            elif isinstance(item, FootnoteCitationsAskResponseItem):
+                citation_footnote_to_context = item.footnote_to_context
             elif isinstance(item, ErrorAskResponseItem):
                 error = item.error
             elif isinstance(item, DebugAskResponseItem):
@@ -548,6 +552,7 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
             "relations": relations,
             "learning_id": learning_id,
             "citations": citations,
+            "citation_footnote_to_context": citation_footnote_to_context,
             "debug": debug,
             "metadata": SyncAskMetadata(tokens=tokens, timings=timings),
             "augmented_context": augmented_context,
