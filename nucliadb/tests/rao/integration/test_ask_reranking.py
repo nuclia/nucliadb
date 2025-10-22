@@ -20,11 +20,11 @@
 
 """/ask endpoint + reranking tests"""
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nucliadb.search.search.chat.ask import ask
+from nucliadb.rao.chat.ask import ask
 from nucliadb_models.search import (
     AskRequest,
     FindRequest,
@@ -48,9 +48,9 @@ async def test_ask_forwarding_rerank_options_to_find(
     expected_reranker: RerankerName,
 ):
     kbid = "kbid"
-    find_mock = AsyncMock(return_value=(KnowledgeboxFindResults(resources={}), False, Mock()))
+    find_mock = AsyncMock(return_value=(KnowledgeboxFindResults(resources={}), False))
 
-    with patch("nucliadb.search.search.chat.query.find", new=find_mock):
+    with patch("nucliadb.rao.chat.query.find", new=find_mock):
         ask_result = await ask(
             kbid=kbid,
             ask_request=AskRequest(

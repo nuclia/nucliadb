@@ -63,7 +63,7 @@ from tests.utils.dirty_index import mark_dirty, wait_for_sync
 @pytest.fixture(scope="function", autouse=True)
 def audit():
     audit_mock = mock.Mock(chat=mock.AsyncMock())
-    with mock.patch("nucliadb.search.search.chat.query.get_audit", return_value=audit_mock):
+    with mock.patch("nucliadb.rao.chat.query.get_audit", return_value=audit_mock):
         yield audit_mock
 
 
@@ -116,10 +116,7 @@ async def test_ask_reasoning(nucliadb_reader: AsyncClient, standalone_knowledgeb
 
 @pytest.fixture(scope="function")
 def find_incomplete_results():
-    with mock.patch(
-        "nucliadb.search.search.chat.query.find",
-        return_value=(mock.MagicMock(), True, None),
-    ):
+    with mock.patch("nucliadb.rao.chat.query.find", return_value=(mock.MagicMock(), True)):
         yield
 
 
@@ -753,7 +750,7 @@ async def test_ask_handles_stream_unexpected_errors_sync(
     nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource
 ):
     with mock.patch(
-        "nucliadb.search.search.chat.ask.AskResult._stream",
+        "nucliadb.rao.chat.ask.AskResult._stream",
         side_effect=ValueError("foobar"),
     ):
         # Sync ask -- should return a 500
@@ -769,10 +766,7 @@ async def test_ask_handles_stream_unexpected_errors_sync(
 async def test_ask_handles_stream_unexpected_errors_stream(
     nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource
 ):
-    with mock.patch(
-        "nucliadb.search.search.chat.ask.AskResult._stream",
-        side_effect=ValueError("foobar"),
-    ):
+    with mock.patch("nucliadb.rao.chat.ask.AskResult._stream", side_effect=ValueError("foobar")):
         # Stream ask -- should handle by yielding the error item
         resp = await nucliadb_reader.post(
             f"/kb/{standalone_knowledgebox}/ask",
@@ -1619,9 +1613,12 @@ async def test_ask_calls_predict_query_once(
     )
     assert resp.status_code == 200
 
-    assert len(predict.calls) == 2
+    assert len(predict.calls) == 3
     assert predict.calls[0][0] == "query"
-    assert predict.calls[1][0] == "chat_query_ndjson"
+    # TODO: we call /query again to get the generation details (visual llm , max
+    # tokens...). We may be able to remove this in RAO
+    assert predict.calls[1][0] == "query"
+    assert predict.calls[2][0] == "chat_query_ndjson"
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -1835,14 +1832,21 @@ async def test_ask_query_image(nucliadb_reader: AsyncClient, standalone_knowledg
             },
         )
     assert resp.status_code == 200
-    assert len(predict.calls) == 2
+    assert len(predict.calls) == 3
     assert predict.calls[0][0] == "query"
     assert predict.calls[0][1].query_image.content_type == "image/png"
     assert predict.calls[0][1].query_image.b64encoded == "dummy_base64_image"
     assert predict.calls[0][1].text == "whatever"
 
-    assert predict.calls[1][0] == "chat_query_ndjson"
-    assert len(predict.calls[1][1].query_context_images) == 1
-    assert predict.calls[1][1].query_context_images["QUERY_IMAGE"].content_type == "image/png"
-    assert predict.calls[1][1].query_context_images["QUERY_IMAGE"].b64encoded == "dummy_base64_image"
-    assert predict.calls[1][1].question == "whatever"
+    # TODO: again, the same duplicated call due to generation parameters parsing
+    # in /ask outside the /find
+    assert predict.calls[1][0] == "query"
+    assert predict.calls[1][1].query_image.content_type == "image/png"
+    assert predict.calls[1][1].query_image.b64encoded == "dummy_base64_image"
+    assert predict.calls[1][1].text == "whatever"
+
+    assert predict.calls[2][0] == "chat_query_ndjson"
+    assert len(predict.calls[2][1].query_context_images) == 1
+    assert predict.calls[2][1].query_context_images["QUERY_IMAGE"].content_type == "image/png"
+    assert predict.calls[2][1].query_context_images["QUERY_IMAGE"].b64encoded == "dummy_base64_image"
+    assert predict.calls[2][1].question == "whatever"
