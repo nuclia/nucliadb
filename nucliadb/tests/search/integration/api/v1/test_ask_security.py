@@ -23,7 +23,6 @@ from httpx import AsyncClient
 from pytest_mock import MockerFixture
 
 
-@pytest.mark.deploy_modes("cluster")
 @pytest.mark.parametrize(
     "endpoint,ask_module",
     [
@@ -34,7 +33,7 @@ from pytest_mock import MockerFixture
     ],
 )
 async def test_ask_receives_injected_security_groups(
-    nucliadb_search: AsyncClient,
+    cluster_nucliadb_search: AsyncClient,
     test_search_resource: str,
     mocker: MockerFixture,
     endpoint: str,
@@ -52,7 +51,7 @@ async def test_ask_receives_injected_security_groups(
     url = endpoint.format(kbid=kbid)
 
     # Test security groups only on authorizer headers
-    resp = await nucliadb_search.post(
+    resp = await cluster_nucliadb_search.post(
         url,
         json={"query": "title"},
         headers={"x-nucliadb-security-groups": "group1;group2"},
@@ -66,7 +65,7 @@ async def test_ask_receives_injected_security_groups(
     spy.reset_mock()
 
     # Test security groups only on payload
-    resp = await nucliadb_search.post(
+    resp = await cluster_nucliadb_search.post(
         url,
         json={"query": "title", "security": {"groups": ["group1", "group2"]}},
     )
@@ -79,7 +78,7 @@ async def test_ask_receives_injected_security_groups(
     spy.reset_mock()
 
     # Test security groups on headers override payload
-    resp = await nucliadb_search.post(
+    resp = await cluster_nucliadb_search.post(
         url,
         headers={"x-nucliadb-security-groups": "group1;group2"},
         json={"query": "title", "security": {"groups": ["group3", "group4"]}},
@@ -93,7 +92,7 @@ async def test_ask_receives_injected_security_groups(
     spy.reset_mock()
 
     # Test no security groups
-    resp = await nucliadb_search.post(
+    resp = await cluster_nucliadb_search.post(
         url,
         json={"query": "title"},
     )
