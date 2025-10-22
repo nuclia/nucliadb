@@ -20,7 +20,11 @@
 
 use lazy_static::lazy_static;
 use memmap2::Mmap;
-use std::{fs::File, io::Write as _, path::Path};
+use std::{
+    fs::File,
+    io::{BufWriter, Write as _},
+    path::Path,
+};
 
 use crate::{
     data_store::{OpenReason, VectorAddr},
@@ -86,13 +90,13 @@ impl QuantVectorStore {
 }
 
 pub struct QuantVectorStoreWriter {
-    output: File,
+    output: BufWriter<File>,
 }
 
 impl QuantVectorStoreWriter {
     pub fn new(path: &Path) -> std::io::Result<Self> {
         Ok(Self {
-            output: File::create(path.join(FILENAME))?,
+            output: BufWriter::new(File::create(path.join(FILENAME))?),
         })
     }
 
@@ -100,7 +104,7 @@ impl QuantVectorStoreWriter {
         self.output.write_all(vector)
     }
 
-    pub fn close(self) -> std::io::Result<()> {
-        self.output.sync_all()
+    pub fn close(&mut self) -> std::io::Result<()> {
+        self.output.flush()
     }
 }

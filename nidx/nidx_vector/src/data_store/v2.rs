@@ -77,7 +77,7 @@ impl DataStoreV2 {
 
         paragraphs.close()?;
         vectors.close()?;
-        if let Some(quantized) = quantized {
+        if let Some(mut quantized) = quantized {
             quantized.close()?;
         }
 

@@ -19,7 +19,11 @@
 //
 
 use memmap2::Mmap;
-use std::{fs::File, io::Write as _, path::Path};
+use std::{
+    fs::File,
+    io::{BufWriter, Write as _},
+    path::Path,
+};
 
 use crate::{
     VectorR,
@@ -112,8 +116,8 @@ impl ParagraphStore {
 }
 
 pub struct ParagraphStoreWriter {
-    data: File,
-    pos: File,
+    data: BufWriter<File>,
+    pos: BufWriter<File>,
     data_pos: u32,
     addr: u32,
 }
@@ -121,8 +125,8 @@ pub struct ParagraphStoreWriter {
 impl ParagraphStoreWriter {
     pub fn new(path: &Path) -> std::io::Result<Self> {
         Ok(Self {
-            pos: File::create(path.join(FILENAME_POS))?,
-            data: File::create(path.join(FILENAME_DATA))?,
+            pos: BufWriter::new(File::create(path.join(FILENAME_POS))?),
+            data: BufWriter::new(File::create(path.join(FILENAME_DATA))?),
             data_pos: 0,
             addr: 0,
         })
@@ -159,9 +163,9 @@ impl ParagraphStoreWriter {
         Ok(self.addr)
     }
 
-    pub fn close(self) -> std::io::Result<()> {
-        self.data.sync_all()?;
-        self.pos.sync_all()?;
+    pub fn close(&mut self) -> std::io::Result<()> {
+        self.data.flush()?;
+        self.pos.flush()?;
         Ok(())
     }
 }
