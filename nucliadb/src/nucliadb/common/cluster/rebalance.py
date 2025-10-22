@@ -132,9 +132,14 @@ class Rebalancer:
         return moved_paragraphs
 
     async def wait_for_indexing(self):
+        try:
+            self.context.nats_manager
+        except AssertionError:
+            logger.warning(f"Nats manager not initialized. Cannot wait for indexing")
+            return
         while True:
             try:
-                await wait_for_nidx(self.context.nats_manager, max_wait_seconds=60, max_pending=30)
+                await wait_for_nidx(self.context.nats_manager, max_wait_seconds=60, max_pending=10)
                 return
             except asyncio.TimeoutError:
                 logger.warning("Nidx is behind. Backing off rebalancing.", extra={"kbid": self.kbid})

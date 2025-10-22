@@ -267,6 +267,11 @@ async def index_to_rollover_index(
 
 
 async def wait_for_indexing_to_catch_up(app_context: ApplicationContext):
+    try:
+        app_context.nats_manager
+    except AssertionError:
+        logger.warning("Nats manager not initialized. Cannot wait for indexing to catch up")
+        return
     max_pending = 30
     while True:
         try:
