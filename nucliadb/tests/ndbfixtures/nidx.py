@@ -28,6 +28,7 @@ from unittest.mock import AsyncMock, patch
 import nats
 import pytest
 from nats.js.api import ConsumerConfig
+from pytest import FixtureRequest
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
@@ -157,7 +158,7 @@ def in_memory_nidx_storage():
 
 
 @pytest.fixture(scope="session")
-def nidx_storage(request) -> dict[str, str]:
+def nidx_storage(request: FixtureRequest) -> dict[str, str]:
     backend = get_testing_storage_backend()
     if backend == "gcs":
         return request.getfixturevalue("gcs_nidx_storage")
@@ -172,7 +173,7 @@ def nidx_storage(request) -> dict[str, str]:
 
 
 @pytest.fixture(scope="session")
-async def nidx(natsd: str, nidx_storage: dict[str, str], pg):
+async def nidx(natsd: str, pg, nidx_storage: dict[str, str]):
     # Create needed NATS stream/consumer
     nc = await nats.connect(servers=[natsd])
     js = nc.jetstream()
