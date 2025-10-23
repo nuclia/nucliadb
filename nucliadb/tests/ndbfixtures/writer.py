@@ -55,8 +55,11 @@ async def standalone_nucliadb_writer(
     standalone_nucliadb: Settings,
 ) -> AsyncIterator[AsyncClient]:
     async with AsyncClient(
-        headers={"X-NUCLIADB-ROLES": "WRITER"},
         base_url=f"http://localhost:{standalone_nucliadb.http_port}/{API_PREFIX}/v1",
+        headers={
+            "X-NUCLIADB-ROLES": "WRITER",
+            "X-NUCLIADB-USER": "ndbtests",
+        },
         timeout=None,
         event_hooks={"request": [mark_dirty]},
     ) as client:

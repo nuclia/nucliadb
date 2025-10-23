@@ -22,17 +22,18 @@ import logging
 import os
 import platform
 import sys
-from typing import AsyncIterator, Iterator
+from typing import Iterator
 from unittest.mock import AsyncMock, patch
 
 import nats
 import pytest
 from nats.js.api import ConsumerConfig
+from pytest import FixtureRequest
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
-from nucliadb.common.nidx import NidxUtility, start_nidx_utility, stop_nidx_utility
+from nucliadb.common.nidx import NidxUtility
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.tests.fixtures import get_testing_storage_backend
 from nucliadb_utils.utilities import Utility
@@ -157,7 +158,7 @@ def in_memory_nidx_storage():
 
 
 @pytest.fixture(scope="session")
-def nidx_storage(request) -> dict[str, str]:
+def nidx_storage(request: FixtureRequest) -> dict[str, str]:
     backend = get_testing_storage_backend()
     if backend == "gcs":
         return request.getfixturevalue("gcs_nidx_storage")
@@ -172,7 +173,7 @@ def nidx_storage(request) -> dict[str, str]:
 
 
 @pytest.fixture(scope="session")
-async def nidx(natsd: str, nidx_storage: dict[str, str], pg):
+async def nidx(natsd: str, pg, nidx_storage: dict[str, str]):
     # Create needed NATS stream/consumer
     nc = await nats.connect(servers=[natsd])
     js = nc.jetstream()
@@ -207,13 +208,6 @@ async def nidx(natsd: str, nidx_storage: dict[str, str], pg):
         yield
 
     image.stop()
-
-
-@pytest.fixture(scope="function")
-async def nidx_utility(nidx) -> AsyncIterator[NidxUtility]:
-    utility = await start_nidx_utility()
-    yield utility
-    await stop_nidx_utility()
 
 
 @pytest.fixture(scope="function")

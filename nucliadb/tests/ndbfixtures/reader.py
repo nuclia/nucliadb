@@ -53,8 +53,11 @@ async def component_nucliadb_reader(reader_api_server: FastAPI) -> AsyncIterator
 @pytest.fixture(scope="function")
 async def standalone_nucliadb_reader(standalone_nucliadb: Settings) -> AsyncIterator[AsyncClient]:
     async with AsyncClient(
-        headers={"X-NUCLIADB-ROLES": "READER"},
         base_url=f"http://localhost:{standalone_nucliadb.http_port}/{API_PREFIX}/v1",
+        headers={
+            "X-NUCLIADB-ROLES": "READER",
+            "X-NUCLIADB-USER": "ndbtests",
+        },
         timeout=None,
         event_hooks={"request": [wait_for_sync]},
     ) as client:

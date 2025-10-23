@@ -23,12 +23,14 @@ from typing import Any, Iterator, Type
 from unittest.mock import Mock
 
 import pytest
+from pytest import FixtureRequest
 from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb_utils.storages.azure import AzureStorage
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.storages.s3 import S3Storage
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import Utility, clean_utility, set_utility
 
 
@@ -52,7 +54,7 @@ def hosted_nucliadb():
     nuclia_settings.onprem = original
 
 
-def get_testing_storage_backend():
+def get_testing_storage_backend() -> str:
     """
     Default to gcs for linux users and s3 for macOS users. This is because some
     tests fail on macOS with the gcs backend with a weird nidx error (to be looked into).
@@ -72,7 +74,7 @@ def lazy_storage_fixture():
 
 
 @pytest.fixture(scope="function", params=lazy_storage_fixture())
-async def storage(request):
+def storage(request: FixtureRequest) -> Iterator[Storage]:
     """
     Generic storage fixture that allows us to run the same tests for different storage backends.
     """

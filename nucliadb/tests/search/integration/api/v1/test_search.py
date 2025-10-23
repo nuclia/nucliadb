@@ -36,12 +36,13 @@ RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"
 
 
 @pytest.mark.flaky(reruns=5)
+@pytest.mark.deploy_modes("cluster")
 async def test_multiple_fuzzy_search_resource_all(
-    cluster_nucliadb_search: AsyncClient, multiple_search_resource: str
+    nucliadb_search: AsyncClient, multiple_search_resource: str
 ) -> None:
     kbid = multiple_search_resource
 
-    resp = await cluster_nucliadb_search.get(
+    resp = await nucliadb_search.get(
         f'/{KB_PREFIX}/{kbid}/search?query=own+test+"This is great"&highlight=true&top_k=20',
     )
 
@@ -59,13 +60,14 @@ async def test_multiple_fuzzy_search_resource_all(
 
 
 @pytest.mark.flaky(reruns=3)
+@pytest.mark.deploy_modes("cluster")
 async def test_search_resource_all(
-    cluster_nucliadb_search: AsyncClient,
+    nucliadb_search: AsyncClient,
     test_search_resource: str,
 ) -> None:
     kbid = test_search_resource
     await asyncio.sleep(1)
-    resp = await cluster_nucliadb_search.get(
+    resp = await nucliadb_search.get(
         f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&text_resource=true",
     )
     assert resp.status_code == 200
@@ -127,14 +129,13 @@ async def test_search_resource_all(
             assert results[2][0].endswith("20-45")
 
 
-async def test_search_with_facets(
-    cluster_nucliadb_search: AsyncClient, multiple_search_resource: str
-) -> None:
+@pytest.mark.deploy_modes("cluster")
+async def test_search_with_facets(nucliadb_search: AsyncClient, multiple_search_resource: str) -> None:
     kbid = multiple_search_resource
 
     url = f"/{KB_PREFIX}/{kbid}/search?query=own+text&faceted=/classification.labels"
 
-    resp = await cluster_nucliadb_search.get(url)
+    resp = await nucliadb_search.get(url)
     data = resp.json()
     assert data["fulltext"]["facets"]["/classification.labels"]["/classification.labels/labelset1"] == 25
     assert (
@@ -143,7 +144,7 @@ async def test_search_with_facets(
 
     # also just test short hand filter
     url = f"/{KB_PREFIX}/{kbid}/search?query=own+text&faceted=/l"
-    resp = await cluster_nucliadb_search.get(url)
+    resp = await nucliadb_search.get(url)
     data = resp.json()
     assert data["fulltext"]["facets"]["/classification.labels"]["/classification.labels/labelset1"] == 25
     assert (
