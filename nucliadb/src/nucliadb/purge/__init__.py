@@ -19,7 +19,7 @@
 #
 import asyncio
 import importlib.metadata
-from itertools import batched
+from itertools import batched  # type: ignore
 from typing import AsyncGenerator
 
 from nucliadb.common import datamanagers
