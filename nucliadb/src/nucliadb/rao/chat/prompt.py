@@ -37,7 +37,6 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.rao.rpc import hydrate
 from nucliadb.search import logger
 from nucliadb.search.search import cache
-from nucliadb.search.search.hydrator import hydrate_field_text
 from nucliadb.search.search.hydrator.images import (
     download_paragraph_source_image,
     download_thumbnail_image,
@@ -641,28 +640,54 @@ async def field_extension_prompt_context(
                 # Invalid field id, skiping
                 continue
 
-    tasks = [hydrate_field_text(kbid, fid) for fid in extend_field_ids]
-    field_extracted_texts = await run_concurrently(tasks)
+    hydration = Hydration(
+        resource=None,
+        field=FieldHydration(
+            text=TextFieldHydration(extracted_text=True),
+            file=FileFieldHydration(extracted_text=True),
+            link=LinkFieldHydration(extracted_text=True),
+            # TODO: extracted text is not implemented for conversation fields in
+            # the Hydration API, we should do that
+            conversation=None,
+            generic=GenericFieldHydration(extracted_text=True),
+        ),
+        paragraph=ParagraphHydration(text=False, image=None, table=None, page=None, related=None),
+    )
+    hydrated = await hydrate(
+        kbid,
+        hydration,
+        [
+            # REVIEW: use a placeholder as we haven't implemented yet a list of
+            # field ids in the Hydration API
+            ParagraphId(field_id, paragraph_start=0, paragraph_end=0).full()
+            for field_id in extend_field_ids
+        ],
+    )
 
-    metrics.set("field_extension_ops", len(field_extracted_texts))
-
-    for result in field_extracted_texts:
-        if result is None:  # pragma: no cover
+    added_fields = set()
+    for hydrated_field in hydrated.fields.values():
+        if hydrated_field.extracted is None or not hydrated_field.extracted.text:
             continue
-        field, extracted_text = result
+
+        field_id = hydrated_field.id
+        extracted_text = hydrated_field.extracted.text
+
         # First off, remove the text block ids from paragraphs that belong to
         # the same field, as otherwise the context will be duplicated.
         for tb_id in context.text_block_ids():
-            if tb_id.startswith(field.full()):
+            if tb_id.startswith(field_id):
                 del context[tb_id]
         # Add the extracted text of each field to the beginning of the context.
-        if field.full() not in context:
-            context[field.full()] = extracted_text
-            augmented_context.fields[field.full()] = AugmentedTextBlock(
-                id=field.full(),
+        if field_id not in context:
+            context[field_id] = extracted_text
+            augmented_context.fields[field_id] = AugmentedTextBlock(
+                id=field_id,
                 text=extracted_text,
                 augmentation_type=TextBlockAugmentationType.FIELD_EXTENSION,
             )
+            added_fields.add(field_id)
+
+    metrics.set("field_extension_ops", len(added_fields))
 
     # Add the extracted text of each paragraph to the end of the context.
     for paragraph in ordered_paragraphs:
@@ -1396,6 +1421,8 @@ class ExtraCharsParagraph:
     paragraphs: List[Tuple[FindParagraph, str]]
 
 
+# TODO: this won't be needed once we move everything to Hydration, as it's a
+# /find specific thing (see /find highligh parameter)
 def _clean_paragraph_text(paragraph: FindParagraph) -> str:
     text = paragraph.text.strip()
     # Do not send highlight marks on prompt context
