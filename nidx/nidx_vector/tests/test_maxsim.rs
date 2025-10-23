@@ -52,6 +52,7 @@ fn test_maxsim() -> anyhow::Result<()> {
         vector_type: VectorType::DenseF32 { dimension: 5 },
         normalize_vectors: false,
         vector_cardinality: VectorCardinality::Multi,
+        prewarm: false,
         flags: vec![],
     };
 
