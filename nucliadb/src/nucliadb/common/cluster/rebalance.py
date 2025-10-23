@@ -333,10 +333,13 @@ class Rebalancer:
                         )
 
                         # Delete shards from kb shards in maindb
-                        to_delete = next(s for s in kb_shards.shards if s.shard == shard_to_merge.id)
-                        deleted_idx = kb_shards.shards.index(to_delete)
+                        to_delete, to_delete_idx = next(
+                            (s, idx)
+                            for idx, s in enumerate(kb_shards.shards)
+                            if s.shard == shard_to_merge.id
+                        )
                         kb_shards.shards.remove(to_delete)
-                        if deleted_idx <= kb_shards.actual:
+                        if to_delete_idx <= kb_shards.actual:
                             # Only decrement the actual pointer if we remove before the pointer.
                             kb_shards.actual -= 1
                         assert kb_shards.actual >= 0
