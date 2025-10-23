@@ -34,8 +34,8 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
+from nucliadb.rao.rpc import hydrate
 from nucliadb.search import logger
-from nucliadb.search.api.v1.hydrate import Hydrator
 from nucliadb.search.search import cache
 from nucliadb.search.search.hydrator import hydrate_field_text, hydrate_resource_text
 from nucliadb.search.search.hydrator.images import (
@@ -674,11 +674,8 @@ async def neighbouring_paragraphs_prompt_context(
             ),
         ),
     )
-
-    hydrator = Hydrator(kbid, hydration)
-
     retrieved_paragraphs_ids = [text_block.id for text_block in ordered_text_blocks]
-    hydrated = await hydrator.hydrate(retrieved_paragraphs_ids)
+    hydrated = await hydrate(kbid, hydration, retrieved_paragraphs_ids)
 
     for paragraph_id in retrieved_paragraphs_ids:
         hydrated_paragraph = hydrated.paragraphs.get(paragraph_id)

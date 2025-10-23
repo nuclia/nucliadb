@@ -23,7 +23,7 @@ from typing import Iterable, Optional, Union
 from nidx_protos.nodereader_pb2 import GraphSearchResponse, SearchResponse
 
 from nucliadb.common.models_utils import to_proto
-from nucliadb.rao.chat.find import find
+from nucliadb.rao.rpc import find
 from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode, RephraseResponse
 from nucliadb.search.requesters.utils import Method, nidx_query

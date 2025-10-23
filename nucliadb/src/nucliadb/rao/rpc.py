@@ -23,6 +23,11 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.search.search.metrics import Metrics
+from nucliadb_models.hydration import (
+    Hydrated,
+    HydrateRequest,
+    Hydration,
+)
 from nucliadb_models.search import (
     FindRequest,
     KnowledgeboxFindResults,
@@ -68,3 +73,21 @@ async def find(
         find_results = KnowledgeboxFindResults.model_validate(resp.json())
 
     return find_results, incomplete
+
+
+async def hydrate(kbid: str, hydration: Hydration, paragraph_ids: list[str]) -> Hydrated:
+    """RPC to /hydrate endpoint making it look as an internal call."""
+
+    payload = (HydrateRequest(data=paragraph_ids, hydration=hydration).model_dump(),)
+    async with AsyncClient(
+        headers={"X-NUCLIADB-ROLES": "READER"},
+        base_url=f"http://{running_settings.serving_host}:{running_settings.serving_port}/{API_PREFIX}/v1",
+        timeout=10.0,
+    ) as client:
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/hydrate", json=payload)
+        if resp.status_code != 200:
+            raise Exception(f"/hydrate call failed: {resp.status_code} {resp.content.decode()}")
+
+        hydrated = Hydrated.model_validate(resp.json())
+
+    return hydrated
