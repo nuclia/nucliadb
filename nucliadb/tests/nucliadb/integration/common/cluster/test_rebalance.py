@@ -175,7 +175,7 @@ async def test_rebalance_splits_and_merges_kb_shards(
 async def create_shard_for_kb(kbid: str):
     async with datamanagers.with_rw_transaction() as txn:
         sm = get_shard_manager()
-        await sm.create_shard_by_kbid(txn, kbid)
+        await sm.create_shard_by_kbid(txn, kbid, prewarm_enabled=False)
         await txn.commit()
 
 

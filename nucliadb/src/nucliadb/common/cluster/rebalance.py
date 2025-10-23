@@ -209,9 +209,11 @@ class Rebalancer:
                 locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=self.kbid)),
                 datamanagers.with_rw_transaction() as txn,
             ):
+                kb_config = await datamanagers.kb.get_config(txn, kbid=self.kbid)
+                prewarm = kb_config is not None and kb_config.prewarm_enabled
                 sm = get_shard_manager()
                 for _ in range(shards_to_add):
-                    await sm.create_shard_by_kbid(txn, self.kbid)
+                    await sm.create_shard_by_kbid(txn, self.kbid, prewarm_enabled=prewarm)
                 await txn.commit()
 
             # Recalculate after having created shards, the active shard is a different one
