@@ -438,8 +438,8 @@ SDK_DEFINITION = {
         path_params=("kbid",),
     ),
     # Learning config models by providers
-    "get_configuration_schema": SdkEndpointDefinition(
-        path_template="/v1/kb/{kbid}/providers",
+    "get_generative_providers": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/generative_providers",
         method="GET",
         path_params=("kbid",),
     ),
@@ -1115,6 +1115,8 @@ class NucliaDB(_NucliaDBBase):
 
     # Learning config schema
     get_configuration_schema = _request_json_sync_builder("get_configuration_schema")
+    # Learning config generative providers
+    get_generative_providers = _request_json_sync_builder("get_generative_providers")
     # Custom synonyms
     set_custom_synonyms = _request_sync_builder("set_custom_synonyms", KnowledgeBoxSynonyms, type(None))
     get_custom_synonyms = _request_sync_builder("get_custom_synonyms", type(None), KnowledgeBoxSynonyms)
@@ -1319,6 +1321,8 @@ class NucliaDBAsync(_NucliaDBBase):
 
     # Learning config schema
     get_configuration_schema = _request_json_async_builder("get_configuration_schema")
+    # Learning config generative providers
+    get_generative_providers = _request_json_async_builder("get_generative_providers")
     # Custom synonyms
     set_custom_synonyms = _request_async_builder("set_custom_synonyms", KnowledgeBoxSynonyms, type(None))
     get_custom_synonyms = _request_async_builder("get_custom_synonyms", type(None), KnowledgeBoxSynonyms)

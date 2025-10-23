@@ -110,11 +110,11 @@ async def test_api(
     assert learning_config_proxy_mock.calls[-1][1:] == ("GET", "/schema", None)
 
     # Get models grouped by providers
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/providers", headers={"x-nucliadb-account": "account"})
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/generative_providers", headers={"x-nucliadb-account": "account"})
     assert resp.status_code == 200
     assert learning_config_proxy_mock.calls[-1][1:] == (
         "GET",
-        f"/{kbid}/providers",
+        f"/{kbid}/generative_providers",
         {"account-id": "account"},
     )
 

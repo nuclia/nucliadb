@@ -232,7 +232,7 @@ def test_learning_config(kbid: str):
 
     # Get the models by provider
     resp = requests.get(
-        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/providers"),
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/generative_providers"),
         headers={
             "content-type": "application/json",
             "X-NUCLIADB-ROLES": "READER",

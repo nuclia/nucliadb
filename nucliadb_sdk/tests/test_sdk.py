@@ -147,6 +147,7 @@ def test_learning_config_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.get_models(kbid=kb.uuid)
     sdk.get_model(kbid=kb.uuid, model_id="foo")
     sdk.get_configuration_schema(kbid=kb.uuid)
+    sdk.get_generative_providers(kbid=kb.uuid)
 
 
 def test_check_response():
