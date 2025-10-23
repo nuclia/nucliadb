@@ -41,5 +41,4 @@ class Features:
     SKIP_EXTERNAL_INDEX = "nucliadb_skip_external_index"
     LOG_REQUEST_PAYLOADS = "nucliadb_log_request_payloads"
     IGNORE_EXTRACTED_IN_SEARCH = "nucliadb_ignore_extracted_in_search"
-    DEBUG_MISSING_VECTORS = "nucliadb_debug_missing_vectors"
     REBALANCE_ENABLED = "nucliadb_rebalance"
