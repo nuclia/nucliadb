@@ -37,12 +37,12 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.search import logger
 from nucliadb.search.api.v1.hydrate import Hydrator
 from nucliadb.search.search import cache
-from nucliadb.search.search.chat.images import (
-    get_file_thumbnail_image,
-    get_page_image,
-    get_paragraph_image,
-)
 from nucliadb.search.search.hydrator import hydrate_field_text, hydrate_resource_text
+from nucliadb.search.search.hydrator.images import (
+    download_paragraph_source_image,
+    download_thumbnail_image,
+    unchecked_download_page_preview,
+)
 from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.paragraphs import get_paragraph_text
 from nucliadb_models.hydration import (
@@ -995,7 +995,7 @@ async def conversation_prompt_context(
                         file_field: File = await resource.get_field(
                             attachment.field_id, attachment.field_type, load=True
                         )  # type: ignore
-                        image = await get_file_thumbnail_image(file_field)
+                        image = await download_thumbnail_image(file_field)
                         if image is not None:
                             pid = f"{rid}/f/{attachment.field_id}/0-0"
                             context.images[pid] = image
@@ -1203,7 +1203,9 @@ class PromptContextBuilder:
                 # page_image_id: rid/f/myfield/0
                 page_image_id = "/".join([pid.field_id.full(), str(paragraph_page_number)])
                 if page_image_id not in context.images:
-                    image = await get_page_image(self.kbid, pid, paragraph_page_number)
+                    image = await unchecked_download_page_preview(
+                        self.kbid, pid.field_id, paragraph_page_number
+                    )
                     if image is not None:
                         ops += 1
                         context.images[page_image_id] = image
@@ -1223,7 +1225,7 @@ class PromptContextBuilder:
             if (add_table or add_paragraph) and (
                 paragraph.reference is not None and paragraph.reference != ""
             ):
-                pimage = await get_paragraph_image(self.kbid, pid, paragraph.reference)
+                pimage = await download_paragraph_source_image(self.kbid, pid, paragraph)
                 if pimage is not None:
                     ops += 1
                     context.images[paragraph.id] = pimage

@@ -18,33 +18,59 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-from typing import Optional, cast
+from io import BytesIO
+from typing import Optional, Union, cast, overload
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_NAME, FieldId, ParagraphId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.file import File
 from nucliadb.search import SERVICE_NAME
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.search import Image
+from nucliadb_models.search import FindParagraph, Image
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.utilities import get_storage
 
 
-async def paragraph_source_image(
+@overload
+async def download_paragraph_source_image(
     kbid: str, paragraph_id: ParagraphId, paragraph: resources_pb2.Paragraph
+) -> Optional[Image]: ...
+
+
+@overload
+async def download_paragraph_source_image(
+    kbid: str, paragraph_id: ParagraphId, paragraph: FindParagraph
+) -> Optional[Image]: ...
+
+
+async def download_paragraph_source_image(
+    kbid: str, paragraph_id: ParagraphId, paragraph: Union[resources_pb2.Paragraph, FindParagraph]
 ) -> Optional[Image]:
     """Certain paragraphs are extracted from images using techniques like OCR or
     inception. If that's the case, return the original image for this paragraph.
 
     """
-    source_image = paragraph.representation.reference_file
-    if not source_image:
-        return None
+    source_image: Optional[str]
+    if isinstance(paragraph, resources_pb2.Paragraph):
+        if paragraph.kind not in (
+            resources_pb2.Paragraph.TypeParagraph.OCR,
+            resources_pb2.Paragraph.TypeParagraph.INCEPTION,
+        ):
+            return None
 
-    if paragraph.kind not in (
-        resources_pb2.Paragraph.TypeParagraph.OCR,
-        resources_pb2.Paragraph.TypeParagraph.INCEPTION,
-    ):
+        source_image = paragraph.representation.reference_file
+
+    elif isinstance(paragraph, FindParagraph):
+        # we don't have information about OCR/inception, so we skip this check
+
+        source_image = paragraph.reference
+
+    else:  # pragma: no cover
+        # This is a trick so mypy generates an error if this branch can be reached,
+        # that is, if we are missing some ifs
+        _a: int = "a"
+
+    if not source_image:
         return None
 
     field_id = paragraph_id.field_id
@@ -57,28 +83,30 @@ async def paragraph_source_image(
         field_id,
         f"generated/{source_image}",
         # XXX: we assume all reference files are PNG images, but this actually
-        # depends on learning so it's a dangerous assumption. We should check it
-        # by ourselves
+        # depends on learning so it's a dangerous assumption. We should have a
+        # safer mechanism to know it
         mime_type="image/png",
     )
     return image
 
 
-async def download_image(
-    kbid: str, field_id: FieldId, image_path: str, *, mime_type: str
+# REVIEW: we could check first its field type and skip fields without pages,
+# avoiding a useless round trip to blob
+async def unchecked_download_page_preview(
+    kbid: str, field_id: FieldId, page_number: int
 ) -> Optional[Image]:
-    storage = await get_storage(service_name=SERVICE_NAME)
-    sf = storage.file_extracted(
+    """Download a specific page preview for a field.
+
+    This function doesn't check if the field has pages or the page number
+    provided is correct.
+
+    """
+    return await download_image(
         kbid,
-        field_id.rid,
-        field_id.type,
-        field_id.key,
-        image_path,
+        field_id,
+        f"generated/extracted_images_{page_number}.png",
+        mime_type="image/png",
     )
-    raw_image = (await storage.downloadbytes(sf.bucket, sf.key)).getvalue()
-    if not raw_image:
-        return None
-    return Image(content_type=mime_type, b64encoded=base64.b64encode(raw_image).decode())
 
 
 async def download_page_preview(field: Field, page: int) -> Optional[Image]:
@@ -128,3 +156,37 @@ async def download_page_preview(field: Field, page: int) -> Optional[Image]:
         _a: int = "a"
 
     return image
+
+
+async def download_thumbnail_image(file: File) -> Optional[Image]:
+    fed = await file.get_file_extracted_data()
+    if fed is None or not fed.HasField("file_thumbnail"):
+        return None
+    storage = await get_storage(service_name=SERVICE_NAME)
+    image_bytes: BytesIO = await storage.downloadbytescf(fed.file_thumbnail)
+    value = image_bytes.getvalue()
+    if len(value) == 0:
+        return None
+    image = Image(
+        b64encoded=base64.b64encode(value).decode(),
+        # We assume the thumbnail is always generated as jpeg by Nuclia processing
+        content_type="image/jpeg",
+    )
+    return image
+
+
+async def download_image(
+    kbid: str, field_id: FieldId, image_path: str, *, mime_type: str
+) -> Optional[Image]:
+    storage = await get_storage(service_name=SERVICE_NAME)
+    sf = storage.file_extracted(
+        kbid,
+        field_id.rid,
+        field_id.type,
+        field_id.key,
+        image_path,
+    )
+    raw_image = (await storage.downloadbytes(sf.bucket, sf.key)).getvalue()
+    if not raw_image:
+        return None
+    return Image(content_type=mime_type, b64encoded=base64.b64encode(raw_image).decode())

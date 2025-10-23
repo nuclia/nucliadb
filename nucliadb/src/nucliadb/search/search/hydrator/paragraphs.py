@@ -26,7 +26,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.search.search import paragraphs
 from nucliadb.search.search.hydrator.fields import page_preview_id
-from nucliadb.search.search.hydrator.images import paragraph_source_image
+from nucliadb.search.search.hydrator.images import download_paragraph_source_image
 from nucliadb_models import hydration as hydration_models
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import FieldComputedMetadata
@@ -219,7 +219,7 @@ async def hydrate_paragraph(
                 hydrated.image = hydration_models.HydratedParagraphImage()
 
                 if config.image.source_image:
-                    hydrated.image.source_image = await paragraph_source_image(
+                    hydrated.image.source_image = await download_paragraph_source_image(
                         kbid, paragraph_id, paragraph
                     )
 
