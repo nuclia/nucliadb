@@ -334,8 +334,11 @@ class Rebalancer:
 
                         # Delete shards from kb shards in maindb
                         to_delete = next(s for s in kb_shards.shards if s.shard == shard_to_merge.id)
+                        deleted_idx = kb_shards.shards.index(to_delete)
                         kb_shards.shards.remove(to_delete)
-                        kb_shards.actual -= 1
+                        if deleted_idx <= kb_shards.actual:
+                            # Only decrement the actual pointer if we remove before the pointer.
+                            kb_shards.actual -= 1
                         assert kb_shards.actual >= 0
                         await datamanagers.cluster.update_kb_shards(
                             txn, kbid=self.kbid, shards=kb_shards
