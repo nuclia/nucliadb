@@ -22,7 +22,6 @@ import dataclasses
 import logging
 import math
 import random
-import time
 from typing import Optional
 
 import aioitertools
@@ -76,7 +75,7 @@ class Rebalancer:
         Return the sorted list of shards by increasing paragraph count.
         """
         self.kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=self.kbid)
-        if self.kb_shards is None:
+        if self.kb_shards is None:  # pragma: no cover
             return []
         return list(
             sorted(
@@ -94,7 +93,6 @@ class Rebalancer:
         )
 
     async def build_shard_resources_index(self):
-        start = time.time()
         async with datamanagers.with_ro_transaction() as txn:
             iterable = datamanagers.resources.iterate_resource_ids(kbid=self.kbid)
             async for resources_batch in aioitertools.batched(iterable, n=200):
@@ -105,12 +103,6 @@ class Rebalancer:
                 for rid, shard_bytes in zip(resources_batch, shards):
                     if shard_bytes is not None:
                         self.index.setdefault(shard_bytes.decode(), set()).add(rid)
-        duration = time.time() - start
-        if duration > 30:
-            logger.warning(
-                f"Building the shard to resources index took too long",
-                extra={"kbid": self.kbid, "duration": duration},
-            )
 
     async def move_paragraphs(
         self, from_shard: RebalanceShard, to_shard: RebalanceShard, max_paragraphs: int
@@ -378,7 +370,7 @@ async def get_resource_paragraphs_count(resource_id: str, nidx_shard_id: str) ->
         )
         search_response: nodereader_pb2.SearchResponse = await get_nidx_searcher_client().Search(request)
         return search_response.paragraph.total
-    except AioRpcError as exc:
+    except AioRpcError as exc:  # pragma: no cover
         if exc.code() == StatusCode.NOT_FOUND:
             logger.warning(f"Shard not found in nidx", extra={"nidx_shard_id": nidx_shard_id})
             return 0
@@ -403,7 +395,7 @@ def get_target_shard(
         ),
         None,
     )
-    if target_shard is None:
+    if target_shard is None:  # pragma: no cover
         return None, 0
 
     # Aim to fill target shards up to 100% of max
@@ -422,7 +414,7 @@ async def get_shard_paragraph_count(nidx_shard_id: str) -> int:
         )
         search_response: nodereader_pb2.SearchResponse = await get_nidx_searcher_client().Search(request)
         return search_response.paragraph.total
-    except AioRpcError as exc:
+    except AioRpcError as exc:  # pragma: no cover
         if exc.code() == StatusCode.NOT_FOUND:
             logger.warning(f"Shard not found in nidx", extra={"nidx_shard_id": nidx_shard_id})
             return 0
@@ -448,10 +440,10 @@ async def move_resource_to_shard(
             found_shard_id = await datamanagers.resources.get_resource_shard_id(
                 txn, kbid=kbid, rid=resource_id, for_update=True
             )
-            if found_shard_id is None:
+            if found_shard_id is None:  # pragma: no cover
                 # resource deleted
                 return False
-            if found_shard_id != from_shard.shard:
+            if found_shard_id != from_shard.shard:  # pragma: no cover
                 # resource could have already been moved
                 return False
 
@@ -481,10 +473,6 @@ async def move_resource_to_shard(
                 extra={"kbid": kbid, "resource_id": resource_id},
             )
         return False
-
-
-def is_active_shard(shard: RebalanceShard) -> bool:
-    return shard.active
 
 
 def needs_split(shard: RebalanceShard) -> bool:
