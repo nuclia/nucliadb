@@ -138,7 +138,7 @@ class Rebalancer:
     async def wait_for_indexing(self):
         try:
             self.context.nats_manager
-        except AssertionError:
+        except AssertionError:  # pragma: no cover
             logger.warning(f"Nats manager not initialized. Cannot wait for indexing")
             return
         while True:
