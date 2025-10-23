@@ -127,6 +127,7 @@ async def get_schema_for_configuration_updates(
         headers={"account-id": x_nucliadb_account},
     )
 
+
 @api.get(
     path=f"/{KB_PREFIX}/{{kbid}}/generative_providers",
     status_code=200,
