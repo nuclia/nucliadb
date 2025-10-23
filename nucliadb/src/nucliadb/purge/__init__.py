@@ -19,6 +19,7 @@
 #
 import asyncio
 import importlib.metadata
+from itertools import batched  # type: ignore
 from typing import AsyncGenerator
 
 from nucliadb.common import datamanagers
@@ -233,7 +234,7 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
                     fields.extend((await resource.get_fields(force=True)).values())
 
             logger.info(f"Purging {len(fields)} fields for vectorset {vectorset}", extra={"kbid": kbid})
-            for fields_batch in batchify(fields, 20):
+            for fields_batch in batched(fields, n=20):
                 tasks = []
                 for field in fields_batch:
                     if purge_payload.storage_key_kind == VectorSetConfig.StorageKeyKind.UNSET:
@@ -317,9 +318,3 @@ def run() -> int:  # pragma: no cover
     setup_logging()
     errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
     return asyncio.run(main())
-
-
-def batchify(iterable, n=1):
-    """Yield successive n-sized chunks from iterable."""
-    for i in range(0, len(iterable), n):
-        yield iterable[i : i + n]

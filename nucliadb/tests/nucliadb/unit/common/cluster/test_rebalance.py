@@ -17,12 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from nucliadb.common import locking
 from nucliadb.common.cluster.rebalance import run
+from nucliadb.common.cluster.utils import wait_for_nidx
 
 
 async def test_run_handles_locked_rebalance():
@@ -34,3 +36,10 @@ async def test_run_handles_locked_rebalance():
         distributed_lock.side_effect = locking.ResourceLocked("other-key")
         with pytest.raises(locking.ResourceLocked):
             await run(context)
+
+
+async def test_wait_for_nidx():
+    nats_conn_manager = MagicMock()
+    with patch("nucliadb.common.cluster.utils.get_nats_consumer_pending_messages", return_value=20):
+        with pytest.raises(asyncio.TimeoutError):
+            await wait_for_nidx(nats_conn_manager, max_pending=5, max_wait_seconds=1)

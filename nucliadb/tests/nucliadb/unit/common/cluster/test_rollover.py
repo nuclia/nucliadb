@@ -169,6 +169,8 @@ def app_context(rollover_datamanager, resources_datamanager):
 
     consumer_info = MagicMock()
     consumer_info.delivered.stream_seq = 0
+    consumer_info.num_pending = 1
+    mock.nats_manager.js = AsyncMock()
     mock.nats_manager.js.consumer_info.return_value = consumer_info
     yield mock
 
