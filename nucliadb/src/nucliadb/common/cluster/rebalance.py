@@ -420,6 +420,8 @@ async def move_resource_to_shard(
     from_shard: writer_pb2.ShardObject,
     to_shard: writer_pb2.ShardObject,
 ) -> bool:
+    indexed_to_new = False
+    deleted_from_old = False
     try:
         async with (
             datamanagers.with_transaction() as txn,
@@ -441,7 +443,9 @@ async def move_resource_to_shard(
                 txn, kbid=kbid, rid=resource_id, shard=to_shard.shard
             )
             await index_resource_to_shard(context, kbid, resource_id, to_shard)
+            indexed_to_new = True
             await delete_resource_from_shard(context, kbid, resource_id, from_shard)
+            deleted_from_old = True
             await txn.commit()
             return True
     except Exception:
@@ -451,8 +455,10 @@ async def move_resource_to_shard(
         )
         # XXX Not ideal failure situation here. Try reverting the whole move even though it could be redundant
         try:
-            await index_resource_to_shard(context, kbid, resource_id, from_shard)
-            await delete_resource_from_shard(context, kbid, resource_id, to_shard)
+            if indexed_to_new:
+                await delete_resource_from_shard(context, kbid, resource_id, to_shard)
+            if deleted_from_old:
+                await index_resource_to_shard(context, kbid, resource_id, from_shard)
         except Exception:
             logger.exception(
                 "Failed to revert move resource. Hopefully you never see this message.",
