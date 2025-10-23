@@ -162,9 +162,9 @@ fn merge_indexes<DS: DataStore + 'static>(
 
     // Creating the hnsw for the new node store.
     let retriever = Retriever::new(&data_store, config, -1.0);
-    let mut ops = HnswOps::new(&retriever, false);
+    let mut builder = HnswBuilder::new(&retriever);
     for id in start_vector_index..merged_vectors_count {
-        ops.insert(VectorAddr(id), &mut index);
+        builder.insert(VectorAddr(id), &mut index);
     }
 
     let hnsw_path = segment_path.join(file_names::HNSW);
@@ -271,9 +271,9 @@ fn create_indexes<DS: DataStore + 'static>(
     // Creating the HNSW using the mmaped nodes
     let mut index = RAMHnsw::new();
     let retriever = Retriever::new(&data_store, config, -1.0);
-    let mut ops = HnswOps::new(&retriever, false);
+    let mut builder = HnswBuilder::new(&retriever);
     for id in 0..vector_count {
-        ops.insert(VectorAddr(id), &mut index)
+        builder.insert(VectorAddr(id), &mut index)
     }
 
     {
@@ -547,7 +547,7 @@ impl OpenSegment {
             self.brute_force_search(bitset, top_k, retriever, encoded_query, &raw_query)
         } else {
             method = "hnsw";
-            let ops = HnswOps::new(&retriever, true);
+            let ops = HnswSearcher::new(&retriever, true);
             let filter = NodeFilter::new(bitset, with_duplicates, config);
             let neighbours = ops.search(encoded_query, self.index.as_ref(), top_k, filter);
             Box::new(

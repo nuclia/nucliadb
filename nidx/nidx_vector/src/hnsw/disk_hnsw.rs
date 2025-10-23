@@ -46,8 +46,8 @@
 use std::collections::HashMap;
 use std::io;
 
-use super::ops_hnsw::{Hnsw, Layer};
 use super::ram_hnsw::{Edge, EntryPoint, RAMHnsw, RAMLayer};
+use super::search::{SearchableHnsw, SearchableLayer};
 use crate::VectorAddr;
 use crate::data_types::usize_utils::*;
 
@@ -66,7 +66,7 @@ pub struct DiskLayer<'a> {
     layer: usize,
 }
 
-impl<'a> Layer for &'a DiskLayer<'a> {
+impl<'a> SearchableLayer for &'a DiskLayer<'a> {
     type EdgeIt = EdgeIter<'a>;
     fn get_out_edges(&self, address: VectorAddr) -> Self::EdgeIt {
         let node = DiskHnsw::get_node(self.hnsw, address);
@@ -74,7 +74,7 @@ impl<'a> Layer for &'a DiskLayer<'a> {
     }
 }
 
-impl<'a> Layer for DiskLayer<'a> {
+impl<'a> SearchableLayer for DiskLayer<'a> {
     type EdgeIt = EdgeIter<'a>;
     fn get_out_edges(&self, address: VectorAddr) -> Self::EdgeIt {
         let node = DiskHnsw::get_node(self.hnsw, address);
@@ -82,7 +82,7 @@ impl<'a> Layer for DiskLayer<'a> {
     }
 }
 
-impl<'a> Hnsw for &'a [u8] {
+impl<'a> SearchableHnsw for &'a [u8] {
     type L = DiskLayer<'a>;
     fn get_entry_point(&self) -> Option<EntryPoint> {
         DiskHnsw::get_entry_point(self)
@@ -261,7 +261,7 @@ impl DiskHnsw {
 mod tests {
     use super::*;
     use crate::hnsw::ram_hnsw::RAMLayer;
-    fn layer_check<L: Layer>(buf: L, no_nodes: u32, cnx: &[Vec<(VectorAddr, Edge)>]) {
+    fn layer_check<L: SearchableLayer>(buf: L, no_nodes: u32, cnx: &[Vec<(VectorAddr, Edge)>]) {
         let no_cnx = vec![];
         for i in 0..no_nodes {
             let expected = cnx.get(i as usize).unwrap_or(&no_cnx);

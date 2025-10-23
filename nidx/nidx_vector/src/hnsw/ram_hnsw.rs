@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use ops_hnsw::{Hnsw, Layer};
 use rustc_hash::FxHashMap;
+use search::{SearchableHnsw, SearchableLayer};
 
 use crate::VectorAddr;
 
@@ -110,14 +110,14 @@ impl RAMHnsw {
     }
 }
 
-impl<'a> Layer for &'a RAMLayer {
+impl<'a> SearchableLayer for &'a RAMLayer {
     type EdgeIt = std::iter::Copied<std::slice::Iter<'a, (VectorAddr, Edge)>>;
     fn get_out_edges(&self, node: VectorAddr) -> Self::EdgeIt {
         self.out_edges(node)
     }
 }
 
-impl<'a> Hnsw for &'a RAMHnsw {
+impl<'a> SearchableHnsw for &'a RAMHnsw {
     type L = &'a RAMLayer;
     fn get_entry_point(&self) -> Option<EntryPoint> {
         self.entry_point

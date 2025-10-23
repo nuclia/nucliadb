@@ -19,24 +19,18 @@
 //
 
 use bit_set::BitSet;
-use ram_hnsw::*;
-use rand::distributions::Uniform;
-use rand::prelude::*;
-use rand::rngs::SmallRng;
 use rustc_hash::FxHashSet;
 use std::cmp::{Ordering, Reverse};
-use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
+use std::collections::{BinaryHeap, HashMap, VecDeque};
 use std::time::Instant;
 use tracing::trace;
 
 use crate::config::{VectorCardinality, VectorConfig};
 use crate::hnsw::params::EF_SEARCH;
+use crate::hnsw::ram_hnsw::{Edge, EntryPoint};
 use crate::inverted_index::FilterBitSet;
 use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr};
-
-use super::params;
-use super::*;
 
 /// Implementors of this trait can guide the hnsw search
 pub trait DataRetriever: std::marker::Sync {
@@ -59,14 +53,14 @@ pub enum SearchVector {
 }
 
 /// Implementors of this trait are layers of an HNSW where a nearest neighbour search can be ran.
-pub trait Layer {
+pub trait SearchableLayer {
     type EdgeIt: Iterator<Item = (VectorAddr, Edge)>;
     fn get_out_edges(&self, node: VectorAddr) -> Self::EdgeIt;
 }
 
 /// Implementors of this trait are an HNSW where search can be ran.
-pub trait Hnsw {
-    type L: Layer;
+pub trait SearchableHnsw {
+    type L: SearchableLayer;
     fn get_entry_point(&self) -> Option<EntryPoint>;
     fn get_layer(&self, i: usize) -> Self::L;
 }
@@ -183,65 +177,20 @@ impl<'a> NodeFilter<'a> {
     }
 }
 
-pub struct HnswOps<'a, DR> {
-    distribution: Uniform<f64>,
-    layer_rng: SmallRng,
+pub struct HnswSearcher<'a, DR> {
     retriever: &'a DR,
     preload_nodes: bool,
 }
 
-impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
-    fn select_neighbours_heuristic(
-        &self,
-        k_neighbours: usize,
-        candidates: Vec<(VectorAddr, Edge)>,
-        layer: &RAMLayer,
-    ) -> Vec<(VectorAddr, Edge)> {
-        let mut results = Vec::new();
-        let mut discarded = BinaryHeap::new();
-
-        // First, select the best candidates to link, trying to connect from all directions
-        // i.e: avoid linking to all nodes in a single cluster
-        for (x, sim) in candidates.into_iter() {
-            if results.len() == k_neighbours {
-                break;
-            }
-            // Keep if x is more similar to the new node than it is similar to other results
-            // i.e: similarity(x, new) > similarity(x, y) for all y in result
-            let check = results
-                .iter()
-                .map(|&(y, _)| {
-                    // Try to get the similarity from an existing graph edge, fallback to calculating it
-                    if let Some((_, edge)) = layer.get_out_edges(x).find(|&(z, _)| z == y) {
-                        edge
-                    } else {
-                        self.retriever.similarity(x, &SearchVector::Stored(y))
-                    }
-                })
-                .all(|inter_sim| sim > inter_sim);
-            if check {
-                results.push((x, sim));
-            } else {
-                discarded.push(Cnx(x, sim));
-            }
+impl<'a, DR: DataRetriever> HnswSearcher<'a, DR> {
+    pub fn new(retriever: &DR, preload_nodes: bool) -> HnswSearcher<'_, DR> {
+        HnswSearcher {
+            retriever,
+            preload_nodes,
         }
-
-        // keepPrunedConnections: keep some other connections to fill M
-        while results.len() < k_neighbours {
-            let Some(Cnx(n, d)) = discarded.pop() else {
-                return results;
-            };
-            results.push((n, d));
-        }
-
-        results
     }
-    fn get_random_layer(&mut self) -> usize {
-        let sample: f64 = self.layer_rng.sample(self.distribution);
-        let picked_level = -sample.ln() * params::level_factor();
-        picked_level.round() as usize
-    }
-    fn closest_up_nodes<L: Layer>(
+
+    fn closest_up_nodes<L: SearchableLayer>(
         &'a self,
         entry_points: Vec<VectorAddr>,
         query: &SearchVector,
@@ -297,7 +246,8 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
 
         results
     }
-    fn layer_search<L: Layer>(
+
+    pub fn layer_search<L: SearchableLayer>(
         &self,
         query: &SearchVector,
         layer: L,
@@ -361,69 +311,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             .map(|Reverse(CnxWithBound(n, d))| (n, d))
     }
 
-    fn layer_insert(
-        &self,
-        x: VectorAddr,
-        layer: &mut RAMLayer,
-        entry_points: &[VectorAddr],
-        mmax: usize,
-    ) -> Vec<VectorAddr> {
-        use params::*;
-        let search_neighbours = self
-            .layer_search::<&RAMLayer>(&SearchVector::Stored(x), layer, EF_CONSTRUCTION, entry_points)
-            .map(|(addr, score)| (addr, score.score))
-            .collect();
-        let neighbours = self.select_neighbours_heuristic(M, search_neighbours, layer);
-        let mut needs_repair = HashSet::new();
-        let mut result = Vec::with_capacity(neighbours.len());
-        layer.add_node(x);
-        for (y, dist) in neighbours.iter().copied() {
-            result.push(y);
-            layer.add_edge(x, dist, y);
-            layer.add_edge(y, dist, x);
-            if layer.no_out_edges(y) > mmax {
-                needs_repair.insert(y);
-            }
-        }
-        for crnt in needs_repair {
-            let edges = layer.take_out_edges(crnt);
-            let neighbours = self.select_neighbours_heuristic(params::prune_m(mmax), edges, layer);
-            neighbours
-                .into_iter()
-                .for_each(|(y, edge)| layer.add_edge(crnt, edge, y));
-        }
-        result
-    }
-    pub fn insert(&mut self, x: VectorAddr, hnsw: &mut RAMHnsw) {
-        match hnsw.entry_point {
-            None => {
-                let top_level = self.get_random_layer();
-                hnsw.increase_layers_with(x, top_level).update_entry_point();
-            }
-            Some(entry_point) => {
-                let level = self.get_random_layer();
-                hnsw.increase_layers_with(x, level);
-                let top_layer = std::cmp::max(entry_point.layer, level);
-                let mut eps = vec![entry_point.node];
-
-                for l in (0..=top_layer).rev() {
-                    if l > level {
-                        // Above insertion point, just search
-                        let new_ep = self
-                            .layer_search(&SearchVector::Stored(x), &hnsw.layers[l], 1, &eps)
-                            .next()
-                            .unwrap();
-                        eps[0] = new_ep.0;
-                    } else {
-                        eps = self.layer_insert(x, &mut hnsw.layers[l], &eps, params::m_max_for_layer(l));
-                    }
-                }
-                hnsw.update_entry_point();
-            }
-        }
-    }
-
-    pub fn search<H: Hnsw>(
+    pub fn search<H: SearchableHnsw>(
         &self,
         query: &SearchVector,
         hnsw: H,
@@ -503,15 +391,6 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         // order may be lost
         filtered_result.sort_by(|a, b| b.1.total_cmp(&a.1));
         filtered_result
-    }
-
-    pub fn new(retriever: &DR, preload_nodes: bool) -> HnswOps<'_, DR> {
-        HnswOps {
-            retriever,
-            distribution: Uniform::new(0.0, 1.0),
-            layer_rng: SmallRng::seed_from_u64(2),
-            preload_nodes,
-        }
     }
 }
 
