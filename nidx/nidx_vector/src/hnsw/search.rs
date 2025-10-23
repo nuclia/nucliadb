@@ -61,7 +61,7 @@ pub trait SearchableLayer {
 /// Implementors of this trait are an HNSW where search can be ran.
 pub trait SearchableHnsw {
     type L: SearchableLayer;
-    fn get_entry_point(&self) -> Option<EntryPoint>;
+    fn get_entry_point(&self) -> EntryPoint;
     fn get_layer(&self, i: usize) -> Self::L;
 }
 
@@ -322,10 +322,7 @@ impl<'a, DR: DataRetriever> HnswSearcher<'a, DR> {
             return Neighbours::with_capacity(0);
         }
 
-        let Some(entry_point) = hnsw.get_entry_point() else {
-            return Neighbours::default();
-        };
-
+        let entry_point = hnsw.get_entry_point();
         let mut crnt_layer = entry_point.layer;
         let mut entry_points = vec![entry_point.node];
 

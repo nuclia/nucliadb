@@ -163,6 +163,7 @@ fn merge_indexes<DS: DataStore + 'static>(
     // Creating the hnsw for the new node store.
     let retriever = Retriever::new(&data_store, config, -1.0);
     let mut builder = HnswBuilder::new(&retriever);
+    builder.initialize_graph(&mut index, start_vector_index, merged_vectors_count);
     for id in start_vector_index..merged_vectors_count {
         builder.insert(VectorAddr(id), &mut index);
     }
@@ -272,6 +273,7 @@ fn create_indexes<DS: DataStore + 'static>(
     let mut index = RAMHnsw::new();
     let retriever = Retriever::new(&data_store, config, -1.0);
     let mut builder = HnswBuilder::new(&retriever);
+    builder.initialize_graph(&mut index, 0, vector_count);
     for id in 0..vector_count {
         builder.insert(VectorAddr(id), &mut index)
     }

@@ -48,6 +48,18 @@ impl<'a, DR: DataRetriever> HnswBuilder<'a, DR> {
         }
     }
 
+    /// Initialize the graph holding the specified number of vectors
+    /// Each vector is assigned to a random amount of layers but no
+    /// edges are built yet. If the node is preinitialized, you can skip
+    /// an initial amount of nodes so they aren't recreated
+    pub fn initialize_graph(&mut self, hnsw: &mut RAMHnsw, skip_nodes: u32, total_nodes: u32) {
+        for node_id in skip_nodes..total_nodes {
+            let top_layer = self.get_random_layer();
+            hnsw.add_node(VectorAddr(node_id), top_layer);
+        }
+        hnsw.update_entry_point();
+    }
+
     fn select_neighbours_heuristic(
         &self,
         k_neighbours: usize,
@@ -100,22 +112,17 @@ impl<'a, DR: DataRetriever> HnswBuilder<'a, DR> {
         picked_level.round() as usize
     }
 
+    /// Insert a node into a layer, calculating all edges
     fn layer_insert(
         &self,
         x: VectorAddr,
         layer: &mut RAMLayer,
-        entry_points: &[VectorAddr],
+        search_neighbours: Vec<(VectorAddr, Edge)>,
         mmax: usize,
     ) -> Vec<VectorAddr> {
-        let search_neighbours = self
-            .searcher
-            .layer_search::<&RAMLayer>(&SearchVector::Stored(x), layer, params::EF_CONSTRUCTION, entry_points)
-            .map(|(addr, score)| (addr, score.score))
-            .collect();
         let neighbours = self.select_neighbours_heuristic(params::M, search_neighbours, layer);
         let mut needs_repair = HashSet::new();
         let mut result = Vec::with_capacity(neighbours.len());
-        layer.add_node(x);
         for (y, dist) in neighbours.iter().copied() {
             result.push(y);
             layer.add_edge(x, dist, y);
@@ -134,33 +141,55 @@ impl<'a, DR: DataRetriever> HnswBuilder<'a, DR> {
         result
     }
 
-    pub fn insert(&mut self, x: VectorAddr, hnsw: &mut RAMHnsw) {
-        match hnsw.entry_point {
-            None => {
-                let top_level = self.get_random_layer();
-                hnsw.increase_layers_with(x, top_level).update_entry_point();
-            }
-            Some(entry_point) => {
-                let level = self.get_random_layer();
-                hnsw.increase_layers_with(x, level);
-                let top_layer = std::cmp::max(entry_point.layer, level);
-                let mut eps = vec![entry_point.node];
+    /// Insert a node into all corresponding layers.
+    /// The node must be created first by calling initialize_graph()
+    pub fn insert(&mut self, node: VectorAddr, hnsw: &mut RAMHnsw) {
+        debug_assert!(!hnsw.layers.is_empty());
+        debug_assert!(node.0 < hnsw.layers[0].out.len() as u32);
 
-                for l in (0..=top_layer).rev() {
-                    if l > level {
-                        // Above insertion point, just search
-                        let new_ep = self
-                            .searcher
-                            .layer_search(&SearchVector::Stored(x), &hnsw.layers[l], 1, &eps)
-                            .next()
-                            .unwrap();
-                        eps[0] = new_ep.0;
-                    } else {
-                        eps = self.layer_insert(x, &mut hnsw.layers[l], &eps, params::m_max_for_layer(l));
-                    }
-                }
-                hnsw.update_entry_point();
+        let mut search_ep = vec![hnsw.entry_point.node];
+        let vector = SearchVector::Stored(node);
+
+        // The neighbours of the node at each layer, for insertion
+        let mut layer_neighbours = Vec::with_capacity(hnsw.no_layers());
+        let mut node_in_layer = false;
+
+        // First, find the neighbours for each layer the node appears in.
+        for l in (0..hnsw.no_layers()).rev() {
+            if !node_in_layer && (l == 0 || hnsw.layers[l].contains(&node)) {
+                node_in_layer = true;
             }
+
+            // On upper layers, find 1 neighbour (as entrypoint to next layer)
+            // On layers where the inserted node appears, find efC neighbours for creating links
+            let k_neighbours = if node_in_layer { params::EF_CONSTRUCTION } else { 1 };
+
+            let search_results: Vec<_> = self
+                .searcher
+                .layer_search(&vector, &hnsw.layers[l], k_neighbours, &search_ep)
+                .map(|x| (x.0, x.1.score))
+                .collect();
+
+            search_ep = search_results.iter().map(|x| x.0).collect();
+            if node_in_layer {
+                // If finding neighbours, store them for insertion later
+                layer_neighbours.push(search_results);
+            }
+        }
+
+        // Insert all neighbours from the bottom layer up. This is done so that it's not possible to
+        // find a node on a top layer before the edges are set on the lower layers because this can cause
+        // problems during parallel insertion.
+        // If edges are inserted from top to bottom, another worker might find the node in layer N and
+        // follow it down to layer N-1 where edges are not yet set. Then, it cannot find neighbours in this
+        // layer and the search gets stuck (no links to follow) resulting in a node with low connectivity.
+        for (layer, neighbours) in layer_neighbours.into_iter().rev().enumerate() {
+            self.layer_insert(
+                node,
+                &mut hnsw.layers[layer],
+                neighbours,
+                params::m_max_for_layer(layer),
+            );
         }
     }
 }

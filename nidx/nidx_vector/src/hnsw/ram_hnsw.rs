@@ -66,45 +66,48 @@ impl RAMLayer {
     pub fn first(&self) -> Option<VectorAddr> {
         self.out.keys().next().cloned()
     }
-    pub fn is_empty(&self) -> bool {
-        self.out.len() == 0
+    pub fn contains(&self, node: &VectorAddr) -> bool {
+        self.out.contains_key(node)
     }
 }
 
-#[derive(Default, Clone)]
 pub struct RAMHnsw {
-    pub entry_point: Option<EntryPoint>,
+    pub entry_point: EntryPoint,
     pub layers: Vec<RAMLayer>,
 }
 impl RAMHnsw {
     pub fn new() -> RAMHnsw {
-        Self::default()
-    }
-    pub fn increase_layers_with(&mut self, x: VectorAddr, level: usize) -> &mut Self {
-        while self.layers.len() <= level {
-            let mut new_layer = RAMLayer::new();
-            new_layer.add_node(x);
-            self.layers.push(new_layer);
+        Self {
+            entry_point: EntryPoint {
+                node: VectorAddr(0),
+                layer: 0,
+            },
+            layers: vec![],
         }
-        self
     }
-    pub fn remove_empty_layers(&mut self) -> &mut Self {
-        while self.layers.last().map(|l| l.is_empty()).unwrap_or_default() {
-            self.layers.pop();
+
+    /// Adds a node to the graph at all layers below the selected top layer
+    pub fn add_node(&mut self, node: VectorAddr, top_layer: usize) {
+        for _ in self.layers.len()..=top_layer {
+            self.layers.push(RAMLayer::new());
         }
-        self
+
+        for layer in 0..=top_layer {
+            self.layers[layer].add_node(node)
+        }
     }
-    pub fn update_entry_point(&mut self) -> &mut Self {
-        self.remove_empty_layers();
-        self.entry_point = self
-            .layers
-            .iter()
-            .enumerate()
-            .next_back()
-            .and_then(|(index, l)| l.first().map(|node| (node, index)))
-            .map(|(node, layer)| EntryPoint { node, layer });
-        self
+
+    /// Updates the entrypoint to point to the first node of the top layer
+    pub fn update_entry_point(&mut self) {
+        // Only update if the entrypoint is not already at the top layer
+        if self.layers.len() > self.entry_point.layer + 1 {
+            self.entry_point = EntryPoint {
+                node: self.layers.last().unwrap().first().unwrap(),
+                layer: self.layers.len() - 1,
+            }
+        }
     }
+
     pub fn no_layers(&self) -> usize {
         self.layers.len()
     }
@@ -119,7 +122,7 @@ impl<'a> SearchableLayer for &'a RAMLayer {
 
 impl<'a> SearchableHnsw for &'a RAMHnsw {
     type L = &'a RAMLayer;
-    fn get_entry_point(&self) -> Option<EntryPoint> {
+    fn get_entry_point(&self) -> EntryPoint {
         self.entry_point
     }
     fn get_layer(&self, i: usize) -> Self::L {
