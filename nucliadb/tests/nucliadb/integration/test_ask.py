@@ -1763,6 +1763,9 @@ async def test_ask_neighbouring_paragraphs_rag_strategy(
             "rag_strategies": [
                 {
                     "name": "hierarchy",
+                    # TODO: we are using this to test hierarchy.count too but we
+                    # should extract it to another test
+                    "count": 100,
                 },
                 {
                     "name": "neighbouring_paragraphs",
@@ -1781,7 +1784,7 @@ async def test_ask_neighbouring_paragraphs_rag_strategy(
     # The retrieved paragraph is the one with the hierarchy information
     assert (
         prompt_context[0]
-        == "DOCUMENT: My resource \n SUMMARY:  \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n Nuria used be friends with Mario."
+        == "DOCUMENT: My resource \n SUMMARY:  \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n Nuria used be friends with Mario.\nWe all know each other now."
     )
     assert prompt_context[1] == "Mario is my older brother."
     assert prompt_context[2] == "We all know each other now."
