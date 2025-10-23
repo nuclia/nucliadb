@@ -24,7 +24,7 @@ from uuid import uuid4
 
 from grpc import StatusCode
 from grpc.aio import AioRpcError
-from nidx_protos import noderesources_pb2
+from nidx_protos import nidx_pb2, noderesources_pb2
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardNotFound
@@ -108,6 +108,7 @@ class KnowledgeBox:
         external_index_provider: CreateExternalIndexProviderMetadata = CreateExternalIndexProviderMetadata(),
         hidden_resources_enabled: bool = False,
         hidden_resources_hide_on_creation: bool = False,
+        prewarm_enabled: bool = False,
     ) -> tuple[str, str]:
         """Creates a new knowledge box and return its id and slug."""
 
@@ -194,6 +195,7 @@ class KnowledgeBox:
                     migration_version=get_latest_version(),
                     hidden_resources_enabled=hidden_resources_enabled,
                     hidden_resources_hide_on_creation=hidden_resources_hide_on_creation,
+                    prewarm_enabled=prewarm_enabled,
                 )
                 config.external_index_provider.CopyFrom(stored_external_index_provider)
                 await datamanagers.kb.set_config(txn, kbid=kbid, config=config)
@@ -220,7 +222,7 @@ class KnowledgeBox:
                 shard_manager = get_shard_manager()
                 # XXX creating a shard is a slow IO operation that requires a write
                 # txn to be open!
-                await shard_manager.create_shard_by_kbid(txn, kbid)
+                await shard_manager.create_shard_by_kbid(txn, kbid, prewarm_enabled=prewarm_enabled)
                 # shards don't need a rollback as they will be eventually purged
 
                 await txn.commit()
@@ -243,39 +245,86 @@ class KnowledgeBox:
     @classmethod
     async def update(
         cls,
-        txn: Transaction,
-        uuid: str,
+        driver: Driver,
+        kbid: str,
+        *,
         slug: Optional[str] = None,
-        config: Optional[KnowledgeBoxConfig] = None,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        migration_version: Optional[int] = None,
+        external_index_provider: Optional[StoredExternalIndexProviderMetadata] = None,
+        hidden_resources_enabled: Optional[bool] = None,
+        hidden_resources_hide_on_creation: Optional[bool] = None,
+        prewarm_enabled: Optional[bool] = None,
     ) -> str:
-        exist = await datamanagers.kb.get_config(txn, kbid=uuid, for_update=True)
-        if not exist:
-            raise datamanagers.exceptions.KnowledgeBoxNotFound()
+        async with driver.rw_transaction() as txn:
+            stored = await datamanagers.kb.get_config(txn, kbid=kbid, for_update=True)
+            if not stored:
+                raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
-        if slug:
-            await txn.delete(datamanagers.kb.KB_SLUGS.format(slug=exist.slug))
-            await txn.set(
-                datamanagers.kb.KB_SLUGS.format(slug=slug),
-                uuid.encode(),
-            )
-            if config:
-                config.slug = slug
-            else:
-                exist.slug = slug
+            if slug:
+                await txn.delete(datamanagers.kb.KB_SLUGS.format(slug=stored.slug))
+                await txn.set(
+                    datamanagers.kb.KB_SLUGS.format(slug=slug),
+                    kbid.encode(),
+                )
+                stored.slug = slug
 
-        if config and exist != config:
-            exist.MergeFrom(config)
-            exist.hidden_resources_enabled = config.hidden_resources_enabled
-            exist.hidden_resources_hide_on_creation = config.hidden_resources_hide_on_creation
+            if title is not None:
+                stored.title = title
+            if description is not None:
+                stored.description = description
 
-        if exist.hidden_resources_hide_on_creation and not exist.hidden_resources_enabled:
-            raise KnowledgeBoxCreationError(
-                "Cannot hide new resources if the hidden resources feature is disabled"
-            )
+            if migration_version is not None:
+                stored.migration_version = migration_version
 
-        await datamanagers.kb.set_config(txn, kbid=uuid, config=exist)
+            if external_index_provider is not None:
+                stored.external_index_provider.MergeFrom(external_index_provider)
 
-        return uuid
+            if hidden_resources_enabled is not None:
+                stored.hidden_resources_enabled = hidden_resources_enabled
+            if hidden_resources_hide_on_creation is not None:
+                stored.hidden_resources_hide_on_creation = hidden_resources_hide_on_creation
+
+            update_nidx_prewarm = None
+            if prewarm_enabled is not None:
+                if stored.prewarm_enabled != prewarm_enabled:
+                    update_nidx_prewarm = prewarm_enabled
+                stored.prewarm_enabled = prewarm_enabled
+
+            if stored.hidden_resources_hide_on_creation and not stored.hidden_resources_enabled:
+                raise KnowledgeBoxCreationError(
+                    "Cannot hide new resources if the hidden resources feature is disabled"
+                )
+
+            await datamanagers.kb.set_config(txn, kbid=kbid, config=stored)
+
+            await txn.commit()
+
+        if update_nidx_prewarm is not None:
+            await cls.configure_shards(driver, kbid, prewarm=update_nidx_prewarm)
+
+        return kbid
+
+    @classmethod
+    async def configure_shards(cls, driver: Driver, kbid: str, *, prewarm: bool):
+        shards_obj = await datamanagers.atomic.cluster.get_kb_shards(kbid=kbid)
+        if shards_obj is None:
+            logger.warning(f"Shards not found for KB while updating pre-warm flag", extra={"kbid": kbid})
+            return
+
+        nidx_shard_ids = [shard.nidx_shard_id for shard in shards_obj.shards]
+
+        nidx_api = get_nidx_api_client()
+        if nidx_api is not None and len(nidx_shard_ids) > 0:
+            configs = [
+                nidx_pb2.ShardConfig(
+                    shard_id=shard_id,
+                    prewarm_enabled=prewarm,
+                )
+                for shard_id in nidx_shard_ids
+            ]
+            await nidx_api.ConfigureShards(nidx_pb2.ShardsConfig(configs=configs))
 
     @classmethod
     async def delete(cls, driver: Driver, kbid: str):

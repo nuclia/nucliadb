@@ -457,7 +457,11 @@ class Processor:
             shard = await self.index_node_shard_manager.get_current_active_shard(txn, kbid)
             if shard is None:
                 # No current shard available, create a new one
-                shard = await self.index_node_shard_manager.create_shard_by_kbid(txn, kbid)
+                kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
+                prewarm = kb_config is not None and kb_config.prewarm_enabled
+                shard = await self.index_node_shard_manager.create_shard_by_kbid(
+                    txn, kbid, prewarm_enabled=prewarm
+                )
             await datamanagers.resources.set_resource_shard_id(
                 txn, kbid=kbid, rid=uuid, shard=shard.shard
             )

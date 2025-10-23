@@ -23,8 +23,6 @@ use std::io::Write;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::errors::NidxError;
-use crate::metadata::{Index, IndexId, IndexKind, Shard};
 use axum::body::{Body, Bytes};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -41,6 +39,8 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::api::shards;
+use crate::errors::NidxError;
+use crate::metadata::{Index, IndexId, IndexKind, Shard};
 use crate::{NidxMetadata, Settings, import_export};
 
 #[derive(Clone)]
@@ -137,6 +137,10 @@ impl NidxApi for ApiServer {
         Ok(Response::new(ShardIds {
             ids: ids.iter().map(|x| ShardId { id: x.to_string() }).collect(),
         }))
+    }
+
+    async fn configure_shards(&self, _request: Request<ShardsConfig>) -> Result<Response<EmptyQuery>> {
+        Ok(Response::new(EmptyQuery {}))
     }
 
     async fn add_vector_set(&self, request: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>> {

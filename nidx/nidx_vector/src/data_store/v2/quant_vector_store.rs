@@ -19,7 +19,7 @@
 //
 
 use lazy_static::lazy_static;
-use memmap2::Mmap;
+use memmap2::{Mmap, MmapOptions};
 use std::{
     fs::File,
     io::{BufWriter, Write as _},
@@ -41,13 +41,17 @@ pub struct QuantVectorStore {
 
 impl QuantVectorStore {
     pub fn open(path: &Path, vector_len_bytes: usize, reason: &OpenReason) -> std::io::Result<Self> {
-        let data = unsafe { Mmap::map(&File::open(path.join(FILENAME))?)? };
+        let mut options = MmapOptions::new();
+        if matches!(reason, OpenReason::Search { prewarm: true }) {
+            options.populate();
+        }
+        let data = unsafe { options.map(&File::open(path.join(FILENAME))?)? };
 
         #[cfg(not(target_os = "windows"))]
         {
             let advice = match reason {
                 OpenReason::Create => memmap2::Advice::Sequential,
-                OpenReason::Search => memmap2::Advice::Random,
+                OpenReason::Search { .. } => memmap2::Advice::Random,
             };
             data.advise(advice)?;
         }

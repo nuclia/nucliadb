@@ -23,8 +23,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from nidx_protos import nodereader_pb2
+from pytest_mock import MockerFixture
 
 from nucliadb.common.cluster.settings import settings
+from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.consumer import shard_creator
 from nucliadb_protos.writer_pb2 import Notification, ShardObject, Shards
 
@@ -37,11 +39,6 @@ def pubsub():
 
 
 @pytest.fixture()
-def reader():
-    yield AsyncMock()
-
-
-@pytest.fixture()
 def kbdm():
     mock = MagicMock()
     mock.get_model_metadata = AsyncMock(return_value="model")
@@ -50,7 +47,7 @@ def kbdm():
 
 
 @pytest.fixture()
-def shard_manager(dummy_nidx_utility, reader):
+def shard_manager(dummy_nidx_utility: NidxUtility):
     sm = MagicMock()
     shards = Shards(shards=[ShardObject(read_only=False)], actual=0)
     sm.get_current_active_shard = AsyncMock(return_value=shards.shards[0])
@@ -70,7 +67,6 @@ async def shard_creator_handler(pubsub, shard_manager):
     txn = MagicMock(return_value=AsyncMock())
     sc = shard_creator.ShardCreatorHandler(
         driver=AsyncMock(ro_transaction=txn, rw_transaction=txn),
-        storage=AsyncMock(),
         pubsub=pubsub,
         check_delay=0.05,
     )
@@ -81,14 +77,15 @@ async def shard_creator_handler(pubsub, shard_manager):
 
 async def test_handle_message_create_new_shard(
     shard_creator_handler: shard_creator.ShardCreatorHandler,
-    reader,
     kbdm,
     shard_manager,
-    dummy_nidx_utility,
+    dummy_nidx_utility: NidxUtility,
+    mocker: MockerFixture,
 ):
     dummy_nidx_utility.api_client.GetShard.return_value = nodereader_pb2.Shard(
         paragraphs=settings.max_shard_paragraphs + 1
     )
+    spy = mocker.spy(shard_creator, "should_create_new_shard")
 
     notif = Notification(
         kbid="kbid",
@@ -96,13 +93,18 @@ async def test_handle_message_create_new_shard(
     )
     await shard_creator_handler.handle_message(notif.SerializeToString())
     await asyncio.sleep(0.06)
-    shard_manager.maybe_create_new_shard.assert_called_with("kbid", settings.max_shard_paragraphs + 1)
+
+    spy.assert_called_with(settings.max_shard_paragraphs + 1)
 
 
 async def test_handle_message_do_not_create(
-    shard_creator_handler: shard_creator.ShardCreatorHandler, reader, shard_manager
+    shard_creator_handler: shard_creator.ShardCreatorHandler,
+    dummy_nidx_utility: NidxUtility,
+    shard_manager,
 ):
-    reader.GetShard.return_value = nodereader_pb2.Shard(paragraphs=settings.max_shard_paragraphs - 1)
+    dummy_nidx_utility.api_client.GetShard.return_value = nodereader_pb2.Shard(
+        paragraphs=settings.max_shard_paragraphs - 1
+    )
 
     notif = Notification(
         kbid="kbid",

@@ -23,21 +23,8 @@ import pytest
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.settings import settings
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import writer_pb2
-
-
-def test_should_create_new_shard():
-    sm = manager.KBShardManager()
-    low_para_counter = {
-        "num_paragraphs": settings.max_shard_paragraphs - 1,
-    }
-    high_para_counter = {
-        "num_paragraphs": settings.max_shard_paragraphs + 1,
-    }
-    assert sm.should_create_new_shard(**low_para_counter) is False
-    assert sm.should_create_new_shard(**high_para_counter) is True
 
 
 async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
@@ -61,7 +48,7 @@ async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
     )
 
     # create first shard
-    await sm.create_shard_by_kbid(txn, kbid)
+    await sm.create_shard_by_kbid(txn, kbid, prewarm_enabled=False)
 
     shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     assert shards is not None
@@ -71,7 +58,7 @@ async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
     assert shards.actual == 0
 
     # adding a second shard will mark the first as read only
-    await sm.create_shard_by_kbid(txn, kbid)
+    await sm.create_shard_by_kbid(txn, kbid, prewarm_enabled=False)
 
     shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     assert shards is not None
@@ -82,7 +69,7 @@ async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
     assert shards.actual == 1
 
     # adding a third one will be equivalent
-    await sm.create_shard_by_kbid(txn, kbid)
+    await sm.create_shard_by_kbid(txn, kbid, prewarm_enabled=False)
 
     shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
     assert shards is not None
