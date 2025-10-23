@@ -187,9 +187,10 @@ class Rebalancer:
             },
         )
 
-        # First off, calculate if the excess fits in the other shards or we need to add a new shard
+        # First off, calculate if the excess fits in the other shards or we need to add a new shard.
+        # Note that we don't filter out the active shard on purpose.
         excess = shard_to_split.paragraphs - settings.max_shard_paragraphs
-        other_shards = [s for s in shards if s.id != shard_to_split.id and not s.active]
+        other_shards = [s for s in shards if s.id != shard_to_split.id]
         other_shards_capacity = sum(
             [max(0, (settings.max_shard_paragraphs - s.paragraphs)) for s in other_shards]
         )
@@ -227,7 +228,7 @@ class Rebalancer:
                 )
                 break
 
-            target_shard, target_apacity = get_target_shard(shards, shard_to_split)
+            target_shard, target_capacity = get_target_shard(shards, shard_to_split, skip_active=False)
             if target_shard is None:
                 logger.warning("No target shard found for splitting", extra={"kbid": self.kbid})
                 break
@@ -235,7 +236,7 @@ class Rebalancer:
             moved_paragraphs = await self.move_paragraphs(
                 from_shard=shard_to_split,
                 to_shard=target_shard,
-                max_paragraphs=min(excess, target_apacity),
+                max_paragraphs=min(excess, target_capacity),
             )
 
             # Update shard paragraph counts
@@ -277,7 +278,7 @@ class Rebalancer:
                 },
             )
 
-            target_shard, target_capacity = get_target_shard(shards, shard_to_merge)
+            target_shard, target_capacity = get_target_shard(shards, shard_to_merge, skip_active=True)
             if target_shard is None:
                 logger.warning(
                     "No target shard could be found for merging. Moving on",
@@ -367,11 +368,10 @@ async def get_resource_paragraphs_count(resource_id: str, nidx_shard_id: str) ->
 
 
 def get_target_shard(
-    shards: list[RebalanceShard], rebalanced_shard: RebalanceShard
+    shards: list[RebalanceShard], rebalanced_shard: RebalanceShard, skip_active: bool = True
 ) -> tuple[Optional[RebalanceShard], int]:
     """
     Return the biggest shard with capacity (< 90% of the max paragraphs per shard).
-    Active shards are excluded to avoid problems with concurrent ingestion of new resources on the kb.
     """
     target_shard = next(
         reversed(
@@ -380,7 +380,7 @@ def get_target_shard(
                 for s in shards
                 if s.id != rebalanced_shard.id
                 and s.paragraphs < settings.max_shard_paragraphs * 0.9
-                and not s.active
+                and (not skip_active or (skip_active and not s.active))
             ]
         ),
         None,
