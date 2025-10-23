@@ -413,6 +413,11 @@ message NewKnowledgeBoxV2Request {
     knowledgebox.CreateExternalIndexProviderMetadata external_index_provider = 6;
     bool hidden_resources_enabled = 7;
     bool hidden_resources_hide_on_creation = 8;
+
+    // whether to enable prewarm of data for faster search or not. Activating
+    // this flag allow faster searches (with less cold start) but it is
+    // expensive on the infrastructure
+    bool prewarm_enabled = 9;
 }
 
 message NewKnowledgeBoxV2Response {

@@ -31,7 +31,7 @@ use v2::StoredParagraph;
 use crate::{ParagraphAddr, VectorAddr, vector_types::rabitq};
 
 pub enum OpenReason {
-    Search,
+    Search { prewarm: bool },
     Create,
 }
 

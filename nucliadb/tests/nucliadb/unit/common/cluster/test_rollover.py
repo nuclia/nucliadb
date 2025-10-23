@@ -24,7 +24,7 @@ import pytest
 
 from nucliadb.common.cluster import rollover
 from nucliadb.common.datamanagers.rollover import RolloverState
-from nucliadb_protos import writer_pb2
+from nucliadb_protos import knowledgebox_pb2, writer_pb2
 
 
 @pytest.fixture()
@@ -149,6 +149,10 @@ def rollover_datamanager(resource_ids, cluster_datamanager):
         patch(
             "nucliadb.common.cluster.rollover.datamanagers.vectorsets.iter",
             return_value=async_iterable([]),
+        ),
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.atomic.kb.get_config",
+            return_value=knowledgebox_pb2.KnowledgeBoxConfig(),
         ),
     ):
         yield mock

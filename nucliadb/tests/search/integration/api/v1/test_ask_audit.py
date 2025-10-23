@@ -25,6 +25,7 @@ from nats.js import JetStreamContext
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_protos.audit_pb2 import AuditRequest
+from nucliadb_utils.settings import audit_settings
 
 
 async def get_audit_messages(sub):
@@ -37,8 +38,6 @@ async def get_audit_messages(sub):
 async def test_ask_sends_only_one_audit(
     cluster_nucliadb_search: AsyncClient, test_search_resource: str, stream_audit
 ) -> None:
-    from nucliadb_utils.settings import audit_settings
-
     kbid = test_search_resource
 
     # Prepare a test audit stream to receive our messages
