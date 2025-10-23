@@ -1239,6 +1239,7 @@ class HierarchyResourceStrategy(RagStrategy):
         title="Count",
         description="Number of extra characters that are added to each matching paragraph when adding to the context.",
         ge=0,
+        le=500,
     )
 
 
