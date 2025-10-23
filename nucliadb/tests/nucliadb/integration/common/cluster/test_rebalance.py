@@ -75,7 +75,7 @@ async def test_rebalance_splits_kb_shards(
         # Make sure that the paragraphs are properly balanced across shards
         shards_to_resources = await build_shard_resources_index(standalone_knowledgebox)
         assert len(shards_to_resources) == 2
-        assert {len(resources) for resources in shards_to_resources.values()} == {7, 3}
+        assert {len(resources) for resources in shards_to_resources.values()} == {8, 2}
 
 
 @pytest.mark.deploy_modes("standalone")
