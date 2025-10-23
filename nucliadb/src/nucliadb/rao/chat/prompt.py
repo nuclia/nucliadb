@@ -37,7 +37,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.rao.rpc import hydrate
 from nucliadb.search import logger
 from nucliadb.search.search import cache
-from nucliadb.search.search.hydrator import hydrate_field_text, hydrate_resource_text
+from nucliadb.search.search.hydrator import hydrate_field_text
 from nucliadb.search.search.hydrator.images import (
     download_paragraph_source_image,
     download_thumbnail_image,
@@ -47,10 +47,14 @@ from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.paragraphs import get_paragraph_text
 from nucliadb_models.hydration import (
     FieldHydration,
+    FileFieldHydration,
+    GenericFieldHydration,
     Hydration,
+    LinkFieldHydration,
     NeighbourParagraphHydration,
     ParagraphHydration,
     RelatedParagraphHydration,
+    TextFieldHydration,
 )
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.metadata import Extra, Origin
@@ -318,33 +322,60 @@ async def full_resource_prompt_context(
                 if not skip:
                     ordered_resources.append(resource_uuid)
 
-    # For each resource, collect the extracted text from all its fields.
-    resources_extracted_texts = await run_concurrently(
-        [
-            hydrate_resource_text(kbid, resource_uuid, max_concurrent_tasks=MAX_RESOURCE_FIELD_TASKS)
-            for resource_uuid in ordered_resources[: strategy.count]
-        ],
-        max_concurrent=MAX_RESOURCE_TASKS,
-    )
-    added_fields = set()
-    for resource_extracted_texts in resources_extracted_texts:
-        if resource_extracted_texts is None:
-            continue
-        for field, extracted_text in resource_extracted_texts:
-            # First off, remove the text block ids from paragraphs that belong to
-            # the same field, as otherwise the context will be duplicated.
-            for tb_id in context.text_block_ids():
-                if tb_id.startswith(field.full()):
-                    del context[tb_id]
-            # Add the extracted text of each field to the context.
-            context[field.full()] = extracted_text
-            augmented_context.fields[field.full()] = AugmentedTextBlock(
-                id=field.full(),
-                text=extracted_text,
-                augmentation_type=TextBlockAugmentationType.FULL_RESOURCE,
-            )
+    # adjust the number of resources to the user limit
+    ordered_resources = ordered_resources[: strategy.count]
 
-            added_fields.add(field.full())
+    hydration = Hydration(
+        resource=None,
+        field=FieldHydration(
+            text=TextFieldHydration(extracted_text=True),
+            file=FileFieldHydration(extracted_text=True),
+            link=LinkFieldHydration(extracted_text=True),
+            # TODO: extracted text is not implemented for conversation fields in
+            # the Hydration API, we should do that
+            conversation=None,
+            generic=GenericFieldHydration(extracted_text=True),
+        ),
+        paragraph=ParagraphHydration(text=False, image=None, table=None, page=None, related=None),
+    )
+    hydrated = await hydrate(
+        kbid,
+        hydration,
+        [
+            # REVIEW: use a placeholder as we haven't implemented yet a list of
+            # resource ids in the Hydration API
+            ParagraphId(
+                FieldId(rid=rid, type="z", key="placeholder"),
+                paragraph_start=0,
+                paragraph_end=0,
+            ).full()
+            for rid in ordered_resources
+        ],
+    )
+
+    added_fields = set()
+    for hydrated_field in hydrated.fields.values():
+        if hydrated_field.extracted is None or not hydrated_field.extracted.text:
+            continue
+
+        field_id = hydrated_field.id
+        extracted_text = hydrated_field.extracted.text
+
+        # First off, remove the text block ids from paragraphs that belong to
+        # the same field, as otherwise the context will be duplicated.
+        for tb_id in context.text_block_ids():
+            if tb_id.startswith(field_id):
+                del context[tb_id]
+
+        # Add the extracted text of each field to the context.
+        context[field_id] = extracted_text
+        augmented_context.fields[field_id] = AugmentedTextBlock(
+            id=field_id,
+            text=extracted_text,
+            augmentation_type=TextBlockAugmentationType.FULL_RESOURCE,
+        )
+
+        added_fields.add(field_id)
 
     metrics.set("full_resource_ops", len(added_fields))
 
