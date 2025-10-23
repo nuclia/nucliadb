@@ -27,8 +27,6 @@ use crate::VectorAddr;
 
 use super::*;
 
-const NO_EDGES: [(VectorAddr, Edge); 0] = [];
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EntryPoint {
     pub node: VectorAddr,
@@ -58,6 +56,15 @@ impl RAMLayer {
     pub fn no_out_edges(&self, node: &VectorAddr) -> usize {
         // TODO: Why is this called for non-existing nodes???
         self.out.get(node).map(|n| n.read().unwrap().len()).unwrap_or(0)
+    }
+
+    /// Remove any links that point to a node which is not in this layer
+    /// See RAMHnsw.fix_broken_links for details
+    fn fix_broken_links(&self) {
+        for edges in self.out.values() {
+            let mut edges = edges.write().unwrap();
+            edges.retain(|e| self.out.contains_key(&e.0));
+        }
     }
 }
 
@@ -101,6 +108,16 @@ impl RAMHnsw {
     pub fn no_layers(&self) -> usize {
         self.layers.len()
     }
+
+    /// Remove any links that point to a node which is not in this layer
+    /// A bug in a previous version of this program could cause a node in layer N
+    /// to link to a node in layer N-1. This breaks navigation accross layer N.
+    /// This function will delete any such link from the graph.
+    pub fn fix_broken_links(&self) {
+        for l in &self.layers[1..] {
+            l.fix_broken_links();
+        }
+    }
 }
 
 struct EdgesIterator<'a>(RwLockReadGuard<'a, Vec<(VectorAddr, Edge)>>, usize);
@@ -133,5 +150,33 @@ impl<'a> SearchableHnsw for &'a RAMHnsw {
     }
     fn get_layer(&self, i: usize) -> Self::L {
         &self.layers[i]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fix_broken_links() {
+        // Create a minimal broken graph
+        let layer0 = RAMLayer {
+            out: [
+                (VectorAddr(0), RwLock::new(vec![(VectorAddr(1), 0.5)])),
+                (VectorAddr(1), RwLock::new(vec![(VectorAddr(0), 0.5)])),
+            ]
+            .into_iter()
+            .collect(),
+        };
+        let layer1 = RAMLayer {
+            out: [(VectorAddr(0), RwLock::new(vec![(VectorAddr(1), 0.5)]))]
+                .into_iter()
+                .collect(),
+        };
+        let mut graph = RAMHnsw::new();
+        graph.layers.push(layer0);
+        graph.layers.push(layer1);
+        graph.fix_broken_links();
+        assert!(graph.layers[1].out[&VectorAddr(0)].read().unwrap().is_empty());
     }
 }

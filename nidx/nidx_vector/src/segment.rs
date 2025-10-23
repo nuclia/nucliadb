@@ -158,6 +158,7 @@ fn merge_indexes<DS: DataStore + 'static>(
         // If there are no deletions, we can reuse the first segment
         // HNSW since its indexes will match the the ones in data_store
         index = DiskHnsw::deserialize(&operants[0].index);
+        index.fix_broken_links();
         start_vector_index = operants[0].data_store.stored_vector_count();
     }
     let merged_vectors_count = data_store.stored_vector_count();
@@ -167,7 +168,7 @@ fn merge_indexes<DS: DataStore + 'static>(
     let mut builder = HnswBuilder::new(&retriever);
     builder.initialize_graph(&mut index, start_vector_index, merged_vectors_count);
     (start_vector_index..merged_vectors_count)
-        .into_iter()
+        .into_par_iter()
         .for_each(|id| builder.insert(VectorAddr(id), &index));
 
     let hnsw_path = segment_path.join(file_names::HNSW);

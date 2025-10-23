@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::BinaryHeap;
 
 use rand::{Rng, SeedableRng, distributions::Uniform, rngs::SmallRng};
 
@@ -27,7 +27,6 @@ use crate::{
     hnsw::{
         Cnx, DataRetriever, HnswSearcher, RAMHnsw, SearchVector, params,
         ram_hnsw::{Edge, RAMLayer},
-        search::SearchableLayer,
     },
 };
 
