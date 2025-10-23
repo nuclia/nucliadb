@@ -124,7 +124,7 @@ impl DiskHnsw {
         let mut length = offset;
         let mut indexing = HashMap::new();
         for layer in 0..hnsw.no_layers() {
-            let no_edges = hnsw.get_layer(layer).no_out_edges(node);
+            let no_edges = hnsw.get_layer(layer).no_out_edges(&node);
             indexing.insert(layer, length);
             buf.write_all(&no_edges.to_le_bytes())?;
             length += USIZE_LEN;
@@ -233,7 +233,12 @@ impl DiskHnsw {
                 let cnx_end = cnx_start + number_edges * CNX_LEN;
 
                 if number_edges > 0 {
-                    let ram_edges = ram.layers[layer_index].out.entry(VectorAddr(node_index)).or_default();
+                    let mut ram_edges = ram.layers[layer_index]
+                        .out
+                        .entry(VectorAddr(node_index))
+                        .or_default()
+                        .write()
+                        .unwrap();
                     let edges = EdgeIter {
                         crnt: 0,
                         buf: &hnsw[cnx_start..cnx_end],
@@ -261,6 +266,8 @@ impl DiskHnsw {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::RwLock;
+
     use super::*;
     use crate::hnsw::ram_hnsw::RAMLayer;
     fn layer_check<L: SearchableLayer>(buf: L, no_nodes: u32, cnx: &[Vec<(VectorAddr, Edge)>]) {
@@ -291,7 +298,7 @@ mod tests {
             out: cnx0
                 .iter()
                 .enumerate()
-                .map(|(i, c)| (VectorAddr(i as u32), c.clone()))
+                .map(|(i, c)| (VectorAddr(i as u32), RwLock::new(c.clone())))
                 .collect(),
         };
         let cnx1 = vec![vec![(VectorAddr(1), 4.0)], vec![(VectorAddr(2), 5.0)]];
@@ -299,7 +306,7 @@ mod tests {
             out: cnx1
                 .iter()
                 .enumerate()
-                .map(|(i, c)| (VectorAddr(i as u32), c.clone()))
+                .map(|(i, c)| (VectorAddr(i as u32), RwLock::new(c.clone())))
                 .collect(),
         };
         let cnx2 = vec![vec![(VectorAddr(1), 6.0)]];
@@ -307,7 +314,7 @@ mod tests {
             out: cnx2
                 .iter()
                 .enumerate()
-                .map(|(i, c)| (VectorAddr(i as u32), c.clone()))
+                .map(|(i, c)| (VectorAddr(i as u32), RwLock::new(c.clone())))
                 .collect(),
         };
         let entry_point = EntryPoint {
@@ -341,7 +348,7 @@ mod tests {
             out: cnx0
                 .iter()
                 .enumerate()
-                .map(|(i, c)| (VectorAddr(i as u32), c.clone()))
+                .map(|(i, c)| (VectorAddr(i as u32), RwLock::new(c.clone())))
                 .collect(),
         };
         let cnx1 = [vec![(VectorAddr(1), 4.0)], vec![(VectorAddr(2), 5.0)]];
@@ -349,7 +356,7 @@ mod tests {
             out: cnx1
                 .iter()
                 .enumerate()
-                .map(|(i, c)| (VectorAddr(i as u32), c.clone()))
+                .map(|(i, c)| (VectorAddr(i as u32), RwLock::new(c.clone())))
                 .collect(),
         };
         let cnx2 = [vec![(VectorAddr(1), 6.0)]];
@@ -357,7 +364,7 @@ mod tests {
             out: cnx2
                 .iter()
                 .enumerate()
-                .map(|(i, c)| (VectorAddr(i as u32), c.clone()))
+                .map(|(i, c)| (VectorAddr(i as u32), RwLock::new(c.clone())))
                 .collect(),
         };
         let entry_point = EntryPoint {

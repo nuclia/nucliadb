@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::sync::{RwLock, RwLockReadGuard};
+
 use rustc_hash::FxHashMap;
 use search::{SearchableHnsw, SearchableLayer};
 
@@ -35,39 +37,27 @@ pub struct EntryPoint {
 
 pub type Edge = f32;
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct RAMLayer {
-    pub out: FxHashMap<VectorAddr, Vec<(VectorAddr, Edge)>>,
+    pub(super) out: FxHashMap<VectorAddr, RwLock<Vec<(VectorAddr, Edge)>>>,
 }
 
 impl RAMLayer {
-    fn out_edges(&self, node: VectorAddr) -> std::iter::Copied<std::slice::Iter<'_, (VectorAddr, Edge)>> {
-        self.out
-            .get(&node)
-            .map_or_else(|| NO_EDGES.iter().copied(), |out| out.iter().copied())
-    }
     pub fn new() -> RAMLayer {
         RAMLayer::default()
     }
+
     pub fn add_node(&mut self, node: VectorAddr) {
         self.out.entry(node).or_default();
     }
-    pub fn add_edge(&mut self, from: VectorAddr, edge: Edge, to: VectorAddr) {
-        if let Some(edges) = self.out.get_mut(&from) {
-            edges.push((to, edge))
-        }
-    }
-    pub fn take_out_edges(&mut self, x: VectorAddr) -> Vec<(VectorAddr, Edge)> {
-        self.out.get_mut(&x).map(std::mem::take).unwrap_or_default()
-    }
-    pub fn no_out_edges(&self, node: VectorAddr) -> usize {
-        self.out.get(&node).map_or(0, |v| v.len())
-    }
-    pub fn first(&self) -> Option<VectorAddr> {
-        self.out.keys().next().cloned()
-    }
+
     pub fn contains(&self, node: &VectorAddr) -> bool {
         self.out.contains_key(node)
+    }
+
+    pub fn no_out_edges(&self, node: &VectorAddr) -> usize {
+        // TODO: Why is this called for non-existing nodes???
+        self.out.get(node).map(|n| n.read().unwrap().len()).unwrap_or(0)
     }
 }
 
@@ -102,7 +92,7 @@ impl RAMHnsw {
         // Only update if the entrypoint is not already at the top layer
         if self.layers.len() > self.entry_point.layer + 1 {
             self.entry_point = EntryPoint {
-                node: self.layers.last().unwrap().first().unwrap(),
+                node: *self.layers.last().unwrap().out.keys().next().unwrap(),
                 layer: self.layers.len() - 1,
             }
         }
@@ -113,10 +103,26 @@ impl RAMHnsw {
     }
 }
 
+struct EdgesIterator<'a>(RwLockReadGuard<'a, Vec<(VectorAddr, Edge)>>, usize);
+
+impl<'a> Iterator for EdgesIterator<'a> {
+    type Item = (VectorAddr, Edge);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let it = self.0.get(self.1);
+        self.1 += 1;
+        it.copied()
+    }
+}
+
 impl<'a> SearchableLayer for &'a RAMLayer {
-    type EdgeIt = std::iter::Copied<std::slice::Iter<'a, (VectorAddr, Edge)>>;
+    type EdgeIt = Box<dyn Iterator<Item = (VectorAddr, Edge)> + 'a>;
     fn get_out_edges(&self, node: VectorAddr) -> Self::EdgeIt {
-        self.out_edges(node)
+        if let Some(edges) = self.out.get(&node) {
+            Box::new(EdgesIterator(edges.read().unwrap(), 0))
+        } else {
+            Box::new(std::iter::empty())
+        }
     }
 }
 

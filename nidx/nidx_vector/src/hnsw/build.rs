@@ -63,15 +63,14 @@ impl<'a, DR: DataRetriever> HnswBuilder<'a, DR> {
     fn select_neighbours_heuristic(
         &self,
         k_neighbours: usize,
-        candidates: Vec<(VectorAddr, Edge)>,
-        layer: &RAMLayer,
+        candidates: &[(VectorAddr, Edge)],
     ) -> Vec<(VectorAddr, Edge)> {
         let mut results = Vec::new();
         let mut discarded = BinaryHeap::new();
 
         // First, select the best candidates to link, trying to connect from all directions
         // i.e: avoid linking to all nodes in a single cluster
-        for (x, sim) in candidates.into_iter() {
+        for (x, sim) in candidates.iter().copied() {
             if results.len() == k_neighbours {
                 break;
             }
@@ -79,14 +78,7 @@ impl<'a, DR: DataRetriever> HnswBuilder<'a, DR> {
             // i.e: similarity(x, new) > similarity(x, y) for all y in result
             let check = results
                 .iter()
-                .map(|&(y, _)| {
-                    // Try to get the similarity from an existing graph edge, fallback to calculating it
-                    if let Some((_, edge)) = layer.get_out_edges(x).find(|&(z, _)| z == y) {
-                        edge
-                    } else {
-                        self.retriever.similarity(x, &SearchVector::Stored(y))
-                    }
-                })
+                .map(|&(y, _)| self.retriever.similarity(x, &SearchVector::Stored(y)))
                 .all(|inter_sim| sim > inter_sim);
             if check {
                 results.push((x, sim));
@@ -96,11 +88,13 @@ impl<'a, DR: DataRetriever> HnswBuilder<'a, DR> {
         }
 
         // keepPrunedConnections: keep some other connections to fill M
-        while results.len() < k_neighbours {
-            let Some(Cnx(n, d)) = discarded.pop() else {
-                return results;
-            };
-            results.push((n, d));
+        if results.len() < k_neighbours {
+            while results.len() < k_neighbours {
+                let Some(Cnx(n, d)) = discarded.pop() else { break };
+                results.push((n, d));
+            }
+            // Sort the list since the newly added connections might be out of order
+            results.sort_unstable_by(|y, x| x.1.total_cmp(&y.1));
         }
 
         results
@@ -113,37 +107,26 @@ impl<'a, DR: DataRetriever> HnswBuilder<'a, DR> {
     }
 
     /// Insert a node into a layer, calculating all edges
-    fn layer_insert(
-        &self,
-        x: VectorAddr,
-        layer: &mut RAMLayer,
-        search_neighbours: Vec<(VectorAddr, Edge)>,
-        mmax: usize,
-    ) -> Vec<VectorAddr> {
-        let neighbours = self.select_neighbours_heuristic(params::M, search_neighbours, layer);
-        let mut needs_repair = HashSet::new();
-        let mut result = Vec::with_capacity(neighbours.len());
+    fn layer_insert(&self, x: VectorAddr, layer: &RAMLayer, search_neighbours: Vec<(VectorAddr, Edge)>, mmax: usize) {
+        let neighbours = self.select_neighbours_heuristic(params::M, &search_neighbours);
+
+        // Set edges from this node to neighbours
+        *layer.out.get(&x).unwrap().write().unwrap() = neighbours.clone();
+
+        // Set edges from neighbours to this node
         for (y, dist) in neighbours.iter().copied() {
-            result.push(y);
-            layer.add_edge(x, dist, y);
-            layer.add_edge(y, dist, x);
-            if layer.no_out_edges(y) > mmax {
-                needs_repair.insert(y);
+            let other_node = layer.out.get(&y).unwrap();
+            let mut other_edges = other_node.write().unwrap();
+            other_edges.push((x, dist));
+            if other_edges.len() > mmax {
+                *other_edges = self.select_neighbours_heuristic(params::prune_m(mmax), &other_edges);
             }
         }
-        for crnt in needs_repair {
-            let edges = layer.take_out_edges(crnt);
-            let neighbours = self.select_neighbours_heuristic(params::prune_m(mmax), edges, layer);
-            neighbours
-                .into_iter()
-                .for_each(|(y, edge)| layer.add_edge(crnt, edge, y));
-        }
-        result
     }
 
     /// Insert a node into all corresponding layers.
     /// The node must be created first by calling initialize_graph()
-    pub fn insert(&mut self, node: VectorAddr, hnsw: &mut RAMHnsw) {
+    pub fn insert(&self, node: VectorAddr, hnsw: &RAMHnsw) {
         debug_assert!(!hnsw.layers.is_empty());
         debug_assert!(node.0 < hnsw.layers[0].out.len() as u32);
 
@@ -184,12 +167,7 @@ impl<'a, DR: DataRetriever> HnswBuilder<'a, DR> {
         // follow it down to layer N-1 where edges are not yet set. Then, it cannot find neighbours in this
         // layer and the search gets stuck (no links to follow) resulting in a node with low connectivity.
         for (layer, neighbours) in layer_neighbours.into_iter().rev().enumerate() {
-            self.layer_insert(
-                node,
-                &mut hnsw.layers[layer],
-                neighbours,
-                params::m_max_for_layer(layer),
-            );
+            self.layer_insert(node, &hnsw.layers[layer], neighbours, params::m_max_for_layer(layer));
         }
     }
 }
