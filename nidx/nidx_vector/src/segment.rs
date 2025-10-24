@@ -31,6 +31,8 @@ use crate::{hnsw::*, inverted_index};
 use core::f32;
 use io::{BufWriter, Write};
 use memmap2::{Mmap, MmapOptions};
+use rayon::prelude::*;
+
 use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::fs::File;
@@ -164,9 +166,9 @@ fn merge_indexes<DS: DataStore + 'static>(
     let retriever = Retriever::new(&data_store, config, -1.0);
     let mut builder = HnswBuilder::new(&retriever);
     builder.initialize_graph(&mut index, start_vector_index, merged_vectors_count);
-    for id in start_vector_index..merged_vectors_count {
-        builder.insert(VectorAddr(id), &mut index);
-    }
+    (start_vector_index..merged_vectors_count)
+        .into_iter()
+        .for_each(|id| builder.insert(VectorAddr(id), &index));
 
     let hnsw_path = segment_path.join(file_names::HNSW);
     let mut hnsw_file = File::options()
@@ -274,9 +276,9 @@ fn create_indexes<DS: DataStore + 'static>(
     let retriever = Retriever::new(&data_store, config, -1.0);
     let mut builder = HnswBuilder::new(&retriever);
     builder.initialize_graph(&mut index, 0, vector_count);
-    for id in 0..vector_count {
-        builder.insert(VectorAddr(id), &mut index)
-    }
+    (0..vector_count)
+        .into_par_iter()
+        .for_each(|id| builder.insert(VectorAddr(id), &index));
 
     {
         // The HNSW is on RAM
