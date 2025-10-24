@@ -53,8 +53,8 @@ impl RAMLayer {
         self.out.contains_key(node)
     }
 
-    pub fn no_out_edges(&self, node: &VectorAddr) -> usize {
-        // TODO: Why is this called for non-existing nodes???
+    pub fn num_out_edges(&self, node: &VectorAddr) -> usize {
+        // This is called by the serialization code for all nodes and each layer, so we need to handle non-existing nodes
         self.out.get(node).map(|n| n.read().unwrap().len()).unwrap_or(0)
     }
 
@@ -120,7 +120,7 @@ impl RAMHnsw {
     }
 }
 
-struct EdgesIterator<'a>(RwLockReadGuard<'a, Vec<(VectorAddr, Edge)>>, usize);
+pub struct EdgesIterator<'a>(RwLockReadGuard<'a, Vec<(VectorAddr, Edge)>>, usize);
 
 impl<'a> Iterator for EdgesIterator<'a> {
     type Item = (VectorAddr, Edge);
@@ -133,13 +133,9 @@ impl<'a> Iterator for EdgesIterator<'a> {
 }
 
 impl<'a> SearchableLayer for &'a RAMLayer {
-    type EdgeIt = Box<dyn Iterator<Item = (VectorAddr, Edge)> + 'a>;
+    type EdgeIt = EdgesIterator<'a>;
     fn get_out_edges(&self, node: VectorAddr) -> Self::EdgeIt {
-        if let Some(edges) = self.out.get(&node) {
-            Box::new(EdgesIterator(edges.read().unwrap(), 0))
-        } else {
-            Box::new(std::iter::empty())
-        }
+        EdgesIterator(self.out[&node].read().unwrap(), 0)
     }
 }
 

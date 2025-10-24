@@ -124,14 +124,16 @@ impl DiskHnsw {
         let mut length = offset;
         let mut indexing = HashMap::new();
         for layer in 0..hnsw.no_layers() {
-            let no_edges = hnsw.get_layer(layer).no_out_edges(&node);
+            let num_edges = hnsw.get_layer(layer).num_out_edges(&node);
             indexing.insert(layer, length);
-            buf.write_all(&no_edges.to_le_bytes())?;
+            buf.write_all(&num_edges.to_le_bytes())?;
             length += USIZE_LEN;
-            for (cnx, edge) in hnsw.get_layer(layer).get_out_edges(node) {
-                buf.write_all(&(cnx.0 as usize).to_le_bytes())?;
-                buf.write_all(&edge.to_le_bytes())?;
-                length += CNX_LEN;
+            if num_edges > 0 {
+                for (cnx, edge) in hnsw.get_layer(layer).get_out_edges(node) {
+                    buf.write_all(&(cnx.0 as usize).to_le_bytes())?;
+                    buf.write_all(&edge.to_le_bytes())?;
+                    length += CNX_LEN;
+                }
             }
         }
         for layer in (0..hnsw.no_layers()).rev() {
