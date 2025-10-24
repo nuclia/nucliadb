@@ -31,6 +31,8 @@ use crate::{hnsw::*, inverted_index};
 use core::f32;
 use io::{BufWriter, Write};
 use memmap2::{Mmap, MmapOptions};
+use rayon::prelude::*;
+
 use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::fs::File;
@@ -156,16 +158,18 @@ fn merge_indexes<DS: DataStore + 'static>(
         // If there are no deletions, we can reuse the first segment
         // HNSW since its indexes will match the the ones in data_store
         index = DiskHnsw::deserialize(&operants[0].index);
+        index.fix_broken_links();
         start_vector_index = operants[0].data_store.stored_vector_count();
     }
     let merged_vectors_count = data_store.stored_vector_count();
 
     // Creating the hnsw for the new node store.
     let retriever = Retriever::new(&data_store, config, -1.0);
-    let mut ops = HnswOps::new(&retriever, false);
-    for id in start_vector_index..merged_vectors_count {
-        ops.insert(VectorAddr(id), &mut index);
-    }
+    let mut builder = HnswBuilder::new(&retriever);
+    builder.initialize_graph(&mut index, start_vector_index, merged_vectors_count);
+    (start_vector_index..merged_vectors_count)
+        .into_par_iter()
+        .for_each(|id| builder.insert(VectorAddr(id), &index));
 
     let hnsw_path = segment_path.join(file_names::HNSW);
     let mut hnsw_file = File::options()
@@ -271,10 +275,11 @@ fn create_indexes<DS: DataStore + 'static>(
     // Creating the HNSW using the mmaped nodes
     let mut index = RAMHnsw::new();
     let retriever = Retriever::new(&data_store, config, -1.0);
-    let mut ops = HnswOps::new(&retriever, false);
-    for id in 0..vector_count {
-        ops.insert(VectorAddr(id), &mut index)
-    }
+    let mut builder = HnswBuilder::new(&retriever);
+    builder.initialize_graph(&mut index, 0, vector_count);
+    (0..vector_count)
+        .into_par_iter()
+        .for_each(|id| builder.insert(VectorAddr(id), &index));
 
     {
         // The HNSW is on RAM
@@ -547,7 +552,7 @@ impl OpenSegment {
             self.brute_force_search(bitset, top_k, retriever, encoded_query, &raw_query)
         } else {
             method = "hnsw";
-            let ops = HnswOps::new(&retriever, true);
+            let ops = HnswSearcher::new(&retriever, true);
             let filter = NodeFilter::new(bitset, with_duplicates, config);
             let neighbours = ops.search(encoded_query, self.index.as_ref(), top_k, filter);
             Box::new(

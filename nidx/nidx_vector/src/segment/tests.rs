@@ -471,7 +471,7 @@ fn fast_data_merge() -> VectorR<()> {
     }
 
     // If there are deletions, we cannot reuse the HNSW, and we are much slower
-    assert!(slow_merge_time.as_secs_f64() > 2.0 * fast_merge_time.as_secs_f64());
+    assert!(slow_merge_time.as_secs_f64() > 1.5 * fast_merge_time.as_secs_f64());
 
     Ok(())
 }
