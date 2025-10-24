@@ -29,7 +29,6 @@ use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::time::Instant;
 use tracing::trace;
 
-use crate::config::{VectorCardinality, VectorConfig};
 use crate::hnsw::params::EF_SEARCH;
 use crate::inverted_index::FilterBitSet;
 use crate::vector_types::rabitq;
