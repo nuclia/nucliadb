@@ -99,3 +99,4 @@ async def test_learning_config_endpoints(sdk_async: nucliadb_sdk.NucliaDB, kb):
     await sdk_async.get_models(kbid=kb.uuid)
     await sdk_async.get_model(kbid=kb.uuid, model_id="foo")
     await sdk_async.get_configuration_schema(kbid=kb.uuid)
+    await sdk_async.get_generative_providers(kbid=kb.uuid)
