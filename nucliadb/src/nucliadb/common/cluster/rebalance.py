@@ -161,6 +161,7 @@ class Rebalancer:
         Split chooses a >110% filled shard and reduces it to 100%
         If the shard is between 90% and 110% full, nobody touches it
         """
+        logger.info("Starting rebalance for kb", extra={"kbid", self.kbid})
         await self.build_shard_resources_index()
         while True:
             await self.wait_for_indexing()
@@ -179,6 +180,7 @@ class Rebalancer:
                 await self.merge_shard(shard_to_merge, shards)
             else:
                 break
+        logger.info("Finished rebalance for kb", extra={"kbid", self.kbid})
 
     async def split_shard(self, shard_to_split: RebalanceShard, shards: list[RebalanceShard]):
         logger.info(
