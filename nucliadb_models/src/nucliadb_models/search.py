@@ -484,7 +484,8 @@ class SearchParamDefaults:
     autofilter = ParamDefault(
         default=False,
         title="Automatic search filtering",
-        description="If set to true, the search will automatically add filters to the query. For example, it will filter results containing the entities detected in the query",  # noqa: E501
+        description="[Deprecated] If set to true, the search will automatically add filters to the query. For example, it will filter results containing the entities detected in the query",  # noqa: E501
+        deprecated=True,
     )
     chat_query = ParamDefault(
         default=...,
