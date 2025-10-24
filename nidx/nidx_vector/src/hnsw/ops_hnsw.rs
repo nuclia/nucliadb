@@ -30,6 +30,7 @@ use std::time::Instant;
 use tracing::trace;
 
 use crate::config::{VectorCardinality, VectorConfig};
+use crate::hnsw::params::EF_SEARCH;
 use crate::inverted_index::FilterBitSet;
 use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr};
@@ -354,7 +355,10 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 _ => (),
             }
         }
-        ms_neighbours.into_iter().map(|Reverse(CnxWithBound(n, d))| (n, d))
+        ms_neighbours
+            .into_sorted_vec()
+            .into_iter()
+            .map(|Reverse(CnxWithBound(n, d))| (n, d))
     }
 
     fn layer_insert(
@@ -457,7 +461,10 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let last_layer_k = if original_query.is_some() {
             std::cmp::min(k_neighbours * rabitq::RERANKING_FACTOR, rabitq::RERANKING_LIMIT)
         } else {
-            k_neighbours
+            // We search for at least EF_SEARCH neighbours to guarantee good results
+            // In the case k > EF we could use EF search and expand the search with
+            // closest_up_nodes()
+            std::cmp::max(k_neighbours, EF_SEARCH)
         };
 
         // Find the best k nodes in the last layer
