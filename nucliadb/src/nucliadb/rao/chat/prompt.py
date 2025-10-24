@@ -43,7 +43,6 @@ from nucliadb.search.search.hydrator.images import (
     unchecked_download_page_preview,
 )
 from nucliadb.search.search.metrics import Metrics
-from nucliadb.search.search.paragraphs import get_paragraph_text
 from nucliadb_models.hydration import (
     FieldHydration,
     FileFieldHydration,
@@ -1076,52 +1075,50 @@ async def hierarchy_prompt_context(
     ordered_paragraphs_copy = copy.deepcopy(ordered_paragraphs)
     resources: Dict[str, ExtraCharsParagraph] = {}
 
-    # Iterate paragraphs to get extended text
+    # we want to hydrate paragraphs as well as resource title and summary. We
+    # hydrate the latter as paragraphs to control how many chars are we adding
+    # to the context
+    hydration = Hydration(
+        resource=None,
+        field=FieldHydration(text=None, file=None, link=None, conversation=None, generic=None),
+        paragraph=ParagraphHydration(text=True, image=None, table=None, page=None, related=None),
+    )
+
+    paragraphs_to_hydrate = []
     for paragraph in ordered_paragraphs_copy:
         paragraph_id = ParagraphId.from_string(paragraph.id)
-        extended_paragraph_text = paragraph.text
-        if paragraphs_extra_characters > 0:
-            extended_paragraph_text = await get_paragraph_text(
-                kbid=kbid,
-                paragraph_id=paragraph_id,
-                log_on_missing_field=True,
-            )
         rid = paragraph_id.rid
+        extended_paragraph_text = paragraph.text
+
+        if paragraphs_extra_characters > 0:
+            paragraph_id.paragraph_end += paragraphs_extra_characters
+
+        paragraphs_to_hydrate.append(paragraph_id.full())
+
         if rid not in resources:
-            # Get the title and the summary of the resource
-            title_text = await get_paragraph_text(
-                kbid=kbid,
-                paragraph_id=ParagraphId(
-                    field_id=FieldId(
-                        rid=rid,
-                        type="a",
-                        key="title",
-                    ),
-                    paragraph_start=0,
-                    paragraph_end=500,
-                ),
-                log_on_missing_field=False,
+            # add the resource title and summary to hydrate
+            title_id = ParagraphId(
+                FieldId(rid=rid, type="a", key="title"),
+                paragraph_start=0,
+                paragraph_end=500,
             )
-            summary_text = await get_paragraph_text(
-                kbid=kbid,
-                paragraph_id=ParagraphId(
-                    field_id=FieldId(
-                        rid=rid,
-                        type="a",
-                        key="summary",
-                    ),
-                    paragraph_start=0,
-                    paragraph_end=1000,
-                ),
-                log_on_missing_field=False,
+            summary_id = ParagraphId(
+                FieldId(rid=rid, type="a", key="summary"),
+                paragraph_start=0,
+                paragraph_end=1000,
             )
+            paragraphs_to_hydrate.append(title_id.full())
+            paragraphs_to_hydrate.append(summary_id.full())
+
             resources[rid] = ExtraCharsParagraph(
-                title=title_text,
-                summary=summary_text,
-                paragraphs=[(paragraph, extended_paragraph_text)],
+                title=title_id.full(),
+                summary=summary_id.full(),
+                paragraphs=[(paragraph, paragraph_id.full())],
             )
         else:
-            resources[rid].paragraphs.append((paragraph, extended_paragraph_text))
+            resources[rid].paragraphs.append((paragraph, paragraph_id.full()))
+
+    hydrated = await hydrate(kbid, hydration, paragraphs_to_hydrate)
 
     metrics.set("hierarchy_ops", len(resources))
     augmented_paragraphs = set()
@@ -1129,11 +1126,27 @@ async def hierarchy_prompt_context(
     # Modify the first paragraph of each resource to include the title and summary of the resource, as well as the
     # extended paragraph text of all the paragraphs in the resource.
     for values in resources.values():
-        title_text = values.title
-        summary_text = values.summary
+        hydrated_title = hydrated.paragraphs.get(values.title)
+        if hydrated_title:
+            title_text = hydrated_title.text or ""
+        else:
+            title_text = ""
+
+        hydrated_summary = hydrated.paragraphs.get(values.summary)
+        if hydrated_summary:
+            summary_text = hydrated_summary.text or ""
+        else:
+            summary_text = ""
+
         first_paragraph = None
         text_with_hierarchy = ""
-        for paragraph, extended_paragraph_text in values.paragraphs:
+        for paragraph, extended_paragraph_id in values.paragraphs:
+            hydrated_paragraph = hydrated.paragraphs.get(extended_paragraph_id)
+            if hydrated_paragraph:
+                extended_paragraph_text = hydrated_paragraph.text or ""
+            else:
+                extended_paragraph_text = ""
+
             if first_paragraph is None:
                 first_paragraph = paragraph
             text_with_hierarchy += "\n EXTRACTED BLOCK: \n " + extended_paragraph_text + " \n\n "
