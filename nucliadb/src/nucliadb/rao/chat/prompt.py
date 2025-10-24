@@ -343,7 +343,7 @@ async def full_resource_prompt_context(
             # REVIEW: use a placeholder as we haven't implemented yet a list of
             # resource ids in the Hydration API
             ParagraphId(
-                FieldId(rid=rid, type="z", key="placeholder"),
+                FieldId(rid=rid, type="a", key="placeholder"),
                 paragraph_start=0,
                 paragraph_end=0,
             ).full()
@@ -737,19 +737,14 @@ async def neighbouring_paragraphs_prompt_context(
         if hydrated_paragraph is None or hydrated_paragraph.related is None:
             continue
 
-        augmented_context.paragraphs[paragraph_id] = AugmentedTextBlock(
-            id=paragraph_id,
-            text=hydrated_paragraph.text or "",
-            # TODO: we need positions from hydrate API too... For now, we skip it though
-            position=None,
-            parent=None,
-            augmentation_type=TextBlockAugmentationType.NEIGHBOURING_PARAGRAPHS,
-        )
+        if hydrated_paragraph.text and paragraph_id not in context:
+            context[paragraph_id] = hydrated_paragraph.text
 
         if hydrated_paragraph.related.neighbours is None:
             # no neighbours found
             continue
 
+        # Now add the neigbhbouring paragraphs
         related = itertools.chain(
             hydrated_paragraph.related.neighbours.before or [],
             hydrated_paragraph.related.neighbours.after or [],
@@ -759,9 +754,13 @@ async def neighbouring_paragraphs_prompt_context(
             # TODO: replace for error handling, but this shouldn't be possible
             assert hydrated_neighbour is not None
 
+            if not hydrated_neighbour.text:
+                continue
+
+            context[neighbour_id] = hydrated_neighbour.text
             augmented_context.paragraphs[neighbour_id] = AugmentedTextBlock(
                 id=neighbour_id,
-                text=hydrated_neighbour.text or "",
+                text=hydrated_neighbour.text,
                 # TODO: we need positions from hydrate API too... For now, we skip it though
                 position=None,
                 parent=paragraph_id,
