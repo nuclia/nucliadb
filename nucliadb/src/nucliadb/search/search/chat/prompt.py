@@ -946,9 +946,14 @@ async def hierarchy_prompt_context(
         paragraph_id = ParagraphId.from_string(paragraph.id)
         extended_paragraph_text = paragraph.text
         if paragraphs_extra_characters > 0:
+            extended_paragraph_id = ParagraphId(
+                field_id=paragraph_id.field_id,
+                paragraph_start=paragraph_id.paragraph_start,
+                paragraph_end=paragraph_id.paragraph_end + paragraphs_extra_characters,
+            )
             extended_paragraph_text = await get_paragraph_text(
                 kbid=kbid,
-                paragraph_id=paragraph_id,
+                paragraph_id=extended_paragraph_id,
                 log_on_missing_field=True,
             )
         rid = paragraph_id.rid
