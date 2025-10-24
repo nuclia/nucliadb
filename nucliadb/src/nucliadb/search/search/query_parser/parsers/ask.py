@@ -19,11 +19,21 @@
 #
 from typing import Optional
 
+from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
     Generation,
+    NoopReranker,
+    PredictReranker,
+    Reranker,
 )
-from nucliadb_models.search import AskRequest, MaxTokens
+from nucliadb_models import search as search_models
+from nucliadb_models.search import (
+    AskRequest,
+    MaxTokens,
+)
+
+from .common import parse_top_k
 
 
 async def parse_ask(kbid: str, item: AskRequest, *, fetcher: Optional[Fetcher] = None) -> Generation:
@@ -43,6 +53,35 @@ def fetcher_for_ask(kbid: str, item: AskRequest) -> Fetcher:
         generative_model=item.generative_model,
         query_image=item.query_image,
     )
+
+
+# XXX: reranker parsing copied from find parser. This has been extracted while
+# migrating /ask to RAO but needs a cleaner abstraction
+def parse_reranker(item: AskRequest) -> Reranker:
+    reranking: Reranker
+
+    top_k = parse_top_k(item)
+
+    if isinstance(item.reranker, search_models.RerankerName):
+        if item.reranker == search_models.RerankerName.NOOP:
+            reranking = NoopReranker()
+
+        elif item.reranker == search_models.RerankerName.PREDICT_RERANKER:
+            # for predict rearnker, by default, we want a x2 factor with a
+            # top of 200 results
+            reranking = PredictReranker(window=min(top_k * 2, 200))
+
+        else:
+            raise InternalParserError(f"Unknown reranker algorithm: {item.reranker}")
+
+    elif isinstance(item.reranker, search_models.PredictReranker):
+        user_window = item.reranker.window
+        reranking = PredictReranker(window=min(max(user_window or 0, top_k), 200))
+
+    else:
+        raise InternalParserError(f"Unknown reranker {item.reranker}")
+
+    return reranking
 
 
 class _AskParser:
