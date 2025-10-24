@@ -1467,7 +1467,7 @@ class PageImageStrategy(ImageRagStrategy):
     count: Optional[int] = Field(
         default=None,
         title="Count",
-        description="Maximum number of images to retrieve from the page. By default, at most 5 images are retrieved.",
+        description="Maximum number of page images to retrieve. By default, at most 5 images are retrieved.",
     )
 
 
