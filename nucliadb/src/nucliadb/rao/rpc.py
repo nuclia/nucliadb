@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from httpx import AsyncClient
+from opentelemetry import trace
+from opentelemetry.trace import format_trace_id
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.search import API_PREFIX
@@ -33,6 +35,7 @@ from nucliadb_models.search import (
     KnowledgeboxFindResults,
     NucliaDBClientType,
 )
+from nucliadb_telemetry.fastapi.tracing import NUCLIA_TRACE_ID_HEADER
 from nucliadb_utils.settings import running_settings
 
 
@@ -48,7 +51,7 @@ async def find(
     """RPC to /find endpoint making it look as an internal call."""
 
     async with AsyncClient(
-        headers={"X-NUCLIADB-ROLES": "READER"},
+        headers={"X-NUCLIADB-ROLES": "READER", **__get_tracing_headers()},
         base_url=f"http://{running_settings.serving_host}:{running_settings.serving_port}/{API_PREFIX}/v1",
         timeout=10.0,
     ) as client:
@@ -78,9 +81,9 @@ async def find(
 async def hydrate(kbid: str, hydration: Hydration, paragraph_ids: list[str]) -> Hydrated:
     """RPC to /hydrate endpoint making it look as an internal call."""
 
-    payload = (HydrateRequest(data=paragraph_ids, hydration=hydration).model_dump(),)
+    payload = HydrateRequest(data=paragraph_ids, hydration=hydration).model_dump()
     async with AsyncClient(
-        headers={"X-NUCLIADB-ROLES": "READER"},
+        headers={"X-NUCLIADB-ROLES": "READER", **__get_tracing_headers()},
         base_url=f"http://{running_settings.serving_host}:{running_settings.serving_port}/{API_PREFIX}/v1",
         timeout=10.0,
     ) as client:
@@ -91,3 +94,17 @@ async def hydrate(kbid: str, hydration: Hydration, paragraph_ids: list[str]) -> 
         hydrated = Hydrated.model_validate(resp.json())
 
     return hydrated
+
+
+def __get_tracing_headers() -> dict[str, str]:
+    headers = {}
+
+    span = trace.get_current_span()
+    if span is None:
+        return
+
+    trace_id = format_trace_id(span.get_span_context().trace_id)
+    if trace_id:
+        headers[NUCLIA_TRACE_ID_HEADER] = trace_id
+
+    return headers
