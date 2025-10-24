@@ -40,6 +40,7 @@ from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.external_index_providers.base import ScoredTextBlock
 from nucliadb.common.ids import ParagraphId
 from nucliadb.models.responses import HTTPClientError
+from nucliadb.rao.chat.prompt import PromptContextBuilder
 from nucliadb.rao.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
     ChatAuditor,
@@ -60,7 +61,6 @@ from nucliadb.search.search.chat.exceptions import (
     AnswerJsonSchemaTooLong,
     NoRetrievalResultsError,
 )
-from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
 )
