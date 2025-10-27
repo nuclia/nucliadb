@@ -22,5 +22,11 @@ from nucliadb.common.maindb.pg import PGTransaction
 
 
 async def migrate(txn: PGTransaction) -> None:
-    async with txn.connection.cursor() as cur:
-        await cur.execute("CREATE INDEX concurrently ON resources (key, value) WHERE key LIKE '/kbs/%/r/%/shard';")
+    # Concurrent index must be created outside of a transaction but psycopg automatically
+    # creates transactions. We temporarily disable this for building indexes.
+    await txn.connection.commit()
+    try:
+        await txn.connection.set_autocommit(True)
+        await txn.connection.execute("CREATE INDEX CONCURRENTLY ON resources (key, value) WHERE key LIKE '/kbs/%/r/%/shard';")
+    finally:
+        await txn.connection.set_autocommit(False)
