@@ -25,6 +25,7 @@ import random
 from typing import Optional
 
 import aioitertools
+import backoff
 from grpc import StatusCode
 from grpc.aio import AioRpcError
 from nidx_protos import nodereader_pb2, noderesources_pb2
@@ -358,6 +359,7 @@ class Rebalancer:
                 )
 
 
+@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8)
 async def get_resource_paragraphs_count(resource_id: str, nidx_shard_id: str) -> int:
     # Do a search on the fields (paragraph) index and return the number of paragraphs this resource has
     try:
