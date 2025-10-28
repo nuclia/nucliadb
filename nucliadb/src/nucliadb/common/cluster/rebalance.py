@@ -163,25 +163,30 @@ class Rebalancer:
         If the shard is between 90% and 110% full, nobody touches it
         """
         logger.info("Starting rebalance for kb", extra={"kbid": self.kbid})
-        await self.build_shard_resources_index()
-        while True:
-            await self.wait_for_indexing()
+        try:
+            await self.build_shard_resources_index()
+            while True:
+                await self.wait_for_indexing()
 
-            shards = await self.get_rebalance_shards()
+                shards = await self.get_rebalance_shards()
 
-            # Any shards to split?
-            shard_to_split = next((s for s in shards[::-1] if needs_split(s)), None)
-            if shard_to_split is not None:
-                await self.split_shard(shard_to_split, shards)
-                continue
+                # Any shards to split?
+                shard_to_split = next((s for s in shards[::-1] if needs_split(s)), None)
+                if shard_to_split is not None:
+                    await self.split_shard(shard_to_split, shards)
+                    continue
 
-            # Any shards to merge?
-            shard_to_merge = next((s for s in shards if needs_merge(s, shards)), None)
-            if shard_to_merge is not None:
-                await self.merge_shard(shard_to_merge, shards)
-            else:
-                break
-        logger.info("Finished rebalance for kb", extra={"kbid": self.kbid})
+                # Any shards to merge?
+                shard_to_merge = next((s for s in shards if needs_merge(s, shards)), None)
+                if shard_to_merge is not None:
+                    await self.merge_shard(shard_to_merge, shards)
+                else:
+                    break
+        except Exception as err:
+            logger.exception("Rebalance finished with error", extra={"kbid": self.kbid})
+            errors.capture_exception(err)
+        else:
+            logger.info("Finished rebalance for kb", extra={"kbid": self.kbid})
 
     async def split_shard(self, shard_to_split: RebalanceShard, shards: list[RebalanceShard]):
         logger.info(
