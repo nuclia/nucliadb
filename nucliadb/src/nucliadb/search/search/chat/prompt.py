@@ -26,6 +26,7 @@ from typing import Deque, Dict, List, Optional, Sequence, Tuple, Union, cast
 import yaml
 from pydantic import BaseModel
 
+from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.models_utils import from_proto
@@ -589,17 +590,7 @@ async def field_extension_prompt_context(
         if resource_uuid not in ordered_resources:
             ordered_resources.append(resource_uuid)
 
-    # Fetch the extracted texts of the specified fields for each resource
-    extend_fields = strategy.fields
-    extend_field_ids = []
-    for resource_uuid in ordered_resources:
-        for field_id in extend_fields:
-            try:
-                fid = FieldId.from_string(f"{resource_uuid}/{field_id.strip('/')}")
-                extend_field_ids.append(fid)
-            except ValueError:  # pragma: no cover
-                # Invalid field id, skiping
-                continue
+    extend_field_ids = await get_matching_field_ids(kbid, ordered_resources, strategy)
 
     tasks = [hydrate_field_text(kbid, fid) for fid in extend_field_ids]
     field_extracted_texts = await run_concurrently(tasks)
@@ -628,6 +619,39 @@ async def field_extension_prompt_context(
     for paragraph in ordered_paragraphs:
         if paragraph.id not in context:
             context[paragraph.id] = _clean_paragraph_text(paragraph)
+
+
+async def get_matching_field_ids(
+    kbid: str, ordered_resources: list[str], strategy: FieldExtensionStrategy
+) -> list[FieldId]:
+    extend_field_ids: list[FieldId] = []
+    if strategy.match_type == FieldExtensionStrategy.MatchType.EXACT:
+        # Fetch the extracted texts of the specified fields for each resource
+        for resource_uuid in ordered_resources:
+            for field_id in strategy.fields:
+                try:
+                    fid = FieldId.from_string(f"{resource_uuid}/{field_id.strip('/')}")
+                    extend_field_ids.append(fid)
+                except ValueError:  # pragma: no cover
+                    # Invalid field id, skiping
+                    continue
+    elif strategy.match_type == FieldExtensionStrategy.MatchType.CONTAINS:
+        for resource_uuid in ordered_resources:
+            all_field_ids = await datamanagers.atomic.resources.get_all_field_ids(
+                kbid=kbid, rid=resource_uuid, for_update=False
+            )
+            if all_field_ids is None:
+                continue
+            for fieldid in all_field_ids.fields:
+                if any(pattern for pattern in strategy.fields if pattern in fieldid.field):
+                    extend_field_ids.append(
+                        FieldId.from_pb(
+                            rid=resource_uuid, field_type=fieldid.field_type, key=fieldid.field
+                        )
+                    )
+    else:  # pragma: no cover
+        raise ValueError(f"Unknown match type: {strategy.match_type}")
+    return extend_field_ids
 
 
 async def get_orm_field(kbid: str, field_id: FieldId) -> Optional[Field]:

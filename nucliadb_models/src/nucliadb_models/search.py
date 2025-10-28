@@ -1184,6 +1184,12 @@ class FieldExtensionStrategy(RagStrategy):
         min_length=1,
     )
 
+    class MatchType(str, Enum):
+        EXACT = "exact"
+        CONTAINS = "contains"
+
+    match_type: MatchType = Field(default=MatchType.EXACT, description="")
+
     @field_validator("fields", mode="after")
     @classmethod
     def fields_validator(cls, fields) -> Self:
