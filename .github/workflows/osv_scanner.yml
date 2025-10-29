@@ -15,5 +15,7 @@ jobs:
   scan-scheduled:
     uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v1.8.2"
     with:
-      scan-args: nidx/Cargo.lock uv.lock
+      scan-args: |-
+        nidx/Cargo.lock
+        uv.lock
       fail-on-vuln: false
