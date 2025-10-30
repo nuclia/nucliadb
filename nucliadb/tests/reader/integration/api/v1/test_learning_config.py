@@ -116,7 +116,7 @@ async def test_api(
     assert resp.status_code == 200
     assert learning_config_proxy_mock.calls[-1][1:] == (
         "GET",
-        f"/{kbid}/generative_providers",
+        f"/generative_providers/{kbid}",
         {"account-id": "account"},
     )
 

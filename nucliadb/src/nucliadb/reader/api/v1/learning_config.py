@@ -144,7 +144,7 @@ async def get_models_group_by_providers(
     return await learning_config_proxy(
         request,
         "GET",
-        f"/{kbid}/generative_providers",
+        f"/generative_providers/{kbid}",
         headers={"account-id": x_nucliadb_account},
     )
 
