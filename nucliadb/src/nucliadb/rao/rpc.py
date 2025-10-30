@@ -28,6 +28,8 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.search.search.metrics import Metrics
+from nucliadb_models.graph.requests import GraphNodesSearchRequest
+from nucliadb_models.graph.responses import GraphNodesSearchResponse
 from nucliadb_models.hydration import (
     Hydrated,
     HydrateRequest,
@@ -89,6 +91,17 @@ async def hydrate(kbid: str, hydration: Hydration, paragraph_ids: list[str]) -> 
         hydrated = Hydrated.model_validate(resp.json())
 
     return hydrated
+
+
+async def graph_nodes(kbid: str, query: GraphNodesSearchRequest) -> GraphNodesSearchResponse:
+    payload = query.model_dump()
+    async with get_client() as client:
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/graph/nodes", json=payload)
+        if resp.status_code != 200:
+            raise Exception(f"/graph/nodes call failed: {resp.status_code} {resp.content.decode()}")
+        nodes = GraphNodesSearchResponse.model_validate(resp.json())
+
+    return nodes
 
 
 @asynccontextmanager
