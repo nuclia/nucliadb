@@ -943,8 +943,8 @@ async def test_ask_top_k(nucliadb_reader: AsyncClient, standalone_knowledgebox: 
 
 
 @pytest.mark.parametrize("relation_ranking", ["generative", "reranker"])
-@patch("nucliadb.search.search.graph_strategy.rank_relations_reranker")
-@patch("nucliadb.search.search.graph_strategy.rank_relations_generative")
+@patch("nucliadb.rao.graph_strategy.rank_relations_reranker")
+@patch("nucliadb.rao.graph_strategy.rank_relations_generative")
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_graph_strategy(
     mocker_generative,
@@ -1087,8 +1087,8 @@ async def test_ask_graph_strategy(
     await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
 
 
-@patch("nucliadb.search.search.graph_strategy.rank_relations_reranker")
-@patch("nucliadb.search.search.graph_strategy.rank_relations_generative")
+@patch("nucliadb.rao.graph_strategy.rank_relations_reranker")
+@patch("nucliadb.rao.graph_strategy.rank_relations_generative")
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_graph_strategy_with_user_relations(
     mocker_generative,
@@ -1216,7 +1216,7 @@ async def test_ask_graph_strategy_inner_fuzzy_prefix_search(
     graph_resource,
     dummy_predict,
 ):
-    from nucliadb.search.search.graph_strategy import fuzzy_search_entities
+    from nucliadb.rao.graph_strategy import fuzzy_search_entities
 
     kbid = standalone_knowledgebox
 

@@ -39,6 +39,8 @@ class NodeMatchKindName(str, Enum):
     EXACT = "exact"
     FUZZY = "fuzzy"
 
+    FUZZY_WORDS = "fuzzy_words"
+
 
 class GraphNode(BaseModel, extra="forbid"):
     value: Optional[str] = None

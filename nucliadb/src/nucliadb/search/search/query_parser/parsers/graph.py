@@ -230,6 +230,10 @@ def _set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuer
             pb.fuzzy.kind = nodereader_pb2.GraphQuery.Node.MatchLocation.PREFIX
             pb.fuzzy.distance = 1
 
+        elif node.match == graph_requests.NodeMatchKindName.FUZZY_WORDS:
+            pb.fuzzy.kind = nodereader_pb2.GraphQuery.Node.MatchLocation.WORDS
+            pb.fuzzy.distance = 1
+
         else:  # pragma: no cover
             # This is a trick so mypy generates an error if this branch can be reached,
             # that is, if we are missing some ifs

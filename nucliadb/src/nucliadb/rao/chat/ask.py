@@ -52,6 +52,7 @@ from nucliadb.rao.chat.query import (
     sorted_prompt_context_list,
     tokens_to_chars,
 )
+from nucliadb.rao.graph_strategy import get_graph_results
 from nucliadb.search import logger, predict
 from nucliadb.search.predict import (
     AnswerStatusCode,
@@ -64,7 +65,6 @@ from nucliadb.search.search.chat.exceptions import (
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
 )
-from nucliadb.search.search.graph_strategy import get_graph_results
 from nucliadb.search.search.metrics import AskMetrics, Metrics
 from nucliadb.search.search.query_parser.parsers.ask import parse_ask, parse_reranker
 from nucliadb.search.search.rank_fusion import WeightedCombSum
