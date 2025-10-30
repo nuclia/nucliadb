@@ -46,7 +46,6 @@ from nucliadb_models.search import (
     KnowledgeboxFindResults,
     NucliaDBClientType,
     RankFusionName,
-    Reranker,
     RerankerName,
     ResourceProperties,
     SearchParamDefaults,
@@ -131,7 +130,7 @@ async def find_knowledgebox(
     security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
     show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
     rank_fusion: RankFusionName = fastapi_query(SearchParamDefaults.rank_fusion),
-    reranker: Union[RerankerName, Reranker] = fastapi_query(SearchParamDefaults.reranker),
+    reranker: RerankerName = fastapi_query(SearchParamDefaults.reranker),
     search_configuration: Optional[str] = Query(
         default=None,
         description="Load find parameters from this configuration. Parameters in the request override parameters from the configuration.",

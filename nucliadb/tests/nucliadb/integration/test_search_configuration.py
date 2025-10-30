@@ -21,6 +21,7 @@ import datetime
 from unittest.mock import patch
 
 import pytest
+from fastapi import HTTPException
 from httpx import AsyncClient
 
 from nucliadb_models.search import FullResourceStrategy
@@ -174,6 +175,7 @@ async def test_search_configuration_find(
 
     async def run_find(params):
         with patch("nucliadb.search.api.v1.find.find") as mock:
+            mock.side_effect = HTTPException(status_code=500)
             await nucliadb_reader.post(
                 f"/kb/{kbid}/find",
                 json=params,
@@ -239,7 +241,7 @@ async def test_search_configuration_ask(
 
     async def run_ask(params):
         with patch("nucliadb.search.api.v1.ask.ask") as mock:
-            mock.side_effect = Exception()
+            mock.side_effect = HTTPException(status_code=500)
             await nucliadb_reader.post(
                 f"/kb/{kbid}/ask",
                 json={**params, "query": "whatever"},
@@ -304,6 +306,7 @@ async def test_search_configuration_merge(
 
     async def run_find(params):
         with patch("nucliadb.search.api.v1.find.find") as mock:
+            mock.side_effect = HTTPException(status_code=500)
             await nucliadb_reader.post(
                 f"/kb/{kbid}/find",
                 json=params,

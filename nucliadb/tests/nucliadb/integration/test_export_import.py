@@ -119,10 +119,11 @@ async def src_kb(
     assert resp.status_code == 200
     yield kbid
 
-    resp = await nucliadb_writer_manager.delete(f"/kb/{kbid}")
     try:
+        # This can fail because the pg driver fixture might be destroyed by now
+        resp = await nucliadb_writer_manager.delete(f"/kb/{kbid}")
         assert resp.status_code == 200
-    except AssertionError:
+    except Exception:
         pass
 
 
@@ -132,10 +133,12 @@ async def dst_kb(nucliadb_writer_manager: AsyncClient) -> AsyncIterator[str]:
     assert resp.status_code == 201
     uuid = resp.json().get("uuid")
     yield uuid
-    resp = await nucliadb_writer_manager.delete(f"/kb/{uuid}")
+
     try:
+        # This can fail because the pg driver fixture might be destroyed by now
+        resp = await nucliadb_writer_manager.delete(f"/kb/{uuid}")
         assert resp.status_code == 200
-    except AssertionError:
+    except Exception:
         pass
 
 

@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 from nucliadb_telemetry import errors
 
@@ -67,8 +67,7 @@ def test_setup_error_handling(monkeypatch):
             release="1.0.0",
             environment="environment",
             dsn="sentry_url",
-            integrations=[],
-            default_integrations=False,
+            integrations=[ANY],
         )
 
 
