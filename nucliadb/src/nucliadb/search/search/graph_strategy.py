@@ -469,7 +469,7 @@ async def fuzzy_search_entities(
     """Fuzzy find entities in KB given a query using the same methodology as /suggest, but split by words."""
 
     # Build an OR for each word in the query matching with fuzzy any word in any
-    # node in any position. I.e., for the query "Rose Hamiltn", it'll match
+    # node in any position. I.e., for the query "Rose Hamilton", it'll match
     # "Rosa Parks" and "Margaret Hamilton"
     request = nodereader_pb2.GraphSearchRequest()
     # XXX Are those enough results? Too many?
