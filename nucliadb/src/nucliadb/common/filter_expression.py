@@ -52,37 +52,20 @@ from nucliadb_models.filters import (
 )
 
 # Filters that end up as a facet
-FacetFilter = Union[
-    OriginTag,
-    Label,
-    ResourceMimetype,
-    FieldMimetype,
-    Entity,
-    Language,
-    OriginMetadata,
-    OriginPath,
-    Generated,
-    Kind,
-    OriginCollaborator,
-    OriginSource,
-    Status,
-]
-# In Python 3.9 we cannot do isinstance against an union
-# Once we support only 3.10+, we can remove this
-FacetFilterTypes = (
-    OriginTag,
-    Label,
-    ResourceMimetype,
-    FieldMimetype,
-    Entity,
-    Language,
-    OriginMetadata,
-    OriginPath,
-    Generated,
-    Kind,
-    OriginCollaborator,
-    OriginSource,
-    Status,
+FacetFilter = (
+    OriginTag
+    | Label
+    | ResourceMimetype
+    | FieldMimetype
+    | Entity
+    | Language
+    | OriginMetadata
+    | OriginPath
+    | Generated
+    | Kind
+    | OriginCollaborator
+    | OriginSource
+    | Status
 )
 
 
@@ -131,7 +114,7 @@ async def parse_expression(
             f.date.since.FromDatetime(expr.since)
         if expr.until:
             f.date.until.FromDatetime(expr.until)
-    elif isinstance(expr, FacetFilterTypes):
+    elif isinstance(expr, FacetFilter):
         f.facet.facet = facet_from_filter(expr)
     else:
         # This is a trick so mypy generates an error if this branch can be reached,
