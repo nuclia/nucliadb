@@ -17,6 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
 from httpx import AsyncClient
 from opentelemetry import trace
 from opentelemetry.trace import format_trace_id
@@ -50,11 +53,7 @@ async def find(
 ) -> tuple[KnowledgeboxFindResults, bool]:
     """RPC to /find endpoint making it look as an internal call."""
 
-    async with AsyncClient(
-        headers={"X-NUCLIADB-ROLES": "READER", **__get_tracing_headers()},
-        base_url=f"http://{running_settings.serving_host}:{running_settings.serving_port}/{API_PREFIX}/v1",
-        timeout=10.0,
-    ) as client:
+    async with get_client() as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{kbid}/find",
             headers={
@@ -82,11 +81,7 @@ async def hydrate(kbid: str, hydration: Hydration, paragraph_ids: list[str]) -> 
     """RPC to /hydrate endpoint making it look as an internal call."""
 
     payload = HydrateRequest(data=paragraph_ids, hydration=hydration).model_dump()
-    async with AsyncClient(
-        headers={"X-NUCLIADB-ROLES": "READER", **__get_tracing_headers()},
-        base_url=f"http://{running_settings.serving_host}:{running_settings.serving_port}/{API_PREFIX}/v1",
-        timeout=10.0,
-    ) as client:
+    async with get_client() as client:
         resp = await client.post(f"/{KB_PREFIX}/{kbid}/hydrate", json=payload)
         if resp.status_code != 200:
             raise Exception(f"/hydrate call failed: {resp.status_code} {resp.content.decode()}")
@@ -94,6 +89,16 @@ async def hydrate(kbid: str, hydration: Hydration, paragraph_ids: list[str]) -> 
         hydrated = Hydrated.model_validate(resp.json())
 
     return hydrated
+
+
+@asynccontextmanager
+async def get_client() -> AsyncIterator[AsyncClient]:
+    async with AsyncClient(
+        headers={"X-NUCLIADB-ROLES": "READER", **__get_tracing_headers()},
+        base_url=f"http://{running_settings.serving_host}:{running_settings.serving_port}/{API_PREFIX}/v1",
+        timeout=10.0,
+    ) as client:
+        yield client
 
 
 def __get_tracing_headers() -> dict[str, str]:
