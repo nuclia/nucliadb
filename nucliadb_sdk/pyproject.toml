@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb_sdk"
-version = "6.9.1"
+version = "6.9.2"
 license = "Apache-2.0"
 description = "NucliaDB SDK"
 authors = [{ name = "Nuclia", email = "nucliadb@nuclia.com" }]
@@ -15,13 +15,12 @@ classifiers = [
     "Intended Audience :: Information Technology",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3 :: Only",
 ]
-requires-python = ">=3.9, <4"
+requires-python = ">=3.10, <4"
 dependencies = [
     "httpx",
     "orjson",

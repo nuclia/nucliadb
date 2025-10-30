@@ -29,6 +29,8 @@ use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::time::Instant;
 use tracing::trace;
 
+use crate::config::{VectorCardinality, VectorConfig};
+use crate::hnsw::params::EF_SEARCH;
 use crate::inverted_index::FilterBitSet;
 use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr};
@@ -136,31 +138,48 @@ impl PartialOrd for CnxWithBound {
 pub type Neighbours = Vec<(VectorAddr, f32)>;
 
 /// Guides an algorithm to the valid nodes.
-struct NodeFilter<'a, DR> {
-    retriever: &'a DR,
+pub struct NodeFilter<'a> {
     filter: &'a FilterBitSet,
-    paragraphs: FxHashSet<ParagraphAddr>,
+    paragraphs: Option<FxHashSet<ParagraphAddr>>,
     vec_counter: RepCounter<'a>,
 }
 
-impl<DR: DataRetriever> NodeFilter<'_, DR> {
-    pub fn passes_formula(&self, n: ParagraphAddr) -> bool {
-        self.filter.contains(n)
+impl<'a> NodeFilter<'a> {
+    pub fn new(filter: &'a FilterBitSet, with_duplicates: bool, config: &VectorConfig) -> NodeFilter<'a> {
+        let paragraphs = matches!(config.vector_cardinality, VectorCardinality::Multi).then_some(Default::default());
+        let vec_counter = RepCounter::new(!with_duplicates);
+        NodeFilter {
+            filter,
+            paragraphs,
+            vec_counter,
+        }
     }
 
-    pub fn is_valid(&self, n: VectorAddr, score: f32) -> bool {
-        !score.is_nan()
-        // Reject the candidate if we already have a result for the same paragraph
-        && !self.paragraphs.contains(&self.retriever.paragraph(n))
-        // Reject the candidate if we already have a result with an identical vector
-        && self.vec_counter.get(self.retriever.get_vector(n)) == 0
-    }
+    pub fn passes(&mut self, retriever: &'a impl DataRetriever, v: VectorAddr) -> bool {
+        let vector = retriever.get_vector(v);
+        let paragraph = retriever.paragraph(v);
 
-    /// Adds a result so that further candidates with the same vector
-    /// or paragraph will get rejected.
-    pub fn add_result(&mut self, n: VectorAddr) {
-        self.paragraphs.insert(self.retriever.paragraph(n));
-        self.vec_counter.add(self.retriever.get_vector(n));
+        // Matches query filters?
+        if !self.filter.contains(paragraph) {
+            return false;
+        }
+
+        // Is a duplicated vector?
+        if self.vec_counter.get(vector) > 0 {
+            return false;
+        };
+
+        // Is a vector for an existing paragraph? (only relevant in multi-vector search)
+        if let Some(paragraphs) = &mut self.paragraphs
+            && !paragraphs.insert(paragraph)
+        {
+            return false;
+        }
+
+        // Track the vector for duplicates (the paragraphs was tracked in the above check)
+        self.vec_counter.add(vector);
+
+        true
     }
 }
 
@@ -228,7 +247,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         query: &SearchVector,
         layer: L,
         number_of_results: usize,
-        mut filter: NodeFilter<'a, DR>,
+        mut filter: NodeFilter<'a>,
     ) -> Vec<(VectorAddr, f32)> {
         // We just need to perform BFS, the replacement is the closest node to the actual
         // best solution. This algorithm takes a lazy approach to computing the similarity of
@@ -253,9 +272,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 break;
             }
 
-            let paragraph_addr = self.retriever.paragraph(candidate);
-            if filter.is_valid(candidate, candidate_similarity) && filter.passes_formula(paragraph_addr) {
-                filter.add_result(candidate);
+            if !candidate_similarity.is_nan() && filter.passes(self.retriever, candidate) {
                 results.push((candidate, candidate_similarity));
             }
 
@@ -338,7 +355,10 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 _ => (),
             }
         }
-        ms_neighbours.into_iter().map(|Reverse(CnxWithBound(n, d))| (n, d))
+        ms_neighbours
+            .into_sorted_vec()
+            .into_iter()
+            .map(|Reverse(CnxWithBound(n, d))| (n, d))
     }
 
     fn layer_insert(
@@ -408,8 +428,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         query: &SearchVector,
         hnsw: H,
         k_neighbours: usize,
-        with_filter: &FilterBitSet,
-        with_duplicates: bool,
+        filter: NodeFilter,
     ) -> Neighbours {
         if k_neighbours == 0 {
             return Neighbours::with_capacity(0);
@@ -442,7 +461,10 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let last_layer_k = if original_query.is_some() {
             std::cmp::min(k_neighbours * rabitq::RERANKING_FACTOR, rabitq::RERANKING_LIMIT)
         } else {
-            k_neighbours
+            // We search for at least EF_SEARCH neighbours to guarantee good results
+            // In the case k > EF we could use EF search and expand the search with
+            // closest_up_nodes()
+            std::cmp::max(k_neighbours, EF_SEARCH)
         };
 
         // Find the best k nodes in the last layer
@@ -466,20 +488,12 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             neighbours.map(|(addr, _)| addr).collect()
         };
 
-        let filter = NodeFilter {
-            filter: with_filter,
-            retriever: self.retriever,
-            paragraphs: Default::default(),
-            vec_counter: RepCounter::new(!with_duplicates),
-        };
-        let layer_zero = hnsw.get_layer(0);
-
         // Find k nodes that match the filter in the last layer
         let t = Instant::now();
         let mut filtered_result = self.closest_up_nodes(
             entry_points,
             original_query.unwrap_or(query),
-            layer_zero,
+            hnsw.get_layer(0),
             k_neighbours,
             filter,
         );

@@ -7,13 +7,13 @@ name = "nidx_binding"
 description = "Bindings for nidx (part of nucliadb)"
 license = "AGPL-3.0-or-later"
 authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
-requires-python = ">=3.9, <4"
+requires-python = ">=3.10, <4"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-version = "6.9.1"
+version = "6.9.2"
 
 [project.urls]
 Homepage = "https://nuclia.com"

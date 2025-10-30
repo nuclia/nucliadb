@@ -484,7 +484,8 @@ class SearchParamDefaults:
     autofilter = ParamDefault(
         default=False,
         title="Automatic search filtering",
-        description="If set to true, the search will automatically add filters to the query. For example, it will filter results containing the entities detected in the query",  # noqa: E501
+        description="[Deprecated] If set to true, the search will automatically add filters to the query. For example, it will filter results containing the entities detected in the query",  # noqa: E501
+        deprecated=True,
     )
     chat_query = ParamDefault(
         default=...,
@@ -1239,6 +1240,7 @@ class HierarchyResourceStrategy(RagStrategy):
         title="Count",
         description="Number of extra characters that are added to each matching paragraph when adding to the context.",
         ge=0,
+        le=1024,
     )
 
 
@@ -1467,7 +1469,7 @@ class PageImageStrategy(ImageRagStrategy):
     count: Optional[int] = Field(
         default=None,
         title="Count",
-        description="Maximum number of images to retrieve from the page. By default, at most 5 images are retrieved.",
+        description="Maximum number of page images to retrieve. By default, at most 5 images are retrieved.",
     )
 
 

@@ -548,7 +548,8 @@ impl OpenSegment {
         } else {
             method = "hnsw";
             let ops = HnswOps::new(&retriever, true);
-            let neighbours = ops.search(encoded_query, self.index.as_ref(), top_k, bitset, with_duplicates);
+            let filter = NodeFilter::new(bitset, with_duplicates, config);
+            let neighbours = ops.search(encoded_query, self.index.as_ref(), top_k, filter);
             Box::new(
                 neighbours
                     .into_iter()

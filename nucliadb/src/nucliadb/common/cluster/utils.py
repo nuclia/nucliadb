@@ -32,6 +32,7 @@ from nucliadb.common.cluster.settings import settings
 from nucliadb.ingest.orm import index_message
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import writer_pb2
+from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -125,3 +126,28 @@ async def delete_resource_from_shard(
     partition = partitioning.generate_partition(kbid, resource_id)
 
     await sm.delete_resource(shard, resource_id, 0, str(partition), kbid)
+
+
+async def get_nats_consumer_pending_messages(
+    nats_manager: NatsConnectionManager, *, stream: str, consumer: str
+) -> int:
+    # get raw js client
+    js = nats_manager.js
+    consumer_info = await js.consumer_info(stream, consumer)
+    return consumer_info.num_pending
+
+
+async def wait_for_nidx(
+    nats_manager: NatsConnectionManager,
+    max_pending: int,
+    poll_interval_seconds: int = 5,
+    max_wait_seconds: int = 60,
+):
+    async with asyncio.timeout(max_wait_seconds):  # type: ignore
+        while True:
+            pending = await get_nats_consumer_pending_messages(
+                nats_manager, stream="nidx", consumer="nidx"
+            )
+            if pending < max_pending:
+                return
+            await asyncio.sleep(poll_interval_seconds)

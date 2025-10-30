@@ -4,21 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb_models"
-version = "6.9.1"
+version = "6.9.2"
 license = "Apache-2.0"
 readme = "README.md"
 authors = [{ name = "Nuclia", email = "nucliadb@nuclia.com" }]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-requires-python = ">=3.9, <4"
+requires-python = ">=3.10, <4"
 # https://github.com/pydantic/pydantic/issues/11978
 dependencies = ["pydantic>=2.6,!=2.11.5,!=2.11.6"]
 

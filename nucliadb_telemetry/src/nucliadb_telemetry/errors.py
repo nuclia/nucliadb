@@ -101,8 +101,11 @@ def setup_error_handling(version: str) -> None:
             release=version,
             environment=settings.environment,
             dsn=settings.sentry_url,
-            integrations=[],
-            default_integrations=False,
+            integrations=[
+                LoggingIntegration(
+                    level=None,
+                ),
+            ],
         )
         sentry_sdk.set_tag("zone", settings.zone)
 

@@ -24,7 +24,6 @@ from opentelemetry.instrumentation.fastapi import (  # type: ignore
 from prometheus_client import CONTENT_TYPE_LATEST
 from starlette.responses import PlainTextResponse
 
-from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi.metrics import PrometheusMiddleware
 from nucliadb_telemetry.fastapi.tracing import (
     CaptureTraceIdMiddleware,
@@ -92,9 +91,3 @@ def instrument_app(
             server_request_hook=server_request_hook,
             tracer_provider=tracer_provider,
         )
-
-    error_settings = errors.ErrorHandlingSettings()
-    if SentryAsgiMiddleware is not None and error_settings.sentry_url is not None:
-        # add last to catch all exceptions
-        # `add_middleware` always adds to the beginning of the middleware list
-        app.add_middleware(SentryAsgiMiddleware)

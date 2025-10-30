@@ -47,6 +47,7 @@ from .utils import (
     get_resource,
     get_rollover_resource_index_message,
     index_resource_to_shard,
+    wait_for_nidx,
 )
 
 logger = logging.getLogger(__name__)
@@ -256,12 +257,29 @@ async def index_to_rollover_index(
             for rid in resource_ids
         ]
         await asyncio.gather(*batch)
+        await wait_for_indexing_to_catch_up(app_context)
 
     async with datamanagers.with_transaction() as txn:
         state.resources_indexed = True
         await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
         await datamanagers.rollover.update_kb_rollover_shards(txn, kbid=kbid, kb_shards=rollover_shards)
         await txn.commit()
+
+
+async def wait_for_indexing_to_catch_up(app_context: ApplicationContext):
+    try:
+        app_context.nats_manager
+    except AssertionError:
+        logger.warning("Nats manager not initialized. Cannot wait for indexing to catch up")
+        return
+    max_pending = 1000
+    while True:
+        try:
+            await wait_for_nidx(app_context.nats_manager, max_wait_seconds=60, max_pending=max_pending)
+            return
+        except asyncio.TimeoutError:
+            logger.warning(f"Nidx is behind more than {max_pending} messages. Throttling rollover.")
+            await asyncio.sleep(30)
 
 
 async def _index_resource_to_rollover_index(

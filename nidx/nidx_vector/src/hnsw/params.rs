@@ -44,5 +44,8 @@ pub const M_MAX: usize = 30;
 /// Number of bi-directional links created for every new element.
 pub const M: usize = 30;
 
-/// Number of neighbours that are searched for before adding a new embedding.
+/// Number of neighbours that are explored when searching for the insertion place of a new node
 pub const EF_CONSTRUCTION: usize = 100;
+
+/// Number of neighbours that are explored when searching for a query
+pub const EF_SEARCH: usize = 30;
