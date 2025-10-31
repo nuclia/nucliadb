@@ -24,10 +24,10 @@ from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import rebalance
+from nucliadb.common.cluster.rebalance import build_shard_resources_index
 from nucliadb.common.cluster.settings import settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
-from nucliadb.common.datamanagers.resources import KB_RESOURCE_SHARD
 from nucliadb_protos import writer_pb2
 
 
@@ -183,20 +183,6 @@ async def get_kb_shards(kbid: str) -> writer_pb2.Shards:
     kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=kbid)
     assert kb_shards is not None
     return kb_shards
-
-
-async def build_shard_resources_index(kbid: str) -> dict[str, set[str]]:
-    index: dict[str, set[str]] = {}
-    rids = [rid async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid)]
-    async with datamanagers.with_ro_transaction() as txn:
-        shards = await txn.batch_get(
-            keys=[KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid) for rid in rids],
-            for_update=False,
-        )
-        for rid, shard_bytes in zip(rids, shards):
-            if shard_bytes is not None:
-                index.setdefault(shard_bytes.decode(), set()).add(rid)
-    return index
 
 
 async def create_resource_with_paragraph(nucliadb_writer: AsyncClient, kbid: str, i: int):

@@ -22,7 +22,7 @@ import dataclasses
 import logging
 import math
 import random
-from typing import Optional, cast
+from typing import Optional
 
 import aioitertools
 from grpc import StatusCode
@@ -33,7 +33,6 @@ from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SHARD
-from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.common.nidx import get_nidx_api_client, get_nidx_searcher_client
 from nucliadb_protos import writer_pb2
 from nucliadb_telemetry import errors
@@ -94,22 +93,7 @@ class Rebalancer:
         )
 
     async def build_shard_resources_index(self):
-        driver = cast(PGDriver, self.context.kv_driver)
-        async with driver._get_connection() as conn:
-            cur = conn.cursor(name="foo")
-            await cur.execute(
-                """
-                SELECT encode(value, 'escape'), COUNT(*) FROM resources WHERE key LIKE %s GROUP BY value;
-                """,
-                (f"/kbs/{self.kbid}/r/%/shard",),
-            )
-            records = await cur.fetchall()
-            if len(records) == 0:
-                return {}
-            breakpoint()
-            
-            pass
-            
+        self.index = await build_shard_resources_index(self.kbid)
 
     async def move_paragraphs(
         self, from_shard: RebalanceShard, to_shard: RebalanceShard, max_paragraphs: int
@@ -361,6 +345,21 @@ class Rebalancer:
                 await get_nidx_api_client().DeleteShard(
                     noderesources_pb2.ShardId(id=to_delete.nidx_shard_id)
                 )
+
+
+async def build_shard_resources_index(kbid: str) -> dict[str, set[str]]:
+    index: dict[str, set[str]] = {}
+    async with datamanagers.with_ro_transaction() as txn:
+        iterable = datamanagers.resources.iterate_resource_ids(kbid=kbid)
+        async for resources_batch in aioitertools.batched(iterable, n=200):
+            shards = await txn.batch_get(
+                keys=[KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid) for rid in resources_batch],
+                for_update=False,
+            )
+            for rid, shard_bytes in zip(resources_batch, shards):
+                if shard_bytes is not None:
+                    index.setdefault(shard_bytes.decode(), set()).add(rid)
+    return index
 
 
 async def get_resource_paragraphs_count(resource_id: str, nidx_shard_id: str) -> int:
