@@ -129,6 +129,27 @@ async def get_schema_for_configuration_updates(
 
 
 @api.get(
+    path=f"/{KB_PREFIX}/{{kbid}}/generative_providers",
+    status_code=200,
+    summary="Available models for a knowledge box",
+    description="Get all available models for a knowledge box grouped by provider",
+    response_model=None,
+    tags=["Models"],
+)
+@requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
+@version(1)
+async def get_models_group_by_providers(
+    request: Request, kbid: str, x_nucliadb_account: str = Header(default="", include_in_schema=False)
+):
+    return await learning_config_proxy(
+        request,
+        "GET",
+        f"/generative_providers/{kbid}",
+        headers={"account-id": x_nucliadb_account},
+    )
+
+
+@api.get(
     path=f"/nua/schema",
     status_code=200,
     summary="Learning configuration schema for Knowledge Box creation",

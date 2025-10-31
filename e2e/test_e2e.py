@@ -230,6 +230,17 @@ def test_learning_config(kbid: str):
     )
     raise_for_status(resp)
 
+    # Get the models by provider
+    resp = requests.get(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/generative_providers"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+    )
+    raise_for_status(resp)
+
 
 def test_mimetypes(kbid: str):
     # Create a resource with a few different mimetypes to ensure they are supported
