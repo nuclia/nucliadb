@@ -451,34 +451,40 @@ async def test_ask_rag_options_extend_with_fields(
     nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
 ):
     resource1, resource2 = resources
-
     predict = get_predict()
-    predict.calls.clear()  # type: ignore
 
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/ask",
-        json={
-            "query": "title",
-            "features": ["keyword", "semantic", "relations"],
-            "rag_strategies": [{"name": "field_extension", "fields": ["a/summary"]}],
-        },
-    )
-    assert resp.status_code == 200, resp.text
-    _ = parse_ask_response(resp)
+    for rag_strategy in [
+        # Check exact match type
+        {"name": "field_extension", "fields": ["a/summary"], "match_type": "exact"},
+        # Check contains match type
+        {"name": "field_extension", "fields": ["sum"], "match_type": "contains"},
+    ]:
+        predict.calls.clear()  # type: ignore
 
-    # Make sure the prompt context is properly crafted
-    assert predict.calls[-2][0] == "chat_query_ndjson"  # type: ignore
-    prompt_context = predict.calls[-2][1].query_context  # type: ignore
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/ask",
+            json={
+                "query": "title",
+                "features": ["keyword", "semantic", "relations"],
+                "rag_strategies": [rag_strategy],
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        _ = parse_ask_response(resp)
 
-    # Matching paragraphs should be in the prompt
-    # context, plus the extended field for each resource
-    assert len(prompt_context) == 4
-    # The matching paragraphs
-    assert prompt_context[f"{resource1}/a/title/0-11"] == "The title 0"
-    assert prompt_context[f"{resource2}/a/title/0-11"] == "The title 1"
-    # The extended fields
-    assert prompt_context[f"{resource1}/a/summary"] == "The summary 0"
-    assert prompt_context[f"{resource2}/a/summary"] == "The summary 1"
+        # Make sure the prompt context is properly crafted
+        assert predict.calls[-2][0] == "chat_query_ndjson"  # type: ignore
+        prompt_context = predict.calls[-2][1].query_context  # type: ignore
+
+        # Matching paragraphs should be in the prompt
+        # context, plus the extended field for each resource
+        assert len(prompt_context) == 4
+        # The matching paragraphs
+        assert prompt_context[f"{resource1}/a/title/0-11"] == "The title 0"
+        assert prompt_context[f"{resource2}/a/title/0-11"] == "The title 1"
+        # The extended fields
+        assert prompt_context[f"{resource1}/a/summary"] == "The summary 0"
+        assert prompt_context[f"{resource2}/a/summary"] == "The summary 1"
 
 
 @pytest.mark.parametrize(
