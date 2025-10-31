@@ -1179,9 +1179,9 @@ ALLOWED_FIELD_TYPES: dict[str, str] = {
 class FieldExtensionStrategy(RagStrategy):
     name: Literal["field_extension"] = "field_extension"
     fields: list[str] = Field(
+        default=[],
         title="Fields",
         description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",
-        min_length=1,
     )
     data_augmentation_field_prefixes: list[str] = Field(
         default=[],
