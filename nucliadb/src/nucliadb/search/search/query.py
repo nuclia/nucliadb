@@ -26,9 +26,6 @@ from nidx_protos.noderesources_pb2 import Resource
 from nucliadb.common import datamanagers
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.filter_expression import add_and_expression, parse_expression
-from nucliadb.search.search.filters import (
-    translate_label,
-)
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.labels import LABEL_HIDDEN
@@ -164,26 +161,6 @@ def expand_entities(
                     )
 
     return list(result_entities.values())
-
-
-def apply_entities_filter(
-    request: nodereader_pb2.SearchRequest,
-    detected_entities: list[utils_pb2.RelationNode],
-) -> list[str]:
-    added_filters = []
-    for entity_filter in [
-        f"/e/{entity.subtype}/{entity.value}"
-        for entity in detected_entities
-        if entity.ntype == utils_pb2.RelationNode.NodeType.ENTITY
-    ]:
-        if entity_filter not in added_filters:
-            added_filters.append(entity_filter)
-            # Add the entity to the filter expression (with AND)
-            entity_expr = nodereader_pb2.FilterExpression()
-            entity_expr.facet.facet = translate_label(entity_filter)
-            add_and_expression(request.field_filter, entity_expr)
-
-    return added_filters
 
 
 async def suggest_query_to_pb(

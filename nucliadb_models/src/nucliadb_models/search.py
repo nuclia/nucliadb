@@ -79,8 +79,9 @@ ANSWER_JSON_SCHEMA_EXAMPLE = {
 class ModelParamDefaults:
     applied_autofilters = ParamDefault(
         default=[],
-        title="Autofilters",
-        description="List of filters automatically applied to the search query",
+        title="Applied autofilters",
+        description="[deprecated] list of filters automatically applied to the search query",
+        deprecated=True,
     )
 
 
@@ -296,6 +297,8 @@ class KnowledgeboxSearchResults(JsonBaseModel):
     relations: Optional[Relations] = None
     nodes: Optional[list[dict[str, str]]] = None
     shards: Optional[list[str]] = None
+
+    # TODO: remove on a future major release
     autofilters: list[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
 
 
@@ -480,12 +483,6 @@ class SearchParamDefaults:
         title="Faceted",
         description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
         max_items=50,
-    )
-    autofilter = ParamDefault(
-        default=False,
-        title="Automatic search filtering",
-        description="[Deprecated] If set to true, the search will automatically add filters to the query. For example, it will filter results containing the entities detected in the query",  # noqa: E501
-        deprecated=True,
     )
     chat_query = ParamDefault(
         default=...,
@@ -877,7 +874,9 @@ class BaseSearchRequest(AuditMetadataBase):
     vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
     with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
-    autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
+    # autofilter is deprecated and its logic was removed. We're just keeping it in the model definition to
+    # avoid breaking changes in the python sdks. Please remove on a future major release.
+    autofilter: SkipJsonSchema[bool] = False
     resource_filters: list[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
     show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
@@ -1620,7 +1619,11 @@ class AskRequest(AuditMetadataBase):
         description="Image that will be used together with the query text for retrieval and then sent to the LLM as part of the context. "
         "If a query image is provided, the `extra_context_images` and `rag_images_strategies` will be disabled.",
     )
-    autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
+
+    # autofilter is deprecated and its logic was removed. We're just keeping it in the model definition to
+    # avoid breaking changes in the python sdks. Please remove on a future major release.
+    autofilter: SkipJsonSchema[bool] = False
+
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     resource_filters: list[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
     prompt: Optional[Union[str, CustomPrompt]] = Field(

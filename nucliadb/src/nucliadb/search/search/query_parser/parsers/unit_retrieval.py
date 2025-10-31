@@ -25,10 +25,10 @@ from nidx_protos.nodereader_pb2 import SearchRequest
 from nucliadb.common.filter_expression import add_and_expression
 from nucliadb.search.search.filters import translate_label
 from nucliadb.search.search.metrics import node_features, query_parser_observer
-from nucliadb.search.search.query import apply_entities_filter, get_sort_field_proto
+from nucliadb.search.search.query import get_sort_field_proto
 from nucliadb.search.search.query_parser.models import ParsedQuery, PredictReranker, UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.graph import parse_path_query
-from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
+from nucliadb_models.labels import LABEL_HIDDEN
 from nucliadb_models.search import SortOrderMap
 from nucliadb_protos import utils_pb2
 
@@ -36,7 +36,7 @@ from nucliadb_protos import utils_pb2
 @query_parser_observer.wrap({"type": "convert_retrieval_to_proto"})
 async def legacy_convert_retrieval_to_proto(
     parsed: ParsedQuery,
-) -> tuple[SearchRequest, bool, list[str], Optional[str]]:
+) -> tuple[SearchRequest, bool, Optional[str]]:
     converter = _Converter(parsed.retrieval)
     request = converter.into_search_request()
 
@@ -44,13 +44,12 @@ async def legacy_convert_retrieval_to_proto(
     # needed. We should find a better abstraction
 
     incomplete = is_incomplete(parsed.retrieval)
-    autofilter = converter._autofilter
 
     rephrased_query = None
     if parsed.retrieval.query.semantic:
         rephrased_query = await parsed.fetcher.get_rephrased_query()
 
-    return request, incomplete, autofilter, rephrased_query
+    return request, incomplete, rephrased_query
 
 
 @query_parser_observer.wrap({"type": "convert_retrieval_to_proto"})
@@ -64,8 +63,6 @@ class _Converter:
     def __init__(self, retrieval: UnitRetrieval):
         self.req = nodereader_pb2.SearchRequest()
         self.retrieval = retrieval
-
-        self._autofilter: list[str] = []
 
     def into_search_request(self) -> nodereader_pb2.SearchRequest:
         """Generate a SearchRequest proto from a retrieval operation."""
@@ -234,10 +231,6 @@ class _Converter:
         if self.retrieval.filters.paragraph_expression:
             self.req.paragraph_filter.CopyFrom(self.retrieval.filters.paragraph_expression)
         self.req.filter_operator = self.retrieval.filters.filter_expression_operator
-
-        if self.retrieval.filters.autofilter:
-            entity_filters = apply_entities_filter(self.req, self.retrieval.filters.autofilter)
-            self._autofilter.extend([translate_system_to_alias_label(e) for e in entity_filters])
 
         if self.retrieval.filters.hidden is not None:
             expr = nodereader_pb2.FilterExpression()

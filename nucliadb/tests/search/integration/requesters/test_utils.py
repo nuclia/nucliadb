@@ -56,7 +56,7 @@ async def test_vector_result_metadata(nucliadb_search: AsyncClient, test_search_
             ),
         ),
     )
-    pb_query, _, _, _ = await legacy_convert_retrieval_to_proto(parsed)
+    pb_query, _, _ = await legacy_convert_retrieval_to_proto(parsed)
 
     results, _ = await nidx_query(kbid, Method.SEARCH, pb_query)
     assert len(results[0].vector.documents) > 0

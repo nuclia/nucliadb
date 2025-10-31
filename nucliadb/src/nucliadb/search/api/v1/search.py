@@ -148,7 +148,6 @@ async def search_knowledgebox(
     extracted: list[ExtractedDataTypeName] = fastapi_query(SearchParamDefaults.extracted),
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
-    autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
     security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
     show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
@@ -187,7 +186,6 @@ async def search_knowledgebox(
             extracted=extracted,
             with_duplicates=with_duplicates,
             with_synonyms=with_synonyms,
-            autofilter=autofilter,
             security=security,
             show_hidden=show_hidden,
         )
@@ -262,7 +260,7 @@ async def search(
     start_time = time()
 
     parsed = await parse_search(kbid, item)
-    pb_query, incomplete_results, autofilters, _ = await legacy_convert_retrieval_to_proto(parsed)
+    pb_query, incomplete_results, _ = await legacy_convert_retrieval_to_proto(parsed)
 
     # We need to query all nodes
     results, queried_shards = await nidx_query(kbid, Method.SEARCH, pb_query)
@@ -290,5 +288,4 @@ async def search(
         )
 
     search_results.shards = queried_shards
-    search_results.autofilters = autofilters
     return search_results, incomplete_results

@@ -100,7 +100,6 @@ async def _index_node_retrieval(
         (
             pb_query,
             incomplete_results,
-            autofilters,
             rephrased_query,
         ) = await legacy_convert_retrieval_to_proto(parsed)
 
@@ -137,7 +136,6 @@ async def _index_node_retrieval(
         )
 
     search_results.shards = queried_shards
-    search_results.autofilters = autofilters
 
     ndb_time = metrics["index_search"] + metrics["results_merge"]
     if metrics["index_search"] > settings.slow_node_query_log_threshold:
@@ -180,9 +178,7 @@ async def _external_index_retrieval(
     parsed = await parse_find(kbid, item)
     assert parsed.retrieval.reranker is not None, "find parser must provide a reranking algorithm"
     reranker = get_reranker(parsed.retrieval.reranker)
-    search_request, incomplete_results, _, rephrased_query = await legacy_convert_retrieval_to_proto(
-        parsed
-    )
+    search_request, incomplete_results, rephrased_query = await legacy_convert_retrieval_to_proto(parsed)
 
     # Query index
     query_results = await external_index_manager.query(search_request)  # noqa
@@ -220,7 +216,6 @@ async def _external_index_retrieval(
         page_number=0,
         page_size=item.top_k,
         relations=None,  # Not implemented for external indexes yet
-        autofilters=[],  # Not implemented for external indexes yet
         min_score=results_min_score,
         best_matches=best_matches,
         # These are not used for external indexes
