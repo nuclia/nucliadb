@@ -28,7 +28,7 @@ async def migrate(txn: PGTransaction) -> None:
     try:
         await txn.connection.set_autocommit(True)
         await txn.connection.execute(
-            "CREATE INDEX CONCURRENTLY ON resources (key, value) WHERE key LIKE '/kbs/%/r/%/shard';"
+            "CREATE INDEX CONCURRENTLY ON resources (key, value) WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$';"
         )
     finally:
         await txn.connection.set_autocommit(False)

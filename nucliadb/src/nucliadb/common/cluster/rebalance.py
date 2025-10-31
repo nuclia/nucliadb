@@ -22,9 +22,8 @@ import dataclasses
 import logging
 import math
 import random
-from typing import Optional
+from typing import Optional, cast
 
-import aioitertools
 from grpc import StatusCode
 from grpc.aio import AioRpcError
 from nidx_protos import nodereader_pb2, noderesources_pb2
@@ -32,7 +31,8 @@ from nidx_protos import nodereader_pb2, noderesources_pb2
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
-from nucliadb.common.datamanagers.resources import KB_RESOURCE_SHARD
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.nidx import get_nidx_api_client, get_nidx_searcher_client
 from nucliadb_protos import writer_pb2
 from nucliadb_telemetry import errors
@@ -68,7 +68,7 @@ class Rebalancer:
         self.context = context
         self.kbid = kbid
         self.kb_shards: Optional[writer_pb2.Shards] = None
-        self.index: dict[str, set[str]] = {}
+        self.index: dict[str, int] = {}
 
     async def get_rebalance_shards(self) -> list[RebalanceShard]:
         """
@@ -93,7 +93,7 @@ class Rebalancer:
         )
 
     async def build_shard_resources_index(self):
-        self.index = await build_shard_resources_index(self.kbid)
+        self.index = await build_shard_resources_index(self.context.kv_driver, self.kbid)
 
     async def move_paragraphs(
         self, from_shard: RebalanceShard, to_shard: RebalanceShard, max_paragraphs: int
@@ -106,9 +106,10 @@ class Rebalancer:
 
         while moved_paragraphs < max_paragraphs:
             # Take a random resource to move
-            try:
-                resource_id = random.choice(tuple(self.index[from_shard.id]))
-            except (KeyError, IndexError):
+            resource_id = await get_random_resource_from_shard(
+                self.context.kv_driver, self.kbid, from_shard.id
+            )
+            if resource_id is None:
                 # No more resources in shard or shard not found
                 break
 
@@ -120,8 +121,8 @@ class Rebalancer:
                 self.context, self.kbid, resource_id, from_shard_obj, to_shard_obj
             )
             if moved:
-                self.index[from_shard.id].remove(resource_id)
-                self.index.setdefault(to_shard.id, set()).add(resource_id)
+                self.index[from_shard.id] = self.index.get(from_shard.id, 1) - 1
+                self.index[to_shard.id] = self.index.get(to_shard.id, 0) + 1
                 moved_paragraphs += paragraphs_count
 
         return moved_paragraphs
@@ -252,7 +253,7 @@ class Rebalancer:
         empty_shard = False
 
         for _ in range(MAX_MOVES_PER_SHARD):
-            resources_count = len(self.index.get(shard_to_merge.id, []))
+            resources_count = self.index.get(shard_to_merge.id, 0)
             if resources_count == 0:
                 logger.info(
                     "Shard is now empty",
@@ -297,14 +298,14 @@ class Rebalancer:
         if empty_shard:
             # Build the index again, and make sure there is no resource assigned to this shard
             await self.build_shard_resources_index()
-            shard_resources = self.index.get(shard_to_merge.id, set())
-            if len(shard_resources) > 0:
+            shard_resources = self.index.get(shard_to_merge.id, 0)
+            if shard_resources > 0:
                 logger.error(
                     f"Shard expected to be empty, but it isn't. Won't be deleted.",
                     extra={
                         "kbid": self.kbid,
                         "shard": shard_to_merge.id,
-                        "resources": list(shard_resources)[:30],
+                        "resources": shard_resources,
                     },
                 )
                 return
@@ -347,19 +348,38 @@ class Rebalancer:
                 )
 
 
-async def build_shard_resources_index(kbid: str) -> dict[str, set[str]]:
-    index: dict[str, set[str]] = {}
-    async with datamanagers.with_ro_transaction() as txn:
-        iterable = datamanagers.resources.iterate_resource_ids(kbid=kbid)
-        async for resources_batch in aioitertools.batched(iterable, n=200):
-            shards = await txn.batch_get(
-                keys=[KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid) for rid in resources_batch],
-                for_update=False,
-            )
-            for rid, shard_bytes in zip(resources_batch, shards):
-                if shard_bytes is not None:
-                    index.setdefault(shard_bytes.decode(), set()).add(rid)
-    return index
+async def build_shard_resources_index(driver: Driver, kbid: str) -> dict[str, int]:
+    index: dict[str, int] = {}
+    driver = cast(PGDriver, driver)
+    async with driver._get_connection() as conn:
+        cur = conn.cursor("")
+        await cur.execute(
+            """
+            SELECT encode(value, 'escape'), COUNT(*) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s GROUP BY value;
+            """,
+            (f"/kbs/{kbid}/r/[^/]*/shard$",),
+        )
+        records = await cur.fetchall()
+        shard: str
+        resources_count: int
+        for shard, resources_count in records:
+            index[shard] = resources_count
+        return index
+
+
+async def get_random_resource_from_shard(driver: Driver, kbid: str, shard_id: str) -> Optional[str]:
+    driver = cast(PGDriver, driver)
+    async with driver._get_connection() as conn:
+        cur = conn.cursor("")
+        await cur.execute(
+            """
+            SELECT split_part(key, '/', 5) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s AND encode(value, 'escape') LIKE %s limit 50;
+            """,
+            (f"/kbs/{kbid}/r/[^/]*/shard$", shard_id),
+        )
+        records = await cur.fetchall()
+        rids: list[str] = [r[0] for r in records]
+        return random.choice(rids) if len(rids) > 0 else None
 
 
 async def get_resource_paragraphs_count(resource_id: str, nidx_shard_id: str) -> int:
