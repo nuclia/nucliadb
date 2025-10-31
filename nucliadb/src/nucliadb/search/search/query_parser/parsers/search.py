@@ -251,17 +251,9 @@ class _SearchParser:
             else:
                 filter_operator = nodereader_pb2.FilterOperator.AND
 
-        autofilter = None
-        if self.item.autofilter:
-            if self._query.relation is not None:
-                autofilter = self._query.relation.entry_points
-            else:
-                autofilter = await self._get_detected_entities()
-
         hidden = await filter_hidden_resources(self.kbid, self.item.show_hidden)
 
         return Filters(
-            autofilter=autofilter,
             facets=self.item.faceted,
             field_expression=field_expr,
             paragraph_expression=paragraph_expr,

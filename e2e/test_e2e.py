@@ -160,7 +160,6 @@ def test_search(kbid: str, resource_id: str):
             "show": ["basic", "values", "origin"],
             "features": ["keyword", "relations"],
             "highlight": True,
-            "autofilter": False,
             "page_number": 0,
             "filters": [],
             "debug": True,

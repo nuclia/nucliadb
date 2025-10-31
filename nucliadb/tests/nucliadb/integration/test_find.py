@@ -248,7 +248,6 @@ async def test_story_7286(
                 "features": [FindOptions.KEYWORD, FindOptions.SEMANTIC, FindOptions.RELATIONS],
                 "shards": [],
                 "highlight": True,
-                "autofilter": False,
                 "page_number": 0,
                 "show": ["basic", "values", "origin"],
                 "filters": [],

@@ -1077,7 +1077,6 @@ def calculate_prequeries_for_json_schema(
             rephrase=ask_request.rephrase,
             rephrase_prompt=parse_rephrase_prompt(ask_request),
             security=ask_request.security,
-            autofilter=False,
         )
         prequery = PreQuery(
             request=req,
