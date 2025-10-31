@@ -28,6 +28,7 @@ from starlette.responses import HTMLResponse
 
 from nucliadb.middleware import ProcessTimeHeaderMiddleware
 from nucliadb.search import API_PREFIX
+from nucliadb.search.api.rao.router import api as api_rao
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import lifespan
 from nucliadb_telemetry import errors
@@ -69,6 +70,7 @@ fastapi_settings = dict(
 
 base_app = FastAPI(title="NucliaDB Search API", **fastapi_settings)  # type: ignore
 base_app.include_router(api_v1)
+base_app.include_router(api_rao)
 
 extend_openapi(base_app)
 
