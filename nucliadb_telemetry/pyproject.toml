@@ -15,14 +15,13 @@ classifiers = [
     "Intended Audience :: Information Technology",
     "Framework :: AsyncIO",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: System :: Monitoring",
 ]
-requires-python = ">=3.9, <4"
+requires-python = ">=3.10, <4"
 dependencies = [
     "pydantic>=2.6",
     "pydantic-settings>=2.2",

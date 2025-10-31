@@ -14,13 +14,12 @@ classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3 :: Only",
 ]
-requires-python = ">=3.9, <4"
+requires-python = ">=3.10, <4"
 dependencies = [
     # nucliadb dependencies are auto pinned on release
     "nucliadb-telemetry[all]",
@@ -66,7 +65,7 @@ dependencies = [
 
     "fastapi-versioning>=0.10.0",
     "fastapi>=0.95.2",
-    "sentry-sdk>=2.8.0",
+    "sentry-sdk[fastapi]>=2.8.0",
     "pyjwt>=2.4.0",
     "mmh3>=3.0.0",
     "httpx>=0.23.0",
