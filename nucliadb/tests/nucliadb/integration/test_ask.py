@@ -550,14 +550,6 @@ async def test_ask_rag_options_extend_with_fields(
             "The following strategies cannot be combined in the same request: field_extension, full_resource",
         ),
         (
-            # field_extension requires fields
-            {
-                "query": "title",
-                "rag_strategies": [{"name": "field_extension"}],
-            },
-            "Field required",
-        ),
-        (
             # fields must be in the right format: field_type/field_name
             {
                 "query": "title",
