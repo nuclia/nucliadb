@@ -79,8 +79,8 @@ ANSWER_JSON_SCHEMA_EXAMPLE = {
 class ModelParamDefaults:
     applied_autofilters = ParamDefault(
         default=[],
-        title="Autofilters",
-        description="List of filters automatically applied to the search query",
+        title="Applied autofilters",
+        description="[deprecated] list of filters automatically applied to the search query",
         deprecated=True,
     )
 
@@ -297,6 +297,8 @@ class KnowledgeboxSearchResults(JsonBaseModel):
     relations: Optional[Relations] = None
     nodes: Optional[list[dict[str, str]]] = None
     shards: Optional[list[str]] = None
+
+    # TODO: remove on a future major release
     autofilters: list[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
 
 
