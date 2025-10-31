@@ -872,6 +872,9 @@ class BaseSearchRequest(AuditMetadataBase):
     vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
     with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
+    # autofilter is deprecated and its logic was removed. We're just keeping it in the model definition to
+    # avoid breaking changes in the python sdks. Please remove on a future major release.
+    autofilter: SkipJsonSchema[bool] = False
     resource_filters: list[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
     show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
@@ -1614,6 +1617,11 @@ class AskRequest(AuditMetadataBase):
         description="Image that will be used together with the query text for retrieval and then sent to the LLM as part of the context. "
         "If a query image is provided, the `extra_context_images` and `rag_images_strategies` will be disabled.",
     )
+
+    # autofilter is deprecated and its logic was removed. We're just keeping it in the model definition to
+    # avoid breaking changes in the python sdks. Please remove on a future major release.
+    autofilter: SkipJsonSchema[bool] = False
+
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     resource_filters: list[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
     prompt: Optional[Union[str, CustomPrompt]] = Field(
