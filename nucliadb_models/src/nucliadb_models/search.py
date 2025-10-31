@@ -1170,7 +1170,7 @@ ALLOWED_FIELD_TYPES: dict[str, str] = {
     "t": "text",
     "f": "file",
     "u": "link",
-    "d": "datetime",
+    "c": "conversation",
     "a": "generic",
 }
 
@@ -1178,16 +1178,19 @@ ALLOWED_FIELD_TYPES: dict[str, str] = {
 class FieldExtensionStrategy(RagStrategy):
     name: Literal["field_extension"] = "field_extension"
     fields: list[str] = Field(
+        default=[],
         title="Fields",
-        description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",  # noqa: E501
-        min_length=1,
+        description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",
+    )
+    data_augmentation_field_prefixes: list[str] = Field(
+        default=[],
+        description="List of prefixes for data augmentation added fields to extend the context with. For example, if the prefix is 'simpson', all fields that are a result of data augmentation with that prefix will be used to extend the context.",
     )
 
-    @field_validator("fields", mode="after")
-    @classmethod
-    def fields_validator(cls, fields) -> Self:
+    @model_validator(mode="after")
+    def field_extension_strategy_validator(self) -> Self:
         # Check that the fields are in the format {field_type}/{field_name}
-        for field in fields:
+        for field in self.fields:
             try:
                 field_type, _ = field.strip("/").split("/")
             except ValueError:
@@ -1200,8 +1203,7 @@ class FieldExtensionStrategy(RagStrategy):
                     f"Field '{field}' does not have a valid field type. "
                     f"Valid field types are: {allowed_field_types_part}."
                 )
-
-        return fields
+        return self
 
 
 class FullResourceApplyTo(BaseModel):
