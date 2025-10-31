@@ -1171,7 +1171,7 @@ ALLOWED_FIELD_TYPES: dict[str, str] = {
     "t": "text",
     "f": "file",
     "u": "link",
-    "d": "datetime",
+    "c": "conversation",
     "a": "generic",
 }
 
@@ -1180,7 +1180,7 @@ class FieldExtensionStrategy(RagStrategy):
     name: Literal["field_extension"] = "field_extension"
     fields: list[str] = Field(
         title="Fields",
-        description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",  # noqa: E501
+        description="If match_type is 'exact', only fields that exactly match the query will be used to extend the context. If match_type is 'contains', fields that contain the query text will be used to extend the context. Exact match field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",  # noqa: E501
         min_length=1,
     )
 
@@ -1188,13 +1188,18 @@ class FieldExtensionStrategy(RagStrategy):
         EXACT = "exact"
         CONTAINS = "contains"
 
-    match_type: MatchType = Field(default=MatchType.EXACT, description="")
+    match_type: MatchType = Field(
+        default=MatchType.EXACT, description="Controls the matching behavior for field extensions."
+    )
 
-    @field_validator("fields", mode="after")
-    @classmethod
-    def fields_validator(cls, fields) -> Self:
+    @model_validator(mode="after")
+    def field_extension_strategy_validator(self) -> Self:
+        if self.match_type != FieldExtensionStrategy.MatchType.EXACT:
+            # Only exact match requires field format validation
+            return self
+
         # Check that the fields are in the format {field_type}/{field_name}
-        for field in fields:
+        for field in self.fields:
             try:
                 field_type, _ = field.strip("/").split("/")
             except ValueError:
@@ -1207,8 +1212,7 @@ class FieldExtensionStrategy(RagStrategy):
                     f"Field '{field}' does not have a valid field type. "
                     f"Valid field types are: {allowed_field_types_part}."
                 )
-
-        return fields
+        return self
 
 
 class FullResourceApplyTo(BaseModel):
