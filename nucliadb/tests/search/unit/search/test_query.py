@@ -21,12 +21,10 @@ from typing import Optional
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from nidx_protos.nodereader_pb2 import SearchRequest
 
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.search.query import (
-    apply_entities_filter,
     check_supported_filters,
 )
 from nucliadb.search.search.query_parser.fetcher import Fetcher
@@ -34,21 +32,6 @@ from nucliadb.search.search.query_parser.parsers.common import parse_semantic_qu
 from nucliadb.tests.vectors import Q
 from nucliadb_models.search import FindOptions, FindRequest
 from nucliadb_protos.knowledgebox_pb2 import Synonyms
-from nucliadb_protos.utils_pb2 import RelationNode
-
-
-def test_parse_entities_to_filters():
-    detected_entities = [
-        RelationNode(value="John", ntype=RelationNode.NodeType.ENTITY, subtype="person")
-    ]
-
-    request = SearchRequest()
-    request.field_filter.facet.facet = "/e/person/Austin"
-    assert apply_entities_filter(request, detected_entities) == ["/e/person/John"]
-    assert [x.facet.facet for x in request.field_filter.bool_and.operands] == [
-        "/e/person/Austin",
-        "/e/person/John",
-    ]
 
 
 @pytest.fixture()
