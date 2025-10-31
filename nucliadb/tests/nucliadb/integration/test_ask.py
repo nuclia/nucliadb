@@ -448,43 +448,75 @@ async def test_ask_full_resource_rag_strategy_with_exclude(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_rag_options_extend_with_fields(
-    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    resources,
 ):
     resource1, resource2 = resources
-    predict = get_predict()
 
-    for rag_strategy in [
-        # Check exact match type
-        {"name": "field_extension", "fields": ["a/summary"], "match_type": "exact"},
-        # Check contains match type
-        {"name": "field_extension", "fields": ["sum"], "match_type": "contains"},
-    ]:
-        predict.calls.clear()  # type: ignore
-
-        resp = await nucliadb_reader.post(
-            f"/kb/{standalone_knowledgebox}/ask",
-            json={
-                "query": "title",
-                "features": ["keyword", "semantic", "relations"],
-                "rag_strategies": [rag_strategy],
+    # Create a 'fake' data augmentation field
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": "The title DA",
+            "texts": {
+                "da-simpson-augmented-field": {
+                    "body": "This is a data augmentation field content",
+                }
             },
-        )
-        assert resp.status_code == 200, resp.text
-        _ = parse_ask_response(resp)
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+    bmb = BrokerMessageBuilder(
+        kbid=standalone_knowledgebox, rid=rid, source=wpb2.BrokerMessage.MessageSource.PROCESSOR
+    )
+    bmb_fb = bmb.field_builder("da-simpson-augmented-field", field_type=rpb2.FieldType.TEXT)
+    bmb_fb.with_extracted_text("This is a data augmentation field content")
+    bm = bmb.build()
+    await inject_message(nucliadb_ingest_grpc, bm)
 
-        # Make sure the prompt context is properly crafted
-        assert predict.calls[-2][0] == "chat_query_ndjson"  # type: ignore
-        prompt_context = predict.calls[-2][1].query_context  # type: ignore
+    predict = get_predict()
+    predict.calls.clear()  # type: ignore
 
-        # Matching paragraphs should be in the prompt
-        # context, plus the extended field for each resource
-        assert len(prompt_context) == 4
-        # The matching paragraphs
-        assert prompt_context[f"{resource1}/a/title/0-11"] == "The title 0"
-        assert prompt_context[f"{resource2}/a/title/0-11"] == "The title 1"
-        # The extended fields
-        assert prompt_context[f"{resource1}/a/summary"] == "The summary 0"
-        assert prompt_context[f"{resource2}/a/summary"] == "The summary 1"
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={
+            "query": "title",
+            "features": ["keyword", "semantic", "relations"],
+            "rag_strategies": [
+                {
+                    "name": "field_extension",
+                    "fields": ["a/summary"],
+                    "data_augmentation_field_prefixes": ["simpson"],
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    _ = parse_ask_response(resp)
+
+    # Make sure the prompt context is properly crafted
+    assert predict.calls[-2][0] == "chat_query_ndjson"  # type: ignore
+    prompt_context = predict.calls[-2][1].query_context  # type: ignore
+
+    # Matching paragraphs should be in the prompt
+    # context, plus the extended field for each resource
+    assert len(prompt_context) == 6
+    # The matching paragraphs
+    assert prompt_context[f"{resource1}/a/title/0-11"] == "The title 0"
+    assert prompt_context[f"{resource2}/a/title/0-11"] == "The title 1"
+    assert prompt_context[f"{rid}/a/title/0-12"] == "The title DA"
+
+    # The extended fields
+    assert prompt_context[f"{resource1}/a/summary"] == "The summary 0"
+    assert prompt_context[f"{resource2}/a/summary"] == "The summary 1"
+    assert (
+        prompt_context[f"{rid}/t/da-simpson-augmented-field"]
+        == "This is a data augmentation field content"
+    )
 
 
 @pytest.mark.parametrize(

@@ -54,13 +54,6 @@ def test_field_extension_strategy_fields_field_validator():
             fields=["z/myfield"],
         )
 
-    # not exact match does not raise validation error
-    search.FieldExtensionStrategy(
-        name="field_extension",
-        match_type=search.FieldExtensionStrategy.MatchType.CONTAINS,
-        fields=["foobar"],
-    )
-
 
 def test_find_request_fulltext_feature_not_allowed():
     with pytest.raises(ValidationError):

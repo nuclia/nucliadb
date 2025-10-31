@@ -591,7 +591,6 @@ async def field_extension_prompt_context(
             ordered_resources.append(resource_uuid)
 
     extend_field_ids = await get_matching_field_ids(kbid, ordered_resources, strategy)
-
     tasks = [hydrate_field_text(kbid, fid) for fid in extend_field_ids]
     field_extracted_texts = await run_concurrently(tasks)
 
@@ -625,17 +624,16 @@ async def get_matching_field_ids(
     kbid: str, ordered_resources: list[str], strategy: FieldExtensionStrategy
 ) -> list[FieldId]:
     extend_field_ids: list[FieldId] = []
-    if strategy.match_type == FieldExtensionStrategy.MatchType.EXACT:
-        # Fetch the extracted texts of the specified fields for each resource
-        for resource_uuid in ordered_resources:
-            for field_id in strategy.fields:
-                try:
-                    fid = FieldId.from_string(f"{resource_uuid}/{field_id.strip('/')}")
-                    extend_field_ids.append(fid)
-                except ValueError:  # pragma: no cover
-                    # Invalid field id, skiping
-                    continue
-    elif strategy.match_type == FieldExtensionStrategy.MatchType.CONTAINS:
+    # Fetch the extracted texts of the specified fields for each resource
+    for resource_uuid in ordered_resources:
+        for field_id in strategy.fields:
+            try:
+                fid = FieldId.from_string(f"{resource_uuid}/{field_id.strip('/')}")
+                extend_field_ids.append(fid)
+            except ValueError:  # pragma: no cover
+                # Invalid field id, skiping
+                continue
+    if len(strategy.data_augmentation_field_prefixes) > 0:
         for resource_uuid in ordered_resources:
             all_field_ids = await datamanagers.atomic.resources.get_all_field_ids(
                 kbid=kbid, rid=resource_uuid, for_update=False
@@ -643,14 +641,19 @@ async def get_matching_field_ids(
             if all_field_ids is None:
                 continue
             for fieldid in all_field_ids.fields:
-                if any(pattern for pattern in strategy.fields if pattern in fieldid.field):
+                # Generated fields are always text fields starting with "da-"
+                if any(
+                    (
+                        fieldid.field_type == resources_pb2.FieldType.TEXT
+                        and fieldid.field.startswith(f"da-{prefix}-")
+                    )
+                    for prefix in strategy.data_augmentation_field_prefixes
+                ):
                     extend_field_ids.append(
                         FieldId.from_pb(
                             rid=resource_uuid, field_type=fieldid.field_type, key=fieldid.field
                         )
                     )
-    else:  # pragma: no cover
-        raise ValueError(f"Unknown match type: {strategy.match_type}")
     return extend_field_ids
 
 

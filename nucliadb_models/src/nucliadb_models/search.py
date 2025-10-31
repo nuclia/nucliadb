@@ -1180,24 +1180,16 @@ class FieldExtensionStrategy(RagStrategy):
     name: Literal["field_extension"] = "field_extension"
     fields: list[str] = Field(
         title="Fields",
-        description="If match_type is 'exact', only fields that exactly match the query will be used to extend the context. If match_type is 'contains', fields that contain the query text will be used to extend the context. Exact match field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",  # noqa: E501
+        description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",
         min_length=1,
     )
-
-    class MatchType(str, Enum):
-        EXACT = "exact"
-        CONTAINS = "contains"
-
-    match_type: MatchType = Field(
-        default=MatchType.EXACT, description="Controls the matching behavior for field extensions."
+    data_augmentation_field_prefixes: list[str] = Field(
+        default=[],
+        description="List of prefixes for data augmentation added fields to extend the context with. For example, if the prefix is 'simpson', all fields that are a result of data augmentation with that prefix will be used to extend the context.",
     )
 
     @model_validator(mode="after")
     def field_extension_strategy_validator(self) -> Self:
-        if self.match_type != FieldExtensionStrategy.MatchType.EXACT:
-            # Only exact match requires field format validation
-            return self
-
         # Check that the fields are in the format {field_type}/{field_name}
         for field in self.fields:
             try:
