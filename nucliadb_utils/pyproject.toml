@@ -33,6 +33,7 @@ dependencies = [
     "mrflagly>=0.2.9",
 
     # automatically bumped during release"
+    "nidx-protos",
     "nucliadb-protos",
     "nucliadb-telemetry",
 ]
