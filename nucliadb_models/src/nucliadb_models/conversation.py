@@ -129,7 +129,6 @@ class InputConversationField(BaseModel):
     messages: List[InputMessage] = Field(
         default_factory=list,
         description="List of messages in the conversation field. Each message must have a unique ident. A single conversation can contain up to 51,200 messages. You can add up to 2,048 messages per request.",
-        max_length=2048,
     )
     extract_strategy: Optional[str] = Field(
         default=None,
