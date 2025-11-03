@@ -86,7 +86,7 @@ class FieldConversation(BaseModel):
 
 
 class InputMessageContent(BaseModel):
-    text: str = Field(max_length=10 * 1024)
+    text: str = Field()
     format: MessageFormat = MessageFormat.PLAIN
     attachments: List[FileB64] = Field(default=[], max_length=50)
     attachments_fields: List[FieldRef] = Field(default=[], max_length=50)
