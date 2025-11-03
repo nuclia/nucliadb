@@ -379,7 +379,7 @@ async def get_resources_from_shard(driver: Driver, kbid: str, shard_id: str, n: 
         cur = conn.cursor("")
         await cur.execute(
             """
-            SELECT split_part(key, '/', 5) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s AND encode(value, 'escape') LIKE %s limit %d;
+            SELECT split_part(key, '/', 5) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s AND encode(value, 'escape') LIKE %s limit %s;
             """,
             (f"/kbs/{kbid}/r/[^/]*/shard$", shard_id, n),
         )
