@@ -22,9 +22,8 @@ import dataclasses
 import logging
 import math
 import random
-from typing import Optional
+from typing import Optional, cast
 
-import aioitertools
 from grpc import StatusCode
 from grpc.aio import AioRpcError
 from nidx_protos import nodereader_pb2, noderesources_pb2
@@ -32,7 +31,8 @@ from nidx_protos import nodereader_pb2, noderesources_pb2
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
-from nucliadb.common.datamanagers.resources import KB_RESOURCE_SHARD
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.nidx import get_nidx_api_client, get_nidx_searcher_client
 from nucliadb_protos import writer_pb2
 from nucliadb_telemetry import errors
@@ -68,7 +68,7 @@ class Rebalancer:
         self.context = context
         self.kbid = kbid
         self.kb_shards: Optional[writer_pb2.Shards] = None
-        self.index: dict[str, set[str]] = {}
+        self.index: dict[str, int] = {}
 
     async def get_rebalance_shards(self) -> list[RebalanceShard]:
         """
@@ -93,16 +93,7 @@ class Rebalancer:
         )
 
     async def build_shard_resources_index(self):
-        async with datamanagers.with_ro_transaction() as txn:
-            iterable = datamanagers.resources.iterate_resource_ids(kbid=self.kbid)
-            async for resources_batch in aioitertools.batched(iterable, n=200):
-                shards = await txn.batch_get(
-                    keys=[KB_RESOURCE_SHARD.format(kbid=self.kbid, uuid=rid) for rid in resources_batch],
-                    for_update=False,
-                )
-                for rid, shard_bytes in zip(resources_batch, shards):
-                    if shard_bytes is not None:
-                        self.index.setdefault(shard_bytes.decode(), set()).add(rid)
+        self.index = await build_shard_resources_index(self.context.kv_driver, self.kbid)
 
     async def move_paragraphs(
         self, from_shard: RebalanceShard, to_shard: RebalanceShard, max_paragraphs: int
@@ -113,13 +104,19 @@ class Rebalancer:
         """
         moved_paragraphs = 0
 
+        resources_batch: list[str] = []
+
         while moved_paragraphs < max_paragraphs:
+            if len(resources_batch) == 0:
+                resources_batch = await get_resources_from_shard(
+                    self.context.kv_driver, self.kbid, from_shard.id, n=50
+                )
+                if len(resources_batch) == 0:
+                    # No more resources to move or shard not found
+                    break
+
             # Take a random resource to move
-            try:
-                resource_id = random.choice(tuple(self.index[from_shard.id]))
-            except (KeyError, IndexError):
-                # No more resources in shard or shard not found
-                break
+            resource_id = random.choice(resources_batch)
 
             assert self.kb_shards is not None
             from_shard_obj = next(s for s in self.kb_shards.shards if s.shard == from_shard.id)
@@ -129,8 +126,9 @@ class Rebalancer:
                 self.context, self.kbid, resource_id, from_shard_obj, to_shard_obj
             )
             if moved:
-                self.index[from_shard.id].remove(resource_id)
-                self.index.setdefault(to_shard.id, set()).add(resource_id)
+                resources_batch.remove(resource_id)
+                self.index[from_shard.id] = self.index.get(from_shard.id, 1) - 1
+                self.index[to_shard.id] = self.index.get(to_shard.id, 0) + 1
                 moved_paragraphs += paragraphs_count
 
         return moved_paragraphs
@@ -261,7 +259,7 @@ class Rebalancer:
         empty_shard = False
 
         for _ in range(MAX_MOVES_PER_SHARD):
-            resources_count = len(self.index.get(shard_to_merge.id, []))
+            resources_count = self.index.get(shard_to_merge.id, 0)
             if resources_count == 0:
                 logger.info(
                     "Shard is now empty",
@@ -306,14 +304,14 @@ class Rebalancer:
         if empty_shard:
             # Build the index again, and make sure there is no resource assigned to this shard
             await self.build_shard_resources_index()
-            shard_resources = self.index.get(shard_to_merge.id, set())
-            if len(shard_resources) > 0:
+            shard_resources = self.index.get(shard_to_merge.id, 0)
+            if shard_resources > 0:
                 logger.error(
                     f"Shard expected to be empty, but it isn't. Won't be deleted.",
                     extra={
                         "kbid": self.kbid,
                         "shard": shard_to_merge.id,
-                        "resources": list(shard_resources)[:30],
+                        "resources": shard_resources,
                     },
                 )
                 return
@@ -354,6 +352,40 @@ class Rebalancer:
                 await get_nidx_api_client().DeleteShard(
                     noderesources_pb2.ShardId(id=to_delete.nidx_shard_id)
                 )
+
+
+async def build_shard_resources_index(driver: Driver, kbid: str) -> dict[str, int]:
+    index: dict[str, int] = {}
+    driver = cast(PGDriver, driver)
+    async with driver._get_connection() as conn:
+        cur = conn.cursor("")
+        await cur.execute(
+            """
+            SELECT encode(value, 'escape'), COUNT(*) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s GROUP BY value;
+            """,
+            (f"/kbs/{kbid}/r/[^/]*/shard$",),
+        )
+        records = await cur.fetchall()
+        shard: str
+        resources_count: int
+        for shard, resources_count in records:
+            index[shard] = resources_count
+        return index
+
+
+async def get_resources_from_shard(driver: Driver, kbid: str, shard_id: str, n: int) -> list[str]:
+    driver = cast(PGDriver, driver)
+    async with driver._get_connection() as conn:
+        cur = conn.cursor("")
+        await cur.execute(
+            """
+            SELECT split_part(key, '/', 5) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s AND encode(value, 'escape') LIKE %s limit %s;
+            """,
+            (f"/kbs/{kbid}/r/[^/]*/shard$", shard_id, n),
+        )
+        records = await cur.fetchall()
+        rids: list[str] = [r[0] for r in records]
+        return rids
 
 
 async def get_resource_paragraphs_count(resource_id: str, nidx_shard_id: str) -> int:
