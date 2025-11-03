@@ -104,14 +104,19 @@ class Rebalancer:
         """
         moved_paragraphs = 0
 
+        resources_batch: list[str] = []
+
         while moved_paragraphs < max_paragraphs:
+            if len(resources_batch) == 0:
+                resources_batch = await get_resources_from_shard(
+                    self.context.kv_driver, self.kbid, from_shard.id, n=50
+                )
+                if len(resources_batch) == 0:
+                    # No more resources to move or shard not found
+                    break
+
             # Take a random resource to move
-            resource_id = await get_random_resource_from_shard(
-                self.context.kv_driver, self.kbid, from_shard.id
-            )
-            if resource_id is None:
-                # No more resources in shard or shard not found
-                break
+            resource_id = random.choice(resources_batch)
 
             assert self.kb_shards is not None
             from_shard_obj = next(s for s in self.kb_shards.shards if s.shard == from_shard.id)
@@ -121,6 +126,7 @@ class Rebalancer:
                 self.context, self.kbid, resource_id, from_shard_obj, to_shard_obj
             )
             if moved:
+                resources_batch.remove(resource_id)
                 self.index[from_shard.id] = self.index.get(from_shard.id, 1) - 1
                 self.index[to_shard.id] = self.index.get(to_shard.id, 0) + 1
                 moved_paragraphs += paragraphs_count
@@ -367,19 +373,19 @@ async def build_shard_resources_index(driver: Driver, kbid: str) -> dict[str, in
         return index
 
 
-async def get_random_resource_from_shard(driver: Driver, kbid: str, shard_id: str) -> Optional[str]:
+async def get_resources_from_shard(driver: Driver, kbid: str, shard_id: str, n: int) -> list[str]:
     driver = cast(PGDriver, driver)
     async with driver._get_connection() as conn:
         cur = conn.cursor("")
         await cur.execute(
             """
-            SELECT split_part(key, '/', 5) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s AND encode(value, 'escape') LIKE %s limit 50;
+            SELECT split_part(key, '/', 5) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s AND encode(value, 'escape') LIKE %s limit %d;
             """,
-            (f"/kbs/{kbid}/r/[^/]*/shard$", shard_id),
+            (f"/kbs/{kbid}/r/[^/]*/shard$", shard_id, n),
         )
         records = await cur.fetchall()
         rids: list[str] = [r[0] for r in records]
-        return random.choice(rids) if len(rids) > 0 else None
+        return rids
 
 
 async def get_resource_paragraphs_count(resource_id: str, nidx_shard_id: str) -> int:

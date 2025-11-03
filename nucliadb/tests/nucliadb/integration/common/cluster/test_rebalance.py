@@ -24,7 +24,7 @@ from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import rebalance
-from nucliadb.common.cluster.rebalance import build_shard_resources_index, get_random_resource_from_shard
+from nucliadb.common.cluster.rebalance import build_shard_resources_index, get_resources_from_shard
 from nucliadb.common.cluster.settings import settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
@@ -225,7 +225,7 @@ async def test_build_shard_resources_index(
     assert len(shards_to_resources) == 1
     assert set(shards_to_resources.values()) == {30}
 
-    rid = await get_random_resource_from_shard(
-        app_context.kv_driver, kbid, list(shards_to_resources.keys())[0]
+    resources_batch = await get_resources_from_shard(
+        app_context.kv_driver, kbid, list(shards_to_resources.keys())[0], n=1000
     )
-    assert rid in rids
+    assert set(resources_batch) == set(rids)
