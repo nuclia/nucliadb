@@ -25,7 +25,7 @@ from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation, SplitMet
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_utils.storages.storage import StorageField
 
-MAX_CONVERSATION_MESSAGES = 50 * 1024
+MAX_CONVERSATION_MESSAGES = None  # No limit
 
 PAGE_SIZE = 200
 

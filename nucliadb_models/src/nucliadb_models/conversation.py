@@ -86,7 +86,7 @@ class FieldConversation(BaseModel):
 
 
 class InputMessageContent(BaseModel):
-    text: str = Field(max_length=10 * 1024)
+    text: str = Field()
     format: MessageFormat = MessageFormat.PLAIN
     attachments: List[FileB64] = Field(default=[], max_length=50)
     attachments_fields: List[FieldRef] = Field(default=[], max_length=50)
@@ -129,7 +129,6 @@ class InputConversationField(BaseModel):
     messages: List[InputMessage] = Field(
         default_factory=list,
         description="List of messages in the conversation field. Each message must have a unique ident. A single conversation can contain up to 51,200 messages. You can add up to 2,048 messages per request.",
-        max_length=2048,
     )
     extract_strategy: Optional[str] = Field(
         default=None,
