@@ -564,7 +564,10 @@ async def _conversation_append_checks(
 
         # Make sure that the max number of messages is not exceeded
         current_message_count = (await conv.get_metadata()).total
-        if len(input.messages) + current_message_count > MAX_CONVERSATION_MESSAGES:
+        if (
+            MAX_CONVERSATION_MESSAGES is not None
+            and (len(input.messages) + current_message_count) > MAX_CONVERSATION_MESSAGES
+        ):
             raise HTTPException(
                 status_code=422,
                 detail=f"Conversation fields cannot have more than {MAX_CONVERSATION_MESSAGES} messages.",
