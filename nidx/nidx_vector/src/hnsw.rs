@@ -18,11 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+mod build;
 mod disk_hnsw;
-mod ops_hnsw;
 mod params;
 mod ram_hnsw;
+mod search;
 
+pub use build::HnswBuilder;
 pub use disk_hnsw::DiskHnsw;
-pub use ops_hnsw::{Cnx, DataRetriever, EstimatedScore, HnswOps, NodeFilter, SearchVector};
 pub use ram_hnsw::RAMHnsw;
+pub use search::{Cnx, DataRetriever, EstimatedScore, HnswSearcher, NodeFilter, SearchVector};

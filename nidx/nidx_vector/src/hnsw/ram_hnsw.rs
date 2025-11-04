@@ -18,14 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use ops_hnsw::{Hnsw, Layer};
+use std::sync::{RwLock, RwLockReadGuard};
+
 use rustc_hash::FxHashMap;
+use search::{SearchableHnsw, SearchableLayer};
 
 use crate::VectorAddr;
 
 use super::*;
-
-const NO_EDGES: [(VectorAddr, Edge); 0] = [];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EntryPoint {
@@ -35,94 +35,144 @@ pub struct EntryPoint {
 
 pub type Edge = f32;
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct RAMLayer {
-    pub out: FxHashMap<VectorAddr, Vec<(VectorAddr, Edge)>>,
+    pub(super) out: FxHashMap<VectorAddr, RwLock<Vec<(VectorAddr, Edge)>>>,
 }
 
 impl RAMLayer {
-    fn out_edges(&self, node: VectorAddr) -> std::iter::Copied<std::slice::Iter<'_, (VectorAddr, Edge)>> {
-        self.out
-            .get(&node)
-            .map_or_else(|| NO_EDGES.iter().copied(), |out| out.iter().copied())
-    }
     pub fn new() -> RAMLayer {
         RAMLayer::default()
     }
+
     pub fn add_node(&mut self, node: VectorAddr) {
         self.out.entry(node).or_default();
     }
-    pub fn add_edge(&mut self, from: VectorAddr, edge: Edge, to: VectorAddr) {
-        if let Some(edges) = self.out.get_mut(&from) {
-            edges.push((to, edge))
+
+    pub fn contains(&self, node: &VectorAddr) -> bool {
+        self.out.contains_key(node)
+    }
+
+    pub fn num_out_edges(&self, node: &VectorAddr) -> usize {
+        // This is called by the serialization code for all nodes and each layer, so we need to handle non-existing nodes
+        self.out.get(node).map(|n| n.read().unwrap().len()).unwrap_or(0)
+    }
+
+    /// Remove any links that point to a node which is not in this layer
+    /// See RAMHnsw.fix_broken_links for details
+    fn fix_broken_links(&self) {
+        for edges in self.out.values() {
+            let mut edges = edges.write().unwrap();
+            edges.retain(|e| self.out.contains_key(&e.0));
         }
-    }
-    pub fn take_out_edges(&mut self, x: VectorAddr) -> Vec<(VectorAddr, Edge)> {
-        self.out.get_mut(&x).map(std::mem::take).unwrap_or_default()
-    }
-    pub fn no_out_edges(&self, node: VectorAddr) -> usize {
-        self.out.get(&node).map_or(0, |v| v.len())
-    }
-    pub fn first(&self) -> Option<VectorAddr> {
-        self.out.keys().next().cloned()
-    }
-    pub fn is_empty(&self) -> bool {
-        self.out.len() == 0
     }
 }
 
-#[derive(Default, Clone)]
 pub struct RAMHnsw {
-    pub entry_point: Option<EntryPoint>,
+    pub entry_point: EntryPoint,
     pub layers: Vec<RAMLayer>,
 }
 impl RAMHnsw {
     pub fn new() -> RAMHnsw {
-        Self::default()
-    }
-    pub fn increase_layers_with(&mut self, x: VectorAddr, level: usize) -> &mut Self {
-        while self.layers.len() <= level {
-            let mut new_layer = RAMLayer::new();
-            new_layer.add_node(x);
-            self.layers.push(new_layer);
+        Self {
+            entry_point: EntryPoint {
+                node: VectorAddr(0),
+                layer: 0,
+            },
+            layers: vec![],
         }
-        self
     }
-    pub fn remove_empty_layers(&mut self) -> &mut Self {
-        while self.layers.last().map(|l| l.is_empty()).unwrap_or_default() {
-            self.layers.pop();
+
+    /// Adds a node to the graph at all layers below the selected top layer
+    pub fn add_node(&mut self, node: VectorAddr, top_layer: usize) {
+        for _ in self.layers.len()..=top_layer {
+            self.layers.push(RAMLayer::new());
         }
-        self
+
+        for layer in 0..=top_layer {
+            self.layers[layer].add_node(node)
+        }
     }
-    pub fn update_entry_point(&mut self) -> &mut Self {
-        self.remove_empty_layers();
-        self.entry_point = self
-            .layers
-            .iter()
-            .enumerate()
-            .next_back()
-            .and_then(|(index, l)| l.first().map(|node| (node, index)))
-            .map(|(node, layer)| EntryPoint { node, layer });
-        self
+
+    /// Updates the entrypoint to point to the first node of the top layer
+    pub fn update_entry_point(&mut self) {
+        // Only update if the entrypoint is not already at the top layer
+        if self.layers.len() > self.entry_point.layer + 1 {
+            self.entry_point = EntryPoint {
+                node: *self.layers.last().unwrap().out.keys().next().unwrap(),
+                layer: self.layers.len() - 1,
+            }
+        }
     }
+
     pub fn no_layers(&self) -> usize {
         self.layers.len()
     }
-}
 
-impl<'a> Layer for &'a RAMLayer {
-    type EdgeIt = std::iter::Copied<std::slice::Iter<'a, (VectorAddr, Edge)>>;
-    fn get_out_edges(&self, node: VectorAddr) -> Self::EdgeIt {
-        self.out_edges(node)
+    /// Remove any links that point to a node which is not in this layer
+    /// A bug in a previous version of this program could cause a node in layer N
+    /// to link to a node in layer N-1. This breaks navigation accross layer N.
+    /// This function will delete any such link from the graph.
+    pub fn fix_broken_links(&self) {
+        for l in &self.layers[1..] {
+            l.fix_broken_links();
+        }
     }
 }
 
-impl<'a> Hnsw for &'a RAMHnsw {
+pub struct EdgesIterator<'a>(RwLockReadGuard<'a, Vec<(VectorAddr, Edge)>>, usize);
+
+impl<'a> Iterator for EdgesIterator<'a> {
+    type Item = (VectorAddr, Edge);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let it = self.0.get(self.1);
+        self.1 += 1;
+        it.copied()
+    }
+}
+
+impl<'a> SearchableLayer for &'a RAMLayer {
+    type EdgeIt = EdgesIterator<'a>;
+    fn get_out_edges(&self, node: VectorAddr) -> Self::EdgeIt {
+        EdgesIterator(self.out[&node].read().unwrap(), 0)
+    }
+}
+
+impl<'a> SearchableHnsw for &'a RAMHnsw {
     type L = &'a RAMLayer;
-    fn get_entry_point(&self) -> Option<EntryPoint> {
+    fn get_entry_point(&self) -> EntryPoint {
         self.entry_point
     }
     fn get_layer(&self, i: usize) -> Self::L {
         &self.layers[i]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fix_broken_links() {
+        // Create a minimal broken graph
+        let layer0 = RAMLayer {
+            out: [
+                (VectorAddr(0), RwLock::new(vec![(VectorAddr(1), 0.5)])),
+                (VectorAddr(1), RwLock::new(vec![(VectorAddr(0), 0.5)])),
+            ]
+            .into_iter()
+            .collect(),
+        };
+        let layer1 = RAMLayer {
+            out: [(VectorAddr(0), RwLock::new(vec![(VectorAddr(1), 0.5)]))]
+                .into_iter()
+                .collect(),
+        };
+        let mut graph = RAMHnsw::new();
+        graph.layers.push(layer0);
+        graph.layers.push(layer1);
+        graph.fix_broken_links();
+        assert!(graph.layers[1].out[&VectorAddr(0)].read().unwrap().is_empty());
     }
 }
