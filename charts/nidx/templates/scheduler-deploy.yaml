@@ -72,6 +72,9 @@ spec:
         {{- end }}
         env:
           {{- include "toEnv" .Values.env | nindent 10 }}
+          {{- with .Values.scheduler.env }}
+            {{- include "toEnv" . | nindent 10 }}
+          {{- end }}
           - name: CONTROL_SOCKET
             value: "/run/nidx.sock"
         ports:
