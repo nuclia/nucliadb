@@ -71,6 +71,9 @@ spec:
         {{- end }}
         env:
           {{- include "toEnv" .Values.env | nindent 10 }}
+          {{- with .Values.indexer.env }}
+            {{- include "toEnv" . | nindent 10 }}
+          {{- end }}
           - name: WORK_PATH
             value: "/data"
           - name: CONTROL_SOCKET
