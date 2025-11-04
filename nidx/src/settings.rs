@@ -193,16 +193,16 @@ pub struct StorageSettings {
 #[serde(default)]
 pub struct MergeSettings {
     pub max_deletions: usize,
-    pub log_merge: LogMergeSettings,
-    pub vector_merge: VectorMergeSettings,
+    pub log: LogMergeSettings,
+    pub vector: VectorMergeSettings,
 }
 
 impl Default for MergeSettings {
     fn default() -> Self {
         Self {
             max_deletions: 500,
-            log_merge: Default::default(),
-            vector_merge: Default::default(),
+            log: Default::default(),
+            vector: Default::default(),
         }
     }
 }
@@ -434,7 +434,7 @@ mod tests {
         assert_eq!(settings.indexer.unwrap().nats_server, Some("localhost".to_string()));
         assert_eq!(settings.merge.max_deletions, 1234);
         assert_eq!(
-            settings.merge.log_merge.min_number_of_segments,
+            settings.merge.log.min_number_of_segments,
             LogMergeSettings::default().min_number_of_segments
         );
     }
