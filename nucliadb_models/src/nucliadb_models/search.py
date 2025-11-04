@@ -2500,3 +2500,51 @@ class CatalogFacetsRequest(BaseModel):
 
 class CatalogFacetsResponse(BaseModel):
     facets: dict[str, int]
+
+
+class KeywordQuery(BaseModel):
+    query: str
+    min_score: float
+
+
+class SemanticQuery(BaseModel):
+    query: Optional[list[float]]
+    vectorset: str
+    min_score: float
+
+
+class Query(BaseModel):
+    keyword: Optional[KeywordQuery] = None
+    semantic: Optional[SemanticQuery] = None
+
+
+class Filters(BaseModel):
+    filter_expression: Optional[FilterExpression] = (
+        SearchParamDefaults.filter_expression.to_pydantic_field()
+    )
+    hidden: Optional[bool] = None
+    security: Optional[RequestSecurity] = None
+    with_duplicates: bool = False
+
+
+class RetrievalRequest(BaseModel):
+    query: Query
+    top_k: int = Field(default=20, gt=0, le=500)
+    filters: Filters = Field(default_factory=Filters)
+    rank_fusion: RankFusion = Field(default_factory=ReciprocalRankFusion)
+
+
+class Score(BaseModel):
+    value: float
+    type: str
+
+
+class TextBlockMatch(BaseModel):
+    id: str
+    score: float
+    scores: list[Score]
+    metadata: dict[str, Any]
+
+
+class RetrievalResponse(BaseModel):
+    text_blocks: list[TextBlockMatch]
