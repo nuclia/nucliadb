@@ -12,23 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import asyncio
 import os
 import subprocess
 import sys
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Optional
+from typing import AsyncIterator, Iterator, Optional
 from uuid import uuid4
 
-import docker  # type: ignore
+import docker  # type: ignore[import-untyped]
 import httpx
 import pytest
-from pytest_docker_fixtures import images  # type: ignore
-from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
+from pytest_docker_fixtures import images  # type: ignore[import-untyped]
+from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore[import-untyped]
 
 import nucliadb_sdk
+from nucliadb_models.resource import (
+    KnowledgeBoxObj,
+)
 
 images.settings["postgresql"]["version"] = "13"
 images.settings["postgresql"]["env"]["POSTGRES_PASSWORD"] = "postgres"
@@ -64,7 +66,7 @@ class NucliaDB(BaseImage):
     name = "nucliadb"
     port = 8080
 
-    def check(self):
+    def check(self) -> bool:
         try:
             response = httpx.get(f"http://{self.host}:{self.get_port()}")
             return response.status_code == 200
@@ -81,7 +83,7 @@ class NucliaFixture:
     container: Optional[NucliaDB] = None
 
 
-def get_docker_internal_host():
+def get_docker_internal_host() -> str:
     """
     This is needed for the case when we are starting a nucliadb container for testing,
     it needs to know the docker internal host to connect to pg container that is on the same network.
@@ -103,7 +105,7 @@ def get_docker_internal_host():
 
 
 @pytest.fixture(scope="session")
-def nucliadb(pg):
+def nucliadb(pg) -> Iterator[NucliaFixture]:
     pg_host, pg_port = pg
     # Setup the connection to pg for the maindb driver
     url = f"postgresql://postgres:postgres@{pg_host}:{pg_port}/postgres"
@@ -112,7 +114,7 @@ def nucliadb(pg):
     images.settings["nucliadb"]["env"]["DRIVER_PG_URL"] = url
 
     if os.environ.get("TEST_LOCAL_NUCLIADB"):
-        host = os.environ.get("TEST_LOCAL_NUCLIADB")
+        host = os.environ["TEST_LOCAL_NUCLIADB"]
         child = None
 
         # Start a local NucliaDB here
@@ -140,7 +142,7 @@ def nucliadb(pg):
             host=host,
             port=8080,
             grpc=8030,
-            container="local",
+            container=None,
             url=f"http://{host}:8080/api",
         )
 
@@ -168,19 +170,19 @@ def nucliadb(pg):
 
 
 @pytest.fixture(scope="session")
-def sdk(nucliadb: NucliaFixture):
+def sdk(nucliadb: NucliaFixture) -> nucliadb_sdk.NucliaDB:
     sdk = nucliadb_sdk.NucliaDB(region="on-prem", url=nucliadb.url)
     return sdk
 
 
 @pytest.fixture(scope="function")
-def sdk_async(nucliadb: NucliaFixture):
+def sdk_async(nucliadb: NucliaFixture) -> nucliadb_sdk.NucliaDBAsync:
     sdk = nucliadb_sdk.NucliaDBAsync(region="on-prem", url=nucliadb.url)
     return sdk
 
 
 @pytest.fixture(scope="function")
-def kb(sdk: nucliadb_sdk.NucliaDB):
+def kb(sdk: nucliadb_sdk.NucliaDB) -> Iterator[KnowledgeBoxObj]:
     kbslug = uuid4().hex
     kb = sdk.create_knowledge_box(slug=kbslug)
 
@@ -193,7 +195,7 @@ async def init_fixture(
     nucliadb: NucliaFixture,
     dataset_slug: str,
     dataset_location: str,
-):
+) -> str:
     sdk = nucliadb_sdk.NucliaDB(region="on-prem", url=nucliadb.url)
     slug = uuid.uuid4().hex
     kb_obj = sdk.create_knowledge_box(slug=slug)
@@ -212,6 +214,6 @@ async def init_fixture(
 
 
 @pytest.fixture(scope="session")
-def docs_dataset(nucliadb: NucliaFixture):
-    kbid = asyncio.run(init_fixture(nucliadb, "docs", NUCLIA_DOCS_dataset))
+async def docs_dataset(nucliadb: NucliaFixture) -> AsyncIterator[str]:
+    kbid = await init_fixture(nucliadb, "docs", NUCLIA_DOCS_dataset)
     yield kbid
