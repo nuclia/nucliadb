@@ -50,12 +50,15 @@ mod file_names {
 }
 
 pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<OpenSegment> {
-    // TODO: we should get this flag from the VectorConfig or some other place
-    let prewarm = false;
-
     let path = &metadata.path;
     let data_store: Box<dyn DataStore> = if DataStoreV1::exists(path)? {
-        let data_store = DataStoreV1::open(path, &config.vector_type, OpenReason::Search { prewarm })?;
+        let data_store = DataStoreV1::open(
+            path,
+            &config.vector_type,
+            OpenReason::Search {
+                prewarm: config.prewarm,
+            },
+        )?;
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
         if !InvertedIndexes::exists(path) {
@@ -63,7 +66,13 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         }
         Box::new(data_store)
     } else {
-        let data_store = DataStoreV2::open(path, &config.vector_type, OpenReason::Search { prewarm })?;
+        let data_store = DataStoreV2::open(
+            path,
+            &config.vector_type,
+            OpenReason::Search {
+                prewarm: config.prewarm,
+            },
+        )?;
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
         if !InvertedIndexes::exists(path) {
@@ -74,7 +83,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
 
     let hnsw_file = File::open(path.join(file_names::HNSW))?;
     let mut index_options = MmapOptions::new();
-    if prewarm {
+    if config.prewarm {
         index_options.populate();
     }
     let index = unsafe { index_options.map(&hnsw_file)? };
@@ -86,7 +95,13 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         index.advise(memmap2::Advice::WillNeed)?;
     }
 
-    let inverted_indexes = InvertedIndexes::open(path, metadata.records, inverted_index::OpenOptions { prewarm })?;
+    let inverted_indexes = InvertedIndexes::open(
+        path,
+        metadata.records,
+        inverted_index::OpenOptions {
+            prewarm: config.prewarm,
+        },
+    )?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
@@ -720,6 +735,7 @@ mod test {
             similarity: Similarity::Dot,
             vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
             normalize_vectors: false,
+            prewarm: false,
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
         };
@@ -766,6 +782,7 @@ mod test {
             similarity: Similarity::Dot,
             vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
             normalize_vectors: false,
+            prewarm: false,
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
         };
@@ -844,6 +861,7 @@ mod test {
             similarity: Similarity::Dot,
             vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
             normalize_vectors: false,
+            prewarm: false,
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
         };
