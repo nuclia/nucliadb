@@ -30,12 +30,12 @@ use nidx_types::Seq;
 use super::{log_merge, vector_merge};
 
 pub struct MergeScheduler {
-    settings: MergeSettings,
+    merge_settings: MergeSettings,
 }
 
 impl MergeScheduler {
-    pub fn from_settings(settings: MergeSettings) -> Self {
-        Self { settings }
+    pub fn from_settings(merge_settings: MergeSettings) -> Self {
+        Self { merge_settings }
     }
 
     /// Enqueue merge jobs for segments older than `last_indexed_seq` that aren't
@@ -100,7 +100,7 @@ impl MergeScheduler {
                 HAVING COUNT(segments) > 1 OR index_deletion_window.id IS NOT NULL
             "#,
             i64::from(last_indexed_seq),
-            self.settings.max_deletions as i64
+            self.merge_settings.max_deletions as i64
         )
         .fetch_all(&meta.pool)
         .await?;
@@ -109,9 +109,9 @@ impl MergeScheduler {
             let segment_info: HashMap<_, _> = index.segments.iter().map(|(id, rec, f)| (*id, (*rec, *f))).collect();
             let merges = match index.kind {
                 IndexKind::Text | IndexKind::Paragraph | IndexKind::Relation => {
-                    log_merge::plan_merges(&self.settings.log_merge, index.segments)
+                    log_merge::plan_merges(&self.merge_settings.log, index.segments)
                 }
-                IndexKind::Vector => vector_merge::plan_merges(&self.settings.vector_merge, index.segments),
+                IndexKind::Vector => vector_merge::plan_merges(&self.merge_settings.vector, index.segments),
             };
 
             for m in merges {
@@ -166,7 +166,7 @@ mod tests {
 
         fn merge_scheduler() -> MergeScheduler {
             MergeScheduler::from_settings(MergeSettings {
-                log_merge: LogMergeSettings {
+                log: LogMergeSettings {
                     min_number_of_segments: 3,
                     ..Default::default()
                 },
@@ -326,7 +326,7 @@ mod tests {
         #[sqlx::test]
         async fn test_schedule_merges_with_segment_tags(pool: sqlx::PgPool) -> anyhow::Result<()> {
             let merge_scheduler = MergeScheduler::from_settings(MergeSettings {
-                log_merge: LogMergeSettings {
+                log: LogMergeSettings {
                     min_number_of_segments: 2,
                     ..Default::default()
                 },
