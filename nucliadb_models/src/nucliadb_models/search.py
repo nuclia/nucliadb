@@ -351,6 +351,9 @@ class SortOptions(BaseModel):
     order: SortOrder = SortOrder.DESC
 
 
+MAX_RANK_FUSION_WINDOW = 500
+
+
 class RankFusionName(str, Enum):
     RECIPROCAL_RANK_FUSION = "rrf"
 
@@ -380,7 +383,7 @@ class ReciprocalRankFusion(_BaseRankFusion):
     )
     window: Optional[int] = Field(
         default=None,
-        le=500,
+        le=MAX_RANK_FUSION_WINDOW,
         title="RRF window",
         description="Number of elements for retrieval to do RRF. Window must be greater or equal to top_k. Greater values will increase probability of multi match at cost of retrieval time",  # noqa: E501
     )
@@ -2513,16 +2516,21 @@ class SemanticQuery(BaseModel):
     min_score: float
 
 
+class GraphQuery(BaseModel):
+    query: GraphPathQuery
+
+
 class Query(BaseModel):
     keyword: Optional[KeywordQuery] = None
     semantic: Optional[SemanticQuery] = None
+    graph: Optional[GraphQuery] = None
 
 
 class Filters(BaseModel):
     filter_expression: Optional[FilterExpression] = (
         SearchParamDefaults.filter_expression.to_pydantic_field()
     )
-    hidden: Optional[bool] = None
+    show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
     security: Optional[RequestSecurity] = None
     with_duplicates: bool = False
 
@@ -2531,19 +2539,76 @@ class RetrievalRequest(BaseModel):
     query: Query
     top_k: int = Field(default=20, gt=0, le=500)
     filters: Filters = Field(default_factory=Filters)
-    rank_fusion: RankFusion = Field(default_factory=ReciprocalRankFusion)
+    rank_fusion: Union[RankFusionName, RankFusion] = Field(default=RankFusionName.RECIPROCAL_RANK_FUSION)
 
 
-class Score(BaseModel):
+class ScoreSource(Enum):
+    INDEX = "index"
+    RANK_FUSION = "rank_fusion"
+
+
+class ScoreType(Enum):
+    SEMANTIC = "semantic"
+    KEYWORD = "keyword"
+    GRAPH = "graph"
+    RRF = "rrf"
+
+
+class KeywordScore(BaseModel):
+    score: float
+    source: Literal[ScoreSource.INDEX] = ScoreSource.INDEX
+    type: Literal[ScoreType.KEYWORD] = ScoreType.KEYWORD
+
+
+class SemanticScore(BaseModel):
+    score: float
+    source: Literal[ScoreSource.INDEX] = ScoreSource.INDEX
+    type: Literal[ScoreType.SEMANTIC] = ScoreType.SEMANTIC
+
+
+class GraphScore(BaseModel):
+    score: float
+    source: Literal[ScoreSource.INDEX] = ScoreSource.INDEX
+    type: Literal[ScoreType.GRAPH] = ScoreType.GRAPH
+
+
+class RrfScore(BaseModel):
+    score: float
+    source: Literal[ScoreSource.INDEX] = ScoreSource.INDEX
+    type: Literal[ScoreType.RRF] = ScoreType.RRF
+
+
+Score = KeywordScore | SemanticScore | GraphScore | RrfScore
+
+
+class Scores(BaseModel):
     value: float
-    type: str
+    # TODO: replace for source and type
+    score_type: SCORE_TYPE
+    # source: ScoreSource
+    # _type: ScoreType
+    # history: list[Score]
+
+
+class Metadata(BaseModel):
+    field_labels: list[str]
+    paragraph_labels: list[str]
+
+    is_an_image: bool
+    is_a_table: bool
+
+    # for extracted from visual content (ocr, inception, tables)
+    source_file: str | None
+
+    # for documents (pdf, docx...) only
+    page: int | None
+    in_page_with_visual: bool | None
 
 
 class RetrievalMatch(BaseModel):
     id: str
-    score: float
-    scores: list[Score]
-    metadata: dict[str, Any]
+    score: Scores
+    metadata: Metadata
 
 
 class RetrievalResponse(BaseModel):

@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb_models import search as search_models
 from nucliadb_models.graph.requests import GraphPathQuery
+from nucliadb_models.search import MAX_RANK_FUSION_WINDOW
 from nucliadb_protos import utils_pb2
 
 ### Retrieval
@@ -100,7 +101,7 @@ class DateTimeFilter(BaseModel):
 
 
 class RankFusion(BaseModel):
-    window: int = Field(le=500)
+    window: int = Field(le=MAX_RANK_FUSION_WINDOW)
 
 
 class ReciprocalRankFusion(RankFusion):

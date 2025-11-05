@@ -31,6 +31,7 @@ from nucliadb.common.external_index_providers.exceptions import ExternalIndexing
 from nucliadb.common.ids import ParagraphId
 from nucliadb_models.external_index_providers import ExternalIndexProviderType
 from nucliadb_models.search import SCORE_TYPE, Relations, TextPosition
+from nucliadb_protos import resources_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
     StoredExternalIndexProviderMetadata,
@@ -41,6 +42,14 @@ from nucliadb_telemetry.metrics import Observer
 logger = logging.getLogger(__name__)
 
 manager_observer = Observer("external_index_manager", labels={"operation": "", "provider": ""})
+
+
+_OCR_LABEL = (
+    f"/k/{resources_pb2.Paragraph.TypeParagraph.Name(resources_pb2.Paragraph.TypeParagraph.OCR).lower()}"
+)
+_INCEPTION_LABEL = (
+    f"/k/{resources_pb2.Paragraph.TypeParagraph.Name(resources_pb2.Paragraph.TypeParagraph.OCR).lower()}"
+)
 
 
 @dataclass
@@ -77,6 +86,10 @@ class TextBlockMatch(ScoredTextBlock):
     field_labels: list[str] = []
     text: Optional[str] = None
     relevant_relations: Optional[Relations] = None
+
+    @property
+    def is_an_image(self) -> bool:
+        return _OCR_LABEL in self.paragraph_labels or _INCEPTION_LABEL in self.paragraph_labels
 
 
 class QueryResults(BaseModel):
