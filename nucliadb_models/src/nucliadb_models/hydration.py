@@ -246,10 +246,11 @@ class Hydration(BaseModel, extra="forbid"):
 ParagraphId = Annotated[
     str,
     StringConstraints(
-        pattern=r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+/[0-9]+-[0-9]+$",
-        min_length=32 + 1 + 1 + 1 + 1 + 1 + 3,
+        # resource-uuid/field-type/field-id/[split-id/]paragraph-id
+        pattern=r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+/([^/]{1,128}/)?[0-9]+-[0-9]+$",
+        min_length=32 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 3,
         # max field id of 250 and 10 digit paragraphs. More than enough
-        max_length=32 + 1 + 1 + 1 + 250 + 1 + 21,
+        max_length=32 + 1 + 1 + 1 + 250 + 1 + 128 + 1 + 21,
     ),
 ]
 
