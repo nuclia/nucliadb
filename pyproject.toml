@@ -19,6 +19,7 @@ members = [
 
 [tool.uv]
 default-groups = "all"
+managed = true
 
 [tool.uv.sources]
 nidx-binding = { workspace = true }
