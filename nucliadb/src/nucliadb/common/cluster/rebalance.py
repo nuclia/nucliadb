@@ -68,32 +68,32 @@ class Rebalancer:
         self.context = context
         self.kbid = kbid
         self.kb_shards: Optional[writer_pb2.Shards] = None
-        self.index: dict[str, int] = {}
 
-    async def get_rebalance_shards(self) -> list[RebalanceShard]:
+    async def get_rebalance_shards(self, dirty: bool = False) -> list[RebalanceShard]:
         """
         Return the sorted list of shards by increasing paragraph count.
+
+        If dirty is True, it will fetch the paragraph count from nidx for each shard, which is lighter but deletions are not guaranteed to be reflected.
+        Otherwise, it will get the paragraph counts by querying nidx paragraph index for each shard.
         """
+        result = []
         self.kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=self.kbid)
-        if self.kb_shards is None:  # pragma: no cover
-            return []
-        return list(
-            sorted(
-                [
+        if self.kb_shards is not None:
+            for idx, shard in enumerate(self.kb_shards.shards):
+                if dirty:
+                    shard_metadata = await get_shard_metadata(shard.nidx_shard_id)
+                    paragraphs = shard_metadata.paragraphs
+                else:
+                    paragraphs = await get_shard_paragraph_count(shard.nidx_shard_id)
+                result.append(
                     RebalanceShard(
                         id=shard.shard,
                         nidx_id=shard.nidx_shard_id,
-                        paragraphs=await get_shard_paragraph_count(shard.nidx_shard_id),
+                        paragraphs=paragraphs,
                         active=(idx == self.kb_shards.actual),
                     )
-                    for idx, shard in enumerate(self.kb_shards.shards)
-                ],
-                key=lambda x: x.paragraphs,
-            )
-        )
-
-    async def build_shard_resources_index(self):
-        self.index = await build_shard_resources_index(self.context.kv_driver, self.kbid)
+                )
+        return list(sorted(result, key=lambda x: x.paragraphs))
 
     async def move_paragraphs(
         self, from_shard: RebalanceShard, to_shard: RebalanceShard, max_paragraphs: int
@@ -109,7 +109,7 @@ class Rebalancer:
         while moved_paragraphs < max_paragraphs:
             if len(resources_batch) == 0:
                 resources_batch = await get_resources_from_shard(
-                    self.context.kv_driver, self.kbid, from_shard.id, n=50
+                    self.context.kv_driver, self.kbid, from_shard.id, n=100
                 )
                 if len(resources_batch) == 0:
                     # No more resources to move or shard not found
@@ -127,8 +127,6 @@ class Rebalancer:
             )
             if moved:
                 resources_batch.remove(resource_id)
-                self.index[from_shard.id] = self.index.get(from_shard.id, 1) - 1
-                self.index[to_shard.id] = self.index.get(to_shard.id, 0) + 1
                 moved_paragraphs += paragraphs_count
 
         return moved_paragraphs
@@ -159,26 +157,31 @@ class Rebalancer:
         Split chooses a >110% filled shard and reduces it to 100%
         If the shard is between 90% and 110% full, nobody touches it
         """
-        await self.build_shard_resources_index()
+
+        i = 0
         while True:
             await self.wait_for_indexing()
 
-            shards = await self.get_rebalance_shards()
+            # The first time we get the dirty counts, afterwards we get the accurate ones
+            shards = await self.get_rebalance_shards(dirty=i == 0)
+            i += 1
 
             # Any shards to split?
             shard_to_split = next((s for s in shards[::-1] if needs_split(s)), None)
             if shard_to_split is not None:
-                await self.split_shard(shard_to_split, shards)
+                await self.split_shard(shard_to_split.id)
                 continue
 
             # Any shards to merge?
             shard_to_merge = next((s for s in shards if needs_merge(s, shards)), None)
             if shard_to_merge is not None:
-                await self.merge_shard(shard_to_merge, shards)
+                await self.merge_shard(shard_to_merge.id)
             else:
                 break
 
-    async def split_shard(self, shard_to_split: RebalanceShard, shards: list[RebalanceShard]):
+    async def split_shard(self, shard_id: str):
+        shards = await self.get_rebalance_shards()
+        shard_to_split = next(s for s in shards if s.id == shard_id)
         logger.info(
             "Splitting excess of paragraphs to other shards",
             extra={
@@ -248,7 +251,9 @@ class Rebalancer:
 
             await self.wait_for_indexing()
 
-    async def merge_shard(self, shard_to_merge: RebalanceShard, shards: list[RebalanceShard]):
+    async def merge_shard(self, shard_id: str):
+        shards = await self.get_rebalance_shards()
+        shard_to_merge = next(s for s in shards if s.id == shard_id)
         logger.info(
             "Merging shard",
             extra={
@@ -259,7 +264,9 @@ class Rebalancer:
         empty_shard = False
 
         for _ in range(MAX_MOVES_PER_SHARD):
-            resources_count = self.index.get(shard_to_merge.id, 0)
+            resources_count = await count_resources_in_shard(
+                self.context.kv_driver, self.kbid, shard_to_merge.id
+            )
             if resources_count == 0:
                 logger.info(
                     "Shard is now empty",
@@ -302,20 +309,6 @@ class Rebalancer:
             await self.wait_for_indexing()
 
         if empty_shard:
-            # Build the index again, and make sure there is no resource assigned to this shard
-            await self.build_shard_resources_index()
-            shard_resources = self.index.get(shard_to_merge.id, 0)
-            if shard_resources > 0:
-                logger.error(
-                    f"Shard expected to be empty, but it isn't. Won't be deleted.",
-                    extra={
-                        "kbid": self.kbid,
-                        "shard": shard_to_merge.id,
-                        "resources": shard_resources,
-                    },
-                )
-                return
-
             # If shard was emptied, delete it
             async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=self.kbid)):
                 async with datamanagers.with_rw_transaction() as txn:
@@ -352,25 +345,6 @@ class Rebalancer:
                 await get_nidx_api_client().DeleteShard(
                     noderesources_pb2.ShardId(id=to_delete.nidx_shard_id)
                 )
-
-
-async def build_shard_resources_index(driver: Driver, kbid: str) -> dict[str, int]:
-    index: dict[str, int] = {}
-    driver = cast(PGDriver, driver)
-    async with driver._get_connection() as conn:
-        cur = conn.cursor("")
-        await cur.execute(
-            """
-            SELECT encode(value, 'escape'), COUNT(*) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s GROUP BY value;
-            """,
-            (f"/kbs/{kbid}/r/[^/]*/shard$",),
-        )
-        records = await cur.fetchall()
-        shard: str
-        resources_count: int
-        for shard, resources_count in records:
-            index[shard] = resources_count
-        return index
 
 
 async def get_resources_from_shard(driver: Driver, kbid: str, shard_id: str, n: int) -> list[str]:
@@ -435,6 +409,22 @@ def get_target_shard(
     return target_shard, capacity
 
 
+async def count_resources_in_shard(driver: Driver, kbid: str, shard_id: str) -> int:
+    driver = cast(PGDriver, driver)
+    async with driver._get_connection() as conn:
+        cur = conn.cursor("")
+        await cur.execute(
+            """
+            SELECT COUNT(*) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s AND encode(value, 'escape') LIKE %s;
+            """,
+            (f"/kbs/{kbid}/r/[^/]*/shard$", shard_id),
+        )
+        record = await cur.fetchone()
+        if record is None:  # pragma: no cover
+            return 0
+        return record[0]
+
+
 async def get_shard_paragraph_count(nidx_shard_id: str) -> int:
     # Do a search on the fields (paragraph) index
     try:
@@ -450,6 +440,19 @@ async def get_shard_paragraph_count(nidx_shard_id: str) -> int:
         if exc.code() == StatusCode.NOT_FOUND:
             logger.warning(f"Shard not found in nidx", extra={"nidx_shard_id": nidx_shard_id})
             return 0
+        raise
+
+
+async def get_shard_metadata(nidx_shard_id: str) -> nodereader_pb2.Shard:
+    try:
+        shard_metadata: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
+            nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=nidx_shard_id))
+        )
+        return shard_metadata
+    except AioRpcError as exc:  # pragma: no cover
+        if exc.code() == StatusCode.NOT_FOUND:
+            logger.warning(f"Shard not found in nidx", extra={"nidx_shard_id": nidx_shard_id})
+            return nodereader_pb2.Shard()
         raise
 
 
