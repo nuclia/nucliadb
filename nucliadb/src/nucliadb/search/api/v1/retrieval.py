@@ -55,7 +55,11 @@ async def retrieval_endpoint(
     x_forwarded_for: str = Header(""),
 ) -> RetrievalResponse:
     retrieval = await parse_retrieve(kbid, item)
+
     text_blocks, _, _ = await text_block_search(kbid, retrieval)
+
+    # cut the top K, we may have more due to extra results used for rank fusion
+    text_blocks = text_blocks[: retrieval.top_k]
 
     # convert to response models
     matches = [text_block_match_to_retrieval_match(text_block) for text_block in text_blocks]
