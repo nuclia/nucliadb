@@ -69,11 +69,11 @@ class Rebalancer:
         self.kbid = kbid
         self.kb_shards: Optional[writer_pb2.Shards] = None
 
-    async def get_rebalance_shards(self, dirty: bool = False) -> list[RebalanceShard]:
+    async def get_rebalance_shards(self, estimate: bool = False) -> list[RebalanceShard]:
         """
         Return the sorted list of shards by increasing paragraph count.
 
-        If dirty is True, it will fetch the paragraph count from nidx shard metadata, which is lighter
+        If estimate is True, it will fetch the paragraph count from nidx shard metadata, which is lighter
         but deletions are not guaranteed to be reflected. Otherwise, it will get the paragraph counts
         by querying nidx paragraph index for each shard.
         """
@@ -81,7 +81,7 @@ class Rebalancer:
         self.kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=self.kbid)
         if self.kb_shards is not None:
             for idx, shard in enumerate(self.kb_shards.shards):
-                if dirty:
+                if estimate:
                     shard_metadata = await get_shard_metadata(shard.nidx_shard_id)
                     paragraphs = shard_metadata.paragraphs
                 else:
@@ -310,6 +310,21 @@ class Rebalancer:
             await self.wait_for_indexing()
 
         if empty_shard:
+            # Make sure there is no resource assigned to this shard
+            shard_resources = await count_resources_in_shard(
+                self.context.kv_driver, self.kbid, shard_to_merge.id
+            )
+            if shard_resources > 0:
+                logger.error(
+                    f"Shard expected to be empty, but it isn't. Won't be deleted.",
+                    extra={
+                        "kbid": self.kbid,
+                        "shard": shard_to_merge.id,
+                        "resources": shard_resources,
+                    },
+                )
+                return
+
             # If shard was emptied, delete it
             async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=self.kbid)):
                 async with datamanagers.with_rw_transaction() as txn:
@@ -354,7 +369,7 @@ async def get_resources_from_shard(driver: Driver, kbid: str, shard_id: str, n: 
         cur = conn.cursor("")
         await cur.execute(
             """
-            SELECT split_part(key, '/', 5) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s AND encode(value, 'escape') LIKE %s limit %s;
+            SELECT split_part(key, '/', 5) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s AND value = %s LIMIT %s;
             """,
             (f"/kbs/{kbid}/r/[^/]*/shard$", shard_id, n),
         )
@@ -416,7 +431,7 @@ async def count_resources_in_shard(driver: Driver, kbid: str, shard_id: str) -> 
         cur = conn.cursor("")
         await cur.execute(
             """
-            SELECT COUNT(*) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s AND encode(value, 'escape') LIKE %s;
+            SELECT COUNT(*) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s AND value = %s;
             """,
             (f"/kbs/{kbid}/r/[^/]*/shard$", shard_id),
         )
