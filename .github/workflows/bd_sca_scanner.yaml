@@ -3,13 +3,13 @@ on:
   push:
     branches:
       - main
-    # paths:
-    #   - '**/*.lock'
+    paths:
+      - '**/*.lock'
   pull_request:
     branches:
       - main
-    # paths:
-    #   - '**/*.lock'
+    paths:
+      - '**/*.lock'
 
 jobs:
   blackduck-sca-scan:
