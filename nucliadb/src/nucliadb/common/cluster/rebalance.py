@@ -146,6 +146,13 @@ class Rebalancer:
                 logger.warning("Nidx is behind. Backing off rebalancing.", extra={"kbid": self.kbid})
                 await asyncio.sleep(30)
 
+    async def required(self) -> bool:
+        """
+        Return true if any shard needs rebalancing.
+        """
+        shards = await self.get_rebalance_shards(estimate=True)
+        return any(needs_split(shard) or needs_merge(shard, shards) for shard in shards)
+
     async def rebalance_shards(self):
         """
         Iterate over shards until none of them need more rebalancing.
@@ -158,31 +165,24 @@ class Rebalancer:
         Split chooses a >110% filled shard and reduces it to 100%
         If the shard is between 90% and 110% full, nobody touches it
         """
-
-        i = 0
         while True:
             await self.wait_for_indexing()
-
-            # The first time we get the dirty counts, afterwards we get the accurate ones
-            shards = await self.get_rebalance_shards(dirty=i == 0)
-            i += 1
+            shards = await self.get_rebalance_shards()
 
             # Any shards to split?
             shard_to_split = next((s for s in shards[::-1] if needs_split(s)), None)
             if shard_to_split is not None:
-                await self.split_shard(shard_to_split.id)
+                await self.split_shard(shard_to_split, shards)
                 continue
 
             # Any shards to merge?
             shard_to_merge = next((s for s in shards if needs_merge(s, shards)), None)
             if shard_to_merge is not None:
-                await self.merge_shard(shard_to_merge.id)
+                await self.merge_shard(shard_to_merge, shards)
             else:
                 break
 
-    async def split_shard(self, shard_id: str):
-        shards = await self.get_rebalance_shards()
-        shard_to_split = next(s for s in shards if s.id == shard_id)
+    async def split_shard(self, shard_to_split: RebalanceShard, shards: list[RebalanceShard]):
         logger.info(
             "Splitting excess of paragraphs to other shards",
             extra={
@@ -252,9 +252,7 @@ class Rebalancer:
 
             await self.wait_for_indexing()
 
-    async def merge_shard(self, shard_id: str):
-        shards = await self.get_rebalance_shards()
-        shard_to_merge = next(s for s in shards if s.id == shard_id)
+    async def merge_shard(self, shard_to_merge: RebalanceShard, shards: list[RebalanceShard]):
         logger.info(
             "Merging shard",
             extra={
@@ -543,7 +541,8 @@ async def rebalance_kb(context: ApplicationContext, kbid: str) -> None:
     rebalancer = Rebalancer(context, kbid)
     try:
         logger.info("Starting rebalance for kb", extra={"kbid": kbid})
-        await rebalancer.rebalance_shards()
+        if await rebalancer.required():
+            await rebalancer.rebalance_shards()
         logger.info("Finished rebalance for kb", extra={"kbid": kbid})
     except Exception as err:
         logger.exception("Rebalance finished with error", extra={"kbid": kbid})
