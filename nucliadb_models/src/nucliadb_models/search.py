@@ -2508,7 +2508,7 @@ class KeywordQuery(BaseModel):
 
 
 class SemanticQuery(BaseModel):
-    query: Optional[list[float]]
+    query: list[float]
     vectorset: str
     min_score: float
 
@@ -2539,7 +2539,7 @@ class Score(BaseModel):
     type: str
 
 
-class TextBlockMatch(BaseModel):
+class RetrievalMatch(BaseModel):
     id: str
     score: float
     scores: list[Score]
@@ -2547,4 +2547,4 @@ class TextBlockMatch(BaseModel):
 
 
 class RetrievalResponse(BaseModel):
-    text_blocks: list[TextBlockMatch]
+    matches: list[RetrievalMatch]
