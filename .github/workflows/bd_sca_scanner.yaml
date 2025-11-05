@@ -1,0 +1,37 @@
+name: BD SCA Scanner
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**/*.lock'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**/*.lock'
+
+jobs:
+  blackduck-sca-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      
+      - name: Run Black Duck SCA PR Scan
+        id: blackduck-pr-scan
+        uses: blackduck-inc/black-duck-security-scan@v2
+        env:
+          DETECT_PROJECT_NAME: nucliadb
+          DETECT_PROJECT_GROUP_NAME: Nuclia
+          DETECT_PROJECT_VERSION_NAME: main
+        with:
+          bridgecli_download_version: "3.7.1" # Issue with Bridge_CLI 3.8.0
+          blackducksca_url: 'https://progresssoftware.app.blackduck.com'
+          blackducksca_token: ${{ secrets.BD_SCA_TOKEN }}
+          blackducksca_scan_full: ${{ github.event_name == 'pull_request' && 'false' || 'true' }}
+          project_directory: '.'
+          blackducksca_scan_failure_severities: 'BLOCKER,CRITICAL,MAJOR'
+          detect_search_depth: 1
+          detect_args: '--detect.included.detector.types=uv,cargo --detect.timeout=600'
+          include_diagnostics: false
