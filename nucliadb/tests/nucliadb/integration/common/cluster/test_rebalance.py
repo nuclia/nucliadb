@@ -24,10 +24,11 @@ from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import rebalance
-from nucliadb.common.cluster.rebalance import build_shard_resources_index, get_resources_from_shard
+from nucliadb.common.cluster.rebalance import count_resources_in_shard, get_resources_from_shard
 from nucliadb.common.cluster.settings import settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
+from nucliadb.common.maindb.driver import Driver
 from nucliadb_protos import writer_pb2
 
 
@@ -63,14 +64,14 @@ async def test_rebalance_splits_kb_shards(
     shards_to_resources = await build_shard_resources_index(
         app_context.kv_driver, standalone_knowledgebox
     )
-    assert len(shards_to_resources) == 1
-    assert list(shards_to_resources.values()) == [10]
+    assert len(shards_to_resources) == 2
+    assert set(shards_to_resources.values()) == {0, 10}
 
-    # Active shard should not be present in the index as it doesn't have any resource yet
+    # Active shard should not have any resource yet
     active_shard = next(
         s for idx, s in enumerate(kb_shards.shards) if not s.read_only and idx == kb_shards.actual
     )
-    assert active_shard.shard not in shards_to_resources.keys()
+    assert shards_to_resources[active_shard.shard] == 0
 
     # Change max shard paragraphs to be half: this should force the shard to be split in two
     with patch.object(settings, "max_shard_paragraphs", total_paragraphs * 0.75):
@@ -161,13 +162,13 @@ async def test_rebalance_splits_and_merges_kb_shards(
 
         # Check that the paragraphs distribution is the expected
         shards_to_resources = await build_shard_resources_index(app_context.kv_driver, kbid)
-        assert set(shards_to_resources.values()) == {14, 1, 1}
+        assert set(shards_to_resources.values()) == {14, 1, 1, 0}
 
         # Active shard should not be present in the index as it doesn't have any resource yet
         active_shard = next(
             s for idx, s in enumerate(kb_shards.shards) if not s.read_only and idx == kb_shards.actual
         )
-        assert active_shard.shard not in shards_to_resources.keys()
+        assert shards_to_resources[active_shard.shard] == 0
 
         # Run rebalance
         await rebalance.rebalance_kb(app_context, standalone_knowledgebox)
@@ -177,7 +178,7 @@ async def test_rebalance_splits_and_merges_kb_shards(
 
         # Check that the paragraphs distribution is the expected
         shards_to_resources = await build_shard_resources_index(app_context.kv_driver, kbid)
-        assert set(shards_to_resources.values()) == {10, 6}
+        assert set(shards_to_resources.values()) == {10, 6, 0}
 
 
 async def create_shard_for_kb(kbid: str):
@@ -229,3 +230,12 @@ async def test_build_shard_resources_index(
         app_context.kv_driver, kbid, list(shards_to_resources.keys())[0], n=1000
     )
     assert set(resources_batch) == set(rids)
+
+
+async def build_shard_resources_index(driver: Driver, kbid: str) -> dict[str, int]:
+    shards = await get_kb_shards(kbid)
+    result = {}
+    for shard in shards.shards:
+        count = await count_resources_in_shard(driver, kbid, shard.shard)
+        result[shard.shard] = count
+    return result
