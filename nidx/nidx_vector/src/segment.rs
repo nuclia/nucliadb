@@ -26,7 +26,7 @@ use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, Paragra
 use crate::formula::Formula;
 use crate::inverted_index::{FilterBitSet, InvertedIndexes, build_indexes};
 use crate::vector_types::rabitq;
-use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
+use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata, hnsw};
 use crate::{hnsw::*, inverted_index};
 use core::f32;
 use io::{BufWriter, Write};
@@ -41,9 +41,6 @@ use std::iter::empty;
 use std::path::Path;
 use std::time::Instant;
 use tracing::{debug, trace};
-
-/// How much expensive is to find a node via HNSW compared to a simple brute force scan
-const HNSW_COST_FACTOR: usize = 100;
 
 mod file_names {
     pub const HNSW: &str = "index.hnsw";
@@ -543,14 +540,10 @@ impl OpenSegment {
         if matching == 0 {
             return Box::new(empty());
         }
-        let expected_traversal_scan = top_k * self.metadata.records / matching;
 
         let t = Instant::now();
         let method;
-        let results = if matching < expected_traversal_scan * HNSW_COST_FACTOR {
-            method = "brute force";
-            self.brute_force_search(bitset, top_k, retriever, encoded_query, &raw_query)
-        } else {
+        let results = if use_hnsw(self.metadata.records, matching, top_k, rabitq) {
             method = "hnsw";
             let ops = HnswSearcher::new(&retriever, true);
             let filter = NodeFilter::new(bitset, with_duplicates, config);
@@ -561,6 +554,9 @@ impl OpenSegment {
                     .map(|(address, dist)| ScoredVector::new(address, self.data_store.as_ref(), dist))
                     .take(top_k),
             )
+        } else {
+            method = "brute force";
+            self.brute_force_search(bitset, top_k, retriever, encoded_query, &raw_query)
         };
 
         let time = t.elapsed();
@@ -625,6 +621,42 @@ impl OpenSegment {
 
         results
     }
+}
+
+fn use_hnsw(total_nodes: usize, matching_nodes: usize, top_k: usize, has_rabitq: bool) -> bool {
+    // Cost of a full vector comparison compared to a quantized vector comparison
+    let full_cost: usize;
+    // How many more vectors are evaluated in layer_search for quantized vectors
+    let search_mult: usize;
+    // How many vectors are reranked
+    let rerank_mult: usize;
+    if has_rabitq {
+        full_cost = 16;
+        search_mult = rabitq::RERANKING_FACTOR * 3 / 4;
+        rerank_mult = rabitq::RERANKING_FACTOR / 2;
+    } else {
+        full_cost = 1;
+        search_mult = 1;
+        rerank_mult = 0;
+    }
+
+    // Estimated vectors visited during hnsw search (quantized vectors)
+    let hnsw_rq = ((total_nodes as f32).ln() - 2.0).powi(2) * (top_k as f32).ln() * search_mult as f32;
+    // Estimated vectors visited in closest_up_nodes (full vectors)
+    let hnsw_full = (top_k * rerank_mult) + (top_k * hnsw::M * total_nodes / matching_nodes);
+
+    // Quantized vectors evaluated with brute-force
+    let bf_rq = matching_nodes;
+    // Estimated full vectors to be evaluated during rerank in brute-force
+    let bf_full = top_k * rerank_mult;
+
+    let hnsw_cost = hnsw_rq as usize + hnsw_full * full_cost;
+    let bf_cost = bf_rq + bf_full * full_cost;
+
+    let use_hnsw = hnsw_cost < bf_cost;
+    debug!(hnsw_cost, bf_cost, use_hnsw, "Estimated search costs");
+
+    use_hnsw
 }
 
 #[cfg(test)]
