@@ -3,13 +3,13 @@ on:
   push:
     branches:
       - main
-    paths:
-      - '**/*.lock'
+    # paths:
+    #   - '**/*.lock'
   pull_request:
     branches:
       - main
-    paths:
-      - '**/*.lock'
+    # paths:
+    #   - '**/*.lock'
 
 jobs:
   blackduck-sca-scan:
@@ -17,7 +17,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-      
+
+      - name: Calculate detect-args for BD SCA Scan
+        id: calculate-detect-args
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "DETECT_ARGS=--detect.included.detector.types=uv,cargo --detect.timeout=600 --detect.blackduck.rapid.compare.mode=BOM_COMPARE_STRICT" >> $GITHUB_OUTPUT
+          else
+            echo "DETECT_ARGS=--detect.included.detector.types=uv,cargo --detect.timeout=600" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run Black Duck SCA PR Scan
         id: blackduck-pr-scan
         uses: blackduck-inc/black-duck-security-scan@v2
@@ -33,5 +42,5 @@ jobs:
           project_directory: '.'
           blackducksca_scan_failure_severities: 'BLOCKER,CRITICAL,MAJOR'
           detect_search_depth: 1
-          detect_args: '--detect.included.detector.types=uv,cargo --detect.timeout=600'
+          detect_args: ${{ steps.calculate-detect-args.outputs.DETECT_ARGS }}
           include_diagnostics: false
