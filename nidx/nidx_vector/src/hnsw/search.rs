@@ -21,7 +21,7 @@
 use bit_set::BitSet;
 use rustc_hash::FxHashSet;
 use std::cmp::{Ordering, Reverse};
-use std::collections::{BinaryHeap, HashMap, VecDeque};
+use std::collections::{BinaryHeap, HashMap};
 use std::time::Instant;
 use tracing::trace;
 
@@ -190,32 +190,28 @@ impl<'a, DR: DataRetriever> HnswSearcher<'a, DR> {
         }
     }
 
+    /// Breadth-first search to find the closest nodes to the entry-points that fulfill the filtering conditions
     fn closest_up_nodes<L: SearchableLayer>(
         &'a self,
-        entry_points: Vec<VectorAddr>,
+        entry_points: Vec<Cnx>,
         query: &SearchVector,
         layer: L,
         number_of_results: usize,
         mut filter: NodeFilter<'a>,
     ) -> Vec<(VectorAddr, f32)> {
-        // We just need to perform BFS, the replacement is the closest node to the actual
-        // best solution. This algorithm takes a lazy approach to computing the similarity of
-        // candidates.
-
         const MAX_VECTORS_TO_PRELOAD: u32 = 20_000;
         let mut results = Vec::new();
-        let inner_entry_points_iter = entry_points.iter().map(|VectorAddr(inner)| *inner as usize);
+        let inner_entry_points_iter = entry_points.iter().map(|Cnx(VectorAddr(inner), _)| *inner as usize);
         let mut visited_nodes: BitSet = BitSet::from_iter(inner_entry_points_iter);
-        let mut candidates = VecDeque::from(entry_points);
+        let mut candidates = entry_points;
+        candidates.sort_unstable();
 
         let mut preloaded = 0;
 
         loop {
-            let Some(candidate) = candidates.pop_front() else {
+            let Some(Cnx(candidate, candidate_similarity)) = candidates.pop() else {
                 break;
             };
-
-            let candidate_similarity = self.retriever.similarity(candidate, query);
 
             if candidate_similarity < self.retriever.min_score() {
                 break;
@@ -226,22 +222,28 @@ impl<'a, DR: DataRetriever> HnswSearcher<'a, DR> {
             }
 
             if results.len() == number_of_results {
-                return results;
+                break;
             }
 
-            let mut sorted_out: Vec<_> = layer.get_out_edges(candidate).collect();
-            sorted_out.sort_by(|a, b| b.1.total_cmp(&a.1));
-            sorted_out.into_iter().for_each(|(new_candidate, _)| {
-                if !visited_nodes.contains(new_candidate.0 as usize) {
-                    visited_nodes.insert(new_candidate.0 as usize);
-                    candidates.push_back(new_candidate);
-
-                    if self.preload_nodes && preloaded < MAX_VECTORS_TO_PRELOAD {
+            if self.preload_nodes && preloaded < MAX_VECTORS_TO_PRELOAD {
+                for (new_candidate, _) in layer.get_out_edges(candidate) {
+                    if !visited_nodes.contains(new_candidate.0 as usize) {
                         self.retriever.will_need(new_candidate);
                         preloaded += 1;
                     }
                 }
-            });
+            }
+
+            for (new_candidate, _) in layer.get_out_edges(candidate) {
+                if visited_nodes.insert(new_candidate.0 as usize) {
+                    let new_similarity = self.retriever.similarity(new_candidate, query);
+
+                    if new_similarity > self.retriever.min_score() {
+                        candidates.push(Cnx(new_candidate, new_similarity));
+                    }
+                }
+            }
+            candidates.sort_unstable();
         }
 
         results
@@ -364,13 +366,13 @@ impl<'a, DR: DataRetriever> HnswSearcher<'a, DR> {
             let t = Instant::now();
             let reranked = rabitq::rerank_top(neighbours.collect(), k_neighbours, self.retriever, query)
                 .into_iter()
-                .map(|Reverse(Cnx(addr, _))| addr)
+                .map(|Reverse(c)| c)
                 .collect();
             let time = t.elapsed();
             trace!(?time, "HNSW search: reranking");
             reranked
         } else {
-            neighbours.map(|(addr, _)| addr).collect()
+            neighbours.map(|(addr, score)| Cnx(addr, score.score)).collect()
         };
 
         // Find k nodes that match the filter in the last layer
