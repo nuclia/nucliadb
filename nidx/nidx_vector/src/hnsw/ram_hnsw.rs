@@ -113,9 +113,30 @@ impl RAMHnsw {
     /// A bug in a previous version of this program could cause a node in layer N
     /// to link to a node in layer N-1. This breaks navigation accross layer N.
     /// This function will delete any such link from the graph.
-    pub fn fix_broken_links(&self) {
+    /// Also delete empty layers and entrypoints pointing to unexisting layers
+    pub fn fix_broken_graph(&mut self) {
+        // Fix links to a node not in this lauer
         for l in &self.layers[1..] {
             l.fix_broken_links();
+        }
+
+        // Delete empty layers
+        while let Some(layer) = self.layers.last() {
+            if layer.out.is_empty() {
+                self.layers.pop();
+            } else {
+                break;
+            }
+        }
+
+        // If entrypoint point to non-existing layer, point it to the top-most layer
+        if self.entry_point.layer >= self.layers.len() {
+            self.entry_point.layer = self.layers.len() - 1;
+            let last_layer = self.layers.last().unwrap();
+            if !last_layer.contains(&self.entry_point.node) {
+                // If the current entrypoint node is not in the last layer, point to another node that is here
+                self.entry_point.node = *self.layers.last().unwrap().out.keys().next().unwrap();
+            }
         }
     }
 }
@@ -172,7 +193,7 @@ mod tests {
         let mut graph = RAMHnsw::new();
         graph.layers.push(layer0);
         graph.layers.push(layer1);
-        graph.fix_broken_links();
+        graph.fix_broken_graph();
         assert!(graph.layers[1].out[&VectorAddr(0)].read().unwrap().is_empty());
     }
 }

@@ -158,7 +158,7 @@ fn merge_indexes<DS: DataStore + 'static>(
         // If there are no deletions, we can reuse the first segment
         // HNSW since its indexes will match the the ones in data_store
         index = DiskHnsw::deserialize(&operants[0].index);
-        index.fix_broken_links();
+        index.fix_broken_graph();
         start_vector_index = operants[0].data_store.stored_vector_count();
     }
     let merged_vectors_count = data_store.stored_vector_count();
