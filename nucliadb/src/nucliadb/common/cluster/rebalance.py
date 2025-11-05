@@ -310,21 +310,6 @@ class Rebalancer:
             await self.wait_for_indexing()
 
         if empty_shard:
-            # Make sure there is no resource assigned to this shard
-            shard_resources = await count_resources_in_shard(
-                self.context.kv_driver, self.kbid, shard_to_merge.id
-            )
-            if shard_resources > 0:
-                logger.error(
-                    f"Shard expected to be empty, but it isn't. Won't be deleted.",
-                    extra={
-                        "kbid": self.kbid,
-                        "shard": shard_to_merge.id,
-                        "resources": shard_resources,
-                    },
-                )
-                return
-
             # If shard was emptied, delete it
             async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=self.kbid)):
                 async with datamanagers.with_rw_transaction() as txn:
