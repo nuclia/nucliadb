@@ -73,8 +73,9 @@ class Rebalancer:
         """
         Return the sorted list of shards by increasing paragraph count.
 
-        If dirty is True, it will fetch the paragraph count from nidx for each shard, which is lighter but deletions are not guaranteed to be reflected.
-        Otherwise, it will get the paragraph counts by querying nidx paragraph index for each shard.
+        If dirty is True, it will fetch the paragraph count from nidx shard metadata, which is lighter
+        but deletions are not guaranteed to be reflected. Otherwise, it will get the paragraph counts
+        by querying nidx paragraph index for each shard.
         """
         result = []
         self.kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=self.kbid)
