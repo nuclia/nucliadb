@@ -73,6 +73,7 @@ def text_block_match_to_retrieval_match(item: TextBlockMatch) -> RetrievalMatch:
             value=item.current_score.score,
             source=item.current_score.source,
             type=item.current_score.type,
+            history=item.scores,
         ),
         metadata=Metadata(
             field_labels=item.field_labels,

@@ -2600,7 +2600,7 @@ class Scores(BaseModel):
     value: float
     source: ScoreSource
     type: ScoreType
-    # history: list[Score]
+    history: list[Score]
 
 
 class Metadata(BaseModel):
