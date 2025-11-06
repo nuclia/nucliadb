@@ -72,9 +72,12 @@ class ScoredTextBlock(BaseModel):
 
     @property
     def score(self) -> float:
+        return self.current_score.score
+
+    @property
+    def current_score(self) -> Score:
         assert len(self.scores) > 0, "text block matches must be scored"
-        current_score = self.scores[-1]
-        return current_score.score
+        return self.scores[-1]
 
 
 class TextBlockMatch(ScoredTextBlock):

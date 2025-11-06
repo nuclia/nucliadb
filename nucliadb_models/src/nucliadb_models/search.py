@@ -2598,10 +2598,8 @@ Score = KeywordScore | SemanticScore | GraphScore | RrfScore | WeightedCombSumSc
 
 class Scores(BaseModel):
     value: float
-    # TODO: replace for source and type
-    score_type: SCORE_TYPE
-    # source: ScoreSource
-    # _type: ScoreType
+    source: ScoreSource
+    type: ScoreType
     # history: list[Score]
 
 

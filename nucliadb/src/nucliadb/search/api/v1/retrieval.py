@@ -70,8 +70,9 @@ def text_block_match_to_retrieval_match(item: TextBlockMatch) -> RetrievalMatch:
     return RetrievalMatch(
         id=item.paragraph_id.full(),
         score=Scores(
-            value=item.score,
-            score_type=item.score_type,
+            value=item.current_score.score,
+            source=item.current_score.source,
+            type=item.current_score.type,
         ),
         metadata=Metadata(
             field_labels=item.field_labels,
