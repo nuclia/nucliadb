@@ -37,7 +37,10 @@ from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search import cache
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query_parser.parsers.search import parse_search
-from nucliadb.search.search.query_parser.parsers.unit_retrieval import legacy_convert_retrieval_to_proto
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
+    convert_retrieval_to_proto,
+    is_incomplete,
+)
 from nucliadb.search.search.utils import (
     min_score_from_query_params,
 )
@@ -260,7 +263,8 @@ async def search(
     start_time = time()
 
     parsed = await parse_search(kbid, item)
-    pb_query, incomplete_results = await legacy_convert_retrieval_to_proto(parsed)
+    incomplete_results = is_incomplete(parsed.retrieval)
+    pb_query = convert_retrieval_to_proto(parsed.retrieval)
 
     # We need to query all nodes
     results, queried_shards = await nidx_query(kbid, Method.SEARCH, pb_query)

@@ -34,21 +34,6 @@ from nucliadb_protos import utils_pb2
 
 
 @query_parser_observer.wrap({"type": "convert_retrieval_to_proto"})
-async def legacy_convert_retrieval_to_proto(
-    parsed: ParsedQuery,
-) -> tuple[SearchRequest, bool]:
-    converter = _Converter(parsed.retrieval)
-    request = converter.into_search_request()
-
-    # XXX: legacy values that were returned by QueryParser but not always
-    # needed. We should find a better abstraction
-
-    incomplete = is_incomplete(parsed.retrieval)
-
-    return request, incomplete
-
-
-@query_parser_observer.wrap({"type": "convert_retrieval_to_proto"})
 def convert_retrieval_to_proto(retrieval: UnitRetrieval) -> SearchRequest:
     converter = _Converter(retrieval)
     request = converter.into_search_request()

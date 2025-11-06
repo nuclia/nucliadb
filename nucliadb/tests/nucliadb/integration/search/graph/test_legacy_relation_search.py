@@ -29,7 +29,7 @@ from nucliadb.search.search.query_parser.models import (
     RelationQuery,
     UnitRetrieval,
 )
-from nucliadb.search.search.query_parser.parsers.unit_retrieval import legacy_convert_retrieval_to_proto
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb_protos import utils_pb2
 
 
@@ -114,11 +114,11 @@ async def entities_subgraph_search(
         reranker=NoopReranker(),  # unused
     )
 
-    converted = await legacy_convert_retrieval_to_proto(parsed)
+    converted = convert_retrieval_to_proto(parsed)
     with (
         patch("nucliadb.search.search.find.parse_find", new=AsyncMock(return_value=parsed)),
         patch(
-            "nucliadb.search.search.find.legacy_convert_retrieval_to_proto",
+            "nucliadb.search.search.find.convert_retrieval_to_proto",
             new=AsyncMock(return_value=converted),
         ),
     ):
