@@ -30,7 +30,8 @@ from nucliadb.common.counters import IndexCounts
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexingError
 from nucliadb.common.ids import ParagraphId
 from nucliadb_models.external_index_providers import ExternalIndexProviderType
-from nucliadb_models.search import SCORE_TYPE, Relations, Score, TextPosition
+from nucliadb_models.internal.retrieval import Score
+from nucliadb_models.search import SCORE_TYPE, Relations, TextPosition
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,

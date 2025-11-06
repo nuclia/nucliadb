@@ -37,10 +37,8 @@ from nucliadb.search.search.query_parser.models import (
 from nucliadb.search.search.utils import filter_hidden_resources
 from nucliadb_models import search as search_models
 from nucliadb_models.filters import FilterExpression
-from nucliadb_models.search import (
-    MAX_RANK_FUSION_WINDOW,
-    RetrievalRequest,
-)
+from nucliadb_models.internal.retrieval import RetrievalRequest
+from nucliadb_models.search import MAX_RANK_FUSION_WINDOW
 
 
 @query_parser_observer.wrap({"type": "parse_retrieve"})

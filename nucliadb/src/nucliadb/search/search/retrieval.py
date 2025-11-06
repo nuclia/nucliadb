@@ -36,13 +36,8 @@ from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.query_parser.models import UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.search.rank_fusion import IndexSource, get_rank_fusion
-from nucliadb_models.search import (
-    SCORE_TYPE,
-    GraphScore,
-    KeywordScore,
-    SemanticScore,
-    TextPosition,
-)
+from nucliadb_models.internal.retrieval import GraphScore, KeywordScore, SemanticScore
+from nucliadb_models.search import SCORE_TYPE, TextPosition
 
 # Constant score given to all graph results until we implement graph scoring
 FAKE_GRAPH_SCORE = 1.0

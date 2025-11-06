@@ -54,6 +54,7 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.internal.predict import (
     RerankModel,
 )
+from nucliadb_models.internal.retrieval import GraphScore
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -62,7 +63,6 @@ from nucliadb_models.search import (
     DirectionalRelation,
     EntitySubgraph,
     FindRequest,
-    GraphScore,
     GraphStrategy,
     KnowledgeboxFindResults,
     NucliaDBClientType,

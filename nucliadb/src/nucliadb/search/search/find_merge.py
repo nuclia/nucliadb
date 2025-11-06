@@ -37,14 +37,9 @@ from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import merge_observer
 from nucliadb.search.search.query_parser.models import UnitRetrieval
 from nucliadb.search.search.rerankers import RerankableItem, Reranker, RerankingOptions
+from nucliadb_models.internal.retrieval import RerankerScore
 from nucliadb_models.resource import Resource
-from nucliadb_models.search import (
-    FindField,
-    FindResource,
-    KnowledgeboxFindResults,
-    MinScore,
-    RerankerScore,
-)
+from nucliadb_models.search import FindField, FindResource, KnowledgeboxFindResults, MinScore
 from nucliadb_telemetry import metrics
 
 FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(

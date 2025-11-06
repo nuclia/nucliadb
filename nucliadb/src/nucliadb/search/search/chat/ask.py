@@ -73,6 +73,13 @@ from nucliadb.search.search.rerankers import (
     get_reranker,
 )
 from nucliadb.search.utilities import get_predict
+from nucliadb_models.internal.retrieval import (
+    GraphScore,
+    KeywordScore,
+    RerankerScore,
+    RrfScore,
+    SemanticScore,
+)
 from nucliadb_models.search import (
     SCORE_TYPE,
     AnswerAskResponseItem,
@@ -94,10 +101,8 @@ from nucliadb_models.search import (
     FindParagraph,
     FindRequest,
     FootnoteCitationsAskResponseItem,
-    GraphScore,
     GraphStrategy,
     JSONAskResponseItem,
-    KeywordScore,
     KnowledgeboxFindResults,
     MetadataAskResponseItem,
     NucliaDBClientType,
@@ -111,10 +116,7 @@ from nucliadb_models.search import (
     ReasoningAskResponseItem,
     Relations,
     RelationsAskResponseItem,
-    RerankerScore,
     RetrievalAskResponseItem,
-    RrfScore,
-    SemanticScore,
     StatusAskResponseItem,
     SyncAskMetadata,
     SyncAskResponse,
