@@ -181,6 +181,7 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
         find_response = await build_find_response(
             search_response,
             text_blocks,
+            search_response.graph,
             retrieval=retrieval,
             kbid="kbid",
             query=query,

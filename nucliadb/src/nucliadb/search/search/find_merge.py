@@ -77,6 +77,7 @@ FAKE_GRAPH_SCORE = 1.0
 async def build_find_response(
     search_response: SearchResponse,
     merged_text_blocks: list[TextBlockMatch],
+    graph_response: GraphSearchResponse,
     *,
     retrieval: UnitRetrieval,
     kbid: str,
@@ -120,7 +121,7 @@ async def build_find_response(
     entry_points = []
     if retrieval.query.relation is not None:
         entry_points = retrieval.query.relation.entry_points
-    relations = await merge_relations_results([search_response.graph], entry_points)
+    relations = await merge_relations_results([graph_response], entry_points)
 
     # compose response
     find_resources = compose_find_resources(text_blocks, resources)

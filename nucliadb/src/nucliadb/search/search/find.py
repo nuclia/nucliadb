@@ -119,6 +119,7 @@ async def _index_node_retrieval(
         search_results = await build_find_response(
             pb_response,
             text_blocks,
+            pb_response.graph,
             retrieval=parsed.retrieval,
             kbid=kbid,
             query=pb_query.body,
