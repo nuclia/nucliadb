@@ -54,9 +54,13 @@ from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
     FindResource,
+    GraphScore,
+    KeywordScore,
     KnowledgeboxFindResults,
     MinScore,
+    RerankerScore,
     ResourceProperties,
+    SemanticScore,
     TextPosition,
 )
 from nucliadb_telemetry import metrics
@@ -264,7 +268,7 @@ def keyword_result_to_text_block_match(item: ParagraphResult) -> TextBlockMatch:
     fuzzy_result = len(item.matches) > 0
     return TextBlockMatch(
         paragraph_id=ParagraphId.from_string(item.paragraph),
-        score=item.score.bm25,
+        scores=[KeywordScore(score=item.score.bm25)],
         score_type=SCORE_TYPE.BM25,
         order=0,  # NOTE: this will be filled later
         text="",  # NOTE: this will be filled later too
@@ -306,7 +310,7 @@ def semantic_result_to_text_block_match(item: DocumentScored) -> TextBlockMatch:
 
     return TextBlockMatch(
         paragraph_id=ParagraphId.from_vector_id(vector_id),
-        score=item.score,
+        scores=[SemanticScore(score=item.score)],
         score_type=SCORE_TYPE.VECTOR,
         order=0,  # NOTE: this will be filled later
         text="",  # NOTE: this will be filled later too
@@ -352,7 +356,7 @@ def graph_results_to_text_block_matches(item: GraphSearchResponse) -> list[TextB
         matches.append(
             TextBlockMatch(
                 paragraph_id=paragraph_id,
-                score=FAKE_GRAPH_SCORE,
+                scores=[GraphScore(score=FAKE_GRAPH_SCORE)],
                 score_type=SCORE_TYPE.RELATION_RELEVANCE,
                 order=0,  # NOTE: this will be filled later
                 text="",  # NOTE: this will be filled later too
@@ -476,7 +480,7 @@ async def hydrate_and_rerank(
         score_type = item.score_type
 
         text_block = text_blocks_by_id[paragraph_id]
-        text_block.score = score
+        text_block.scores.append(RerankerScore(score=score))
         text_block.score_type = score_type
 
         matches.append((paragraph_id, score))

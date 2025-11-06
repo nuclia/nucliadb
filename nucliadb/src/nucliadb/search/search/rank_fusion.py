@@ -25,7 +25,7 @@ from typing import Optional, TypeVar
 from nucliadb.common.external_index_providers.base import ScoredTextBlock
 from nucliadb.common.ids import ParagraphId
 from nucliadb.search.search.query_parser import models as parser_models
-from nucliadb_models.search import SCORE_TYPE
+from nucliadb_models.search import SCORE_TYPE, RrfScore, WeightedCombSumScore
 from nucliadb_telemetry.metrics import Observer
 
 logger = logging.getLogger(__name__)
@@ -177,7 +177,7 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
             i, j = match_positions[paragraph_id][0]
             score, score_type = scores[paragraph_id]
             item = rankings[i][0][j]
-            item.score = score
+            item.scores.append(RrfScore(score=score))
             item.score_type = score_type
             merged.append(item)
 
@@ -244,7 +244,7 @@ class WeightedCombSum(RankFusionAlgorithm):
             i, j = match_positions[paragraph_id][0]
             score, score_type = scores[paragraph_id]
             item = rankings[i][0][j]
-            item.score = score
+            item.scores.append(WeightedCombSumScore(score=score))
             item.score_type = score_type
             merged.append(item)
 

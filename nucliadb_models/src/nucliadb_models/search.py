@@ -2545,6 +2545,7 @@ class RetrievalRequest(BaseModel):
 class ScoreSource(Enum):
     INDEX = "index"
     RANK_FUSION = "rank_fusion"
+    RERANKER = "reranker"
 
 
 class ScoreType(Enum):
@@ -2552,6 +2553,8 @@ class ScoreType(Enum):
     KEYWORD = "keyword"
     GRAPH = "graph"
     RRF = "rrf"
+    WCOMB_SUM = "wCombSUM"
+    DEFAULT_RERANKER = "default_reranker"
 
 
 class KeywordScore(BaseModel):
@@ -2574,11 +2577,23 @@ class GraphScore(BaseModel):
 
 class RrfScore(BaseModel):
     score: float
-    source: Literal[ScoreSource.INDEX] = ScoreSource.INDEX
+    source: Literal[ScoreSource.RANK_FUSION] = ScoreSource.RANK_FUSION
     type: Literal[ScoreType.RRF] = ScoreType.RRF
 
 
-Score = KeywordScore | SemanticScore | GraphScore | RrfScore
+class WeightedCombSumScore(BaseModel):
+    score: float
+    source: Literal[ScoreSource.RANK_FUSION] = ScoreSource.RANK_FUSION
+    type: Literal[ScoreType.WCOMB_SUM] = ScoreType.WCOMB_SUM
+
+
+class RerankerScore(BaseModel):
+    score: float
+    source: Literal[ScoreSource.RERANKER] = ScoreSource.RERANKER
+    type: Literal[ScoreType.DEFAULT_RERANKER] = ScoreType.DEFAULT_RERANKER
+
+
+Score = KeywordScore | SemanticScore | GraphScore | RrfScore | WeightedCombSumScore | RerankerScore
 
 
 class Scores(BaseModel):

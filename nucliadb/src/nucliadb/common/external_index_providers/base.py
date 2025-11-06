@@ -30,7 +30,7 @@ from nucliadb.common.counters import IndexCounts
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexingError
 from nucliadb.common.ids import ParagraphId
 from nucliadb_models.external_index_providers import ExternalIndexProviderType
-from nucliadb_models.search import SCORE_TYPE, Relations, TextPosition
+from nucliadb_models.search import SCORE_TYPE, Relations, Score, TextPosition
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
@@ -66,8 +66,15 @@ class VectorsetExternalIndex:
 
 class ScoredTextBlock(BaseModel):
     paragraph_id: ParagraphId
-    score: float
     score_type: SCORE_TYPE
+
+    scores: list[Score]
+
+    @property
+    def score(self) -> float:
+        assert len(self.scores) > 0, "text block matches must be scored"
+        current_score = self.scores[-1]
+        return current_score.score
 
 
 class TextBlockMatch(ScoredTextBlock):
