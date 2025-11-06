@@ -28,103 +28,99 @@ from nucliadb.search.search.find_merge import build_find_response
 from nucliadb.search.search.query_parser.models import (
     KeywordQuery,
     Query,
+    ReciprocalRankFusion,
     SemanticQuery,
     UnitRetrieval,
 )
-from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
 from nucliadb.search.search.rerankers import PredictReranker
-from nucliadb_models.internal.predict import (
-    RerankModel,
-    RerankResponse,
-)
+from nucliadb.search.search.retrieval import text_block_search
+from nucliadb_models.internal.predict import RerankModel, RerankResponse
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import SCORE_TYPE, ResourceProperties
 
 
 async def test_find_post_index_search(expected_find_response: dict[str, Any], predict_mock):
     query = "How should I validate this?"
-    search_responses = [
-        nodereader_pb2.SearchResponse(
-            paragraph=nodereader_pb2.ParagraphSearchResponse(
-                fuzzy_distance=1,
-                total=1,
-                results=[
-                    nodereader_pb2.ParagraphResult(
-                        uuid="rid-1",
-                        field="/f/field-a",
-                        start=10,
-                        end=20,
-                        index=3,
-                        paragraph="rid-1/f/field-a/10-20",
-                        score=nodereader_pb2.ResultScore(
-                            bm25=1.125,
-                        ),
-                        labels=["/a/title"],
+    search_response = nodereader_pb2.SearchResponse(
+        paragraph=nodereader_pb2.ParagraphSearchResponse(
+            fuzzy_distance=1,
+            total=1,
+            results=[
+                nodereader_pb2.ParagraphResult(
+                    uuid="rid-1",
+                    field="/f/field-a",
+                    start=10,
+                    end=20,
+                    index=3,
+                    paragraph="rid-1/f/field-a/10-20",
+                    score=nodereader_pb2.ResultScore(
+                        bm25=1.125,
                     ),
-                    nodereader_pb2.ParagraphResult(
-                        uuid="rid-2",
-                        field="/f/field-b",
-                        split="subfield-x",
-                        start=100,
-                        end=150,
-                        index=0,
-                        paragraph="rid-2/f/field-b/subfield-x/100-150",
-                        score=nodereader_pb2.ResultScore(
-                            bm25=0.64,
-                        ),
+                    labels=["/a/title"],
+                ),
+                nodereader_pb2.ParagraphResult(
+                    uuid="rid-2",
+                    field="/f/field-b",
+                    split="subfield-x",
+                    start=100,
+                    end=150,
+                    index=0,
+                    paragraph="rid-2/f/field-b/subfield-x/100-150",
+                    score=nodereader_pb2.ResultScore(
+                        bm25=0.64,
                     ),
-                    nodereader_pb2.ParagraphResult(
-                        uuid="rid-2",
-                        field="/f/field-b",
-                        split="subfield-y",
-                        start=0,
-                        end=17,
-                        index=2,
-                        paragraph="rid-2/f/field-b/subfield-y/0-17",
-                        score=nodereader_pb2.ResultScore(
-                            bm25=0.7025,
+                ),
+                nodereader_pb2.ParagraphResult(
+                    uuid="rid-2",
+                    field="/f/field-b",
+                    split="subfield-y",
+                    start=0,
+                    end=17,
+                    index=2,
+                    paragraph="rid-2/f/field-b/subfield-y/0-17",
+                    score=nodereader_pb2.ResultScore(
+                        bm25=0.7025,
+                    ),
+                    metadata=noderesources_pb2.ParagraphMetadata(
+                        position=noderesources_pb2.Position(
+                            index=2,
+                            start=0,
+                            end=17,
+                            page_number=10,
+                            in_page=True,
                         ),
-                        metadata=noderesources_pb2.ParagraphMetadata(
-                            position=noderesources_pb2.Position(
-                                index=2,
-                                start=0,
-                                end=17,
-                                page_number=10,
-                                in_page=True,
-                            ),
-                            page_with_visual=True,
-                            representation=noderesources_pb2.Representation(
-                                is_a_table=True,
-                                file="myfile.pdf",
-                            ),
+                        page_with_visual=True,
+                        representation=noderesources_pb2.Representation(
+                            is_a_table=True,
+                            file="myfile.pdf",
                         ),
                     ),
-                ],
-                result_per_page=20,
-                query=query,
-                next_page=False,
-                bm25=True,
-            ),
-            vector=nodereader_pb2.VectorSearchResponse(
-                documents=[
-                    nodereader_pb2.DocumentScored(
-                        doc_id=nodereader_pb2.DocumentVectorIdentifier(
-                            id="rid-3/t/field-c/5/0-30",
-                        ),
-                        score=1.5,
-                        labels=["u/link", "/k/text"],
+                ),
+            ],
+            result_per_page=20,
+            query=query,
+            next_page=False,
+            bm25=True,
+        ),
+        vector=nodereader_pb2.VectorSearchResponse(
+            documents=[
+                nodereader_pb2.DocumentScored(
+                    doc_id=nodereader_pb2.DocumentVectorIdentifier(
+                        id="rid-3/t/field-c/5/0-30",
                     ),
-                    nodereader_pb2.DocumentScored(
-                        doc_id=nodereader_pb2.DocumentVectorIdentifier(
-                            id="rid-2/f/field-b/subfield-y/10/0-17",
-                        ),
-                        score=0.89,
+                    score=1.5,
+                    labels=["u/link", "/k/text"],
+                ),
+                nodereader_pb2.DocumentScored(
+                    doc_id=nodereader_pb2.DocumentVectorIdentifier(
+                        id="rid-2/f/field-b/subfield-y/10/0-17",
                     ),
-                ],
-                result_per_page=20,
-            ),
-        )
-    ]
+                    score=0.89,
+                ),
+            ],
+            result_per_page=20,
+        ),
+    )
 
     async def mock_hydrate_resource_metadata(kbid: str, rid: str, *args, **kwargs):
         return Resource(id=rid)
@@ -139,6 +135,32 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
             }
         )
 
+    retrieval = UnitRetrieval(
+        query=Query(
+            keyword=KeywordQuery(
+                query=query,
+                is_synonyms_query=False,
+                min_score=0.2,
+            ),
+            semantic=SemanticQuery(
+                query=[1, 2, 3],  # unused
+                vectorset="my-model",  # unused
+                min_score=0.4,
+            ),
+        ),
+        top_k=20,
+        rank_fusion=ReciprocalRankFusion(window=20),
+    )
+
+    with (
+        patch("nucliadb.search.search.retrieval.convert_retrieval_to_proto"),
+        patch(
+            "nucliadb.search.search.retrieval.nidx_search",
+            return_value=(search_response, ["my-queried-shard"]),
+        ),
+    ):
+        text_blocks, _, _, _ = await text_block_search("kbid", retrieval)
+
     with (
         patch("nucliadb.search.search.find.get_external_index_manager", return_value=None),
         patch(
@@ -152,22 +174,9 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
         patch.object(predict_mock, "rerank", AsyncMock(side_effect=fake_reranking)),
     ):
         find_response = await build_find_response(
-            search_responses,
-            retrieval=UnitRetrieval(
-                query=Query(
-                    keyword=KeywordQuery(
-                        query=query,
-                        is_synonyms_query=False,
-                        min_score=0.2,
-                    ),
-                    semantic=SemanticQuery(
-                        query=[1, 2, 3],  # unused
-                        vectorset="my-model",  # unused
-                        min_score=0.4,
-                    ),
-                ),
-                top_k=20,
-            ),
+            search_response,
+            text_blocks,
+            retrieval=retrieval,
             kbid="kbid",
             query=query,
             rephrased_query=None,
@@ -175,7 +184,6 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
             field_type_filter=[],
             extracted=[],
             highlight=True,
-            rank_fusion_algorithm=ReciprocalRankFusion(window=20),
             reranker=PredictReranker(window=20),
         )
         resp = find_response.model_dump()

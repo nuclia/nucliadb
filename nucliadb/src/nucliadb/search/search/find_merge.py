@@ -42,7 +42,6 @@ from nucliadb.search.search.hydrator import (
 )
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.query_parser.models import UnitRetrieval
-from nucliadb.search.search.rank_fusion import IndexSource, RankFusionAlgorithm
 from nucliadb.search.search.rerankers import (
     RerankableItem,
     Reranker,
@@ -78,13 +77,13 @@ FAKE_GRAPH_SCORE = 1.0
 
 @merge_observer.wrap({"type": "find_merge"})
 async def build_find_response(
-    search_responses: list[SearchResponse],
+    search_response: SearchResponse,
+    merged_text_blocks: list[TextBlockMatch],
     *,
     retrieval: UnitRetrieval,
     kbid: str,
     query: str,
     rephrased_query: Optional[str],
-    rank_fusion_algorithm: RankFusionAlgorithm,
     reranker: Reranker,
     show: list[ResourceProperties] = [],
     extracted: list[ExtractedDataTypeName] = [],
@@ -99,26 +98,6 @@ async def build_find_response(
     min_score_semantic = 0.0
     if retrieval.query.semantic is not None:
         min_score_semantic = retrieval.query.semantic.min_score
-
-    # merge
-    search_response = merge_shard_responses(search_responses)
-
-    keyword_results = keyword_results_to_text_block_matches(search_response.paragraph.results)
-    semantic_results = semantic_results_to_text_block_matches(
-        filter(
-            lambda x: x.score >= min_score_semantic,
-            search_response.vector.documents,
-        )
-    )
-    graph_results = graph_results_to_text_block_matches(search_response.graph)
-
-    merged_text_blocks = rank_fusion_algorithm.fuse(
-        {
-            IndexSource.KEYWORD: keyword_results,
-            IndexSource.SEMANTIC: semantic_results,
-            IndexSource.GRAPH: graph_results,
-        }
-    )
 
     # cut
     # we assume pagination + predict reranker is forbidden and has been already

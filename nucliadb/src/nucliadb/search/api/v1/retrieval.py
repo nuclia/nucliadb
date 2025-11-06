@@ -56,7 +56,7 @@ async def retrieval_endpoint(
 ) -> RetrievalResponse:
     retrieval = await parse_retrieve(kbid, item)
 
-    text_blocks, _, _ = await text_block_search(kbid, retrieval)
+    text_blocks, _, _, _ = await text_block_search(kbid, retrieval)
 
     # cut the top K, we may have more due to extra results used for rank fusion
     text_blocks = text_blocks[: retrieval.top_k]

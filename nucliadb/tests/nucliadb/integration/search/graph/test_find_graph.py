@@ -23,7 +23,7 @@ from httpx import AsyncClient
 from nidx_protos.nodereader_pb2 import SearchRequest
 from pytest_mock import MockerFixture
 
-from nucliadb.search.search import find
+from nucliadb.search.search import find, retrieval
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -34,7 +34,7 @@ async def test_find_graph_request(
 ):
     """Validate how /find prepares a graph search"""
     kbid = standalone_knowledgebox
-    spy = mocker.spy(find, "nidx_query")
+    spy = mocker.spy(retrieval, "nidx_query")
 
     # graph_query but missing features=graph
     resp = await nucliadb_reader.post(
@@ -163,11 +163,9 @@ async def test_find_graph_feature(
     )
 
     assert spy.call_count == 1
-    pb_responses = spy.call_args.args[0]
-    assert len(pb_responses) == 1, "there's only 1 shard in this KB"
-    pb_response = pb_responses[0]
-    assert pb_response.HasField("graph")
-    graph_response = pb_response.graph
+    merged_pb_responses = spy.call_args.args[0]
+    assert merged_pb_responses.HasField("graph")
+    graph_response = merged_pb_responses.graph
     graph_response.nodes[graph_response.graph[0].source].value == "Leonardo DiCaprio"
     graph_response.relations[graph_response.graph[0].relation].label == "analogy"
     graph_response.nodes[graph_response.graph[0].destination].value == "DiCaprio"

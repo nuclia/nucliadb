@@ -49,7 +49,7 @@ async def nidx_search(kbid: str, pb_query: SearchRequest) -> tuple[SearchRespons
 
 async def text_block_search(
     kbid: str, retrieval: UnitRetrieval
-) -> tuple[list[TextBlockMatch], SearchResponse, list[str]]:
+) -> tuple[list[TextBlockMatch], SearchRequest, SearchResponse, list[str]]:
     """Search for text blocks in multiple indexes and return an rank fused view.
 
     This search method provides a textual view of the data. For example, given a
@@ -79,4 +79,4 @@ async def text_block_search(
     # we'll normally have extra results
     text_blocks = merged_text_blocks[: retrieval.rank_fusion.window]
 
-    return text_blocks, shards_response, queried_shards
+    return text_blocks, pb_query, shards_response, queried_shards
