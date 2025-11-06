@@ -44,10 +44,7 @@ async def legacy_convert_retrieval_to_proto(
     # needed. We should find a better abstraction
 
     incomplete = is_incomplete(parsed.retrieval)
-
-    rephrased_query = None
-    if parsed.retrieval.query.semantic:
-        rephrased_query = await parsed.fetcher.get_rephrased_query()
+    rephrased_query = get_rephrased_query(parsed)
 
     return request, incomplete, rephrased_query
 
@@ -274,3 +271,8 @@ def is_incomplete(retrieval: UnitRetrieval) -> bool:
         return False
     incomplete = retrieval.query.semantic.query is None or len(retrieval.query.semantic.query) == 0
     return incomplete
+
+
+def get_rephrased_query(parsed: ParsedQuery) -> Optional[str]:
+    """Given a parsed query, return the rephrased query used, if any."""
+    return parsed.fetcher.get_cached_rephrased_query()

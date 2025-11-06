@@ -38,7 +38,10 @@ from nucliadb.search.search.metrics import (
 )
 from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.search.query_parser.parsers import parse_find
-from nucliadb.search.search.query_parser.parsers.unit_retrieval import legacy_convert_retrieval_to_proto
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
+    get_rephrased_query,
+    legacy_convert_retrieval_to_proto,
+)
 from nucliadb.search.search.rank_fusion import (
     get_rank_fusion,
 )
@@ -178,7 +181,8 @@ async def _external_index_retrieval(
     parsed = await parse_find(kbid, item)
     assert parsed.retrieval.reranker is not None, "find parser must provide a reranking algorithm"
     reranker = get_reranker(parsed.retrieval.reranker)
-    search_request, incomplete_results, rephrased_query = await legacy_convert_retrieval_to_proto(parsed)
+    search_request, incomplete_results, _ = await legacy_convert_retrieval_to_proto(parsed)
+    rephrased_query = get_rephrased_query(parsed)
 
     # Query index
     query_results = await external_index_manager.query(search_request)  # noqa
