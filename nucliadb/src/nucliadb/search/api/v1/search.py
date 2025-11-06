@@ -260,7 +260,7 @@ async def search(
     start_time = time()
 
     parsed = await parse_search(kbid, item)
-    pb_query, incomplete_results, _ = await legacy_convert_retrieval_to_proto(parsed)
+    pb_query, incomplete_results = await legacy_convert_retrieval_to_proto(parsed)
 
     # We need to query all nodes
     results, queried_shards = await nidx_query(kbid, Method.SEARCH, pb_query)

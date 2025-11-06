@@ -100,11 +100,8 @@ async def _index_node_retrieval(
         )
         rank_fusion = get_rank_fusion(parsed.retrieval.rank_fusion)
         reranker = get_reranker(parsed.retrieval.reranker)
-        (
-            pb_query,
-            incomplete_results,
-            rephrased_query,
-        ) = await legacy_convert_retrieval_to_proto(parsed)
+        pb_query, incomplete_results = await legacy_convert_retrieval_to_proto(parsed)
+        rephrased_query = get_rephrased_query(parsed)
 
     with metrics.time("index_search"):
         results, queried_shards = await nidx_query(kbid, Method.SEARCH, pb_query)
@@ -181,7 +178,7 @@ async def _external_index_retrieval(
     parsed = await parse_find(kbid, item)
     assert parsed.retrieval.reranker is not None, "find parser must provide a reranking algorithm"
     reranker = get_reranker(parsed.retrieval.reranker)
-    search_request, incomplete_results, _ = await legacy_convert_retrieval_to_proto(parsed)
+    search_request, incomplete_results = await legacy_convert_retrieval_to_proto(parsed)
     rephrased_query = get_rephrased_query(parsed)
 
     # Query index

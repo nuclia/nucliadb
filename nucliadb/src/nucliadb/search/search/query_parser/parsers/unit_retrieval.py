@@ -36,7 +36,7 @@ from nucliadb_protos import utils_pb2
 @query_parser_observer.wrap({"type": "convert_retrieval_to_proto"})
 async def legacy_convert_retrieval_to_proto(
     parsed: ParsedQuery,
-) -> tuple[SearchRequest, bool, Optional[str]]:
+) -> tuple[SearchRequest, bool]:
     converter = _Converter(parsed.retrieval)
     request = converter.into_search_request()
 
@@ -44,9 +44,8 @@ async def legacy_convert_retrieval_to_proto(
     # needed. We should find a better abstraction
 
     incomplete = is_incomplete(parsed.retrieval)
-    rephrased_query = get_rephrased_query(parsed)
 
-    return request, incomplete, rephrased_query
+    return request, incomplete
 
 
 @query_parser_observer.wrap({"type": "convert_retrieval_to_proto"})
