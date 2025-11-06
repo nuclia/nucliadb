@@ -24,7 +24,12 @@ from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import rebalance
-from nucliadb.common.cluster.rebalance import count_resources_in_shard, get_resources_from_shard
+from nucliadb.common.cluster.rebalance import (
+    RebalanceShard,
+    count_resources_in_shard,
+    get_resources_from_shard,
+    needs_merge,
+)
 from nucliadb.common.cluster.settings import settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
@@ -239,3 +244,39 @@ async def build_shard_resources_index(driver: Driver, kbid: str) -> dict[str, in
         count = await count_resources_in_shard(driver, kbid, shard.shard)
         result[shard.shard] = count
     return result
+
+
+def test_needs_rebalance_and_finds_target():
+    with patch.object(settings, "max_shard_paragraphs", 1_000_000):
+        shards = [
+            RebalanceShard(
+                id=str(i),
+                nidx_id=str(i),
+                paragraphs=paragraphs,
+                active=active,
+            )
+            for i, (paragraphs, active) in enumerate(
+                [
+                    (1_000_114, False),
+                    (1_000_053, False),
+                    (1_000_038, False),
+                    (960_001, False),
+                    (947_585, False),
+                    (942_161, False),
+                    (940_040, False),
+                    (936_741, False),
+                    (926_385, False),
+                    (918_645, False),
+                    (913_837, False),
+                    # This one cannot be merged with all others because all of them are above %90 of max capacity
+                    # and we don't currently merge onto the active shard.
+                    (
+                        469_845,
+                        False,
+                    ),
+                    (174_397, True),
+                ]
+            )
+        ]
+        shard_to_merge = next((s for s in shards if needs_merge(s, shards)), None)
+        assert shard_to_merge is None
