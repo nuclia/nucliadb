@@ -47,8 +47,7 @@ from nucliadb.search.search.rerankers import (
     Reranker,
     RerankingOptions,
 )
-from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import ExtractedDataTypeName, Resource
+from nucliadb_models.resource import Resource
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
@@ -58,7 +57,6 @@ from nucliadb_models.search import (
     KnowledgeboxFindResults,
     MinScore,
     RerankerScore,
-    ResourceProperties,
     SemanticScore,
     TextPosition,
 )
@@ -85,10 +83,8 @@ async def build_find_response(
     query: str,
     rephrased_query: Optional[str],
     reranker: Reranker,
-    show: list[ResourceProperties] = [],
-    extracted: list[ExtractedDataTypeName] = [],
-    field_type_filter: list[FieldTypeName] = [],
-    highlight: bool = False,
+    resource_hydration_options: ResourceHydrationOptions,
+    text_block_hydration_options: TextBlockHydrationOptions,
 ) -> KnowledgeboxFindResults:
     # XXX: we shouldn't need a min score that we haven't used. Previous
     # implementations got this value from the proto request (i.e., default to 0)
@@ -109,13 +105,6 @@ async def build_find_response(
         text_blocks_page, next_page = cut_page(merged_text_blocks, retrieval.top_k)
 
     # hydrate and rerank
-    resource_hydration_options = ResourceHydrationOptions(
-        show=show, extracted=extracted, field_type_filter=field_type_filter
-    )
-    text_block_hydration_options = TextBlockHydrationOptions(
-        highlight=highlight,
-        ematches=search_response.paragraph.ematches,  # type: ignore
-    )
     reranking_options = RerankingOptions(kbid=kbid, query=query)
     text_blocks, resources, best_matches = await hydrate_and_rerank(
         text_blocks_page,

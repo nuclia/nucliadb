@@ -107,6 +107,15 @@ async def _index_node_retrieval(
 
     # Rank fusion merge, cut, hydrate and rerank
     with metrics.time("results_merge"):
+        resource_hydration_options = ResourceHydrationOptions(
+            show=item.show,
+            extracted=item.extracted,
+            field_type_filter=item.field_type_filter,
+        )
+        text_block_hydration_options = TextBlockHydrationOptions(
+            highlight=item.highlight,
+            ematches=pb_response.paragraph.ematches,  # type: ignore
+        )
         search_results = await build_find_response(
             pb_response,
             text_blocks,
@@ -114,11 +123,9 @@ async def _index_node_retrieval(
             kbid=kbid,
             query=pb_query.body,
             rephrased_query=rephrased_query,
-            show=item.show,
-            extracted=item.extracted,
-            field_type_filter=item.field_type_filter,
-            highlight=item.highlight,
             reranker=reranker,
+            resource_hydration_options=resource_hydration_options,
+            text_block_hydration_options=text_block_hydration_options,
         )
 
     search_time = time() - start_time

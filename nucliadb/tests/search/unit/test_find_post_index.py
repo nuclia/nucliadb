@@ -25,6 +25,7 @@ import pytest
 from nidx_protos import nodereader_pb2, noderesources_pb2
 
 from nucliadb.search.search.find_merge import build_find_response
+from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
 from nucliadb.search.search.query_parser.models import (
     KeywordQuery,
     Query,
@@ -173,6 +174,10 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
         ),
         patch.object(predict_mock, "rerank", AsyncMock(side_effect=fake_reranking)),
     ):
+        resource_hydration_options = ResourceHydrationOptions(
+            show=[ResourceProperties.BASIC], extracted=[], field_type_filter=[]
+        )
+        text_block_hydration_options = TextBlockHydrationOptions(highlight=True, ematches=[])
         find_response = await build_find_response(
             search_response,
             text_blocks,
@@ -180,10 +185,8 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
             kbid="kbid",
             query=query,
             rephrased_query=None,
-            show=[ResourceProperties.BASIC],
-            field_type_filter=[],
-            extracted=[],
-            highlight=True,
+            resource_hydration_options=resource_hydration_options,
+            text_block_hydration_options=text_block_hydration_options,
             reranker=PredictReranker(window=20),
         )
         resp = find_response.model_dump()
