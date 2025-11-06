@@ -110,11 +110,15 @@ class _RetrievalParser:
             return filters
 
         if self.item.filters.filter_expression is not None:
+            # FIXME: remove this type ignore and fix the Union issue
             filters.field_expression = await parse_expression(
-                self.item.filters.filter_expression.field, self.kbid
+                self.item.filters.filter_expression.field,  # type: ignore
+                self.kbid,
             )
+            # FIXME: remove this type ignore and fix the Union issue
             filters.paragraph_expression = await parse_expression(
-                self.item.filters.filter_expression.paragraph, self.kbid
+                self.item.filters.filter_expression.paragraph,  # type: ignore
+                self.kbid,
             )
             if self.item.filters.filter_expression.operator == FilterExpression.Operator.OR:
                 filter_operator = nodereader_pb2.FilterOperator.OR
