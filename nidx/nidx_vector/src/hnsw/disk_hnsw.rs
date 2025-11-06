@@ -82,13 +82,13 @@ impl<'a> SearchableLayer for DiskLayer<'a> {
     }
 }
 
-impl<'a> SearchableHnsw for &'a [u8] {
+impl<'a> SearchableHnsw for DiskHnsw<'a> {
     type L = DiskLayer<'a>;
     fn get_entry_point(&self) -> EntryPoint {
-        DiskHnsw::get_entry_point(self)
+        self.get_entry_point()
     }
     fn get_layer(&self, i: usize) -> Self::L {
-        DiskLayer { hnsw: self, layer: i }
+        DiskLayer { hnsw: self.0, layer: i }
     }
 }
 
@@ -114,8 +114,8 @@ impl Iterator for EdgeIter<'_> {
     }
 }
 
-pub struct DiskHnsw;
-impl DiskHnsw {
+pub struct DiskHnsw<'a>(pub &'a [u8]);
+impl<'a> DiskHnsw<'a> {
     fn serialize_node<W>(mut buf: W, offset: usize, node_addr: u32, hnsw: &RAMHnsw) -> io::Result<usize>
     where
         W: io::Write,
@@ -184,13 +184,13 @@ impl DiskHnsw {
         Ok(())
     }
     // hnsw must be serialized using DiskHnsw, may have trailing bytes at the start.
-    pub fn get_entry_point(hnsw: &[u8]) -> EntryPoint {
-        assert!(!hnsw.is_empty());
+    pub fn get_entry_point(&self) -> EntryPoint {
+        assert!(!self.0.is_empty());
 
-        let node_start = hnsw.len() - USIZE_LEN;
+        let node_start = self.0.len() - USIZE_LEN;
         let layer_start = node_start - USIZE_LEN;
-        let node_addr = usize_from_slice_le(&hnsw[node_start..(node_start + NODE_LEN)]);
-        let layer = usize_from_slice_le(&hnsw[layer_start..(layer_start + USIZE_LEN)]);
+        let node_addr = usize_from_slice_le(&self.0[node_start..(node_start + NODE_LEN)]);
+        let layer = usize_from_slice_le(&self.0[layer_start..(layer_start + USIZE_LEN)]);
         EntryPoint {
             node: VectorAddr(node_addr as u32),
             layer,
@@ -215,7 +215,7 @@ impl DiskHnsw {
         }
 
         let end = hnsw.len();
-        ram.entry_point = Self::get_entry_point(hnsw);
+        ram.entry_point = DiskHnsw(hnsw).get_entry_point();
 
         let mut node_index: u32 = 0;
         loop {
@@ -328,13 +328,15 @@ mod tests {
         hnsw.layers = vec![layer0, layer1, layer2];
         let mut buf = vec![];
         DiskHnsw::serialize_into(&mut buf, no_nodes, hnsw).unwrap();
-        let ep = DiskHnsw::get_entry_point(&buf);
+
+        let hnsw = DiskHnsw(&buf);
+        let ep = hnsw.get_entry_point();
         assert_eq!(ep, entry_point);
-        let layer0 = buf.as_slice().get_layer(0);
+        let layer0 = hnsw.get_layer(0);
         layer_check(layer0, no_nodes, &cnx0);
-        let layer1 = buf.as_slice().get_layer(1);
+        let layer1 = hnsw.get_layer(1);
         layer_check(layer1, no_nodes, &cnx1);
-        let layer2 = buf.as_slice().get_layer(2);
+        let layer2 = hnsw.get_layer(2);
         layer_check(layer2, no_nodes, &cnx2);
     }
 
