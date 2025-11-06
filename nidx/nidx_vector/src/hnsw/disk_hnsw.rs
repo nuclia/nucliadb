@@ -46,7 +46,7 @@
 use std::collections::HashMap;
 use std::io;
 
-use super::ram_hnsw::{Edge, EntryPoint, RAMHnsw, RAMLayer};
+use super::ram_hnsw::{EntryPoint, RAMHnsw, RAMLayer};
 use super::search::{SearchableHnsw, SearchableLayer};
 use crate::VectorAddr;
 use crate::data_types::usize_utils::*;
@@ -66,19 +66,10 @@ pub struct DiskLayer<'a> {
     layer: usize,
 }
 
-impl<'a> SearchableLayer for &'a DiskLayer<'a> {
-    type EdgeIt = EdgeIter<'a>;
-    fn get_out_edges(&self, address: VectorAddr) -> Self::EdgeIt {
-        let node = DiskHnsw::get_node(self.hnsw, address);
-        DiskHnsw::get_out_edges(node, self.layer)
-    }
-}
-
 impl<'a> SearchableLayer for DiskLayer<'a> {
-    type EdgeIt = EdgeIter<'a>;
-    fn get_out_edges(&self, address: VectorAddr) -> Self::EdgeIt {
+    fn get_out_edges(&self, address: VectorAddr) -> impl Iterator<Item = VectorAddr> {
         let node = DiskHnsw::get_node(self.hnsw, address);
-        DiskHnsw::get_out_edges(node, self.layer)
+        DiskHnsw::get_out_edges(node, self.layer).map(|(a, _s)| a)
     }
 }
 
@@ -97,7 +88,7 @@ pub struct EdgeIter<'a> {
     buf: &'a [u8],
 }
 impl Iterator for EdgeIter<'_> {
-    type Item = (VectorAddr, Edge);
+    type Item = (VectorAddr, f32);
     fn next(&mut self) -> Option<Self::Item> {
         if self.buf.len() == self.crnt {
             None
@@ -129,7 +120,7 @@ impl<'a> DiskHnsw<'a> {
             buf.write_all(&num_edges.to_le_bytes())?;
             length += USIZE_LEN;
             if num_edges > 0 {
-                for (cnx, edge) in hnsw.get_layer(layer).get_out_edges(node) {
+                for (cnx, edge) in hnsw.get_layer(layer).out[&node].read().unwrap().iter() {
                     buf.write_all(&(cnx.0 as usize).to_le_bytes())?;
                     buf.write_all(&edge.to_le_bytes())?;
                     length += CNX_LEN;
@@ -245,8 +236,8 @@ impl<'a> DiskHnsw<'a> {
                         crnt: 0,
                         buf: &hnsw[cnx_start..cnx_end],
                     };
-                    for (to, weight) in edges {
-                        ram_edges.push((to, weight));
+                    for (to, edge) in edges {
+                        ram_edges.push((to, edge));
                     }
                 }
 
@@ -272,12 +263,12 @@ mod tests {
 
     use super::*;
     use crate::hnsw::ram_hnsw::RAMLayer;
-    fn layer_check<L: SearchableLayer>(buf: L, no_nodes: u32, cnx: &[Vec<(VectorAddr, Edge)>]) {
+    fn layer_check<L: SearchableLayer>(buf: L, no_nodes: u32, cnx: &[Vec<(VectorAddr, f32)>]) {
         let no_cnx = vec![];
         for i in 0..no_nodes {
             let expected = cnx.get(i as usize).unwrap_or(&no_cnx);
             let got: Vec<_> = buf.get_out_edges(VectorAddr(i)).collect();
-            assert_eq!(expected, &got);
+            assert_eq!(got, expected.iter().map(|(x, _)| *x).collect::<Vec<_>>());
         }
     }
     #[test]

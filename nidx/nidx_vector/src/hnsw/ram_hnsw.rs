@@ -144,18 +144,17 @@ impl RAMHnsw {
 pub struct EdgesIterator<'a>(RwLockReadGuard<'a, Vec<(VectorAddr, Edge)>>, usize);
 
 impl<'a> Iterator for EdgesIterator<'a> {
-    type Item = (VectorAddr, Edge);
+    type Item = VectorAddr;
 
     fn next(&mut self) -> Option<Self::Item> {
         let it = self.0.get(self.1);
         self.1 += 1;
-        it.copied()
+        it.map(|(addr, _score)| *addr)
     }
 }
 
-impl<'a> SearchableLayer for &'a RAMLayer {
-    type EdgeIt = EdgesIterator<'a>;
-    fn get_out_edges(&self, node: VectorAddr) -> Self::EdgeIt {
+impl SearchableLayer for &RAMLayer {
+    fn get_out_edges(&self, node: VectorAddr) -> impl Iterator<Item = VectorAddr> {
         EdgesIterator(self.out[&node].read().unwrap(), 0)
     }
 }

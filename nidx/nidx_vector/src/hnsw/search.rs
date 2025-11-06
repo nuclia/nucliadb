@@ -27,7 +27,7 @@ use tracing::trace;
 
 use crate::config::{VectorCardinality, VectorConfig};
 use crate::hnsw::params::EF_SEARCH;
-use crate::hnsw::ram_hnsw::{Edge, EntryPoint};
+use crate::hnsw::ram_hnsw::EntryPoint;
 use crate::inverted_index::FilterBitSet;
 use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr};
@@ -54,8 +54,7 @@ pub enum SearchVector {
 
 /// Implementors of this trait are layers of an HNSW where a nearest neighbour search can be ran.
 pub trait SearchableLayer {
-    type EdgeIt: Iterator<Item = (VectorAddr, Edge)>;
-    fn get_out_edges(&self, node: VectorAddr) -> Self::EdgeIt;
+    fn get_out_edges(&self, node: VectorAddr) -> impl Iterator<Item = VectorAddr>;
 }
 
 /// Implementors of this trait are an HNSW where search can be ran.
@@ -226,7 +225,7 @@ impl<'a, DR: DataRetriever> HnswSearcher<'a, DR> {
             }
 
             if self.preload_nodes && preloaded < MAX_VECTORS_TO_PRELOAD {
-                for (new_candidate, _) in layer.get_out_edges(candidate) {
+                for new_candidate in layer.get_out_edges(candidate) {
                     if !visited_nodes.contains(new_candidate.0 as usize) {
                         self.retriever.will_need(new_candidate);
                         preloaded += 1;
@@ -234,7 +233,7 @@ impl<'a, DR: DataRetriever> HnswSearcher<'a, DR> {
                 }
             }
 
-            for (new_candidate, _) in layer.get_out_edges(candidate) {
+            for new_candidate in layer.get_out_edges(candidate) {
                 if visited_nodes.insert(new_candidate.0 as usize) {
                     let new_similarity = self.retriever.similarity(new_candidate, query);
 
@@ -284,12 +283,12 @@ impl<'a, DR: DataRetriever> HnswSearcher<'a, DR> {
                 }
                 // Candidate is better than worse result
                 (Some(CnxWithBound(cn, _)), Some(Reverse(CnxWithBound(_, mut ws)))) => {
-                    for (y, _) in layer.get_out_edges(cn) {
+                    for y in layer.get_out_edges(cn) {
                         if self.preload_nodes && !visited.contains(&y) {
                             self.retriever.will_need_vector(y);
                         }
                     }
-                    for (y, _) in layer.get_out_edges(cn) {
+                    for y in layer.get_out_edges(cn) {
                         if !visited.contains(&y) {
                             visited.insert(y);
                             let similarity = self.retriever.similarity_upper_bound(y, query);
