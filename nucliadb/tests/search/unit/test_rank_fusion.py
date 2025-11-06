@@ -36,17 +36,13 @@ from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.search.predict import PredictEngine
-from nucliadb.search.search.find_merge import (
+from nucliadb.search.search.query_parser.parsers import parse_find
+from nucliadb.search.search.rank_fusion import ReciprocalRankFusion, WeightedCombSum, get_rank_fusion
+from nucliadb.search.search.retrieval import (
     FAKE_GRAPH_SCORE,
     graph_results_to_text_block_matches,
     keyword_result_to_text_block_match,
     semantic_result_to_text_block_match,
-)
-from nucliadb.search.search.query_parser.parsers import parse_find
-from nucliadb.search.search.rank_fusion import (
-    ReciprocalRankFusion,
-    WeightedCombSum,
-    get_rank_fusion,
 )
 from nucliadb_models.search import SCORE_TYPE, FindRequest
 from nucliadb_protos.utils_pb2 import RelationMetadata
