@@ -18,25 +18,27 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Iterable, Optional, Union
+from typing import Iterable, Optional
 
 from nidx_protos.nodereader_pb2 import GraphSearchResponse, SearchResponse
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
-from nucliadb.search import SERVICE_NAME
+from nucliadb.search.augmentor.models import AugmentedParagraph, AugmentedResource
+from nucliadb.search.augmentor.paragraphs import augment_paragraphs
+from nucliadb.search.augmentor.resources import augment_resources
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
-    hydrate_resource_metadata,
-    hydrate_text_block,
     text_block_to_find_paragraph,
 )
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import merge_observer
+from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import UnitRetrieval
 from nucliadb.search.search.rerankers import RerankableItem, Reranker, RerankingOptions
+from nucliadb_models.internal.augment import ParagraphText
 from nucliadb_models.internal.retrieval import RerankerScore
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import FindField, FindResource, KnowledgeboxFindResults, MinScore
@@ -143,8 +145,9 @@ async def hydrate_and_rerank(
     # Iterate text blocks and create text block and resource metadata hydration
     # tasks depending on the reranker
     text_blocks_by_id: dict[str, TextBlockMatch] = {}  # useful for faster access to text blocks later
-    resource_hydration_ops = {}
-    text_block_hydration_ops = []
+    resources_to_hydrate = set()
+    text_blocks_to_hydrate = []
+
     for text_block in text_blocks:
         rid = text_block.paragraph_id.rid
         paragraph_id = text_block.paragraph_id.full()
@@ -159,41 +162,41 @@ async def hydrate_and_rerank(
         # ones we see now, so we'll skip this step and recompute the resources
         # later
         if not reranker.needs_extra_results:
-            if rid not in resource_hydration_ops:
-                resource_hydration_ops[rid] = asyncio.create_task(
-                    hydrate_resource_metadata(
-                        kbid,
-                        rid,
-                        options=resource_hydration_options,
-                        concurrency_control=max_operations,
-                        service_name=SERVICE_NAME,
-                    )
-                )
+            resources_to_hydrate.add(rid)
 
-        text_block_hydration_ops.append(
-            asyncio.create_task(
-                hydrate_text_block(
-                    kbid,
-                    text_block,
-                    text_block_hydration_options,
-                    concurrency_control=max_operations,
-                )
-            )
-        )
+        if text_block_hydration_options.only_hydrate_empty and text_block.text:
+            pass
+        else:
+            text_blocks_to_hydrate.append(text_block.paragraph_id)
 
     # hydrate only the strictly needed before rerank
-    hydrated_text_blocks: list[TextBlockMatch]
-    hydrated_resources: list[Union[Resource, None]]
-
     ops = [
-        *text_block_hydration_ops,
-        *resource_hydration_ops.values(),
+        augment_paragraphs(
+            kbid,
+            given=text_blocks_to_hydrate,
+            select=[ParagraphText()],
+            concurrency_control=max_operations,
+        ),
+        augment_resources(
+            kbid,
+            given=list(resources_to_hydrate),
+            opts=resource_hydration_options,
+            concurrency_control=max_operations,
+        ),
     ]
-    FIND_FETCH_OPS_DISTRIBUTION.observe(len(ops))
+    FIND_FETCH_OPS_DISTRIBUTION.observe(len(text_blocks_to_hydrate) + len(resources_to_hydrate))
     results = await asyncio.gather(*ops)
 
-    hydrated_text_blocks = results[: len(text_block_hydration_ops)]  # type: ignore
-    hydrated_resources = results[len(text_block_hydration_ops) :]  # type: ignore
+    augmented_paragraphs: dict[ParagraphId, AugmentedParagraph | None] = results[0]  # type: ignore
+    augmented_resources: dict[str, AugmentedResource | None] = results[1]  # type: ignore
+
+    # add hydrated text to our text blocks
+    for text_block in text_blocks:
+        augmented = augmented_paragraphs.get(text_block.paragraph_id, None)
+        if augmented is not None and augmented.text is not None:
+            text_block.text = highlight_paragraph(
+                augmented.text, words=[], ematches=text_block_hydration_options.ematches
+            )
 
     # with the hydrated text, rerank and apply new scores to the text blocks
     to_rerank = [
@@ -203,7 +206,7 @@ async def hydrate_and_rerank(
             score_type=text_block.score_type,
             content=text_block.text or "",  # TODO: add a warning, this shouldn't usually happen
         )
-        for text_block in hydrated_text_blocks
+        for text_block in text_blocks
     ]
     reranked = await reranker.rerank(to_rerank, reranking_options)
 
@@ -227,7 +230,7 @@ async def hydrate_and_rerank(
 
     best_matches = []
     best_text_blocks = []
-    resource_hydration_ops = {}
+    resources_to_hydrate.clear()
     for order, (paragraph_id, _) in enumerate(matches):
         text_block = text_blocks_by_id[paragraph_id]
         text_block.order = order
@@ -237,24 +240,19 @@ async def hydrate_and_rerank(
         # now we have removed the text block surplus, fetch resource metadata
         if reranker.needs_extra_results:
             rid = ParagraphId.from_string(paragraph_id).rid
-            if rid not in resource_hydration_ops:
-                resource_hydration_ops[rid] = asyncio.create_task(
-                    hydrate_resource_metadata(
-                        kbid,
-                        rid,
-                        options=resource_hydration_options,
-                        concurrency_control=max_operations,
-                        service_name=SERVICE_NAME,
-                    )
-                )
+            resources_to_hydrate.add(rid)
 
     # Finally, fetch resource metadata if we haven't already done it
     if reranker.needs_extra_results:
-        ops = list(resource_hydration_ops.values())
-        FIND_FETCH_OPS_DISTRIBUTION.observe(len(ops))
-        hydrated_resources = await asyncio.gather(*ops)  # type: ignore
+        FIND_FETCH_OPS_DISTRIBUTION.observe(len(resources_to_hydrate))
+        augmented_resources = await augment_resources(
+            kbid,
+            given=list(resources_to_hydrate),
+            opts=resource_hydration_options,
+            concurrency_control=max_operations,
+        )
 
-    resources = [resource for resource in hydrated_resources if resource is not None]
+    resources = [resource for resource in augmented_resources.values() if resource is not None]
 
     return best_text_blocks, resources, best_matches
 
