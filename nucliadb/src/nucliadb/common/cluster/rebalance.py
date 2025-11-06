@@ -532,7 +532,7 @@ def needs_merge(shard: RebalanceShard, all_shards: list[RebalanceShard]) -> bool
         return False
     other_shards = [s for s in all_shards if s.id != shard.id and not s.active]
     other_shards_capacity = sum(
-        [max(0, (settings.max_shard_paragraphs - s.paragraphs)) for s in other_shards]
+        [max(0, ((settings.max_shard_paragraphs * 0.9) - s.paragraphs)) for s in other_shards]
     )
     return shard.paragraphs < other_shards_capacity
 
