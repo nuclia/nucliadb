@@ -122,6 +122,7 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
             bm.basic.fieldmetadata.append(userfieldmetadata)
 
     if item.usermetadata is not None:
+        classifs = []
         for classif in item.usermetadata.classifications:
             classif_pb = Classification(
                 labelset=classif.labelset,
@@ -129,7 +130,9 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
                 cancelled_by_user=classif.cancelled_by_user,
             )
             if classif_pb not in bm.basic.usermetadata.classifications:
-                bm.basic.usermetadata.classifications.append(classif_pb)
+                classifs.append(classif_pb)
+        bm.basic.usermetadata.classifications.extend(classifs)
+
         relation_node_resource = RelationNode(value=bm.uuid, ntype=RelationNode.NodeType.RESOURCE)
         relations = []
         for relation in item.usermetadata.relations:
