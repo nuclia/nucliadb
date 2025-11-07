@@ -129,7 +129,7 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
                 label=classif.label,
                 cancelled_by_user=classif.cancelled_by_user,
             )
-            if classif_pb not in bm.basic.usermetadata.classifications:
+            if classif_pb not in classifs:
                 classifs.append(classif_pb)
         bm.basic.usermetadata.classifications.extend(classifs)
 
