@@ -31,7 +31,6 @@ from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
-    text_block_to_find_paragraph,
 )
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import merge_observer
@@ -41,7 +40,13 @@ from nucliadb.search.search.rerankers import RerankableItem, Reranker, Reranking
 from nucliadb_models.internal.augment import ParagraphText
 from nucliadb_models.internal.retrieval import RerankerScore
 from nucliadb_models.resource import Resource
-from nucliadb_models.search import FindField, FindResource, KnowledgeboxFindResults, MinScore
+from nucliadb_models.search import (
+    FindField,
+    FindParagraph,
+    FindResource,
+    KnowledgeboxFindResults,
+    MinScore,
+)
 from nucliadb_telemetry import metrics
 
 FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
@@ -285,6 +290,23 @@ def compose_find_resources(
         find_field.paragraphs[paragraph_id] = find_paragraph
 
     return find_resources
+
+
+def text_block_to_find_paragraph(text_block: TextBlockMatch) -> FindParagraph:
+    return FindParagraph(
+        id=text_block.paragraph_id.full(),
+        text=text_block.text or "",
+        score=text_block.score,
+        score_type=text_block.score_type,
+        order=text_block.order,
+        labels=text_block.paragraph_labels,
+        fuzzy_result=text_block.fuzzy_search,
+        is_a_table=text_block.is_a_table,
+        reference=text_block.representation_file,
+        page_with_visual=text_block.page_with_visual,
+        position=text_block.position,
+        relevant_relations=text_block.relevant_relations,
+    )
 
 
 def _round(x: float) -> float:
