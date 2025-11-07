@@ -883,3 +883,37 @@ async def test_catalog_data_augmentation_labels(
             "/classification.labels/vegetables/potato": 1,
         }
     }
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_catalog_duplicate_labels(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox,
+):
+    classif = {"labelset": "animals", "label": "cat", "cancelled_by_user": False}
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": f"Resource",
+            "texts": {"text": {"body": "Text for resource"}},
+            "usermetadata": {"classifications": [classif, classif]},
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["resources"][rid]["usermetadata"]["classifications"] == [classif]
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{rid}",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["usermetadata"]["classifications"] == [classif]

@@ -122,18 +122,16 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
             bm.basic.fieldmetadata.append(userfieldmetadata)
 
     if item.usermetadata is not None:
-        # protobufers repeated fields don't support assignment
-        # will allways be a clean basic
-        bm.basic.usermetadata.classifications.extend(
-            [
-                Classification(
-                    labelset=x.labelset,
-                    label=x.label,
-                    cancelled_by_user=x.cancelled_by_user,
-                )
-                for x in item.usermetadata.classifications
-            ]
-        )
+        classifs = []
+        for classif in item.usermetadata.classifications:
+            classif_pb = Classification(
+                labelset=classif.labelset,
+                label=classif.label,
+                cancelled_by_user=classif.cancelled_by_user,
+            )
+            if classif_pb not in classifs:
+                classifs.append(classif_pb)
+        bm.basic.usermetadata.classifications.extend(classifs)
 
         relation_node_resource = RelationNode(value=bm.uuid, ntype=RelationNode.NodeType.RESOURCE)
         relations = []
