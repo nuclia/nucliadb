@@ -40,17 +40,17 @@ def build_catalog_resource_data(resource: Resource, index_message: IndexMessage)
     }
 
     # Labels from the resource and classification labels from each field
-    labels = list(set(label for label in index_message.labels))
+    labels = set(label for label in index_message.labels)
     for classification in resource.basic.computedmetadata.field_classifications:
         for clf in classification.classifications:
             label = f"/l/{clf.labelset}/{clf.label}"
-            if label not in cancelled_labels and label not in labels:
-                labels.append(label)
+            if label not in cancelled_labels:
+                labels.add(label)
 
     return CatalogResourceData(
         title=resource.basic.title,
         created_at=created_at,
         modified_at=modified_at,
-        labels=labels,
+        labels=list(labels),
         slug=resource.basic.slug,
     )
