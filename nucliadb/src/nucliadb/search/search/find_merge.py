@@ -24,7 +24,7 @@ from nidx_protos.nodereader_pb2 import GraphSearchResponse, SearchResponse
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
-from nucliadb.search.augmentor.models import AugmentedParagraph, AugmentedResource
+from nucliadb.search.augmentor.models import AugmentedParagraph, AugmentedResource, Paragraph
 from nucliadb.search.augmentor.paragraphs import augment_paragraphs
 from nucliadb.search.augmentor.resources import augment_resources
 from nucliadb.search.search.cut import cut_page
@@ -142,8 +142,8 @@ async def hydrate_and_rerank(
     """
     max_operations = asyncio.Semaphore(50)
 
-    # Iterate text blocks and create text block and resource metadata hydration
-    # tasks depending on the reranker
+    # Iterate text blocks to create an "index" for faster access by id and get a
+    # list of text block ids and resource ids to hydrate
     text_blocks_by_id: dict[str, TextBlockMatch] = {}  # useful for faster access to text blocks later
     resources_to_hydrate = set()
     text_blocks_to_hydrate = []
@@ -167,7 +167,7 @@ async def hydrate_and_rerank(
         if text_block_hydration_options.only_hydrate_empty and text_block.text:
             pass
         else:
-            text_blocks_to_hydrate.append(text_block.paragraph_id)
+            text_blocks_to_hydrate.append(Paragraph.from_text_block_match(text_block))
 
     # hydrate only the strictly needed before rerank
     ops = [
