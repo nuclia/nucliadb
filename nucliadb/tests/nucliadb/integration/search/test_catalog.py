@@ -889,20 +889,15 @@ async def test_catalog_data_augmentation_labels(
 async def test_catalog_duplicate_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
     standalone_knowledgebox,
 ):
+    classif = {"labelset": "animals", "label": "cat", "cancelled_by_user": False}
     resp = await nucliadb_writer.post(
         f"/kb/{standalone_knowledgebox}/resources",
         json={
             "title": f"Resource",
             "texts": {"text": {"body": "Text for resource"}},
-            "usermetadata": {
-                "classifications": [
-                    {"labelset": "animals", "label": "cat"},
-                    {"labelset": "animals", "label": "cat"},
-                ]
-            },
+            "usermetadata": {"classifications": [classif, classif]},
         },
     )
     assert resp.status_code == 201
@@ -914,6 +909,11 @@ async def test_catalog_duplicate_labels(
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["resources"][rid]["usermetadata"]["classifications"] == [
-        {"labelset": "animals", "label": "cat", "cancelled_by_user": False},
-    ]
+    assert body["resources"][rid]["usermetadata"]["classifications"] == [classif]
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{rid}",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["usermetadata"]["classifications"] == [classif]
