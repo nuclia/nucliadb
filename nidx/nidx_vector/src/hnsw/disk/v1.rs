@@ -44,9 +44,7 @@
 //
 
 use std::any::Any;
-use std::collections::HashMap;
 use std::fs::File;
-use std::io::{self, BufWriter};
 use std::path::Path;
 
 use memmap2::{Mmap, MmapOptions};
@@ -56,6 +54,12 @@ use crate::hnsw::DiskHnsw;
 use crate::hnsw::ram_hnsw::{EntryPoint, RAMHnsw, RAMLayer};
 use crate::hnsw::search::{SearchableHnsw, SearchableLayer};
 use crate::{VectorAddr, VectorR};
+
+// These are used in serialization code which is no longer used outside tests
+#[cfg(test)]
+use std::collections::HashMap;
+#[cfg(test)]
+use std::io::{self, BufWriter};
 
 pub const FILENAME: &str = "index.hnsw";
 
@@ -129,6 +133,7 @@ impl DiskHnswV1 {
         Ok(DiskHnswV1(index))
     }
 
+    #[cfg(test)] // Not used anymore, used to test migration in tests
     fn serialize_node<W>(mut buf: W, offset: usize, node_addr: u32, hnsw: &RAMHnsw) -> io::Result<usize>
     where
         W: io::Write,
@@ -173,7 +178,8 @@ impl DiskHnswV1 {
         }
     }
 
-    fn serialize_into(mut buf: impl std::io::Write, num_nodes: u32, hnsw: RAMHnsw) -> io::Result<()> {
+    #[cfg(test)] // Not used anymore, used to test migration in tests
+    fn serialize_into(mut buf: impl std::io::Write, num_nodes: u32, hnsw: &RAMHnsw) -> io::Result<()> {
         if num_nodes == 0 {
             // Empty graph, nothing to serialize
             return Ok(());
@@ -182,7 +188,7 @@ impl DiskHnswV1 {
         let mut length = 0;
         let mut nodes_end = vec![];
         for node in 0..num_nodes {
-            length = DiskHnswV1::serialize_node(&mut buf, length, node, &hnsw)?;
+            length = DiskHnswV1::serialize_node(&mut buf, length, node, hnsw)?;
             nodes_end.push(length)
         }
         for ends_at in nodes_end.into_iter().rev() {
@@ -198,7 +204,8 @@ impl DiskHnswV1 {
         Ok(())
     }
 
-    pub fn serialize_to(path: &Path, num_nodes: u32, hnsw: RAMHnsw) -> io::Result<()> {
+    #[cfg(test)] // Not used anymore, used to test migration in tests
+    pub fn serialize_to(path: &Path, num_nodes: u32, hnsw: &RAMHnsw) -> io::Result<()> {
         let mut buf = BufWriter::new(File::create(path.join(FILENAME))?);
 
         Self::serialize_into(&mut buf, num_nodes, hnsw)
@@ -317,7 +324,7 @@ mod tests {
     fn empty_hnsw() {
         let hnsw = RAMHnsw::new();
         let mut buf = vec![];
-        DiskHnswV1::serialize_into(&mut buf, 0, hnsw).unwrap();
+        DiskHnswV1::serialize_into(&mut buf, 0, &hnsw).unwrap();
         assert!(buf.is_empty());
     }
 
@@ -361,7 +368,7 @@ mod tests {
         hnsw.layers = vec![layer0, layer1, layer2];
 
         let dir = TempDir::new().unwrap();
-        DiskHnswV1::serialize_to(dir.path(), no_nodes, hnsw).unwrap();
+        DiskHnswV1::serialize_to(dir.path(), no_nodes, &hnsw).unwrap();
 
         let hnsw = &DiskHnswV1::open(dir.path(), false).unwrap();
         let ep = hnsw.get_entry_point();
@@ -414,12 +421,12 @@ mod tests {
         hnsw.layers = vec![layer0, layer1, layer2];
 
         let dir = TempDir::new().unwrap();
-        DiskHnswV1::serialize_to(dir.path(), no_nodes, hnsw).unwrap();
+        DiskHnswV1::serialize_to(dir.path(), no_nodes, &hnsw).unwrap();
         let disk1 = DiskHnswV1::open(dir.path(), false).unwrap();
         let ram = disk1.deserialize().unwrap();
 
         let mut buf2 = vec![];
-        DiskHnswV1::serialize_into(&mut buf2, no_nodes, ram).unwrap();
+        DiskHnswV1::serialize_into(&mut buf2, no_nodes, &ram).unwrap();
 
         assert_eq!(disk1.0.as_ref(), buf2.as_slice());
     }

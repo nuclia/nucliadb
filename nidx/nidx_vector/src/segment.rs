@@ -149,7 +149,7 @@ fn merge_indexes<DS: DataStore + 'static>(
         .into_par_iter()
         .for_each(|id| builder.insert(VectorAddr(id), &index));
 
-    DiskHnswV1::serialize_to(segment_path, merged_vectors_count, index)?;
+    DiskHnswV2::serialize_to(segment_path, merged_vectors_count, &index)?;
     let index = open_disk_hnsw(segment_path, false)?;
 
     let metadata = VectorSegmentMetadata {
@@ -238,7 +238,7 @@ fn create_indexes<DS: DataStore + 'static>(
 
     // The HNSW is on RAM
     // Serializing the HNSW into disk
-    DiskHnswV1::serialize_to(path, vector_count, index)?;
+    DiskHnswV2::serialize_to(path, vector_count, &index)?;
 
     let index = open_disk_hnsw(path, false)?;
 
@@ -394,7 +394,7 @@ impl ScoredVector<'_> {
 
 pub struct OpenSegment {
     metadata: VectorSegmentMetadata,
-    pub data_store: Box<dyn DataStore>,
+    data_store: Box<dyn DataStore>,
     index: Box<dyn DiskHnsw>,
     inverted_indexes: InvertedIndexes,
     alive_bitset: FilterBitSet,
@@ -498,7 +498,7 @@ impl OpenSegment {
             let filter = NodeFilter::new(bitset, with_duplicates, config);
             let neighbours = if let Some(v1) = self.index.as_any().downcast_ref::<DiskHnswV1>() {
                 ops.search(encoded_query, v1, top_k, filter)
-            } else if let Some(v2) = self.index.as_any().downcast_ref::<DiskHnswV1>() {
+            } else if let Some(v2) = self.index.as_any().downcast_ref::<DiskHnswV2>() {
                 ops.search(encoded_query, v2, top_k, filter)
             } else {
                 unreachable!()
