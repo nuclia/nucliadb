@@ -56,22 +56,17 @@ def test_hydration_v2():
 
 
 def test_full_resource_strategy():
-    paragraph_ids = [f"{uuid4().hex}/t/text/0-10", f"{uuid4().hex}/f/file/20-25"]
+    resource_ids = [f"{uuid4().hex}", f"{uuid4().hex}"]
 
     _ = hydration_v2.HydrationRequest.model_validate(
         {
             "hydrations": [
                 {
-                    "given": paragraph_ids,
+                    "given": resource_ids,
                     "select": [
-                        {
-                            "prop": "fields",
-                            "select": [
-                                {"prop": "text"},
-                            ],
-                        },
+                        {"prop": "text"},
                     ],
-                    "from": "resources",
+                    "from": "fields",
                 }
             ]
         }
@@ -79,23 +74,18 @@ def test_full_resource_strategy():
 
 
 def test_field_extension_strategy():
-    paragraph_ids = [f"{uuid4().hex}/t/text/0-10", f"{uuid4().hex}/f/file/20-25"]
+    resource_ids = [f"{uuid4().hex}", f"{uuid4().hex}"]
 
     _ = hydration_v2.HydrationRequest.model_validate(
         {
             "hydrations": [
                 {
-                    "given": paragraph_ids,
+                    "given": resource_ids,
                     "select": [
-                        {
-                            "prop": "fields",
-                            "select": [
-                                {"prop": "text"},
-                            ],
-                            "filter": {"ids": ["a/title"]},
-                        },
+                        {"prop": "text"},
                     ],
-                    "from": "resources",
+                    "from": "fields",
+                    "filter": {"ids": ["a/title"]},
                 }
             ]
         }
@@ -184,7 +174,17 @@ def test_conversational_strategy():
                     ],
                     "from": "conversations",
                     "limits": {"max_messages": 5},
-                }
+                },
+                {
+                    "given": paragraph_ids,
+                    "select": [
+                        # we do have this implemented but not exposed. Given a
+                        # conversation, if it's a question try to find a
+                        # following message marked as answer in the same page
+                        {"prop": "answer"},
+                    ],
+                    "from": "conversations",
+                },
             ]
         }
     )
