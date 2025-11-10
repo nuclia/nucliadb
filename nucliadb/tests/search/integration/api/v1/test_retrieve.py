@@ -24,10 +24,17 @@ from httpx import AsyncClient
 from nucliadb.models.internal.retrieval import RetrievalResponse
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.tests.vectors import Q
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.ndbfixtures.resources import smb_wonder_resource
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_retrieve(nucliadb_search: AsyncClient, smb_wonder: tuple[str, str]) -> None:
+async def test_retrieve(
+    nucliadb_search: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    knowledgebox: str,
+) -> None:
     """Basic test for the /retrieve endpoint with a keyword and semantic query.
 
     We expect to match all paragraphs from the smb wonder resource. One of them
@@ -35,7 +42,8 @@ async def test_retrieve(nucliadb_search: AsyncClient, smb_wonder: tuple[str, str
 
     """
 
-    kbid, rid = smb_wonder
+    kbid = knowledgebox
+    rid = await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
     resp = await nucliadb_search.post(
         f"/{KB_PREFIX}/{kbid}/retrieve",

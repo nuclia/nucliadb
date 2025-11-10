@@ -576,17 +576,13 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
     yield rid
 
 
-@pytest.fixture(scope="function")
-async def smb_wonder(
-    nucliadb_ingest_grpc: WriterStub,
-    nucliadb_writer: AsyncClient,
-    knowledgebox: str,
-):
+async def smb_wonder_resource(
+    kbid: str, nucliadb_writer: AsyncClient, nucliadb_ingest_grpc: WriterStub
+) -> str:
     """Resource with a PDF file field, extracted vectors and question and
     answers.
 
     """
-    kbid = knowledgebox
     slug = "smb-wonder"
     field_id = "smb-wonder"
 
@@ -631,8 +627,9 @@ async def smb_wonder(
         "As one of eight player characters, the player completes levels across the Flower Kingdom.",  # noqa
     ]
     random.seed(63)
+    paragraph_ids = []
     for paragraph in paragraphs:
-        field_builder.add_paragraph(
+        paragraph_id, _ = field_builder.add_paragraph(
             paragraph,
             vectors={
                 vectorset_id: [
@@ -641,37 +638,33 @@ async def smb_wonder(
                 for i, (vectorset_id, config) in enumerate(vectorsets.items())
             },
         )
+        paragraph_ids.append(paragraph_id)
 
-    # # add Q&A
+    # add Q&A
 
-    # question = "What is SMB Wonder?"
-    # field_builder.add_question_answer(
-    #     question=question,
-    #     question_paragraph_ids=[paragraph_ids[0].full()],
-    #     answer="SMB Wonder is a side-scrolling Nintendo Switch game",
-    #     answer_paragraph_ids=[paragraph_ids[0].full(), paragraph_ids[1].full()],
-    # )
-    # field_builder.add_question_answer(
-    #     question=question,
-    #     question_paragraph_ids=[paragraph_ids[0].full()],
-    #     answer="It's the new Mario game for Nintendo Switch",
-    #     answer_paragraph_ids=[paragraph_ids[0].full()],
-    # )
+    question = "What is SMB Wonder?"
+    field_builder.add_question_answer(
+        question=question,
+        question_paragraph_ids=[paragraph_ids[0].full()],
+        answer="SMB Wonder is a side-scrolling Nintendo Switch game",
+        answer_paragraph_ids=[paragraph_ids[0].full(), paragraph_ids[1].full()],
+    )
+    field_builder.add_question_answer(
+        question=question,
+        question_paragraph_ids=[paragraph_ids[0].full()],
+        answer="It's the new Mario game for Nintendo Switch",
+        answer_paragraph_ids=[paragraph_ids[0].full()],
+    )
 
-    # question = "Give me an example of side-scrolling game"
-    # field_builder.add_question_answer(
-    #     question=question,
-    #     answer="SMB Wonder game",
-    #     answer_paragraph_ids=[paragraph_ids[1].full()],
-    # )
+    question = "Give me an example of side-scrolling game"
+    field_builder.add_question_answer(
+        question=question,
+        answer="SMB Wonder game",
+        answer_paragraph_ids=[paragraph_ids[1].full()],
+    )
 
     bm = bmb.build()
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
 
-    yield kbid, rid
-
-    resp = await nucliadb_writer.delete(
-        f"/{KB_PREFIX}/{kbid}/resource/{rid}",
-    )
-    assert resp.status_code == 204
+    return rid
