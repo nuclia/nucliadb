@@ -1,0 +1,38 @@
+name: Polaris SAST Security Scan
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Run Polaris PR Scan
+        id: polaris-pr-scan
+        uses: blackduck-inc/black-duck-security-scan@v2
+        with:
+            polaris_server_url: 'https://polaris.blackduck.com'
+            polaris_access_token: ${{ secrets.POLARIS_ACCESS_TOKEN }}
+            polaris_application_name: Nuclia
+            polaris_project_name: ${{ github.event.repository.name }}
+            polaris_assessment_types: "SAST"
+            polaris_test_sast_type: ${{ github.event_name == 'pull_request' && 'SAST_RAPID' || 'SAST_FULL' }}
+            polaris_assessment_mode: CI
+            project_directory: '.'
+            include_diagnostics: false
+            polaris_prComment_enabled: true
+            polaris_prComment_severities: 'critical,high,medium'
+            github_token: ${{ github.token }}
