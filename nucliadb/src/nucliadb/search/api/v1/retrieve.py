@@ -38,7 +38,7 @@ from nucliadb_utils.authentication import requires
 
 
 @api.post(
-    f"/{KB_PREFIX}/{{kbid}}/retrieval",
+    f"/{KB_PREFIX}/{{kbid}}/retrieve",
     status_code=200,
     description="Search text blocks on a Knowledge Box",
     include_in_schema=False,
@@ -46,7 +46,7 @@ from nucliadb_utils.authentication import requires
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def retrieval_endpoint(
+async def retrieve_endpoint(
     request: Request,
     kbid: str,
     item: RetrievalRequest,

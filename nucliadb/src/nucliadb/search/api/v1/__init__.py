@@ -26,7 +26,7 @@ from . import (  # noqa: F401
     hydrate,
     knowledgebox,
     predict_proxy,
-    retrieval,
+    retrieve,
     search,
     suggest,
     summarize,
