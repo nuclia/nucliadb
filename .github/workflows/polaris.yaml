@@ -19,12 +19,6 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      
-      - name: Run Polaris SAST Scan
-        uses: prgs-community/githubactions-reusableworkflows/actions/polaris@c12753c1cc6d2ac7a934af09fe9fb788abcf79b5
-        with:
-          polaris-access-token: ${{ secrets.POLARIS_ACCESS_TOKEN }}
-          application-name: "Nuclia"
 
       - name: Run Polaris PR Scan
         id: polaris-pr-scan
