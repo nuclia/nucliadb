@@ -25,7 +25,7 @@ mod ram_hnsw;
 mod search;
 
 pub use build::HnswBuilder;
-pub use disk::v1::DiskHnsw;
+pub use disk::*;
 pub use params::M;
 pub use ram_hnsw::RAMHnsw;
 pub use search::{Cnx, DataRetriever, EstimatedScore, HnswSearcher, NodeFilter, SearchVector};

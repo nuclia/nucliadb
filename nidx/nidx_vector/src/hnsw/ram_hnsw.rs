@@ -72,6 +72,12 @@ pub struct RAMHnsw {
     pub entry_point: EntryPoint,
     pub layers: Vec<RAMLayer>,
 }
+impl Default for RAMHnsw {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RAMHnsw {
     pub fn new() -> RAMHnsw {
         Self {

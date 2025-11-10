@@ -58,12 +58,12 @@ pub struct DiskLayer<'a> {
 
 impl<'a> SearchableLayer for DiskLayer<'a> {
     fn get_out_edges(&self, address: VectorAddr) -> impl Iterator<Item = VectorAddr> {
-        let node = DiskHnsw::get_node(self.hnsw, address);
-        DiskHnsw::get_out_edges(node, self.layer)
+        let node = DiskHnswV2::get_node(self.hnsw, address);
+        DiskHnswV2::get_out_edges(node, self.layer)
     }
 }
 
-impl<'a> SearchableHnsw for DiskHnsw<'a> {
+impl<'a> SearchableHnsw for DiskHnswV2<'a> {
     type L = DiskLayer<'a>;
     fn get_entry_point(&self) -> EntryPoint {
         self.get_entry_point()
@@ -90,8 +90,8 @@ impl Iterator for EdgeIter<'_> {
     }
 }
 
-pub struct DiskHnsw<'a>(pub &'a [u8]);
-impl<'a> DiskHnsw<'a> {
+pub struct DiskHnswV2<'a>(pub &'a [u8]);
+impl<'a> DiskHnswV2<'a> {
     fn serialize_node<W1, W2>(mut graph: W1, mut edge_file: W2, node_addr: u32, hnsw: &RAMHnsw) -> io::Result<usize>
     where
         W1: io::Write,
@@ -159,7 +159,7 @@ impl<'a> DiskHnsw<'a> {
         let mut nodes_end = vec![];
         let mut pos = 0;
         for node in 0..num_nodes {
-            pos += DiskHnsw::serialize_node(&mut graph, &mut edge_file, node, &hnsw)?;
+            pos += DiskHnswV2::serialize_node(&mut graph, &mut edge_file, node, &hnsw)?;
             nodes_end.push(pos);
         }
 
@@ -214,7 +214,7 @@ impl<'a> DiskHnsw<'a> {
         }
 
         let end = hnsw.len();
-        ram.entry_point = DiskHnsw(hnsw).get_entry_point();
+        ram.entry_point = DiskHnswV2(hnsw).get_entry_point();
 
         let mut node_index: u32 = 0;
         loop {
@@ -273,7 +273,7 @@ impl<'a> DiskHnsw<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::{io::BufReader, sync::RwLock};
+    use std::sync::RwLock;
 
     use super::*;
     use crate::hnsw::ram_hnsw::RAMLayer;
@@ -290,7 +290,7 @@ mod tests {
         let hnsw = RAMHnsw::new();
         let mut buf = vec![];
         let mut edges = vec![];
-        DiskHnsw::serialize_into(&mut buf, &mut edges, 0, hnsw).unwrap();
+        DiskHnswV2::serialize_into(&mut buf, &mut edges, 0, hnsw).unwrap();
         assert!(buf.is_empty());
     }
 
@@ -334,9 +334,9 @@ mod tests {
         hnsw.layers = vec![layer0, layer1, layer2];
         let mut buf = vec![];
         let mut edges = vec![];
-        DiskHnsw::serialize_into(&mut buf, &mut edges, no_nodes, hnsw).unwrap();
+        DiskHnswV2::serialize_into(&mut buf, &mut edges, no_nodes, hnsw).unwrap();
 
-        let hnsw = DiskHnsw(&buf);
+        let hnsw = DiskHnswV2(&buf);
         let ep = hnsw.get_entry_point();
         assert_eq!(ep, entry_point);
         let layer0 = hnsw.get_layer(0);
@@ -387,11 +387,11 @@ mod tests {
         hnsw.layers = vec![layer0, layer1, layer2];
         let mut buf = vec![];
         let mut edges = vec![];
-        DiskHnsw::serialize_into(&mut buf, &mut edges, no_nodes, hnsw).unwrap();
-        let ram = DiskHnsw::deserialize(&buf, edges.as_slice()).unwrap();
+        DiskHnswV2::serialize_into(&mut buf, &mut edges, no_nodes, hnsw).unwrap();
+        let ram = DiskHnswV2::deserialize(&buf, edges.as_slice()).unwrap();
         let mut buf2 = vec![];
         let mut edges2 = vec![];
-        DiskHnsw::serialize_into(&mut buf2, &mut edges2, no_nodes, ram).unwrap();
+        DiskHnswV2::serialize_into(&mut buf2, &mut edges2, no_nodes, ram).unwrap();
 
         assert_eq!(buf, buf2);
         assert_eq!(edges, edges2);

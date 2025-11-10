@@ -18,5 +18,26 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod v1;
-pub mod v2;
+mod v1;
+mod v2;
+
+use crate::{VectorR, hnsw::RAMHnsw};
+use std::{any::Any, path::Path};
+
+pub use v1::DiskHnswV1;
+pub use v2::DiskHnswV2;
+
+pub fn open_disk_hnsw(path: &Path, prewarm: bool) -> VectorR<Box<dyn DiskHnsw>> {
+    // let v2 = DiskHnswV2::open(path, prewarm);
+    // if let Ok(v2) = v2 {
+    //     return Ok(Box::new(v2));
+    // };
+    let v1 = DiskHnswV1::open(path, prewarm)?;
+    Ok(Box::new(v1))
+}
+
+pub trait DiskHnsw: Sync + Send {
+    fn deserialize(&self) -> VectorR<RAMHnsw>;
+    fn size(&self) -> usize;
+    fn as_any(&self) -> &dyn Any;
+}
