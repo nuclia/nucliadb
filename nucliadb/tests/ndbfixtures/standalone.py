@@ -20,19 +20,17 @@
 import base64
 import logging
 import os
+from contextlib import contextmanager
 from pathlib import Path
 from typing import AsyncIterator, Iterator
 from unittest.mock import patch
 
 import pytest
 
-from nucliadb.common.maindb.exceptions import UnsetUtility
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.settings import DriverSettings
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.run import run_async_nucliadb
 from nucliadb.standalone.settings import Settings
-from nucliadb.tests.config import reset_config
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.settings import (
     LogFormatType,
@@ -42,8 +40,6 @@ from nucliadb_telemetry.settings import (
 )
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.tests import free_port
-
-from .maindb import cleanup_maindb
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +58,10 @@ async def standalone_nucliadb(
     # we need to force DATA_PATH updates to run every test on the proper
     # temporary directory
     data_path = str((tmp_path / "node").absolute())
-    with patch.dict(os.environ, {"DATA_PATH": data_path}, clear=False):
+    with (
+        safe_global_config(),
+        patch.dict(os.environ, {"DATA_PATH": data_path}, clear=False),
+    ):
         settings = Settings(
             data_path=data_path,
             http_port=free_port(),
@@ -94,9 +93,6 @@ async def standalone_nucliadb(
 
         yield settings
 
-        await maybe_cleanup_maindb()
-
-        reset_config()
         await server.shutdown()
 
 
@@ -129,17 +125,59 @@ def endecryptor_settings():
         yield
 
 
-# Utils
+@contextmanager
+def safe_global_config():
+    """Save a copy of nucliadb global state (across all settings) and restore it
+    afterwards.
 
+    """
+    import nucliadb.backups.settings
+    import nucliadb.common.back_pressure.settings
+    import nucliadb.common.cluster.settings
+    import nucliadb.common.external_index_providers.settings
+    import nucliadb.ingest.settings
+    import nucliadb.migrator.settings
+    import nucliadb.search.settings
+    import nucliadb.standalone.settings
+    import nucliadb.train.settings
+    import nucliadb.writer.settings
+    import nucliadb_telemetry.settings
+    import nucliadb_utils.cache.settings
+    import nucliadb_utils.encryption.settings
+    import nucliadb_utils.settings
+    import nucliadb_utils.storages.settings
 
-async def maybe_cleanup_maindb():
-    try:
-        driver = get_driver()
-    except UnsetUtility:
-        pass
-    else:
-        try:
-            await cleanup_maindb(driver)
-        except Exception:
-            logger.error("Could not cleanup maindb on test teardown")
-            pass
+    all_settings = [
+        nucliadb.backups.settings.settings,
+        nucliadb.common.back_pressure.settings.settings,
+        nucliadb.common.cluster.settings.settings,
+        nucliadb.common.external_index_providers.settings.settings,
+        nucliadb.ingest.settings.settings,
+        nucliadb.migrator.settings.settings,
+        nucliadb.search.settings.settings,
+        nucliadb.train.settings.settings,
+        nucliadb.writer.settings.settings,
+        nucliadb_telemetry.settings.telemetry_settings,
+        nucliadb_utils.cache.settings.settings,
+        nucliadb_utils.encryption.settings.settings,
+        nucliadb_utils.settings.audit_settings,
+        nucliadb_utils.settings.http_settings,
+        nucliadb_utils.settings.indexing_settings,
+        nucliadb_utils.settings.nuclia_settings,
+        nucliadb_utils.settings.nucliadb_settings,
+        nucliadb_utils.settings.storage_settings,
+        nucliadb_utils.settings.transaction_settings,
+        nucliadb_utils.storages.settings,
+    ]
+
+    global_state = []
+    # save current global state
+    for settings in all_settings:
+        for attr, value in settings:
+            global_state.append((settings, attr, value))
+
+    yield
+
+    # restore previous state
+    for settings, attr, value in global_state:
+        setattr(settings, attr, value)
