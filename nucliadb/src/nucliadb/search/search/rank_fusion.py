@@ -24,7 +24,7 @@ from typing import Optional, TypeVar
 
 from nucliadb.common.external_index_providers.base import ScoredTextBlock
 from nucliadb.common.ids import ParagraphId
-from nucliadb.models.internal.retrieval import RrfScore, WeightedCombSumScore
+from nucliadb.models.internal.retrieval import RrfScore, Score, WeightedCombSumScore
 from nucliadb.search.search.query_parser import models as parser_models
 from nucliadb_models.search import SCORE_TYPE
 from nucliadb_telemetry.metrics import Observer
@@ -146,7 +146,7 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         sources: dict[str, list[ScoredItem]],
     ) -> list[ScoredItem]:
         # accumulated scores per paragraph
-        scores: dict[ParagraphId, tuple[float, SCORE_TYPE]] = {}
+        scores: dict[ParagraphId, tuple[float, SCORE_TYPE, list[Score]]] = {}
         # pointers from paragraph to the original source
         match_positions: dict[ParagraphId, list[tuple[int, int]]] = {}
 
@@ -162,11 +162,12 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         for i, (ranking, weight) in enumerate(rankings):
             for rank, item in enumerate(ranking):
                 id = item.paragraph_id
-                score, score_type = scores.setdefault(id, (0, item.score_type))
+                score, score_type, history = scores.setdefault(id, (0, item.score_type, []))
                 score += 1 / (self._k + rank) * weight
+                history.append(item.current_score)
                 if {score_type, item.score_type} == {SCORE_TYPE.BM25, SCORE_TYPE.VECTOR}:
                     score_type = SCORE_TYPE.BOTH
-                scores[id] = (score, score_type)
+                scores[id] = (score, score_type, history)
 
                 position = (i, rank)
                 match_positions.setdefault(item.paragraph_id, []).append(position)
@@ -176,9 +177,10 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
             # we are getting only one position, effectively deduplicating
             # multiple matches for the same text block
             i, j = match_positions[paragraph_id][0]
-            score, score_type = scores[paragraph_id]
+            score, score_type, history = scores[paragraph_id]
             item = rankings[i][0][j]
-            item.scores.append(RrfScore(score=score))
+            history.append(RrfScore(score=score))
+            item.scores = history
             item.score_type = score_type
             merged.append(item)
 
@@ -218,7 +220,7 @@ class WeightedCombSum(RankFusionAlgorithm):
     @rank_fusion_observer.wrap({"type": "weighted_comb_sum"})
     def _fuse(self, sources: dict[str, list[ScoredItem]]) -> list[ScoredItem]:
         # accumulated scores per paragraph
-        scores: dict[ParagraphId, tuple[float, SCORE_TYPE]] = {}
+        scores: dict[ParagraphId, tuple[float, SCORE_TYPE, list[Score]]] = {}
         # pointers from paragraph to the original source
         match_positions: dict[ParagraphId, list[tuple[int, int]]] = {}
 
@@ -229,11 +231,12 @@ class WeightedCombSum(RankFusionAlgorithm):
         for i, (ranking, weight) in enumerate(rankings):
             for j, item in enumerate(ranking):
                 id = item.paragraph_id
-                score, score_type = scores.setdefault(id, (0, item.score_type))
+                score, score_type, history = scores.setdefault(id, (0, item.score_type, []))
                 score += item.score * weight
+                history.append(item.current_score)
                 if {score_type, item.score_type} == {SCORE_TYPE.BM25, SCORE_TYPE.VECTOR}:
                     score_type = SCORE_TYPE.BOTH
-                scores[id] = (score, score_type)
+                scores[id] = (score, score_type, history)
 
                 position = (i, j)
                 match_positions.setdefault(item.paragraph_id, []).append(position)
@@ -243,9 +246,10 @@ class WeightedCombSum(RankFusionAlgorithm):
             # we are getting only one position, effectively deduplicating
             # multiple matches for the same text block
             i, j = match_positions[paragraph_id][0]
-            score, score_type = scores[paragraph_id]
+            score, score_type, history = scores[paragraph_id]
             item = rankings[i][0][j]
-            item.scores.append(WeightedCombSumScore(score=score))
+            history.append(WeightedCombSumScore(score=score))
+            item.scores = history
             item.score_type = score_type
             merged.append(item)
 

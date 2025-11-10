@@ -65,13 +65,13 @@ class RetrievalRequest(BaseModel):
     rank_fusion: Union[RankFusionName, RankFusion] = Field(default=RankFusionName.RECIPROCAL_RANK_FUSION)
 
 
-class ScoreSource(Enum):
+class ScoreSource(str, Enum):
     INDEX = "index"
     RANK_FUSION = "rank_fusion"
     RERANKER = "reranker"
 
 
-class ScoreType(Enum):
+class ScoreType(str, Enum):
     SEMANTIC = "semantic"
     KEYWORD = "keyword"
     GRAPH = "graph"
