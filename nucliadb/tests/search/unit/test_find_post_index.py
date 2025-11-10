@@ -24,6 +24,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from nidx_protos import nodereader_pb2, noderesources_pb2
 
+from nucliadb.common.ids import ParagraphId
+from nucliadb.search.augmentor.models import AugmentedParagraph
 from nucliadb.search.search.find_merge import build_find_response
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
 from nucliadb.search.search.query_parser.models import (
@@ -123,8 +125,11 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
         ),
     )
 
-    async def mock_hydrate_resource_metadata(kbid: str, rid: str, *args, **kwargs):
-        return Resource(id=rid)
+    async def mock_augment_resources(kbid: str, given: list[str], *args, **kwargs):
+        return {rid: Resource(id=rid) for rid in given}
+
+    async def mock_augment_paragraph(kbid: str, paragraph_id: ParagraphId, select, metadata):
+        return AugmentedParagraph(id=paragraph_id, text="extracted text", source_image=None)
 
     async def fake_reranking(kbid: str, item: RerankModel) -> RerankResponse:
         return RerankResponse(
@@ -165,12 +170,12 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
     with (
         patch("nucliadb.search.search.find.get_external_index_manager", return_value=None),
         patch(
-            "nucliadb.search.search.find_merge.hydrate_resource_metadata",
-            side_effect=mock_hydrate_resource_metadata,
+            "nucliadb.search.search.find_merge.augment_resources",
+            side_effect=mock_augment_resources,
         ),
         patch(
-            "nucliadb.search.search.hydrator.get_paragraph_text",
-            return_value="extracted text",
+            "nucliadb.search.augmentor.paragraphs.augment_paragraph",
+            side_effect=mock_augment_paragraph,
         ),
         patch.object(predict_mock, "rerank", AsyncMock(side_effect=fake_reranking)),
     ):

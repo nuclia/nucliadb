@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from typing import Annotated, Any, Literal
-from uuid import UUID
 
 from pydantic import BaseModel, Discriminator, Field, StringConstraints, Tag, model_validator
 from typing_extensions import Self
@@ -55,7 +54,10 @@ def from_discriminator(v: Any) -> str | None:
 
 # Ids
 
-ResourceId = UUID
+ResourceId = Annotated[
+    str,
+    StringConstraints(pattern=r"^[0-9a-f]{32}$", min_length=32, max_length=32),
+]
 
 FieldId = Annotated[
     str,
@@ -129,6 +131,10 @@ class ConversationAttachments(SelectProp):
     image: bool
 
 
+class ConversationAnswer(SelectProp):
+    prop: Literal["answer"] = "answer"
+
+
 class ResourceTitle(SelectProp):
     prop: Literal["title"] = "title"
 
@@ -194,15 +200,16 @@ class ConversationAugmentLimits(BaseModel):
 
 class ConversationAugment(BaseModel, extra="forbid"):
     given: list[FieldId | ParagraphId]
-    select: list[FieldProp | ConversationAttachments]
+    select: list[FieldProp | ConversationAttachments | ConversationAnswer]
     from_: Literal["conversations"] = Field("conversations", alias="from")
     limits: ConversationAugmentLimits | None = Field(default_factory=ConversationAugmentLimits)
 
 
 class FieldAugment(BaseModel, extra="forbid"):
-    given: list[FieldId | ParagraphId]
+    given: list[ResourceId | FieldId | ParagraphId]
     select: list[FieldProp]
     from_: Literal["fields"] = Field("fields", alias="from")
+    filter: Any | None = None
 
 
 class ParagraphAugment(BaseModel, extra="forbid"):

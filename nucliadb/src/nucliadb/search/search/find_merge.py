@@ -151,7 +151,7 @@ async def hydrate_and_rerank(
     # list of text block ids and resource ids to hydrate
     text_blocks_by_id: dict[str, TextBlockMatch] = {}  # useful for faster access to text blocks later
     resources_to_hydrate = set()
-    text_blocks_to_hydrate = []
+    text_block_id_to_hydrate = set()
 
     for text_block in text_blocks:
         rid = text_block.paragraph_id.rid
@@ -172,13 +172,16 @@ async def hydrate_and_rerank(
         if text_block_hydration_options.only_hydrate_empty and text_block.text:
             pass
         else:
-            text_blocks_to_hydrate.append(Paragraph.from_text_block_match(text_block))
+            text_block_id_to_hydrate.add(paragraph_id)
 
     # hydrate only the strictly needed before rerank
     ops = [
         augment_paragraphs(
             kbid,
-            given=text_blocks_to_hydrate,
+            given=[
+                Paragraph.from_text_block_match(text_blocks_by_id[paragraph_id])
+                for paragraph_id in text_block_id_to_hydrate
+            ],
             select=[ParagraphText()],
             concurrency_control=max_operations,
         ),
@@ -189,7 +192,7 @@ async def hydrate_and_rerank(
             concurrency_control=max_operations,
         ),
     ]
-    FIND_FETCH_OPS_DISTRIBUTION.observe(len(text_blocks_to_hydrate) + len(resources_to_hydrate))
+    FIND_FETCH_OPS_DISTRIBUTION.observe(len(text_block_id_to_hydrate) + len(resources_to_hydrate))
     results = await asyncio.gather(*ops)
 
     augmented_paragraphs: dict[ParagraphId, AugmentedParagraph | None] = results[0]  # type: ignore
@@ -199,9 +202,13 @@ async def hydrate_and_rerank(
     for text_block in text_blocks:
         augmented = augmented_paragraphs.get(text_block.paragraph_id, None)
         if augmented is not None and augmented.text is not None:
-            text_block.text = highlight_paragraph(
-                augmented.text, words=[], ematches=text_block_hydration_options.ematches
-            )
+            if text_block_hydration_options.highlight:
+                text = highlight_paragraph(
+                    augmented.text, words=[], ematches=text_block_hydration_options.ematches
+                )
+            else:
+                text = augmented.text
+            text_block.text = text
 
     # with the hydrated text, rerank and apply new scores to the text blocks
     to_rerank = [
