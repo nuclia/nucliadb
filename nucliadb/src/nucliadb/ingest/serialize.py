@@ -32,6 +32,7 @@ from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.metadata import Extra, Origin, Relation
 from nucliadb_models.resource import (
     ConversationFieldData,
     ConversationFieldExtractedData,
@@ -230,29 +231,18 @@ async def managed_serialize(
             resource.queue = QueueType[orm_resource.basic.QueueType.Name(orm_resource.basic.queue)]
 
             if ResourceProperties.RELATIONS in show:
-                relations = await orm_resource.get_user_relations()
-                resource.usermetadata.relations = [
-                    from_proto.relation(rel) for rel in relations.relations
-                ]
+                resource.usermetadata.relations = await serialize_user_relations(orm_resource)
 
     if ResourceProperties.ORIGIN in show:
-        await orm_resource.get_origin()
-        if orm_resource.origin is not None:
-            resource.origin = from_proto.origin(orm_resource.origin)
+        resource.origin = await serialize_origin(orm_resource)
 
     if ResourceProperties.EXTRA in show:
-        await orm_resource.get_extra()
-        if orm_resource.extra is not None:
-            resource.extra = from_proto.extra(orm_resource.extra)
+        resource.extra = await serialize_extra(orm_resource)
 
     include_errors = ResourceProperties.ERRORS in show
 
     if ResourceProperties.SECURITY in show:
-        await orm_resource.get_security()
-        resource.security = ResourceSecurity(access_groups=[])
-        if orm_resource.security is not None:
-            for gid in orm_resource.security.access_groups:
-                resource.security.access_groups.append(gid)
+        resource.security = await serialize_security(orm_resource)
 
     if (field_type_filter and (include_values or include_extracted_data)) or include_errors:
         await orm_resource.get_fields()
@@ -358,6 +348,37 @@ async def managed_serialize(
                         text=models.ExtractedText(text=resource.data.generics[field.id].value)
                     )
     return resource
+
+
+async def serialize_origin(resource: ORMResource) -> Optional[Origin]:
+    origin = await resource.get_origin()
+    if origin is None:
+        return None
+
+    return from_proto.origin(origin)
+
+
+async def serialize_extra(resource: ORMResource) -> Optional[Extra]:
+    extra = await resource.get_extra()
+    if extra is None:
+        return None
+    return from_proto.extra(extra)
+
+
+async def serialize_user_relations(resource: ORMResource) -> list[Relation]:
+    relations = await resource.get_user_relations()
+    return [from_proto.relation(rel) for rel in relations.relations]
+
+
+async def serialize_security(resource: ORMResource) -> ResourceSecurity:
+    security = ResourceSecurity(access_groups=[])
+
+    security_pb = await resource.get_security()
+    if security_pb is not None:
+        for gid in security_pb.access_groups:
+            security.access_groups.append(gid)
+
+    return security
 
 
 async def get_orm_resource(
