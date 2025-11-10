@@ -117,6 +117,7 @@ class Paragraph:
 class AugmentedParagraph:
     id: ParagraphId
 
+    # textual representation of the paragraph
     text: str | None
 
     # original image for the paragraph when it has been extracted from an image
