@@ -133,11 +133,11 @@ impl<'a, DR: DataRetriever> HnswBuilder<'a, DR> {
         let vector = SearchVector::Stored(node);
 
         // The neighbours of the node at each layer, for insertion
-        let mut layer_neighbours = Vec::with_capacity(hnsw.no_layers());
+        let mut layer_neighbours = Vec::with_capacity(hnsw.num_layers());
         let mut node_in_layer = false;
 
         // First, find the neighbours for each layer the node appears in.
-        for l in (0..hnsw.no_layers()).rev() {
+        for l in (0..hnsw.num_layers()).rev() {
             if !node_in_layer && (l == 0 || hnsw.layers[l].contains(&node)) {
                 node_in_layer = true;
             }

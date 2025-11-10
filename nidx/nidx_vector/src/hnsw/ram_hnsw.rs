@@ -105,7 +105,7 @@ impl RAMHnsw {
         }
     }
 
-    pub fn no_layers(&self) -> usize {
+    pub fn num_layers(&self) -> usize {
         self.layers.len()
     }
 

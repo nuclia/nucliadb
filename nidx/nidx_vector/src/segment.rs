@@ -445,7 +445,7 @@ impl ScoredVector<'_> {
 
 pub struct OpenSegment {
     metadata: VectorSegmentMetadata,
-    data_store: Box<dyn DataStore>,
+    pub data_store: Box<dyn DataStore>,
     index: Mmap,
     inverted_indexes: InvertedIndexes,
     alive_bitset: FilterBitSet,

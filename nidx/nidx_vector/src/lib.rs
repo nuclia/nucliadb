@@ -19,10 +19,10 @@
 //
 
 pub mod config;
-mod data_store;
+pub mod data_store;
 mod data_types;
 pub mod formula;
-mod hnsw;
+pub mod hnsw;
 mod indexer;
 mod inverted_index;
 mod multivector;

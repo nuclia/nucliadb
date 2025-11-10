@@ -18,13 +18,5 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod usize_utils {
-    pub const USIZE_LEN: usize = (usize::BITS / 8) as usize;
-    pub fn usize_from_slice_le(v: &[u8]) -> usize {
-        usize::from_le_bytes(v.try_into().unwrap())
-    }
-    pub const U32_LEN: usize = (u32::BITS / 8) as usize;
-    pub fn u32_from_slice_le(v: &[u8]) -> u32 {
-        u32::from_le_bytes(v.try_into().unwrap())
-    }
-}
+pub mod v1;
+pub mod v2;

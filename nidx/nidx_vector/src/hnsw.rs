@@ -19,13 +19,13 @@
 //
 
 mod build;
-mod disk_hnsw;
+mod disk;
 mod params;
 mod ram_hnsw;
 mod search;
 
 pub use build::HnswBuilder;
-pub use disk_hnsw::DiskHnsw;
+pub use disk::v1::DiskHnsw;
 pub use params::M;
 pub use ram_hnsw::RAMHnsw;
 pub use search::{Cnx, DataRetriever, EstimatedScore, HnswSearcher, NodeFilter, SearchVector};

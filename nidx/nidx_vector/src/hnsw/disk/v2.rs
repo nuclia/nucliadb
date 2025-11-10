@@ -27,39 +27,29 @@
 // \Layer segment:
 // -> N: number of connexions.
 // -> List per connexion of T tuples (node, edge), where:
-// -> node: usize, in little endian.
-// -> edge: f32, in little endian.
+// -> node: u32, in little endian.
 // Hnsw:
 // -> Node segment.
 // -> Indexing segment.
 // -> Entry point segment.
 // \Entry point segment:
-// -> Layer, usize in little endian.
-// -> Node, usize in little endian.
+// -> Layer, u32 in little endian.
+// -> Node, u32 in little endian.
 // \Node segment (serialized as explained above).
 // \Indexing segment:
 // Per layer in the hnsw:
 // -> The byte where it ends.
 //
-//
+// Edge file (only for deserializing):
+// - f32 per edge, in the same order they appear on the main index
 
 use std::collections::HashMap;
 use std::io;
 
-use super::ram_hnsw::{EntryPoint, RAMHnsw, RAMLayer};
-use super::search::{SearchableHnsw, SearchableLayer};
 use crate::VectorAddr;
 use crate::data_types::usize_utils::*;
-
-const EDGE_LEN: usize = 4;
-const NODE_LEN: usize = USIZE_LEN;
-const CNX_LEN: usize = NODE_LEN + EDGE_LEN;
-
-fn f32_from_le_bytes(buf: &[u8]) -> f32 {
-    let mut temp = [0; 4];
-    temp.copy_from_slice(buf);
-    f32::from_le_bytes(temp)
-}
+use crate::hnsw::ram_hnsw::{EntryPoint, RAMHnsw, RAMLayer};
+use crate::hnsw::search::{SearchableHnsw, SearchableLayer};
 
 pub struct DiskLayer<'a> {
     hnsw: &'a [u8],
@@ -69,7 +59,7 @@ pub struct DiskLayer<'a> {
 impl<'a> SearchableLayer for DiskLayer<'a> {
     fn get_out_edges(&self, address: VectorAddr) -> impl Iterator<Item = VectorAddr> {
         let node = DiskHnsw::get_node(self.hnsw, address);
-        DiskHnsw::get_out_edges(node, self.layer).map(|(a, _s)| a)
+        DiskHnsw::get_out_edges(node, self.layer)
     }
 }
 
@@ -84,55 +74,57 @@ impl<'a> SearchableHnsw for DiskHnsw<'a> {
 }
 
 pub struct EdgeIter<'a> {
-    crnt: usize,
+    pos: usize,
     buf: &'a [u8],
 }
 impl Iterator for EdgeIter<'_> {
-    type Item = (VectorAddr, f32);
+    type Item = VectorAddr;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.buf.len() == self.crnt {
+        if self.buf.len() == self.pos {
             None
         } else {
-            let buf = self.buf;
-            let mut crnt = self.crnt;
-            let node_addr = usize_from_slice_le(&buf[crnt..(crnt + NODE_LEN)]);
-            crnt += USIZE_LEN;
-            let edge = f32_from_le_bytes(&buf[crnt..(crnt + EDGE_LEN)]);
-            crnt += EDGE_LEN;
-            self.crnt = crnt;
-            Some((VectorAddr(node_addr as u32), edge))
+            let node_addr = u32_from_slice_le(&self.buf[self.pos..(self.pos + U32_LEN)]);
+            self.pos += 4;
+            Some(VectorAddr(node_addr))
         }
     }
 }
 
 pub struct DiskHnsw<'a>(pub &'a [u8]);
 impl<'a> DiskHnsw<'a> {
-    fn serialize_node<W>(mut buf: W, offset: usize, node_addr: u32, hnsw: &RAMHnsw) -> io::Result<usize>
+    fn serialize_node<W1, W2>(mut graph: W1, mut edge_file: W2, node_addr: u32, hnsw: &RAMHnsw) -> io::Result<usize>
     where
-        W: io::Write,
+        W1: io::Write,
+        W2: io::Write,
     {
         let node = VectorAddr(node_addr);
-        let mut length = offset;
         let mut indexing = HashMap::new();
-        for layer in 0..hnsw.no_layers() {
+        let mut pos = 0;
+
+        for layer in 0..hnsw.num_layers() {
             let num_edges = hnsw.get_layer(layer).num_out_edges(&node);
-            indexing.insert(layer, length);
-            buf.write_all(&num_edges.to_le_bytes())?;
-            length += USIZE_LEN;
+            indexing.insert(layer, pos);
+            graph.write_all(&(num_edges as u32).to_le_bytes())?;
+
             if num_edges > 0 {
                 for (cnx, edge) in hnsw.get_layer(layer).out[&node].read().unwrap().iter() {
-                    buf.write_all(&(cnx.0 as usize).to_le_bytes())?;
-                    buf.write_all(&edge.to_le_bytes())?;
-                    length += CNX_LEN;
+                    let to: u32 = cnx.0;
+                    graph.write_all(&to.to_le_bytes())?;
+                    edge_file.write_all(&edge.to_le_bytes())?;
                 }
             }
+
+            pos += (1 + num_edges) * U32_LEN;
         }
-        for layer in (0..hnsw.no_layers()).rev() {
-            buf.write_all(&indexing[&layer].to_le_bytes())?;
+
+        // Positions to the edgelist of each layer, relative to the end of the node
+        pos += hnsw.num_layers() * U32_LEN;
+        for layer in (0..hnsw.num_layers()).rev() {
+            let pos: u32 = (pos - indexing[&layer]) as u32;
+            graph.write_all(&pos.to_le_bytes())?;
         }
-        length += hnsw.no_layers() * USIZE_LEN;
-        buf.flush()?;
-        Ok(length)
+
+        Ok(pos)
     }
 
     // node must be serialized using DiskNode, may have trailing bytes at the start.
@@ -140,69 +132,85 @@ impl<'a> DiskHnsw<'a> {
         // layer + 1 since the layers are stored in reverse order.
         // [l3, l2, l1, l0, end] Since we have the position of end, the layer i is
         // i + 1 positions to its left.
-        let pos = node.len() - ((layer + 1) * USIZE_LEN);
-        let cnx_start = usize_from_slice_le(&node[pos..(pos + USIZE_LEN)]);
-        let no_cnx = usize_from_slice_le(&node[cnx_start..(cnx_start + USIZE_LEN)]);
-        let cnx_start = cnx_start + USIZE_LEN;
-        let cnx_end = cnx_start + (no_cnx * CNX_LEN);
+        let pos = node.len() - ((layer + 1) * U32_LEN);
+        let cnx_offset = u32_from_slice_le(&node[pos..(pos + U32_LEN)]) as usize;
+        let cnx_start = node.len() - cnx_offset;
+        let num_cnx = u32_from_slice_le(&node[cnx_start..(cnx_start + U32_LEN)]) as usize;
+
+        let cnx_start = cnx_start + U32_LEN;
+        let cnx_end = cnx_start + (num_cnx * U32_LEN);
         EdgeIter {
-            crnt: 0,
+            pos: 0,
             buf: &node[cnx_start..cnx_end],
         }
     }
-    pub fn serialize_into<W: io::Write>(mut buf: W, no_nodes: u32, hnsw: RAMHnsw) -> io::Result<()> {
-        if no_nodes == 0 {
+
+    pub fn serialize_into<W1: io::Write, W2: io::Write>(
+        mut graph: W1,
+        mut edge_file: W2,
+        num_nodes: u32,
+        hnsw: RAMHnsw,
+    ) -> io::Result<()> {
+        if num_nodes == 0 {
             // Empty graph, nothing to serialize
             return Ok(());
         }
 
-        let mut length = 0;
         let mut nodes_end = vec![];
-        for node in 0..no_nodes {
-            length = DiskHnsw::serialize_node(&mut buf, length, node, &hnsw)?;
-            nodes_end.push(length)
+        let mut pos = 0;
+        for node in 0..num_nodes {
+            pos += DiskHnsw::serialize_node(&mut graph, &mut edge_file, node, &hnsw)?;
+            nodes_end.push(pos);
         }
+
         for ends_at in nodes_end.into_iter().rev() {
-            buf.write_all(&ends_at.to_le_bytes())?;
-            length += USIZE_LEN;
+            let ends_at: u32 = ends_at as u32;
+            graph.write_all(&ends_at.to_le_bytes())?;
         }
+
         let EntryPoint { node, layer } = hnsw.entry_point;
-        buf.write_all(&layer.to_le_bytes())?;
-        buf.write_all(&(node.0 as usize).to_le_bytes())?;
-        let _length = length + 2 * USIZE_LEN;
-        buf.flush()?;
+        let node: u32 = node.0;
+        let layer: u32 = layer as u32;
+
+        graph.write_all(&layer.to_le_bytes())?;
+        graph.write_all(&node.to_le_bytes())?;
+
+        graph.flush()?;
+        edge_file.flush()?;
 
         Ok(())
     }
-    // hnsw must be serialized using DiskHnsw, may have trailing bytes at the start.
+
+    // hnsw must be serialized using DiskHnswV2, may have trailing bytes at the start.
     pub fn get_entry_point(&self) -> EntryPoint {
         assert!(!self.0.is_empty());
 
-        let node_start = self.0.len() - USIZE_LEN;
-        let layer_start = node_start - USIZE_LEN;
-        let node_addr = usize_from_slice_le(&self.0[node_start..(node_start + NODE_LEN)]);
-        let layer = usize_from_slice_le(&self.0[layer_start..(layer_start + USIZE_LEN)]);
+        let node_start = self.0.len() - U32_LEN;
+        let layer_start = node_start - U32_LEN;
+        let node_addr = u32_from_slice_le(&self.0[node_start..(node_start + U32_LEN)]);
+        let layer = u32_from_slice_le(&self.0[layer_start..(layer_start + U32_LEN)]) as usize;
         EntryPoint {
-            node: VectorAddr(node_addr as u32),
+            node: VectorAddr(node_addr),
             layer,
         }
     }
+
     // hnsw must be serialized using MHnsw, may have trailing bytes at the start.
     // The returned node will have trailing bytes at the start.
     pub fn get_node(hnsw: &[u8], address: VectorAddr) -> &[u8] {
-        let indexing_end = hnsw.len() - (2 * USIZE_LEN);
+        let indexing_end = hnsw.len() - (2 * U32_LEN);
         // node + 1 since the layers are stored in reverse order.
         // [n3, n2, n1, n0, end] Since we have the position of end, the node i is
         // i + 1 positions to its left.
-        let pos = indexing_end - ((address.0 as usize + 1) * USIZE_LEN);
-        let node_end = usize_from_slice_le(&hnsw[pos..(pos + USIZE_LEN)]);
+        let pos = indexing_end - ((address.0 as usize + 1) * U32_LEN);
+        let node_end = u32_from_slice_le(&hnsw[pos..(pos + U32_LEN)]) as usize;
         &hnsw[..node_end]
     }
 
-    pub fn deserialize(hnsw: &[u8]) -> RAMHnsw {
+    pub fn deserialize(hnsw: &[u8], mut edge_file: impl io::Read) -> std::io::Result<RAMHnsw> {
         let mut ram = RAMHnsw::new();
         if hnsw.is_empty() {
-            return ram;
+            return Ok(ram);
         }
 
         let end = hnsw.len();
@@ -210,20 +218,22 @@ impl<'a> DiskHnsw<'a> {
 
         let mut node_index: u32 = 0;
         loop {
-            let indexing_pos = end - (node_index as usize + 3) * USIZE_LEN;
-            let node_end = usize_from_slice_le(&hnsw[indexing_pos..indexing_pos + USIZE_LEN]);
+            let indexing_pos = end - (node_index as usize + 3) * U32_LEN;
+            let node_end = u32_from_slice_le(&hnsw[indexing_pos..indexing_pos + U32_LEN]) as usize;
             let mut layer_index = 0;
             loop {
                 if ram.layers.len() == layer_index {
                     ram.layers.push(RAMLayer::default());
                 }
 
-                let layer_pos = node_end - (layer_index + 1) * USIZE_LEN;
-                let edges_start = usize_from_slice_le(&hnsw[layer_pos..layer_pos + USIZE_LEN]);
-                let number_edges = usize_from_slice_le(&hnsw[edges_start..edges_start + USIZE_LEN]);
+                let layer_pos = node_end - (layer_index + 1) * U32_LEN;
+                let edges_offset = u32_from_slice_le(&hnsw[layer_pos..layer_pos + U32_LEN]) as usize;
+                let edges_start = node_end - edges_offset;
 
-                let cnx_start = edges_start + USIZE_LEN;
-                let cnx_end = cnx_start + number_edges * CNX_LEN;
+                let number_edges = u32_from_slice_le(&hnsw[edges_start..edges_start + U32_LEN]) as usize;
+
+                let cnx_start = edges_start + U32_LEN;
+                let cnx_end = cnx_start + number_edges * U32_LEN;
 
                 if number_edges > 0 {
                     let mut ram_edges = ram.layers[layer_index]
@@ -233,10 +243,14 @@ impl<'a> DiskHnsw<'a> {
                         .write()
                         .unwrap();
                     let edges = EdgeIter {
-                        crnt: 0,
+                        pos: 0,
                         buf: &hnsw[cnx_start..cnx_end],
                     };
-                    for (to, edge) in edges {
+                    for to in edges {
+                        let mut buf = [0u8; 4];
+                        edge_file.read_exact(&mut buf)?;
+                        let edge = f32::from_le_bytes(buf);
+
                         ram_edges.push((to, edge));
                     }
                 }
@@ -253,13 +267,13 @@ impl<'a> DiskHnsw<'a> {
             node_index += 1;
         }
 
-        ram
+        Ok(ram)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::RwLock;
+    use std::{io::BufReader, sync::RwLock};
 
     use super::*;
     use crate::hnsw::ram_hnsw::RAMLayer;
@@ -275,7 +289,8 @@ mod tests {
     fn empty_hnsw() {
         let hnsw = RAMHnsw::new();
         let mut buf = vec![];
-        DiskHnsw::serialize_into(&mut buf, 0, hnsw).unwrap();
+        let mut edges = vec![];
+        DiskHnsw::serialize_into(&mut buf, &mut edges, 0, hnsw).unwrap();
         assert!(buf.is_empty());
     }
 
@@ -318,7 +333,8 @@ mod tests {
         hnsw.entry_point = entry_point;
         hnsw.layers = vec![layer0, layer1, layer2];
         let mut buf = vec![];
-        DiskHnsw::serialize_into(&mut buf, no_nodes, hnsw).unwrap();
+        let mut edges = vec![];
+        DiskHnsw::serialize_into(&mut buf, &mut edges, no_nodes, hnsw).unwrap();
 
         let hnsw = DiskHnsw(&buf);
         let ep = hnsw.get_entry_point();
@@ -370,11 +386,14 @@ mod tests {
         hnsw.entry_point = entry_point;
         hnsw.layers = vec![layer0, layer1, layer2];
         let mut buf = vec![];
-        DiskHnsw::serialize_into(&mut buf, no_nodes, hnsw).unwrap();
-        let ram = DiskHnsw::deserialize(&buf);
+        let mut edges = vec![];
+        DiskHnsw::serialize_into(&mut buf, &mut edges, no_nodes, hnsw).unwrap();
+        let ram = DiskHnsw::deserialize(&buf, edges.as_slice()).unwrap();
         let mut buf2 = vec![];
-        DiskHnsw::serialize_into(&mut buf2, no_nodes, ram).unwrap();
+        let mut edges2 = vec![];
+        DiskHnsw::serialize_into(&mut buf2, &mut edges2, no_nodes, ram).unwrap();
 
         assert_eq!(buf, buf2);
+        assert_eq!(edges, edges2);
     }
 }
