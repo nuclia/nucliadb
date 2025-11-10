@@ -370,7 +370,8 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
     # Run tests with old filters and new filter_expression
     for apply_filters in [apply_old_filters, apply_new_filters]:
         with patch(
-            "nucliadb.search.search.find.get_rank_fusion", return_value=ReciprocalRankFusion(window=20)
+            "nucliadb.search.search.retrieval.get_rank_fusion",
+            return_value=ReciprocalRankFusion(window=20),
         ):
             request = dict(
                 query="",

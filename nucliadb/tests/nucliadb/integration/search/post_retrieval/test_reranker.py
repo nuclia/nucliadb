@@ -126,11 +126,8 @@ async def test_predict_reranker_requests_more_results(
         build_find_response_call = spy_build_find_response.call_args_list[i]
         cut_page_call = spy_cut_page.call_args_list[i]
 
-        search_responses = build_find_response_call.args[0]
-        assert len(search_responses) == 1
-
-        search_response = search_responses[0]
-        assert len(search_response.paragraph.results) == 7
+        merged_search_response = build_find_response_call.args[0]
+        assert len(merged_search_response.paragraph.results) == 7
 
         items, top_k = cut_page_call.args
         assert len(items) == 7

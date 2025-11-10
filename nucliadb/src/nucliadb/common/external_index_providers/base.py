@@ -29,8 +29,10 @@ from pydantic import BaseModel
 from nucliadb.common.counters import IndexCounts
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexingError
 from nucliadb.common.ids import ParagraphId
+from nucliadb.models.internal.retrieval import Score
 from nucliadb_models.external_index_providers import ExternalIndexProviderType
 from nucliadb_models.search import SCORE_TYPE, Relations, TextPosition
+from nucliadb_protos import resources_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
     StoredExternalIndexProviderMetadata,
@@ -41,6 +43,16 @@ from nucliadb_telemetry.metrics import Observer
 logger = logging.getLogger(__name__)
 
 manager_observer = Observer("external_index_manager", labels={"operation": "", "provider": ""})
+
+
+# /k/ocr
+_OCR_LABEL = (
+    f"/k/{resources_pb2.Paragraph.TypeParagraph.Name(resources_pb2.Paragraph.TypeParagraph.OCR).lower()}"
+)
+# /k/inception
+_INCEPTION_LABEL = (
+    f"/k/{resources_pb2.Paragraph.TypeParagraph.Name(resources_pb2.Paragraph.TypeParagraph.OCR).lower()}"
+)
 
 
 @dataclass
@@ -57,8 +69,18 @@ class VectorsetExternalIndex:
 
 class ScoredTextBlock(BaseModel):
     paragraph_id: ParagraphId
-    score: float
     score_type: SCORE_TYPE
+
+    scores: list[Score]
+
+    @property
+    def score(self) -> float:
+        return self.current_score.score
+
+    @property
+    def current_score(self) -> Score:
+        assert len(self.scores) > 0, "text block matches must be scored"
+        return self.scores[-1]
 
 
 class TextBlockMatch(ScoredTextBlock):
@@ -77,6 +99,10 @@ class TextBlockMatch(ScoredTextBlock):
     field_labels: list[str] = []
     text: Optional[str] = None
     relevant_relations: Optional[Relations] = None
+
+    @property
+    def is_an_image(self) -> bool:
+        return _OCR_LABEL in self.paragraph_labels or _INCEPTION_LABEL in self.paragraph_labels
 
 
 class QueryResults(BaseModel):

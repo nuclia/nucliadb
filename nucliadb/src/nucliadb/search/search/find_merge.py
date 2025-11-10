@@ -18,74 +18,56 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Iterable, Optional, Union
+from typing import Iterable, Optional
 
-from nidx_protos.nodereader_pb2 import (
-    DocumentScored,
-    GraphSearchResponse,
-    ParagraphResult,
-    ParagraphSearchResponse,
-    SearchResponse,
-    VectorSearchResponse,
-)
+from nidx_protos.nodereader_pb2 import GraphSearchResponse, SearchResponse
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
-from nucliadb.common.ids import ParagraphId, VectorId
-from nucliadb.search import SERVICE_NAME, logger
+from nucliadb.common.ids import ParagraphId
+from nucliadb.models.internal.augment import ParagraphText
+from nucliadb.models.internal.retrieval import RerankerScore
+from nucliadb.search.augmentor.models import AugmentedParagraph, AugmentedResource, Paragraph
+from nucliadb.search.augmentor.paragraphs import augment_paragraphs
+from nucliadb.search.augmentor.resources import augment_resources
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
-    hydrate_resource_metadata,
-    hydrate_text_block,
-    text_block_to_find_paragraph,
 )
 from nucliadb.search.search.merge import merge_relations_results
+from nucliadb.search.search.metrics import merge_observer
+from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import UnitRetrieval
-from nucliadb.search.search.rank_fusion import IndexSource, RankFusionAlgorithm
-from nucliadb.search.search.rerankers import (
-    RerankableItem,
-    Reranker,
-    RerankingOptions,
-)
-from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import ExtractedDataTypeName, Resource
+from nucliadb.search.search.rerankers import RerankableItem, Reranker, RerankingOptions
+from nucliadb_models.resource import Resource
 from nucliadb_models.search import (
-    SCORE_TYPE,
     FindField,
+    FindParagraph,
     FindResource,
     KnowledgeboxFindResults,
     MinScore,
-    ResourceProperties,
-    TextPosition,
 )
 from nucliadb_telemetry import metrics
-
-from .metrics import merge_observer
 
 FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
     "nucliadb_find_fetch_operations",
     buckets=[1, 5, 10, 20, 30, 40, 50, 60, 80, 100, 200],
 )
 
-# Constant score given to all graph results until we implement graph scoring
-FAKE_GRAPH_SCORE = 1.0
-
 
 @merge_observer.wrap({"type": "find_merge"})
 async def build_find_response(
-    search_responses: list[SearchResponse],
+    search_response: SearchResponse,
+    merged_text_blocks: list[TextBlockMatch],
+    graph_response: GraphSearchResponse,
     *,
     retrieval: UnitRetrieval,
     kbid: str,
     query: str,
     rephrased_query: Optional[str],
-    rank_fusion_algorithm: RankFusionAlgorithm,
     reranker: Reranker,
-    show: list[ResourceProperties] = [],
-    extracted: list[ExtractedDataTypeName] = [],
-    field_type_filter: list[FieldTypeName] = [],
-    highlight: bool = False,
+    resource_hydration_options: ResourceHydrationOptions,
+    text_block_hydration_options: TextBlockHydrationOptions,
 ) -> KnowledgeboxFindResults:
     # XXX: we shouldn't need a min score that we haven't used. Previous
     # implementations got this value from the proto request (i.e., default to 0)
@@ -95,26 +77,6 @@ async def build_find_response(
     min_score_semantic = 0.0
     if retrieval.query.semantic is not None:
         min_score_semantic = retrieval.query.semantic.min_score
-
-    # merge
-    search_response = merge_shard_responses(search_responses)
-
-    keyword_results = keyword_results_to_text_block_matches(search_response.paragraph.results)
-    semantic_results = semantic_results_to_text_block_matches(
-        filter(
-            lambda x: x.score >= min_score_semantic,
-            search_response.vector.documents,
-        )
-    )
-    graph_results = graph_results_to_text_block_matches(search_response.graph)
-
-    merged_text_blocks = rank_fusion_algorithm.fuse(
-        {
-            IndexSource.KEYWORD: keyword_results,
-            IndexSource.SEMANTIC: semantic_results,
-            IndexSource.GRAPH: graph_results,
-        }
-    )
 
     # cut
     # we assume pagination + predict reranker is forbidden and has been already
@@ -126,13 +88,6 @@ async def build_find_response(
         text_blocks_page, next_page = cut_page(merged_text_blocks, retrieval.top_k)
 
     # hydrate and rerank
-    resource_hydration_options = ResourceHydrationOptions(
-        show=show, extracted=extracted, field_type_filter=field_type_filter
-    )
-    text_block_hydration_options = TextBlockHydrationOptions(
-        highlight=highlight,
-        ematches=search_response.paragraph.ematches,  # type: ignore
-    )
     reranking_options = RerankingOptions(kbid=kbid, query=query)
     text_blocks, resources, best_matches = await hydrate_and_rerank(
         text_blocks_page,
@@ -148,7 +103,7 @@ async def build_find_response(
     entry_points = []
     if retrieval.query.relation is not None:
         entry_points = retrieval.query.relation.entry_points
-    relations = await merge_relations_results([search_response.graph], entry_points)
+    relations = await merge_relations_results([graph_response], entry_points)
 
     # compose response
     find_resources = compose_find_resources(text_blocks, resources)
@@ -169,212 +124,6 @@ async def build_find_response(
         min_score=MinScore(bm25=_round(min_score_bm25), semantic=_round(min_score_semantic)),
     )
     return find_results
-
-
-def merge_shard_responses(
-    responses: list[SearchResponse],
-) -> SearchResponse:
-    """Merge search responses into a single response as if there were no shards
-    involved.
-
-    ATENTION! This is not a complete merge, we are only merging the fields
-    needed to compose a /find response.
-
-    """
-    paragraphs = []
-    vectors = []
-    graphs = []
-    for response in responses:
-        paragraphs.append(response.paragraph)
-        vectors.append(response.vector)
-        graphs.append(response.graph)
-
-    merged = SearchResponse(
-        paragraph=merge_shards_keyword_responses(paragraphs),
-        vector=merge_shards_semantic_responses(vectors),
-        graph=merge_shards_graph_responses(graphs),
-    )
-    return merged
-
-
-def merge_shards_keyword_responses(
-    keyword_responses: list[ParagraphSearchResponse],
-) -> ParagraphSearchResponse:
-    """Merge keyword (paragraph) search responses into a single response as if
-    there were no shards involved.
-
-    ATENTION! This is not a complete merge, we are only merging the fields
-    needed to compose a /find response.
-
-    """
-    merged = ParagraphSearchResponse()
-    for response in keyword_responses:
-        merged.query = response.query
-        merged.next_page = merged.next_page or response.next_page
-        merged.total += response.total
-        merged.results.extend(response.results)
-        merged.ematches.extend(response.ematches)
-
-    return merged
-
-
-def merge_shards_semantic_responses(
-    semantic_responses: list[VectorSearchResponse],
-) -> VectorSearchResponse:
-    """Merge semantic (vector) search responses into a single response as if
-    there were no shards involved.
-
-    ATENTION! This is not a complete merge, we are only merging the fields
-    needed to compose a /find response.
-
-    """
-    merged = VectorSearchResponse()
-    for response in semantic_responses:
-        merged.documents.extend(response.documents)
-
-    return merged
-
-
-def merge_shards_graph_responses(
-    graph_responses: list[GraphSearchResponse],
-):
-    merged = GraphSearchResponse()
-
-    for response in graph_responses:
-        nodes_offset = len(merged.nodes)
-        relations_offset = len(merged.relations)
-
-        # paths contain indexes to nodes and relations, we must offset them
-        # while merging responses to maintain valid data
-        for path in response.graph:
-            merged_path = GraphSearchResponse.Path()
-            merged_path.CopyFrom(path)
-            merged_path.source += nodes_offset
-            merged_path.relation += relations_offset
-            merged_path.destination += nodes_offset
-            merged.graph.append(merged_path)
-
-        merged.nodes.extend(response.nodes)
-        merged.relations.extend(response.relations)
-
-    return merged
-
-
-def keyword_result_to_text_block_match(item: ParagraphResult) -> TextBlockMatch:
-    fuzzy_result = len(item.matches) > 0
-    return TextBlockMatch(
-        paragraph_id=ParagraphId.from_string(item.paragraph),
-        score=item.score.bm25,
-        score_type=SCORE_TYPE.BM25,
-        order=0,  # NOTE: this will be filled later
-        text="",  # NOTE: this will be filled later too
-        position=TextPosition(
-            page_number=item.metadata.position.page_number,
-            index=item.metadata.position.index,
-            start=item.start,
-            end=item.end,
-            start_seconds=[x for x in item.metadata.position.start_seconds],
-            end_seconds=[x for x in item.metadata.position.end_seconds],
-        ),
-        # XXX: we should split labels
-        field_labels=[],
-        paragraph_labels=list(item.labels),
-        fuzzy_search=fuzzy_result,
-        is_a_table=item.metadata.representation.is_a_table,
-        representation_file=item.metadata.representation.file,
-        page_with_visual=item.metadata.page_with_visual,
-    )
-
-
-def keyword_results_to_text_block_matches(items: Iterable[ParagraphResult]) -> list[TextBlockMatch]:
-    return [keyword_result_to_text_block_match(item) for item in items]
-
-
-class InvalidDocId(Exception):
-    """Raised while parsing an invalid id coming from semantic search"""
-
-    def __init__(self, invalid_vector_id: str):
-        self.invalid_vector_id = invalid_vector_id
-        super().__init__(f"Invalid vector ID: {invalid_vector_id}")
-
-
-def semantic_result_to_text_block_match(item: DocumentScored) -> TextBlockMatch:
-    try:
-        vector_id = VectorId.from_string(item.doc_id.id)
-    except (IndexError, ValueError):
-        raise InvalidDocId(item.doc_id.id)
-
-    return TextBlockMatch(
-        paragraph_id=ParagraphId.from_vector_id(vector_id),
-        score=item.score,
-        score_type=SCORE_TYPE.VECTOR,
-        order=0,  # NOTE: this will be filled later
-        text="",  # NOTE: this will be filled later too
-        position=TextPosition(
-            page_number=item.metadata.position.page_number,
-            index=item.metadata.position.index,
-            start=vector_id.vector_start,
-            end=vector_id.vector_end,
-            start_seconds=[x for x in item.metadata.position.start_seconds],
-            end_seconds=[x for x in item.metadata.position.end_seconds],
-        ),
-        # XXX: we should split labels
-        field_labels=[],
-        paragraph_labels=list(item.labels),
-        fuzzy_search=False,  # semantic search doesn't have fuzziness
-        is_a_table=item.metadata.representation.is_a_table,
-        representation_file=item.metadata.representation.file,
-        page_with_visual=item.metadata.page_with_visual,
-    )
-
-
-def semantic_results_to_text_block_matches(items: Iterable[DocumentScored]) -> list[TextBlockMatch]:
-    text_blocks: list[TextBlockMatch] = []
-    for item in items:
-        try:
-            text_block = semantic_result_to_text_block_match(item)
-        except InvalidDocId as exc:
-            logger.warning(f"Skipping invalid doc_id: {exc.invalid_vector_id}")
-            continue
-        text_blocks.append(text_block)
-    return text_blocks
-
-
-def graph_results_to_text_block_matches(item: GraphSearchResponse) -> list[TextBlockMatch]:
-    matches = []
-    for path in item.graph:
-        metadata = path.metadata
-
-        if not metadata.paragraph_id:
-            continue
-
-        paragraph_id = ParagraphId.from_string(metadata.paragraph_id)
-        matches.append(
-            TextBlockMatch(
-                paragraph_id=paragraph_id,
-                score=FAKE_GRAPH_SCORE,
-                score_type=SCORE_TYPE.RELATION_RELEVANCE,
-                order=0,  # NOTE: this will be filled later
-                text="",  # NOTE: this will be filled later too
-                position=TextPosition(
-                    page_number=0,
-                    index=0,
-                    start=paragraph_id.paragraph_start,
-                    end=paragraph_id.paragraph_end,
-                    start_seconds=[],
-                    end_seconds=[],
-                ),
-                # XXX: we should split labels
-                field_labels=[],
-                paragraph_labels=[],
-                fuzzy_search=False,  # TODO: this depends on the query, should we populate it?
-                is_a_table=False,
-                representation_file="",
-                page_with_visual=False,
-            )
-        )
-
-    return matches
 
 
 @merge_observer.wrap({"type": "hydrate_and_rerank"})
@@ -398,11 +147,12 @@ async def hydrate_and_rerank(
     """
     max_operations = asyncio.Semaphore(50)
 
-    # Iterate text blocks and create text block and resource metadata hydration
-    # tasks depending on the reranker
+    # Iterate text blocks to create an "index" for faster access by id and get a
+    # list of text block ids and resource ids to hydrate
     text_blocks_by_id: dict[str, TextBlockMatch] = {}  # useful for faster access to text blocks later
-    resource_hydration_ops = {}
-    text_block_hydration_ops = []
+    resources_to_hydrate = set()
+    text_block_id_to_hydrate = set()
+
     for text_block in text_blocks:
         rid = text_block.paragraph_id.rid
         paragraph_id = text_block.paragraph_id.full()
@@ -417,41 +167,48 @@ async def hydrate_and_rerank(
         # ones we see now, so we'll skip this step and recompute the resources
         # later
         if not reranker.needs_extra_results:
-            if rid not in resource_hydration_ops:
-                resource_hydration_ops[rid] = asyncio.create_task(
-                    hydrate_resource_metadata(
-                        kbid,
-                        rid,
-                        options=resource_hydration_options,
-                        concurrency_control=max_operations,
-                        service_name=SERVICE_NAME,
-                    )
-                )
+            resources_to_hydrate.add(rid)
 
-        text_block_hydration_ops.append(
-            asyncio.create_task(
-                hydrate_text_block(
-                    kbid,
-                    text_block,
-                    text_block_hydration_options,
-                    concurrency_control=max_operations,
-                )
-            )
-        )
+        if text_block_hydration_options.only_hydrate_empty and text_block.text:
+            pass
+        else:
+            text_block_id_to_hydrate.add(paragraph_id)
 
     # hydrate only the strictly needed before rerank
-    hydrated_text_blocks: list[TextBlockMatch]
-    hydrated_resources: list[Union[Resource, None]]
-
     ops = [
-        *text_block_hydration_ops,
-        *resource_hydration_ops.values(),
+        augment_paragraphs(
+            kbid,
+            given=[
+                Paragraph.from_text_block_match(text_blocks_by_id[paragraph_id])
+                for paragraph_id in text_block_id_to_hydrate
+            ],
+            select=[ParagraphText()],
+            concurrency_control=max_operations,
+        ),
+        augment_resources(
+            kbid,
+            given=list(resources_to_hydrate),
+            opts=resource_hydration_options,
+            concurrency_control=max_operations,
+        ),
     ]
-    FIND_FETCH_OPS_DISTRIBUTION.observe(len(ops))
+    FIND_FETCH_OPS_DISTRIBUTION.observe(len(text_block_id_to_hydrate) + len(resources_to_hydrate))
     results = await asyncio.gather(*ops)
 
-    hydrated_text_blocks = results[: len(text_block_hydration_ops)]  # type: ignore
-    hydrated_resources = results[len(text_block_hydration_ops) :]  # type: ignore
+    augmented_paragraphs: dict[ParagraphId, AugmentedParagraph | None] = results[0]  # type: ignore
+    augmented_resources: dict[str, AugmentedResource | None] = results[1]  # type: ignore
+
+    # add hydrated text to our text blocks
+    for text_block in text_blocks:
+        augmented = augmented_paragraphs.get(text_block.paragraph_id, None)
+        if augmented is not None and augmented.text is not None:
+            if text_block_hydration_options.highlight:
+                text = highlight_paragraph(
+                    augmented.text, words=[], ematches=text_block_hydration_options.ematches
+                )
+            else:
+                text = augmented.text
+            text_block.text = text
 
     # with the hydrated text, rerank and apply new scores to the text blocks
     to_rerank = [
@@ -461,7 +218,7 @@ async def hydrate_and_rerank(
             score_type=text_block.score_type,
             content=text_block.text or "",  # TODO: add a warning, this shouldn't usually happen
         )
-        for text_block in hydrated_text_blocks
+        for text_block in text_blocks
     ]
     reranked = await reranker.rerank(to_rerank, reranking_options)
 
@@ -476,7 +233,7 @@ async def hydrate_and_rerank(
         score_type = item.score_type
 
         text_block = text_blocks_by_id[paragraph_id]
-        text_block.score = score
+        text_block.scores.append(RerankerScore(score=score))
         text_block.score_type = score_type
 
         matches.append((paragraph_id, score))
@@ -485,7 +242,7 @@ async def hydrate_and_rerank(
 
     best_matches = []
     best_text_blocks = []
-    resource_hydration_ops = {}
+    resources_to_hydrate.clear()
     for order, (paragraph_id, _) in enumerate(matches):
         text_block = text_blocks_by_id[paragraph_id]
         text_block.order = order
@@ -495,24 +252,19 @@ async def hydrate_and_rerank(
         # now we have removed the text block surplus, fetch resource metadata
         if reranker.needs_extra_results:
             rid = ParagraphId.from_string(paragraph_id).rid
-            if rid not in resource_hydration_ops:
-                resource_hydration_ops[rid] = asyncio.create_task(
-                    hydrate_resource_metadata(
-                        kbid,
-                        rid,
-                        options=resource_hydration_options,
-                        concurrency_control=max_operations,
-                        service_name=SERVICE_NAME,
-                    )
-                )
+            resources_to_hydrate.add(rid)
 
     # Finally, fetch resource metadata if we haven't already done it
     if reranker.needs_extra_results:
-        ops = list(resource_hydration_ops.values())
-        FIND_FETCH_OPS_DISTRIBUTION.observe(len(ops))
-        hydrated_resources = await asyncio.gather(*ops)  # type: ignore
+        FIND_FETCH_OPS_DISTRIBUTION.observe(len(resources_to_hydrate))
+        augmented_resources = await augment_resources(
+            kbid,
+            given=list(resources_to_hydrate),
+            opts=resource_hydration_options,
+            concurrency_control=max_operations,
+        )
 
-    resources = [resource for resource in hydrated_resources if resource is not None]
+    resources = [resource for resource in augmented_resources.values() if resource is not None]
 
     return best_text_blocks, resources, best_matches
 
@@ -545,6 +297,23 @@ def compose_find_resources(
         find_field.paragraphs[paragraph_id] = find_paragraph
 
     return find_resources
+
+
+def text_block_to_find_paragraph(text_block: TextBlockMatch) -> FindParagraph:
+    return FindParagraph(
+        id=text_block.paragraph_id.full(),
+        text=text_block.text or "",
+        score=text_block.score,
+        score_type=text_block.score_type,
+        order=text_block.order,
+        labels=text_block.paragraph_labels,
+        fuzzy_result=text_block.fuzzy_search,
+        is_a_table=text_block.is_a_table,
+        reference=text_block.representation_file,
+        page_with_visual=text_block.page_with_visual,
+        position=text_block.position,
+        relevant_relations=text_block.relevant_relations,
+    )
 
 
 def _round(x: float) -> float:

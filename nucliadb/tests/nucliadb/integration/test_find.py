@@ -474,7 +474,7 @@ async def test_find_highlight(
     kbid = philosophy_books_kb
 
     with patch(
-        "nucliadb.search.search.find.get_rank_fusion", return_value=ReciprocalRankFusion(window=20)
+        "nucliadb.search.search.retrieval.get_rank_fusion", return_value=ReciprocalRankFusion(window=20)
     ):
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",

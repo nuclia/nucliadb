@@ -837,9 +837,9 @@ async def test_search_user_relations(
 ):
     kbid = standalone_knowledgebox
 
-    from nucliadb.search.search import find
+    from nucliadb.search.search import retrieval
 
-    spy = mocker.spy(find, "nidx_query")
+    spy = mocker.spy(retrieval, "nidx_query")
     with patch.object(predict_mock, "detect_entities", AsyncMock(return_value=[])):
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",

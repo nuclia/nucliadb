@@ -17,22 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 from typing import AsyncIterator
 
 import aiohttp
 import pytest
+from httpx import AsyncClient
 
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
-from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.dataset_pb2 import ParagraphStreamingBatch, TaskType, TrainSet
-from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.ndbfixtures.resources import smb_wonder_resource
 from tests.train.utils import get_batches_from_train_response_stream
-from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import wait_for_sync
 
 
 async def get_paragraph_streaming_batch_from_response(
@@ -54,11 +50,12 @@ async def get_paragraph_streaming_batch_from_response(
 async def test_generator_paragraph_streaming(
     nucliadb_train: aiohttp.ClientSession,
     nucliadb_ingest_grpc: WriterStub,
+    nucliadb_writer: AsyncClient,
     knowledgebox: str,
 ):
     kbid = knowledgebox
 
-    await inject_resources_with_paragraphs(kbid, nucliadb_ingest_grpc)
+    await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
     async with nucliadb_train.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200
@@ -81,28 +78,3 @@ async def test_generator_paragraph_streaming(
             batches.append(batch)
             assert len(batch.data) == 5
         assert len(batches) == 1
-
-
-async def inject_resources_with_paragraphs(kbid: str, nucliadb_ingest_grpc: WriterStub):
-    await inject_message(nucliadb_ingest_grpc, smb_wonder_bm(kbid))
-    await asyncio.sleep(0.1)
-    await wait_for_sync()
-
-
-def smb_wonder_bm(kbid: str) -> BrokerMessage:
-    bmb = BrokerMessageBuilder(kbid=kbid)
-    bmb.with_title("Super Mario Bros. Wonder")
-    bmb.with_summary("SMB Wonder: the new Mario game from Nintendo")
-
-    field_builder = bmb.field_builder("smb-wonder", rpb.FieldType.FILE)
-    paragraphs = [
-        "Super Mario Bros. Wonder (SMB Wonder) is a 2023 platform game developed and published by Nintendo.\n",  # noqa
-        "SMB Wonder is a side-scrolling plaftorm game.\n",
-        "As one of eight player characters, the player completes levels across the Flower Kingdom.",  # noqa
-    ]
-    for paragraph in paragraphs:
-        field_builder.add_paragraph(paragraph)
-
-    bm = bmb.build()
-
-    return bm

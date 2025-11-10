@@ -17,21 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from . import (  # noqa: F401
-    ask,
-    catalog,
-    feedback,
-    find,
-    graph,
-    hydrate,
-    knowledgebox,
-    predict_proxy,
-    retrieve,
-    search,
-    suggest,
-    summarize,
-)
-from .resource import ask as ask_resource  # noqa: F401
-from .resource import ingestion_agents as ingestion_agents_resource  # noqa: F401
-from .resource import search as search_resource  # noqa: F401
-from .router import api  # noqa: F401
+import asyncio
+from contextlib import AsyncExitStack
+from typing import Awaitable, TypeVar
+
+T = TypeVar("T")
+
+
+async def limited_concurrency(aw: Awaitable[T], *, max_ops: asyncio.Semaphore | None) -> T:
+    async with AsyncExitStack() as stack:
+        if max_ops is not None:
+            await stack.enter_async_context(max_ops)
+        r = await aw
+    return r

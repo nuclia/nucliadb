@@ -21,6 +21,7 @@ from unittest.mock import patch
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
+from nucliadb.models.internal.retrieval import SemanticScore
 from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
@@ -28,10 +29,7 @@ from nucliadb.search.search.hydrator import (
     hydrate_text_block,
 )
 from nucliadb_models.resource import Resource
-from nucliadb_models.search import (
-    SCORE_TYPE,
-    TextPosition,
-)
+from nucliadb_models.search import SCORE_TYPE, TextPosition
 
 MODULE = "nucliadb.search.search.hydrator"
 
@@ -44,7 +42,7 @@ async def test_hydrate_text_block():
         text_block = TextBlockMatch(
             paragraph_id=ParagraphId.from_string("rid/f/field/0/0-10"),
             position=TextPosition(index=0, start=0, end=10),
-            score=0.8,
+            scores=[SemanticScore(score=0.8)],
             score_type=SCORE_TYPE.VECTOR,
             order=3,
             fuzzy_search=False,

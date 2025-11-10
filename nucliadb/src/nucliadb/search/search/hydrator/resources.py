@@ -20,11 +20,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.orm.resource import Resource
+from nucliadb.ingest.serialize import serialize_security
 from nucliadb_models import hydration as hydration_models
-from nucliadb_models.security import ResourceSecurity
 
 
 async def hydrate_resource(
@@ -41,11 +40,7 @@ async def hydrate_resource(
         hydrated.summary = basic.summary
 
     if config.security:
-        security = await resource.get_security()
-        hydrated.security = ResourceSecurity(access_groups=[])
-        if security is not None:
-            for group_id in security.access_groups:
-                hydrated.security.access_groups.append(group_id)
+        hydrated.security = await serialize_security(resource)
 
     if config.origin:
         origin = await resource.get_origin()

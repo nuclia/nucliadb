@@ -34,25 +34,6 @@ from nucliadb_protos import utils_pb2
 
 
 @query_parser_observer.wrap({"type": "convert_retrieval_to_proto"})
-async def legacy_convert_retrieval_to_proto(
-    parsed: ParsedQuery,
-) -> tuple[SearchRequest, bool, Optional[str]]:
-    converter = _Converter(parsed.retrieval)
-    request = converter.into_search_request()
-
-    # XXX: legacy values that were returned by QueryParser but not always
-    # needed. We should find a better abstraction
-
-    incomplete = is_incomplete(parsed.retrieval)
-
-    rephrased_query = None
-    if parsed.retrieval.query.semantic:
-        rephrased_query = await parsed.fetcher.get_rephrased_query()
-
-    return request, incomplete, rephrased_query
-
-
-@query_parser_observer.wrap({"type": "convert_retrieval_to_proto"})
 def convert_retrieval_to_proto(retrieval: UnitRetrieval) -> SearchRequest:
     converter = _Converter(retrieval)
     request = converter.into_search_request()
@@ -274,3 +255,8 @@ def is_incomplete(retrieval: UnitRetrieval) -> bool:
         return False
     incomplete = retrieval.query.semantic.query is None or len(retrieval.query.semantic.query) == 0
     return incomplete
+
+
+def get_rephrased_query(parsed: ParsedQuery) -> Optional[str]:
+    """Given a parsed query, return the rephrased query used, if any."""
+    return parsed.fetcher.get_cached_rephrased_query()

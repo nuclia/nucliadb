@@ -23,7 +23,6 @@ from time import time
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.common.models_utils import to_proto
-from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.find_merge import (
     build_find_response,
     compose_find_resources,
@@ -38,14 +37,16 @@ from nucliadb.search.search.metrics import (
 )
 from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.search.query_parser.parsers import parse_find
-from nucliadb.search.search.query_parser.parsers.unit_retrieval import legacy_convert_retrieval_to_proto
-from nucliadb.search.search.rank_fusion import (
-    get_rank_fusion,
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
+    convert_retrieval_to_proto,
+    get_rephrased_query,
+    is_incomplete,
 )
 from nucliadb.search.search.rerankers import (
     RerankingOptions,
     get_reranker,
 )
+from nucliadb.search.search.retrieval import text_block_search
 from nucliadb.search.settings import settings
 from nucliadb_models.search import (
     FindRequest,
@@ -95,31 +96,37 @@ async def _index_node_retrieval(
         assert parsed.retrieval.rank_fusion is not None and parsed.retrieval.reranker is not None, (
             "find parser must provide rank fusion and reranker algorithms"
         )
-        rank_fusion = get_rank_fusion(parsed.retrieval.rank_fusion)
         reranker = get_reranker(parsed.retrieval.reranker)
-        (
-            pb_query,
-            incomplete_results,
-            rephrased_query,
-        ) = await legacy_convert_retrieval_to_proto(parsed)
+        incomplete_results = is_incomplete(parsed.retrieval)
+        rephrased_query = get_rephrased_query(parsed)
 
     with metrics.time("index_search"):
-        results, queried_shards = await nidx_query(kbid, Method.SEARCH, pb_query)
+        text_blocks, pb_query, pb_response, queried_shards = await text_block_search(
+            kbid, parsed.retrieval
+        )
 
     # Rank fusion merge, cut, hydrate and rerank
     with metrics.time("results_merge"):
+        resource_hydration_options = ResourceHydrationOptions(
+            show=item.show,
+            extracted=item.extracted,
+            field_type_filter=item.field_type_filter,
+        )
+        text_block_hydration_options = TextBlockHydrationOptions(
+            highlight=item.highlight,
+            ematches=pb_response.paragraph.ematches,  # type: ignore
+        )
         search_results = await build_find_response(
-            results,
+            pb_response,
+            text_blocks,
+            pb_response.graph,
             retrieval=parsed.retrieval,
             kbid=kbid,
             query=pb_query.body,
             rephrased_query=rephrased_query,
-            show=item.show,
-            extracted=item.extracted,
-            field_type_filter=item.field_type_filter,
-            highlight=item.highlight,
-            rank_fusion_algorithm=rank_fusion,
             reranker=reranker,
+            resource_hydration_options=resource_hydration_options,
+            text_block_hydration_options=text_block_hydration_options,
         )
 
     search_time = time() - start_time
@@ -178,7 +185,9 @@ async def _external_index_retrieval(
     parsed = await parse_find(kbid, item)
     assert parsed.retrieval.reranker is not None, "find parser must provide a reranking algorithm"
     reranker = get_reranker(parsed.retrieval.reranker)
-    search_request, incomplete_results, rephrased_query = await legacy_convert_retrieval_to_proto(parsed)
+    incomplete_results = is_incomplete(parsed.retrieval)
+    rephrased_query = get_rephrased_query(parsed)
+    search_request = convert_retrieval_to_proto(parsed.retrieval)
 
     # Query index
     query_results = await external_index_manager.query(search_request)  # noqa

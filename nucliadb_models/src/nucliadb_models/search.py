@@ -351,6 +351,9 @@ class SortOptions(BaseModel):
     order: SortOrder = SortOrder.DESC
 
 
+MAX_RANK_FUSION_WINDOW = 500
+
+
 class RankFusionName(str, Enum):
     RECIPROCAL_RANK_FUSION = "rrf"
 
@@ -380,7 +383,7 @@ class ReciprocalRankFusion(_BaseRankFusion):
     )
     window: Optional[int] = Field(
         default=None,
-        le=500,
+        le=MAX_RANK_FUSION_WINDOW,
         title="RRF window",
         description="Number of elements for retrieval to do RRF. Window must be greater or equal to top_k. Greater values will increase probability of multi match at cost of retrieval time",  # noqa: E501
     )

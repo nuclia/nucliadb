@@ -143,7 +143,7 @@ async def test_vectorset_parameter_without_default_vectorset(
             new=AsyncMock(side_effect=mock_nidx_query),
         ),
         patch(
-            "nucliadb.search.search.find.nidx_query",
+            "nucliadb.search.search.retrieval.nidx_query",
             new=AsyncMock(side_effect=mock_nidx_query),
         ),
         patch(
@@ -196,7 +196,7 @@ async def test_vectorset_parameter_with_default_vectorset(
             new=AsyncMock(side_effect=mock_nidx_query),
         ),
         patch(
-            "nucliadb.search.search.find.nidx_query",
+            "nucliadb.search.search.retrieval.nidx_query",
             new=AsyncMock(side_effect=mock_nidx_query),
         ),
         patch(

@@ -39,6 +39,13 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.external_index_providers.base import ScoredTextBlock
 from nucliadb.common.ids import ParagraphId
+from nucliadb.models.internal.retrieval import (
+    GraphScore,
+    KeywordScore,
+    RerankerScore,
+    RrfScore,
+    SemanticScore,
+)
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger, predict
 from nucliadb.search.predict import (
@@ -74,6 +81,7 @@ from nucliadb.search.search.rerankers import (
 )
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
+    SCORE_TYPE,
     AnswerAskResponseItem,
     AskRequest,
     AskResponseItem,
@@ -968,15 +976,27 @@ def compute_best_matches(
     `main_query_weight` is the weight given to the paragraphs matching the main query when calculating the final score.
     """
 
+    score_type_map = {
+        SCORE_TYPE.VECTOR: SemanticScore,
+        SCORE_TYPE.BM25: KeywordScore,
+        SCORE_TYPE.BOTH: RrfScore,  # /find only exposes RRF as rank fusion algorithm
+        SCORE_TYPE.RERANKER: RerankerScore,
+        SCORE_TYPE.RELATION_RELEVANCE: GraphScore,
+    }
+
     def extract_paragraphs(results: KnowledgeboxFindResults) -> list[_FindParagraph]:
         paragraphs = []
         for resource in results.resources.values():
             for field in resource.fields.values():
                 for paragraph in field.paragraphs.values():
+                    # TODO: we don't know the score history, as we are using
+                    # find results. Once we move boolean queries inside the new
+                    # retrieval flow we'll move this and have the proper
+                    # information to do this rank fusion
                     paragraphs.append(
                         _FindParagraph(
                             paragraph_id=ParagraphId.from_string(paragraph.id),
-                            score=paragraph.score,
+                            scores=[score_type_map[paragraph.score_type](score=paragraph.score)],
                             score_type=paragraph.score_type,
                             original=paragraph,
                         )

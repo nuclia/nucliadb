@@ -33,6 +33,7 @@ from sentry_sdk import capture_exception
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.models.internal.retrieval import GraphScore
 from nucliadb.search import logger
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat.query import (
@@ -758,7 +759,7 @@ def build_text_blocks_from_relations(
         TextBlockMatch(
             # XXX: Even though we are setting a paragraph_id, the text is not coming from the paragraph
             paragraph_id=p_id,
-            score=score,
+            scores=[GraphScore(score=score)],
             score_type=SCORE_TYPE.RELATION_RELEVANCE,
             order=0,
             text=f"- {ent} {rel} {tail}",  # Manually build the text
@@ -902,7 +903,7 @@ def relations_match_to_text_block_match(
     parsed_paragraph_id = paragraph_match.paragraph_id
     return TextBlockMatch(
         paragraph_id=parsed_paragraph_id,
-        score=paragraph_match.score,
+        scores=[GraphScore(score=paragraph_match.score)],
         score_type=SCORE_TYPE.RELATION_RELEVANCE,
         order=0,  # NOTE: this will be filled later
         text="",  # NOTE: this will be filled later too

@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
-import uuid
 from typing import AsyncIterator
 
 import aiohttp
@@ -27,14 +25,10 @@ from httpx import AsyncClient
 
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
-from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.dataset_pb2 import QuestionAnswerStreamingBatch, TaskType, TrainSet
-from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.ndbfixtures.resources import smb_wonder_resource
 from tests.train.utils import get_batches_from_train_response_stream
-from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import wait_for_sync
 
 
 async def get_question_answer_streaming_batch_from_response(
@@ -56,11 +50,12 @@ async def get_question_answer_streaming_batch_from_response(
 async def test_generator_question_answer_streaming(
     nucliadb_train: aiohttp.ClientSession,
     nucliadb_ingest_grpc: WriterStub,
+    nucliadb_writer: AsyncClient,
     knowledgebox: str,
 ):
     kbid = knowledgebox
 
-    await inject_resources_with_question_answers(kbid, nucliadb_ingest_grpc)
+    await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
     async with nucliadb_train.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200
@@ -98,121 +93,3 @@ async def test_generator_question_answer_streaming(
         assert len(set(questions)) == 2
         assert question_paragraphs_count == 2
         assert answer_paragraphs_count == 4
-
-
-async def inject_resources_with_question_answers(kbid: str, nucliadb_ingest_grpc: WriterStub):
-    await inject_message(nucliadb_ingest_grpc, smb_wonder_bm(kbid))
-    await wait_for_sync()
-    await asyncio.sleep(0.1)
-
-
-def smb_wonder_bm(kbid: str) -> BrokerMessage:
-    rid = str(uuid.uuid4())
-    bmb = BrokerMessageBuilder(kbid=kbid, rid=rid)
-    bmb.with_title("Super Mario Bros. Wonder")
-    bmb.with_summary("SMB Wonder: the new Mario game from Nintendo")
-
-    field_builder = bmb.field_builder("smb-wonder", rpb.FieldType.FILE)
-    extracted_text = [
-        "Super Mario Bros. Wonder (SMB Wonder) is a 2023 platform game developed and published by Nintendo.\n",  # noqa
-        "SMB Wonder is a side-scrolling plaftorm game.\n",
-        "As one of eight player characters, the player completes levels across the Flower Kingdom.",  # noqa
-    ]
-    paragraph_ids = []
-    for paragraph in extracted_text:
-        paragraph_id, paragraph_pb = field_builder.add_paragraph(paragraph)
-        paragraph_ids.append(paragraph_id)
-
-    question = "What is SMB Wonder?"
-    field_builder.add_question_answer(
-        question=question,
-        question_paragraph_ids=[paragraph_ids[0].full()],
-        answer="SMB Wonder is a side-scrolling Nintendo Switch game",
-        answer_paragraph_ids=[paragraph_ids[0].full(), paragraph_ids[1].full()],
-    )
-    field_builder.add_question_answer(
-        question=question,
-        question_paragraph_ids=[paragraph_ids[0].full()],
-        answer="It's the new Mario game for Nintendo Switch",
-        answer_paragraph_ids=[paragraph_ids[0].full()],
-    )
-
-    question = "Give me an example of side-scrolling game"
-    field_builder.add_question_answer(
-        question=question,
-        answer="SMB Wonder game",
-        answer_paragraph_ids=[paragraph_ids[1].full()],
-    )
-
-    bm = bmb.build()
-
-    return bm
-
-
-@pytest.mark.deploy_modes("standalone")
-async def test_generator_question_answer_streaming_streams_qa_annotations(
-    nucliadb_train: aiohttp.ClientSession,
-    nucliadb_writer: AsyncClient,
-    knowledgebox: str,
-):
-    kbid = knowledgebox
-
-    resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{kbid}/resources",
-        json={
-            "title": "Super Mario Bros. Wonder",
-            "texts": {
-                "smb-wonder": {
-                    "body": "Super Mario Bros. Wonder (SMB Wonder) is a 2023 platform game developed and published by Nintendo.\n"  # noqa
-                },
-            },
-            "fieldmetadata": [
-                {
-                    "field": {"field_type": "text", "field": "smb-wonder"},
-                    "question_answers": [
-                        {
-                            "cancelled_by_user": True,
-                            "question_answer": {
-                                "question": {
-                                    "text": "What is SMB Wonder?",
-                                    "ids_paragraphs": [],
-                                },
-                                "answers": [
-                                    {
-                                        "ids_paragraphs": [],
-                                        "language": "english",
-                                        "text": "SMB Wonder is a Nintendo Switch game",
-                                    }
-                                ],
-                            },
-                        }
-                    ],
-                }
-            ],
-        },
-    )
-    assert resp.status_code == 201, resp.text
-    await wait_for_sync()
-
-    async with nucliadb_train.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
-        assert partitions.status == 200
-        data = await partitions.json()
-        assert len(data["partitions"]) == 1
-        partition_id = data["partitions"][0]
-
-    trainset = TrainSet()
-    trainset.type = TaskType.QUESTION_ANSWER_STREAMING
-    trainset.batch_size = 5
-
-    async with nucliadb_train.post(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}",
-        data=trainset.SerializeToString(),
-    ) as response:
-        assert response.status == 200
-        batches = []
-        async for batch in get_batches_from_train_response_stream(
-            response, QuestionAnswerStreamingBatch
-        ):
-            batches.append(batch)
-            assert len(batch.data) == 1
-        assert len(batches) == 1

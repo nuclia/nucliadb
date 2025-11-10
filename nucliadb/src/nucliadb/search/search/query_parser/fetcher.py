@@ -212,6 +212,13 @@ class Fetcher:
             return None
         return query_info.rephrased_query
 
+    def get_cached_rephrased_query(self) -> Optional[str]:
+        if not is_cached(self.cache.predict_query_info):
+            return None
+        if self.cache.predict_query_info is None:
+            return None
+        return self.cache.predict_query_info.rephrased_query
+
     async def get_semantic_min_score(self) -> Optional[float]:
         query_info = await self._predict_query_endpoint()
         if query_info is None:
