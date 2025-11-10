@@ -14,7 +14,7 @@
 #
 from uuid import uuid4
 
-from nucliadb_models.internal import augment
+from nucliadb.models.internal import augment
 
 
 def test_augment():

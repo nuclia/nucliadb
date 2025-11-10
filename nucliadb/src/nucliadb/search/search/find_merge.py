@@ -24,6 +24,8 @@ from nidx_protos.nodereader_pb2 import GraphSearchResponse, SearchResponse
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
+from nucliadb.models.internal.augment import ParagraphText
+from nucliadb.models.internal.retrieval import RerankerScore
 from nucliadb.search.augmentor.models import AugmentedParagraph, AugmentedResource, Paragraph
 from nucliadb.search.augmentor.paragraphs import augment_paragraphs
 from nucliadb.search.augmentor.resources import augment_resources
@@ -37,8 +39,6 @@ from nucliadb.search.search.metrics import merge_observer
 from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import UnitRetrieval
 from nucliadb.search.search.rerankers import RerankableItem, Reranker, RerankingOptions
-from nucliadb_models.internal.augment import ParagraphText
-from nucliadb_models.internal.retrieval import RerankerScore
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import (
     FindField,

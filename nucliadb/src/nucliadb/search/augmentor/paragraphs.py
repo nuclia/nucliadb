@@ -22,18 +22,18 @@ import asyncio
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.search import logger
-from nucliadb.search.augmentor.models import AugmentedParagraph, Metadata, Paragraph
-from nucliadb.search.augmentor.utils import limited_concurrency
-from nucliadb.search.search import cache
-from nucliadb.search.search.paragraphs import get_paragraph_from_full_text
-from nucliadb_models.internal.augment import (
+from nucliadb.models.internal.augment import (
     ParagraphImage,
     ParagraphProp,
     ParagraphTable,
     ParagraphText,
     RelatedParagraphs,
 )
+from nucliadb.search import logger
+from nucliadb.search.augmentor.models import AugmentedParagraph, Metadata, Paragraph
+from nucliadb.search.augmentor.utils import limited_concurrency
+from nucliadb.search.search import cache
+from nucliadb.search.search.paragraphs import get_paragraph_from_full_text
 from nucliadb_models.search import Image
 
 

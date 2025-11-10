@@ -22,16 +22,16 @@ from fastapi import Header, Request
 from fastapi_versioning import version
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
-from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.search.query_parser.parsers.retrieve import parse_retrieve
-from nucliadb.search.search.retrieval import text_block_search
-from nucliadb_models.internal.retrieval import (
+from nucliadb.models.internal.retrieval import (
     Metadata,
     RetrievalMatch,
     RetrievalRequest,
     RetrievalResponse,
     Scores,
 )
+from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.search.search.query_parser.parsers.retrieve import parse_retrieve
+from nucliadb.search.search.retrieval import text_block_search
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import NucliaDBClientType
 from nucliadb_utils.authentication import requires
