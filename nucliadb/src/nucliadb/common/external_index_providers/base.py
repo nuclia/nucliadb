@@ -45,9 +45,11 @@ logger = logging.getLogger(__name__)
 manager_observer = Observer("external_index_manager", labels={"operation": "", "provider": ""})
 
 
+# /k/ocr
 _OCR_LABEL = (
     f"/k/{resources_pb2.Paragraph.TypeParagraph.Name(resources_pb2.Paragraph.TypeParagraph.OCR).lower()}"
 )
+# /k/inception
 _INCEPTION_LABEL = (
     f"/k/{resources_pb2.Paragraph.TypeParagraph.Name(resources_pb2.Paragraph.TypeParagraph.OCR).lower()}"
 )
