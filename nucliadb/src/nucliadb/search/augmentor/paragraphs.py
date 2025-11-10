@@ -87,6 +87,9 @@ async def augment_paragraph(
 
     if metadata is None:
         metadata = await db_paragraph_metadata(field, paragraph_id)
+        if metadata is None:
+            # we are unable to get any paragraph metadata, we can't continue
+            return None
 
     return await db_augment_paragraph(resource, field, paragraph_id, select, metadata)
 
@@ -162,11 +165,11 @@ async def download_paragraph_source_image(
     return image
 
 
-async def db_paragraph_metadata(field: Field, paragraph_id: ParagraphId) -> Metadata:
+async def db_paragraph_metadata(field: Field, paragraph_id: ParagraphId) -> Metadata | None:
     field_metadata = await field.get_field_metadata()
     if field_metadata is None:
         # We don't have metadata for this field and thus, for this paragraph.
-        return Metadata.unknown()
+        return None
 
     field_id = field.field_id
     if field_id.subfield_id is None:
