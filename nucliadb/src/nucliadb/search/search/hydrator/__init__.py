@@ -24,12 +24,10 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import FieldId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search.search import cache
-from nucliadb.search.search.paragraphs import get_paragraph_text
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import ResourceProperties
@@ -148,31 +146,3 @@ async def hydrate_field_text(
         return field_id, extracted_text_pb.split_text[field_id.subfield_id]
     else:
         return field_id, extracted_text_pb.text
-
-
-@hydrator_observer.wrap({"type": "text_block"})
-async def hydrate_text_block(
-    kbid: str,
-    text_block: TextBlockMatch,
-    options: TextBlockHydrationOptions,
-    *,
-    concurrency_control: Optional[asyncio.Semaphore] = None,
-) -> TextBlockMatch:
-    """Given a `text_block`, fetch its corresponding text, modify and return the
-    `text_block` object.
-
-    """
-    if options.only_hydrate_empty and text_block.text:
-        return text_block
-    async with AsyncExitStack() as stack:
-        if concurrency_control is not None:
-            await stack.enter_async_context(concurrency_control)
-
-        text_block.text = await get_paragraph_text(
-            kbid=kbid,
-            paragraph_id=text_block.paragraph_id,
-            highlight=options.highlight,
-            matches=[],  # TODO: this was never implemented
-            ematches=options.ematches,
-        )
-    return text_block
