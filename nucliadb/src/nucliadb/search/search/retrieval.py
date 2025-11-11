@@ -34,6 +34,7 @@ from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.models.internal.retrieval import GraphScore, KeywordScore, SemanticScore
 from nucliadb.search import logger
 from nucliadb.search.requesters.utils import Method, nidx_query
+from nucliadb.search.search.metrics import merge_observer, search_observer
 from nucliadb.search.search.query_parser.models import UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.search.rank_fusion import IndexSource, get_rank_fusion
@@ -56,6 +57,7 @@ async def nidx_search(kbid: str, pb_query: SearchRequest) -> tuple[SearchRespons
     return response, queried_shards
 
 
+@search_observer.wrap({"type": "text_block_search"})
 async def text_block_search(
     kbid: str, retrieval: UnitRetrieval
 ) -> tuple[list[TextBlockMatch], SearchRequest, SearchResponse, list[str]]:
@@ -91,6 +93,7 @@ async def text_block_search(
     return text_blocks, pb_query, shards_response, queried_shards
 
 
+@merge_observer.wrap({"type": "shards_responses"})
 def merge_shard_responses(
     responses: list[SearchResponse],
 ) -> SearchResponse:
