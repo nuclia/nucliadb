@@ -406,13 +406,3 @@ async def get_orm_resource(
         return None
 
     return orm_resource
-
-
-async def get_resource_uuid_by_slug(
-    kbid: str, slug: str, service_name: Optional[str] = None
-) -> Optional[str]:
-    storage = await get_storage(service_name=service_name)
-    driver = get_driver()
-    async with driver.ro_transaction() as txn:
-        kb = KnowledgeBox(txn, storage, kbid)
-        return await kb.get_resource_uuid_by_slug(slug)
