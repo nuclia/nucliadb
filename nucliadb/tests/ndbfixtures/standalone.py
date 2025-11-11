@@ -167,7 +167,7 @@ def safe_global_config():
         nucliadb_utils.settings.nucliadb_settings,
         nucliadb_utils.settings.storage_settings,
         nucliadb_utils.settings.transaction_settings,
-        nucliadb_utils.storages.settings,
+        nucliadb_utils.storages.settings.settings,
     ]
 
     global_state = []
