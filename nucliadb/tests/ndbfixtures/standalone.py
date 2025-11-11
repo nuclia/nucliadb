@@ -127,8 +127,11 @@ def endecryptor_settings():
 
 @contextmanager
 def safe_global_config():
-    """Save a copy of nucliadb global state (across all settings) and restore it
-    afterwards.
+    """Save a copy of nucliadb global state (across all settings) and restore
+    it afterwards.
+
+    This allows to freely modify global state without consequences, as changes
+    made will only be visible inside the context.
 
     """
     import nucliadb.backups.settings
