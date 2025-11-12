@@ -179,7 +179,7 @@ class S3StorageField(StorageField):
             Bucket=bucket_name,
             Key=upload_id,
             Metadata={
-                "FILENAME": cf.filename,
+                "base64_filename": base64.b64encode(cf.filename.encode()).decode(),
                 "SIZE": str(cf.size),
                 "CONTENT_TYPE": cf.content_type,
             },

@@ -20,6 +20,7 @@
 
 from __future__ import annotations
 
+import base64
 import logging
 from datetime import datetime
 from typing import AsyncGenerator, AsyncIterator, Optional, Union
@@ -426,13 +427,20 @@ class AzureObjectStore(ObjectStore):
     @ops_observer.wrap({"type": "multipart_start"})
     async def upload_multipart_start(self, bucket: str, key: str, metadata: ObjectMetadata) -> None:
         container_client = self.service_client.get_container_client(bucket)
-        custom_metadata = {key: str(value) for key, value in metadata.model_dump().items()}
+        custom_metadata = {
+            "base64_filename": base64.b64encode(metadata.filename.encode()).decode(),
+            "content_type": metadata.content_type,
+            "size": str(metadata.size),
+        }
         blob_client = container_client.get_blob_client(key)
+        safe_filename = (
+            metadata.filename.encode("ascii", "replace").decode().replace('"', "").replace("\n", "")
+        )
         await blob_client.create_append_blob(
             metadata=custom_metadata,
             content_settings=ContentSettings(
                 content_type=metadata.content_type,
-                content_disposition=f"attachment; filename={metadata.filename}",
+                content_disposition=f'attachment; filename="{safe_filename}"',
             ),
         )
 
@@ -460,7 +468,12 @@ def parse_object_metadata(properties: BlobProperties, key: str) -> ObjectMetadat
         size = int(custom_metadata_size)
     else:
         size = properties.size
-    filename = custom_metadata.get("filename") or key.split("/")[-1]
+
+    b64_filename = custom_metadata.get("base64_filename")
+    if b64_filename:
+        filename = base64.b64decode(b64_filename.encode()).decode()
+    else:
+        filename = key.split("/")[-1]
     content_type = custom_metadata.get("content_type") or properties.content_settings.content_type or ""
     return ObjectMetadata(
         filename=filename,
