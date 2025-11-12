@@ -20,9 +20,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.ingest.serialize import serialize_security
+from nucliadb.ingest.serialize import serialize_origin, serialize_security
 from nucliadb_models import hydration as hydration_models
 
 
@@ -43,9 +42,7 @@ async def hydrate_resource(
         hydrated.security = await serialize_security(resource)
 
     if config.origin:
-        origin = await resource.get_origin()
-        if origin is not None:
-            # TODO: we want a better hydration than proto to JSON
-            hydrated.origin = from_proto.origin(origin)
+        # REVIEW: we may want a better hydration than proto to JSON
+        hydrated.origin = await serialize_origin(resource)
 
     return hydrated
