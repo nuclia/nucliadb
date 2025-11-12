@@ -20,6 +20,7 @@
 import uuid
 
 from nucliadb_protos.resources_pb2 import CloudFile
+from nucliadb_utils.storages.azure import AzureStorage
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.storages.s3 import S3Storage
@@ -36,6 +37,10 @@ async def test_gcs_driver(gcs_storage: GCSStorage):
 
 async def test_local_driver(local_storage: LocalStorage):
     await storage_field_test(local_storage)
+
+
+async def test_azure_driver(azure_storage: AzureStorage):
+    await storage_field_test(azure_storage)
 
 
 async def storage_field_test(storage: Storage):
@@ -103,3 +108,18 @@ async def storage_field_test(storage: Storage):
     await check_downloaded_data(new_sfield, binary_data)
     # Check that the old key is empty
     await check_downloaded_data(sfield_kb2, b"")
+
+    # Test upload + download of file with special characters in name
+    # Upload bytes to a key pointing to a file field
+    rid = "rid"
+    field_id = "field_weird"
+    field_key = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field_id)
+    filename = "weird characters \n áñæ€普通話.txt"
+    await storage.chunked_upload_object(
+        bucket, field_key, binary_data, filename=filename, content_type="text/plain"
+    )
+
+    sfield: StorageField = storage.file_field(kbid, rid, field=field_id)
+    metadata = await sfield.exists()
+    assert metadata.filename == filename
+    await check_downloaded_data(sfield, binary_data)
