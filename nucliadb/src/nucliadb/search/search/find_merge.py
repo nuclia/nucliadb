@@ -26,9 +26,9 @@ from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
 from nucliadb.models.internal.augment import ParagraphText
 from nucliadb.models.internal.retrieval import RerankerScore
-from nucliadb.search.augmentor.models import AugmentedParagraph, AugmentedResource, Paragraph
+from nucliadb.search.augmentor.models import AugmentedParagraph, Paragraph
 from nucliadb.search.augmentor.paragraphs import augment_paragraphs
-from nucliadb.search.augmentor.resources import augment_resources
+from nucliadb.search.augmentor.resources import legacy_augment_resources
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
@@ -185,10 +185,9 @@ async def hydrate_and_rerank(
             select=[ParagraphText()],
             concurrency_control=max_operations,
         ),
-        augment_resources(
+        legacy_augment_resources(
             kbid,
             given=list(resources_to_hydrate),
-            select=[],
             opts=resource_hydration_options,
             concurrency_control=max_operations,
         ),
@@ -197,7 +196,7 @@ async def hydrate_and_rerank(
     results = await asyncio.gather(*ops)
 
     augmented_paragraphs: dict[ParagraphId, AugmentedParagraph | None] = results[0]  # type: ignore
-    augmented_resources: dict[str, AugmentedResource | None] = results[1]  # type: ignore
+    augmented_resources: dict[str, Resource | None] = results[1]  # type: ignore
 
     # add hydrated text to our text blocks
     for text_block in text_blocks:
@@ -258,10 +257,9 @@ async def hydrate_and_rerank(
     # Finally, fetch resource metadata if we haven't already done it
     if reranker.needs_extra_results:
         FIND_FETCH_OPS_DISTRIBUTION.observe(len(resources_to_hydrate))
-        augmented_resources = await augment_resources(
+        augmented_resources = await legacy_augment_resources(
             kbid,
             given=list(resources_to_hydrate),
-            select=[],
             opts=resource_hydration_options,
             concurrency_control=max_operations,
         )

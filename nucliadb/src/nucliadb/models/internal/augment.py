@@ -155,10 +155,6 @@ class ResourceBasic(SelectProp):
     prop: Literal["basic"] = "basic"
 
 
-class ResourceExtra(SelectProp):
-    prop: Literal["extra"] = "extra"
-
-
 class ResourceFieldsFilter(BaseModel):
     ids: list[str]
 
@@ -177,7 +173,6 @@ ResourceProp = Annotated[
         | Annotated[ResourceSummary, Tag("summary")]
         | Annotated[ResourceBasic, Tag("basic")]
         | Annotated[ResourceOrigin, Tag("origin")]
-        | Annotated[ResourceExtra, Tag("extra")]
         | Annotated[ResourceSecurity, Tag("security")]
         | Annotated[ResourceFields, Tag("fields")]
     ),

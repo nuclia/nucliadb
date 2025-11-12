@@ -26,8 +26,12 @@ from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb_models.conversation import FieldConversation
 from nucliadb_models.file import FieldFile
 from nucliadb_models.link import FieldLink
-from nucliadb_models.resource import Resource
+from nucliadb_models.metadata import Origin
+from nucliadb_models.resource import (
+    Resource,
+)
 from nucliadb_models.search import Image
+from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import FieldText
 from nucliadb_protos import resources_pb2
 
@@ -179,5 +183,14 @@ AugmentedField = (
 )
 
 
-# TODO: we should take ownership of this
-AugmentedResource = Resource
+@dataclass
+class AugmentedResource:
+    id: str
+
+    title: str | None
+    summary: str | None
+
+    origin: Origin | None
+    security: ResourceSecurity | None
+
+    legacy: Resource | None

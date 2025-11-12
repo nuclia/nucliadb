@@ -21,7 +21,14 @@
 #
 
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.ingest.serialize import serialize_origin, serialize_security
+from nucliadb.models.internal.augment import (
+    ResourceOrigin,
+    ResourceProp,
+    ResourceSecurity,
+    ResourceSummary,
+    ResourceTitle,
+)
+from nucliadb.search.augmentor.resources import db_augment_resource
 from nucliadb_models import hydration as hydration_models
 
 
@@ -33,16 +40,21 @@ async def hydrate_resource(
     slug = basic.slug
     hydrated = hydration_models.HydratedResource(id=rid, slug=slug)
 
+    select: list[ResourceProp] = []
     if config.title:
-        hydrated.title = basic.title
+        select.append(ResourceTitle())
     if config.summary:
-        hydrated.summary = basic.summary
-
-    if config.security:
-        hydrated.security = await serialize_security(resource)
-
+        select.append(ResourceSummary())
     if config.origin:
-        # REVIEW: we may want a better hydration than proto to JSON
-        hydrated.origin = await serialize_origin(resource)
+        select.append(ResourceOrigin())
+    if config.security:
+        select.append(ResourceSecurity())
+
+    augmented = await db_augment_resource(resource, select)
+
+    hydrated.title = augmented.title
+    hydrated.summary = augmented.summary
+    hydrated.origin = augmented.origin
+    hydrated.security = augmented.security
 
     return hydrated

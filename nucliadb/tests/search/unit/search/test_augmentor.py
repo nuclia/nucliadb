@@ -24,7 +24,6 @@ from nucliadb.models.internal.augment import ParagraphText
 from nucliadb.search.augmentor.models import Metadata
 from nucliadb.search.augmentor.paragraphs import db_augment_paragraph
 from nucliadb.search.augmentor.resources import db_augment_resource
-from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb_models.resource import Resource
 
 MODULE = "nucliadb.search.augmentor"
@@ -63,6 +62,6 @@ async def test_augment_resource():
         augmented = await db_augment_resource(
             resource,
             select=[],
-            opts=ResourceHydrationOptions(),
+            opts=None,
         )
         assert augmented == Resource(id="rid", slug="my-resource")
