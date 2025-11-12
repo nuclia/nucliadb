@@ -18,40 +18,40 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-// The disk format is as follows:
-//
-// 1st, we serialize each node. For each node, we serialize each layer on the graph like this:
-// [num_edges: u32] [edge_0: u32] [edge_1: u32] ...
-//
-// If the layer is empty (the node is not present in this layer) we just save num_edges = 0.
-// At the end of the layer list, we store offsets that refer to where the layer starts taken
-// from the end of the node:
-//
-// [layer_2_offset: u32] [layer_1_offset: u32] [layer_0_offset: u32]
-//
-// For example, a full node might look like this (each number is a u32)
-//
-// 5 (layer 0 num edges) 1 17 5433 45 667 (VectorAddr of linked nodes)
-// 3 (layer 1 num edges) 45 666 22 (VectorAddr of linked nodes)
-// 0 (layer 2 num edges)
-// 16 (layer 2 offset) 32 (layer 1 offset) 52 (layer 0 offset) |
-//                                                             ^
-//                                           offsets measured from here in bytes
-//
-// After all the nodes, we store the position where the node was saved. The position is the
-// pointer to the end of the node, which is the same as the starting point of the offset for
-// the layers.
-//
-// [node_3_offset: u32] [node_2_offset: u32] [node_1_offset: u32] [node_0_offset: u32]
-//
-// Finally, we serialize the entry point as:
-//
-// [layer: u32] [node: u32]
-//
-// Finally, we store edge weights/distances as f32 in a separate file. This is only used
-// for deserialization during segment merge, so it does not need to be seekable. So we simply
-// dump the edges in the same order that the edges appear in the graph file, one by one:
-// [edge_0: f32] [edge_1: f32] ...
+//! The disk format is as follows:
+//!
+//! 1st, we serialize each node. For each node, we serialize each layer on the graph like this:
+//! [num_edges: u32] [edge_0: u32] [edge_1: u32] ...
+//!
+//! If the layer is empty (the node is not present in this layer) we just save num_edges = 0.
+//! At the end of the layer list, we store offsets that refer to where the layer starts taken
+//! from the end of the node:
+//!
+//! [layer_2_offset: u32] [layer_1_offset: u32] [layer_0_offset: u32]
+//!
+//! For example, a full node might look like this (each number is a u32)
+//!
+//! 5 (layer 0 num edges) 1 17 5433 45 667 (VectorAddr of linked nodes)
+//! 3 (layer 1 num edges) 45 666 22 (VectorAddr of linked nodes)
+//! 0 (layer 2 num edges)
+//! 16 (layer 2 offset) 32 (layer 1 offset) 52 (layer 0 offset) |
+//!                                                             ^
+//!                                           offsets measured from here in bytes
+//!
+//! After all the nodes, we store the position where the node was saved. The position is the
+//! pointer to the end of the node, which is the same as the starting point of the offset for
+//! the layers.
+//!
+//! [node_3_offset: u32] [node_2_offset: u32] [node_1_offset: u32] [node_0_offset: u32]
+//!
+//! Finally, we serialize the entry point as:
+//!
+//! [layer: u32] [node: u32]
+//!
+//! Finally, we store edge weights/distances as f32 in a separate file. This is only used
+//! for deserialization during segment merge, so it does not need to be seekable. So we simply
+//! dump the edges in the same order that the edges appear in the graph file, one by one:
+//! [edge_0: f32] [edge_1: f32] ...
 
 use std::collections::HashMap;
 use std::fs::File;
