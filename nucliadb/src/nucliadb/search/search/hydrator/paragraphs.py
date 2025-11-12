@@ -24,7 +24,7 @@ from typing import Optional, Union
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.search.search import paragraphs
+from nucliadb.search.augmentor.paragraphs import get_paragraph_text
 from nucliadb.search.search.hydrator.fields import page_preview_id
 from nucliadb.search.search.hydrator.images import paragraph_source_image
 from nucliadb_models import hydration as hydration_models
@@ -199,7 +199,7 @@ async def hydrate_paragraph(
     )
 
     if config.text:
-        text = await paragraphs.get_paragraph_text(kbid=kbid, paragraph_id=paragraph_id)
+        text = await get_paragraph_text(field, paragraph_id)
         hydrated.text = text
 
     requires_paragraph_metadata = config.image or config.table or config.page or config.related

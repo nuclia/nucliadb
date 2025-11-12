@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from typing import Sequence
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.ingest.fields.base import Field
@@ -30,11 +31,14 @@ from nucliadb.models.internal.augment import (
     RelatedParagraphs,
 )
 from nucliadb.search import logger
+from nucliadb.search.augmentor import models as augmentor_models
+from nucliadb.search.augmentor.metrics import augmentor_observer
 from nucliadb.search.augmentor.models import AugmentedParagraph, Metadata, Paragraph
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 from nucliadb.search.search.paragraphs import get_paragraph_from_full_text
 from nucliadb_models.search import Image
+from nucliadb_protos import resources_pb2
 
 
 async def augment_paragraphs(
@@ -91,7 +95,42 @@ async def augment_paragraph(
             # we are unable to get any paragraph metadata, we can't continue
             return None
 
+    # TODO: make sure we don't repeat any select clause
+
     return await db_augment_paragraph(resource, field, paragraph_id, select, metadata)
+
+
+async def db_paragraph_metadata(field: Field, paragraph_id: ParagraphId) -> Metadata | None:
+    """Obtain paragraph metadata from the source of truth (maindb/blob).
+
+    This operation may require data from blob storage, which makes it costly.
+
+    """
+    field_paragraphs = await get_field_paragraphs(field)
+    if field_paragraphs is None:
+        # We don't have paragraph metadata for this field, we can't do anything
+        return None
+
+    for paragraph in field_paragraphs:
+        field_paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end).full()
+        if field_paragraph_id == paragraph_id:
+            return Metadata.from_db_paragraph(paragraph)
+    else:
+        return Metadata.unknown()
+
+
+async def get_field_paragraphs(field: Field) -> Sequence[resources_pb2.Paragraph] | None:
+    field_metadata = await field.get_field_metadata()
+    if field_metadata is None:
+        return None
+
+    field_id = field.field_id
+    if field_id.subfield_id is None:
+        field_paragraphs = field_metadata.metadata.paragraphs
+    else:
+        field_paragraphs = field_metadata.split_metadata[field_id.subfield_id].paragraphs
+
+    return field_paragraphs
 
 
 async def db_augment_paragraph(
@@ -103,22 +142,32 @@ async def db_augment_paragraph(
 ) -> AugmentedParagraph | None:
     text = None
     image = None
+    related = None
     for prop in select:
-        if isinstance(prop, ParagraphText) and text is None:
+        if isinstance(prop, ParagraphText):
             text = await get_paragraph_text(field, paragraph_id)
 
         elif isinstance(prop, ParagraphImage):
             if metadata.is_an_image and metadata.source_file:
-                kbid = field.kbid
-                image = await download_paragraph_source_image(kbid, paragraph_id, metadata.source_file)
-
-            raise NotImplementedError()
+                image = await download_paragraph_source_image(
+                    field.kbid, paragraph_id, metadata.source_file
+                )
 
         elif isinstance(prop, ParagraphTable):
-            raise NotImplementedError()
+            # REVIEW: is it better to provide an image of the table or is it
+            # better to use the page preview?
+            if metadata.is_a_table and metadata.source_file:
+                image = await download_paragraph_source_image(
+                    field.kbid, paragraph_id, metadata.source_file
+                )
 
         elif isinstance(prop, RelatedParagraphs):
-            raise NotImplementedError()
+            related = await related_paragraphs(
+                field,
+                paragraph_id,
+                neighbours_before=prop.neighbours.before,
+                neighbours_after=prop.neighbours.after,
+            )
 
         else:  # pragma: no cover
             logger.warning(f"Unexpected paragraph prop: {prop}")
@@ -127,9 +176,11 @@ async def db_augment_paragraph(
         id=paragraph_id,
         text=text,
         source_image=image,
+        related=related,
     )
 
 
+@augmentor_observer.wrap({"type": "paragraph_text"})
 async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | None:
     text = await get_paragraph_from_full_text(
         field=field,
@@ -165,21 +216,39 @@ async def download_paragraph_source_image(
     return image
 
 
-async def db_paragraph_metadata(field: Field, paragraph_id: ParagraphId) -> Metadata | None:
-    field_metadata = await field.get_field_metadata()
-    if field_metadata is None:
-        # We don't have metadata for this field and thus, for this paragraph.
+async def related_paragraphs(
+    field: Field,
+    paragraph_id: ParagraphId,
+    *,
+    neighbours_before: int = 0,
+    neighbours_after: int = 0,
+) -> augmentor_models.RelatedParagraphs | None:
+    field_paragraphs = await get_field_paragraphs(field)
+    if field_paragraphs is None:
         return None
 
-    field_id = field.field_id
-    if field_id.subfield_id is None:
-        field_paragraphs = field_metadata.metadata.paragraphs
-    else:
-        field_paragraphs = field_metadata.split_metadata[field_id.subfield_id].paragraphs
-
-    for paragraph in field_paragraphs:
-        field_paragraph_id = field_id.paragraph_id(paragraph.start, paragraph.end).full()
+    idx: int | None
+    for idx, paragraph in enumerate(field_paragraphs):
+        field_paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end)
         if field_paragraph_id == paragraph_id:
-            return Metadata.from_db_paragraph(paragraph)
+            break
     else:
-        return Metadata.unknown()
+        # we haven't found the paragraph, we won't find any related either
+        return None
+
+    before = []
+    for idx_before in range(max(idx - neighbours_before, 0), idx):
+        paragraph = field_paragraphs[idx_before]
+        paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end)
+        before.append(paragraph_id)
+
+    after = []
+    for idx_after in range(idx + 1, min(idx + 1 + neighbours_after, len(field_paragraphs))):
+        paragraph = field_paragraphs[idx_after]
+        paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end)
+        after.append(paragraph_id)
+
+    return augmentor_models.RelatedParagraphs(
+        neighbours_before=before,
+        neighbours_after=after,
+    )

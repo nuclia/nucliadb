@@ -188,6 +188,7 @@ async def hydrate_and_rerank(
         augment_resources(
             kbid,
             given=list(resources_to_hydrate),
+            select=[],
             opts=resource_hydration_options,
             concurrency_control=max_operations,
         ),
@@ -260,6 +261,7 @@ async def hydrate_and_rerank(
         augmented_resources = await augment_resources(
             kbid,
             given=list(resources_to_hydrate),
+            select=[],
             opts=resource_hydration_options,
             concurrency_control=max_operations,
         )

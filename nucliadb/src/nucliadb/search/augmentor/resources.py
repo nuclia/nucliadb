@@ -19,15 +19,22 @@
 #
 import asyncio
 
+from nucliadb.models.internal.augment import (
+    ResourceExtra,
+    ResourceOrigin,
+    ResourceProp,
+    ResourceSecurity,
+)
 from nucliadb.search.augmentor.models import AugmentedResource
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, hydrate_resource_metadata
+from nucliadb_models.search import ResourceProperties
 
 
 async def augment_resources(
     kbid: str,
     given: list[str],
-    # select: list[ResourceProp],
+    select: list[ResourceProp],
     opts: ResourceHydrationOptions,
     *,
     concurrency_control: asyncio.Semaphore | None = None,
@@ -38,7 +45,7 @@ async def augment_resources(
     for rid in given:
         task = asyncio.create_task(
             limited_concurrency(
-                augment_resource(kbid, rid, opts),
+                augment_resource(kbid, rid, select, opts),
                 max_ops=concurrency_control,
             )
         )
@@ -55,15 +62,20 @@ async def augment_resources(
 async def augment_resource(
     kbid: str,
     rid: str,
-    # select: list[ResourceProp],
+    select: list[ResourceProp],
     opts: ResourceHydrationOptions,
 ) -> AugmentedResource | None:
-    # options = ResourceHydrationOptions()
-    # for prop in select:
-    #     if isinstance(prop, ResourceOrigin):
-    #         options.show.append(ResourceProperties.ORIGIN)
-    #     else:
-    #         raise NotImplementedError(f"resource property not implemented: {prop}")
+    # TODO: make sure we don't repeat any select clause
+
+    for prop in select:
+        if isinstance(prop, ResourceOrigin):
+            opts.show.append(ResourceProperties.ORIGIN)
+        elif isinstance(prop, ResourceExtra):
+            opts.show.append(ResourceProperties.EXTRA)
+        elif isinstance(prop, ResourceSecurity):
+            opts.show.append(ResourceProperties.SECURITY)
+        else:
+            raise NotImplementedError(f"resource property not implemented: {prop}")
 
     # XXX: for now, we delegate hydration, but we augmentor should take ownership
     augmented = await hydrate_resource_metadata(kbid, rid, opts)

@@ -22,9 +22,10 @@ from dataclasses import dataclass
 from typing_extensions import Self
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
-from nucliadb.common.ids import ParagraphId
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import Image
+from nucliadb_models.text import FieldText
 from nucliadb_protos import resources_pb2
 
 
@@ -114,6 +115,12 @@ class Paragraph:
 
 
 @dataclass
+class RelatedParagraphs:
+    neighbours_before: list[ParagraphId]
+    neighbours_after: list[ParagraphId]
+
+
+@dataclass
 class AugmentedParagraph:
     id: ParagraphId
 
@@ -123,6 +130,23 @@ class AugmentedParagraph:
     # original image for the paragraph when it has been extracted from an image
     # or a table
     source_image: Image | None
+
+    related: RelatedParagraphs | None
+
+
+@dataclass
+class BaseAugmentedField:
+    id: FieldId
+
+    text: str | None
+
+
+@dataclass
+class AugmentedTextField(BaseAugmentedField):
+    value: FieldText | None
+
+
+AugmentedField = BaseAugmentedField | AugmentedTextField
 
 
 # TODO: we should take ownership of this
