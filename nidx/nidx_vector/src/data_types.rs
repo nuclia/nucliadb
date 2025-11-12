@@ -21,14 +21,10 @@
 pub mod usize_utils {
     pub const USIZE_LEN: usize = (usize::BITS / 8) as usize;
     pub fn usize_from_slice_le(v: &[u8]) -> usize {
-        let mut buff = [0; USIZE_LEN];
-        buff.copy_from_slice(v);
-        usize::from_le_bytes(buff)
+        usize::from_le_bytes(v.try_into().unwrap())
     }
     pub const U32_LEN: usize = (u32::BITS / 8) as usize;
     pub fn u32_from_slice_le(v: &[u8]) -> u32 {
-        let mut buff = [0; U32_LEN];
-        buff.copy_from_slice(v);
-        u32::from_le_bytes(buff)
+        u32::from_le_bytes(v.try_into().unwrap())
     }
 }

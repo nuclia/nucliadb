@@ -24,27 +24,20 @@ mod tests;
 use crate::config::{VectorConfig, flags};
 use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, ParagraphRef, VectorRef};
 use crate::formula::Formula;
+use crate::hnsw::{self, *};
+use crate::inverted_index;
 use crate::inverted_index::{FilterBitSet, InvertedIndexes, build_indexes};
 use crate::vector_types::rabitq;
-use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata, hnsw};
-use crate::{hnsw::*, inverted_index};
+use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use core::f32;
-use io::{BufWriter, Write};
-use memmap2::{Mmap, MmapOptions};
 use rayon::prelude::*;
 
 use std::cmp::Reverse;
 use std::collections::HashSet;
-use std::fs::File;
-use std::io;
 use std::iter::empty;
 use std::path::Path;
 use std::time::Instant;
 use tracing::{debug, trace};
-
-mod file_names {
-    pub const HNSW: &str = "index.hnsw";
-}
 
 pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<OpenSegment> {
     // TODO: we should get this flag from the VectorConfig or some other place
@@ -69,19 +62,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         Box::new(data_store)
     };
 
-    let hnsw_file = File::open(path.join(file_names::HNSW))?;
-    let mut index_options = MmapOptions::new();
-    if prewarm {
-        index_options.populate();
-    }
-    let index = unsafe { index_options.map(&hnsw_file)? };
-
-    // Telling the OS our expected access pattern
-    #[cfg(not(target_os = "windows"))]
-    {
-        index.advise(memmap2::Advice::Random)?;
-        index.advise(memmap2::Advice::WillNeed)?;
-    }
+    let index = open_disk_hnsw(path, prewarm)?;
 
     let inverted_indexes = InvertedIndexes::open(path, metadata.records, inverted_index::OpenOptions { prewarm })?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
@@ -154,7 +135,7 @@ fn merge_indexes<DS: DataStore + 'static>(
     } else {
         // If there are no deletions, we can reuse the first segment
         // HNSW since its indexes will match the the ones in data_store
-        index = DiskHnsw::deserialize(&operants[0].index);
+        index = operants[0].index.deserialize()?;
         index.fix_broken_graph();
         start_vector_index = operants[0].data_store.stored_vector_count();
     }
@@ -168,25 +149,8 @@ fn merge_indexes<DS: DataStore + 'static>(
         .into_par_iter()
         .for_each(|id| builder.insert(VectorAddr(id), &index));
 
-    let hnsw_path = segment_path.join(file_names::HNSW);
-    let mut hnsw_file = File::options()
-        .read(true)
-        .write(true)
-        .create_new(true)
-        .open(hnsw_path)?;
-    {
-        let mut hnswf_buffer = BufWriter::new(&mut hnsw_file);
-        DiskHnsw::serialize_into(&mut hnswf_buffer, merged_vectors_count, index)?;
-        hnswf_buffer.flush()?;
-    }
-
-    let index = unsafe { Mmap::map(&hnsw_file)? };
-
-    // Telling the OS our expected access pattern
-    #[cfg(not(target_os = "windows"))]
-    {
-        index.advise(memmap2::Advice::Random)?;
-    }
+    DiskHnswV2::serialize_to(segment_path, merged_vectors_count, &index)?;
+    let index = open_disk_hnsw(segment_path, false)?;
 
     let metadata = VectorSegmentMetadata {
         path: segment_path.to_path_buf(),
@@ -261,12 +225,6 @@ fn create_indexes<DS: DataStore + 'static>(
     config: &VectorConfig,
     tags: HashSet<String>,
 ) -> VectorR<OpenSegment> {
-    let mut hnsw_file = File::options()
-        .read(true)
-        .write(true)
-        .create_new(true)
-        .open(path.join(file_names::HNSW))?;
-
     let vector_count = data_store.stored_vector_count();
 
     // Creating the HNSW using the mmaped nodes
@@ -278,20 +236,11 @@ fn create_indexes<DS: DataStore + 'static>(
         .into_par_iter()
         .for_each(|id| builder.insert(VectorAddr(id), &index));
 
-    {
-        // The HNSW is on RAM
-        // Serializing the HNSW into disk
-        let mut hnsw_file_buffer = BufWriter::new(&mut hnsw_file);
-        DiskHnsw::serialize_into(&mut hnsw_file_buffer, vector_count, index)?;
-        hnsw_file_buffer.flush()?;
-    }
-    let index = unsafe { Mmap::map(&hnsw_file)? };
+    // The HNSW is on RAM
+    // Serializing the HNSW into disk
+    DiskHnswV2::serialize_to(path, vector_count, &index)?;
 
-    // Telling the OS our expected access pattern
-    #[cfg(not(target_os = "windows"))]
-    {
-        index.advise(memmap2::Advice::Random)?;
-    }
+    let index = open_disk_hnsw(path, false)?;
 
     build_indexes(path, &data_store)?;
 
@@ -446,7 +395,7 @@ impl ScoredVector<'_> {
 pub struct OpenSegment {
     metadata: VectorSegmentMetadata,
     data_store: Box<dyn DataStore>,
-    index: Mmap,
+    index: Box<dyn DiskHnsw>,
     inverted_indexes: InvertedIndexes,
     alive_bitset: FilterBitSet,
 }
@@ -479,7 +428,7 @@ impl OpenSegment {
     }
 
     pub fn space_usage(&self) -> usize {
-        self.data_store.size_bytes() + self.index.len() + self.inverted_indexes.space_usage()
+        self.data_store.size_bytes() + self.index.size() + self.inverted_indexes.space_usage()
     }
 
     pub fn get_paragraph(&self, id: ParagraphAddr) -> ParagraphRef<'_> {
@@ -547,7 +496,14 @@ impl OpenSegment {
             method = "hnsw";
             let ops = HnswSearcher::new(&retriever, true);
             let filter = NodeFilter::new(bitset, with_duplicates, config);
-            let neighbours = ops.search(encoded_query, self.index.as_ref(), top_k, filter);
+            let neighbours = if let Some(v1) = self.index.as_any().downcast_ref::<DiskHnswV1>() {
+                ops.search(encoded_query, v1, top_k, filter)
+            } else if let Some(v2) = self.index.as_any().downcast_ref::<DiskHnswV2>() {
+                ops.search(encoded_query, v2, top_k, filter)
+            } else {
+                unreachable!()
+            };
+
             Box::new(
                 neighbours
                     .into_iter()
