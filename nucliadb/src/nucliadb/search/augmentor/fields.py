@@ -83,6 +83,14 @@ async def augment_field(
         return None
     field = await resource.get_field(field_id.key, field_id.pb_type)
 
+    return await db_augment_field(field, field_id, select)
+
+
+async def db_augment_field(
+    field: Field,
+    field_id: FieldId,
+    select: list[FieldProp],
+) -> AugmentedField | None:
     db_augments_by_type = {
         "t": db_augment_text_field,
         "f": db_augment_file_field,
@@ -90,11 +98,10 @@ async def augment_field(
         "c": db_augment_conversation_field,
         "a": db_augment_generic_field,
     }
-    return await db_augments_by_type[field_id.type](kbid, field, field_id, select)
+    return await db_augments_by_type[field_id.type](field, field_id, select)
 
 
 async def db_augment_text_field(
-    kbid: str,
     field: Field,
     field_id: FieldId,
     select: list[FieldProp],
@@ -122,7 +129,6 @@ async def db_augment_text_field(
 
 
 async def db_augment_file_field(
-    kbid: str,
     field: Field,
     field_id: FieldId,
     select: list[FieldProp],
@@ -150,7 +156,6 @@ async def db_augment_file_field(
 
 
 async def db_augment_link_field(
-    kbid: str,
     field: Field,
     field_id: FieldId,
     select: list[FieldProp],
@@ -178,7 +183,6 @@ async def db_augment_link_field(
 
 
 async def db_augment_conversation_field(
-    kbid: str,
     field: Field,
     field_id: FieldId,
     select: list[FieldProp],
@@ -188,7 +192,7 @@ async def db_augment_conversation_field(
 
     for prop in select:
         if isinstance(prop, FieldText):
-            text = await get_field_extracted_text(field_id, field)
+            raise NotImplementedError("which text should we augment here?")
 
         elif isinstance(prop, FieldValue):
             db_value = await field.get_value()
@@ -206,7 +210,6 @@ async def db_augment_conversation_field(
 
 
 async def db_augment_generic_field(
-    kbid: str,
     field: Field,
     field_id: FieldId,
     select: list[FieldProp],

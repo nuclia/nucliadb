@@ -233,7 +233,7 @@ class Hydrator:
 
             if field_id not in field_tasks:
                 field_tasks[field_id] = asyncio.create_task(
-                    self._limited_concurrency(hydrate_field(resource, field_id, self.config.field))
+                    self._limited_concurrency(hydrate_field(field, field_id, self.config.field))
                 )
 
             if rid not in resource_tasks:
