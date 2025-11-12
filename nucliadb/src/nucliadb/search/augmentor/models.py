@@ -23,6 +23,9 @@ from typing_extensions import Self
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb_models.conversation import FieldConversation
+from nucliadb_models.file import FieldFile
+from nucliadb_models.link import FieldLink
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import Image
 from nucliadb_models.text import FieldText
@@ -146,7 +149,34 @@ class AugmentedTextField(BaseAugmentedField):
     value: FieldText | None
 
 
-AugmentedField = BaseAugmentedField | AugmentedTextField
+@dataclass
+class AugmentedFileField(BaseAugmentedField):
+    value: FieldFile | None
+
+
+@dataclass
+class AugmentedLinkField(BaseAugmentedField):
+    value: FieldLink | None
+
+
+@dataclass
+class AugmentedConversationField(BaseAugmentedField):
+    value: FieldConversation | None
+
+
+@dataclass
+class AugmentedGenericField(BaseAugmentedField):
+    value: str | None
+
+
+AugmentedField = (
+    BaseAugmentedField
+    | AugmentedTextField
+    | AugmentedFileField
+    | AugmentedLinkField
+    | AugmentedConversationField
+    | AugmentedGenericField
+)
 
 
 # TODO: we should take ownership of this

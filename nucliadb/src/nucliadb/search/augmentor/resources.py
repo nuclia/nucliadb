@@ -19,16 +19,22 @@
 #
 import asyncio
 
+from nucliadb.ingest.orm.resource import Resource
+from nucliadb.ingest.serialize import serialize_resource
 from nucliadb.models.internal.augment import (
     ResourceExtra,
     ResourceOrigin,
     ResourceProp,
     ResourceSecurity,
 )
+from nucliadb.search.augmentor.metrics import augmentor_observer
 from nucliadb.search.augmentor.models import AugmentedResource
 from nucliadb.search.augmentor.utils import limited_concurrency
-from nucliadb.search.search.hydrator import ResourceHydrationOptions, hydrate_resource_metadata
+from nucliadb.search.search import cache
+from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb_models.search import ResourceProperties
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 
 async def augment_resources(
@@ -67,6 +73,22 @@ async def augment_resource(
 ) -> AugmentedResource | None:
     # TODO: make sure we don't repeat any select clause
 
+    resource = await cache.get_resource(kbid, rid)
+    if resource is None:
+        # skip resources that aren't in the DB
+        return None
+
+    return await db_augment_resource(resource, select, opts)
+
+
+@augmentor_observer.wrap({"type": "db_resource"})
+async def db_augment_resource(
+    resource: Resource,
+    select: list[ResourceProp],
+    opts: ResourceHydrationOptions,
+) -> AugmentedResource | None:
+    kbid = resource.kb.kbid
+
     for prop in select:
         if isinstance(prop, ResourceOrigin):
             opts.show.append(ResourceProperties.ORIGIN)
@@ -78,5 +100,19 @@ async def augment_resource(
             raise NotImplementedError(f"resource property not implemented: {prop}")
 
     # XXX: for now, we delegate hydration, but we augmentor should take ownership
-    augmented = await hydrate_resource_metadata(kbid, rid, opts)
+
+    if ResourceProperties.EXTRACTED in opts.show and has_feature(
+        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
+    ):
+        # Returning extracted metadata in search results is deprecated and this flag
+        # will be set to True for all KBs in the future.
+        opts.show.remove(ResourceProperties.EXTRACTED)
+        opts.extracted.clear()
+
+    augmented = await serialize_resource(
+        resource,
+        show=opts.show,
+        field_type_filter=opts.field_type_filter,
+        extracted=opts.extracted,
+    )
     return augmented

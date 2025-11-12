@@ -23,6 +23,9 @@ from nucliadb.common.ids import ParagraphId
 from nucliadb.models.internal.augment import ParagraphText
 from nucliadb.search.augmentor.models import Metadata
 from nucliadb.search.augmentor.paragraphs import db_augment_paragraph
+from nucliadb.search.augmentor.resources import db_augment_resource
+from nucliadb.search.search.hydrator import ResourceHydrationOptions
+from nucliadb_models.resource import Resource
 
 MODULE = "nucliadb.search.augmentor"
 
@@ -48,3 +51,18 @@ async def test_augment_text():
         )
         assert augmented.text is not None
         assert augmented.text == "some text"
+
+
+async def test_augment_resource():
+    with (
+        patch(
+            f"{MODULE}.resources.serialize_resource", return_value=Resource(id="rid", slug="my-resource")
+        ),
+    ):
+        resource = Mock()
+        augmented = await db_augment_resource(
+            resource,
+            select=[],
+            opts=ResourceHydrationOptions(),
+        )
+        assert augmented == Resource(id="rid", slug="my-resource")

@@ -17,24 +17,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import logging
-from contextlib import AsyncExitStack
 from typing import Optional
 
 from pydantic import BaseModel
 
 from nucliadb.common.ids import FieldId
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search.search import cache
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import ExtractedDataTypeName, Resource
+from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import ResourceProperties
 from nucliadb_telemetry.metrics import Observer
-from nucliadb_utils import const
 from nucliadb_utils.asyncio_utils import ConcurrentRunner
-from nucliadb_utils.utilities import has_feature
 
 logger = logging.getLogger(__name__)
 
@@ -89,48 +84,6 @@ async def hydrate_resource_text(
         field_extracted_texts = await runner.wait()
 
     return [text for text in field_extracted_texts if text is not None]
-
-
-@hydrator_observer.wrap({"type": "resource_metadata"})
-async def hydrate_resource_metadata(
-    kbid: str,
-    resource_id: str,
-    options: ResourceHydrationOptions,
-    *,
-    concurrency_control: Optional[asyncio.Semaphore] = None,
-    service_name: Optional[str] = None,
-) -> Optional[Resource]:
-    """Fetch resource metadata and return it serialized."""
-    show = options.show
-    extracted = options.extracted
-
-    if ResourceProperties.EXTRACTED in show and has_feature(
-        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
-    ):
-        # Returning extracted metadata in search results is deprecated and this flag
-        # will be set to True for all KBs in the future.
-        show.remove(ResourceProperties.EXTRACTED)
-        extracted = []
-
-    async with AsyncExitStack() as stack:
-        if concurrency_control is not None:
-            await stack.enter_async_context(concurrency_control)
-
-        async with get_driver().ro_transaction() as ro_txn:
-            serialized_resource = await managed_serialize(
-                txn=ro_txn,
-                kbid=kbid,
-                rid=resource_id,
-                show=show,
-                field_type_filter=options.field_type_filter,
-                extracted=extracted,
-                service_name=service_name,
-            )
-            if serialized_resource is None:
-                logger.warning(
-                    "Resource not found in database", extra={"kbid": kbid, "rid": resource_id}
-                )
-    return serialized_resource
 
 
 @hydrator_observer.wrap({"type": "field_text"})

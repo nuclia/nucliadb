@@ -23,7 +23,14 @@ from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.models.internal.augment import FieldProp, FieldText, FieldValue
-from nucliadb.search.augmentor.models import AugmentedField, AugmentedTextField
+from nucliadb.search.augmentor.models import (
+    AugmentedConversationField,
+    AugmentedField,
+    AugmentedFileField,
+    AugmentedGenericField,
+    AugmentedLinkField,
+    AugmentedTextField,
+)
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 
@@ -78,6 +85,10 @@ async def augment_field(
 
     db_augments_by_type = {
         "t": db_augment_text_field,
+        "f": db_augment_file_field,
+        "u": db_augment_link_field,
+        "c": db_augment_conversation_field,
+        "a": db_augment_generic_field,
     }
     return await db_augments_by_type[field_id.type](kbid, field, field_id, select)
 
@@ -103,6 +114,118 @@ async def db_augment_text_field(
             raise NotImplementedError(f"field property not implemented: {prop}")
 
     augmented = AugmentedTextField(
+        id=field.field_id,
+        text=text,
+        value=value,
+    )
+    return augmented
+
+
+async def db_augment_file_field(
+    kbid: str,
+    field: Field,
+    field_id: FieldId,
+    select: list[FieldProp],
+) -> AugmentedFileField | None:
+    text = None
+    value = None
+
+    for prop in select:
+        if isinstance(prop, FieldText):
+            text = await get_field_extracted_text(field_id, field)
+
+        elif isinstance(prop, FieldValue):
+            db_value = await field.get_value()
+            value = from_proto.field_file(db_value)
+
+        else:
+            raise NotImplementedError(f"field property not implemented: {prop}")
+
+    augmented = AugmentedFileField(
+        id=field.field_id,
+        text=text,
+        value=value,
+    )
+    return augmented
+
+
+async def db_augment_link_field(
+    kbid: str,
+    field: Field,
+    field_id: FieldId,
+    select: list[FieldProp],
+) -> AugmentedLinkField | None:
+    text = None
+    value = None
+
+    for prop in select:
+        if isinstance(prop, FieldText):
+            text = await get_field_extracted_text(field_id, field)
+
+        elif isinstance(prop, FieldValue):
+            db_value = await field.get_value()
+            value = from_proto.field_link(db_value)
+
+        else:
+            raise NotImplementedError(f"field property not implemented: {prop}")
+
+    augmented = AugmentedLinkField(
+        id=field.field_id,
+        text=text,
+        value=value,
+    )
+    return augmented
+
+
+async def db_augment_conversation_field(
+    kbid: str,
+    field: Field,
+    field_id: FieldId,
+    select: list[FieldProp],
+) -> AugmentedConversationField | None:
+    text = None
+    value = None
+
+    for prop in select:
+        if isinstance(prop, FieldText):
+            text = await get_field_extracted_text(field_id, field)
+
+        elif isinstance(prop, FieldValue):
+            db_value = await field.get_value()
+            value = from_proto.field_conversation(db_value)
+
+        else:
+            raise NotImplementedError(f"field property not implemented: {prop}")
+
+    augmented = AugmentedConversationField(
+        id=field.field_id,
+        text=text,
+        value=value,
+    )
+    return augmented
+
+
+async def db_augment_generic_field(
+    kbid: str,
+    field: Field,
+    field_id: FieldId,
+    select: list[FieldProp],
+) -> AugmentedGenericField | None:
+    text = None
+    value = None
+
+    for prop in select:
+        if isinstance(prop, FieldText):
+            text = await get_field_extracted_text(field_id, field)
+
+        elif isinstance(prop, FieldValue):
+            db_value = await field.get_value()
+            value = db_value
+
+        else:
+            raise NotImplementedError(f"field property not implemented: {prop}")
+
+    augmented = AugmentedGenericField(
         id=field.field_id,
         text=text,
         value=value,
