@@ -638,24 +638,24 @@ class ResourceBrain:
         Adds the user-defined dates to the brain object. This is at resource level and applies to
         all fields of the resource.
         """
-        if basic.created.seconds > 0:
+        if basic.created.seconds != 0:
             self.brain.metadata.created.CopyFrom(basic.created)
         else:
             logging.warning(f"Basic metadata has no created field for {self.rid}")
             self.brain.metadata.created.GetCurrentTime()
-        if basic.modified.seconds > 0:
+        if basic.modified.seconds != 0:
             self.brain.metadata.modified.CopyFrom(basic.modified)
         else:
-            if basic.created.seconds > 0:
+            if basic.created.seconds != 0:
                 self.brain.metadata.modified.CopyFrom(basic.created)
             else:
                 self.brain.metadata.modified.GetCurrentTime()
 
         if origin is not None:
             # overwrite created/modified if provided on origin
-            if origin.HasField("created") and origin.created.seconds > 0:
+            if origin.HasField("created") and origin.created.seconds != 0:
                 self.brain.metadata.created.CopyFrom(origin.created)
-            if origin.HasField("modified") and origin.modified.seconds > 0:
+            if origin.HasField("modified") and origin.modified.seconds != 0:
                 self.brain.metadata.modified.CopyFrom(origin.modified)
 
     def _set_resource_relations(self, basic: Basic, origin: Optional[Origin], user_relations: Relations):
