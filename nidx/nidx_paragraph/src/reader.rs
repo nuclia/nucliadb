@@ -138,30 +138,6 @@ impl ParagraphReaderService {
             debug!("Fallback fuzzy query took {}µs", time_tracker.checkpoint().as_micros());
         }
 
-        let total = response.results.len() as f32;
-        let mut some_below_min_score: bool = false;
-        let response_results = std::mem::take(&mut response.results);
-
-        for (i, mut r) in response_results.into_iter().enumerate() {
-            match &mut r.score {
-                None => continue,
-                Some(sc) if sc.bm25 < request.min_score => {
-                    // We can break here because the results are sorted by score
-                    some_below_min_score = true;
-                    break;
-                }
-                Some(sc) => {
-                    sc.booster = total - (i as f32);
-                    response.results.push(r);
-                }
-            }
-        }
-
-        if some_below_min_score {
-            // We set next_page to false so that the client stops asking for more results
-            response.next_page = false;
-        }
-
         debug!("Result processing took {}µs", time_tracker.checkpoint().as_micros());
         debug!("Paragraph search took {}µs", time_tracker.elapsed().as_micros());
 
@@ -298,6 +274,7 @@ impl Searcher<'_> {
             let extra_result = self.results + 1;
             match self.request.order.clone() {
                 Some(order) => {
+                    let sort_field = order.sort_by();
                     let custom_collector = self.custom_order_collector(order, extra_result);
                     let collector = &(Count, custom_collector);
                     let (total, top_docs) = searcher.search(&query, collector)?;
@@ -311,6 +288,7 @@ impl Searcher<'_> {
                         query: self.text,
                         results_per_page: self.results as i32,
                         searcher,
+                        sort_field,
                     }))
                 }
                 None => {
@@ -336,6 +314,7 @@ impl Searcher<'_> {
 
             match self.request.order.clone() {
                 Some(order) => {
+                    let sort_field = order.sort_by();
                     let custom_collector = self.custom_order_collector(order, extra_result);
                     let collector = &(Count, facet_collector, custom_collector);
                     let (total, facets_count, top_docs) = searcher.search(&query, collector)?;
@@ -349,6 +328,7 @@ impl Searcher<'_> {
                         query: self.text,
                         results_per_page: self.results as i32,
                         searcher,
+                        sort_field,
                     }))
                 }
                 None => {

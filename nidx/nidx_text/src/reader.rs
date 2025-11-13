@@ -21,13 +21,14 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::*;
 
-use crate::schema::decode_field_id;
+use crate::schema::{datetime_utc_to_timestamp, decode_field_id};
 use crate::search_query::filter_to_query;
 use crate::{DocumentSearchRequest, prefilter::*};
 
 use super::schema::TextSchema;
 use super::search_query;
 use itertools::Itertools;
+use nidx_protos::document_result::SortValue;
 use nidx_protos::order_by::{OrderField, OrderType};
 use nidx_protos::{
     DocumentItem, DocumentResult, DocumentSearchResponse, FacetResult, FacetResults, OrderBy, ResultScore,
@@ -249,21 +250,22 @@ impl TextReaderService {
         })
     }
 
-    fn convert_int_order(&self, response: SearchResponse<i64>, searcher: &Searcher) -> DocumentSearchResponse {
+    fn convert_int_order(
+        &self,
+        response: SearchResponse<i64>,
+        searcher: &Searcher,
+        sort_field: OrderField,
+    ) -> DocumentSearchResponse {
         let total = response.total as i32;
         let retrieved_results = response.results_per_page;
         let next_page = total > retrieved_results;
         let results_per_page = response.results_per_page as usize;
-        let result_stream = response.top_docs.into_iter().take(results_per_page).enumerate();
+        let result_stream = response.top_docs.into_iter().take(results_per_page);
         let mut results = Vec::with_capacity(results_per_page);
 
-        for (id, (_, doc_address)) in result_stream {
+        for (_score, doc_address) in result_stream {
             match searcher.doc::<TantivyDocument>(doc_address) {
                 Ok(doc) => {
-                    let score = Some(ResultScore {
-                        bm25: 0.0,
-                        booster: id as f32,
-                    });
                     let uuid = String::from_utf8(
                         doc.get_first(self.schema.uuid)
                             .expect("document doesn't appear to have uuid.")
@@ -287,10 +289,20 @@ impl TextReaderService {
                         .filter(|x| x.starts_with("/l/"))
                         .collect_vec();
 
+                    let sort_field = match sort_field {
+                        OrderField::Created => self.schema.created,
+                        OrderField::Modified => self.schema.modified,
+                    };
+                    let sort_value = doc
+                        .get_first(sort_field)
+                        .map(|v| v.as_datetime().unwrap())
+                        .map(|d| datetime_utc_to_timestamp(&d))
+                        .map(SortValue::Date);
+
                     let result = DocumentResult {
                         uuid,
                         field,
-                        score,
+                        sort_value,
                         labels,
                     };
                     results.push(result);
@@ -330,10 +342,10 @@ impl TextReaderService {
             }
             match searcher.doc::<TantivyDocument>(doc_address) {
                 Ok(doc) => {
-                    let score = Some(ResultScore {
+                    let score = ResultScore {
                         bm25: score,
                         booster: id as f32,
-                    });
+                    };
                     let uuid = String::from_utf8(
                         doc.get_first(self.schema.uuid)
                             .expect("document doesn't appear to have uuid.")
@@ -359,7 +371,7 @@ impl TextReaderService {
                     let result = DocumentResult {
                         uuid,
                         field,
-                        score,
+                        sort_value: Some(SortValue::Score(score)),
                         labels,
                     };
                     results.push(result);
@@ -445,6 +457,7 @@ impl TextReaderService {
                 })
             }
             Some(order_by) => {
+                let sort_field = order_by.sort_by();
                 let topdocs_collector = self.custom_order_collector(order_by, extra_result);
                 let multicollector = &(facet_collector, topdocs_collector, Count);
                 let (facets_count, top_docs, total) = searcher.search(&query, multicollector)?;
@@ -458,6 +471,7 @@ impl TextReaderService {
                         results_per_page: results as i32,
                     },
                     &searcher,
+                    sort_field,
                 );
                 Ok(result)
             }
