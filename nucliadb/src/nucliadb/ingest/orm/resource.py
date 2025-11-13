@@ -25,6 +25,8 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Optional, Sequence, Type
 
+import backoff
+
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB, FieldId
@@ -68,6 +70,7 @@ from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.utilities import get_storage
 
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -128,6 +131,16 @@ class Resource:
         self._previous_status: Optional[Metadata.Status.ValueType] = None
         self.user_relations: Optional[PBRelations] = None
         self.locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+    # REVIEW: this backoff comes from the datamanager function, is this really needed?
+    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
+    @classmethod
+    async def get(cls, txn: Transaction, kbid: str, rid: str) -> Optional["Resource"]:
+        # prevent circulat imports
+        from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+
+        kb = KnowledgeBox(txn, await get_storage(), kbid)
+        return await kb.get(rid)
 
     async def set_slug(self):
         basic = await self.get_basic()
