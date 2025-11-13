@@ -25,17 +25,26 @@ from nidx_protos.nodereader_pb2 import (
     SearchResponse,
 )
 
+from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.models_utils import to_proto
+from nucliadb.models.internal.augment import ParagraphText
 from nucliadb.search import logger
+from nucliadb.search.augmentor.models import AugmentedParagraph, AugmentedResource, Metadata, Paragraph
+from nucliadb.search.augmentor.paragraphs import augment_paragraphs
+from nucliadb.search.augmentor.resources import augment_resources
+from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.predict import AnswerStatusCode, RephraseResponse
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
+from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.query_parser.models import ParsedQuery, Query, RelationQuery, UnitRetrieval
+from nucliadb.search.search.query_parser.parsers.find import parse_find
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
+from nucliadb.search.search.retrieval import text_block_search
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import filters
@@ -73,6 +82,7 @@ async def rephrase_query(
     generative_model: Optional[str] = None,
     chat_history_relevance_threshold: Optional[float] = None,
 ) -> RephraseResponse:
+    # When moved to RAO, this must be an internal request from RAO to predict api
     predict = get_predict()
     req = RephraseModel(
         question=query,
@@ -85,7 +95,7 @@ async def rephrase_query(
     return await predict.rephrase_query(kbid, req)
 
 
-async def get_find_results(
+async def find_retrieval(
     *,
     kbid: str,
     query: str,
@@ -456,28 +466,76 @@ async def run_prequeries(
     metrics: Metrics,
 ) -> list[PreQueryResult]:
     """
-    Runs simultaneous find requests for each prequery and returns the merged results according to the normalized weights.
+    Runs simultaneous text block retrievals for each prequery and returns the list of results.
     """
-    results: list[PreQueryResult] = []
-    max_parallel_prequeries = asyncio.Semaphore(settings.prequeries_max_parallel)
+    limited = limited_concurrency(max_ops=asyncio.Semaphore(settings.prequeries_max_parallel))
 
-    async def _prequery_find(prequery: PreQuery, index: int):
-        async with max_parallel_prequeries:
-            prequery_id = prequery.id or f"prequery-{index}"
-            find_results, _, _ = await find(
-                kbid,
-                prequery.request,
-                x_ndb_client,
-                x_nucliadb_user,
-                x_forwarded_for,
-                metrics=metrics.child_span(prequery_id),
+    # First, parse all prequeries to get their retrieval units: this will call the /query endpoint at the predict api.
+    async def _pre_retrieval(request: FindRequest) -> UnitRetrieval:
+        async with limited:
+            parsed_query = await parse_find(kbid, request)
+            return parsed_query.retrieval
+
+    retrieval_units = await asyncio.gather(
+        *[_pre_retrieval(kbid, prequery.request) for prequery in prequeries]
+    )
+
+    # Then, for each retrieval unit, perform the text block search. This calls nidx
+    async def _retrieve(retrieval: UnitRetrieval) -> list[TextBlockMatch]:
+        # When moved to RAO, this will be a call to nucliadb_sdk.AsyncNucliaDB.retrieve()
+        async with limited:
+            text_blocks, _, _, _ = await text_block_search(kbid, retrieval)
+            return text_blocks
+
+    prequeries_text_blocks = await asyncio.gather(
+        *[_retrieve(retrieval) for retrieval in retrieval_units]
+    )
+
+    # Do a single hydration/augmentation of all text blocks to avoid unnecessary repeated calls.
+    # When moved to RAO, this will be a call to nucliadb_sdk.AsyncNucliaDB.augment()
+    augmented_resoures, augmented_text_blocks = await augment(
+        kbid,
+        [tb for text_blocks in prequeries_text_blocks for tb in text_blocks],
+    )
+
+    # Then convert to KnowledgeboxFindResults to keep current interface.
+
+    return [
+        PreQueryResult(
+            id=prequery.id or f"prequery-{index}",
+            text_blocks=text_blocks,
+        )
+        for index, (prequery, text_blocks) in enumerate(zip(prequeries, prequeries_text_blocks))
+    ]
+
+
+async def augment(
+    kbid: str,
+    text_blocks: list[TextBlockMatch],
+    semaphore: asyncio.Semaphore,
+) -> tuple[list[AugmentedResource], list[AugmentedParagraph]]:
+    augmented_paragraphs = await augment_paragraphs(
+        kbid,
+        given=[
+            Paragraph(
+                id=tb.paragraph_id,
+                metadata=Metadata.from_text_block_match(tb),
             )
-            return prequery, find_results
-
-    ops = []
-    for idx, prequery in enumerate(prequeries):
-        ops.append(asyncio.create_task(_prequery_find(prequery, idx)))
-    ops_results = await asyncio.gather(*ops)
-    for prequery, find_results in ops_results:
-        results.append((prequery, find_results))
-    return results
+            for tb in text_blocks
+        ],
+        select=[ParagraphText()],
+        concurrency_control=semaphore,
+    )
+    augmented_resources = await augment_resources(
+        kbid,
+        given=list({tb.paragraph_id.rid for tb in text_blocks}),
+        opts=ResourceHydrationOptions(
+            show=[],
+            extracted=[],
+            field_type_filter=[],
+        ),
+        concurrency_control=semaphore,
+    )
+    return [r for r in augmented_resources.values() if r is not None], [
+        p for p in augmented_paragraphs.values() if p is not None
+    ]
