@@ -137,7 +137,7 @@ impl From<SearchIntResponse<'_>> for ParagraphSearchResponse {
         let no_results = std::cmp::min(obtained, requested);
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(no_results);
         let searcher = response.searcher;
-        for (_, doc_address) in response.top_docs.into_iter().take(no_results) {
+        for (score, doc_address) in response.top_docs.into_iter().take(no_results) {
             match searcher.doc::<TantivyDocument>(doc_address) {
                 Ok(doc) => {
                     let schema = &response.text_service.schema;
@@ -179,15 +179,7 @@ impl From<SearchIntResponse<'_>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_string();
 
-                    let sort_field = match response.sort_field {
-                        OrderField::Created => schema.created,
-                        OrderField::Modified => schema.modified,
-                    };
-                    let sort_value = doc
-                        .get_first(sort_field)
-                        .map(|v| v.as_datetime().unwrap())
-                        .map(|d| datetime_utc_to_timestamp(&d))
-                        .map(SortValue::Date);
+                    let sort_value = Some(SortValue::Date(datetime_utc_to_timestamp(&score)));
 
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
                     let mut terms: Vec<_> = response.termc.get_fterms(doc_address.doc_id).into_iter().collect();

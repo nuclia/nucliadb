@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
+
 import pytest
 from httpx import AsyncClient
 
@@ -190,6 +192,7 @@ async def philosophy_books_kb(
             f"/kb/{kbid}/resources",
             json=payload,
         )
+        await asyncio.sleep(1)
         assert resp.status_code == 201
 
     yield kbid
