@@ -36,7 +36,7 @@ from nucliadb.models.internal.augment import (
 from nucliadb.search.augmentor.augmentor import augment
 from nucliadb_models.hydration import NeighbourParagraphHydration
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.ndbfixtures.resources import smb_wonder_resource
+from tests.ndbfixtures.resources import cookie_tale_resource, smb_wonder_resource
 
 
 @pytest.fixture
@@ -47,9 +47,11 @@ async def augmentor_kb(
     knowledgebox: str,
 ) -> AsyncIterator[tuple[str, dict[str, str]]]:
     kbid = knowledgebox
-    rid = await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
-
-    yield kbid, {"smb-wonder": rid}
+    rids = {
+        "smb-wonder": await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc),
+        "cookie-tale": await cookie_tale_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc),
+    }
+    yield kbid, rids
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -57,20 +59,25 @@ async def test_augmentor_metadata_extension_strategy(
     augmentor_kb: tuple[str, dict[str, str]],
 ) -> None:
     kbid, rids = augmentor_kb
-    rid = rids["smb-wonder"]
 
     augmented = await augment(
         kbid,
         [
             ResourceAugment(
-                given=[rid],
+                given=[rids["smb-wonder"], rids["cookie-tale"]],
                 select=[ResourceOrigin()],
             ),
         ],
     )
-    resource = augmented.resources[rid]
+    resource = augmented.resources[rids["smb-wonder"]]
     assert resource.origin is not None
     assert resource.origin.source_id == "My Source"
+    assert resource.origin.url == ""
+
+    resource = augmented.resources[rids["cookie-tale"]]
+    assert resource.origin is not None
+    assert resource.origin.source_id == "My Source"
+    assert resource.origin.url == "my://url"
 
 
 @pytest.mark.deploy_modes("standalone")
