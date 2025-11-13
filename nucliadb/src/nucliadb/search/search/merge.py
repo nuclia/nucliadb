@@ -37,7 +37,6 @@ from nidx_protos.nodereader_pb2 import (
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.common.models_utils.from_proto import RelationTypePbMap
-from nucliadb.search.search import cache
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.fetch import (
     fetch_resources,
@@ -105,37 +104,6 @@ def sort_results_by_score(results: Union[list[ParagraphResult], list[DocumentRes
     results.sort(key=lambda x: (x.score.bm25, x.score.booster), reverse=True)
 
 
-async def get_sort_value(
-    item: Union[DocumentResult, ParagraphResult],
-    sort_field: SortField,
-    kbid: str,
-) -> Optional[SortValue]:
-    """Returns the score for given `item` and `sort_field`. If the resource is being
-    deleted, it might appear on search results but not in maindb. In this
-    specific case, return None.
-    """
-    if sort_field == SortField.SCORE:
-        return (item.score.bm25, item.score.booster)
-
-    score: Any = None
-    resource = await cache.get_resource(kbid, item.uuid)
-    if resource is None:
-        return score
-
-    basic = await resource.get_basic()
-    if basic is None:
-        return score
-
-    if sort_field == SortField.CREATED:
-        score = basic.created.ToDatetime()
-    elif sort_field == SortField.MODIFIED:
-        score = basic.modified.ToDatetime()
-    elif sort_field == SortField.TITLE:
-        score = basic.title
-
-    return score
-
-
 async def merge_documents_results(
     kbid: str,
     responses: list[DocumentSearchResponse],
@@ -160,8 +128,9 @@ async def merge_documents_results(
         if document_response.next_page:
             next_page = True
         for result in document_response.results:
+            sort_value: SortValue
             if query.order_by == SortField.SCORE:
-                sort_value = result.score
+                sort_value = (result.score.bm25, result.score.booster)
             else:
                 sort_value = result.date.ToDatetime()
             if sort_value is not None:
@@ -382,8 +351,9 @@ async def merge_paragraph_results(
         if paragraph_response.next_page:
             next_page = True
         for result in paragraph_response.results:
+            sort_value: SortValue
             if sort.field == SortField.SCORE:
-                sort_value = result.score
+                sort_value = (result.score.bm25, result.score.booster)
             else:
                 sort_value = result.date.ToDatetime()
             if sort_value is not None:
@@ -620,6 +590,7 @@ async def merge_paragraphs_results(
             order=SortOrder.DESC,
         ),
         min_score=min_score,
+        offset=0,
     )
     return api_results
 

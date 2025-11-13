@@ -97,6 +97,9 @@ class _SearchParser:
 
         self._top_k = parse_top_k(self.item)
 
+        if self._top_k > 0 and self.item.offset > 0:
+            self._top_k += self.item.offset
+
         # parse search types (features)
 
         self._query = Query()
