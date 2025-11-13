@@ -28,7 +28,7 @@ from nucliadb.models.internal.augment import ParagraphText
 from nucliadb.models.internal.retrieval import RerankerScore
 from nucliadb.search.augmentor.models import AugmentedParagraph, Paragraph
 from nucliadb.search.augmentor.paragraphs import augment_paragraphs
-from nucliadb.search.augmentor.resources import legacy_augment_resources
+from nucliadb.search.augmentor.resources import augment_resources_deep
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
@@ -205,7 +205,7 @@ async def hydrate_and_rerank(
             select=[ParagraphText()],
             concurrency_control=max_operations,
         ),
-        legacy_augment_resources(
+        augment_resources_deep(
             kbid,
             given=list(resources_to_hydrate),
             opts=resource_hydration_options,
@@ -277,7 +277,7 @@ async def hydrate_and_rerank(
     # Finally, fetch resource metadata if we haven't already done it
     if reranker.needs_extra_results:
         FIND_FETCH_OPS_DISTRIBUTION.observe(len(resources_to_hydrate))
-        augmented_resources = await legacy_augment_resources(
+        augmented_resources = await augment_resources_deep(
             kbid,
             given=list(resources_to_hydrate),
             opts=resource_hydration_options,

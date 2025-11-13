@@ -43,63 +43,6 @@ from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
 
-# XXX: legacy serialization. At some point, we may want to remove this behavior
-# and fully replace it
-async def legacy_augment_resources(
-    kbid: str,
-    given: list[str],
-    opts: ResourceHydrationOptions,
-    *,
-    concurrency_control: asyncio.Semaphore | None = None,
-) -> dict[str, nucliadb_models.resource.Resource | None]:
-    """Augment a list of resources following an augmentation"""
-
-    if ResourceProperties.EXTRACTED in opts.show and has_feature(
-        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
-    ):
-        # Returning extracted metadata in search results is deprecated and this flag
-        # will be set to True for all KBs in the future.
-        opts.show.remove(ResourceProperties.EXTRACTED)
-        opts.extracted.clear()
-
-    ops = []
-    for rid in given:
-        task = asyncio.create_task(
-            limited_concurrency(
-                legacy_augment_resource(kbid, rid, opts),
-                max_ops=concurrency_control,
-            )
-        )
-        ops.append(task)
-    results: list[nucliadb_models.resource.Resource | None] = await asyncio.gather(*ops)
-
-    augmented: dict[str, nucliadb_models.resource.Resource | None] = {}
-    for rid, augmentation in zip(given, results):
-        augmented[rid] = augmentation
-
-    return augmented
-
-
-@augmentor_observer.wrap({"type": "legacy_resource"})
-async def legacy_augment_resource(
-    kbid: str,
-    rid: str,
-    opts: ResourceHydrationOptions,
-) -> nucliadb_models.resource.Resource | None:
-    resource = await cache.get_resource(kbid, rid)
-    if resource is None:
-        # skip resources that aren't in the DB
-        return None
-
-    serialized = await serialize_resource(
-        resource,
-        show=opts.show,
-        field_type_filter=opts.field_type_filter,
-        extracted=opts.extracted,
-    )
-    return serialized
-
-
 async def augment_resources(
     kbid: str,
     given: list[str],
@@ -184,3 +127,69 @@ async def db_augment_resource(
         security=security,
     )
     return augmented
+
+
+async def augment_resources_deep(
+    kbid: str,
+    given: list[str],
+    opts: ResourceHydrationOptions,
+    *,
+    concurrency_control: asyncio.Semaphore | None = None,
+) -> dict[str, nucliadb_models.resource.Resource | None]:
+    """Augment resources using the Resource model. Depending on the options,
+    this can serialize resource fields, extracted data like text, vectors...
+
+    Thus, this operation can be quite expensive.
+
+    """
+
+    if ResourceProperties.EXTRACTED in opts.show and has_feature(
+        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
+    ):
+        # Returning extracted metadata in search results is deprecated and this flag
+        # will be set to True for all KBs in the future.
+        opts.show.remove(ResourceProperties.EXTRACTED)
+        opts.extracted.clear()
+
+    ops = []
+    for rid in given:
+        task = asyncio.create_task(
+            limited_concurrency(
+                augment_resource_deep(kbid, rid, opts),
+                max_ops=concurrency_control,
+            )
+        )
+        ops.append(task)
+    results: list[nucliadb_models.resource.Resource | None] = await asyncio.gather(*ops)
+
+    augmented: dict[str, nucliadb_models.resource.Resource | None] = {}
+    for rid, augmentation in zip(given, results):
+        augmented[rid] = augmentation
+
+    return augmented
+
+
+@augmentor_observer.wrap({"type": "seialize_resource"})
+async def augment_resource_deep(
+    kbid: str,
+    rid: str,
+    opts: ResourceHydrationOptions,
+) -> nucliadb_models.resource.Resource | None:
+    """Augment a resource using the Resource model. Depending on the options,
+    this can serialize resource fields, extracted data like text, vectors...
+
+    Thus, this operation can be quite expensive.
+
+    """
+    resource = await cache.get_resource(kbid, rid)
+    if resource is None:
+        # skip resources that aren't in the DB
+        return None
+
+    serialized = await serialize_resource(
+        resource,
+        show=opts.show,
+        field_type_filter=opts.field_type_filter,
+        extracted=opts.extracted,
+    )
+    return serialized

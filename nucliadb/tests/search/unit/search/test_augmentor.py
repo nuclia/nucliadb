@@ -23,7 +23,7 @@ from nucliadb.common.ids import ParagraphId
 from nucliadb.models.internal.augment import ParagraphText
 from nucliadb.search.augmentor.models import Metadata
 from nucliadb.search.augmentor.paragraphs import db_augment_paragraph
-from nucliadb.search.augmentor.resources import legacy_augment_resource
+from nucliadb.search.augmentor.resources import augment_resource_deep
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb_models.resource import Resource
 
@@ -60,5 +60,5 @@ async def test_augment_resource():
             f"{MODULE}.resources.serialize_resource", return_value=Resource(id="rid", slug="my-resource")
         ),
     ):
-        augmented = await legacy_augment_resource("kbid", "rid", opts=ResourceHydrationOptions())
+        augmented = await augment_resource_deep("kbid", "rid", opts=ResourceHydrationOptions())
         assert augmented == Resource(id="rid", slug="my-resource")

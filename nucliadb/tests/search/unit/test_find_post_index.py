@@ -172,7 +172,7 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
     with (
         patch("nucliadb.search.search.find.get_external_index_manager", return_value=None),
         patch(
-            "nucliadb.search.search.find_merge.augment_resources",
+            "nucliadb.search.search.find_merge.augment_resources_deep",
             side_effect=mock_augment_resources,
         ),
         patch(
