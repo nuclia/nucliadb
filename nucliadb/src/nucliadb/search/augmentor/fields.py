@@ -90,7 +90,7 @@ async def db_augment_field(
     field: Field,
     field_id: FieldId,
     select: list[FieldProp],
-) -> AugmentedField | None:
+) -> AugmentedField:
     db_augments_by_type = {
         "t": db_augment_text_field,
         "f": db_augment_file_field,
@@ -105,7 +105,7 @@ async def db_augment_text_field(
     field: Field,
     field_id: FieldId,
     select: list[FieldProp],
-) -> AugmentedTextField | None:
+) -> AugmentedTextField:
     text = None
     value = None
 
@@ -132,7 +132,7 @@ async def db_augment_file_field(
     field: Field,
     field_id: FieldId,
     select: list[FieldProp],
-) -> AugmentedFileField | None:
+) -> AugmentedFileField:
     text = None
     value = None
 
@@ -159,7 +159,7 @@ async def db_augment_link_field(
     field: Field,
     field_id: FieldId,
     select: list[FieldProp],
-) -> AugmentedLinkField | None:
+) -> AugmentedLinkField:
     text = None
     value = None
 
@@ -186,7 +186,7 @@ async def db_augment_conversation_field(
     field: Field,
     field_id: FieldId,
     select: list[FieldProp],
-) -> AugmentedConversationField | None:
+) -> AugmentedConversationField:
     text = None
     value = None
 
@@ -213,7 +213,7 @@ async def db_augment_generic_field(
     field: Field,
     field_id: FieldId,
     select: list[FieldProp],
-) -> AugmentedGenericField | None:
+) -> AugmentedGenericField:
     text = None
     value = None
 

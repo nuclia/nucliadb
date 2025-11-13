@@ -88,8 +88,6 @@ async def hydrate_text_field(
         resource=field_id.rid,
         field_type=FieldTypeName.TEXT,
     )
-    if augmented is None:
-        return hydrated
 
     if config.value and augmented.value:
         hydrated.value = augmented.value
@@ -118,8 +116,6 @@ async def hydrate_file_field(
         resource=field_id.rid,
         field_type=FieldTypeName.FILE,
     )
-    if augmented is None:
-        return hydrated
 
     if config.value and augmented.value:
         hydrated.value = augmented.value
@@ -148,8 +144,6 @@ async def hydrate_link_field(
         resource=field_id.rid,
         field_type=FieldTypeName.LINK,
     )
-    if augmented is None:
-        return hydrated
 
     if config.value and augmented.value:
         hydrated.value = augmented.value
@@ -177,9 +171,6 @@ async def hydrate_conversation_field(
         field_type=FieldTypeName.CONVERSATION,
     )
 
-    if augmented is None:
-        return hydrated
-
     if config.value and augmented.value:
         hydrated.value = augmented.value
 
@@ -204,8 +195,6 @@ async def hydrate_generic_field(
         resource=field_id.rid,
         field_type=FieldTypeName.GENERIC,
     )
-    if augmented is None:
-        return hydrated
 
     if config.value and augmented.value:
         hydrated.value = augmented.value

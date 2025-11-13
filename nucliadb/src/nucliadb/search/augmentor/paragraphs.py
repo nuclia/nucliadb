@@ -139,7 +139,7 @@ async def db_augment_paragraph(
     paragraph_id: ParagraphId,
     select: list[ParagraphProp],
     metadata: Metadata,
-) -> AugmentedParagraph | None:
+) -> AugmentedParagraph:
     text = None
     image = None
     related = None
