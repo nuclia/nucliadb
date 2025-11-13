@@ -74,7 +74,8 @@ class NatsTaskConsumer(Generic[MsgType]):
         for task in self.running_tasks:
             task.cancel()
         try:
-            await asyncio.wait(self.running_tasks, timeout=5)
+            if len(self.running_tasks) > 0:
+                await asyncio.wait(self.running_tasks, timeout=5)
             self.running_tasks.clear()
         except asyncio.TimeoutError:
             pass
