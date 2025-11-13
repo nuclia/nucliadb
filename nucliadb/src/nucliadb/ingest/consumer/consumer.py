@@ -25,7 +25,6 @@ from typing import Optional, Union
 import backoff
 import nats
 import nats.js.api
-import nats.js.errors
 from nats.aio.client import Msg
 from nats.js import JetStreamContext
 
