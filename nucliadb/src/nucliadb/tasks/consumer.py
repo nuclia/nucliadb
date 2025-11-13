@@ -22,6 +22,7 @@ import asyncio
 from typing import Generic, Optional, Type
 
 import nats
+import nats.js.api
 import pydantic
 from nats.aio.client import Msg
 
@@ -45,6 +46,7 @@ class NatsTaskConsumer(Generic[MsgType]):
         callback: Callback,
         msg_type: Type[MsgType],
         max_concurrent_messages: Optional[int] = None,
+        max_deliver: Optional[int] = None,
     ):
         self.name = name
         self.stream = stream
@@ -52,6 +54,7 @@ class NatsTaskConsumer(Generic[MsgType]):
         self.callback = callback
         self.msg_type = msg_type
         self.max_concurrent_messages = max_concurrent_messages
+        self.max_deliver = max_deliver
         self.initialized = False
         self.running_tasks: list[asyncio.Task] = []
         self.subscription = None
@@ -96,6 +99,7 @@ class NatsTaskConsumer(Generic[MsgType]):
                 ack_wait=nats_consumer_settings.nats_ack_wait,
                 idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
                 max_ack_pending=max_ack_pending,
+                max_deliver=self.max_deliver,
             ),
         )
         logger.info(
@@ -179,6 +183,7 @@ def create_consumer(
     callback: Callback,
     msg_type: Type[MsgType],
     max_concurrent_messages: Optional[int] = None,
+    max_retries: int = 100,
 ) -> NatsTaskConsumer[MsgType]:
     """
     Returns a non-initialized consumer
@@ -190,4 +195,5 @@ def create_consumer(
         callback=callback,
         msg_type=msg_type,
         max_concurrent_messages=max_concurrent_messages,
+        max_deliver=max_retries,
     )

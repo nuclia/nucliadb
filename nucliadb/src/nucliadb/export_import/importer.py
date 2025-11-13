@@ -22,6 +22,7 @@ from typing import AsyncGenerator, Callable, Optional, cast
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import import logger
 from nucliadb.export_import.datamanager import ExportImportDataManager
+from nucliadb.export_import.exceptions import MetadataNotFound
 from nucliadb.export_import.models import (
     ExportedItemType,
     ImportMetadata,
@@ -99,7 +100,13 @@ async def import_kb_from_blob_storage(context: ApplicationContext, msg: NatsTask
     """
     kbid, import_id = msg.kbid, msg.id
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
-    metadata = await dm.get_metadata(type="import", kbid=kbid, id=import_id)
+    try:
+        metadata = await dm.get_metadata(type="import", kbid=kbid, id=import_id)
+    except MetadataNotFound:  # pragma: no cover
+        logger.error(
+            "Import metadata not found. Skipping import.", extra={"kbid": kbid, "import_id": import_id}
+        )
+        return
 
     retry_handler = TaskRetryHandler("import", dm, metadata)
 

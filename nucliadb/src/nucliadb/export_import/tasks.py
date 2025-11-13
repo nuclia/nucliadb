@@ -56,6 +56,7 @@ def get_exports_consumer() -> NatsTaskConsumer[NatsTaskMessage]:
         callback=export_kb_to_blob_storage,
         msg_type=NatsTaskMessage,
         max_concurrent_messages=10,
+        max_retries=100,
     )
 
 
@@ -77,6 +78,7 @@ def get_imports_consumer() -> NatsTaskConsumer[NatsTaskMessage]:
         callback=import_kb_from_blob_storage,
         msg_type=NatsTaskMessage,
         max_concurrent_messages=10,
+        max_retries=100,
     )
 
 

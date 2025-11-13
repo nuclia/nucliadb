@@ -38,6 +38,7 @@ def creator_consumer() -> NatsTaskConsumer[CreateBackupRequest]:
         callback=backup_kb_task,
         msg_type=CreateBackupRequest,
         max_concurrent_messages=10,
+        max_retries=100,
     )
     return consumer
 
@@ -64,6 +65,7 @@ def restorer_consumer() -> NatsTaskConsumer[RestoreBackupRequest]:
         callback=restore_kb_task,
         msg_type=RestoreBackupRequest,
         max_concurrent_messages=10,
+        max_retries=100,
     )
     return consumer
 
@@ -90,6 +92,7 @@ def deleter_consumer() -> NatsTaskConsumer[DeleteBackupRequest]:
         callback=delete_backup_task,
         msg_type=DeleteBackupRequest,
         max_concurrent_messages=2,
+        max_retries=100,
     )
     return consumer
 
