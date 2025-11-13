@@ -622,6 +622,7 @@ async def smb_wonder_resource(
     bmb.with_summary("SMB Wonder: the new Mario game from Nintendo")
 
     field_builder = bmb.field_builder(field_id, FieldType.FILE)
+    # ids are hardcoded so it's easier to copy while testing and changes on them may break tests
     paragraphs = [
         (
             ParagraphId.from_string(f"{rid}/f/smb-wonder/0-99"),
