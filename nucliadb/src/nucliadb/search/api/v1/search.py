@@ -275,6 +275,7 @@ async def search(
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
         highlight=item.highlight,
+        offset=item.offset,
     )
 
     if audit is not None and do_audit:

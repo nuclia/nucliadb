@@ -79,7 +79,7 @@ def should_disable_vector_search(request: search_models.BaseSearchRequest) -> bo
 
 def parse_top_k(item: search_models.BaseSearchRequest) -> int:
     assert item.top_k is not None, "top_k must have an int value"
-    top_k = item.top_k
+    top_k = item.top_k + item.offset
     return top_k
 
 
