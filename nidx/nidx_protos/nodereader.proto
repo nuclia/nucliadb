@@ -60,7 +60,6 @@ message DocumentResult {
     }
     string field = 4;
     repeated string labels = 5;
-    // Date value which was used to sort the results (if applicable)
 }
 
 message DocumentSearchResponse {
