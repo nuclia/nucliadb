@@ -61,7 +61,7 @@ from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
     ChatAuditor,
     add_resource_filter,
-    get_find_results,
+    find_retrieval,
     get_relations_results,
     maybe_audit_chat,
     rephrase_query,
@@ -838,7 +838,7 @@ async def retrieval_in_kb(
 ) -> RetrievalResults:
     prequeries = parse_prequeries(ask_request)
     graph_strategy = parse_graph_strategy(ask_request)
-    main_results, prequeries_results, parsed_query = await get_find_results(
+    main_results, prequeries_results, parsed_query = await find_retrieval(
         kbid=kbid,
         query=main_query,
         item=ask_request,
@@ -926,7 +926,7 @@ async def retrieval_in_resource(
                 )
             add_resource_filter(prequery.request, [resource])
 
-    main_results, prequeries_results, parsed_query = await get_find_results(
+    main_results, prequeries_results, parsed_query = await find_retrieval(
         kbid=kbid,
         query=main_query,
         item=ask_request,

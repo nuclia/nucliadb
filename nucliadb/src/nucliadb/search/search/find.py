@@ -75,12 +75,10 @@ async def find(
             external_index_manager,
         )
     else:
-        return await _index_node_retrieval(
-            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, metrics
-        )
+        return await _nidx_retrieval(kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, metrics)
 
 
-async def _index_node_retrieval(
+async def _nidx_retrieval(
     kbid: str,
     item: FindRequest,
     x_ndb_client: NucliaDBClientType,
