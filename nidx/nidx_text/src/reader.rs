@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::*;
 
-use crate::schema::decode_field_id;
+use crate::schema::{datetime_utc_to_timestamp, decode_field_id};
 use crate::search_query::filter_to_query;
 use crate::{DocumentSearchRequest, prefilter::*};
 
@@ -40,8 +40,8 @@ use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentC
 use tantivy::columnar::Column;
 use tantivy::query::{AllQuery, BooleanQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::Value;
-use tantivy::schema::*;
-use tantivy::{DocAddress, Index, IndexReader, Searcher};
+use tantivy::{DateTime, DocAddress, Index, IndexReader, Searcher};
+use tantivy::{Order, schema::*};
 use tracing::*;
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
@@ -235,22 +235,23 @@ impl TextReaderService {
 }
 
 impl TextReaderService {
-    fn custom_order_collector(&self, order: OrderBy, limit: usize) -> impl Collector<Fruit = Vec<(i64, DocAddress)>> {
-        use tantivy::{DocId, SegmentReader};
-        let sorter = match order.r#type() {
-            OrderType::Desc => |t: i64| t,
-            OrderType::Asc => |t: i64| -t,
+    fn custom_order_collector(
+        &self,
+        order: OrderBy,
+        limit: usize,
+    ) -> impl Collector<Fruit = Vec<(DateTime, DocAddress)>> {
+        let order_field = match order.sort_by() {
+            OrderField::Created => "created",
+            OrderField::Modified => "modified",
         };
-        TopDocs::with_limit(limit).custom_score(move |segment_reader: &SegmentReader| {
-            let reader = match order.sort_by() {
-                OrderField::Created => segment_reader.fast_fields().date("created").unwrap(),
-                OrderField::Modified => segment_reader.fast_fields().date("modified").unwrap(),
-            };
-            move |doc: DocId| sorter(reader.values_for_doc(doc).next().unwrap().into_timestamp_secs())
-        })
+        let order_direction = match order.r#type() {
+            OrderType::Desc => Order::Desc,
+            OrderType::Asc => Order::Asc,
+        };
+        TopDocs::with_limit(limit).order_by_fast_field(order_field, order_direction)
     }
 
-    fn convert_int_order(&self, response: SearchResponse<i64>, searcher: &Searcher) -> DocumentSearchResponse {
+    fn convert_int_order(&self, response: SearchResponse<DateTime>, searcher: &Searcher) -> DocumentSearchResponse {
         let total = response.total as i32;
         let retrieved_results = response.results_per_page;
         let next_page = total > retrieved_results;
@@ -284,10 +285,7 @@ impl TextReaderService {
                         .filter(|x| x.starts_with("/l/"))
                         .collect_vec();
 
-                    let sort_value = Some(SortValue::Date(nidx_protos::prost_types::Timestamp {
-                        seconds: score,
-                        nanos: 0,
-                    }));
+                    let sort_value = Some(SortValue::Date(datetime_utc_to_timestamp(&score)));
 
                     let result = DocumentResult {
                         uuid,

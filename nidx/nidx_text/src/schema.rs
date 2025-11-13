@@ -54,6 +54,13 @@ pub fn timestamp_to_datetime_utc(timestamp: &nidx_protos::prost_types::Timestamp
     DateTime::from_timestamp_secs(timestamp.seconds)
 }
 
+pub fn datetime_utc_to_timestamp(tantivy: &DateTime) -> nidx_protos::prost_types::Timestamp {
+    nidx_protos::prost_types::Timestamp {
+        seconds: tantivy.into_timestamp_secs(),
+        nanos: 0,
+    }
+}
+
 impl TextSchema {
     pub fn new(_version: u64) -> Self {
         let mut sb = Schema::builder();

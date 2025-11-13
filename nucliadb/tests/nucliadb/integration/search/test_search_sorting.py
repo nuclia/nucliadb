@@ -82,6 +82,7 @@ async def test_search_sorted_by_creation_and_modification_dates(
             "sort_field": sort_field,
             "sort_order": sort_order,
             "features": ["fulltext", "keyword"],
+            "show": ["origin"],
         },
     )
     assert resp.status_code == 200
@@ -91,7 +92,8 @@ async def test_search_sorted_by_creation_and_modification_dates(
         assert len(results) > 0
 
         sort_fields = [
-            datetime.fromisoformat(body["resources"][result["rid"]][sort_field]) for result in results
+            datetime.fromisoformat(body["resources"][result["rid"]]["origin"][sort_field])
+            for result in results
         ]
         assert sort_fields == sort_function(sort_fields)
 

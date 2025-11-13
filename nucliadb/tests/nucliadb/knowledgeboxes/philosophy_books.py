@@ -18,8 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import asyncio
-
 import pytest
 from httpx import AsyncClient
 
@@ -33,6 +31,7 @@ async def philosophy_books_kb(
         {
             "slug": "meditations",
             "title": "Meditations",
+            "origin": {"created": "2023-01-01", "modified": "2023-03-03"},
             "summary": (
                 "Series of personal writings by Marcus Aurelius recording his private notes to "
                 "himself and ideas on Stoic philosophy"
@@ -53,6 +52,7 @@ async def philosophy_books_kb(
         {
             "slug": "nicomachean-ethics",
             "title": "Nicomachean Ethics",
+            "origin": {"created": "2021-01-01", "modified": "2021-03-03"},
             "summary": ("Aristotle's best-known work on ethics, the science of human life"),
             "usermetadata": {
                 "relations": [
@@ -70,6 +70,7 @@ async def philosophy_books_kb(
         {
             "slug": "beyond-good-and-evil",
             "title": "Beyond Good and Evil: Prelude to a philosophy of the Future",
+            "origin": {"created": "1999-01-01", "modified": "2000-03-03"},
             "summary": (
                 "Nietzsche acuse past philosophers of lacking critical sense and blindly accepting "
                 "dogmatic premises in their consideration of morality"
@@ -90,6 +91,7 @@ async def philosophy_books_kb(
         {
             "slug": "meditations-on-first-philosophy",
             "title": "Meditations on First Philosophy",
+            "origin": {"created": "2000-01-01", "modified": "2001-03-03"},
             "summary": (
                 "Six meditations in which Descartes first discards all belief in things that are "
                 "not absolutely certain, and then tries to establish what can be known for sure"
@@ -110,6 +112,7 @@ async def philosophy_books_kb(
         {
             "slug": "the-principles-of-the-most-ancient-and-modern-philosophy",
             "title": "The Principles of the most Ancient and Modern Philosophy",
+            "origin": {"created": "2013-01-01", "modified": "2013-03-03"},
             "summary": ("Conway's monistic view of the world as created from one substance"),
             "usermetadata": {
                 "relations": [
@@ -127,6 +130,7 @@ async def philosophy_books_kb(
         {
             "slug": "ethics",
             "title": "Ethics",
+            "origin": {"created": "2008-01-01", "modified": "2025-03-03"},
             "summary": (
                 "Spinoza puts forward a small number of definitions and axioms from which he "
                 "attempts to derive hundreds of propositions and corollaries"
@@ -147,6 +151,7 @@ async def philosophy_books_kb(
         {
             "slug": "critique-of-pure-reason",
             "title": "Critique of Pure Reason",
+            "origin": {"created": "2024-01-01", "modified": "2024-03-03"},
             "summary": ("Kant seeks to determine the limits and scope of metaphysics"),
             "usermetadata": {
                 "relations": [
@@ -164,6 +169,7 @@ async def philosophy_books_kb(
         {
             "slug": "the-human-condition",
             "title": "The Human Condition",
+            "origin": {"created": "1988-01-01", "modified": "2016-03-03"},
             "summary": (
                 "Arendt differentiates political and social concepts, labor and work, and various "
                 "forms of actions; she then explores the implications of those distinctions"
@@ -192,7 +198,6 @@ async def philosophy_books_kb(
             f"/kb/{kbid}/resources",
             json=payload,
         )
-        await asyncio.sleep(1)
         assert resp.status_code == 201
 
     yield kbid
