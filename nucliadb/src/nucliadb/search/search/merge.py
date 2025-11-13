@@ -550,7 +550,6 @@ async def merge_results(
         sort = SortOptions(
             field=retrieval.query.keyword.order_by,
             order=retrieval.query.keyword.sort,
-            limit=None,  # unused
         )
         api_results.paragraphs, matched_resources = await merge_paragraph_results(
             kbid,
@@ -601,7 +600,6 @@ async def merge_paragraphs_results(
         sort=SortOptions(
             field=SortField.SCORE,
             order=SortOrder.DESC,
-            limit=None,
         ),
         min_score=min_score,
     )

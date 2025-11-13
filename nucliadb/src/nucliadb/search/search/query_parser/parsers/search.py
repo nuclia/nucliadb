@@ -122,7 +122,6 @@ class _SearchParser:
         retrieval = UnitRetrieval(
             query=self._query,
             top_k=self._top_k,
-            offset=item.offset,
             filters=filters,
         )
         return retrieval
@@ -150,12 +149,10 @@ class _SearchParser:
         assert self._top_k is not None, "top_k must be parsed before text query"
 
         keyword = await parse_keyword_query(self.item, fetcher=self.fetcher)
-        sort, order_by, limit = self._parse_sorting()
+        sort, order_by = self._parse_sorting()
         keyword.sort = sort
         keyword.order_by = order_by
-        if limit is not None:
-            # sort limit can extend top_k
-            self._top_k = max(self._top_k, limit)
+
         return keyword
 
     async def _parse_relation_query(self) -> RelationQuery:
@@ -175,42 +172,21 @@ class _SearchParser:
         detected_entities = expand_entities(meta_cache, detected_entities)
         return detected_entities
 
-    def _parse_sorting(self) -> tuple[search_models.SortOrder, search_models.SortField, Optional[int]]:
+    def _parse_sorting(self) -> tuple[search_models.SortOrder, search_models.SortField]:
         sort = self.item.sort
-        if len(self.item.query) == 0:
-            if sort is None:
+        if sort is None:
+            if len(self.item.query) == 0:
                 sort = SortOptions(
                     field=SortField.CREATED,
                     order=SortOrder.DESC,
-                    limit=None,
                 )
-            elif sort.field not in INDEX_SORTABLE_FIELDS:
-                raise InvalidQueryError(
-                    "sort_field",
-                    f"Empty query can only be sorted by '{SortField.CREATED}' or"
-                    f" '{SortField.MODIFIED}' and sort limit won't be applied",
-                )
-        else:
-            if sort is None:
+            else:
                 sort = SortOptions(
                     field=SortField.SCORE,
                     order=SortOrder.DESC,
-                    limit=None,
-                )
-            elif sort.field not in INDEX_SORTABLE_FIELDS and sort.limit is None:
-                raise InvalidQueryError(
-                    "sort_field",
-                    f"Sort by '{sort.field}' requires setting a sort limit",
                 )
 
-        # We need to ask for all and cut later
-        top_k = None
-        if sort and sort.limit is not None:
-            # As the index can't sort, we have to do it when merging. To
-            # have consistent results, we must limit them
-            top_k = sort.limit
-
-        return (sort.order, sort.field, top_k)
+        return (sort.order, sort.field)
 
     async def _parse_filters(self) -> Filters:
         assert self._query is not None, "query must be parsed before filters"

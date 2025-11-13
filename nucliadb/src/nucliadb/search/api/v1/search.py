@@ -108,7 +108,6 @@ async def search_knowledgebox(
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
     sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
-    sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
     top_k: int = fastapi_query(SearchParamDefaults.top_k),
     offset: int = fastapi_query(SearchParamDefaults.offset),
@@ -170,11 +169,7 @@ async def search_knowledgebox(
             fields=fields,
             filters=filters,
             faceted=faceted,
-            sort=(
-                SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
-                if sort_field is not None
-                else None
-            ),
+            sort=(SortOptions(field=sort_field, order=sort_order) if sort_field is not None else None),
             top_k=top_k,
             min_score=min_score_from_query_params(min_score_bm25, min_score_semantic, min_score),
             vectorset=vectorset,

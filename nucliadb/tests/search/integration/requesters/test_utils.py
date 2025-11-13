@@ -52,7 +52,6 @@ async def test_vector_result_metadata(nucliadb_search: AsyncClient, test_search_
             sort=SortOptions(
                 field=SortField.SCORE,
                 order=SortOrder.DESC,
-                limit=1000,
             ),
         ),
     )

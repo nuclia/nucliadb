@@ -79,7 +79,6 @@ async def catalog_get(
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
     sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
-    sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
     page_number: int = fastapi_query(SearchParamDefaults.catalog_page_number),
     page_size: int = fastapi_query(SearchParamDefaults.catalog_page_size),
@@ -125,7 +124,7 @@ async def catalog_get(
         show=show,
     )
     if sort_field:
-        item.sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
+        item.sort = SortOptions(field=sort_field, order=sort_order)
     return await catalog(kbid, item)
 
 

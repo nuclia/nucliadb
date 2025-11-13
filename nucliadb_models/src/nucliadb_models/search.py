@@ -347,7 +347,6 @@ SortOrderMap = {
 
 class SortOptions(BaseModel):
     field: SortField
-    limit: Optional[int] = Field(None, gt=0)
     order: SortOrder = SortOrder.DESC
 
 
@@ -506,17 +505,17 @@ class SearchParamDefaults:
     )
     top_k = ParamDefault(
         default=20,
-        ge=0,
+        gt=-1,
         le=200,
         title="Top k",
         description="The number of results search should return. The maximum number of results allowed is 200.",
     )
     offset = ParamDefault(
         default=0,
-        ge=0,
+        gt=-1,
         le=1000,
         title="Results offset",
-        description="The number of results to skip, starting from the beginning in sort order. Used for pagination. It can only be used with the keyword and fulltext indexes."
+        description="The number of results to skip, starting from the beginning in sort order. Used for pagination. It can only be used with the keyword and fulltext indexes.",
     )
     highlight = ParamDefault(
         default=False,
@@ -542,12 +541,6 @@ class SearchParamDefaults:
         default=SortOrder.DESC,
         title="Sort order",
         description="Order to sort results with",
-    )
-    sort_limit = ParamDefault(
-        default=None,
-        title="Sort limit",
-        description="",
-        gt=0,
     )
     sort_field = ParamDefault(
         default=None,
@@ -969,7 +962,7 @@ class SearchRequest(BaseSearchRequest):
 
     @field_validator("sort", mode="after")
     @classmethod
-    def sorting_by_title_not_supported(cls, value: Optional[SortOptions]) -> int:
+    def sorting_by_title_not_supported(cls, value: Optional[SortOptions]) -> Optional[SortOptions]:
         if value and value.field == SortField.TITLE:
             raise ValueError("sorting by title not supported in /search")
 

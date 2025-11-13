@@ -138,7 +138,6 @@ class _FindParser:
         retrieval = UnitRetrieval(
             query=self._query,
             top_k=self._top_k,
-            offset=0,
             filters=filters,
             rank_fusion=rank_fusion,
             reranker=reranker,
