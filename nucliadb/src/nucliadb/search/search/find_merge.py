@@ -69,15 +69,6 @@ async def build_find_response(
     resource_hydration_options: ResourceHydrationOptions,
     text_block_hydration_options: TextBlockHydrationOptions,
 ) -> KnowledgeboxFindResults:
-    # XXX: we shouldn't need a min score that we haven't used. Previous
-    # implementations got this value from the proto request (i.e., default to 0)
-    min_score_bm25 = 0.0
-    if retrieval.query.keyword is not None:
-        min_score_bm25 = retrieval.query.keyword.min_score
-    min_score_semantic = 0.0
-    if retrieval.query.semantic is not None:
-        min_score_semantic = retrieval.query.semantic.min_score
-
     # cut
     # we assume pagination + predict reranker is forbidden and has been already
     # enforced/validated by the query parsing.
@@ -108,7 +99,36 @@ async def build_find_response(
     # compose response
     find_resources = compose_find_resources(text_blocks, resources)
 
-    next_page = search_response.paragraph.next_page or next_page
+    # Compute some misc values for the response
+
+    # XXX: we shouldn't need a min score that we haven't used. Previous
+    # implementations got this value from the proto request (i.e., default to 0)
+    min_score_bm25 = 0.0
+    if retrieval.query.keyword is not None:
+        min_score_bm25 = retrieval.query.keyword.min_score
+    min_score_semantic = 0.0
+    if retrieval.query.semantic is not None:
+        min_score_semantic = retrieval.query.semantic.min_score
+
+    # Bw/c with pagination, next page can be obtained from different places. The
+    # meaning is whether a greater top_k would have returned more results.
+    # Although it doesn't take into account matches on the same paragraphs, an
+    # estimate is good enough
+    next_page = (
+        # when rank fusion window is greater than top_k or the reranker window
+        next_page
+        # when the keyword index already has more results
+        or search_response.paragraph.next_page
+        # when rank fusion window is greater than top_k
+        or len(merged_text_blocks) > retrieval.top_k
+        # when the sum of all indexes makes more than top_k
+        or (
+            len(search_response.paragraph.results)
+            + len(search_response.vector.documents)
+            + len([True for path in graph_response.graph if path.metadata.paragraph_id])
+            > retrieval.top_k
+        )
+    )
     total_paragraphs = search_response.paragraph.total
 
     find_results = KnowledgeboxFindResults(
