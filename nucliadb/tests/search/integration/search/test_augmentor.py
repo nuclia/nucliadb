@@ -27,13 +27,14 @@ from nucliadb.common.ids import ParagraphId
 from nucliadb.models.internal.augment import (
     ParagraphAugment,
     ParagraphText,
+    RelatedParagraphs,
     ResourceAugment,
     ResourceOrigin,
-    ResourceSecurity,
     ResourceSummary,
     ResourceTitle,
 )
 from nucliadb.search.augmentor.augmentor import augment
+from nucliadb_models.hydration import NeighbourParagraphHydration
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.ndbfixtures.resources import smb_wonder_resource
 
@@ -51,46 +52,6 @@ async def augmentor_kb(
     yield kbid, {"smb-wonder": rid}
 
 
-@pytest.mark.skip  # TODO: remove skip, only to iterate tests
-@pytest.mark.deploy_modes("standalone")
-async def test_augmentor(
-    augmentor_kb: tuple[str, dict[str, str]],
-) -> None:
-    kbid, rids = augmentor_kb
-    rid = rids["smb-wonder"]
-
-    # Simple augmentation example
-
-    augmented = await augment(
-        kbid,
-        [
-            ResourceAugment(
-                given=[rid],
-                select=[ResourceTitle()],
-            ),
-            ResourceAugment(
-                given=[rid],
-                select=[ResourceSummary()],
-            ),
-            ResourceAugment(
-                given=[rid],
-                select=[ResourceOrigin(), ResourceSecurity()],
-            ),
-        ],
-    )
-
-    resource = augmented.resources[rid]
-    assert resource.title is not None
-    assert resource.title == "Super Mario Bros. Wonder"
-    assert resource.summary is not None
-    assert resource.summary == "SMB Wonder: the new Mario game from Nintendo"
-    assert resource.origin is not None
-    assert resource.origin.source_id == "My Source"
-    assert resource.security is not None
-    assert resource.security.access_groups == []
-
-
-@pytest.mark.skip  # TODO: remove skip, only to iterate tests
 @pytest.mark.deploy_modes("standalone")
 async def test_augmentor_metadata_extension_strategy(
     augmentor_kb: tuple[str, dict[str, str]],
@@ -118,18 +79,97 @@ async def test_augmentor_neighbouring_paragraphs_strategy(
 ) -> None:
     kbid, rids = augmentor_kb
     rid = rids["smb-wonder"]
-    paragraph_id = ParagraphId.from_string(f"{rid}/f/smb-wonder/99-145")
 
     augmented = await augment(
         kbid,
         [
             ParagraphAugment(
-                given=[paragraph_id.full()],
+                given=[f"{rid}/f/smb-wonder/99-145"],
+                select=[RelatedParagraphs(neighbours=NeighbourParagraphHydration(before=0, after=0))],
+            ),
+        ],
+    )
+    assert len(augmented.paragraphs) == 1
+    (_, paragraph) = augmented.paragraphs.popitem()
+    assert paragraph.related is not None
+    assert len(paragraph.related.neighbours_before) == 0
+    assert len(paragraph.related.neighbours_after) == 0
+
+    augmented = await augment(
+        kbid,
+        [
+            ParagraphAugment(
+                given=[f"{rid}/f/smb-wonder/99-145"],
+                select=[RelatedParagraphs(neighbours=NeighbourParagraphHydration(before=10, after=10))],
+            ),
+        ],
+    )
+    assert len(augmented.paragraphs) == 1
+    (_, paragraph) = augmented.paragraphs.popitem()
+    assert paragraph.related is not None
+    assert paragraph.related.neighbours_before == [ParagraphId.from_string(f"{rid}/f/smb-wonder/0-99")]
+    assert paragraph.related.neighbours_after == [ParagraphId.from_string(f"{rid}/f/smb-wonder/145-234")]
+
+    augmented = await augment(
+        kbid,
+        [
+            ParagraphAugment(
+                given=[f"{rid}/f/smb-wonder/0-99"],
+                select=[RelatedParagraphs(neighbours=NeighbourParagraphHydration(before=10, after=10))],
+            ),
+        ],
+    )
+    assert len(augmented.paragraphs) == 1
+    (_, paragraph) = augmented.paragraphs.popitem()
+    assert paragraph.related is not None
+    assert len(paragraph.related.neighbours_before) == 0
+    assert paragraph.related.neighbours_after == [
+        ParagraphId.from_string(f"{rid}/f/smb-wonder/99-145"),
+        ParagraphId.from_string(f"{rid}/f/smb-wonder/145-234"),
+    ]
+
+    augmented = await augment(
+        kbid,
+        [
+            ParagraphAugment(
+                given=[f"{rid}/f/smb-wonder/145-234"],
+                select=[RelatedParagraphs(neighbours=NeighbourParagraphHydration(before=10, after=10))],
+            ),
+        ],
+    )
+    assert len(augmented.paragraphs) == 1
+    (_, paragraph) = augmented.paragraphs.popitem()
+    assert paragraph.related is not None
+    assert paragraph.related.neighbours_before == [
+        ParagraphId.from_string(f"{rid}/f/smb-wonder/0-99"),
+        ParagraphId.from_string(f"{rid}/f/smb-wonder/99-145"),
+    ]
+    assert len(paragraph.related.neighbours_after) == 0
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_augmentor_hierarchy_strategy(
+    augmentor_kb: tuple[str, dict[str, str]],
+) -> None:
+    kbid, rids = augmentor_kb
+    rid = rids["smb-wonder"]
+
+    augmented = await augment(
+        kbid,
+        [
+            ResourceAugment(
+                given=[rid],
+                select=[ResourceTitle(), ResourceSummary()],
+            ),
+            ParagraphAugment(
+                given=[f"{rid}/f/smb-wonder/99-145"],
                 select=[ParagraphText()],
             ),
         ],
     )
-    paragraph = augmented.paragraphs[paragraph_id]
-    assert paragraph.text == "SMB Wonder is a side-scrolling plaftorm game.\n"
 
-    # TODO: WIP
+    resource = augmented.resources[rid]
+    assert resource.title == "Super Mario Bros. Wonder"
+    assert resource.summary == "SMB Wonder: the new Mario game from Nintendo"
+    (_, paragraph) = augmented.paragraphs.popitem()
+    assert paragraph.text == "SMB Wonder is a side-scrolling plaftorm game.\n"
