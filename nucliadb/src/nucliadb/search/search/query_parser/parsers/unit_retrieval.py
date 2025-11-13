@@ -53,6 +53,7 @@ class _Converter:
         self._apply_graph_query()
         self._apply_filters()
         self._apply_top_k()
+
         return self.req
 
     def _apply_text_queries(self) -> None:

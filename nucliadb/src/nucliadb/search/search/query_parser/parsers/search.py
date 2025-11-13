@@ -122,6 +122,7 @@ class _SearchParser:
         retrieval = UnitRetrieval(
             query=self._query,
             top_k=self._top_k,
+            offset=item.offset,
             filters=filters,
         )
         return retrieval

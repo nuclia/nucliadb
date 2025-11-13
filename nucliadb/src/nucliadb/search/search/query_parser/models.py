@@ -130,6 +130,7 @@ Reranker = Union[NoopReranker, PredictReranker]
 class UnitRetrieval(BaseModel):
     query: Query
     top_k: int
+    offset: int
     filters: Filters = Field(default_factory=Filters)
     rank_fusion: Optional[RankFusion] = None
     reranker: Optional[Reranker] = None
