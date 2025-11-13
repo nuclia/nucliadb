@@ -329,7 +329,7 @@ async def test_hydration_related_paragraphs(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_hydration_paragraph_source_image__WIP(
+async def test_hydration_paragraph_source_image(
     nucliadb_reader: AsyncClient,
     hydration_kb: HydrationKb,
 ):
@@ -368,7 +368,7 @@ async def test_hydration_paragraph_source_image__WIP(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_hydration_paragraph_table_page_preview__WIP(
+async def test_hydration_paragraph_table_page_preview(
     nucliadb_reader: AsyncClient,
     hydration_kb: HydrationKb,
 ):
@@ -414,7 +414,7 @@ async def test_hydration_paragraph_table_page_preview__WIP(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_hydration_paragraph_page_preview__WIP(
+async def test_hydration_paragraph_page_preview(
     nucliadb_reader: AsyncClient,
     hydration_kb: HydrationKb,
 ):
