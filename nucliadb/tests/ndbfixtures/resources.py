@@ -30,6 +30,7 @@ from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.manager import KBShardManager
+from nucliadb.common.ids import ParagraphId
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
@@ -622,13 +623,21 @@ async def smb_wonder_resource(
 
     field_builder = bmb.field_builder(field_id, FieldType.FILE)
     paragraphs = [
-        "Super Mario Bros. Wonder (SMB Wonder) is a 2023 platform game developed and published by Nintendo.\n",  # noqa
-        "SMB Wonder is a side-scrolling plaftorm game.\n",
-        "As one of eight player characters, the player completes levels across the Flower Kingdom.",  # noqa
+        (
+            ParagraphId.from_string(f"{rid}/f/smb-wonder/0-99"),
+            "Super Mario Bros. Wonder (SMB Wonder) is a 2023 platform game developed and published by Nintendo.\n",  # noqa
+        ),
+        (
+            ParagraphId.from_string(f"{rid}/f/smb-wonder/99-145"),
+            "SMB Wonder is a side-scrolling plaftorm game.\n",
+        ),
+        (
+            ParagraphId.from_string(f"{rid}/f/smb-wonder/145-234"),
+            "As one of eight player characters, the player completes levels across the Flower Kingdom.",  # noqa
+        ),
     ]
     random.seed(63)
-    paragraph_ids = []
-    for paragraph in paragraphs:
+    for expected_paragraph_id, paragraph in paragraphs:
         paragraph_id, _ = field_builder.add_paragraph(
             paragraph,
             vectors={
@@ -638,29 +647,29 @@ async def smb_wonder_resource(
                 for i, (vectorset_id, config) in enumerate(vectorsets.items())
             },
         )
-        paragraph_ids.append(paragraph_id)
+        assert paragraph_id == expected_paragraph_id
 
     # add Q&A
 
     question = "What is SMB Wonder?"
     field_builder.add_question_answer(
         question=question,
-        question_paragraph_ids=[paragraph_ids[0].full()],
+        question_paragraph_ids=[paragraphs[0][0].full()],
         answer="SMB Wonder is a side-scrolling Nintendo Switch game",
-        answer_paragraph_ids=[paragraph_ids[0].full(), paragraph_ids[1].full()],
+        answer_paragraph_ids=[paragraphs[0][0].full(), paragraphs[1][0].full()],
     )
     field_builder.add_question_answer(
         question=question,
-        question_paragraph_ids=[paragraph_ids[0].full()],
+        question_paragraph_ids=[paragraphs[0][0].full()],
         answer="It's the new Mario game for Nintendo Switch",
-        answer_paragraph_ids=[paragraph_ids[0].full()],
+        answer_paragraph_ids=[paragraphs[0][0].full()],
     )
 
     question = "Give me an example of side-scrolling game"
     field_builder.add_question_answer(
         question=question,
         answer="SMB Wonder game",
-        answer_paragraph_ids=[paragraph_ids[1].full()],
+        answer_paragraph_ids=[paragraphs[1][0].full()],
     )
 
     bm = bmb.build()

@@ -35,9 +35,6 @@ class SelectProp(BaseModel):
         return self
 
 
-class VirtualSelectProp(SelectProp): ...
-
-
 def prop_discriminator(v: Any) -> str | None:
     if isinstance(v, dict):
         return v.get("prop", None)
@@ -54,26 +51,29 @@ def from_discriminator(v: Any) -> str | None:
 
 # Ids
 
+ResourceIdPattern = r"^[0-9a-f]{32}$"
 ResourceId = Annotated[
     str,
-    StringConstraints(pattern=r"^[0-9a-f]{32}$", min_length=32, max_length=32),
+    StringConstraints(pattern=ResourceIdPattern, min_length=32, max_length=32),
 ]
 
+FieldIdPattern = r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+(/[^/]{1,128})?$"
 FieldId = Annotated[
     str,
     StringConstraints(
-        pattern=r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+(/[^/]{1,128})?$",
+        pattern=FieldIdPattern,
         min_length=32 + 1 + 1 + 1 + 1 + 0 + 0,
         # max field id of 250
         max_length=32 + 1 + 1 + 1 + 250 + 1 + 218,
     ),
 ]
 
+ParagraphIdPattern = r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+(/[^/]{1,128})?/[0-9]+-[0-9]+$"
 ParagraphId = Annotated[
     str,
     StringConstraints(
         # resource-uuid/field-type/field-id/[split-id/]paragraph-id
-        pattern=r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+(/[^/]{1,128})?/[0-9]+-[0-9]+$",
+        pattern=ParagraphIdPattern,
         min_length=32 + 1 + 1 + 1 + 1 + 0 + 0 + 1 + 3,
         # max field id of 250 and 10 digit paragraphs. More than enough
         max_length=32 + 1 + 1 + 1 + 250 + 1 + 128 + 1 + 21,
@@ -135,6 +135,18 @@ class ConversationAnswer(SelectProp):
     prop: Literal["answer"] = "answer"
 
 
+ConversationProp = (
+    FieldProp
+    | Annotated[
+        (
+            Annotated[ConversationAttachments, Tag("attachments")]
+            | Annotated[ConversationAnswer, Tag("answer")]
+        ),
+        Discriminator(prop_discriminator),
+    ]
+)
+
+
 class ResourceTitle(SelectProp):
     prop: Literal["title"] = "title"
 
@@ -159,14 +171,6 @@ class ResourceFieldsFilter(BaseModel):
     ids: list[str]
 
 
-class ResourceFields(VirtualSelectProp):
-    """Virtual property to access resource fields"""
-
-    prop: Literal["fields"] = "fields"
-    select: list[FieldProp]
-    filter: ResourceFieldsFilter | None = None
-
-
 ResourceProp = Annotated[
     (
         Annotated[ResourceTitle, Tag("title")]
@@ -174,7 +178,6 @@ ResourceProp = Annotated[
         | Annotated[ResourceBasic, Tag("basic")]
         | Annotated[ResourceOrigin, Tag("origin")]
         | Annotated[ResourceSecurity, Tag("security")]
-        | Annotated[ResourceFields, Tag("fields")]
     ),
     Discriminator(prop_discriminator),
 ]
@@ -186,7 +189,7 @@ ResourceProp = Annotated[
 class ResourceAugment(BaseModel, extra="forbid"):
     given: list[ResourceId | FieldId | ParagraphId]
     select: list[ResourceProp]
-    from_: Literal["resources"] = Field("resources", alias="from")
+    from_: Literal["resources"] = Field(default="resources", alias="from")
 
 
 class ConversationAugmentLimits(BaseModel):
@@ -195,22 +198,22 @@ class ConversationAugmentLimits(BaseModel):
 
 class ConversationAugment(BaseModel, extra="forbid"):
     given: list[FieldId | ParagraphId]
-    select: list[FieldProp | ConversationAttachments | ConversationAnswer]
-    from_: Literal["conversations"] = Field("conversations", alias="from")
+    select: list[ConversationProp]
+    from_: Literal["conversations"] = Field(default="conversations", alias="from")
     limits: ConversationAugmentLimits | None = Field(default_factory=ConversationAugmentLimits)
 
 
 class FieldAugment(BaseModel, extra="forbid"):
     given: list[ResourceId | FieldId | ParagraphId]
     select: list[FieldProp]
-    from_: Literal["fields"] = Field("fields", alias="from")
+    from_: Literal["fields"] = Field(default="fields", alias="from")
     filter: Any | None = None
 
 
 class ParagraphAugment(BaseModel, extra="forbid"):
     given: list[ParagraphId]
     select: list[ParagraphProp]
-    from_: Literal["paragraphs"] = Field("paragraphs", alias="from")
+    from_: Literal["paragraphs"] = Field(default="paragraphs", alias="from")
 
 
 class AugmentationLimits(BaseModel, extra="forbid"):

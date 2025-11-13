@@ -189,3 +189,10 @@ class AugmentedResource:
 
     origin: Origin | None
     security: ResourceSecurity | None
+
+
+@dataclass
+class Augmented:
+    resources: dict[str, AugmentedResource]
+    fields: dict[FieldId, AugmentedField]
+    paragraphs: dict[ParagraphId, AugmentedParagraph]
