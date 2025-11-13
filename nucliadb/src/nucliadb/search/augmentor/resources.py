@@ -43,6 +43,8 @@ from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
 
+# XXX: legacy serialization. At some point, we may want to remove this behavior
+# and fully replace it
 async def legacy_augment_resources(
     kbid: str,
     given: list[str],
@@ -52,25 +54,50 @@ async def legacy_augment_resources(
 ) -> dict[str, nucliadb_models.resource.Resource | None]:
     """Augment a list of resources following an augmentation"""
 
+    if ResourceProperties.EXTRACTED in opts.show and has_feature(
+        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
+    ):
+        # Returning extracted metadata in search results is deprecated and this flag
+        # will be set to True for all KBs in the future.
+        opts.show.remove(ResourceProperties.EXTRACTED)
+        opts.extracted.clear()
+
     ops = []
     for rid in given:
         task = asyncio.create_task(
             limited_concurrency(
-                augment_resource(kbid, rid, [], opts),
+                legacy_augment_resource(kbid, rid, opts),
                 max_ops=concurrency_control,
             )
         )
         ops.append(task)
-    results: list[AugmentedResource | None] = await asyncio.gather(*ops)
+    results: list[nucliadb_models.resource.Resource | None] = await asyncio.gather(*ops)
 
     augmented: dict[str, nucliadb_models.resource.Resource | None] = {}
     for rid, augmentation in zip(given, results):
-        if augmentation is None:
-            augmented[rid] = None
-        else:
-            augmented[rid] = augmentation.legacy
+        augmented[rid] = augmentation
 
     return augmented
+
+
+@augmentor_observer.wrap({"type": "legacy_resource"})
+async def legacy_augment_resource(
+    kbid: str,
+    rid: str,
+    opts: ResourceHydrationOptions,
+) -> nucliadb_models.resource.Resource | None:
+    resource = await cache.get_resource(kbid, rid)
+    if resource is None:
+        # skip resources that aren't in the DB
+        return None
+
+    serialized = await serialize_resource(
+        resource,
+        show=opts.show,
+        field_type_filter=opts.field_type_filter,
+        extracted=opts.extracted,
+    )
+    return serialized
 
 
 async def augment_resources(
@@ -86,7 +113,7 @@ async def augment_resources(
     for rid in given:
         task = asyncio.create_task(
             limited_concurrency(
-                augment_resource(kbid, rid, select, None),
+                augment_resource(kbid, rid, select),
                 max_ops=concurrency_control,
             )
         )
@@ -104,7 +131,6 @@ async def augment_resource(
     kbid: str,
     rid: str,
     select: list[ResourceProp],
-    opts: ResourceHydrationOptions | None = None,
 ) -> AugmentedResource | None:
     # TODO: make sure we don't repeat any select clause
 
@@ -113,68 +139,42 @@ async def augment_resource(
         # skip resources that aren't in the DB
         return None
 
-    return await db_augment_resource(resource, select, opts)
+    return await db_augment_resource(resource, select)
 
 
 @augmentor_observer.wrap({"type": "db_resource"})
 async def db_augment_resource(
     resource: Resource,
     select: list[ResourceProp],
-    opts: ResourceHydrationOptions | None = None,
 ) -> AugmentedResource:
-    kbid = resource.kb.kbid
-
     title = None
     summary = None
     origin = None
     security = None
-    legacy = None
 
-    if opts is not None:
-        # XXX: legacy serialization. At some point, we may want to remove this
-        # behavior and fully replace it
+    basic = None
+    for prop in select:
+        if isinstance(prop, ResourceTitle):
+            if basic is None:
+                basic = await resource.get_basic()
+            if basic is not None:
+                title = basic.title
 
-        if ResourceProperties.EXTRACTED in opts.show and has_feature(
-            const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
-        ):
-            # Returning extracted metadata in search results is deprecated and this flag
-            # will be set to True for all KBs in the future.
-            opts.show.remove(ResourceProperties.EXTRACTED)
-            opts.extracted.clear()
+        elif isinstance(prop, ResourceSummary):
+            if basic is None:
+                basic = await resource.get_basic()
+            if basic is not None:
+                summary = basic.summary
 
-        legacy = await serialize_resource(
-            resource,
-            show=opts.show,
-            field_type_filter=opts.field_type_filter,
-            extracted=opts.extracted,
-        )
+        elif isinstance(prop, ResourceOrigin):
+            # REVIEW: we may want a better hydration than proto to JSON
+            origin = await serialize_origin(resource)
 
-    else:
-        # new augmentation, more fine graned and less proto to JSON
+        elif isinstance(prop, ResourceSecurity):
+            security = await serialize_security(resource)
 
-        basic = None
-        for prop in select:
-            if isinstance(prop, ResourceTitle):
-                if basic is None:
-                    basic = await resource.get_basic()
-                if basic is not None:
-                    title = basic.title
-
-            elif isinstance(prop, ResourceSummary):
-                if basic is None:
-                    basic = await resource.get_basic()
-                if basic is not None:
-                    summary = basic.summary
-
-            elif isinstance(prop, ResourceOrigin):
-                # REVIEW: we may want a better hydration than proto to JSON
-                origin = await serialize_origin(resource)
-
-            elif isinstance(prop, ResourceSecurity):
-                security = await serialize_security(resource)
-
-            else:
-                raise NotImplementedError(f"resource property not implemented: {prop}")
+        else:
+            raise NotImplementedError(f"resource property not implemented: {prop}")
 
     augmented = AugmentedResource(
         id=resource.uuid,
@@ -182,6 +182,5 @@ async def db_augment_resource(
         summary=summary,
         origin=origin,
         security=security,
-        legacy=legacy,
     )
     return augmented

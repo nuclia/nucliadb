@@ -27,9 +27,6 @@ from nucliadb_models.conversation import FieldConversation
 from nucliadb_models.file import FieldFile
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import Origin
-from nucliadb_models.resource import (
-    Resource,
-)
 from nucliadb_models.search import Image
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import FieldText
@@ -192,5 +189,3 @@ class AugmentedResource:
 
     origin: Origin | None
     security: ResourceSecurity | None
-
-    legacy: Resource | None
