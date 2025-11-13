@@ -111,6 +111,7 @@ async def search_knowledgebox(
     sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
     top_k: int = fastapi_query(SearchParamDefaults.top_k),
+    offset: int = fastapi_query(SearchParamDefaults.offset),
     min_score: Optional[float] = Query(
         default=None,
         description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
@@ -191,6 +192,7 @@ async def search_knowledgebox(
             with_synonyms=with_synonyms,
             security=security,
             show_hidden=show_hidden,
+            offset=offset,
         )
     except ValidationError as exc:
         detail = json.loads(exc.json())

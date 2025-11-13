@@ -506,9 +506,17 @@ class SearchParamDefaults:
     )
     top_k = ParamDefault(
         default=20,
+        ge=0,
         le=200,
         title="Top k",
         description="The number of results search should return. The maximum number of results allowed is 200.",
+    )
+    offset = ParamDefault(
+        default=0,
+        ge=0,
+        le=1000,
+        title="Results offset",
+        description="The number of results to skip, starting from the beginning in sort order. Used for pagination. It can only be used with the keyword and fulltext indexes."
     )
     highlight = ParamDefault(
         default=False,
@@ -941,11 +949,31 @@ class SearchRequest(BaseSearchRequest):
     )
     faceted: list[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
+    offset: int = SearchParamDefaults.offset.to_pydantic_field()
 
     @field_validator("faceted")
     @classmethod
     def nested_facets_not_supported(cls, facets):
         return validate_facets(facets)
+
+    @model_validator(mode="after")
+    def offset_sort_only_on_keyword_indexes(self):
+        has_non_keyword_indexes = set(self.features) & {SearchOptions.SEMANTIC, SearchOptions.RELATIONS}
+        if has_non_keyword_indexes:
+            if self.offset > 0:
+                raise ValueError("offset cannot be used with the semantic or relations index")
+            if self.sort and self.sort.field != SortField.SCORE:
+                raise ValueError("sort by date cannot be used with the semantic or relations index")
+
+        return self
+
+    @field_validator("sort", mode="after")
+    @classmethod
+    def sorting_by_title_not_supported(cls, value: Optional[SortOptions]) -> int:
+        if value and value.field == SortField.TITLE:
+            raise ValueError("sorting by title not supported in /search")
+
+        return value
 
 
 class Author(str, Enum):

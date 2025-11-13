@@ -65,6 +65,43 @@ def test_find_supports_search_options():
     search.FindRequest(features=[search.SearchOptions.SEMANTIC])  # type: ignore
     search.FindRequest(features=[search.SearchOptions.RELATIONS])  # type: ignore
 
+def test_search_semantic_with_offset_not_supported():
+    # Semantic without offset is OK
+    search.SearchRequest(features=[search.SearchOptions.SEMANTIC])
+    # Keyword with offset is OK
+    search.SearchRequest(features=[search.SearchOptions.KEYWORD, search.SearchOptions.FULLTEXT], offset=1)
+
+    # Semantic with offset is not OK
+    with pytest.raises(ValidationError):
+        search.SearchRequest(features=[search.SearchOptions.SEMANTIC], offset=1)
+
+    # Relations with offset is not OK
+    with pytest.raises(ValidationError):
+        search.SearchRequest(features=[search.SearchOptions.RELATIONS], offset=1)
+
+    # Default features (all) with offset is not OK
+    with pytest.raises(ValidationError):
+        search.SearchRequest(offset=1)
+
+
+def test_search_semantic_with_sorting_not_supported():
+    # Semantic with default sort (score) is OK
+    search.SearchRequest(features=[search.SearchOptions.SEMANTIC])
+    search.SearchRequest(features=[search.SearchOptions.SEMANTIC], sort=search.SortOptions(field=search.SortField.SCORE))
+
+    # Semantic with date sorting is not OK
+    with pytest.raises(ValidationError):
+        search.SearchRequest(features=[search.SearchOptions.SEMANTIC], sort=search.SortOptions(field=search.SortField.CREATED))
+
+    with pytest.raises(ValidationError):
+        search.SearchRequest(features=[search.SearchOptions.SEMANTIC], sort=search.SortOptions(field=search.SortField.MODIFIED))
+
+    # It is supported in keyword indexes
+    search.SearchRequest(features=[search.SearchOptions.KEYWORD, search.SearchOptions.FULLTEXT], sort=search.SortOptions(field=search.SortField.CREATED))
+
+    # Title sorting is not supported for any index (only catalog)
+    with pytest.raises(ValidationError):
+        search.SearchRequest(features=[search.SearchOptions.KEYWORD], sort=search.SortOptions(field=search.SortField.TITLE))
 
 # Rank fusion
 
