@@ -66,6 +66,7 @@ from nucliadb_utils.authentication import requires_one
     summary="Start an export of a Knowledge Box",
     tags=["Knowledge Boxes"],
     response_model=CreateExportResponse,
+    include_in_schema=False,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
@@ -91,6 +92,7 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
     tags=["Knowledge Boxes"],
     response_model=NewImportedKbResponse,
     openapi_extra={"x-hidden-operation": True},
+    include_in_schema=False,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
@@ -140,6 +142,7 @@ async def kb_create_and_import_endpoint(request: Request):
     summary="Start an import to a Knowledge Box",
     tags=["Knowledge Boxes"],
     response_model=CreateImportResponse,
+    include_in_schema=False,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
