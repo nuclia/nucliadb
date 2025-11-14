@@ -172,7 +172,7 @@ async def test_send_to_process_generated_fields(
         )
     )
 
-    index_resource_spy = mocker.spy(processor.index_node_shard_manager, "add_resource")
+    index_resource_spy = mocker.spy(processor.nidx_shard_manager, "add_resource")
     await processor.process(bm, 4)
 
     index_message: noderesources_pb2.Resource = index_resource_spy.call_args.args[1]

@@ -152,7 +152,7 @@ class Processor:
         self.storage = storage
         self.partition = partition
         self.pubsub = pubsub
-        self.index_node_shard_manager = get_shard_manager()
+        self.nidx_shard_manager = get_shard_manager()
 
     async def process(
         self,
@@ -223,7 +223,7 @@ class Processor:
                     if external_index_manager is not None:
                         await self.external_index_delete_resource(external_index_manager, uuid)
                     else:
-                        await self.index_node_shard_manager.delete_resource(
+                        await self.nidx_shard_manager.delete_resource(
                             shard, message.uuid, seqid, partition, message.kbid
                         )
                     try:
@@ -454,13 +454,13 @@ class Processor:
                     raise AttributeError("Shard not available")
             else:
                 # It's a new resource, get KB's current active shard to place new resource on
-                shard = await self.index_node_shard_manager.get_current_active_shard(txn, kbid)
+                shard = await self.nidx_shard_manager.get_current_active_shard(txn, kbid)
                 if shard is None:
                     # No current shard available, create a new one
                     async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
                         kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
                         prewarm = kb_config is not None and kb_config.prewarm_enabled
-                        shard = await self.index_node_shard_manager.create_shard_by_kbid(
+                        shard = await self.nidx_shard_manager.create_shard_by_kbid(
                             txn, kbid, prewarm_enabled=prewarm
                         )
                 await datamanagers.resources.set_resource_shard_id(
@@ -488,7 +488,7 @@ class Processor:
         if external_index_manager is not None:
             await self.external_index_add_resource(external_index_manager, uuid, index_message)
         else:
-            await self.index_node_shard_manager.add_resource(
+            await self.nidx_shard_manager.add_resource(
                 shard,
                 index_message,
                 seqid,

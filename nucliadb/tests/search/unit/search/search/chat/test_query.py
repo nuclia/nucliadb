@@ -22,7 +22,7 @@ import pytest
 
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.search.chat.query import (
-    get_find_results,
+    find_retrieval,
     parse_audit_answer,
 )
 from nucliadb.search.search.metrics import Metrics
@@ -75,7 +75,7 @@ def predict():
         ),
     ],
 )
-async def test_get_find_results_vector_search_is_optional(predict, chat_features, find_features):
+async def test_find_retrieval_vector_search_is_optional(predict, chat_features, find_features):
     find_results = KnowledgeboxFindResults(
         total=0, min_score=MinScore(semantic=0.7), resources={}, facets=[]
     )
@@ -90,7 +90,7 @@ async def test_get_find_results_vector_search_is_optional(predict, chat_features
         "nucliadb.search.search.chat.query.find",
         return_value=(find_results, False, query_parser),
     ) as find_mock:
-        await get_find_results(
+        await find_retrieval(
             kbid="kbid",
             query="query",
             item=ask_request,
