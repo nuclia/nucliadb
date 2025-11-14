@@ -72,7 +72,7 @@ def get_shard_manager() -> KBShardManager:
 
 async def get_resource(kbid: str, resource_id: str) -> Optional[Resource]:
     async with datamanagers.with_ro_transaction() as txn:
-        return await datamanagers.resources.get_resource(txn, kbid=kbid, rid=resource_id)
+        return await Resource.get(txn, kbid=kbid, rid=resource_id)
 
 
 @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8)
@@ -80,7 +80,7 @@ async def get_rollover_resource_index_message(
     kbid: str, resource_id: str
 ) -> Optional[nodereader_pb2.Resource]:
     async with datamanagers.with_ro_transaction() as txn:
-        resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=resource_id)
+        resource = await Resource.get(txn, kbid=kbid, rid=resource_id)
         if resource is None:
             logger.warning(
                 "Resource not found while indexing, skipping",

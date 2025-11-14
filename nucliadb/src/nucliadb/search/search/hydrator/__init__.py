@@ -17,26 +17,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import logging
-from contextlib import AsyncExitStack
 from typing import Optional
 
 from pydantic import BaseModel
 
-from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import FieldId
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search.search import cache
-from nucliadb.search.search.paragraphs import get_paragraph_text
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import ExtractedDataTypeName, Resource
+from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import ResourceProperties
 from nucliadb_telemetry.metrics import Observer
-from nucliadb_utils import const
 from nucliadb_utils.asyncio_utils import ConcurrentRunner
-from nucliadb_utils.utilities import has_feature
 
 logger = logging.getLogger(__name__)
 
@@ -93,86 +86,17 @@ async def hydrate_resource_text(
     return [text for text in field_extracted_texts if text is not None]
 
 
-@hydrator_observer.wrap({"type": "resource_metadata"})
-async def hydrate_resource_metadata(
-    kbid: str,
-    resource_id: str,
-    options: ResourceHydrationOptions,
-    *,
-    concurrency_control: Optional[asyncio.Semaphore] = None,
-    service_name: Optional[str] = None,
-) -> Optional[Resource]:
-    """Fetch resource metadata and return it serialized."""
-    show = options.show
-    extracted = options.extracted
-
-    if ResourceProperties.EXTRACTED in show and has_feature(
-        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
-    ):
-        # Returning extracted metadata in search results is deprecated and this flag
-        # will be set to True for all KBs in the future.
-        show.remove(ResourceProperties.EXTRACTED)
-        extracted = []
-
-    async with AsyncExitStack() as stack:
-        if concurrency_control is not None:
-            await stack.enter_async_context(concurrency_control)
-
-        async with get_driver().ro_transaction() as ro_txn:
-            serialized_resource = await managed_serialize(
-                txn=ro_txn,
-                kbid=kbid,
-                rid=resource_id,
-                show=show,
-                field_type_filter=options.field_type_filter,
-                extracted=extracted,
-                service_name=service_name,
-            )
-            if serialized_resource is None:
-                logger.warning(
-                    "Resource not found in database", extra={"kbid": kbid, "rid": resource_id}
-                )
-    return serialized_resource
-
-
 @hydrator_observer.wrap({"type": "field_text"})
 async def hydrate_field_text(
     kbid: str,
     field_id: FieldId,
 ) -> Optional[tuple[FieldId, str]]:
-    extracted_text_pb = await cache.get_extracted_text_from_field_id(kbid, field_id)
-    if extracted_text_pb is None:  # pragma: no cover
+    from nucliadb.models.internal.augment import FieldText
+    from nucliadb.search.augmentor.fields import augment_field
+
+    augmented = await augment_field(kbid, field_id, select=[FieldText()])
+    if augmented is None or augmented.text is None:
+        # we haven't found the resource, field or text
         return None
 
-    if field_id.subfield_id:
-        return field_id, extracted_text_pb.split_text[field_id.subfield_id]
-    else:
-        return field_id, extracted_text_pb.text
-
-
-@hydrator_observer.wrap({"type": "text_block"})
-async def hydrate_text_block(
-    kbid: str,
-    text_block: TextBlockMatch,
-    options: TextBlockHydrationOptions,
-    *,
-    concurrency_control: Optional[asyncio.Semaphore] = None,
-) -> TextBlockMatch:
-    """Given a `text_block`, fetch its corresponding text, modify and return the
-    `text_block` object.
-
-    """
-    if options.only_hydrate_empty and text_block.text:
-        return text_block
-    async with AsyncExitStack() as stack:
-        if concurrency_control is not None:
-            await stack.enter_async_context(concurrency_control)
-
-        text_block.text = await get_paragraph_text(
-            kbid=kbid,
-            paragraph_id=text_block.paragraph_id,
-            highlight=options.highlight,
-            matches=[],  # TODO: this was never implemented
-            ematches=options.ematches,
-        )
-    return text_block
+    return field_id, augmented.text

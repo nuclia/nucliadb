@@ -23,6 +23,7 @@ from typing import Optional
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.base import Field
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.search.predict_models import (
     FieldInfo,
     NameOperationFilter,
@@ -69,7 +70,7 @@ def _parse_filters(filters: Optional[list[AgentsFilter]]) -> Optional[list[NameO
 
 async def fetch_resource_fields(kbid: str, rid: str) -> list[FieldInfo]:
     async with datamanagers.with_ro_transaction() as txn:
-        resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
+        resource = await Resource.get(txn, kbid=kbid, rid=rid)
         if resource is None:
             raise ResourceNotFoundError()
         fields = await resource.get_fields(force=True)

@@ -27,11 +27,11 @@ Backfill the catalog with labels from fields metadata
 import logging
 from typing import cast
 
-from nucliadb.common import datamanagers
 from nucliadb.common.catalog import catalog_update, get_catalog
 from nucliadb.common.catalog.pg import PGCatalog
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.ingest.orm.index_message import get_resource_index_message
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb_protos import resources_pb2
 
@@ -82,7 +82,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                 # Index each resource
                 for key in to_index:
                     rid = key.split("/")[4]
-                    resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
+                    resource = await Resource.get(txn, kbid=kbid, rid=rid)
                     if resource is None:
                         logger.warning(f"Could not load resource {rid} for kbid {kbid}")
                         continue

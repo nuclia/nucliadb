@@ -22,9 +22,9 @@ from typing import Union
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
+from nucliadb.common import datamanagers
 from nucliadb.common.models_utils import from_proto
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.search.api.v1.resource.utils import get_resource_uuid_by_slug
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCE_SLUG_PREFIX, api
 from nucliadb.search.predict_models import AugmentedField, RunAgentsResponse
 from nucliadb.search.search.exceptions import ResourceNotFoundError
@@ -81,7 +81,7 @@ async def run_agents_by_slug(
     item: ResourceAgentsRequest,
     x_nucliadb_user: str = Header(""),
 ) -> Union[ResourceAgentsResponse, HTTPClientError]:
-    resource_id = await get_resource_uuid_by_slug(kbid, slug)
+    resource_id = await datamanagers.atomic.resources.get_resource_uuid_from_slug(kbid=kbid, slug=slug)
     if resource_id is None:
         return HTTPClientError(status_code=404, detail="Resource not found")
     return await _run_agents_endpoint(kbid, resource_id, x_nucliadb_user, item)

@@ -330,7 +330,9 @@ class FieldBuilder:
 
         storage = await get_storage()
 
-        sf = storage.file_extracted(self._kbid, self._rid, "f", "myfile", f"file_pages_previews/{page}")
+        sf = storage.file_extracted(
+            self._kbid, self._rid, "f", self._field_id.field, f"file_pages_previews/{page}"
+        )
         await storage.chunked_upload_object(
             sf.bucket,
             sf.key,
@@ -373,7 +375,7 @@ class FieldBuilder:
         # so the tests can get them. But the existence of this images **only**
         # depend on learning
         sf = storage.file_extracted(
-            self._kbid, self._rid, "f", "myfile", f"generated/extracted_images_{page}.png"
+            self._kbid, self._rid, "f", self._field_id.field, f"generated/extracted_images_{page}.png"
         )
         await storage.chunked_upload_object(
             sf.bucket,

@@ -17,12 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_NAME, FieldId
-from nucliadb.common.models_utils import from_proto
-from nucliadb.ingest.orm.resource import Resource
-from nucliadb.search.search.hydrator import hydrate_field_text
+from nucliadb.ingest.fields.base import Field
+from nucliadb.models.internal.augment import FieldProp, FieldText, FieldValue
+from nucliadb.search.augmentor.fields import (
+    db_augment_conversation_field,
+    db_augment_file_field,
+    db_augment_generic_field,
+    db_augment_link_field,
+    db_augment_text_field,
+)
 from nucliadb_models import hydration as hydration_models
 from nucliadb_models.common import FieldTypeName
 
@@ -32,33 +36,33 @@ def page_preview_id(page_number: int) -> str:
     return f"{page_number}"
 
 
-async def hydrate_field(resource: Resource, field_id: FieldId, config: hydration_models.FieldHydration):
+async def hydrate_field(field: Field, field_id: FieldId, config: hydration_models.FieldHydration):
     field_type = FIELD_TYPE_STR_TO_NAME[field_id.type]
 
     if field_type == FieldTypeName.TEXT:
         if not config.text is not None:
             return
-        return await hydrate_text_field(resource, field_id, config.text)
+        return await hydrate_text_field(field, field_id, config.text)
 
     elif field_type == FieldTypeName.FILE is not None:
         if not config.file:
             return
-        return await hydrate_file_field(resource, field_id, config.file)
+        return await hydrate_file_field(field, field_id, config.file)
 
     elif field_type == FieldTypeName.LINK is not None:
         if not config.link:
             return
-        return await hydrate_link_field(resource, field_id, config.link)
+        return await hydrate_link_field(field, field_id, config.link)
 
     elif field_type == FieldTypeName.CONVERSATION is not None:
         if not config.conversation:
             return
-        return await hydrate_conversation_field(resource, field_id, config.conversation)
+        return await hydrate_conversation_field(field, field_id, config.conversation)
 
     elif field_type == FieldTypeName.GENERIC is not None:
         if not config.generic:
             return
-        return await hydrate_generic_field(resource, field_id, config.generic)
+        return await hydrate_generic_field(field, field_id, config.generic)
 
     else:  # pragma: no cover
         # This is a trick so mypy generates an error if this branch can be reached,
@@ -67,109 +71,135 @@ async def hydrate_field(resource: Resource, field_id: FieldId, config: hydration
 
 
 async def hydrate_text_field(
-    resource: Resource,
+    field: Field,
     field_id: FieldId,
     config: hydration_models.TextFieldHydration,
 ) -> hydration_models.HydratedTextField:
+    select: list[FieldProp] = []
+    if config.value:
+        select.append(FieldValue())
+    if config.extracted_text:
+        select.append(FieldText())
+
+    augmented = await db_augment_text_field(field, field_id, select)
+
     hydrated = hydration_models.HydratedTextField(
         id=field_id.full(),
         resource=field_id.rid,
         field_type=FieldTypeName.TEXT,
     )
 
-    if config.extracted_text:
-        field_text = await hydrate_field_text(resource.kb.kbid, field_id)
-        if field_text is not None:
-            (_, text) = field_text
-            hydrated.extracted = hydration_models.FieldExtractedData(text=text)
+    if config.value and augmented.value:
+        hydrated.value = augmented.value
+
+    if config.extracted_text and augmented.text:
+        hydrated.extracted = hydration_models.FieldExtractedData(text=augmented.text)
 
     return hydrated
 
 
 async def hydrate_file_field(
-    resource: Resource,
+    field: Field,
     field_id: FieldId,
     config: hydration_models.FileFieldHydration,
 ) -> hydration_models.HydratedFileField:
+    select: list[FieldProp] = []
+    if config.value:
+        select.append(FieldValue())
+    if config.extracted_text:
+        select.append(FieldText())
+
+    augmented = await db_augment_file_field(field, field_id, select)
+
     hydrated = hydration_models.HydratedFileField(
         id=field_id.full(),
         resource=field_id.rid,
         field_type=FieldTypeName.FILE,
     )
 
-    if config.value:
-        field = await resource.get_field(field_id.key, field_id.pb_type)
-        value = await field.get_value()
-        hydrated.value = from_proto.field_file(value)
+    if config.value and augmented.value:
+        hydrated.value = augmented.value
 
-    if config.extracted_text:
-        field_text = await hydrate_field_text(resource.kb.kbid, field_id)
-        if field_text is not None:
-            (_, text) = field_text
-            hydrated.extracted = hydration_models.FieldExtractedData(text=text)
+    if config.extracted_text and augmented.text:
+        hydrated.extracted = hydration_models.FieldExtractedData(text=augmented.text)
 
     return hydrated
 
 
 async def hydrate_link_field(
-    resource: Resource,
+    field: Field,
     field_id: FieldId,
     config: hydration_models.LinkFieldHydration,
 ) -> hydration_models.HydratedLinkField:
+    select: list[FieldProp] = []
+    if config.value:
+        select.append(FieldValue())
+    if config.extracted_text:
+        select.append(FieldText())
+
+    augmented = await db_augment_link_field(field, field_id, select)
+
     hydrated = hydration_models.HydratedLinkField(
         id=field_id.full(),
         resource=field_id.rid,
         field_type=FieldTypeName.LINK,
     )
 
-    if config.value:
-        field = await resource.get_field(field_id.key, field_id.pb_type)
-        value = await field.get_value()
-        hydrated.value = from_proto.field_link(value)
+    if config.value and augmented.value:
+        hydrated.value = augmented.value
 
-    if config.extracted_text:
-        field_text = await hydrate_field_text(resource.kb.kbid, field_id)
-        if field_text is not None:
-            (_, text) = field_text
-            hydrated.extracted = hydration_models.FieldExtractedData(text=text)
+    if config.extracted_text and augmented.text:
+        hydrated.extracted = hydration_models.FieldExtractedData(text=augmented.text)
 
     return hydrated
 
 
 async def hydrate_conversation_field(
-    resource: Resource,
+    field: Field,
     field_id: FieldId,
     config: hydration_models.ConversationFieldHydration,
 ) -> hydration_models.HydratedConversationField:
+    select: list[FieldProp] = []
+    if config.value:
+        select.append(FieldValue())
+
+    augmented = await db_augment_conversation_field(field, field_id, select)
+
     hydrated = hydration_models.HydratedConversationField(
         id=field_id.full(),
         resource=field_id.rid,
         field_type=FieldTypeName.CONVERSATION,
     )
-    # TODO: implement conversation fields
+
+    if config.value and augmented.value:
+        hydrated.value = augmented.value
+
     return hydrated
 
 
 async def hydrate_generic_field(
-    resource: Resource,
+    field: Field,
     field_id: FieldId,
     config: hydration_models.GenericFieldHydration,
 ) -> hydration_models.HydratedGenericField:
+    select: list[FieldProp] = []
+    if config.value:
+        select.append(FieldValue())
+    if config.extracted_text:
+        select.append(FieldText())
+
+    augmented = await db_augment_generic_field(field, field_id, select)
+
     hydrated = hydration_models.HydratedGenericField(
         id=field_id.full(),
         resource=field_id.rid,
         field_type=FieldTypeName.GENERIC,
     )
 
-    if config.value:
-        field = await resource.get_field(field_id.key, field_id.pb_type)
-        value = await field.get_value()
-        hydrated.value = value
+    if config.value and augmented.value:
+        hydrated.value = augmented.value
 
-    if config.extracted_text:
-        field_text = await hydrate_field_text(resource.kb.kbid, field_id)
-        if field_text is not None:
-            (_, text) = field_text
-            hydrated.extracted = hydration_models.FieldExtractedData(text=text)
+    if config.extracted_text and augmented.text:
+        hydrated.extracted = hydration_models.FieldExtractedData(text=augmented.text)
 
     return hydrated

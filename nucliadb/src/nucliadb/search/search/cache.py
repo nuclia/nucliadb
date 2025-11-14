@@ -46,16 +46,25 @@ async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
     resource_cache = get_resource_cache()
     if resource_cache is None:
         logger.warning("Resource cache not set")
-        return await _orm_get_resource(kbid, uuid)
+        async with get_driver().ro_transaction() as txn:
+            storage = await get_storage(service_name=SERVICE_NAME)
+            kb = KnowledgeBoxORM(txn, storage, kbid)
+            return await kb.get(uuid)
 
     return await resource_cache.get(kbid, uuid)
 
 
-async def _orm_get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
-    async with get_driver().ro_transaction() as txn:
-        storage = await get_storage(service_name=SERVICE_NAME)
-        kb = KnowledgeBoxORM(txn, storage, kbid)
-        return await kb.get(uuid)
+async def get_field(kbid: str, field_id: FieldId) -> Optional[Field]:
+    rid = field_id.rid
+    orm_resource = await get_resource(kbid, rid)
+    if orm_resource is None:
+        return None
+    field_obj = await orm_resource.get_field(
+        key=field_id.key,
+        type=field_id.pb_type,
+        load=False,
+    )
+    return field_obj
 
 
 async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
@@ -72,19 +81,6 @@ async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
     return extracted_text
 
 
-async def get_extracted_text_from_field_id(kbid: str, field: FieldId) -> Optional[ExtractedText]:
-    rid = field.rid
-    orm_resource = await get_resource(kbid, rid)
-    if orm_resource is None:
-        return None
-    field_obj = await orm_resource.get_field(
-        key=field.key,
-        type=field.pb_type,
-        load=False,
-    )
-    return await get_field_extracted_text(field_obj)
-
-
 @contextlib.contextmanager
 def request_caches():
     """
@@ -96,7 +92,8 @@ def request_caches():
     Makes sure to clean the caches at the end of the context manager.
     >>> with request_caches():
     ...     resource = await get_resource(kbid, uuid)
-    ...     extracted_text = await get_extracted_text_from_field_id(kbid, rid, field_id)
+    ...     field = await get_field(kbid, field_id)
+    ...     extracted_text = await get_field_extracted_text(field)
     """
 
     # This cache size is an arbitrary number, once we have a metric in place and

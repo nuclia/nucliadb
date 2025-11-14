@@ -555,7 +555,7 @@ async def _conversation_append_checks(
     kbid: str, rid: str, field_id: str, input: models.InputConversationField
 ):
     async with datamanagers.with_ro_transaction() as txn:
-        resource_obj = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
+        resource_obj = await ORMResource.get(txn, kbid=kbid, rid=rid)
         if resource_obj is None:
             return
         conv: Conversation = await resource_obj.get_field(

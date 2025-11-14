@@ -28,9 +28,9 @@ from fastapi_versioning import version
 from starlette.datastructures import Headers
 from starlette.responses import StreamingResponse
 
+from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.common.models_utils import to_proto
-from nucliadb.ingest.serialize import get_resource_uuid_by_slug
 from nucliadb.reader import SERVICE_NAME, logger
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
@@ -301,7 +301,11 @@ async def _get_resource_uuid_from_params(kbid, rid: Optional[str], rslug: Option
 
     if not rid:
         # Attempt to get it from slug
-        rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)  # type: ignore
+        rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(
+            kbid=kbid,
+            # mypy doesn't infer that we already checked for slug to be something
+            slug=rslug,  # type: ignore[arg-type]
+        )
         if rid is None:
             raise HTTPException(status_code=404, detail="Resource does not exist")
 

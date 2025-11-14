@@ -188,6 +188,15 @@ async def managed_serialize(
     if orm_resource is None:
         return None
 
+    return await serialize_resource(orm_resource, show, field_type_filter, extracted)
+
+
+async def serialize_resource(
+    orm_resource: ORMResource,
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    extracted: list[ExtractedDataTypeName],
+) -> Resource:
     resource = Resource(id=orm_resource.uuid)
 
     include_values = ResourceProperties.VALUES in show
@@ -406,13 +415,3 @@ async def get_orm_resource(
         return None
 
     return orm_resource
-
-
-async def get_resource_uuid_by_slug(
-    kbid: str, slug: str, service_name: Optional[str] = None
-) -> Optional[str]:
-    storage = await get_storage(service_name=service_name)
-    driver = get_driver()
-    async with driver.ro_transaction() as txn:
-        kb = KnowledgeBox(txn, storage, kbid)
-        return await kb.get_resource_uuid_by_slug(slug)

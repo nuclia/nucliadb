@@ -239,7 +239,7 @@ async def test_story_7286(
     )
     assert resp.status_code == 200
 
-    with patch("nucliadb.search.search.hydrator.managed_serialize", return_value=None):
+    with patch("nucliadb.search.augmentor.resources.serialize_resource", return_value=None):
         # should get no result (because serialize returns None, as the resource is not found in the DB)
         resp = await nucliadb_reader.post(
             f"/kb/{standalone_knowledgebox}/find",
