@@ -22,6 +22,7 @@ from typing import Iterable, Optional, Union
 
 from nidx_protos.nodereader_pb2 import (
     GraphSearchResponse,
+    SearchRequest,
     SearchResponse,
 )
 
@@ -38,12 +39,16 @@ from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
+from nucliadb.search.search.find_merge import compose_find_resources
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.query_parser.models import ParsedQuery, Query, RelationQuery, UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.find import parse_find
-from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
+from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
+    convert_retrieval_to_proto,
+    get_rephrased_query,
+)
 from nucliadb.search.search.retrieval import text_block_search
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
@@ -55,6 +60,7 @@ from nucliadb_models.search import (
     FindOptions,
     FindRequest,
     KnowledgeboxFindResults,
+    MinScore,
     NucliaDBClientType,
     PreQueriesStrategy,
     PreQuery,
@@ -471,42 +477,86 @@ async def run_prequeries(
     limited = limited_concurrency(max_ops=asyncio.Semaphore(settings.prequeries_max_parallel))
 
     # First, parse all prequeries to get their retrieval units: this will call the /query endpoint at the predict api.
-    async def _pre_retrieval(request: FindRequest) -> UnitRetrieval:
+    async def _pre_retrieval(request: FindRequest) -> ParsedQuery:
         async with limited:
-            parsed_query = await parse_find(kbid, request)
-            return parsed_query.retrieval
+            return await parse_find(kbid, request)
 
-    retrieval_units = await asyncio.gather(
+    parsed_queries: list[ParsedQuery] = await asyncio.gather(
         *[_pre_retrieval(kbid, prequery.request) for prequery in prequeries]
     )
 
     # Then, for each retrieval unit, perform the text block search. This calls nidx
-    async def _retrieve(retrieval: UnitRetrieval) -> list[TextBlockMatch]:
+    async def _retrieve(retrieval: UnitRetrieval) -> tuple[list[TextBlockMatch], SearchRequest, SearchResponse, list[str]]:
         # When moved to RAO, this will be a call to nucliadb_sdk.AsyncNucliaDB.retrieve()
         async with limited:
-            text_blocks, _, _, _ = await text_block_search(kbid, retrieval)
-            return text_blocks
+            return await text_block_search(kbid, retrieval)
 
-    prequeries_text_blocks = await asyncio.gather(
-        *[_retrieve(retrieval) for retrieval in retrieval_units]
+    prequeries_results = await asyncio.gather(
+        *[_retrieve(parsed_query.retrieval) for parsed_query in parsed_queries]
     )
 
     # Do a single hydration/augmentation of all text blocks to avoid unnecessary repeated calls.
     # When moved to RAO, this will be a call to nucliadb_sdk.AsyncNucliaDB.augment()
-    augmented_resoures, augmented_text_blocks = await augment(
+    augmented_resources, augmented_text_blocks = await augment(
         kbid,
-        [tb for text_blocks in prequeries_text_blocks for tb in text_blocks],
+        [tb for text_blocks, _, _, _ in prequeries_results for tb in text_blocks],
     )
 
     # Then convert to KnowledgeboxFindResults to keep current interface.
-
     return [
-        PreQueryResult(
-            id=prequery.id or f"prequery-{index}",
-            text_blocks=text_blocks,
-        )
-        for index, (prequery, text_blocks) in enumerate(zip(prequeries, prequeries_text_blocks))
+        (prequery, convert_to_find_results(
+            prequery,
+            parsed_query,
+            augmented_resources,
+            augmented_text_blocks,
+            result,
+        )) for prequery, result, parsed_query in zip(prequeries, prequeries_results, parsed_queries)
     ]
+
+
+def convert_to_find_results(
+    prequery: PreQuery,
+    parsed_query: ParsedQuery,
+    augmented_resources: list[AugmentedResource],
+    augmented_paragraphs: list[AugmentedParagraph],
+    prequery_result: tuple[list[TextBlockMatch], SearchRequest, SearchResponse, list[str]],
+) -> KnowledgeboxFindResults:
+    text_block_matches = prequery_result[0]
+    matching_paragraph_ids = {tb.paragraph_id for tb in text_block_matches}
+    matching_resource_ids = {pid.rid for pid in matching_paragraph_ids}
+
+    search_request = prequery_result[1]
+    search_response = prequery_result[2]
+    queried_shards = prequery_result[3]
+
+    # Compose response
+    matching_augmented_paragraphs = [
+        ap for ap in augmented_paragraphs if ap.id in matching_paragraph_ids
+    ]
+    matching_augmented_resources = {
+        resource for resource in augmented_resources if resource.id in matching_resource_ids
+    }
+    find_resources = compose_find_resources(matching_augmented_paragraphs, matching_augmented_resources)
+
+    min_score = MinScore(semantic=None, bm25=0)
+    if parsed_query.retrieval.query.semantic is not None:
+        min_score.semantic = parsed_query.retrieval.query.semantic.min_score
+    if parsed_query.retrieval.query.fulltext is not None:
+        min_score.bm25 = parsed_query.retrieval.query.fulltext.min_score
+    find_results = KnowledgeboxFindResults(
+        query=search_request.body,
+        rephrased_query=get_rephrased_query(parsed_query),
+        resources=find_resources,
+        best_matches="best_matches",
+        relations="relations",
+        total=search_response.paragraph.total,
+        page_size=parsed_query.retrieval.top_k,
+        min_score=min_score,
+        # For bw/compatibility, even if we don't use pagination here
+        page_number=0,
+        next_page=False,
+    )
+    return find_results
 
 
 async def augment(
