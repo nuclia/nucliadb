@@ -264,7 +264,9 @@ impl DiskHnsw for DiskHnswV1 {
                 let cnx_start = edges_start + USIZE_LEN;
                 let cnx_end = cnx_start + number_edges * CNX_LEN;
 
-                if number_edges > 0 {
+                // All nodes are in layer 0, always deserialize even if not connected
+                // This happens when the node only has one node (so no connections are possible)
+                if layer_index == 0 || number_edges > 0 {
                     let mut ram_edges = ram.layers[layer_index]
                         .out
                         .entry(VectorAddr(node_index))
@@ -429,5 +431,23 @@ mod tests {
         DiskHnswV1::serialize_into(&mut buf2, no_nodes, &ram).unwrap();
 
         assert_eq!(disk1.0.as_ref(), buf2.as_slice());
+    }
+
+    #[test]
+    fn hnsw_deserialize_one_node() {
+        let mut hnsw = RAMHnsw::new();
+        hnsw.add_node(VectorAddr(0), 0);
+        hnsw.update_entry_point();
+
+        let dir = TempDir::new().unwrap();
+        DiskHnswV1::serialize_to(dir.path(), 1, &hnsw).unwrap();
+
+        let disk1 = DiskHnswV1::open(dir.path(), false).unwrap();
+        let mut ram = disk1.deserialize().unwrap();
+        ram.fix_broken_graph();
+
+        assert_eq!(ram.layers.len(), 1);
+        assert_eq!(ram.layers[0].out.len(), 1);
+        assert_eq!(ram.layers[0].out[&VectorAddr(0)].read().unwrap().len(), 0);
     }
 }
