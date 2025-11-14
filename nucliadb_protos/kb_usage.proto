@@ -41,6 +41,7 @@ enum PredictType {
     DA_GUARD = 14;
     REMI = 15;
     VLLM_EXTRACTION = 17;
+    LLM_SPLITTING = 18;
 }
 
 enum ClientType {
