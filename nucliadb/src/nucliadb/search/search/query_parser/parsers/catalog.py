@@ -78,7 +78,6 @@ async def parse_catalog(kbid: str, item: search_models.CatalogRequest) -> Catalo
         sort = SortOptions(
             field=SortField.CREATED,
             order=SortOrder.DESC,
-            limit=None,
         )
 
     if isinstance(item.query, search_models.CatalogQuery):

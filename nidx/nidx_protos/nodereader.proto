@@ -54,7 +54,10 @@ message ResultScore {
 
 message DocumentResult {
     string uuid = 1;
-    ResultScore score = 3;
+    oneof sort_value {
+        ResultScore score = 3;
+        google.protobuf.Timestamp date = 6;
+    }
     string field = 4;
     repeated string labels = 5;
 }
@@ -86,7 +89,11 @@ message ParagraphResult {
     string paragraph = 6;
     string split = 7;
     uint64 index = 8;
-    ResultScore score = 9;
+    oneof sort_value {
+        ResultScore score = 9;
+        google.protobuf.Timestamp date = 13;
+    }
+
     repeated string matches = 10;
 
     // Metadata that can't be searched with but is returned on search results

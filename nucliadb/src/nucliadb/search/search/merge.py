@@ -37,7 +37,6 @@ from nidx_protos.nodereader_pb2 import (
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.common.models_utils.from_proto import RelationTypePbMap
-from nucliadb.search.search import cache
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.fetch import (
     fetch_resources,
@@ -105,43 +104,13 @@ def sort_results_by_score(results: Union[list[ParagraphResult], list[DocumentRes
     results.sort(key=lambda x: (x.score.bm25, x.score.booster), reverse=True)
 
 
-async def get_sort_value(
-    item: Union[DocumentResult, ParagraphResult],
-    sort_field: SortField,
-    kbid: str,
-) -> Optional[SortValue]:
-    """Returns the score for given `item` and `sort_field`. If the resource is being
-    deleted, it might appear on search results but not in maindb. In this
-    specific case, return None.
-    """
-    if sort_field == SortField.SCORE:
-        return (item.score.bm25, item.score.booster)
-
-    score: Any = None
-    resource = await cache.get_resource(kbid, item.uuid)
-    if resource is None:
-        return score
-
-    basic = await resource.get_basic()
-    if basic is None:
-        return score
-
-    if sort_field == SortField.CREATED:
-        score = basic.created.ToDatetime()
-    elif sort_field == SortField.MODIFIED:
-        score = basic.modified.ToDatetime()
-    elif sort_field == SortField.TITLE:
-        score = basic.title
-
-    return score
-
-
 async def merge_documents_results(
     kbid: str,
     responses: list[DocumentSearchResponse],
     *,
     query: FulltextQuery,
     top_k: int,
+    offset: int,
 ) -> tuple[Resources, list[str]]:
     raw_resource_list: list[tuple[DocumentResult, SortValue]] = []
     facets: dict[str, Any] = {}
@@ -159,14 +128,22 @@ async def merge_documents_results(
         if document_response.next_page:
             next_page = True
         for result in document_response.results:
-            sort_value = await get_sort_value(result, query.order_by, kbid)
+            sort_value: SortValue
+            if query.order_by == SortField.SCORE:
+                sort_value = (result.score.bm25, result.score.booster)
+            else:
+                sort_value = result.date.ToDatetime()
             if sort_value is not None:
                 raw_resource_list.append((result, sort_value))
+
         total += document_response.total
 
     # We need to cut first and then sort, otherwise the page will be wrong if the order is DESC
-    raw_resource_list, has_more = cut_page(raw_resource_list, top_k)
+    raw_resource_list, has_more = cut_page(raw_resource_list[offset:], top_k)
     next_page = next_page or has_more
+
+    # Sort the list by score. It's important that this sort is stable, so the
+    # ordering of results with same scores accross multiple shards doesn't change
     raw_resource_list.sort(key=lambda x: x[1], reverse=(query.sort == SortOrder.DESC))
 
     result_resource_ids = []
@@ -350,6 +327,7 @@ async def merge_paragraph_results(
     highlight: bool,
     sort: SortOptions,
     min_score: float,
+    offset: int,
 ) -> tuple[Paragraphs, list[str]]:
     raw_paragraph_list: list[tuple[ParagraphResult, SortValue]] = []
     facets: dict[str, Any] = {}
@@ -373,14 +351,21 @@ async def merge_paragraph_results(
         if paragraph_response.next_page:
             next_page = True
         for result in paragraph_response.results:
-            score = await get_sort_value(result, sort.field, kbid)
-            if score is not None:
-                raw_paragraph_list.append((result, score))
+            sort_value: SortValue
+            if sort.field == SortField.SCORE:
+                sort_value = (result.score.bm25, result.score.booster)
+            else:
+                sort_value = result.date.ToDatetime()
+            if sort_value is not None:
+                raw_paragraph_list.append((result, sort_value))
+
         total += paragraph_response.total
 
+    # Sort the list by score. It's important that this sort is stable, so the
+    # ordering of results with same scores accross multiple shards doesn't change
     raw_paragraph_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
 
-    raw_paragraph_list, has_more = cut_page(raw_paragraph_list, top_k)
+    raw_paragraph_list, has_more = cut_page(raw_paragraph_list[offset:], top_k)
     next_page = next_page or has_more
 
     result_resource_ids = []
@@ -520,6 +505,7 @@ async def merge_results(
     show: list[ResourceProperties],
     field_type_filter: list[FieldTypeName],
     extracted: list[ExtractedDataTypeName],
+    offset: int,
     highlight: bool = False,
 ) -> KnowledgeboxSearchResults:
     paragraphs = []
@@ -543,6 +529,7 @@ async def merge_results(
             documents,
             query=retrieval.query.fulltext,
             top_k=retrieval.top_k,
+            offset=offset,
         )
         resources.extend(matched_resources)
 
@@ -550,7 +537,6 @@ async def merge_results(
         sort = SortOptions(
             field=retrieval.query.keyword.order_by,
             order=retrieval.query.keyword.sort,
-            limit=None,  # unused
         )
         api_results.paragraphs, matched_resources = await merge_paragraph_results(
             kbid,
@@ -559,6 +545,7 @@ async def merge_results(
             highlight,
             sort,
             min_score=retrieval.query.keyword.min_score,
+            offset=offset,
         )
         resources.extend(matched_resources)
 
@@ -601,9 +588,9 @@ async def merge_paragraphs_results(
         sort=SortOptions(
             field=SortField.SCORE,
             order=SortOrder.DESC,
-            limit=None,
         ),
         min_score=min_score,
+        offset=0,
     )
     return api_results
 

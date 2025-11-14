@@ -81,6 +81,8 @@ async def test_search_sorted_by_creation_and_modification_dates(
             "query": "philosophy",
             "sort_field": sort_field,
             "sort_order": sort_order,
+            "features": ["fulltext", "keyword"],
+            "show": ["origin"],
         },
     )
     assert resp.status_code == 200
@@ -90,60 +92,100 @@ async def test_search_sorted_by_creation_and_modification_dates(
         assert len(results) > 0
 
         sort_fields = [
-            datetime.fromisoformat(body["resources"][result["rid"]][sort_field]) for result in results
+            datetime.fromisoformat(body["resources"][result["rid"]]["origin"][sort_field])
+            for result in results
         ]
         assert sort_fields == sort_function(sort_fields)
 
 
-@pytest.mark.parametrize(
-    "sort_options",
-    [
-        ("title", "asc", sorted),
-        ("title", "desc", lambda x: list(reversed(sorted(x)))),
-    ],
-)
 @pytest.mark.deploy_modes("standalone")
-async def test_limited_sorted_search_of_most_relevant_results(
+async def test_sorted_pagination(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     philosophy_books_kb,
-    sort_options,
 ):
-    """Sort by limited criteria. When sorting by, for example, title, results will
-    be limited to `sort_limit`.
-
-    """
     kbid = philosophy_books_kb
 
-    sort_field, sort_order, sort_function = sort_options
-
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
         json={
             "query": "philosophy",
-            "sort": {
-                "field": sort_field,
-            },
+            "features": ["fulltext", "keyword"],
+            "sort": {"field": "created", "order": "desc"},
         },
     )
-    # must pass a sort limit
-    assert resp.status_code == 412
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    fulltext_results = body["fulltext"]["results"]
+    paragraphs_results = body["paragraphs"]["results"]
 
+    #
+    # FULLTEXT
+    #
+    # Page result by result, ensure we geºt the same results
+    for index, result in enumerate(fulltext_results):
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/search",
+            json={
+                "query": "philosophy",
+                "features": ["fulltext"],
+                "sort": {"field": "created", "order": "desc"},
+                "top_k": 1,
+                "offset": index,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["fulltext"]["results"][0] == result
+
+    # One more result, should not exist
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
         json={
             "query": "philosophy",
-            "sort": {"field": sort_field, "order": sort_order, "limit": 10},
+            "features": ["fulltext"],
+            "sort": {"field": "created", "order": "desc"},
+            "top_k": 1,
+            "offset": len(fulltext_results),
         },
     )
     assert resp.status_code == 200
-
     body = resp.json()
-    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
-        assert len(results) >= 2
+    assert len(body["fulltext"]["results"]) == 0
 
-        sort_fields = [body["resources"][result["rid"]][sort_field] for result in results]
-        assert sort_fields == sort_function(sort_fields)
+    #
+    # PARAGRAPH
+    #
+    # Page result by result, ensure we get the same results
+    for index, result in enumerate(paragraphs_results):
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/search",
+            json={
+                "query": "philosophy",
+                "features": ["keyword"],
+                "sort": {"field": "created", "order": "desc"},
+                "top_k": 1,
+                "offset": index,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["paragraphs"]["results"][0] == result
+
+    # One more result, should not exist
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json={
+            "query": "philosophy",
+            "features": ["keyword"],
+            "sort": {"field": "created", "order": "desc"},
+            "top_k": 1,
+            "offset": len(paragraphs_results),
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["paragraphs"]["results"]) == 0
 
 
 @pytest.mark.deploy_modes("standalone")

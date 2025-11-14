@@ -20,6 +20,8 @@
 use std::collections::HashMap;
 
 use lazy_static::lazy_static;
+use nidx_protos::order_by::OrderField;
+use nidx_protos::paragraph_result::SortValue;
 use nidx_protos::{FacetResult, FacetResults, ParagraphResult, ParagraphSearchResponse, ResultScore};
 use nidx_tantivy::utils::decode_facet;
 use tantivy::collector::FacetCounts;
@@ -29,6 +31,7 @@ use tantivy::{DateTime, DocAddress, TantivyDocument};
 use tracing::*;
 
 use crate::reader::ParagraphReaderService;
+use crate::schema::datetime_utc_to_timestamp;
 use crate::search_query::TermCollector;
 
 pub fn extract_labels<'a>(facets_iterator: impl Iterator<Item = CompactDocValue<'a>>) -> Vec<String> {
@@ -101,6 +104,7 @@ pub struct SearchIntResponse<'a> {
     pub results_per_page: i32,
     pub termc: TermCollector,
     pub searcher: tantivy::Searcher,
+    pub sort_field: OrderField,
 }
 
 pub struct SearchFacetsResponse<'a> {
@@ -133,13 +137,9 @@ impl From<SearchIntResponse<'_>> for ParagraphSearchResponse {
         let no_results = std::cmp::min(obtained, requested);
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(no_results);
         let searcher = response.searcher;
-        for (_, doc_address) in response.top_docs.into_iter().take(no_results) {
+        for (score, doc_address) in response.top_docs.into_iter().take(no_results) {
             match searcher.doc::<TantivyDocument>(doc_address) {
                 Ok(doc) => {
-                    let score = ResultScore {
-                        bm25: 0.0,
-                        booster: 0.0,
-                    };
                     let schema = &response.text_service.schema;
                     let uuid = doc
                         .get_first(schema.uuid)
@@ -179,6 +179,8 @@ impl From<SearchIntResponse<'_>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_string();
 
+                    let sort_value = Some(SortValue::Date(datetime_utc_to_timestamp(&score)));
+
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
                     let mut terms: Vec<_> = response.termc.get_fterms(doc_address.doc_id).into_iter().collect();
                     terms.sort();
@@ -192,7 +194,7 @@ impl From<SearchIntResponse<'_>> for ParagraphSearchResponse {
                         split,
                         index,
                         matches: terms,
-                        score: Some(score),
+                        sort_value,
                         metadata: schema.metadata(&doc),
                     };
 
@@ -223,18 +225,22 @@ impl From<SearchIntResponse<'_>> for ParagraphSearchResponse {
 impl From<SearchBm25Response<'_>> for ParagraphSearchResponse {
     fn from(response: SearchBm25Response) -> Self {
         let total = response.total as i32;
+        let min_score = response.min_score;
         let obtained = response.top_docs.len();
         let requested = response.results_per_page as usize;
         let next_page = obtained > requested;
         let no_results = std::cmp::min(obtained, requested);
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(no_results);
         let searcher = response.searcher;
-        for (score, doc_address) in response.top_docs.into_iter().take(no_results) {
+        for (i, (score, doc_address)) in response.top_docs.into_iter().take(no_results).enumerate() {
+            if score < min_score {
+                break;
+            }
             match searcher.doc::<TantivyDocument>(doc_address) {
                 Ok(doc) => {
                     let score = ResultScore {
                         bm25: score,
-                        booster: 0.0,
+                        booster: (response.total - i) as f32,
                     };
                     let schema = &response.text_service.schema;
                     let uuid = doc
@@ -281,7 +287,7 @@ impl From<SearchBm25Response<'_>> for ParagraphSearchResponse {
                         split,
                         index,
                         paragraph,
-                        score: Some(score),
+                        sort_value: Some(SortValue::Score(score)),
                         start: start_pos,
                         end: end_pos,
                         matches: terms,

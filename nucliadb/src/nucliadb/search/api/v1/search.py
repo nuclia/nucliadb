@@ -108,9 +108,9 @@ async def search_knowledgebox(
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
     sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
-    sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
     top_k: int = fastapi_query(SearchParamDefaults.top_k),
+    offset: int = fastapi_query(SearchParamDefaults.offset),
     min_score: Optional[float] = Query(
         default=None,
         description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
@@ -169,11 +169,7 @@ async def search_knowledgebox(
             fields=fields,
             filters=filters,
             faceted=faceted,
-            sort=(
-                SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
-                if sort_field is not None
-                else None
-            ),
+            sort=(SortOptions(field=sort_field, order=sort_order) if sort_field is not None else None),
             top_k=top_k,
             min_score=min_score_from_query_params(min_score_bm25, min_score_semantic, min_score),
             vectorset=vectorset,
@@ -191,6 +187,7 @@ async def search_knowledgebox(
             with_synonyms=with_synonyms,
             security=security,
             show_hidden=show_hidden,
+            offset=offset,
         )
     except ValidationError as exc:
         detail = json.loads(exc.json())
@@ -278,6 +275,7 @@ async def search(
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
         highlight=item.highlight,
+        offset=item.offset,
     )
 
     if audit is not None and do_audit:
