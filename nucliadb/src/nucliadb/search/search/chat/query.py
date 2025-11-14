@@ -27,8 +27,10 @@ from nidx_protos.nodereader_pb2 import (
 )
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.ids import ParagraphId
 from nucliadb.common.models_utils import to_proto
 from nucliadb.models.internal.augment import ParagraphText
+from nucliadb.models.internal.retrieval import RerankerScore
 from nucliadb.search import logger
 from nucliadb.search.augmentor.models import AugmentedParagraph, AugmentedResource, Metadata, Paragraph
 from nucliadb.search.augmentor.paragraphs import augment_paragraphs
@@ -37,22 +39,27 @@ from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.predict import AnswerStatusCode, RephraseResponse
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
+from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
-from nucliadb.search.search.find_merge import compose_find_resources
-from nucliadb.search.search.hydrator import ResourceHydrationOptions
+from nucliadb.search.search.find_merge import _round, compose_find_resources
+from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import Metrics
+from nucliadb.search.search.paragraphs import highlight_paragraph
+from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import ParsedQuery, Query, RelationQuery, UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.find import parse_find
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
     convert_retrieval_to_proto,
     get_rephrased_query,
 )
+from nucliadb.search.search.rerankers import RerankableItem, Reranker, RerankingOptions
 from nucliadb.search.search.retrieval import text_block_search
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import filters
+from nucliadb_models.resource import Resource
 from nucliadb_models.search import (
     AskRequest,
     ChatContextMessage,
@@ -470,6 +477,7 @@ async def run_prequeries(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     metrics: Metrics,
+    # XXX: TODO (use as before!)
 ) -> list[PreQueryResult]:
     """
     Runs simultaneous text block retrievals for each prequery and returns the list of results.
@@ -504,7 +512,7 @@ async def run_prequeries(
 
     # Then convert to KnowledgeboxFindResults to keep current interface.
     return [
-        (prequery, convert_to_find_results(
+        (prequery, await convert_to_find_results(
             prequery,
             parsed_query,
             augmented_resources,
@@ -514,7 +522,7 @@ async def run_prequeries(
     ]
 
 
-def convert_to_find_results(
+async def convert_to_find_results(
     prequery: PreQuery,
     parsed_query: ParsedQuery,
     augmented_resources: list[AugmentedResource],
@@ -538,6 +546,14 @@ def convert_to_find_results(
     }
     find_resources = compose_find_resources(matching_augmented_paragraphs, matching_augmented_resources)
 
+    # build relations graph
+    entry_points = []
+    if parsed_query.retrieval.query.relation is not None:
+        entry_points = parsed_query.retrieval.query.relation.entry_points
+
+    graph_response = search_response.graph
+    relations = await merge_relations_results([graph_response], entry_points)
+
     min_score = MinScore(semantic=None, bm25=0)
     if parsed_query.retrieval.query.semantic is not None:
         min_score.semantic = parsed_query.retrieval.query.semantic.min_score
@@ -548,7 +564,7 @@ def convert_to_find_results(
         rephrased_query=get_rephrased_query(parsed_query),
         resources=find_resources,
         best_matches="best_matches",
-        relations="relations",
+        relations=relations,
         total=search_response.paragraph.total,
         page_size=parsed_query.retrieval.top_k,
         min_score=min_score,
@@ -589,3 +605,475 @@ async def augment(
     return [r for r in augmented_resources.values() if r is not None], [
         p for p in augmented_paragraphs.values() if p is not None
     ]
+
+
+#@merge_observer.wrap({"type": "find_merge"})
+async def build_find_response(
+    search_response: SearchResponse,
+    merged_text_blocks: list[TextBlockMatch],
+    graph_response: GraphSearchResponse,
+    *,
+    retrieval: UnitRetrieval,
+    kbid: str,
+    query: str,
+    rephrased_query: Optional[str],
+    reranker: Reranker,
+    resource_hydration_options: ResourceHydrationOptions,
+    text_block_hydration_options: TextBlockHydrationOptions,
+) -> KnowledgeboxFindResults:
+    # XXX: we shouldn't need a min score that we haven't used. Previous
+    # implementations got this value from the proto request (i.e., default to 0)
+    min_score_bm25 = 0.0
+    if retrieval.query.keyword is not None:
+        min_score_bm25 = retrieval.query.keyword.min_score
+    min_score_semantic = 0.0
+    if retrieval.query.semantic is not None:
+        min_score_semantic = retrieval.query.semantic.min_score
+
+    # cut
+    # we assume pagination + predict reranker is forbidden and has been already
+    # enforced/validated by the query parsing.
+    if reranker.needs_extra_results:
+        assert reranker.window is not None, "Reranker definition must enforce this condition"
+        text_blocks_page, next_page = cut_page(merged_text_blocks, reranker.window)
+    else:
+        text_blocks_page, next_page = cut_page(merged_text_blocks, retrieval.top_k)
+
+    # hydrate and rerank
+    reranking_options = RerankingOptions(kbid=kbid, query=query)
+    text_blocks, resources, best_matches = await hydrate_and_rerank(
+        text_blocks_page,
+        kbid,
+        resource_hydration_options=resource_hydration_options,
+        text_block_hydration_options=text_block_hydration_options,
+        reranker=reranker,
+        reranking_options=reranking_options,
+        top_k=retrieval.top_k,
+    )
+
+    # build relations graph
+    entry_points = []
+    if retrieval.query.relation is not None:
+        entry_points = retrieval.query.relation.entry_points
+    relations = await merge_relations_results([graph_response], entry_points)
+
+    # compose response
+    find_resources = compose_find_resources(text_blocks, resources)
+
+    next_page = search_response.paragraph.next_page or next_page
+    total_paragraphs = search_response.paragraph.total
+
+    find_results = KnowledgeboxFindResults(
+        query=query,
+        rephrased_query=rephrased_query,
+        resources=find_resources,
+        best_matches=best_matches,
+        relations=relations,
+        total=total_paragraphs,
+        page_number=0,  # Bw/c with pagination
+        page_size=retrieval.top_k,
+        next_page=next_page,
+        min_score=MinScore(bm25=_round(min_score_bm25), semantic=_round(min_score_semantic)),
+    )
+    return find_results
+
+
+
+#@merge_observer.wrap({"type": "hydrate_and_rerank"})
+async def hydrate_and_rerank(
+    text_blocks: Iterable[TextBlockMatch],
+    kbid: str,
+    *,
+    resource_hydration_options: ResourceHydrationOptions,
+    text_block_hydration_options: TextBlockHydrationOptions,
+    reranker: Reranker,
+    reranking_options: RerankingOptions,
+    top_k: int,
+) -> tuple[list[TextBlockMatch], list[Resource], list[str]]:
+    """Given a list of text blocks from a retrieval operation, hydrate and
+    rerank the results.
+
+    This function returns either the entire list or a subset of updated
+    (hydrated and reranked) text blocks and their corresponding resource
+    metadata. It also returns an ordered list of best matches.
+
+    """
+    max_operations = asyncio.Semaphore(50)
+
+    # Iterate text blocks to create an "index" for faster access by id and get a
+    # list of text block ids and resource ids to hydrate
+    text_blocks_by_id: dict[str, TextBlockMatch] = {}  # useful for faster access to text blocks later
+    resources_to_hydrate = set()
+    text_block_id_to_hydrate = set()
+
+    for text_block in text_blocks:
+        rid = text_block.paragraph_id.rid
+        paragraph_id = text_block.paragraph_id.full()
+
+        # If we find multiple results (from different indexes) with different
+        # metadata, this statement will only get the metadata from the first on
+        # the list. We assume metadata is the same on all indexes, otherwise
+        # this would be a BUG
+        text_blocks_by_id.setdefault(paragraph_id, text_block)
+
+        # rerankers that need extra results may end with less resources than the
+        # ones we see now, so we'll skip this step and recompute the resources
+        # later
+        if not reranker.needs_extra_results:
+            resources_to_hydrate.add(rid)
+
+        if text_block_hydration_options.only_hydrate_empty and text_block.text:
+            pass
+        else:
+            text_block_id_to_hydrate.add(paragraph_id)
+
+    # hydrate only the strictly needed before rerank
+    ops = [
+        augment_paragraphs(
+            kbid,
+            given=[
+                Paragraph.from_text_block_match(text_blocks_by_id[paragraph_id])
+                for paragraph_id in text_block_id_to_hydrate
+            ],
+            select=[ParagraphText()],
+            concurrency_control=max_operations,
+        ),
+        augment_resources(
+            kbid,
+            given=list(resources_to_hydrate),
+            opts=resource_hydration_options,
+            concurrency_control=max_operations,
+        ),
+    ]
+#    FIND_FETCH_OPS_DISTRIBUTION.observe(len(text_block_id_to_hydrate) + len(resources_to_hydrate))
+    results = await asyncio.gather(*ops)
+
+    augmented_paragraphs: dict[ParagraphId, AugmentedParagraph | None] = results[0]  # type: ignore
+    augmented_resources: dict[str, AugmentedResource | None] = results[1]  # type: ignore
+
+    # add hydrated text to our text blocks
+    for text_block in text_blocks:
+        augmented = augmented_paragraphs.get(text_block.paragraph_id, None)
+        if augmented is not None and augmented.text is not None:
+            if text_block_hydration_options.highlight:
+                text = highlight_paragraph(
+                    augmented.text, words=[], ematches=text_block_hydration_options.ematches
+                )
+            else:
+                text = augmented.text
+            text_block.text = text
+
+    # with the hydrated text, rerank and apply new scores to the text blocks
+    to_rerank = [
+        RerankableItem(
+            id=text_block.paragraph_id.full(),
+            score=text_block.score,
+            score_type=text_block.score_type,
+            content=text_block.text or "",  # TODO: add a warning, this shouldn't usually happen
+        )
+        for text_block in text_blocks
+    ]
+    reranked = await reranker.rerank(to_rerank, reranking_options)
+
+    # after reranking, we can cut to the number of results the user wants, so we
+    # don't hydrate unnecessary stuff
+    reranked = reranked[:top_k]
+
+    matches = []
+    for item in reranked:
+        paragraph_id = item.id
+        score = item.score
+        score_type = item.score_type
+
+        text_block = text_blocks_by_id[paragraph_id]
+        text_block.scores.append(RerankerScore(score=score))
+        text_block.score_type = score_type
+
+        matches.append((paragraph_id, score))
+
+    matches.sort(key=lambda x: x[1], reverse=True)
+
+    best_matches = []
+    best_text_blocks = []
+    resources_to_hydrate.clear()
+    for order, (paragraph_id, _) in enumerate(matches):
+        text_block = text_blocks_by_id[paragraph_id]
+        text_block.order = order
+        best_matches.append(paragraph_id)
+        best_text_blocks.append(text_block)
+
+        # now we have removed the text block surplus, fetch resource metadata
+        if reranker.needs_extra_results:
+            rid = ParagraphId.from_string(paragraph_id).rid
+            resources_to_hydrate.add(rid)
+
+    # Finally, fetch resource metadata if we haven't already done it
+    if reranker.needs_extra_results:
+#        FIND_FETCH_OPS_DISTRIBUTION.observe(len(resources_to_hydrate))
+        augmented_resources = await augment_resources(
+            kbid,
+            given=list(resources_to_hydrate),
+            opts=resource_hydration_options,
+            concurrency_control=max_operations,
+        )
+
+    resources = [resource for resource in augmented_resources.values() if resource is not None]
+
+    return best_text_blocks, resources, best_matches
+
+
+#@query_parser_observer.wrap({"type": "parse_find"})
+async def parse_query(
+    kbid: str,
+    item: FindRequest,
+    *,
+    fetcher: Optional[Fetcher] = None,
+) -> ParsedQuery:
+    fetcher = fetcher or fetcher_for_find(kbid, item)
+    parser = _FindParser(kbid, item, fetcher)
+    retrieval = await parser.parse()
+    return ParsedQuery(fetcher=fetcher, retrieval=retrieval, generation=None)
+
+
+def fetcher_for_find(kbid: str, item: FindRequest) -> Fetcher:
+    return Fetcher(
+        kbid=kbid,
+        query=item.query,
+        user_vector=item.vector,
+        vectorset=item.vectorset,
+        rephrase=item.rephrase,
+        rephrase_prompt=item.rephrase_prompt,
+        generative_model=item.generative_model,
+        query_image=item.query_image,
+    )
+
+
+class _FindParser:
+    def __init__(self, kbid: str, item: FindRequest, fetcher: Fetcher):
+        self.kbid = kbid
+        self.item = item
+        self.fetcher = fetcher
+
+        # cached data while parsing
+        self._query: Optional[Query] = None
+        self._top_k: Optional[int] = None
+
+    async def parse(self) -> UnitRetrieval:
+        self._validate_request()
+
+        self._top_k = parse_top_k(self.item)
+
+        # parse search types (features)
+
+        self._query = Query()
+
+        if search_models.FindOptions.KEYWORD in self.item.features:
+            self._query.keyword = await parse_keyword_query(self.item, fetcher=self.fetcher)
+
+        if search_models.FindOptions.SEMANTIC in self.item.features:
+            self._query.semantic = await parse_semantic_query(self.item, fetcher=self.fetcher)
+
+        if search_models.FindOptions.RELATIONS in self.item.features:
+            self._query.relation = await self._parse_relation_query()
+
+        if search_models.FindOptions.GRAPH in self.item.features:
+            self._query.graph = await self._parse_graph_query()
+
+        filters = await self._parse_filters()
+
+        try:
+            rank_fusion = self._parse_rank_fusion()
+        except ValidationError as exc:
+            raise InternalParserError(f"Parsing error in rank fusion: {str(exc)}") from exc
+        try:
+            reranker = self._parse_reranker()
+        except ValidationError as exc:
+            raise InternalParserError(f"Parsing error in reranker: {str(exc)}") from exc
+
+        # Adjust retrieval windows. Our current implementation assume:
+        # `top_k <= reranker.window <= rank_fusion.window`
+        # and as rank fusion is done before reranking, we must ensure rank
+        # fusion window is at least, the reranker window
+        if isinstance(reranker, PredictReranker):
+            rank_fusion.window = max(rank_fusion.window, reranker.window)
+
+        retrieval = UnitRetrieval(
+            query=self._query,
+            top_k=self._top_k,
+            filters=filters,
+            rank_fusion=rank_fusion,
+            reranker=reranker,
+        )
+        return retrieval
+
+    def _validate_request(self):
+        # synonyms are not compatible with vector/graph search
+        if (
+            self.item.with_synonyms
+            and self.item.query
+            and (
+                search_models.FindOptions.SEMANTIC in self.item.features
+                or search_models.FindOptions.RELATIONS in self.item.features
+                or search_models.FindOptions.GRAPH in self.item.features
+            )
+        ):
+            raise InvalidQueryError(
+                "synonyms",
+                "Search with custom synonyms is only supported on paragraph and document search",
+            )
+
+        if search_models.FindOptions.SEMANTIC in self.item.features:
+            if should_disable_vector_search(self.item):
+                self.item.features.remove(search_models.FindOptions.SEMANTIC)
+
+        if self.item.graph_query and search_models.FindOptions.GRAPH not in self.item.features:
+            raise InvalidQueryError("graph_query", "Using a graph query requires enabling graph feature")
+
+    async def _parse_relation_query(self) -> RelationQuery:
+        detected_entities = await self._get_detected_entities()
+
+        deleted_entity_groups = await self.fetcher.get_deleted_entity_groups()
+
+        meta_cache = await self.fetcher.get_entities_meta_cache()
+        deleted_entities = meta_cache.deleted_entities
+
+        return RelationQuery(
+            entry_points=detected_entities,
+            deleted_entity_groups=deleted_entity_groups,
+            deleted_entities=deleted_entities,
+        )
+
+    async def _parse_graph_query(self) -> GraphQuery:
+        if self.item.graph_query is None:
+            raise InvalidQueryError(
+                "graph_query", "Graph query must be provided when using graph search"
+            )
+        return GraphQuery(query=self.item.graph_query)
+
+    async def _get_detected_entities(self) -> list[utils_pb2.RelationNode]:
+        """Get entities from request, either automatically detected or
+        explicitly set by the user."""
+
+        if self.item.query_entities:
+            detected_entities = []
+            for entity in self.item.query_entities:
+                relation_node = utils_pb2.RelationNode()
+                relation_node.value = entity.name
+                if entity.type is not None:
+                    relation_node.ntype = RelationNodeTypeMap[entity.type]
+                if entity.subtype is not None:
+                    relation_node.subtype = entity.subtype
+                detected_entities.append(relation_node)
+        else:
+            detected_entities = await self.fetcher.get_detected_entities()
+
+        meta_cache = await self.fetcher.get_entities_meta_cache()
+        detected_entities = expand_entities(meta_cache, detected_entities)
+
+        return detected_entities
+
+    async def _parse_filters(self) -> Filters:
+        assert self._query is not None, "query must be parsed before filters"
+
+        has_old_filters = (
+            len(self.item.filters) > 0
+            or len(self.item.resource_filters) > 0
+            or len(self.item.fields) > 0
+            or len(self.item.keyword_filters) > 0
+            or self.item.range_creation_start is not None
+            or self.item.range_creation_end is not None
+            or self.item.range_modification_start is not None
+            or self.item.range_modification_end is not None
+        )
+        if self.item.filter_expression is not None and has_old_filters:
+            raise InvalidQueryError("filter_expression", "Cannot mix old filters with filter_expression")
+
+        field_expr = None
+        paragraph_expr = None
+        filter_operator = nodereader_pb2.FilterOperator.AND
+
+        if has_old_filters:
+            old_filters = OldFilterParams(
+                label_filters=self.item.filters,
+                keyword_filters=self.item.keyword_filters,
+                range_creation_start=self.item.range_creation_start,
+                range_creation_end=self.item.range_creation_end,
+                range_modification_start=self.item.range_modification_start,
+                range_modification_end=self.item.range_modification_end,
+                fields=self.item.fields,
+                key_filters=self.item.resource_filters,
+            )
+            field_expr, paragraph_expr = await parse_old_filters(old_filters, self.fetcher)
+
+        if self.item.filter_expression is not None:
+            if self.item.filter_expression.field:
+                field_expr = await parse_expression(self.item.filter_expression.field, self.kbid)
+            if self.item.filter_expression.paragraph:
+                paragraph_expr = await parse_expression(self.item.filter_expression.paragraph, self.kbid)
+            if self.item.filter_expression.operator == FilterExpression.Operator.OR:
+                filter_operator = nodereader_pb2.FilterOperator.OR
+            else:
+                filter_operator = nodereader_pb2.FilterOperator.AND
+
+        hidden = await filter_hidden_resources(self.kbid, self.item.show_hidden)
+
+        return Filters(
+            facets=[],
+            field_expression=field_expr,
+            paragraph_expression=paragraph_expr,
+            filter_expression_operator=filter_operator,
+            security=self.item.security,
+            hidden=hidden,
+            with_duplicates=self.item.with_duplicates,
+        )
+
+    def _parse_rank_fusion(self) -> RankFusion:
+        rank_fusion: RankFusion
+
+        top_k = parse_top_k(self.item)
+        window = min(top_k, 500)
+
+        if isinstance(self.item.rank_fusion, search_models.RankFusionName):
+            if self.item.rank_fusion == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
+                rank_fusion = ReciprocalRankFusion(window=window)
+            else:
+                raise InternalParserError(f"Unknown rank fusion algorithm: {self.item.rank_fusion}")
+
+        elif isinstance(self.item.rank_fusion, search_models.ReciprocalRankFusion):
+            user_window = self.item.rank_fusion.window
+            rank_fusion = ReciprocalRankFusion(
+                k=self.item.rank_fusion.k,
+                boosting=self.item.rank_fusion.boosting,
+                window=min(max(user_window or 0, top_k), 500),
+            )
+
+        else:
+            raise InternalParserError(f"Unknown rank fusion {self.item.rank_fusion}")
+
+        return rank_fusion
+
+    def _parse_reranker(self) -> Reranker:
+        reranking: Reranker
+
+        top_k = parse_top_k(self.item)
+
+        if isinstance(self.item.reranker, search_models.RerankerName):
+            if self.item.reranker == search_models.RerankerName.NOOP:
+                reranking = NoopReranker()
+
+            elif self.item.reranker == search_models.RerankerName.PREDICT_RERANKER:
+                # for predict rearnker, by default, we want a x2 factor with a
+                # top of 200 results
+                reranking = PredictReranker(window=min(top_k * 2, 200))
+
+            else:
+                raise InternalParserError(f"Unknown reranker algorithm: {self.item.reranker}")
+
+        elif isinstance(self.item.reranker, search_models.PredictReranker):
+            user_window = self.item.reranker.window
+            reranking = PredictReranker(window=min(max(user_window or 0, top_k), 200))
+
+        else:
+            raise InternalParserError(f"Unknown reranker {self.item.reranker}")
+
+        return reranking
