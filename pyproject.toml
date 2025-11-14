@@ -1,7 +1,7 @@
 [project]
 name = "nucliadb_workspace"
 requires-python = ">=3.10"
-version = "6.9.4"
+version = "6.9.5"
 dependencies = ["nucliadb"]
 
 [tool.uv.workspace]
