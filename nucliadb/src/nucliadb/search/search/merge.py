@@ -369,55 +369,13 @@ async def merge_paragraph_results(
     next_page = next_page or has_more
 
     result_resource_ids = []
-    result_paragraph_list: list[Paragraph] = []
-    for result, _ in raw_paragraph_list:
-        _, field_type, field = result.field.split("/")
-        text = await get_paragraph_text(
-            kbid=kbid,
-            paragraph_id=ParagraphId(
-                field_id=FieldId(
-                    rid=result.uuid,
-                    type=field_type,
-                    key=field,
-                    subfield_id=result.split,
-                ),
-                paragraph_start=result.start,
-                paragraph_end=result.end,
-            ),
-            highlight=highlight,
-            ematches=ematches,
-            matches=result.matches,  # type: ignore
-        )
-        labels = await get_labels_paragraph(result, kbid)
-        fuzzy_result = len(result.matches) > 0
-        new_paragraph = Paragraph(
-            score=result.score.bm25,
-            rid=result.uuid,
-            field_type=field_type,
-            field=field,
-            text=text,
-            labels=labels,
-            position=TextPosition(
-                index=result.metadata.position.index,
-                start=result.metadata.position.start,
-                end=result.metadata.position.end,
-                page_number=result.metadata.position.page_number,
-            ),
-            fuzzy_result=fuzzy_result,
-        )
-        if len(result.metadata.position.start_seconds) or len(result.metadata.position.end_seconds):
-            new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
-            new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
-        else:
-            # TODO: Remove once we are sure all data has been migrated!
-            seconds_positions = await get_seconds_paragraph(result, kbid)
-            if seconds_positions is not None:
-                new_paragraph.start_seconds = seconds_positions[0]
-                new_paragraph.end_seconds = seconds_positions[1]
+    result_paragraph_list: list[Paragraph] = await asyncio.gather(
+        *(load_paragraph(result, kbid, highlight, ematches) for result, _ in raw_paragraph_list)
+    )
+    for paragraph in result_paragraph_list:
+        if paragraph.rid not in result_resource_ids:
+            result_resource_ids.append(paragraph.rid)
 
-        result_paragraph_list.append(new_paragraph)
-        if new_paragraph.rid not in result_resource_ids:
-            result_resource_ids.append(new_paragraph.rid)
     return Paragraphs(
         results=result_paragraph_list,
         facets=facets,
@@ -428,6 +386,56 @@ async def merge_paragraph_results(
         next_page=next_page,
         min_score=min_score,
     ), result_resource_ids
+
+
+async def load_paragraph(
+    result: ParagraphResult, kbid: str, highlight: bool, ematches: Optional[list[str]]
+) -> Paragraph:
+    _, field_type, field = result.field.split("/")
+    text = await get_paragraph_text(
+        kbid=kbid,
+        paragraph_id=ParagraphId(
+            field_id=FieldId(
+                rid=result.uuid,
+                type=field_type,
+                key=field,
+                subfield_id=result.split,
+            ),
+            paragraph_start=result.start,
+            paragraph_end=result.end,
+        ),
+        highlight=highlight,
+        ematches=ematches,
+        matches=result.matches,  # type: ignore
+    )
+    labels = await get_labels_paragraph(result, kbid)
+    fuzzy_result = len(result.matches) > 0
+    new_paragraph = Paragraph(
+        score=result.score.bm25,
+        rid=result.uuid,
+        field_type=field_type,
+        field=field,
+        text=text,
+        labels=labels,
+        position=TextPosition(
+            index=result.metadata.position.index,
+            start=result.metadata.position.start,
+            end=result.metadata.position.end,
+            page_number=result.metadata.position.page_number,
+        ),
+        fuzzy_result=fuzzy_result,
+    )
+    if len(result.metadata.position.start_seconds) or len(result.metadata.position.end_seconds):
+        new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
+        new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
+    else:
+        # TODO: Remove once we are sure all data has been migrated!
+        seconds_positions = await get_seconds_paragraph(result, kbid)
+        if seconds_positions is not None:
+            new_paragraph.start_seconds = seconds_positions[0]
+            new_paragraph.end_seconds = seconds_positions[1]
+
+    return new_paragraph
 
 
 @merge_observer.wrap({"type": "merge_relations"})
