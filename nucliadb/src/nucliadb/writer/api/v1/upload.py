@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-import pickle
 import uuid
 from datetime import datetime
 from hashlib import md5
@@ -309,8 +308,8 @@ async def _tus_post(
     metadata["implies_resource_creation"] = implies_resource_creation
 
     creation_payload = None
-    if implies_resource_creation:
-        creation_payload = base64.b64encode(pickle.dumps(item)).decode()
+    if implies_resource_creation and item is not None:
+        creation_payload = item.model_dump()
 
     await dm.load(upload_id)
     await dm.start(request)
@@ -580,9 +579,7 @@ async def _tus_patch(
         item_payload = dm.get("item")
         creation_payload = None
         if item_payload is not None:
-            if isinstance(item_payload, str):
-                item_payload = item_payload.encode()
-            creation_payload = pickle.loads(base64.b64decode(item_payload))
+            creation_payload = CreateResourcePayload.model_validate(item_payload)
 
         content_type = dm.get("metadata", {}).get("content_type")
         if content_type is not None and not content_types.valid(content_type):
