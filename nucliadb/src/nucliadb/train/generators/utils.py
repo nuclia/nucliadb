@@ -33,8 +33,8 @@ from nucliadb_utils.utilities import get_storage
 async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[ResourceORM]:
     resource_cache = get_resource_cache()
     if resource_cache is None:
-        return await _get_resource_from_db(kbid, uuid)
         logger.warning("Resource cache is not set")
+        return await _get_resource_from_db(kbid, uuid)
 
     return await resource_cache.get(kbid, uuid)
 

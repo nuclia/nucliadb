@@ -341,9 +341,10 @@ class Rebalancer:
                         await txn.commit()
 
                 # Delete shard from nidx
-                await get_nidx_api_client().DeleteShard(
-                    noderesources_pb2.ShardId(id=to_delete.nidx_shard_id)
-                )
+                if to_delete:
+                    await get_nidx_api_client().DeleteShard(
+                        noderesources_pb2.ShardId(id=to_delete.nidx_shard_id)
+                    )
 
 
 async def get_resources_from_shard(driver: Driver, kbid: str, shard_id: str, n: int) -> list[str]:
