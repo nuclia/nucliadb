@@ -22,7 +22,6 @@ from datetime import datetime
 from typing import Optional
 
 import aiohttp
-import jwt
 import pydantic
 
 from nucliadb_utils.helpers import MessageProgressUpdater
@@ -31,15 +30,6 @@ from nucliadb_utils.settings import nuclia_settings
 from .utils import check_status
 
 logger = logging.getLogger(__name__)
-
-
-def get_nua_api_id() -> str:
-    assert nuclia_settings.nuclia_service_account is not None
-    claimset = jwt.decode(
-        nuclia_settings.nuclia_service_account,
-        options={"verify_signature": False},
-    )
-    return claimset.get("sub")
 
 
 def get_processing_api_url() -> str:
