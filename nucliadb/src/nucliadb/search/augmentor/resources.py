@@ -31,7 +31,6 @@ from nucliadb.ingest.serialize import (
 from nucliadb.models.internal.augment import (
     ResourceClassificationLabels,
     ResourceExtra,
-    ResourceNers,
     ResourceOrigin,
     ResourceProp,
     ResourceSecurity,
@@ -126,9 +125,6 @@ async def db_augment_resource(
 
         elif isinstance(prop, ResourceSecurity):
             security = await serialize_security(resource)
-
-        elif isinstance(prop, ResourceNers):
-            raise NotImplementedError()
 
         elif isinstance(prop, ResourceClassificationLabels):
             labels = await classification_labels(resource)

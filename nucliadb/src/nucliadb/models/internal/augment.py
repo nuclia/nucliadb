@@ -133,8 +133,18 @@ class FieldClassificationLabels(SelectProp):
     prop: Literal["classification_labels"] = "classification_labels"
 
 
+class FieldEntities(SelectProp):
+    """Same as MetadataExtensionStrategy asking for ners"""
+
+    prop: Literal["entities"] = "entities"
+
+
 FieldProp = Annotated[
-    (Annotated[FieldText, Tag("text")] | Annotated[FieldValue, Tag("value")]),
+    (
+        Annotated[FieldText, Tag("text")]
+        | Annotated[FieldValue, Tag("value")]
+        | Annotated[FieldEntities, Tag("entities")]
+    ),
     Discriminator(prop_discriminator),
 ]
 
@@ -196,12 +206,6 @@ class ResourceSecurity(SelectProp):
     prop: Literal["security"] = "security"
 
 
-class ResourceNers(SelectProp):
-    """Same as MetadataExtensionStrategy asking for ners"""
-
-    prop: Literal["ners"] = "ners"
-
-
 class ResourceClassificationLabels(SelectProp):
     """Same as MetadataExtensionStrategy asking for classification_labels"""
 
@@ -220,7 +224,6 @@ ResourceProp = Annotated[
         | Annotated[ResourceOrigin, Tag("origin")]
         | Annotated[ResourceExtra, Tag("extra")]
         | Annotated[ResourceSecurity, Tag("security")]
-        | Annotated[ResourceNers, Tag("ners")]
         | Annotated[ResourceClassificationLabels, Tag("classification_labels")]
     ),
     Discriminator(prop_discriminator),

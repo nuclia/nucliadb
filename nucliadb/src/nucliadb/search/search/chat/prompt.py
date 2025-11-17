@@ -29,12 +29,13 @@ from pydantic import BaseModel
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
+from nucliadb.ingest.serialize import serialize_extra, serialize_origin
 from nucliadb.search import logger
+from nucliadb.search.augmentor.fields import field_entities
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import (
     get_file_thumbnail_image,
@@ -409,9 +410,7 @@ async def extend_prompt_context_with_origin_metadata(
         origin = None
         resource = await cache.get_resource(kbid, rid)
         if resource is not None:
-            pb_origin = await resource.get_origin()
-            if pb_origin is not None:
-                origin = from_proto.origin(pb_origin)
+            origin = await serialize_origin(resource)
         return rid, origin
 
     rids = {tb_id.rid for tb_id in text_block_ids}
@@ -489,19 +488,10 @@ async def extend_prompt_context_with_ner(
         resource = await cache.get_resource(kbid, fid.rid)
         if resource is not None:
             field = await resource.get_field(fid.key, fid.pb_type, load=False)
-            fcm = await field.get_field_metadata()
-            if fcm is not None:
-                # Data Augmentation + Processor entities
-                for (
-                    data_aumgentation_task_id,
-                    entities_wrapper,
-                ) in fcm.metadata.entities.items():
-                    for entity in entities_wrapper.entities:
-                        ners.setdefault(entity.label, set()).add(entity.text)
-                # Legacy processor entities
-                # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-                for token, family in fcm.metadata.ner.items():
-                    ners.setdefault(family, set()).add(token)
+
+            entities = await field_entities(fid, field)
+            if entities is not None:
+                ners.update(entities)
         return _id, ners
 
     nerss = await run_concurrently([_get_ners(kbid, tb_id) for tb_id in text_block_ids])
@@ -538,9 +528,7 @@ async def extend_prompt_context_with_extra_metadata(
         extra = None
         resource = await cache.get_resource(kbid, rid)
         if resource is not None:
-            pb_extra = await resource.get_extra()
-            if pb_extra is not None:
-                extra = from_proto.extra(pb_extra)
+            extra = await serialize_extra(resource)
         return rid, extra
 
     rids = {tb_id.rid for tb_id in text_block_ids}

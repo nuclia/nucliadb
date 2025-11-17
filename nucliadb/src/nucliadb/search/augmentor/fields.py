@@ -26,6 +26,7 @@ from nucliadb.models.internal.augment import (
     ConversationAnswer,
     ConversationAttachments,
     FieldClassificationLabels,
+    FieldEntities,
     FieldProp,
     FieldText,
     FieldValue,
@@ -117,6 +118,7 @@ async def db_augment_base_field(
 ) -> BaseAugmentedField:
     text = None
     labels = None
+    entities = None
 
     for prop in select:
         if isinstance(prop, FieldText):
@@ -125,10 +127,14 @@ async def db_augment_base_field(
         elif isinstance(prop, FieldClassificationLabels):
             labels = await classification_labels(field_id, field)
 
+        elif isinstance(prop, FieldEntities):
+            entities = await field_entities(field_id, field)
+
     augmented = BaseAugmentedField(
         id=field.field_id,
         text=text,
         classification_labels=labels,
+        entities=entities,
     )
     return augmented
 
@@ -155,6 +161,7 @@ async def db_augment_text_field(
         text=base.text,
         value=value,
         classification_labels=base.classification_labels,
+        entities=base.entities,
     )
     return augmented
 
@@ -181,6 +188,7 @@ async def db_augment_file_field(
         text=base.text,
         value=value,
         classification_labels=base.classification_labels,
+        entities=base.entities,
     )
     return augmented
 
@@ -207,6 +215,7 @@ async def db_augment_link_field(
         text=base.text,
         value=value,
         classification_labels=base.classification_labels,
+        entities=base.entities,
     )
     return augmented
 
@@ -232,6 +241,9 @@ async def db_augment_conversation_field(
         elif isinstance(prop, FieldClassificationLabels):
             labels = await classification_labels(field_id, field)
 
+        elif isinstance(prop, FieldEntities):
+            entities = await field_entities(field_id, field)
+
         elif isinstance(prop, ConversationAnswer):
             raise NotImplementedError()
 
@@ -246,6 +258,7 @@ async def db_augment_conversation_field(
         text=text,
         value=value,
         classification_labels=labels,
+        entities=entities,
     )
     return augmented
 
@@ -272,6 +285,7 @@ async def db_augment_generic_field(
         text=base.text,
         value=value,
         classification_labels=base.classification_labels,
+        entities=base.entities,
     )
     return augmented
 
@@ -301,3 +315,24 @@ async def classification_labels(id: FieldId, field: Field) -> list[tuple[str, st
                     continue
                 labels.add((classification.labelset, classification.label))
     return list(labels)
+
+
+async def field_entities(id: FieldId, field: Field) -> dict[str, set[str]] | None:
+    field_metadata = await field.get_field_metadata()
+    if field_metadata is None:
+        return None
+
+    ners: dict[str, set[str]] = {}
+    # Data Augmentation + Processor entities
+    for (
+        data_aumgentation_task_id,
+        entities_wrapper,
+    ) in field_metadata.metadata.entities.items():
+        for entity in entities_wrapper.entities:
+            ners.setdefault(entity.label, set()).add(entity.text)
+    # Legacy processor entities
+    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
+    for token, family in field_metadata.metadata.ner.items():
+        ners.setdefault(family, set()).add(token)
+
+    return ners

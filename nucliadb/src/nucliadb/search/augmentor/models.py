@@ -146,7 +146,11 @@ class BaseAugmentedField:
     id: FieldId
 
     text: str | None
+
+    # TODO: review tuples vs dict
     classification_labels: list[tuple[str, str]] | None
+    # TODO: review tuples vs dict
+    entities: dict[str, set[str]] | None
 
 
 @dataclass
