@@ -38,10 +38,10 @@ from tests.utils.dirty_index import wait_for_sync
 @pytest.mark.deploy_modes("standalone")
 async def test_generator_token_classification(
     nucliadb_train: aiohttp.ClientSession,
-    knowledgebox_with_entities: str,
+    knowledgebox: str,
     nucliadb_ingest_grpc: WriterStub,
 ):
-    kbid = knowledgebox_with_entities
+    kbid = knowledgebox
 
     await inject_resource_with_token_classification(kbid, nucliadb_ingest_grpc)
 

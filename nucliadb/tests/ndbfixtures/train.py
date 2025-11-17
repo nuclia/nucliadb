@@ -35,8 +35,6 @@ from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import NidxUtility
-from nucliadb.ingest.orm.entities import EntitiesManager
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.standalone.settings import Settings
 from nucliadb.train.settings import settings as train_settings
@@ -46,7 +44,7 @@ from nucliadb.train.utils import (
     stop_shard_manager,
     stop_train_grpc,
 )
-from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
+from nucliadb_protos.knowledgebox_pb2 import Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     FieldComputedMetadataWrapper,
@@ -58,15 +56,11 @@ from nucliadb_protos.resources_pb2 import (
     Sentence,
 )
 from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.writer_pb2 import BrokerMessage, SetEntitiesRequest
-from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.settings import (
     running_settings,
 )
 from nucliadb_utils.tests import free_port
-from nucliadb_utils.utilities import (
-    get_storage,
-)
 
 
 @dataclass
@@ -148,30 +142,6 @@ async def knowledgebox_with_labels(nucliadb_writer: AsyncClient, knowledgebox: s
         },
     )
     assert resp.status_code == 200
-
-    yield knowledgebox
-
-
-@pytest.fixture(scope="function")
-async def knowledgebox_with_entities(nucliadb_ingest_grpc: WriterStub, knowledgebox: str):
-    ser = SetEntitiesRequest()
-    ser.kb.uuid = knowledgebox
-    ser.group = "PERSON"
-    ser.entities.title = "PERSON"
-    ser.entities.entities["Ramon"].value = "Ramon"
-    ser.entities.entities["Eudald Camprubi"].value = "Eudald Camprubi"
-    ser.entities.entities["Carmen Iniesta"].value = "Carmen Iniesta"
-    ser.entities.entities["el Super Fran"].value = "el Super Fran"
-    await nucliadb_ingest_grpc.SetEntities(ser)  # type: ignore
-
-    ser = SetEntitiesRequest()
-    ser.kb.uuid = knowledgebox
-    ser.group = "ORG"
-    ser.entities.title = "ORG"
-    ser.entities.entities["Nuclia"].value = "Nuclia"
-    ser.entities.entities["Debian"].value = "Debian"
-    ser.entities.entities["Generalitat de Catalunya"].value = "Generalitat de Catalunya"
-    await nucliadb_ingest_grpc.SetEntities(ser)  # type: ignore
 
     yield knowledgebox
 
@@ -326,16 +296,6 @@ async def test_pagination_resources(processor: Processor, knowledgebox: str):
             break
         print(f"got {count}, retrying")
         await asyncio.sleep(2)
-
-    # Add entities
-    storage = await get_storage()
-    async with driver.rw_transaction() as txn:
-        kb = KnowledgeBox(txn, storage, kbid=knowledgebox)
-        entities_manager = EntitiesManager(kb, txn)
-        entities = EntitiesGroup()
-        entities.entities["entity1"].value = "PERSON"
-        await entities_manager.set_entities_group_force("group1", entities)
-        await txn.commit()
 
     # Add ontology
     labelset = LabelSet()

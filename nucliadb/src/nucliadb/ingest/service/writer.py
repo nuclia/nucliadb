@@ -23,7 +23,6 @@ from typing import AsyncIterator
 from nucliadb.backups import tasks as backup_tasks
 from nucliadb.backups import utils as backup_utils
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
@@ -49,7 +48,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
-    DelEntitiesRequest,
     GetEntitiesGroupRequest,
     GetEntitiesGroupResponse,
     GetEntitiesRequest,
@@ -58,12 +56,7 @@ from nucliadb_protos.writer_pb2 import (
     IndexStatus,
     ListEntitiesGroupsRequest,
     ListEntitiesGroupsResponse,
-    NewEntitiesGroupRequest,
-    NewEntitiesGroupResponse,
     OpStatusWriter,
-    SetEntitiesRequest,
-    UpdateEntitiesGroupRequest,
-    UpdateEntitiesGroupResponse,
     WriterStatusRequest,
     WriterStatusResponse,
 )
@@ -224,29 +217,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             logger.info(f"Processed {message.uuid}")
         return response
 
-    async def NewEntitiesGroup(  # type: ignore
-        self, request: NewEntitiesGroupRequest, context=None
-    ) -> NewEntitiesGroupResponse:
-        response = NewEntitiesGroupResponse()
-        async with self.driver.ro_transaction() as ro_txn:
-            kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
-            if kbobj is None:
-                response.status = NewEntitiesGroupResponse.Status.KB_NOT_FOUND
-                return response
-
-        async with self.driver.rw_transaction() as txn:
-            kbobj.txn = txn
-            entities_manager = EntitiesManager(kbobj, txn)
-            try:
-                await entities_manager.create_entities_group(request.group, request.entities)
-            except AlreadyExists:
-                response.status = NewEntitiesGroupResponse.Status.ALREADY_EXISTS
-                return response
-
-            await txn.commit()
-            response.status = NewEntitiesGroupResponse.Status.OK
-            return response
-
     async def GetEntities(  # type: ignore
         self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
@@ -318,81 +288,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     response.status = GetEntitiesGroupResponse.Status.OK
                     response.group.CopyFrom(entities_group)
 
-            return response
-
-    async def SetEntities(self, request: SetEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
-        response = OpStatusWriter()
-        async with self.driver.ro_transaction() as ro_txn:
-            kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
-            if kbobj is None:
-                response.status = OpStatusWriter.Status.NOTFOUND
-                return response
-
-        async with self.driver.rw_transaction() as txn:
-            kbobj.txn = txn
-            entities_manager = EntitiesManager(kbobj, txn)
-            try:
-                await entities_manager.set_entities_group(request.group, request.entities)
-            except Exception as e:
-                errors.capture_exception(e)
-                logger.error("Error in ingest gRPC servicer", exc_info=True)
-                response.status = OpStatusWriter.Status.ERROR
-            else:
-                response.status = OpStatusWriter.Status.OK
-                await txn.commit()
-            return response
-
-    async def UpdateEntitiesGroup(  # type: ignore
-        self, request: UpdateEntitiesGroupRequest, context=None
-    ) -> UpdateEntitiesGroupResponse:
-        response = UpdateEntitiesGroupResponse()
-        async with self.driver.ro_transaction() as ro_txn:
-            kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
-            if kbobj is None:
-                response.status = UpdateEntitiesGroupResponse.Status.KB_NOT_FOUND
-                return response
-
-        async with self.driver.rw_transaction() as txn:
-            kbobj.txn = txn
-            entities_manager = EntitiesManager(kbobj, txn)
-            try:
-                await entities_manager.set_entities_group_metadata(
-                    request.group,
-                    title=request.title,
-                    color=request.color,
-                )
-                updates = {**request.add, **request.update}
-                await entities_manager.update_entities(request.group, updates)
-                await entities_manager.delete_entities(request.group, request.delete)  # type: ignore
-            except EntitiesGroupNotFound:
-                response.status = UpdateEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
-                return response
-
-            await txn.commit()
-            response.status = UpdateEntitiesGroupResponse.Status.OK
-            return response
-
-    async def DelEntities(self, request: DelEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
-        response = OpStatusWriter()
-
-        async with self.driver.ro_transaction() as ro_txn:
-            kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
-            if kbobj is None:
-                response.status = OpStatusWriter.Status.NOTFOUND
-                return response
-
-        async with self.driver.rw_transaction() as txn:
-            kbobj.txn = txn
-            entities_manager = EntitiesManager(kbobj, txn)
-            try:
-                await entities_manager.delete_entities_group(request.group)
-            except Exception as e:
-                errors.capture_exception(e)
-                logger.error("Error in ingest gRPC servicer", exc_info=True)
-                response.status = OpStatusWriter.Status.ERROR
-            else:
-                await txn.commit()
-                response.status = OpStatusWriter.Status.OK
             return response
 
     async def Status(  # type: ignore

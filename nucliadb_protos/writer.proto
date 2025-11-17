@@ -169,59 +169,6 @@ message WriterStatusResponse {
 message WriterStatusRequest {
 }
 
-
-
-message NewEntitiesGroupRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    string group = 2;
-    knowledgebox.EntitiesGroup entities = 3;
-}
-
-message NewEntitiesGroupResponse {
-    enum Status {
-        OK = 0;
-        ERROR = 1;
-        KB_NOT_FOUND = 2;
-        ALREADY_EXISTS = 3;
-    }
-    Status status = 1;
-}
-
-
-message SetEntitiesRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    string group = 2;
-    knowledgebox.EntitiesGroup entities = 3;
-}
-
-message UpdateEntitiesGroupRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-
-    string group = 2;
-
-    // entity_id: Entity
-    map<string, knowledgebox.Entity> add = 3;
-
-    // entity_id: Entity
-    map<string, knowledgebox.Entity> update = 4;
-
-    // entity_id
-    repeated string delete = 5;
-
-    string title = 6;
-    string color = 7;
-}
-
-message UpdateEntitiesGroupResponse {
-    enum Status {
-        OK = 0;
-        ERROR = 1;
-        KB_NOT_FOUND = 2;
-        ENTITIES_GROUP_NOT_FOUND = 3;
-    }
-    Status status = 1;
-}
-
 message ListEntitiesGroupsRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
 }
@@ -250,21 +197,6 @@ message GetEntitiesResponse {
         ERROR = 2;
     }
     Status status = 3;
-}
-
-message DelEntitiesRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    string group = 2;
-}
-
-message MergeEntitiesRequest {
-    message EntityID {
-        string group = 1;
-        string entity = 2;
-    }
-    knowledgebox.KnowledgeBoxID kb = 1;
-    EntityID from = 2;
-    EntityID to = 3;
 }
 
 message GetLabelsResponse {
@@ -436,13 +368,9 @@ service Writer {
     rpc ProcessMessage(stream BrokerMessage) returns (OpStatusWriter) {}
 
     // Entities
-    rpc NewEntitiesGroup(NewEntitiesGroupRequest) returns (NewEntitiesGroupResponse) {}
     rpc GetEntities(GetEntitiesRequest) returns (GetEntitiesResponse) {}
     rpc GetEntitiesGroup(GetEntitiesGroupRequest) returns (GetEntitiesGroupResponse) {}
     rpc ListEntitiesGroups(ListEntitiesGroupsRequest) returns (ListEntitiesGroupsResponse) {}
-    rpc SetEntities(SetEntitiesRequest) returns (OpStatusWriter) {}
-    rpc UpdateEntitiesGroup(UpdateEntitiesGroupRequest) returns (UpdateEntitiesGroupResponse) {}
-    rpc DelEntities(DelEntitiesRequest) returns (OpStatusWriter) {}
 
     rpc Status(WriterStatusRequest) returns (WriterStatusResponse) {}
 
