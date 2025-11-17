@@ -35,7 +35,7 @@ from nucliadb.search.predict import (
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.chat.fetcher import RAOFetcher
-from nucliadb.search.search.chat.parser import RAOQueryParser
+from nucliadb.search.search.chat.parser import RAOFindParser
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
@@ -570,6 +570,6 @@ async def rao_parse_query(kbid: str, item: FindRequest) -> ParsedQuery:
         generative_model=item.generative_model,
         query_image=item.query_image,
     )
-    parser = RAOQueryParser(kbid, item, fetcher)
+    parser = RAOFindParser(kbid, item, fetcher)
     retrieval = await parser.parse()
     return ParsedQuery(fetcher=fetcher, retrieval=retrieval, generation=None)

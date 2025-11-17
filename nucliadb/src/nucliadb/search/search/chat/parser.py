@@ -55,7 +55,7 @@ from nucliadb_models.search import (
 from nucliadb_protos import utils_pb2
 
 
-class RAOQueryParser:
+class RAOFindParser:
     def __init__(self, kbid: str, item: FindRequest, fetcher: Fetcher):
         self.kbid = kbid
         self.item = item
