@@ -74,7 +74,7 @@ def test_back_pressure_cache():
     # Set a value and get it
     now = datetime.now(timezone.utc)
     try_after = now + timedelta(seconds=0.5)
-    data = BackPressureData(try_after=try_after, type="indexing")
+    data = BackPressureData(try_after=try_after, type="indexing", pending=10)
 
     cache.set(key, data)
 
@@ -200,7 +200,7 @@ def test_cached_back_pressure_context_manager(cache):
     func.reset_mock()
 
     data = BackPressureData(
-        try_after=datetime.now(timezone.utc) + timedelta(seconds=10), type="indexing"
+        try_after=datetime.now(timezone.utc) + timedelta(seconds=10), type="indexing", pending=10
     )
     func.side_effect = BackPressureException(data)
 
