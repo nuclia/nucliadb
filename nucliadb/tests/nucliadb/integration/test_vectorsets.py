@@ -147,7 +147,7 @@ async def test_vectorset_parameter_without_default_vectorset(
             new=AsyncMock(side_effect=mock_nidx_query),
         ),
         patch(
-            "nucliadb.search.search.query.datamanagers.vectorsets.exists",
+            "nucliadb.common.datamanagers.vectorsets.exists",
             new=AsyncMock(return_value=True),
         ),
     ):
@@ -200,7 +200,7 @@ async def test_vectorset_parameter_with_default_vectorset(
             new=AsyncMock(side_effect=mock_nidx_query),
         ),
         patch(
-            "nucliadb.search.search.query.datamanagers.vectorsets.exists",
+            "nucliadb.common.datamanagers.vectorsets.exists",
             new=AsyncMock(return_value=True),
         ),
     ):
