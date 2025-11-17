@@ -31,7 +31,6 @@
 from . import (
     atomic,
     cluster,
-    entities,
     exceptions,
     fields,
     kb,
@@ -47,7 +46,6 @@ from .utils import with_ro_transaction, with_rw_transaction, with_transaction
 __all__ = (
     "atomic",
     "cluster",
-    "entities",
     "exceptions",
     "fields",
     "kb",
