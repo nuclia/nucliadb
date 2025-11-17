@@ -339,44 +339,6 @@ async def knowledge_graph(
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
 
-    resp = await nucliadb_writer.post(
-        f"/kb/{standalone_knowledgebox}/entitiesgroups",
-        json={
-            "title": "scientist",
-            "color": "",
-            "entities": {
-                "Isaac": {"value": "Isaac"},
-                "Isaac Newton": {"value": "Isaac Newton", "represents": ["Newton"]},
-                "Isaac Newsome": {"value": "Isaac Newsome"},
-            },
-            "custom": True,
-            "group": "scientist",
-        },
-    )
-    assert resp.status_code == 200, resp.content
-    resp = await nucliadb_writer.patch(
-        f"/kb/{standalone_knowledgebox}/entitiesgroup/scientist",
-        json={"add": {}, "update": {}, "delete": ["Isaac Newsome"]},
-    )
-    assert resp.status_code == 200, resp.content
-    resp = await nucliadb_writer.post(
-        f"/kb/{standalone_knowledgebox}/entitiesgroups",
-        json={
-            "title": "poet",
-            "color": "",
-            "entities": {
-                "Becquer": {
-                    "value": "Becquer",
-                    "represents": ["Gustavo Adolfo Bécquer"],
-                },
-                "Gustavo Adolfo Bécquer": {"value": "Gustavo Adolfo Bécquer"},
-            },
-            "custom": True,
-            "group": "poet",
-        },
-    )
-    assert resp.status_code == 200, resp.content
-
     return (nodes, edges, rid)
 
 

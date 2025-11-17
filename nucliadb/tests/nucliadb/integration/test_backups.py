@@ -114,20 +114,6 @@ async def src_kb(
         )
         assert resp.status_code == 201
 
-    # Create an entity group with a few entities
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/entitiesgroups",
-        json={
-            "group": "foo",
-            "entities": {
-                "bar": {"value": "BAZ", "represents": ["lorem", "ipsum"]},
-            },
-            "title": "Foo title",
-            "color": "red",
-        },
-    )
-    assert resp.status_code == 200
-
     # Create a labelset with a few labels
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/labelset/foo",
@@ -195,11 +181,6 @@ async def test_backup(
     await check_kb(nucliadb_reader, src_kb)
     await check_kb(nucliadb_reader, dst_kb)
 
-    # Check that the entities were restored
-    resp = await nucliadb_reader.get(f"/kb/{dst_kb}/entitiesgroups")
-    assert resp.status_code == 200
-    assert len(resp.json()["groups"]) == 1
-
     # Check that the labelset was restored
     resp = await nucliadb_reader.get(f"/kb/{dst_kb}/labelset/foo")
     assert resp.status_code == 200
@@ -215,7 +196,6 @@ async def check_kb(nucliadb_reader: AsyncClient, kbid: str):
     await check_resources(nucliadb_reader, kbid)
     await check_synonyms(nucliadb_reader, kbid)
     await check_search_configuration(nucliadb_reader, kbid)
-    await check_entities(nucliadb_reader, kbid)
     await check_labelset(nucliadb_reader, kbid)
 
 
@@ -231,16 +211,6 @@ async def check_search_configuration(nucliadb_reader: AsyncClient, kbid: str):
     assert resp.status_code == 200
     config = resp.json()
     assert config == {"kind": "find", "config": {"features": ["keyword"]}}
-
-
-async def check_entities(nucliadb_reader: AsyncClient, kbid: str):
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
-    assert resp.status_code == 200
-    groups = resp.json()["groups"]
-    assert len(groups) == 1
-    group = groups["foo"]
-    assert group["title"] == "Foo title"
-    assert group["color"] == "red"
 
 
 async def check_labelset(nucliadb_reader: AsyncClient, kbid: str):

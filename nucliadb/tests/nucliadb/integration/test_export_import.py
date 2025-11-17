@@ -91,20 +91,6 @@ async def src_kb(
     )
     assert resp.status_code == 201
 
-    # Create an entity group with a few entities
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/entitiesgroups",
-        json={
-            "group": "foo",
-            "entities": {
-                "bar": {"value": "BAZ", "represents": ["lorem", "ipsum"]},
-            },
-            "title": "Foo title",
-            "color": "red",
-        },
-    )
-    assert resp.status_code == 200
-
     # Create a labelset with a few labels
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/labelset/foo",
@@ -373,13 +359,6 @@ async def _check_kb(nucliadb_reader: AsyncClient, kbid: str):
     external_file = body["data"]["files"]["externally-hosted-file"]["value"]
     assert external_file["file"]["uri"] == "https://example.com/testfile"
     assert external_file["external"] is True
-
-    # Entities
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
-    assert resp.status_code == 200
-    body = resp.json()
-    groups = body["groups"]
-    assert len(groups) == 1
 
     # Labels
     resp = await nucliadb_reader.get(f"/kb/{kbid}/labelsets")

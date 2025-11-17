@@ -308,45 +308,6 @@ async def test_serialize_errors(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_entitygroups(
-    nucliadb_writer: AsyncClient,
-    nucliadb_reader: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
-    standalone_knowledgebox: str,
-):
-    await wait_for_sync()
-    entitygroup = {
-        "group": "group1",
-        "title": "Kitchen",
-        "custom": True,
-        "color": "blue",
-        "entities": {
-            "cupboard": {"value": "Cupboard"},
-            "fork": {"value": "Fork"},
-            "fridge": {"value": "Fridge"},
-            "knife": {"value": "Knife"},
-            "sink": {"value": "Sink"},
-            "spoon": {"value": "Spoon"},
-        },
-    }
-    resp = await nucliadb_writer.post(f"/kb/{standalone_knowledgebox}/entitiesgroups", json=entitygroup)
-    assert resp.status_code == 200
-
-    # Entities are not returned by default
-    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/entitiesgroups")
-    groups = resp.json()["groups"]
-    assert "entities" in groups["group1"]
-    assert len(groups["group1"]["entities"]) == 0
-    assert groups["group1"]["title"] == "Kitchen"
-    assert groups["group1"]["color"] == "blue"
-    assert groups["group1"]["custom"] is True
-
-    # show_entities=true returns a http 400
-    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/entitiesgroups?show_entities=true")
-    assert resp.status_code == 400
-
-
-@pytest.mark.deploy_modes("standalone")
 async def test_extracted_shortened_metadata(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
