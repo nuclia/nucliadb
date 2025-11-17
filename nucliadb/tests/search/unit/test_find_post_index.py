@@ -130,7 +130,11 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
 
     async def mock_augment_paragraph(kbid: str, paragraph_id: ParagraphId, select, metadata):
         return AugmentedParagraph(
-            id=paragraph_id, text="extracted text", source_image=None, related=None
+            id=paragraph_id,
+            text="extracted text",
+            source_image_path=None,
+            page_preview_path=None,
+            related=None,
         )
 
     async def fake_reranking(kbid: str, item: RerankModel) -> RerankResponse:

@@ -25,6 +25,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal.augment import (
     ParagraphImage,
+    ParagraphPage,
     ParagraphProp,
     ParagraphTable,
     ParagraphText,
@@ -37,7 +38,6 @@ from nucliadb.search.augmentor.models import AugmentedParagraph, Metadata, Parag
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 from nucliadb.search.search.paragraphs import get_paragraph_from_full_text
-from nucliadb_models.search import Image
 from nucliadb_protos import resources_pb2
 
 
@@ -141,7 +141,8 @@ async def db_augment_paragraph(
     metadata: Metadata,
 ) -> AugmentedParagraph:
     text = None
-    image = None
+    image_path = None
+    page_preview_path = None
     related = None
     for prop in select:
         if isinstance(prop, ParagraphText):
@@ -149,17 +150,19 @@ async def db_augment_paragraph(
 
         elif isinstance(prop, ParagraphImage):
             if metadata.is_an_image and metadata.source_file:
-                image = await download_paragraph_source_image(
-                    field.kbid, paragraph_id, metadata.source_file
-                )
+                image_path = f"generated/{metadata.source_file}"
 
         elif isinstance(prop, ParagraphTable):
-            # REVIEW: is it better to provide an image of the table or is it
-            # better to use the page preview?
-            if metadata.is_a_table and metadata.source_file:
-                image = await download_paragraph_source_image(
-                    field.kbid, paragraph_id, metadata.source_file
-                )
+            if metadata.is_a_table:
+                if prop.prefer_page_preview and metadata.page and metadata.in_page_with_visual:
+                    page_preview_path = f"generated/extracted_images_{metadata.page}.png"
+                elif metadata.source_file:
+                    image_path = f"generated/{metadata.source_file}"
+
+        elif isinstance(prop, ParagraphPage):
+            if prop.preview:
+                if metadata.page and metadata.in_page_with_visual:
+                    page_preview_path = f"generated/extracted_images_{metadata.page}.png"
 
         elif isinstance(prop, RelatedParagraphs):
             related = await related_paragraphs(
@@ -175,7 +178,8 @@ async def db_augment_paragraph(
     return AugmentedParagraph(
         id=paragraph_id,
         text=text,
-        source_image=image,
+        source_image_path=image_path,
+        page_preview_path=page_preview_path,
         related=related,
     )
 
@@ -192,28 +196,6 @@ async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | N
     # we want to be explicit with not having the paragraph text but the function
     # above returns an empty string if it can't find it
     return text or None
-
-
-async def download_paragraph_source_image(
-    kbid: str, paragraph_id: ParagraphId, source_image: str
-) -> Image | None:
-    from nucliadb.search.search.hydrator.images import download_image
-
-    field_id = paragraph_id.field_id
-
-    # Paragraphs extracted from an image store its original image representation
-    # in the reference file. The path is incomplete though, as it's stored in
-    # the `generated` folder
-    image = await download_image(
-        kbid,
-        field_id,
-        f"generated/{source_image}",
-        # XXX: we assume all reference files are PNG images, but this actually
-        # depends on learning so it's a dangerous assumption. We should check it
-        # by ourselves
-        mime_type="image/png",
-    )
-    return image
 
 
 async def related_paragraphs(

@@ -27,7 +27,6 @@ from nucliadb_models.conversation import FieldConversation
 from nucliadb_models.file import FieldFile
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import Origin
-from nucliadb_models.search import Image
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import FieldText
 from nucliadb_protos import resources_pb2
@@ -132,8 +131,12 @@ class AugmentedParagraph:
     text: str | None
 
     # original image for the paragraph when it has been extracted from an image
-    # or a table
-    source_image: Image | None
+    # or a table. This value is the path to be used in the download endpoint
+    source_image_path: str | None
+
+    # if the paragraph comes from a page, this is the path for the download
+    # endpoint to get the page preview image
+    page_preview_path: str | None
 
     related: RelatedParagraphs | None
 

@@ -94,6 +94,16 @@ class ParagraphImage(SelectProp):
 class ParagraphTable(SelectProp):
     prop: Literal["table"] = "table"
 
+    # sometimes, due to a not perfect extraction, is better to use the page
+    # preview instead of the table image for context. This options let users
+    # choose
+    prefer_page_preview: bool = False
+
+
+class ParagraphPage(SelectProp):
+    prop: Literal["page"] = "page"
+    preview: bool = True
+
 
 class RelatedParagraphs(SelectProp):
     prop: Literal["related"] = "related"
