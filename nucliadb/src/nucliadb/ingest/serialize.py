@@ -39,9 +39,15 @@ from nucliadb_models.resource import (
     Error,
     ExtractedDataType,
     ExtractedDataTypeName,
+    ExtractedText,
+    FieldComputedMetadata,
+    FieldQuestionAnswers,
+    FileExtractedData,
     FileFieldData,
     FileFieldExtractedData,
     GenericFieldData,
+    LargeComputedMetadata,
+    LinkExtractedData,
     LinkFieldData,
     LinkFieldExtractedData,
     QueueType,
@@ -49,81 +55,13 @@ from nucliadb_models.resource import (
     ResourceData,
     TextFieldData,
     TextFieldExtractedData,
+    VectorObject,
 )
 from nucliadb_models.search import ResourceProperties
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_protos import writer_pb2
 from nucliadb_protos.writer_pb2 import FieldStatus
 from nucliadb_utils.utilities import get_storage
-
-
-async def set_resource_field_extracted_data(
-    field: Field,
-    field_data: ExtractedDataType,
-    field_type_name: FieldTypeName,
-    wanted_extracted_data: list[ExtractedDataTypeName],
-) -> None:
-    if field_data is None:
-        return
-
-    if ExtractedDataTypeName.TEXT in wanted_extracted_data:
-        data_et = await field.get_extracted_text()
-        if data_et is not None:
-            field_data.text = from_proto.extracted_text(data_et)
-
-    metadata_wanted = ExtractedDataTypeName.METADATA in wanted_extracted_data
-    shortened_metadata_wanted = ExtractedDataTypeName.SHORTENED_METADATA in wanted_extracted_data
-    if metadata_wanted or shortened_metadata_wanted:
-        data_fcm = await field.get_field_metadata()
-
-        if data_fcm is not None:
-            field_data.metadata = from_proto.field_computed_metadata(
-                data_fcm, shortened=shortened_metadata_wanted and not metadata_wanted
-            )
-
-    if ExtractedDataTypeName.LARGE_METADATA in wanted_extracted_data:
-        data_lcm = await field.get_large_field_metadata()
-        if data_lcm is not None:
-            field_data.large_metadata = from_proto.large_computed_metadata(data_lcm)
-
-    if ExtractedDataTypeName.VECTOR in wanted_extracted_data:
-        # XXX: our extracted API is not vectorset-compatible, so we'll get the
-        # first vectorset and return the values. Ideally, we should provide a
-        # way to select a vectorset
-        vectorset_id = None
-        async with datamanagers.with_ro_transaction() as txn:
-            async for vectorset_id, vs in datamanagers.vectorsets.iter(
-                txn=txn,
-                kbid=field.resource.kb.kbid,
-            ):
-                break
-        assert vectorset_id is not None, "All KBs must have at least a vectorset"
-        data_vec = await field.get_vectors(vectorset_id, vs.storage_key_kind)
-        if data_vec is not None:
-            field_data.vectors = from_proto.vector_object(data_vec)
-
-    if ExtractedDataTypeName.QA in wanted_extracted_data:
-        qa = await field.get_question_answers()
-        if qa is not None:
-            field_data.question_answers = from_proto.field_question_answers(qa)
-
-    if (
-        isinstance(field, File)
-        and isinstance(field_data, FileFieldExtractedData)
-        and ExtractedDataTypeName.FILE in wanted_extracted_data
-    ):
-        data_fed = await field.get_file_extracted_data()
-        if data_fed is not None:
-            field_data.file = from_proto.file_extracted_data(data_fed)
-
-    if (
-        isinstance(field, Link)
-        and isinstance(field_data, LinkFieldExtractedData)
-        and ExtractedDataTypeName.LINK in wanted_extracted_data
-    ):
-        data_led = await field.get_link_extracted_data()
-        if data_led is not None:
-            field_data.link = from_proto.link_extracted_data(data_led)
 
 
 async def serialize(
@@ -149,31 +87,6 @@ async def serialize(
         )
 
 
-async def serialize_field_errors(
-    field: Field,
-    serialized: Union[
-        TextFieldData, FileFieldData, LinkFieldData, ConversationFieldData, GenericFieldData
-    ],
-):
-    status = await field.get_status()
-    if status is None:
-        status = FieldStatus()
-    serialized.status = status.Status.Name(status.status)
-    if status.errors:
-        serialized.errors = []
-        for error in status.errors:
-            serialized.errors.append(
-                Error(
-                    body=error.source_error.error,
-                    code=error.source_error.code,
-                    code_str=writer_pb2.Error.ErrorCode.Name(error.source_error.code),
-                    created=error.created.ToDatetime(),
-                    severity=writer_pb2.Error.Severity.Name(error.source_error.severity),
-                )
-            )
-        serialized.error = serialized.errors[-1]
-
-
 async def managed_serialize(
     txn: Transaction,
     kbid: str,
@@ -189,6 +102,33 @@ async def managed_serialize(
         return None
 
     return await serialize_resource(orm_resource, show, field_type_filter, extracted)
+
+
+async def get_orm_resource(
+    txn: Transaction,
+    kbid: str,
+    rid: Optional[str],
+    slug: Optional[str] = None,
+    service_name: Optional[str] = None,
+) -> Optional[ORMResource]:
+    storage = await get_storage(service_name=service_name)
+
+    kb = KnowledgeBox(txn, storage, kbid)
+
+    if rid is None:
+        if slug is None:
+            raise ValueError("Either rid or slug parameters should be used")
+
+        rid = await kb.get_resource_uuid_by_slug(slug)
+        if rid is None:
+            # Could not find resource uuid from slug
+            return None
+
+    orm_resource = await kb.get(rid)
+    if orm_resource is None:
+        return None
+
+    return orm_resource
 
 
 async def serialize_resource(
@@ -390,28 +330,128 @@ async def serialize_security(resource: ORMResource) -> ResourceSecurity:
     return security
 
 
-async def get_orm_resource(
-    txn: Transaction,
-    kbid: str,
-    rid: Optional[str],
-    slug: Optional[str] = None,
-    service_name: Optional[str] = None,
-) -> Optional[ORMResource]:
-    storage = await get_storage(service_name=service_name)
+async def serialize_field_errors(
+    field: Field,
+    serialized: Union[
+        TextFieldData, FileFieldData, LinkFieldData, ConversationFieldData, GenericFieldData
+    ],
+):
+    status = await field.get_status()
+    if status is None:
+        status = FieldStatus()
+    serialized.status = status.Status.Name(status.status)
+    if status.errors:
+        serialized.errors = []
+        for error in status.errors:
+            serialized.errors.append(
+                Error(
+                    body=error.source_error.error,
+                    code=error.source_error.code,
+                    code_str=writer_pb2.Error.ErrorCode.Name(error.source_error.code),
+                    created=error.created.ToDatetime(),
+                    severity=writer_pb2.Error.Severity.Name(error.source_error.severity),
+                )
+            )
+        serialized.error = serialized.errors[-1]
 
-    kb = KnowledgeBox(txn, storage, kbid)
 
-    if rid is None:
-        if slug is None:
-            raise ValueError("Either rid or slug parameters should be used")
+async def set_resource_field_extracted_data(
+    field: Field,
+    field_data: ExtractedDataType,
+    field_type_name: FieldTypeName,
+    wanted_extracted_data: list[ExtractedDataTypeName],
+) -> None:
+    if field_data is None:
+        return
 
-        rid = await kb.get_resource_uuid_by_slug(slug)
-        if rid is None:
-            # Could not find resource uuid from slug
-            return None
+    if ExtractedDataTypeName.TEXT in wanted_extracted_data:
+        field_data.text = await serialize_extracted_text(field)
 
-    orm_resource = await kb.get(rid)
-    if orm_resource is None:
+    metadata_wanted = ExtractedDataTypeName.METADATA in wanted_extracted_data
+    shortened_metadata_wanted = ExtractedDataTypeName.SHORTENED_METADATA in wanted_extracted_data
+    if metadata_wanted or shortened_metadata_wanted:
+        field_data.metadata = await serialize_extracted_metadata(
+            field, shortened=shortened_metadata_wanted and not metadata_wanted
+        )
+
+    if ExtractedDataTypeName.LARGE_METADATA in wanted_extracted_data:
+        field_data.large_metadata = await serialize_extracted_large_metadata(field)
+
+    if ExtractedDataTypeName.VECTOR in wanted_extracted_data:
+        field_data.vectors = await serialize_extracted_vectors(field)
+
+    if ExtractedDataTypeName.QA in wanted_extracted_data:
+        field_data.question_answers = await serialize_extracted_question_answers(field)
+
+    if (
+        isinstance(field, File)
+        and isinstance(field_data, FileFieldExtractedData)
+        and ExtractedDataTypeName.FILE in wanted_extracted_data
+    ):
+        field_data.file = await serialize_file_extracted_data(field)
+
+    if (
+        isinstance(field, Link)
+        and isinstance(field_data, LinkFieldExtractedData)
+        and ExtractedDataTypeName.LINK in wanted_extracted_data
+    ):
+        field_data.link = await serialize_link_extracted_data(field)
+
+
+async def serialize_extracted_text(field: Field) -> Optional[ExtractedText]:
+    data_et = await field.get_extracted_text()
+    if data_et is None:
         return None
+    return from_proto.extracted_text(data_et)
 
-    return orm_resource
+
+async def serialize_extracted_metadata(
+    field: Field, *, shortened: bool
+) -> Optional[FieldComputedMetadata]:
+    data_fcm = await field.get_field_metadata()
+    if data_fcm is None:
+        return None
+    return from_proto.field_computed_metadata(data_fcm, shortened)
+
+
+async def serialize_extracted_large_metadata(field: Field) -> Optional[LargeComputedMetadata]:
+    data_lcm = await field.get_large_field_metadata()
+    if data_lcm is None:
+        return None
+    return from_proto.large_computed_metadata(data_lcm)
+
+
+async def serialize_extracted_vectors(field: Field) -> Optional[VectorObject]:
+    # XXX: our extracted API is not vectorset-compatible, so we'll get the
+    # first vectorset and return the values. Ideally, we should provide a
+    # way to select a vectorset
+    vectorset_id = None
+    async with datamanagers.with_ro_transaction() as txn:
+        async for vectorset_id, vs in datamanagers.vectorsets.iter(txn=txn, kbid=field.kbid):
+            break
+    assert vectorset_id is not None, "All KBs must have at least a vectorset"
+    data_vec = await field.get_vectors(vectorset_id, vs.storage_key_kind)
+    if data_vec is None:
+        return None
+    return from_proto.vector_object(data_vec)
+
+
+async def serialize_extracted_question_answers(field: Field) -> Optional[FieldQuestionAnswers]:
+    qa = await field.get_question_answers()
+    if qa is None:
+        return None
+    return from_proto.field_question_answers(qa)
+
+
+async def serialize_file_extracted_data(field: File) -> Optional[FileExtractedData]:
+    data_fed = await field.get_file_extracted_data()
+    if data_fed is None:
+        return None
+    return from_proto.file_extracted_data(data_fed)
+
+
+async def serialize_link_extracted_data(field: Link) -> Optional[LinkExtractedData]:
+    data_led = await field.get_link_extracted_data()
+    if data_led is None:
+        return None
+    return from_proto.link_extracted_data(data_led)
