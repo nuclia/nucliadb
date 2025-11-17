@@ -18,12 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Iterable, Optional, Union
+from typing import AsyncGenerator, Iterable, Optional, Union
 
 from nidx_protos.nodereader_pb2 import (
     GraphSearchResponse,
     SearchResponse,
 )
+from nuclia_models.predict.generative_responses import GenerativeChunk
 
 from nucliadb.common.models_utils import to_proto
 from nucliadb.search import logger
@@ -34,7 +35,9 @@ from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import Metrics
+from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import ParsedQuery, Query, RelationQuery, UnitRetrieval
+from nucliadb.search.search.query_parser.parsers.find import _FindParser
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
@@ -42,6 +45,7 @@ from nucliadb_models import filters
 from nucliadb_models.search import (
     AskRequest,
     ChatContextMessage,
+    ChatModel,
     ChatOptions,
     FindOptions,
     FindRequest,
@@ -59,7 +63,8 @@ from nucliadb_models.search import (
 from nucliadb_protos import audit_pb2
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry.errors import capture_exception
-from nucliadb_utils.utilities import get_audit
+from nucliadb_utils import const
+from nucliadb_utils.utilities import get_audit, has_feature
 
 NOT_ENOUGH_CONTEXT_ANSWER = "Not enough data to answer this."
 
@@ -73,6 +78,8 @@ async def rephrase_query(
     generative_model: Optional[str] = None,
     chat_history_relevance_threshold: Optional[float] = None,
 ) -> RephraseResponse:
+    # NOTE: When moving /ask to RAO, this will need to change to whatever client/utility is used
+    # to call NUA predict (internally or externally in the case of onprem).
     predict = get_predict()
     req = RephraseModel(
         question=query,
@@ -83,6 +90,17 @@ async def rephrase_query(
         chat_history_relevance_threshold=chat_history_relevance_threshold,
     )
     return await predict.rephrase_query(kbid, req)
+
+
+async def get_answer_stream(
+    kbid: str,
+    item: ChatModel,
+    extra_predict_headers: Optional[dict[str, str]] = None,
+) -> tuple[str, str, AsyncGenerator[GenerativeChunk, None]]:
+    # NOTE: When moving /ask to RAO, this will need to change to whatever client/utility is used
+    # to call NUA predict (internally or externally in the case of onprem).
+    predict = get_predict()
+    return await predict.chat_query_ndjson(kbid=kbid, item=item, extra_headers=extra_predict_headers)
 
 
 async def get_find_results(
@@ -227,8 +245,7 @@ async def run_main_query(
     metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, ParsedQuery]:
     find_request = find_request_from_ask_request(item, query)
-
-    find_results, incomplete, parsed_query = await find(
+    find_results, incomplete, parsed_query = await find_retrieval(
         kbid,
         find_request,
         ndb_client,
@@ -464,7 +481,7 @@ async def run_prequeries(
     async def _prequery_find(prequery: PreQuery, index: int):
         async with max_parallel_prequeries:
             prequery_id = prequery.id or f"prequery-{index}"
-            find_results, _, _ = await find(
+            find_results, _, _ = await find_retrieval(
                 kbid,
                 prequery.request,
                 x_ndb_client,
@@ -481,3 +498,82 @@ async def run_prequeries(
     for prequery, find_results in ops_results:
         results.append((prequery, find_results))
     return results
+
+
+async def find_retrieval(
+    kbid: str,
+    find_request: FindRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    metrics: Metrics,
+) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
+    if has_feature(const.Features.ASK_TO_RAO, context={"kbid": kbid}):
+        find_results, incomplete, parsed_query = await rao_find(
+            kbid,
+            find_request,
+            x_ndb_client,
+            x_nucliadb_user,
+            x_forwarded_for,
+            metrics=metrics,
+        )
+    else:
+        # TODO: Remove once /ask has been fully migrated to RAO.
+        find_results, incomplete, parsed_query = await find(
+            kbid,
+            find_request,
+            x_ndb_client,
+            x_nucliadb_user,
+            x_forwarded_for,
+            metrics=metrics,
+        )
+    return find_results, incomplete, parsed_query
+
+
+async def rao_find(
+    kbid: str,
+    find_request: FindRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    metrics: Metrics,
+) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
+    """
+    Calls to NucliaDB retrieve and augment primitives to perform the text block search.
+    It returns the results as KnowledgeboxFindResults to comply with the existing find
+    interface (/ask logic is tightly coupled with /find).
+    """
+    parsed = await rao_parse_query(kbid, find_request)
+    # TODO: Implement retrieval
+    # TODO: Implement augmentation
+    # TODO: Implement reranking
+    # TODO: Adapt results to KnowledgeboxFindResults
+    return KnowledgeboxFindResults(resources={}), False, parsed
+
+
+async def rao_parse_query(kbid: str, item: FindRequest) -> ParsedQuery:
+    fetcher = RAOFetcher(
+        kbid=kbid,
+        query=item.query,
+        user_vector=item.vector,
+        vectorset=item.vectorset,
+        rephrase=item.rephrase,
+        rephrase_prompt=item.rephrase_prompt,
+        generative_model=item.generative_model,
+        query_image=item.query_image,
+    )
+    parser = RAOQueryParser(kbid, item, fetcher)
+    retrieval = await parser.parse()
+    return ParsedQuery(fetcher=fetcher, retrieval=retrieval, generation=None)
+
+
+class RAOFetcher(Fetcher):
+    # TODO: implement RAO fetcher methods
+    # TODO: cannot access maindb driver here as this will be called from a different component (RAO).
+    pass
+
+
+class RAOQueryParser(_FindParser):
+    # TODO: implement RAO query parser methods
+    # TODO: cannot access maindb driver here as this will be called from a different component (RAO).
+    pass

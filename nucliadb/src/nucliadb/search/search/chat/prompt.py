@@ -74,8 +74,9 @@ from nucliadb_models.search import (
 )
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import ExtractedText, FieldComputedMetadata
+from nucliadb_utils import const
 from nucliadb_utils.asyncio_utils import run_concurrently
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils.utilities import get_storage, has_feature
 
 MAX_RESOURCE_TASKS = 5
 MAX_RESOURCE_FIELD_TASKS = 4
@@ -1103,6 +1104,25 @@ class PromptContextBuilder:
                 context.images[f"USER_IMAGE_CONTEXT_{i}"] = image
 
     async def build(
+        self,
+    ) -> tuple[PromptContext, PromptContextOrder, PromptContextImages, AugmentedContext]:
+        if has_feature(const.Features.ASK_TO_RAO, context={"kbid": self.kbid}):
+            return await self._build_with_augmentation()
+        else:
+            return await self._build_legacy()
+
+    async def _build_with_augmentation(
+        self,
+    ) -> tuple[PromptContext, PromptContextOrder, PromptContextImages, AugmentedContext]:
+        # TODO: Implement the logic for building the context with augmentation requests
+        ccontext = CappedPromptContext(max_size=self.max_context_characters)
+        self.prepend_user_context(ccontext)
+        context = ccontext.cap()
+        context_images = ccontext.images
+        context_order = {text_block_id: order for order, text_block_id in enumerate(context.keys())}
+        return context, context_order, context_images, self.augmented_context
+
+    async def _build_legacy(
         self,
     ) -> tuple[PromptContext, PromptContextOrder, PromptContextImages, AugmentedContext]:
         ccontext = CappedPromptContext(max_size=self.max_context_characters)

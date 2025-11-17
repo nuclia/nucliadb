@@ -61,6 +61,7 @@ from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
     ChatAuditor,
     add_resource_filter,
+    get_answer_stream,
     get_find_results,
     get_relations_results,
     maybe_audit_chat,
@@ -79,7 +80,6 @@ from nucliadb.search.search.rank_fusion import WeightedCombSum
 from nucliadb.search.search.rerankers import (
     get_reranker,
 )
-from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     SCORE_TYPE,
     AnswerAskResponseItem,
@@ -683,13 +683,14 @@ async def ask(
     predict_answer_stream = None
     if ask_request.generate_answer:
         with metrics.time("stream_start"):
-            predict = get_predict()
             (
                 nuclia_learning_id,
                 nuclia_learning_model,
                 predict_answer_stream,
-            ) = await predict.chat_query_ndjson(
-                kbid=kbid, item=chat_model, extra_headers=extra_predict_headers
+            ) = await get_answer_stream(
+                kbid=kbid,
+                item=chat_model,
+                extra_predict_headers=extra_predict_headers,
             )
 
     auditor = ChatAuditor(
