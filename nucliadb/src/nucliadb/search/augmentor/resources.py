@@ -20,13 +20,18 @@
 import asyncio
 
 import nucliadb_models.resource
+from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.serialize import (
+    serialize_extra,
     serialize_origin,
     serialize_resource,
     serialize_security,
 )
 from nucliadb.models.internal.augment import (
+    ResourceClassificationLabels,
+    ResourceExtra,
+    ResourceNers,
     ResourceOrigin,
     ResourceProp,
     ResourceSecurity,
@@ -39,6 +44,7 @@ from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb_models.search import ResourceProperties
+from nucliadb_protos import resources_pb2
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
@@ -93,7 +99,9 @@ async def db_augment_resource(
     title = None
     summary = None
     origin = None
+    extra = None
     security = None
+    labels = None
 
     basic = None
     for prop in select:
@@ -113,8 +121,17 @@ async def db_augment_resource(
             # REVIEW: we may want a better hydration than proto to JSON
             origin = await serialize_origin(resource)
 
+        elif isinstance(prop, ResourceExtra):
+            extra = await serialize_extra(resource)
+
         elif isinstance(prop, ResourceSecurity):
             security = await serialize_security(resource)
+
+        elif isinstance(prop, ResourceNers):
+            raise NotImplementedError()
+
+        elif isinstance(prop, ResourceClassificationLabels):
+            labels = await classification_labels(resource)
 
         else:
             raise NotImplementedError(f"resource property not implemented: {prop}")
@@ -124,9 +141,31 @@ async def db_augment_resource(
         title=title,
         summary=summary,
         origin=origin,
+        extra=extra,
         security=security,
+        classification_labels=labels,
     )
     return augmented
+
+
+async def get_basic(resource: Resource) -> resources_pb2.Basic | None:
+    # HACK: resource.get_basic() always returns a pb, even if it's not in the
+    # DB. Here we really want to know if there's basic or not
+    basic = await datamanagers.resources.get_basic(
+        resource.txn, kbid=resource.kb.kbid, rid=resource.uuid
+    )
+    return basic
+
+
+async def classification_labels(resource: Resource) -> list[tuple[str, str]] | None:
+    basic = await get_basic(resource)
+    if basic is None:
+        return None
+
+    labels = set()
+    for classification in basic.usermetadata.classifications:
+        labels.add((classification.labelset, classification.label))
+    return list(labels)
 
 
 async def augment_resources_deep(

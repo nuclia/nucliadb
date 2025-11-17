@@ -22,7 +22,14 @@ import asyncio
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
-from nucliadb.models.internal.augment import FieldProp, FieldText, FieldValue
+from nucliadb.models.internal.augment import (
+    ConversationAnswer,
+    ConversationAttachments,
+    FieldClassificationLabels,
+    FieldProp,
+    FieldText,
+    FieldValue,
+)
 from nucliadb.search.augmentor.models import (
     AugmentedConversationField,
     AugmentedField,
@@ -30,7 +37,9 @@ from nucliadb.search.augmentor.models import (
     AugmentedGenericField,
     AugmentedLinkField,
     AugmentedTextField,
+    BaseAugmentedField,
 )
+from nucliadb.search.augmentor.resources import get_basic
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 
@@ -101,19 +110,40 @@ async def db_augment_field(
     return await db_augments_by_type[field_id.type](field, field_id, select)
 
 
-async def db_augment_text_field(
+async def db_augment_base_field(
     field: Field,
     field_id: FieldId,
     select: list[FieldProp],
-) -> AugmentedTextField:
+) -> BaseAugmentedField:
     text = None
-    value = None
+    labels = None
 
     for prop in select:
         if isinstance(prop, FieldText):
             text = await get_field_extracted_text(field_id, field)
 
-        elif isinstance(prop, FieldValue):
+        elif isinstance(prop, FieldClassificationLabels):
+            labels = await classification_labels(field_id, field)
+
+    augmented = BaseAugmentedField(
+        id=field.field_id,
+        text=text,
+        classification_labels=labels,
+    )
+    return augmented
+
+
+async def db_augment_text_field(
+    field: Field,
+    field_id: FieldId,
+    select: list[FieldProp],
+) -> AugmentedTextField:
+    base = await db_augment_base_field(field, field_id, select)
+
+    value = None
+
+    for prop in select:
+        if isinstance(prop, FieldValue):
             db_value = await field.get_value()
             value = from_proto.field_text(db_value)
 
@@ -122,8 +152,9 @@ async def db_augment_text_field(
 
     augmented = AugmentedTextField(
         id=field.field_id,
-        text=text,
+        text=base.text,
         value=value,
+        classification_labels=base.classification_labels,
     )
     return augmented
 
@@ -133,14 +164,12 @@ async def db_augment_file_field(
     field_id: FieldId,
     select: list[FieldProp],
 ) -> AugmentedFileField:
-    text = None
+    base = await db_augment_base_field(field, field_id, select)
+
     value = None
 
     for prop in select:
-        if isinstance(prop, FieldText):
-            text = await get_field_extracted_text(field_id, field)
-
-        elif isinstance(prop, FieldValue):
+        if isinstance(prop, FieldValue):
             db_value = await field.get_value()
             value = from_proto.field_file(db_value)
 
@@ -149,8 +178,9 @@ async def db_augment_file_field(
 
     augmented = AugmentedFileField(
         id=field.field_id,
-        text=text,
+        text=base.text,
         value=value,
+        classification_labels=base.classification_labels,
     )
     return augmented
 
@@ -160,14 +190,12 @@ async def db_augment_link_field(
     field_id: FieldId,
     select: list[FieldProp],
 ) -> AugmentedLinkField:
-    text = None
+    base = await db_augment_base_field(field, field_id, select)
+
     value = None
 
     for prop in select:
-        if isinstance(prop, FieldText):
-            text = await get_field_extracted_text(field_id, field)
-
-        elif isinstance(prop, FieldValue):
+        if isinstance(prop, FieldValue):
             db_value = await field.get_value()
             value = from_proto.field_link(db_value)
 
@@ -176,8 +204,9 @@ async def db_augment_link_field(
 
     augmented = AugmentedLinkField(
         id=field.field_id,
-        text=text,
+        text=base.text,
         value=value,
+        classification_labels=base.classification_labels,
     )
     return augmented
 
@@ -189,14 +218,25 @@ async def db_augment_conversation_field(
 ) -> AugmentedConversationField:
     text = None
     value = None
+    labels = None
 
     for prop in select:
         if isinstance(prop, FieldText):
-            raise NotImplementedError("which text should we augment here?")
+            # TODO: which text should we augment here?
+            raise NotImplementedError()
 
         elif isinstance(prop, FieldValue):
             db_value = await field.get_value()
             value = from_proto.field_conversation(db_value)
+
+        elif isinstance(prop, FieldClassificationLabels):
+            labels = await classification_labels(field_id, field)
+
+        elif isinstance(prop, ConversationAnswer):
+            raise NotImplementedError()
+
+        elif isinstance(prop, ConversationAttachments):
+            raise NotImplementedError()
 
         else:
             raise NotImplementedError(f"field property not implemented: {prop}")
@@ -205,6 +245,7 @@ async def db_augment_conversation_field(
         id=field.field_id,
         text=text,
         value=value,
+        classification_labels=labels,
     )
     return augmented
 
@@ -214,14 +255,12 @@ async def db_augment_generic_field(
     field_id: FieldId,
     select: list[FieldProp],
 ) -> AugmentedGenericField:
-    text = None
+    base = await db_augment_base_field(field, field_id, select)
+
     value = None
 
     for prop in select:
-        if isinstance(prop, FieldText):
-            text = await get_field_extracted_text(field_id, field)
-
-        elif isinstance(prop, FieldValue):
+        if isinstance(prop, FieldValue):
             db_value = await field.get_value()
             value = db_value
 
@@ -230,8 +269,9 @@ async def db_augment_generic_field(
 
     augmented = AugmentedGenericField(
         id=field.field_id,
-        text=text,
+        text=base.text,
         value=value,
+        classification_labels=base.classification_labels,
     )
     return augmented
 
@@ -245,3 +285,19 @@ async def get_field_extracted_text(id: FieldId, field: Field) -> str | None:
         return extracted_text_pb.split_text[id.subfield_id]
     else:
         return extracted_text_pb.text
+
+
+async def classification_labels(id: FieldId, field: Field) -> list[tuple[str, str]] | None:
+    resource = field.resource
+    basic = await get_basic(resource)
+    if basic is None:
+        return None
+
+    labels = set()
+    for fc in basic.computedmetadata.field_classifications:
+        if fc.field.field == id.key and fc.field.field_type == id.pb_type:
+            for classification in fc.classifications:
+                if classification.cancelled_by_user:  # pragma: no cover
+                    continue
+                labels.add((classification.labelset, classification.label))
+    return list(labels)

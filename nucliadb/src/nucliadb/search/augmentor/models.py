@@ -26,7 +26,7 @@ from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb_models.conversation import FieldConversation
 from nucliadb_models.file import FieldFile
 from nucliadb_models.link import FieldLink
-from nucliadb_models.metadata import Origin
+from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import FieldText
 from nucliadb_protos import resources_pb2
@@ -146,6 +146,7 @@ class BaseAugmentedField:
     id: FieldId
 
     text: str | None
+    classification_labels: list[tuple[str, str]] | None
 
 
 @dataclass
@@ -191,7 +192,10 @@ class AugmentedResource:
     summary: str | None
 
     origin: Origin | None
+    extra: Extra | None
     security: ResourceSecurity | None
+
+    classification_labels: list[tuple[str, str]] | None
 
 
 @dataclass

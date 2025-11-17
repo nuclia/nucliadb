@@ -129,6 +129,10 @@ class FieldValue(SelectProp):
     prop: Literal["value"] = "value"
 
 
+class FieldClassificationLabels(SelectProp):
+    prop: Literal["classification_labels"] = "classification_labels"
+
+
 FieldProp = Annotated[
     (Annotated[FieldText, Tag("text")] | Annotated[FieldValue, Tag("value")]),
     Discriminator(prop_discriminator),
@@ -165,16 +169,43 @@ class ResourceSummary(SelectProp):
     prop: Literal["summary"] = "summary"
 
 
+class ResourceBasic(SelectProp):
+    """Same as show=["basic"] using GET resource or search endpoints"""
+
+    prop: Literal["basic"] = "basic"
+
+
 class ResourceOrigin(SelectProp):
+    """Same as show=["origin"] using GET resource or search endpoints"""
+
     prop: Literal["origin"] = "origin"
 
 
+class ResourceExtra(SelectProp):
+    """Same as show=["extra"] and MetadataExtensionStrategy asking for
+    extra_metadata
+
+    """
+
+    prop: Literal["extra"] = "extra"
+
+
 class ResourceSecurity(SelectProp):
+    """Same as show=["security"] using GET resource or search endpoints"""
+
     prop: Literal["security"] = "security"
 
 
-class ResourceBasic(SelectProp):
-    prop: Literal["basic"] = "basic"
+class ResourceNers(SelectProp):
+    """Same as MetadataExtensionStrategy asking for ners"""
+
+    prop: Literal["ners"] = "ners"
+
+
+class ResourceClassificationLabels(SelectProp):
+    """Same as MetadataExtensionStrategy asking for classification_labels"""
+
+    prop: Literal["classification_labels"] = "classification_labels"
 
 
 class ResourceFieldsFilter(BaseModel):
@@ -187,7 +218,10 @@ ResourceProp = Annotated[
         | Annotated[ResourceSummary, Tag("summary")]
         | Annotated[ResourceBasic, Tag("basic")]
         | Annotated[ResourceOrigin, Tag("origin")]
+        | Annotated[ResourceExtra, Tag("extra")]
         | Annotated[ResourceSecurity, Tag("security")]
+        | Annotated[ResourceNers, Tag("ners")]
+        | Annotated[ResourceClassificationLabels, Tag("classification_labels")]
     ),
     Discriminator(prop_discriminator),
 ]
