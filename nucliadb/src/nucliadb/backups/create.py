@@ -37,7 +37,6 @@ from nucliadb.export_import.utils import (
     download_binary,
     get_broker_message,
     get_cloud_files,
-    get_entities,
     get_labels,
     get_search_configurations,
     get_synonyms,
@@ -76,7 +75,6 @@ async def backup_kb(context: ApplicationContext, kbid: str, backup_id: str):
     """
     await backup_resources(context, kbid, backup_id)
     await backup_labels(context, kbid, backup_id)
-    await backup_entities(context, kbid, backup_id)
     await backup_synonyms(context, kbid, backup_id)
     await backup_search_configurations(context, kbid, backup_id)
     await notify_backup_completed(context, kbid, backup_id)
@@ -232,15 +230,6 @@ async def backup_labels(context: ApplicationContext, kbid: str, backup_id: str):
         bucket=settings.backups_bucket,
         key=StorageKeys.LABELS.format(backup_id=backup_id),
         data=labels.SerializeToString(),
-    )
-
-
-async def backup_entities(context: ApplicationContext, kbid: str, backup_id: str):
-    entities = await get_entities(context, kbid)
-    await context.blob_storage.upload_object(
-        bucket=settings.backups_bucket,
-        key=StorageKeys.ENTITIES.format(backup_id=backup_id),
-        data=entities.SerializeToString(),
     )
 
 

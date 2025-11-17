@@ -43,10 +43,8 @@ from pydantic import BaseModel, ValidationError
 
 from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
-    CreateEntitiesGroupPayload,
     EntitiesGroup,
     KnowledgeBoxEntities,
-    UpdateEntitiesGroupPayload,
 )
 from nucliadb_models.export_import import (
     CreateExportResponse,
@@ -288,21 +286,6 @@ SDK_DEFINITION = {
         path_params=("kbid", "labelset"),
     ),
     # Entity Groups
-    "create_entitygroup": SdkEndpointDefinition(
-        path_template="/v1/kb/{kbid}/entitiesgroups",
-        method="POST",
-        path_params=("kbid",),
-    ),
-    "update_entitygroup": SdkEndpointDefinition(
-        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
-        method="PATCH",
-        path_params=("kbid", "group"),
-    ),
-    "delete_entitygroup": SdkEndpointDefinition(
-        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
-        method="DELETE",
-        path_params=("kbid", "group"),
-    ),
     "get_entitygroups": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/entitiesgroups",
         method="GET",
@@ -1067,13 +1050,6 @@ class NucliaDB(_NucliaDBBase):
     get_labelsets = _request_sync_builder("get_labelsets", type(None), KnowledgeBoxLabels)
     get_labelset = _request_sync_builder("get_labelset", type(None), LabelSet)
     # Entity Groups
-    create_entitygroup = _request_sync_builder(
-        "create_entitygroup", CreateEntitiesGroupPayload, type(None)
-    )
-    update_entitygroup = _request_sync_builder(
-        "update_entitygroup", UpdateEntitiesGroupPayload, type(None)
-    )
-    delete_entitygroup = _request_sync_builder("delete_entitygroup", type(None), type(None))
     get_entitygroups = _request_sync_builder("get_entitygroups", type(None), KnowledgeBoxEntities)
     get_entitygroup = _request_sync_builder("get_entitygroup", type(None), EntitiesGroup)
     # Search / Find Endpoints
@@ -1273,13 +1249,6 @@ class NucliaDBAsync(_NucliaDBBase):
     get_labelsets = _request_async_builder("get_labelsets", type(None), KnowledgeBoxLabels)
     get_labelset = _request_async_builder("get_labelset", type(None), LabelSet)
     # Entity Groups
-    create_entitygroup = _request_async_builder(
-        "create_entitygroup", CreateEntitiesGroupPayload, type(None)
-    )
-    update_entitygroup = _request_async_builder(
-        "update_entitygroup", UpdateEntitiesGroupPayload, type(None)
-    )
-    delete_entitygroup = _request_async_builder("delete_entitygroup", type(None), type(None))
     get_entitygroups = _request_async_builder("get_entitygroups", type(None), KnowledgeBoxEntities)
     get_entitygroup = _request_async_builder("get_entitygroup", type(None), EntitiesGroup)
     # Search / Find Endpoints

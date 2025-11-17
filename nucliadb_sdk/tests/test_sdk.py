@@ -51,11 +51,8 @@ def test_kb_services(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.delete_labelset(kbid=kb.uuid, labelset="foo")
 
     # Entities
-    sdk.create_entitygroup(kbid=kb.uuid, group="foo")
-    sdk.update_entitygroup(kbid=kb.uuid, group="foo", title="bar")
     sdk.get_entitygroups(kbid=kb.uuid)
-    sdk.get_entitygroup(kbid=kb.uuid, group="foo")
-    sdk.delete_entitygroup(kbid=kb.uuid, group="foo")
+    # sdk.get_entitygroup(kbid=kb.uuid, group="foo")
 
     # Synonyms
     synonyms = KnowledgeBoxSynonyms(synonyms={"foo": ["bar"]})

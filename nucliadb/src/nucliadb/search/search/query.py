@@ -23,7 +23,6 @@ from typing import Any, Optional
 from nidx_protos import nodereader_pb2
 from nidx_protos.noderesources_pb2 import Resource
 
-from nucliadb.common import datamanagers
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.filter_expression import add_and_expression, parse_expression
 from nucliadb.search.search.query_parser.fetcher import Fetcher
@@ -35,7 +34,6 @@ from nucliadb_models.search import (
     SortOrder,
     SuggestOptions,
 )
-from nucliadb_protos import utils_pb2
 
 from .query_parser.old_filters import OldFilterParams, parse_old_filters
 
@@ -114,53 +112,6 @@ async def paragraph_query_to_pb(
     add_and_expression(request.field_filter, key_filter)
 
     return request
-
-
-def expand_entities(
-    meta_cache: datamanagers.entities.EntitiesMetaCache,
-    detected_entities: list[utils_pb2.RelationNode],
-) -> list[utils_pb2.RelationNode]:
-    """
-    Iterate through duplicated entities in a kb.
-
-    The algorithm first makes it so we can look up duplicates by source and
-    by the referenced entity and expands from both directions.
-    """
-    result_entities = {entity.value: entity for entity in detected_entities}
-    duplicated_entities = meta_cache.duplicate_entities
-    duplicated_entities_by_value = meta_cache.duplicate_entities_by_value
-
-    for entity in detected_entities[:]:
-        if entity.subtype not in duplicated_entities:
-            continue
-
-        if entity.value in duplicated_entities[entity.subtype]:
-            for duplicate in duplicated_entities[entity.subtype][entity.value]:
-                result_entities[duplicate] = utils_pb2.RelationNode(
-                    ntype=utils_pb2.RelationNode.NodeType.ENTITY,
-                    subtype=entity.subtype,
-                    value=duplicate,
-                )
-
-        if entity.value in duplicated_entities_by_value[entity.subtype]:
-            source_duplicate = duplicated_entities_by_value[entity.subtype][entity.value]
-            result_entities[source_duplicate] = utils_pb2.RelationNode(
-                ntype=utils_pb2.RelationNode.NodeType.ENTITY,
-                subtype=entity.subtype,
-                value=source_duplicate,
-            )
-
-            if source_duplicate in duplicated_entities[entity.subtype]:
-                for duplicate in duplicated_entities[entity.subtype][source_duplicate]:
-                    if duplicate == entity.value:
-                        continue
-                    result_entities[duplicate] = utils_pb2.RelationNode(
-                        ntype=utils_pb2.RelationNode.NodeType.ENTITY,
-                        subtype=entity.subtype,
-                        value=duplicate,
-                    )
-
-    return list(result_entities.values())
 
 
 async def suggest_query_to_pb(

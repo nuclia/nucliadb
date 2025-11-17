@@ -35,7 +35,6 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.utils import (
     import_binary,
     restore_broker_message,
-    set_entities_groups,
     set_labels,
     set_search_configurations,
     set_synonyms,
@@ -74,7 +73,6 @@ async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
     """
     await restore_resources(context, kbid, backup_id)
     await restore_labels(context, kbid, backup_id)
-    await restore_entities(context, kbid, backup_id)
     await restore_synonyms(context, kbid, backup_id)
     await restore_search_configurations(context, kbid, backup_id)
     await delete_last_restored(context, kbid, backup_id)
@@ -255,16 +253,6 @@ async def restore_labels(context: ApplicationContext, kbid: str, backup_id: str)
     labels = kb_pb2.Labels()
     labels.ParseFromString(raw.getvalue())
     await set_labels(context, kbid, labels)
-
-
-async def restore_entities(context: ApplicationContext, kbid: str, backup_id: str):
-    raw = await context.blob_storage.downloadbytes(
-        bucket=settings.backups_bucket,
-        key=StorageKeys.ENTITIES.format(backup_id=backup_id),
-    )
-    entities = kb_pb2.EntitiesGroups()
-    entities.ParseFromString(raw.getvalue())
-    await set_entities_groups(context, kbid, entities)
 
 
 async def restore_synonyms(context: ApplicationContext, kbid: str, backup_id: str):

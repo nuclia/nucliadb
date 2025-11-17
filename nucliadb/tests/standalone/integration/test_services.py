@@ -25,49 +25,6 @@ from nucliadb.search.api.v1.router import KB_PREFIX
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_entities_service(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    standalone_knowledgebox: str,
-    entities_manager_mock,
-) -> None:
-    kbid = standalone_knowledgebox
-
-    entitygroup = {
-        "group": "group1",
-        "title": "Kitchen",
-        "custom": True,
-        "entities": {
-            "cupboard": {"value": "Cupboard"},
-            "fork": {"value": "Fork"},
-            "fridge": {"value": "Fridge"},
-            "knife": {"value": "Knife"},
-            "sink": {"value": "Sink"},
-            "spoon": {"value": "Spoon"},
-        },
-    }
-    resp = await nucliadb_writer.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=entitygroup)
-    assert resp.status_code == 200
-
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{kbid}/entitiesgroups")
-    assert resp.status_code == 200
-    groups = resp.json()["groups"]
-    assert len(groups) == 1
-    assert groups["group1"]["custom"] is True
-
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{kbid}/entitiesgroup/group1")
-    assert resp.status_code == 200
-    assert resp.json()["custom"] is True
-
-    resp = await nucliadb_writer.delete(f"/{KB_PREFIX}/{kbid}/entitiesgroup/group1")
-    assert resp.status_code == 200
-
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{kbid}/entitiesgroups")
-    assert resp.status_code == 200
-    assert len(resp.json()["groups"]) == 0
-
-
-@pytest.mark.deploy_modes("standalone")
 async def test_labelsets_service(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

@@ -33,7 +33,6 @@ from nucliadb.export_import.utils import (
     TaskRetryHandler,
     import_binary,
     restore_broker_message,
-    set_entities_groups,
     set_labels,
 )
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
@@ -73,8 +72,8 @@ async def import_kb(
             await import_binary(context, kbid, cf, binary_generator)
 
         elif item_type == ExportedItemType.ENTITIES:
-            entities = cast(kb_pb2.EntitiesGroups, data)
-            await set_entities_groups(context, kbid, entities)
+            # This is not supported anymore, we ignore it if we find it in and old backup
+            pass
 
         elif item_type == ExportedItemType.LABELS:
             labels = cast(kb_pb2.Labels, data)

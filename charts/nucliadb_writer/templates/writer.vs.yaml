@@ -70,14 +70,6 @@ spec:
 
         # misc
         - uri:
-            regex: '^/api/v\d+/kb/[^/]+/entitiesgroups'
-          method:
-            regex: "POST|OPTIONS"
-        - uri:
-            regex: '^/api/v\d+/kb/[^/]+/entitiesgroup/[^/]+$'
-          method:
-            regex: "PATCH|DELETE|OPTIONS"
-        - uri:
             regex: '^/api/v\d+/kb/[^/]+/labelset/[^/]+$'
           method:
             regex: "POST|DELETE|OPTIONS"
