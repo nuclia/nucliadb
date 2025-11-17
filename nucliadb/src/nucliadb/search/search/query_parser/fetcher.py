@@ -67,7 +67,6 @@ class FetcherCache:
 
     synonyms: Union[Optional[knowledgebox_pb2.Synonyms], NotCached] = not_cached
 
-    entities_meta_cache: Union[datamanagers.entities.EntitiesMetaCache, NotCached] = not_cached
     deleted_entity_groups: Union[list[str], NotCached] = not_cached
     detected_entities: Union[list[utils_pb2.RelationNode], NotCached] = not_cached
 
@@ -241,24 +240,6 @@ class Fetcher:
 
     # Entities
 
-    async def get_entities_meta_cache(self) -> datamanagers.entities.EntitiesMetaCache:
-        async with self.locks.setdefault("entities_meta_cache", asyncio.Lock()):
-            if is_cached(self.cache.entities_meta_cache):
-                return self.cache.entities_meta_cache
-
-            entities_meta_cache = await get_entities_meta_cache(self.kbid)
-            self.cache.entities_meta_cache = entities_meta_cache
-            return entities_meta_cache
-
-    async def get_deleted_entity_groups(self) -> list[str]:
-        async with self.locks.setdefault("deleted_entity_groups", asyncio.Lock()):
-            if is_cached(self.cache.deleted_entity_groups):
-                return self.cache.deleted_entity_groups
-
-            deleted_entity_groups = await get_deleted_entity_groups(self.kbid)
-            self.cache.deleted_entity_groups = deleted_entity_groups
-            return deleted_entity_groups
-
     async def get_detected_entities(self) -> list[utils_pb2.RelationNode]:
         async with self.locks.setdefault("detected_entities", asyncio.Lock()):
             if is_cached(self.cache.detected_entities):
@@ -424,15 +405,3 @@ async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
 async def get_kb_synonyms(kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
     async with get_driver().ro_transaction() as txn:
         return await datamanagers.synonyms.get(txn, kbid=kbid)
-
-
-@query_parse_dependency_observer.wrap({"type": "entities_meta_cache"})
-async def get_entities_meta_cache(kbid: str) -> datamanagers.entities.EntitiesMetaCache:
-    async with get_driver().ro_transaction() as txn:
-        return await datamanagers.entities.get_entities_meta_cache(txn, kbid=kbid)
-
-
-@query_parse_dependency_observer.wrap({"type": "deleted_entities_groups"})
-async def get_deleted_entity_groups(kbid: str) -> list[str]:
-    async with get_driver().ro_transaction() as txn:
-        return list((await datamanagers.entities.get_deleted_groups(txn, kbid=kbid)).entities_groups)

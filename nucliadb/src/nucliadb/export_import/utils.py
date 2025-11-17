@@ -276,11 +276,6 @@ async def download_binary(
     assert downloaded_bytes == cf.size, "Downloaded bytes do not match the expected size"
 
 
-async def get_entities(context: ApplicationContext, kbid: str) -> kb_pb2.EntitiesGroups:
-    async with datamanagers.with_ro_transaction() as txn:
-        return await datamanagers.entities.get_entities_groups(txn, kbid=kbid)
-
-
 async def get_labels(context: ApplicationContext, kbid: str) -> kb_pb2.Labels:
     async with datamanagers.with_ro_transaction() as txn:
         return await datamanagers.labels.get_labels(txn, kbid=kbid)
