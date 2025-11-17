@@ -22,9 +22,9 @@ from typing import Union
 
 from nidx_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
 
-from nucliadb.common import datamanagers
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR
+from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb_models.filters import (
     And,
     DateCreated,
@@ -72,6 +72,7 @@ FacetFilter = (
 async def parse_expression(
     expr: Union[FieldFilterExpression, ParagraphFilterExpression],
     kbid: str,
+    fetcher: Fetcher,
 ) -> PBFilterExpression:
     f = PBFilterExpression()
 
@@ -87,9 +88,7 @@ async def parse_expression(
         if expr.id:
             f.resource.resource_id = expr.id
         elif expr.slug:
-            rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(
-                kbid=kbid, slug=expr.slug
-            )
+            rid = await fetcher.get_resource_uuid_from_slug(kbid=kbid, slug=expr.slug)
             if rid is None:
                 raise InvalidQueryError("slug", f"Cannot find slug {expr.slug}")
             f.resource.resource_id = rid
