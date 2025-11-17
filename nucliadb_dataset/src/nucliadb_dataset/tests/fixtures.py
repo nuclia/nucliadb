@@ -22,7 +22,6 @@ import pytest
 from grpc import aio
 
 from nucliadb_models.common import UserClassification
-from nucliadb_models.entities import CreateEntitiesGroupPayload, Entity
 from nucliadb_models.labels import Label, LabelSet, LabelSetKind
 from nucliadb_models.metadata import UserMetadata
 from nucliadb_models.resource import KnowledgeBoxObj
@@ -153,70 +152,6 @@ def upload_data_paragraph_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
             ),
         ),
     )
-    return kb
-
-
-@pytest.fixture(scope="function")
-def upload_data_token_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
-    sdk.create_entitygroup(
-        kbid=kb.uuid,
-        content=CreateEntitiesGroupPayload(
-            group="PERSON",
-            entities={
-                "ramon": Entity(value="Ramon"),
-                "carmen": Entity(value="Carmen Iniesta"),
-                "eudald": Entity(value="Eudald Camprubi"),
-            },
-            title="Animals",
-            color="black",
-        ),
-    )
-
-    sdk.create_entitygroup(
-        kbid=kb.uuid,
-        content=CreateEntitiesGroupPayload(
-            group="ANIMAL",
-            entities={
-                "cheetah": Entity(value="cheetah"),
-                "tiger": Entity(value="tiger"),
-                "lion": Entity(value="lion"),
-            },
-            title="Animals",
-            color="black",
-        ),
-    )
-    sdk.create_resource(
-        kbid=kb.uuid,
-        content=CreateResourcePayload(
-            slug=SlugString("doc1"),
-            texts={FieldIdString("text"): TextField(body="Ramon This is my lovely text")},
-        ),
-    )
-
-    sdk.create_resource(
-        kbid=kb.uuid,
-        content=CreateResourcePayload(
-            slug=SlugString("doc2"),
-            texts={
-                FieldIdString("text"): TextField(
-                    body="Carmen Iniesta shows an amazing classifier to Eudald Camprubi"
-                )
-            },
-        ),
-    )
-
-    sdk.create_resource(
-        kbid=kb.uuid,
-        content=CreateResourcePayload(
-            slug=SlugString("doc3"),
-            texts={
-                FieldIdString("text"): TextField(
-                    body="Which is the fastest animal, a lion, a tiger or a cheetah?"
-                )
-            },
-        ),
-    )
-
     return kb
 
 

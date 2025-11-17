@@ -90,10 +90,6 @@ def _check_kbs_are_equal(sdk: nucliadb_sdk.NucliaDB, kb1: str, kb2: str):
     kb2_resources = sdk.list_resources(kbid=kb2)
     assert len(kb1_resources.resources) == len(kb2_resources.resources)
 
-    kb1_entities = sdk.get_entitygroups(kbid=kb1)
-    kb2_entities = sdk.get_entitygroups(kbid=kb2)
-    assert kb1_entities.groups == kb2_entities.groups
-
     kb1_labels = sdk.get_labelsets(kbid=kb1)
     kb2_labels = sdk.get_labelsets(kbid=kb2)
     assert kb1_labels.labelsets == kb2_labels.labelsets

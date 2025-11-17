@@ -71,20 +71,6 @@ async def get_entities_groups(txn: Transaction, *, kbid: str) -> kb_pb2.Entities
     return kbent
 
 
-async def set_entities_groups(
-    txn: Transaction, *, kbid: str, entities_groups: kb_pb2.EntitiesGroups
-) -> None:
-    for group, entities in entities_groups.entities_groups.items():
-        await set_entities_group(txn, kbid=kbid, group_id=group, entities=entities)
-
-
-async def set_entities_group(
-    txn: Transaction, *, kbid: str, group_id: str, entities: kb_pb2.EntitiesGroup
-) -> None:
-    key = KB_ENTITIES_GROUP.format(kbid=kbid, id=group_id)
-    await txn.set(key, entities.SerializeToString())
-
-
 async def iterate_entities_groups(txn: Transaction, *, kbid: str) -> AsyncGenerator[str, None]:
     entities_key = KB_ENTITIES.format(kbid=kbid)
     async for key in txn.keys(entities_key):
@@ -112,20 +98,6 @@ async def get_deleted_groups(txn: Transaction, *, kbid: str) -> kb_pb2.DeletedEn
         deg.ParseFromString(payload)
 
     return deg
-
-
-async def mark_group_as_deleted(txn: Transaction, *, kbid: str, group: str) -> None:
-    deg = await get_deleted_groups(txn, kbid=kbid)
-    if group not in deg.entities_groups:
-        deg.entities_groups.append(group)
-        await txn.set(KB_DELETED_ENTITIES_GROUPS.format(kbid=kbid), deg.SerializeToString())
-
-
-async def unmark_group_as_deleted(txn: Transaction, *, kbid: str, group: str) -> None:
-    deg = await get_deleted_groups(txn, kbid=kbid)
-    if group in deg.entities_groups:
-        deg.entities_groups.remove(group)
-        await txn.set(KB_DELETED_ENTITIES_GROUPS.format(kbid=kbid), deg.SerializeToString())
 
 
 async def get_entities_meta_cache(txn: Transaction, *, kbid: str) -> EntitiesMetaCache:

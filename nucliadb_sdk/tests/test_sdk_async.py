@@ -36,11 +36,8 @@ async def test_kb_services(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     await sdk_async.delete_labelset(kbid=kb.uuid, labelset="foo")
 
     # Entities
-    await sdk_async.create_entitygroup(kbid=kb.uuid, group="foo")
-    await sdk_async.update_entitygroup(kbid=kb.uuid, group="foo", title="bar")
     await sdk_async.get_entitygroups(kbid=kb.uuid)
-    await sdk_async.get_entitygroup(kbid=kb.uuid, group="foo")
-    await sdk_async.delete_entitygroup(kbid=kb.uuid, group="foo")
+    # await sdk_async.get_entitygroup(kbid=kb.uuid, group="foo")
 
     # Synonyms
     synonyms = KnowledgeBoxSynonyms(synonyms={"foo": ["bar"]})

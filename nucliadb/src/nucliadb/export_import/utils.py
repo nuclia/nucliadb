@@ -171,14 +171,6 @@ async def import_binary(
     )
 
 
-async def set_entities_groups(
-    context: ApplicationContext, kbid: str, entities_groups: kb_pb2.EntitiesGroups
-) -> None:
-    async with datamanagers.with_transaction() as txn:
-        await datamanagers.entities.set_entities_groups(txn, kbid=kbid, entities_groups=entities_groups)
-        await txn.commit()
-
-
 async def set_synonyms(context: ApplicationContext, kbid: str, synonyms: kb_pb2.Synonyms) -> None:
     async with datamanagers.with_transaction() as txn:
         await datamanagers.synonyms.set(txn, kbid=kbid, synonyms=synonyms)

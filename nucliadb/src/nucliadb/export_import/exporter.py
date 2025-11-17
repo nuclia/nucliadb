@@ -34,7 +34,6 @@ from nucliadb.export_import.utils import (
     download_binary,
     get_broker_message,
     get_cloud_files,
-    get_entities,
     get_labels,
     get_learning_config,
     iter_kb_resource_uuids,
@@ -62,9 +61,6 @@ async def export_kb(
         resources_iterator = export_resources_resumable(context, metadata)
 
     async for chunk in resources_iterator:
-        yield chunk
-
-    async for chunk in export_entities(context, kbid):
         yield chunk
 
     async for chunk in export_labels(context, kbid):
@@ -173,18 +169,6 @@ async def export_resource_with_binaries(
     yield ExportedItemType.RESOURCE.encode("utf-8")
     yield len(bm_bytes).to_bytes(4, byteorder="big")
     yield bm_bytes
-
-
-async def export_entities(
-    context: ApplicationContext,
-    kbid: str,
-) -> AsyncGenerator[bytes, None]:
-    entities = await get_entities(context, kbid)
-    if len(entities.entities_groups) > 0:
-        data = entities.SerializeToString()
-        yield ExportedItemType.ENTITIES.encode("utf-8")
-        yield len(data).to_bytes(4, byteorder="big")
-        yield data
 
 
 async def export_labels(

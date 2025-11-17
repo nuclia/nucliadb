@@ -30,15 +30,10 @@ from nidx_protos.nodereader_pb2 import (
 )
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.exceptions import (
-    AlreadyExists,
-    EntitiesGroupNotFound,
-)
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.entities import (
     KB_DELETED_ENTITIES_GROUPS,
     KB_ENTITIES,
-    KB_ENTITIES_GROUP,
 )
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -53,8 +48,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
-from .exceptions import EntityManagementException
-
 MAX_DUPLICATES = 300
 MAX_DELETED = 300
 
@@ -68,12 +61,6 @@ class EntitiesManager:
         self.kb = knowledgebox
         self.txn = txn
         self.kbid = self.kb.kbid
-
-    async def create_entities_group(self, group: str, entities: EntitiesGroup):
-        if await self.entities_group_exists(group):
-            raise AlreadyExists(f"Entities group {group} already exists")
-
-        await self.store_entities_group(group, entities)
 
     async def get_entities(self, entities: GetEntitiesResponse):
         async for group, eg in self.iterate_entities_groups(exclude_deleted=True):
@@ -114,73 +101,6 @@ class EntitiesManager:
         if tasks:
             await asyncio.wait(tasks)
         return groups
-
-    async def update_entities(self, group: str, entities: dict[str, Entity]):
-        """Update entities on an entity group. New entities are appended and existing
-        are overwriten. Existing entities not appearing in `entities` are left
-        intact. Use `delete_entities` to delete them instead.
-
-        """
-        if not await self.entities_group_exists(group):
-            raise EntitiesGroupNotFound(f"Entities group '{group}' doesn't exist")
-
-        entities_group = await self.get_stored_entities_group(group)
-        if entities_group is None:
-            entities_group = EntitiesGroup()
-
-        for name, entity in entities.items():
-            entities_group.entities[name].CopyFrom(entity)
-
-        await self.store_entities_group(group, entities_group)
-
-    async def set_entities_group(self, group: str, entities: EntitiesGroup):
-        indexed = await self.get_indexed_entities_group(group)
-        if indexed is None:
-            updated = entities
-        else:
-            updated = EntitiesGroup()
-            updated.CopyFrom(entities)
-
-            for name, entity in indexed.entities.items():
-                if name not in updated.entities:
-                    updated.entities[name].CopyFrom(entity)
-                    updated.entities[name].deleted = True
-
-        await self.store_entities_group(group, updated)
-
-    async def set_entities_group_force(self, group: str, entitiesgroup: EntitiesGroup):
-        await self.store_entities_group(group, entitiesgroup)
-
-    async def set_entities_group_metadata(
-        self, group: str, *, title: Optional[str] = None, color: Optional[str] = None
-    ):
-        entities_group = await self.get_stored_entities_group(group)
-        if entities_group is None:
-            entities_group = EntitiesGroup()
-
-        if title:
-            entities_group.title = title
-        if color:
-            entities_group.color = color
-
-        await self.store_entities_group(group, entities_group)
-
-    async def delete_entities(self, group: str, delete: list[str]):
-        stored = await self.get_stored_entities_group(group)
-
-        stored = stored or EntitiesGroup()
-        for name in delete:
-            if name not in stored.entities:
-                entity = stored.entities[name]
-                entity.value = name
-            else:
-                entity = stored.entities[name]
-            entity.deleted = True
-        await self.store_entities_group(group, stored)
-
-    async def delete_entities_group(self, group: str):
-        await self.delete_stored_entities_group(group)
-        await self.mark_entities_group_as_deleted(group)
 
     # Private API
 
@@ -319,52 +239,9 @@ class EntitiesManager:
             return set()
         return set.union(*results)
 
-    async def store_entities_group(self, group: str, eg: EntitiesGroup):
-        meta_cache = await datamanagers.entities.get_entities_meta_cache(self.txn, kbid=self.kbid)
-        duplicates = {}
-        deleted = []
-        duplicate_count = 0
-        for entity in eg.entities.values():
-            if entity.deleted:
-                deleted.append(entity.value)
-                continue
-            if len(entity.represents) == 0:
-                continue
-            duplicates[entity.value] = list(entity.represents)
-            duplicate_count += len(duplicates[entity.value])
-
-        if duplicate_count > MAX_DUPLICATES:
-            raise EntityManagementException(
-                f"Too many duplicates: {duplicate_count}. Max of {MAX_DUPLICATES} currently allowed"
-            )
-        if len(deleted) > MAX_DELETED:
-            raise EntityManagementException(
-                f"Too many deleted entities: {len(deleted)}. Max of {MAX_DELETED} currently allowed"
-            )
-
-        meta_cache.set_duplicates(group, duplicates)
-        meta_cache.set_deleted(group, deleted)
-        await datamanagers.entities.set_entities_meta_cache(self.txn, kbid=self.kbid, cache=meta_cache)
-
-        await datamanagers.entities.set_entities_group(
-            self.txn, kbid=self.kbid, group_id=group, entities=eg
-        )
-        # if it was preivously deleted, we must unmark it
-        await self.unmark_entities_group_as_deleted(group)
-
     async def is_entities_group_deleted(self, group: str):
         deleted_groups = await self.get_deleted_entities_groups()
         return group in deleted_groups
-
-    async def delete_stored_entities_group(self, group: str):
-        entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        await self.txn.delete(entities_key)
-
-    async def mark_entities_group_as_deleted(self, group: str):
-        await datamanagers.entities.mark_group_as_deleted(self.txn, kbid=self.kbid, group=group)
-
-    async def unmark_entities_group_as_deleted(self, group: str):
-        await datamanagers.entities.unmark_group_as_deleted(self.txn, kbid=self.kbid, group=group)
 
     @staticmethod
     def merge_entities_groups(indexed: EntitiesGroup, stored: EntitiesGroup):
