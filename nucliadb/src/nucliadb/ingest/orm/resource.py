@@ -25,8 +25,6 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Optional, Sequence, Type
 
-import backoff
-
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB, FieldId
@@ -132,8 +130,6 @@ class Resource:
         self.user_relations: Optional[PBRelations] = None
         self.locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
-    # REVIEW: this backoff comes from the datamanager function, is this really needed?
-    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
     @classmethod
     async def get(cls, txn: Transaction, kbid: str, rid: str) -> Optional["Resource"]:
         # prevent circulat imports
