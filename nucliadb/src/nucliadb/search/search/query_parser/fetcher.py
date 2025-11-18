@@ -340,7 +340,7 @@ class Fetcher:
         async with datamanagers.with_ro_transaction() as txn:
             if not await datamanagers.vectorsets.exists(txn, kbid=kbid, vectorset_id=vectorset):
                 raise InvalidQueryError(
-                    "vectorset", f"Vectorset {vectorset} doesn't exist in you Knowledge Box"
+                    "vectorset", f"Vectorset {vectorset} doesn't exist in your Knowledge Box"
                 )
 
     @alru_cache(maxsize=None)

@@ -98,3 +98,41 @@ async def test_retrieve(
     assert matched_only_with_semantic.score.history[0].type == "semantic"
     assert matched_only_with_semantic.score.source == "rank_fusion"
     assert matched_only_with_semantic.score.type == "rrf"
+
+    # Check that invalid semantic model is rejected
+    resp = await nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/retrieve",
+        json={
+            "query": {
+                "semantic": {
+                    "query": Q,
+                    "vectorset": "non-existing-model",
+                },
+            },
+        },
+    )
+    assert resp.status_code == 422
+    body = resp.json()
+    assert (
+        body["detail"]
+        == "Invalid query. Error in vectorset: Vectorset non-existing-model doesn't exist in your Knowledge Box"
+    )
+
+    # Test that matryochka dimension is enforced
+    resp = await nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/retrieve",
+        json={
+            "query": {
+                "semantic": {
+                    "query": Q[:50],  # too short
+                    "vectorset": "my-semantic-model",
+                },
+            },
+        },
+    )
+    assert resp.status_code == 422
+    body = resp.json()
+    assert (
+        body["detail"]
+        == "Invalid query. Error in vector: Invalid vector length, please check valid embedding size for my-semantic-model model"
+    )
