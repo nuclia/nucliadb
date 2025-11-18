@@ -267,32 +267,46 @@ async def _faceted_search_unfiltered(
 ):
     facet_params: dict[str, Any] = {}
     facet_sql: sql.Composable
-    if len(tmp_facets) <= 5:
-        # Asking for few facets, strictly filter to what we need in the query
-        prefixes_sql = []
-        for cnt, prefix in enumerate(tmp_facets.keys()):
-            prefixes_sql.append(
-                sql.SQL("(facet LIKE {} AND POSITION('/' IN RIGHT(facet, {})) = 0)").format(
-                    sql.Placeholder(f"facet_{cnt}"), sql.Placeholder(f"facet_len_{cnt}")
+    if list(tmp_facets.keys()) == ["/n/s"]:
+        # Special case when querying only for status. We know the list of possible facets and optimize
+        # by asking for each facet separately which makes better use of the index
+        sqls = []
+        for status in ["PENDING", "PROCESSED", "ERROR", "EMPTY"]:
+            sqls.append(
+                sql.SQL(
+                    "SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s AND facet = '/n/s/{0}' GROUP BY facet".format(
+                        status
+                    )
                 )
             )
-            facet_params[f"facet_{cnt}"] = f"{prefix}/%"
-            facet_params[f"facet_len_{cnt}"] = -(len(prefix) + 1)
-        facet_sql = sql.SQL("AND {}").format(sql.SQL(" OR ").join(prefixes_sql))
-    elif all((facet.startswith("/l") or facet.startswith("/n/i") for facet in tmp_facets.keys())):
-        # Special case for the catalog query, which can have many facets asked for
-        # Filter for the categories (icon and labels) in the query, filter the rest in the code below
-        facet_sql = sql.SQL("AND (facet LIKE '/l/%%' OR facet like '/n/i/%%')")
+        await cur.execute(sql.SQL(" UNION ").join(sqls), {"kbid": catalog_query.kbid})
     else:
-        # Worst case: ask for all facets and filter here. This is faster than applying lots of filters
-        facet_sql = sql.SQL("")
+        if len(tmp_facets) <= 5:
+            # Asking for few facets, strictly filter to what we need in the query
+            prefixes_sql = []
+            for cnt, prefix in enumerate(tmp_facets.keys()):
+                prefixes_sql.append(
+                    sql.SQL("(facet LIKE {} AND POSITION('/' IN RIGHT(facet, {})) = 0)").format(
+                        sql.Placeholder(f"facet_{cnt}"), sql.Placeholder(f"facet_len_{cnt}")
+                    )
+                )
+                facet_params[f"facet_{cnt}"] = f"{prefix}/%"
+                facet_params[f"facet_len_{cnt}"] = -(len(prefix) + 1)
+            facet_sql = sql.SQL("AND {}").format(sql.SQL(" OR ").join(prefixes_sql))
+        elif all((facet.startswith("/l") or facet.startswith("/n/i") for facet in tmp_facets.keys())):
+            # Special case for the catalog query, which can have many facets asked for
+            # Filter for the categories (icon and labels) in the query, filter the rest in the code below
+            facet_sql = sql.SQL("AND (facet LIKE '/l/%%' OR facet like '/n/i/%%')")
+        else:
+            # Worst case: ask for all facets and filter here. This is faster than applying lots of filters
+            facet_sql = sql.SQL("")
 
-    await cur.execute(
-        sql.SQL(
-            "SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s {} GROUP BY facet"
-        ).format(facet_sql),
-        {"kbid": catalog_query.kbid, **facet_params},
-    )
+        await cur.execute(
+            sql.SQL(
+                "SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s {} GROUP BY facet"
+            ).format(facet_sql),
+            {"kbid": catalog_query.kbid, **facet_params},
+        )
 
     # Only keep the facets we asked for
     for row in await cur.fetchall():
