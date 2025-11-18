@@ -95,9 +95,9 @@ class _RetrievalParser:
     async def _parse_query(self) -> Query:
         keyword = None
         if self.item.query.keyword is not None:
-            lexical_query, is_synonyms_query = await self._parse_keyword_query()
+            keyword_query, is_synonyms_query = await self._parse_keyword_query()
             keyword = KeywordQuery(
-                query=lexical_query,
+                query=keyword_query,
                 is_synonyms_query=is_synonyms_query,
                 min_score=self.item.query.keyword.min_score,
             )
@@ -119,18 +119,18 @@ class _RetrievalParser:
 
     async def _parse_keyword_query(self) -> tuple[str, bool]:
         assert self.item.query.keyword is not None
-        lexical_query = self.item.query.keyword.query
+        keyword_query = self.item.query.keyword.query
         is_synonyms_query = False
         if self.item.query.keyword.with_synonyms:
-            synonyms_query = await query_with_synonyms(lexical_query, fetcher=self.fetcher)
+            synonyms_query = await query_with_synonyms(keyword_query, fetcher=self.fetcher)
             if synonyms_query is not None:
-                lexical_query = synonyms_query
+                keyword_query = synonyms_query
                 is_synonyms_query = True
 
         # after all query transformations, pass a validator that can fix some
         # queries that trigger a panic on the index
-        lexical_query = validate_query_syntax(lexical_query)
-        return lexical_query, is_synonyms_query
+        keyword_query = validate_query_syntax(keyword_query)
+        return keyword_query, is_synonyms_query
 
     async def _parse_semantic_query(self) -> tuple[str, list[float]]:
         # Make sure the vectorset exists in the KB
