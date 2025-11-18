@@ -14,7 +14,7 @@
 
 import re
 import tempfile
-from typing import AsyncIterator, Iterator, Optional
+from typing import TYPE_CHECKING, AsyncIterator, Iterator, Optional
 
 import docker  # type: ignore
 import grpc
@@ -33,6 +33,9 @@ from nucliadb_sdk.v2.sdk import NucliaDB
 
 DOCKER_ENV_GROUPS = re.search(r"//([^:]+)", docker.from_env().api.base_url)
 DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None
+
+if TYPE_CHECKING:
+    from nucliadb_protos.writer_pb2_grpc import WriterAsyncStub
 
 
 @pytest.fixture(scope="function")
@@ -220,7 +223,7 @@ def temp_folder():
 
 
 @pytest.fixture
-async def ingest_stub(nucliadb) -> AsyncIterator[WriterStub]:
+async def ingest_stub(nucliadb) -> AsyncIterator["WriterAsyncStub"]:
     channel = aio.insecure_channel(f"{nucliadb.host}:{nucliadb.grpc}")
     stub = WriterStub(channel)
     yield stub  # type: ignore

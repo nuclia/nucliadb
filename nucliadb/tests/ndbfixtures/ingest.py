@@ -24,7 +24,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from os.path import dirname, getsize
-from typing import AsyncIterator, Iterable, Optional
+from typing import TYPE_CHECKING, AsyncIterator, Iterable, Optional
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -48,7 +48,6 @@ from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos import writer_pb2_grpc
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata, VectorSetConfig
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import NatsConnectionManager
@@ -58,6 +57,11 @@ from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
     clear_global_cache,
 )
+
+if TYPE_CHECKING:
+    from nucliadb_protos.writer_pb2_grpc import WriterAsyncStub as WriterStub
+else:
+    from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 logger = logging.getLogger(__name__)
 
