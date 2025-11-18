@@ -35,7 +35,6 @@ from nucliadb.common.http_clients.exceptions import ServiceUnavailableException
 from nucliadb.common.http_clients.processing import (
     ProcessingHTTPClient,
     ProcessingPullMessageProgressUpdater,
-    get_nua_api_id,
 )
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import SERVICE_NAME, logger, logger_activity
@@ -142,12 +141,9 @@ class PullV2Worker:
         data = None
         if nuclia_settings.nuclia_service_account is not None:
             headers["X-STF-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
-            # parse jwt sub to get pull type id
-            try:
-                get_nua_api_id()
-            except Exception as exc:
+            if nuclia_settings.nuclia_service_account is None:
                 logger.exception("Could not read NUA API Key. Can not start pull worker")
-                raise ReallyStopPulling() from exc
+                raise ReallyStopPulling()
 
         ack_tokens = []
         async with ProcessingHTTPClient() as processing_http_client:

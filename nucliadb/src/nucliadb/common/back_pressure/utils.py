@@ -28,6 +28,7 @@ from nucliadb_utils.nats import NatsConnectionManager
 class BackPressureData:
     type: str
     try_after: datetime
+    pending: int = 0
 
 
 class BackPressureException(Exception):

@@ -118,12 +118,6 @@ class BackPressureMaterializer:
                     extra={"kbid": kbid},
                 )
                 return 0
-
-            if pending > 0:
-                logger.info(
-                    f"Processing returned {pending} pending messages for KB",
-                    extra={"kbid": kbid},
-                )
             self.processing_pending_cache[kbid] = pending
             return pending
 
@@ -184,7 +178,7 @@ class BackPressureMaterializer:
                 pending=pending,
                 max_wait=settings.max_wait_time,
             )
-            data = BackPressureData(type="indexing", try_after=try_after)
+            data = BackPressureData(type="indexing", try_after=try_after, pending=pending)
             raise BackPressureException(data)
 
     def check_ingest(self):
@@ -199,7 +193,7 @@ class BackPressureMaterializer:
                 pending=ingest_pending,
                 max_wait=settings.max_wait_time,
             )
-            data = BackPressureData(type="ingest", try_after=try_after)
+            data = BackPressureData(type="ingest", try_after=try_after, pending=ingest_pending)
             raise BackPressureException(data)
 
     async def check_processing(self, kbid: str):
@@ -215,7 +209,7 @@ class BackPressureMaterializer:
                 pending=kb_pending,
                 max_wait=settings.max_wait_time,
             )
-            data = BackPressureData(type="processing", try_after=try_after)
+            data = BackPressureData(type="processing", try_after=try_after, pending=kb_pending)
             raise BackPressureException(data)
 
 
@@ -299,6 +293,7 @@ async def back_pressure_checks(kbid: str, resource_uuid: Optional[str] = None):
                 "resource_uuid": resource_uuid,
                 "try_after": exc.data.try_after,
                 "back_pressure_type": exc.data.type,
+                "pending": exc.data.pending,
             },
         )
         raise HTTPException(
