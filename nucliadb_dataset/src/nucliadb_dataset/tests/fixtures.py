@@ -226,7 +226,7 @@ def temp_folder():
 async def ingest_stub(nucliadb) -> AsyncIterator["WriterAsyncStub"]:
     channel = aio.insecure_channel(f"{nucliadb.host}:{nucliadb.grpc}")
     stub = WriterStub(channel)
-    yield stub
+    yield stub  # type: ignore
     await channel.close(grace=True)
 
 
@@ -234,5 +234,5 @@ async def ingest_stub(nucliadb) -> AsyncIterator["WriterAsyncStub"]:
 def ingest_stub_sync(nucliadb) -> Iterator[WriterStub]:
     channel = grpc.insecure_channel(f"{nucliadb.host}:{nucliadb.grpc}")
     stub = WriterStub(channel)
-    yield stub
+    yield stub  # type: ignore
     channel.close()

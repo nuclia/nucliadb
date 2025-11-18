@@ -25,6 +25,7 @@ from nucliadb.common.filter_expression import parse_expression
 from nucliadb.models.internal.retrieval import RetrievalRequest
 from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
+from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
     Filters,
     GraphQuery,
@@ -35,6 +36,7 @@ from nucliadb.search.search.query_parser.models import (
     SemanticQuery,
     UnitRetrieval,
 )
+from nucliadb.search.search.query_parser.parsers.common import query_with_synonyms, validate_query_syntax
 from nucliadb.search.search.utils import filter_hidden_resources
 from nucliadb_models import search as search_models
 from nucliadb_models.filters import FilterExpression
@@ -43,22 +45,33 @@ from nucliadb_models.search import MAX_RANK_FUSION_WINDOW
 
 @query_parser_observer.wrap({"type": "parse_retrieve"})
 async def parse_retrieve(kbid: str, item: RetrievalRequest) -> UnitRetrieval:
-    parser = _RetrievalParser(kbid, item)
+    fetcher = Fetcher(
+        kbid=kbid,
+        query=item.query.keyword.query if item.query.keyword else "",
+        user_vector=item.query.semantic.query if item.query.semantic else None,
+        vectorset=item.query.semantic.vectorset if item.query.semantic else None,
+        # Retrieve doesn't use images for now
+        query_image=None,
+        # Retrieve doesn't do rephrasing
+        rephrase=False,
+        rephrase_prompt=None,
+        generative_model=None,
+    )
+    parser = _RetrievalParser(kbid, item, fetcher)
     retrieval = await parser.parse()
     return retrieval
 
 
 class _RetrievalParser:
-    def __init__(self, kbid: str, item: RetrievalRequest):
+    def __init__(self, kbid: str, item: RetrievalRequest, fetcher: Fetcher):
         self.kbid = kbid
         self.item = item
+        self.fetcher = fetcher
 
     async def parse(self) -> UnitRetrieval:
         top_k = self.item.top_k
-        query = self._parse_query()
+        query = await self._parse_query()
         filters = await self._parse_filters()
-        rank_fusion = self._parse_rank_fusion()
-
         try:
             rank_fusion = self._parse_rank_fusion()
         except ValidationError as exc:
@@ -79,20 +92,22 @@ class _RetrievalParser:
         )
         return retrieval
 
-    def _parse_query(self) -> Query:
+    async def _parse_query(self) -> Query:
         keyword = None
         if self.item.query.keyword is not None:
+            keyword_query, is_synonyms_query = await self._parse_keyword_query()
             keyword = KeywordQuery(
-                query=self.item.query.keyword.query,
-                is_synonyms_query=False,
+                query=keyword_query,
+                is_synonyms_query=is_synonyms_query,
                 min_score=self.item.query.keyword.min_score,
             )
 
         semantic = None
         if self.item.query.semantic is not None:
+            vectorset, query_vector = await self._parse_semantic_query()
             semantic = SemanticQuery(
-                query=self.item.query.semantic.query,
-                vectorset=self.item.query.semantic.vectorset,
+                query=query_vector,
+                vectorset=vectorset,
                 min_score=self.item.query.semantic.min_score,
             )
 
@@ -102,18 +117,52 @@ class _RetrievalParser:
 
         return Query(keyword=keyword, semantic=semantic, graph=graph)
 
+    async def _parse_keyword_query(self) -> tuple[str, bool]:
+        assert self.item.query.keyword is not None
+        keyword_query = self.item.query.keyword.query
+        is_synonyms_query = False
+        if self.item.query.keyword.with_synonyms:
+            synonyms_query = await query_with_synonyms(keyword_query, fetcher=self.fetcher)
+            if synonyms_query is not None:
+                keyword_query = synonyms_query
+                is_synonyms_query = True
+
+        # after all query transformations, pass a validator that can fix some
+        # queries that trigger a panic on the index
+        keyword_query = validate_query_syntax(keyword_query)
+        return keyword_query, is_synonyms_query
+
+    async def _parse_semantic_query(self) -> tuple[str, list[float]]:
+        # Make sure the vectorset exists in the KB
+        assert self.item.query.semantic is not None
+        vectorset = self.item.query.semantic.vectorset
+        await self.fetcher.validate_vectorset(self.kbid, vectorset)
+
+        # Calculate the matryoshka dimension if applicable
+        user_vector = self.item.query.semantic.query
+        matryoshka_dimension = await self.fetcher.get_matryoshka_dimension_cached(self.kbid, vectorset)
+        if matryoshka_dimension is not None:
+            if len(user_vector) < matryoshka_dimension:
+                raise InvalidQueryError(
+                    "vector",
+                    f"Invalid vector length, please check valid embedding size for {vectorset} model",
+                )
+
+            # KB using a matryoshka embeddings model, cut the query vector
+            # accordingly
+            query_vector = user_vector[:matryoshka_dimension]
+        return vectorset, query_vector
+
     async def _parse_filters(self) -> Filters:
         filters = Filters()
         if self.item.filters is None:
             return filters
 
         if self.item.filters.filter_expression is not None:
-            # FIXME: remove this type ignore and fix the Union issue
             filters.field_expression = await parse_expression(
                 self.item.filters.filter_expression.field,  # type: ignore
                 self.kbid,
             )
-            # FIXME: remove this type ignore and fix the Union issue
             filters.paragraph_expression = await parse_expression(
                 self.item.filters.filter_expression.paragraph,  # type: ignore
                 self.kbid,
@@ -130,7 +179,6 @@ class _RetrievalParser:
 
         return filters
 
-    # TODO: adapted from find parser, we may want to put it in common
     def _parse_rank_fusion(self) -> RankFusion:
         rank_fusion: RankFusion
 

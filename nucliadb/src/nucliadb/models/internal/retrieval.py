@@ -30,13 +30,14 @@ from nucliadb_models.security import RequestSecurity
 
 class KeywordQuery(BaseModel):
     query: str
-    min_score: float
+    min_score: float = 0.0
+    with_synonyms: bool = False
 
 
 class SemanticQuery(BaseModel):
     query: list[float]
     vectorset: str
-    min_score: float
+    min_score: float = -1.0
 
 
 class GraphQuery(BaseModel):

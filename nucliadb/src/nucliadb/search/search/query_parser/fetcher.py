@@ -113,9 +113,9 @@ class Fetcher:
 
     async def get_matryoshka_dimension(self) -> Optional[int]:
         vectorset = await self.get_vectorset()
-        return await get_matryoshka_dimension_cached(self.kbid, vectorset)
+        return await self.get_matryoshka_dimension_cached(self.kbid, vectorset)
 
-    async def _get_user_vectorset(self) -> Optional[str]:
+    async def get_user_vectorset(self) -> Optional[str]:
         """Returns the user's requested vectorset and validates if it does exist
         in the KB.
 
@@ -123,7 +123,7 @@ class Fetcher:
         async with self.locks.setdefault("user_vectorset", asyncio.Lock()):
             if not self.user_vectorset_validated:
                 if self.user_vectorset is not None:
-                    await validate_vectorset(self.kbid, self.user_vectorset)
+                    await self.validate_vectorset(self.kbid, self.user_vectorset)
             self.user_vectorset_validated = True
             return self.user_vectorset
 
@@ -136,7 +136,7 @@ class Fetcher:
             if is_cached(self.cache.vectorset):
                 return self.cache.vectorset
 
-            user_vectorset = await self._get_user_vectorset()
+            user_vectorset = await self.get_user_vectorset()
             if user_vectorset:
                 # user explicitly asked for a vectorset
                 self.cache.vectorset = user_vectorset
@@ -310,7 +310,7 @@ class Fetcher:
 
             # we can't call get_vectorset, as it would do a recirsive loop between
             # functions, so we'll manually parse it
-            vectorset = await self._get_user_vectorset()
+            vectorset = await self.get_user_vectorset()
             try:
                 query_info = await query_information(
                     self.kbid,
@@ -336,13 +336,17 @@ class Fetcher:
 
         return detected_entities
 
+    async def validate_vectorset(self, kbid: str, vectorset: str):
+        async with datamanagers.with_ro_transaction() as txn:
+            if not await datamanagers.vectorsets.exists(txn, kbid=kbid, vectorset_id=vectorset):
+                raise InvalidQueryError(
+                    "vectorset", f"Vectorset {vectorset} doesn't exist in your Knowledge Box"
+                )
 
-async def validate_vectorset(kbid: str, vectorset: str):
-    async with datamanagers.with_ro_transaction() as txn:
-        if not await datamanagers.vectorsets.exists(txn, kbid=kbid, vectorset_id=vectorset):
-            raise InvalidQueryError(
-                "vectorset", f"Vectorset {vectorset} doesn't exist in you Knowledge Box"
-            )
+    @alru_cache(maxsize=None)
+    async def get_matryoshka_dimension_cached(self, kbid: str, vectorset: str) -> Optional[int]:
+        # This can be safely cached as the matryoshka dimension is not expected to change
+        return await get_matryoshka_dimension(kbid, vectorset)
 
 
 @query_parse_dependency_observer.wrap({"type": "query_information"})
@@ -371,12 +375,6 @@ async def query_information(
 async def detect_entities(kbid: str, query: str) -> list[utils_pb2.RelationNode]:
     predict = get_predict()
     return await predict.detect_entities(kbid, query)
-
-
-@alru_cache(maxsize=None)
-async def get_matryoshka_dimension_cached(kbid: str, vectorset: str) -> Optional[int]:
-    # This can be safely cached as the matryoshka dimension is not expected to change
-    return await get_matryoshka_dimension(kbid, vectorset)
 
 
 @query_parse_dependency_observer.wrap({"type": "matryoshka_dimension"})

@@ -18,9 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from fastapi import Header, Request
+from fastapi import Header, HTTPException, Request
 from fastapi_versioning import version
 
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.models.internal.retrieval import (
     Metadata,
@@ -54,7 +55,13 @@ async def retrieve_endpoint(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> RetrievalResponse:
-    retrieval = await parse_retrieve(kbid, item)
+    try:
+        retrieval = await parse_retrieve(kbid, item)
+    except InvalidQueryError as err:
+        raise HTTPException(
+            status_code=422,
+            detail=str(err),
+        )
 
     text_blocks, _, _, _ = await text_block_search(kbid, retrieval)
 

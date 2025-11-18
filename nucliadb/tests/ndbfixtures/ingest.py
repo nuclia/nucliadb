@@ -90,7 +90,7 @@ async def component_nucliadb_ingest_grpc(
 ) -> AsyncIterator[WriterStub]:
     channel = aio.insecure_channel(ingest_grpc_server.address)
     stub = WriterStub(channel)
-    yield stub
+    yield stub  # type: ignore
     await channel.close(grace=None)
 
 
@@ -98,7 +98,7 @@ async def component_nucliadb_ingest_grpc(
 async def standalone_nucliadb_ingest_grpc(nucliadb: Settings) -> AsyncIterator[WriterStub]:
     channel = aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}")
     stub = WriterStub(channel)
-    yield stub
+    yield stub  # type: ignore
     await channel.close(grace=None)
 
 
