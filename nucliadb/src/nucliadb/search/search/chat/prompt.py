@@ -34,8 +34,11 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.serialize import serialize_extra, serialize_origin
+from nucliadb.models.internal.augment import ParagraphText
 from nucliadb.search import augmentor, logger
 from nucliadb.search.augmentor.fields import field_entities
+from nucliadb.search.augmentor.models import Paragraph
+from nucliadb.search.augmentor.paragraphs import augment_paragraphs
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import (
     get_file_thumbnail_image,
@@ -44,7 +47,6 @@ from nucliadb.search.search.chat.images import (
 )
 from nucliadb.search.search.hydrator import hydrate_field_text, hydrate_resource_text
 from nucliadb.search.search.metrics import Metrics
-from nucliadb.search.search.paragraphs import get_paragraph_text
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.search import (
@@ -955,68 +957,81 @@ async def hierarchy_prompt_context(
     resources: Dict[str, ExtraCharsParagraph] = {}
 
     # Iterate paragraphs to get extended text
+    paragraphs_to_augment = []
     for paragraph in ordered_paragraphs_copy:
         paragraph_id = ParagraphId.from_string(paragraph.id)
-        extended_paragraph_text = paragraph.text
-        if paragraphs_extra_characters > 0:
-            extended_paragraph_id = ParagraphId(
-                field_id=paragraph_id.field_id,
-                paragraph_start=paragraph_id.paragraph_start,
-                paragraph_end=paragraph_id.paragraph_end + paragraphs_extra_characters,
-            )
-            extended_paragraph_text = await get_paragraph_text(
-                kbid=kbid,
-                paragraph_id=extended_paragraph_id,
-                log_on_missing_field=True,
-            )
         rid = paragraph_id.rid
+
+        if paragraphs_extra_characters > 0:
+            paragraph_id.paragraph_end += paragraphs_extra_characters
+
+        paragraphs_to_augment.append(paragraph_id)
+
         if rid not in resources:
             # Get the title and the summary of the resource
-            title_text = await get_paragraph_text(
-                kbid=kbid,
-                paragraph_id=ParagraphId(
-                    field_id=FieldId(
-                        rid=rid,
-                        type="a",
-                        key="title",
-                    ),
-                    paragraph_start=0,
-                    paragraph_end=500,
+            title_paragraph_id = ParagraphId(
+                field_id=FieldId(
+                    rid=rid,
+                    type="a",
+                    key="title",
                 ),
-                log_on_missing_field=False,
+                paragraph_start=0,
+                paragraph_end=500,
             )
-            summary_text = await get_paragraph_text(
-                kbid=kbid,
-                paragraph_id=ParagraphId(
-                    field_id=FieldId(
-                        rid=rid,
-                        type="a",
-                        key="summary",
-                    ),
-                    paragraph_start=0,
-                    paragraph_end=1000,
+            summary_paragraph_id = ParagraphId(
+                field_id=FieldId(
+                    rid=rid,
+                    type="a",
+                    key="summary",
                 ),
-                log_on_missing_field=False,
+                paragraph_start=0,
+                paragraph_end=1000,
             )
+            paragraphs_to_augment.append(title_paragraph_id)
+            paragraphs_to_augment.append(summary_paragraph_id)
+
             resources[rid] = ExtraCharsParagraph(
-                title=title_text,
-                summary=summary_text,
-                paragraphs=[(paragraph, extended_paragraph_text)],
+                title=title_paragraph_id,
+                summary=summary_paragraph_id,
+                paragraphs=[(paragraph, paragraph_id)],
             )
         else:
-            resources[rid].paragraphs.append((paragraph, extended_paragraph_text))
+            resources[rid].paragraphs.append((paragraph, paragraph_id))
 
     metrics.set("hierarchy_ops", len(resources))
+
+    augmented = await augment_paragraphs(
+        kbid,
+        [Paragraph(id=paragraph_id, metadata=None) for paragraph_id in paragraphs_to_augment],
+        select=[ParagraphText()],
+    )
+
     augmented_paragraphs = set()
 
     # Modify the first paragraph of each resource to include the title and summary of the resource, as well as the
     # extended paragraph text of all the paragraphs in the resource.
     for values in resources.values():
-        title_text = values.title
-        summary_text = values.summary
+        augmented_title = augmented.get(values.title)
+        if augmented_title:
+            title_text = augmented_title.text or ""
+        else:
+            title_text = ""
+
+        augmented_summary = augmented.get(values.summary)
+        if augmented_summary:
+            summary_text = augmented_summary.text or ""
+        else:
+            summary_text = ""
+
         first_paragraph = None
         text_with_hierarchy = ""
-        for paragraph, extended_paragraph_text in values.paragraphs:
+        for paragraph, paragraph_id in values.paragraphs:
+            augmented_paragraph = augmented.get(paragraph_id)
+            if augmented_paragraph:
+                extended_paragraph_text = augmented_paragraph.text or ""
+            else:
+                extended_paragraph_text = ""
+
             if first_paragraph is None:
                 first_paragraph = paragraph
             text_with_hierarchy += "\n EXTRACTED BLOCK: \n " + extended_paragraph_text + " \n\n "
@@ -1297,9 +1312,9 @@ def get_paragraph_page_number(paragraph: FindParagraph) -> Optional[int]:
 
 @dataclass
 class ExtraCharsParagraph:
-    title: str
-    summary: str
-    paragraphs: List[Tuple[FindParagraph, str]]
+    title: ParagraphId
+    summary: ParagraphId
+    paragraphs: List[Tuple[FindParagraph, ParagraphId]]
 
 
 def _clean_paragraph_text(paragraph: FindParagraph) -> str:
