@@ -18,12 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Iterable, Optional, Union
+from typing import AsyncGenerator, Iterable, Optional, Union
 
 from nidx_protos.nodereader_pb2 import (
     GraphSearchResponse,
     SearchResponse,
 )
+from nuclia_models.predict.generative_responses import GenerativeChunk
 
 from nucliadb.common.models_utils import to_proto
 from nucliadb.search import logger
@@ -42,6 +43,7 @@ from nucliadb_models import filters
 from nucliadb_models.search import (
     AskRequest,
     ChatContextMessage,
+    ChatModel,
     ChatOptions,
     FindOptions,
     FindRequest,
@@ -73,6 +75,8 @@ async def rephrase_query(
     generative_model: Optional[str] = None,
     chat_history_relevance_threshold: Optional[float] = None,
 ) -> RephraseResponse:
+    # NOTE: When moving /ask to RAO, this will need to change to whatever client/utility is used
+    # to call NUA predict (internally or externally in the case of onprem).
     predict = get_predict()
     req = RephraseModel(
         question=query,
@@ -228,7 +232,7 @@ async def run_main_query(
 ) -> tuple[KnowledgeboxFindResults, ParsedQuery]:
     find_request = find_request_from_ask_request(item, query)
 
-    find_results, incomplete, parsed_query = await find(
+    find_results, incomplete, parsed_query = await find_retrieval(
         kbid,
         find_request,
         ndb_client,
@@ -464,7 +468,7 @@ async def run_prequeries(
     async def _prequery_find(prequery: PreQuery, index: int):
         async with max_parallel_prequeries:
             prequery_id = prequery.id or f"prequery-{index}"
-            find_results, _, _ = await find(
+            find_results, _, _ = await find_retrieval(
                 kbid,
                 prequery.request,
                 x_ndb_client,
@@ -481,3 +485,37 @@ async def run_prequeries(
     for prequery, find_results in ops_results:
         results.append((prequery, find_results))
     return results
+
+
+async def get_answer_stream(
+    kbid: str,
+    item: ChatModel,
+    extra_headers: Optional[dict[str, str]] = None,
+) -> tuple[str, str, AsyncGenerator[GenerativeChunk, None]]:
+    # NOTE: When moving /ask to RAO, this will need to change to whatever client/utility is used
+    # to call NUA predict (internally or externally in the case of onprem).
+    predict = get_predict()
+    return await predict.chat_query_ndjson(
+        kbid=kbid,
+        item=item,
+        extra_headers=extra_headers,
+    )
+
+
+async def find_retrieval(
+    kbid: str,
+    find_request: FindRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    metrics: Metrics,
+) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
+    find_results, incomplete, parsed_query = await find(
+        kbid,
+        find_request,
+        x_ndb_client,
+        x_nucliadb_user,
+        x_forwarded_for,
+        metrics=metrics,
+    )
+    return find_results, incomplete, parsed_query
