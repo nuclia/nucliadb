@@ -25,7 +25,6 @@ from pydantic import ValidationError
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.filter_expression import parse_expression
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
-from nucliadb.search.search.query import expand_entities
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
@@ -139,15 +138,10 @@ class RAOFindParser:
     async def _parse_relation_query(self) -> RelationQuery:
         detected_entities = await self._get_detected_entities()
 
-        deleted_entity_groups = await self.fetcher.get_deleted_entity_groups()
-
-        meta_cache = await self.fetcher.get_entities_meta_cache()
-        deleted_entities = meta_cache.deleted_entities
-
         return RelationQuery(
             entry_points=detected_entities,
-            deleted_entity_groups=deleted_entity_groups,
-            deleted_entities=deleted_entities,
+            deleted_entity_groups=[],
+            deleted_entities={},
         )
 
     async def _parse_graph_query(self) -> GraphQuery:
@@ -173,10 +167,6 @@ class RAOFindParser:
                 detected_entities.append(relation_node)
         else:
             detected_entities = await self.fetcher.get_detected_entities()
-
-        meta_cache = await self.fetcher.get_entities_meta_cache()
-        detected_entities = expand_entities(meta_cache, detected_entities)
-
         return detected_entities
 
     async def _parse_filters(self) -> Filters:
