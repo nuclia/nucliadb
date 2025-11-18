@@ -75,7 +75,7 @@ class TrainGrpcServer:
 async def component_nucliadb_train_grpc(train_grpc_server: TrainGrpcServer) -> AsyncIterator[TrainStub]:
     channel = aio.insecure_channel(f"localhost:{train_grpc_server.port}")
     stub = TrainStub(channel)
-    yield stub
+    yield stub  # type: ignore
     await channel.close(grace=None)
 
 
@@ -83,7 +83,7 @@ async def component_nucliadb_train_grpc(train_grpc_server: TrainGrpcServer) -> A
 async def standalone_nucliadb_train_grpc(nucliadb: Settings) -> AsyncIterator[TrainStub]:
     channel = aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}")
     stub = TrainStub(channel)
-    yield stub
+    yield stub  # type: ignore
     await channel.close(grace=None)
 
 

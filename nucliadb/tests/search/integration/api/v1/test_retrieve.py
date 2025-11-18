@@ -112,9 +112,9 @@ async def test_retrieve(
         },
     )
     assert resp.status_code == 422
-    body = resp.json()
+    json_body = resp.json()
     assert (
-        body["detail"]
+        json_body["detail"]
         == "Invalid query. Error in vectorset: Vectorset non-existing-model doesn't exist in your Knowledge Box"
     )
 
@@ -131,8 +131,8 @@ async def test_retrieve(
         },
     )
     assert resp.status_code == 422
-    body = resp.json()
+    json_body = resp.json()
     assert (
-        body["detail"]
+        json_body["detail"]
         == "Invalid query. Error in vector: Invalid vector length, please check valid embedding size for my-semantic-model model"
     )
