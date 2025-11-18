@@ -69,7 +69,6 @@ class _RetrievalParser:
         self.fetcher = fetcher
 
     async def parse(self) -> UnitRetrieval:
-        self._validate_request()
         top_k = self.item.top_k
         query = await self._parse_query()
         filters = await self._parse_filters()
@@ -92,18 +91,6 @@ class _RetrievalParser:
             reranker=None,
         )
         return retrieval
-
-    def _validate_request(self):
-        # synonyms are not compatible with vector/graph search
-        if (
-            self.item.query.keyword is not None
-            and self.item.query.keyword.with_synonyms
-            and (self.item.query.semantic is not None or self.item.query.graph is not None)
-        ):
-            raise InvalidQueryError(
-                "synonyms",
-                "Search with custom synonyms is only supported on paragraph and document search",
-            )
 
     async def _parse_query(self) -> Query:
         keyword = None
