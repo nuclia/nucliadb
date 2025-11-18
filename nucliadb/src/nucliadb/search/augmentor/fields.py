@@ -18,10 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from typing import AsyncIterator
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
+from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal.augment import (
     ConversationAnswer,
@@ -44,6 +46,7 @@ from nucliadb.search.augmentor.models import (
 from nucliadb.search.augmentor.resources import get_basic
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
+from nucliadb_protos import resources_pb2
 
 
 async def augment_fields(
@@ -295,3 +298,59 @@ async def field_entities(id: FieldId, field: Field) -> dict[str, set[str]] | Non
         ners.setdefault(family, set()).add(token)
 
     return ners
+
+
+async def find_conversation_message(
+    field: Conversation, ident: str
+) -> tuple[int, int, resources_pb2.Message] | None:
+    conversation_metadata = await field.get_metadata()
+    for page in range(1, conversation_metadata.pages + 1):
+        conversation = await field.db_get_value(page)
+        for idx, message in enumerate(conversation.messages):
+            if message.ident == ident:
+                return page, idx, message
+    return None
+
+
+async def iter_conversation_messages(
+    field: Conversation,
+    *,
+    start_from: tuple[int, int] = (1, 0),  # (page, message)
+) -> AsyncIterator[tuple[int, int, resources_pb2.Message]]:
+    start_page, start_index = start_from
+    conversation_metadata = await field.get_metadata()
+    for page in range(start_page, conversation_metadata.pages + 1):
+        conversation = await field.db_get_value(page)
+        for idx, message in enumerate(conversation.messages[start_index:]):
+            yield (page, idx, message)
+        # next iteration we want all messages
+        start_index = 0
+
+
+async def conversation_answer(
+    field: Conversation,
+    *,
+    start_from: tuple[int, int] = (1, 0),  # (page, message)
+) -> resources_pb2.Message | None:
+    async for _, _, message in iter_conversation_messages(field, start_from=start_from):
+        if message.type == resources_pb2.Message.MessageType.ANSWER:
+            return message
+    return None
+
+
+async def conversation_messages_after(
+    field: Conversation,
+    *,
+    start_from: tuple[int, int] = (1, 0),  # (page, index)
+    limit: int | None = None,
+) -> list[resources_pb2.Message] | None:
+    messages_after = []
+    async for _, _, message in iter_conversation_messages(field, start_from=start_from):
+        messages_after.append(message)
+
+        if limit is not None:
+            limit -= 1
+            if limit == 0:
+                break
+
+    return messages_after

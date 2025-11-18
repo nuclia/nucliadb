@@ -36,7 +36,12 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.serialize import serialize_extra, serialize_origin
 from nucliadb.models.internal.augment import ParagraphText
 from nucliadb.search import augmentor, logger
-from nucliadb.search.augmentor.fields import field_entities
+from nucliadb.search.augmentor.fields import (
+    conversation_answer,
+    conversation_messages_after,
+    field_entities,
+    find_conversation_message,
+)
 from nucliadb.search.augmentor.models import Paragraph
 from nucliadb.search.augmentor.paragraphs import augment_paragraphs
 from nucliadb.search.search import cache
@@ -188,18 +193,6 @@ async def get_next_conversation_messages(
     return output
 
 
-async def find_conversation_message(
-    field_obj: Conversation, mident: str
-) -> tuple[Optional[resources_pb2.Message], int, int]:
-    cmetadata = await field_obj.get_metadata()
-    for page in range(1, cmetadata.pages + 1):
-        conv = await field_obj.db_get_value(page)
-        for idx, message in enumerate(conv.messages):
-            if message.ident == mident:
-                return message, page, idx
-    return None, -1, -1
-
-
 async def get_expanded_conversation_messages(
     *,
     kb: KnowledgeBoxORM,
@@ -212,27 +205,24 @@ async def get_expanded_conversation_messages(
     if resource is None:  # pragma: no cover
         return []
     field_obj: Conversation = await resource.get_field(field_id, FIELD_TYPE_STR_TO_PB["c"], load=True)  # type: ignore
-    found_message, found_page, found_idx = await find_conversation_message(
-        field_obj=field_obj, mident=mident
-    )
+    found_message = await find_conversation_message(field_obj, mident)
     if found_message is None:  # pragma: no cover
         return []
-    elif found_message.type == resources_pb2.Message.MessageType.QUESTION:
+    page, index, message = found_message
+
+    if message.type == resources_pb2.Message.MessageType.QUESTION:
         # only try to get answer if it was a question
-        return await get_next_conversation_messages(
-            field_obj=field_obj,
-            page=found_page,
-            start_idx=found_idx + 1,
-            num_messages=1,
-            message_type=resources_pb2.Message.MessageType.ANSWER,
-        )
+        answer = await conversation_answer(field_obj, start_from=(page, index + 1))
+        if answer is None:
+            return []
+        else:
+            return [answer]
+
     else:
-        return await get_next_conversation_messages(
-            field_obj=field_obj,
-            page=found_page,
-            start_idx=found_idx + 1,
-            num_messages=max_messages,
+        messages_after = await conversation_messages_after(
+            field_obj, start_from=(page, index + 1), limit=max_messages
         )
+        return messages_after or []
 
 
 async def default_prompt_context(

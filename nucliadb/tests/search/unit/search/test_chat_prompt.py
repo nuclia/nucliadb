@@ -111,10 +111,10 @@ async def test_get_next_conversation_messages(field_obj, messages):
 
 
 async def test_find_conversation_message(field_obj, messages):
-    assert await chat_prompt.find_conversation_message(field_obj=field_obj, mident="3") == (
-        messages[2],
+    assert await chat_prompt.find_conversation_message(field_obj, ident="3") == (
         1,
         2,
+        messages[2],
     )
 
 
