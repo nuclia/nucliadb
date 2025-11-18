@@ -47,13 +47,20 @@ from nucliadb_utils.authentication import requires
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def retrieve_endpoint(
+async def _retrieve_endpoint(
     request: Request,
     kbid: str,
     item: RetrievalRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
+) -> RetrievalResponse:
+    return await retrieve_endpoint(kbid, item)
+
+
+async def retrieve_endpoint(
+    kbid: str,
+    item: RetrievalRequest,
 ) -> RetrievalResponse:
     try:
         retrieval = await parse_retrieve(kbid, item)

@@ -27,10 +27,13 @@ from nidx_protos.nodereader_pb2 import (
 from nuclia_models.predict.generative_responses import GenerativeChunk
 
 from nucliadb.common.models_utils import to_proto
+from nucliadb.models.internal.retrieval import RetrievalRequest, RetrievalResponse
 from nucliadb.search import logger
+from nucliadb.search.api.v1.retrieve import retrieve_endpoint
 from nucliadb.search.predict import AnswerStatusCode, RephraseResponse
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
+from nucliadb.search.search.chat.parser import build_retrieval_request, rao_parse_find
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
@@ -61,7 +64,8 @@ from nucliadb_models.search import (
 from nucliadb_protos import audit_pb2
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry.errors import capture_exception
-from nucliadb_utils.utilities import get_audit
+from nucliadb_utils import const
+from nucliadb_utils.utilities import get_audit, has_feature
 
 NOT_ENOUGH_CONTEXT_ANSWER = "Not enough data to answer this."
 
@@ -510,7 +514,17 @@ async def find_retrieval(
     x_forwarded_for: str,
     metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
-    find_results, incomplete, parsed_query = await find(
+    # TODO: Remove once the feature has been fully rolled out
+    if not has_feature(const.Features.ASK_DECOUPLED, context={"kbid": kbid}):
+        return await find(
+            kbid,
+            find_request,
+            x_ndb_client,
+            x_nucliadb_user,
+            x_forwarded_for,
+            metrics=metrics,
+        )
+    return await rao_find(
         kbid,
         find_request,
         x_ndb_client,
@@ -518,4 +532,51 @@ async def find_retrieval(
         x_forwarded_for,
         metrics=metrics,
     )
-    return find_results, incomplete, parsed_query
+
+
+async def rao_find(
+    kbid: str,
+    find_request: FindRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    metrics: Metrics,
+) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
+    """
+    Calls to NucliaDB retrieve and augment primitives to perform the text block search.
+    It returns the results as KnowledgeboxFindResults to comply with the existing find
+    interface (/ask logic is tightly coupled with /find).
+
+        # retrieve
+    # augment
+    # rerank
+    # convert results to KnowledgeboxFindResults
+    """
+    breakpoint()
+    parsed = await rao_parse_find(kbid, find_request)
+    retrieval_request = build_retrieval_request(kbid, parsed)
+    _ = await retrieve(kbid, retrieval_request)
+
+    # TODO: Implement augmentation
+    # TODO: Implement reranking
+    # TODO: Adapt results to KnowledgeboxFindResults
+    return KnowledgeboxFindResults(resources={}), False, parsed
+
+
+async def retrieve(kbid: str, item: RetrievalRequest) -> RetrievalResponse:
+    # Parse retrieval struff that will be later done internally at nucliadb and can be removed from here when moved to RAO
+
+    # TODO: replace this for a nucliadb_sdk.retrieve call when moving /ask to RAO
+    return await retrieve_endpoint(kbid, item)
+
+
+async def augment() -> None:
+    pass
+
+
+async def rerank() -> None:
+    pass
+
+
+def convert_to_knowledgebox_find_results() -> None:
+    pass
