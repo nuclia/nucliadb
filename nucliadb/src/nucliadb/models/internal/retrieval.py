@@ -31,6 +31,7 @@ from nucliadb_models.security import RequestSecurity
 class KeywordQuery(BaseModel):
     query: str
     min_score: float
+    with_synonyms: bool = False
 
 
 class SemanticQuery(BaseModel):
