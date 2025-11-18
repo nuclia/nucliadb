@@ -37,7 +37,7 @@ class KeywordQuery(BaseModel):
 class SemanticQuery(BaseModel):
     query: list[float]
     vectorset: str
-    min_score: float = 0.0
+    min_score: float = -1.0
 
 
 class GraphQuery(BaseModel):
