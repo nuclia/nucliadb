@@ -32,6 +32,7 @@ from nucliadb.models.internal.augment import (
     FieldText,
     FieldValue,
 )
+from nucliadb.search import logger
 from nucliadb.search.augmentor.models import (
     AugmentedConversationField,
     AugmentedField,
@@ -154,9 +155,6 @@ async def db_augment_text_field(
             db_value = await field.get_value()
             value = from_proto.field_text(db_value)
 
-        else:
-            raise NotImplementedError(f"field property not implemented: {prop}")
-
     augmented = AugmentedTextField(
         id=field.field_id,
         text=base.text,
@@ -181,9 +179,6 @@ async def db_augment_file_field(
             db_value = await field.get_value()
             value = from_proto.field_file(db_value)
 
-        else:
-            raise NotImplementedError(f"field property not implemented: {prop}")
-
     augmented = AugmentedFileField(
         id=field.field_id,
         text=base.text,
@@ -207,9 +202,6 @@ async def db_augment_link_field(
         if isinstance(prop, FieldValue):
             db_value = await field.get_value()
             value = from_proto.field_link(db_value)
-
-        else:
-            raise NotImplementedError(f"field property not implemented: {prop}")
 
     augmented = AugmentedLinkField(
         id=field.field_id,
@@ -252,7 +244,7 @@ async def db_augment_conversation_field(
             raise NotImplementedError()
 
         else:
-            raise NotImplementedError(f"field property not implemented: {prop}")
+            logger.warning(f"conversation field property not implemented: {prop}")
 
     augmented = AugmentedConversationField(
         id=field.field_id,
@@ -277,9 +269,6 @@ async def db_augment_generic_field(
         if isinstance(prop, FieldValue):
             db_value = await field.get_value()
             value = db_value
-
-        else:
-            raise NotImplementedError(f"field property not implemented: {prop}")
 
     augmented = AugmentedGenericField(
         id=field.field_id,

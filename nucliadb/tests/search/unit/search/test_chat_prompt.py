@@ -407,9 +407,13 @@ async def test_extend_prompt_context_with_metadata():
     field.get_field_metadata = AsyncMock(return_value=fcm)
     resource.get_field = AsyncMock(return_value=field)
     resource.get_extra = AsyncMock(return_value=extra)
-    with mock.patch(
-        "nucliadb.search.search.chat.prompt.cache.get_resource",
-        return_value=resource,
+    with (
+        mock.patch(
+            "nucliadb.search.search.chat.prompt.cache.get_resource",
+            return_value=resource,
+        ),
+        mock.patch("nucliadb.search.augmentor.resources.get_basic", return_value=basic),
+        mock.patch("nucliadb.search.augmentor.fields.get_basic", return_value=basic),
     ):
         paragraph_id = ParagraphId.from_string("r1/f/f1/0-10")
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
