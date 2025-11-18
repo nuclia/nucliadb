@@ -145,37 +145,37 @@ class AugmentedParagraph:
 class BaseAugmentedField:
     id: FieldId
 
-    text: str | None
+    text: str | None = None
 
     # TODO: review tuples vs dict
-    classification_labels: list[tuple[str, str]] | None
+    classification_labels: list[tuple[str, str]] | None = None
     # TODO: review tuples vs dict
-    entities: dict[str, set[str]] | None
+    entities: dict[str, set[str]] | None = None
 
 
 @dataclass
 class AugmentedTextField(BaseAugmentedField):
-    value: FieldText | None
+    value: FieldText | None = None
 
 
 @dataclass
 class AugmentedFileField(BaseAugmentedField):
-    value: FieldFile | None
+    value: FieldFile | None = None
 
 
 @dataclass
 class AugmentedLinkField(BaseAugmentedField):
-    value: FieldLink | None
+    value: FieldLink | None = None
 
 
 @dataclass
 class AugmentedConversationField(BaseAugmentedField):
-    value: FieldConversation | None
+    value: FieldConversation | None = None
 
 
 @dataclass
 class AugmentedGenericField(BaseAugmentedField):
-    value: str | None
+    value: str | None = None
 
 
 AugmentedField = (

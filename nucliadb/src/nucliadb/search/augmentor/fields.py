@@ -40,7 +40,6 @@ from nucliadb.search.augmentor.models import (
     AugmentedGenericField,
     AugmentedLinkField,
     AugmentedTextField,
-    BaseAugmentedField,
 )
 from nucliadb.search.augmentor.resources import get_basic
 from nucliadb.search.augmentor.utils import limited_concurrency
@@ -113,55 +112,29 @@ async def db_augment_field(
     return await db_augments_by_type[field_id.type](field, field_id, select)
 
 
-async def db_augment_base_field(
-    field: Field,
-    field_id: FieldId,
-    select: list[FieldProp],
-) -> BaseAugmentedField:
-    text = None
-    labels = None
-    entities = None
-
-    for prop in select:
-        if isinstance(prop, FieldText):
-            text = await get_field_extracted_text(field_id, field)
-
-        elif isinstance(prop, FieldClassificationLabels):
-            labels = await classification_labels(field_id, field.resource)
-
-        elif isinstance(prop, FieldEntities):
-            entities = await field_entities(field_id, field)
-
-    augmented = BaseAugmentedField(
-        id=field.field_id,
-        text=text,
-        classification_labels=labels,
-        entities=entities,
-    )
-    return augmented
-
-
 async def db_augment_text_field(
     field: Field,
     field_id: FieldId,
     select: list[FieldProp],
 ) -> AugmentedTextField:
-    base = await db_augment_base_field(field, field_id, select)
-
-    value = None
+    augmented = AugmentedTextField(id=field.field_id)
 
     for prop in select:
-        if isinstance(prop, FieldValue):
-            db_value = await field.get_value()
-            value = from_proto.field_text(db_value)
+        if isinstance(prop, FieldText):
+            augmented.text = await get_field_extracted_text(field_id, field)
 
-    augmented = AugmentedTextField(
-        id=field.field_id,
-        text=base.text,
-        value=value,
-        classification_labels=base.classification_labels,
-        entities=base.entities,
-    )
+        elif isinstance(prop, FieldClassificationLabels):
+            augmented.classification_labels = await classification_labels(field_id, field.resource)
+
+        elif isinstance(prop, FieldEntities):
+            augmented.entities = await field_entities(field_id, field)
+
+        # text field props
+
+        elif isinstance(prop, FieldValue):
+            db_value = await field.get_value()
+            augmented.value = from_proto.field_text(db_value)
+
     return augmented
 
 
@@ -170,22 +143,24 @@ async def db_augment_file_field(
     field_id: FieldId,
     select: list[FieldProp],
 ) -> AugmentedFileField:
-    base = await db_augment_base_field(field, field_id, select)
-
-    value = None
+    augmented = AugmentedFileField(id=field.field_id)
 
     for prop in select:
-        if isinstance(prop, FieldValue):
-            db_value = await field.get_value()
-            value = from_proto.field_file(db_value)
+        if isinstance(prop, FieldText):
+            augmented.text = await get_field_extracted_text(field_id, field)
 
-    augmented = AugmentedFileField(
-        id=field.field_id,
-        text=base.text,
-        value=value,
-        classification_labels=base.classification_labels,
-        entities=base.entities,
-    )
+        elif isinstance(prop, FieldClassificationLabels):
+            augmented.classification_labels = await classification_labels(field_id, field.resource)
+
+        elif isinstance(prop, FieldEntities):
+            augmented.entities = await field_entities(field_id, field)
+
+        # file field props
+
+        elif isinstance(prop, FieldValue):
+            db_value = await field.get_value()
+            augmented.value = from_proto.field_file(db_value)
+
     return augmented
 
 
@@ -194,22 +169,24 @@ async def db_augment_link_field(
     field_id: FieldId,
     select: list[FieldProp],
 ) -> AugmentedLinkField:
-    base = await db_augment_base_field(field, field_id, select)
-
-    value = None
+    augmented = AugmentedLinkField(id=field.field_id)
 
     for prop in select:
-        if isinstance(prop, FieldValue):
-            db_value = await field.get_value()
-            value = from_proto.field_link(db_value)
+        if isinstance(prop, FieldText):
+            augmented.text = await get_field_extracted_text(field_id, field)
 
-    augmented = AugmentedLinkField(
-        id=field.field_id,
-        text=base.text,
-        value=value,
-        classification_labels=base.classification_labels,
-        entities=base.entities,
-    )
+        elif isinstance(prop, FieldClassificationLabels):
+            augmented.classification_labels = await classification_labels(field_id, field.resource)
+
+        elif isinstance(prop, FieldEntities):
+            augmented.entities = await field_entities(field_id, field)
+
+        # link field props
+
+        elif isinstance(prop, FieldValue):
+            db_value = await field.get_value()
+            augmented.value = from_proto.field_link(db_value)
+
     return augmented
 
 
@@ -218,9 +195,7 @@ async def db_augment_conversation_field(
     field_id: FieldId,
     select: list[FieldProp],
 ) -> AugmentedConversationField:
-    text = None
-    value = None
-    labels = None
+    augmented = AugmentedConversationField(id=field.field_id)
 
     for prop in select:
         if isinstance(prop, FieldText):
@@ -229,13 +204,13 @@ async def db_augment_conversation_field(
 
         elif isinstance(prop, FieldValue):
             db_value = await field.get_value()
-            value = from_proto.field_conversation(db_value)
+            augmented.value = from_proto.field_conversation(db_value)
 
         elif isinstance(prop, FieldClassificationLabels):
-            labels = await classification_labels(field_id, field.resource)
+            augmented.classification_labels = await classification_labels(field_id, field.resource)
 
         elif isinstance(prop, FieldEntities):
-            entities = await field_entities(field_id, field)
+            augmented.entities = await field_entities(field_id, field)
 
         elif isinstance(prop, ConversationAnswer):
             raise NotImplementedError()
@@ -246,13 +221,6 @@ async def db_augment_conversation_field(
         else:
             logger.warning(f"conversation field property not implemented: {prop}")
 
-    augmented = AugmentedConversationField(
-        id=field.field_id,
-        text=text,
-        value=value,
-        classification_labels=labels,
-        entities=entities,
-    )
     return augmented
 
 
@@ -261,22 +229,24 @@ async def db_augment_generic_field(
     field_id: FieldId,
     select: list[FieldProp],
 ) -> AugmentedGenericField:
-    base = await db_augment_base_field(field, field_id, select)
-
-    value = None
+    augmented = AugmentedGenericField(id=field.field_id)
 
     for prop in select:
-        if isinstance(prop, FieldValue):
-            db_value = await field.get_value()
-            value = db_value
+        if isinstance(prop, FieldText):
+            augmented.text = await get_field_extracted_text(field_id, field)
 
-    augmented = AugmentedGenericField(
-        id=field.field_id,
-        text=base.text,
-        value=value,
-        classification_labels=base.classification_labels,
-        entities=base.entities,
-    )
+        elif isinstance(prop, FieldClassificationLabels):
+            augmented.classification_labels = await classification_labels(field_id, field.resource)
+
+        elif isinstance(prop, FieldEntities):
+            augmented.entities = await field_entities(field_id, field)
+
+        # generic field props
+
+        elif isinstance(prop, FieldValue):
+            db_value = await field.get_value()
+            augmented.value = db_value
+
     return augmented
 
 
