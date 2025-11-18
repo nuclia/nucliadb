@@ -34,7 +34,7 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.serialize import serialize_extra, serialize_origin
-from nucliadb.search import logger
+from nucliadb.search import augmentor, logger
 from nucliadb.search.augmentor.fields import field_entities
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import (
@@ -441,18 +441,16 @@ async def extend_prompt_context_with_classification_labels(
         labels = set()
         resource = await cache.get_resource(kbid, fid.rid)
         if resource is not None:
-            pb_basic = await resource.get_basic()
-            if pb_basic is not None:
-                # Add the classification labels of the resource
-                for classif in pb_basic.usermetadata.classifications:
-                    labels.add((classif.labelset, classif.label))
-                # Add the classifications labels of the field
-                for fc in pb_basic.computedmetadata.field_classifications:
-                    if fc.field.field == fid.key and fc.field.field_type == fid.pb_type:
-                        for classif in fc.classifications:
-                            if classif.cancelled_by_user:  # pragma: no cover
-                                continue
-                            labels.add((classif.labelset, classif.label))
+            resource_classifications = await augmentor.resources.classification_labels(resource)
+            if resource_classifications:
+                for labelset, label in resource_classifications:
+                    labels.add((labelset, label))
+
+            field_classifications = await augmentor.fields.classification_labels(fid, resource)
+            if field_classifications:
+                for labelset, label in field_classifications:
+                    labels.add((labelset, label))
+
         return _id, list(labels)
 
     classif_labels = await run_concurrently([_get_labels(kbid, tb_id) for tb_id in text_block_ids])

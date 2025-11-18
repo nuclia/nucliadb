@@ -22,6 +22,7 @@ import asyncio
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal.augment import (
     ConversationAnswer,
     ConversationAttachments,
@@ -125,7 +126,7 @@ async def db_augment_base_field(
             text = await get_field_extracted_text(field_id, field)
 
         elif isinstance(prop, FieldClassificationLabels):
-            labels = await classification_labels(field_id, field)
+            labels = await classification_labels(field_id, field.resource)
 
         elif isinstance(prop, FieldEntities):
             entities = await field_entities(field_id, field)
@@ -239,7 +240,7 @@ async def db_augment_conversation_field(
             value = from_proto.field_conversation(db_value)
 
         elif isinstance(prop, FieldClassificationLabels):
-            labels = await classification_labels(field_id, field)
+            labels = await classification_labels(field_id, field.resource)
 
         elif isinstance(prop, FieldEntities):
             entities = await field_entities(field_id, field)
@@ -301,8 +302,7 @@ async def get_field_extracted_text(id: FieldId, field: Field) -> str | None:
         return extracted_text_pb.text
 
 
-async def classification_labels(id: FieldId, field: Field) -> list[tuple[str, str]] | None:
-    resource = field.resource
+async def classification_labels(id: FieldId, resource: Resource) -> list[tuple[str, str]] | None:
     basic = await get_basic(resource)
     if basic is None:
         return None
