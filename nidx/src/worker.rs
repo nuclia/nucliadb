@@ -206,11 +206,12 @@ pub async fn run_job(
 
     // Delete old segments
     Segment::mark_many_for_deletion(&mut *tx, &segment_ids).await?;
-    Index::updated(&mut *tx, &index.id).await?;
 
     // Delete task if successful.
     job.finish(&mut *tx).await?;
     tx.commit().await?;
+
+    Index::updated_many(&meta.pool, &[index.id]).await?;
 
     PER_INDEX_MERGE_TIME
         .get_or_create(&IndexKindLabels::new(index.kind))

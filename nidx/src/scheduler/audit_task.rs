@@ -153,7 +153,7 @@ mod tests {
         // Update a segment, report is sent
         let segment_para = Segment::create(&meta.pool, index_para.id, 2i64.into(), 22, serde_json::Value::Null).await?;
         segment_para.mark_ready(&meta.pool, 4444).await?;
-        Index::updated(&meta.pool, &index_para.id).await?;
+        Index::updated_many(&meta.pool, &[index_para.id]).await?;
         let since = audit_kb_storage(&meta, &reporter, since).await?.unwrap();
 
         let reports = reporter.0.lock().unwrap().clone();

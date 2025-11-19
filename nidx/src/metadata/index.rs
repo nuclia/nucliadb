@@ -180,19 +180,14 @@ impl Index {
         .await
     }
 
-    pub async fn updated(meta: impl Executor<'_, Database = Postgres>, index_id: &IndexId) -> sqlx::Result<()> {
-        sqlx::query!(
-            "UPDATE indexes SET updated_at = NOW() WHERE id = $1",
-            index_id as &IndexId
-        )
-        .execute(meta)
-        .await?;
-        Ok(())
-    }
-
+    /// Mark indexes as updated. If there is a transaction already updating the index (holding a lock), it will skip
+    /// the update since it's already being updated by another transaction. This means this function should be called
+    /// after the changes it made are committed, in another transaction.
     pub async fn updated_many(meta: impl Executor<'_, Database = Postgres>, index_id: &[IndexId]) -> sqlx::Result<()> {
         sqlx::query!(
-            "UPDATE indexes SET updated_at = NOW() WHERE id = ANY($1)",
+            "UPDATE indexes SET updated_at = NOW() WHERE id IN (
+                SELECT id FROM indexes WHERE id = ANY ($1) FOR NO KEY UPDATE SKIP LOCKED
+            )",
             index_id as &[IndexId]
         )
         .execute(meta)
