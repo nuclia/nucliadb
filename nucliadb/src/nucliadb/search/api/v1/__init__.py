@@ -19,6 +19,7 @@
 #
 from . import (  # noqa: F401
     ask,
+    augment,
     catalog,
     feedback,
     find,
