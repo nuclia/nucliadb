@@ -278,11 +278,11 @@ pub async fn delete_resource(meta: &NidxMetadata, shard_id: &str, resource: Stri
     let indexes = Index::for_shard(&meta.pool, shard_id).await?;
 
     let mut tx = meta.transaction().await?;
-    for index in indexes {
+    for index in &indexes {
         Deletion::create(&mut *tx, index.id, seq, std::slice::from_ref(&resource)).await?;
-        Index::updated(&mut *tx, &index.id).await?;
     }
     tx.commit().await?;
+    Index::updated_many(&meta.pool, &indexes.iter().map(|i| i.id).collect::<Vec<_>>()).await?;
 
     Ok(())
 }
@@ -374,8 +374,8 @@ pub async fn index_resource(
             indexes.push(index_id)
         }
     }
-    Index::updated_many(&mut *tx, &indexes).await?;
     tx.commit().await?;
+    Index::updated_many(&meta.pool, &indexes).await?;
     TOTAL_INDEXING_TIME.observe(t.elapsed().as_secs_f64());
 
     Ok(())
