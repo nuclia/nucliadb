@@ -440,17 +440,7 @@ class KnowledgeBox:
         return None
 
     async def get(self, uuid: str) -> Optional[Resource]:
-        basic = await datamanagers.resources.get_basic(self.txn, kbid=self.kbid, rid=uuid)
-        if basic is None:
-            return None
-        return Resource(
-            txn=self.txn,
-            storage=self.storage,
-            kb=self,
-            uuid=uuid,
-            basic=basic,
-            disable_vectors=False,
-        )
+        return await Resource.get(self.txn, self.kbid, uuid)
 
     async def maindb_delete_resource(self, uuid: str):
         basic = await datamanagers.resources.get_basic(self.txn, kbid=self.kbid, rid=uuid)
@@ -508,7 +498,7 @@ class KnowledgeBox:
         return Resource(
             storage=self.storage,
             txn=self.txn,
-            kb=self,
+            kbid=self.kbid,
             uuid=uuid,
             basic=basic,
             disable_vectors=False,
@@ -523,7 +513,7 @@ class KnowledgeBox:
                 yield Resource(
                     self.txn,
                     self.storage,
-                    self,
+                    self.kbid,
                     uuid,
                     disable_vectors=False,
                 )

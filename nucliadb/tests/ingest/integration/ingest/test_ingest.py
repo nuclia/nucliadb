@@ -272,8 +272,7 @@ async def test_ingest_messages_origin(
 
     async with processor.driver.ro_transaction() as txn:
         storage = await get_storage(service_name=SERVICE_NAME)
-        kb = KnowledgeBox(txn, storage, knowledgebox)
-        res = Resource(txn, storage, kb, rid)
+        res = Resource(txn, storage, knowledgebox, rid)
         origin = await res.get_origin()
 
     # should not be set
@@ -290,8 +289,7 @@ async def test_ingest_messages_origin(
     await processor.process(message=message1, seqid=2)
 
     async with processor.driver.ro_transaction() as txn:
-        kb = KnowledgeBox(txn, storage, knowledgebox)
-        res = Resource(txn, storage, kb, rid)
+        res = Resource(txn, storage, knowledgebox, rid)
         origin = await res.get_origin()
 
     assert origin is not None
@@ -495,7 +493,7 @@ async def test_qa(
     stream_audit: StreamAuditStorage,
     test_resource: Resource,
 ):
-    kbid = test_resource.kb.kbid
+    kbid = test_resource.kbid
     rid = test_resource.uuid
     driver = processor.driver
     message = make_message(kbid, rid)
@@ -552,7 +550,7 @@ async def test_ingest_audit_stream_mixed(
 ):
     from nucliadb_utils.settings import audit_settings
 
-    kbid = test_resource.kb.kbid
+    kbid = test_resource.kbid
     rid = test_resource.uuid
     # Prepare a test audit stream to receive our messages
     partition = stream_audit.get_partition(kbid)
@@ -617,7 +615,7 @@ async def test_ingest_account_seq_stored(
     test_resource: Resource,
 ):
     driver = processor.driver
-    kbid = test_resource.kb.kbid
+    kbid = test_resource.kbid
     rid = test_resource.uuid
 
     message = make_message(kbid, rid)

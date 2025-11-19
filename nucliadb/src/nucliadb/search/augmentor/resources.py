@@ -147,9 +147,7 @@ async def db_augment_resource(
 async def get_basic(resource: Resource) -> resources_pb2.Basic | None:
     # HACK: resource.get_basic() always returns a pb, even if it's not in the
     # DB. Here we really want to know if there's basic or not
-    basic = await datamanagers.resources.get_basic(
-        resource.txn, kbid=resource.kb.kbid, rid=resource.uuid
-    )
+    basic = await datamanagers.resources.get_basic(resource.txn, kbid=resource.kbid, rid=resource.uuid)
     return basic
 
 

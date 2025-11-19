@@ -23,7 +23,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any, Optional, Sequence, Type
+from typing import Any, Optional, Sequence, Type
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
@@ -70,9 +70,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
-if TYPE_CHECKING:  # pragma: no cover
-    from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-
 logger = logging.getLogger(__name__)
 
 KB_FIELDS: dict[int, Type] = {
@@ -105,7 +102,7 @@ class Resource:
         self,
         txn: Transaction,
         storage: Storage,
-        kb: KnowledgeBox,
+        kbid: str,
         uuid: str,
         basic: Optional[PBBasic] = None,
         disable_vectors: bool = True,
@@ -122,7 +119,7 @@ class Resource:
 
         self.txn = txn
         self.storage = storage
-        self.kb = kb
+        self.kbid = kbid
         self.uuid = uuid
         self.basic = basic
         self.disable_vectors = disable_vectors
@@ -132,6 +129,19 @@ class Resource:
 
     @classmethod
     async def get(cls, txn: Transaction, kbid: str, rid: str) -> Optional["Resource"]:
+        basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
+        if basic is None:
+            return None
+        storage = await get_storage()
+        return cls(
+            txn=txn,
+            storage=storage,
+            kbid=kbid,
+            uuid=rid,
+            basic=basic,
+            disable_vectors=False,
+        )
+
         # prevent circulat imports
         from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
@@ -140,13 +150,13 @@ class Resource:
 
     async def set_slug(self):
         basic = await self.get_basic()
-        new_key = KB_RESOURCE_SLUG.format(kbid=self.kb.kbid, slug=basic.slug)
+        new_key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=basic.slug)
         await self.txn.set(new_key, self.uuid.encode())
 
     # Basic
     async def get_basic(self) -> PBBasic:
         if self.basic is None:
-            basic = await datamanagers.resources.get_basic(self.txn, kbid=self.kb.kbid, rid=self.uuid)
+            basic = await datamanagers.resources.get_basic(self.txn, kbid=self.kbid, rid=self.uuid)
             self.basic = basic if basic is not None else PBBasic()
         return self.basic
 
@@ -221,49 +231,43 @@ class Resource:
         if deleted_fields is not None and len(deleted_fields) > 0:
             delete_basic_computedmetadata_classifications(self.basic, deleted_fields=deleted_fields)
 
-        await datamanagers.resources.set_basic(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid, basic=self.basic
-        )
+        await datamanagers.resources.set_basic(self.txn, kbid=self.kbid, rid=self.uuid, basic=self.basic)
         self.modified = True
 
     # Origin
     async def get_origin(self) -> Optional[PBOrigin]:
         if self.origin is None:
-            origin = await datamanagers.resources.get_origin(self.txn, kbid=self.kb.kbid, rid=self.uuid)
+            origin = await datamanagers.resources.get_origin(self.txn, kbid=self.kbid, rid=self.uuid)
             self.origin = origin
         return self.origin
 
     async def set_origin(self, payload: PBOrigin):
-        await datamanagers.resources.set_origin(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid, origin=payload
-        )
+        await datamanagers.resources.set_origin(self.txn, kbid=self.kbid, rid=self.uuid, origin=payload)
         self.modified = True
         self.origin = payload
 
     # Extra
     async def get_extra(self) -> Optional[PBExtra]:
         if self.extra is None:
-            extra = await datamanagers.resources.get_extra(self.txn, kbid=self.kb.kbid, rid=self.uuid)
+            extra = await datamanagers.resources.get_extra(self.txn, kbid=self.kbid, rid=self.uuid)
             self.extra = extra
         return self.extra
 
     async def set_extra(self, payload: PBExtra):
-        await datamanagers.resources.set_extra(self.txn, kbid=self.kb.kbid, rid=self.uuid, extra=payload)
+        await datamanagers.resources.set_extra(self.txn, kbid=self.kbid, rid=self.uuid, extra=payload)
         self.modified = True
         self.extra = payload
 
     # Security
     async def get_security(self) -> Optional[utils_pb2.Security]:
         if self.security is None:
-            security = await datamanagers.resources.get_security(
-                self.txn, kbid=self.kb.kbid, rid=self.uuid
-            )
+            security = await datamanagers.resources.get_security(self.txn, kbid=self.kbid, rid=self.uuid)
             self.security = security
         return self.security
 
     async def set_security(self, payload: utils_pb2.Security) -> None:
         await datamanagers.resources.set_security(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid, security=payload
+            self.txn, kbid=self.kbid, rid=self.uuid, security=payload
         )
         self.modified = True
         self.security = payload
@@ -271,7 +275,7 @@ class Resource:
     # Relations
     async def get_user_relations(self) -> PBRelations:
         if self.user_relations is None:
-            sf = self.storage.user_relations(self.kb.kbid, self.uuid)
+            sf = self.storage.user_relations(self.kbid, self.uuid)
             relations = await self.storage.download_pb(sf, PBRelations)
             if relations is None:
                 # Key not found = no relations
@@ -281,7 +285,7 @@ class Resource:
         return self.user_relations
 
     async def set_user_relations(self, payload: PBRelations):
-        sf = self.storage.user_relations(self.kb.kbid, self.uuid)
+        sf = self.storage.user_relations(self.kbid, self.uuid)
         await self.storage.upload_pb(sf, payload)
         self.modified = True
         self.user_relations = payload
@@ -377,12 +381,12 @@ class Resource:
 
     async def get_all_field_ids(self, *, for_update: bool) -> Optional[PBAllFieldIDs]:
         return await datamanagers.resources.get_all_field_ids(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid, for_update=for_update
+            self.txn, kbid=self.kbid, rid=self.uuid, for_update=for_update
         )
 
     async def set_all_field_ids(self, all_fields: PBAllFieldIDs):
         return await datamanagers.resources.set_all_field_ids(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid, allfields=all_fields
+            self.txn, kbid=self.kbid, rid=self.uuid, allfields=all_fields
         )
 
     async def update_all_field_ids(
@@ -519,7 +523,7 @@ class Resource:
             return
 
         field_statuses = await datamanagers.fields.get_statuses(
-            self.txn, kbid=self.kb.kbid, rid=self.uuid, fields=field_ids.fields
+            self.txn, kbid=self.kbid, rid=self.uuid, fields=field_ids.fields
         )
 
         # If any field is processing -> PENDING
@@ -660,7 +664,7 @@ class Resource:
             FieldType.LINK,
             load=False,
         )
-        maybe_update_basic_thumbnail(self.basic, link_extracted_data.link_thumbnail, self.kb.kbid)
+        maybe_update_basic_thumbnail(self.basic, link_extracted_data.link_thumbnail, self.kbid)
 
         await field_link.set_link_extracted_data(link_extracted_data)
 
@@ -687,7 +691,7 @@ class Resource:
             return
         logger.info(
             "Updating resource title from link extracted data",
-            extra={"kbid": self.kb.kbid, "field": link_extracted_data.field, "rid": self.uuid},
+            extra={"kbid": self.kbid, "field": link_extracted_data.field, "rid": self.uuid},
         )
         title = link_extracted_data.title
         await self.update_resource_title(title)
@@ -729,7 +733,7 @@ class Resource:
         # uri can change after extraction
         await field_file.set_file_extracted_data(file_extracted_data)
         maybe_update_basic_icon(self.basic, file_extracted_data.icon)
-        maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail, self.kb.kbid)
+        maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail, self.kbid)
         self.modified = True
 
     async def _should_update_resource_title_from_file_metadata(self) -> bool:
@@ -776,7 +780,7 @@ class Resource:
             fid = FieldId.from_pb(rid=self.uuid, field_type=FieldType.FILE, key=fed.field)
             logger.info(
                 "Updating resource title from file extracted data",
-                extra={"kbid": self.kb.kbid, "field": fid.full(), "new_title": fed.title},
+                extra={"kbid": self.kbid, "field": fid.full(), "new_title": fed.title},
             )
             await self.update_resource_title(fed.title)
             await self.unmark_title_for_reset()
@@ -794,9 +798,7 @@ class Resource:
         )
         await field_obj.set_field_metadata(field_metadata)
 
-        maybe_update_basic_thumbnail(
-            self.basic, field_metadata.metadata.metadata.thumbnail, self.kb.kbid
-        )
+        maybe_update_basic_thumbnail(self.basic, field_metadata.metadata.metadata.thumbnail, self.kbid)
 
         update_basic_computedmetadata_classifications(self.basic, field_metadata)
         self.modified = True
@@ -808,7 +810,7 @@ class Resource:
         await self.get_fields(force=True)
         vectorsets = {
             vectorset_id: vs
-            async for vectorset_id, vs in datamanagers.vectorsets.iter(self.txn, kbid=self.kb.kbid)
+            async for vectorset_id, vs in datamanagers.vectorsets.iter(self.txn, kbid=self.kbid)
         }
 
         for field_vectors in fields_vectors:
@@ -823,7 +825,7 @@ class Resource:
                 if field_vectors.vectorset_id not in vectorsets:
                     logger.warning(
                         "Dropping extracted vectors for unknown vectorset",
-                        extra={"kbid": self.kb.kbid, "vectorset": field_vectors.vectorset_id},
+                        extra={"kbid": self.kbid, "vectorset": field_vectors.vectorset_id},
                     )
                     continue
 

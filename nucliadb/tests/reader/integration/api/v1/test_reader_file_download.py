@@ -35,7 +35,7 @@ async def test_resource_download_extracted_file(
     full_resource: Resource,
 ) -> None:
     resource = full_resource
-    kbid = resource.kb.kbid
+    kbid = resource.kbid
     rid = resource.uuid
     field_type = "text"
     field_id = "text1"
@@ -58,7 +58,7 @@ async def test_resource_download_field_file(
     test_resource: Resource,
 ) -> None:
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
     field_id = "file1"
 
@@ -111,7 +111,7 @@ async def test_resource_download_field_conversation(
     local_files, nucliadb_reader: AsyncClient, test_resource: Resource
 ) -> None:
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
     field_id = "conv1"
 
@@ -144,7 +144,7 @@ async def test_download_fields_by_resource_slug(
     local_files, nucliadb_reader: AsyncClient, test_resource, endpoint_part, endpoint_params
 ):
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     slug = rsc.basic.slug
     if endpoint_part.startswith("conversation"):
         # For conversations, we need to get a message id and a file number
@@ -213,7 +213,7 @@ async def test_resource_download_field_file_content_disposition(
     local_files, nucliadb_reader: AsyncClient, test_resource: Resource
 ) -> None:
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
     field_id = "file1"
     download_url = f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field"
@@ -241,7 +241,7 @@ async def test_resource_download_field_file_first_byte(
     test_resource: Resource,
 ) -> None:
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
     field_id = "file1"
 

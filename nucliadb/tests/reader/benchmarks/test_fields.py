@@ -55,7 +55,7 @@ async def test_get_field_all(
     field_id: str,
 ) -> None:
     resource = full_resource
-    kbid = resource.kb.kbid
+    kbid = resource.kbid
     rid = resource.uuid
     resp = await asyncbenchmark(
         nucliadb_reader.get,

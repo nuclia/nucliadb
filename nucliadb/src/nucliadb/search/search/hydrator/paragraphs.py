@@ -187,7 +187,7 @@ async def hydrate_paragraph(
     include more or less text than the originally extracted.
 
     """
-    kbid = resource.kb.kbid
+    kbid = resource.kbid
 
     hydrated = hydration_models.HydratedParagraph(
         id=paragraph_id.full(),

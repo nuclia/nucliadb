@@ -34,7 +34,7 @@ async def test_get_resource_field_default_options(
     nucliadb_reader: AsyncClient, test_resource: Resource
 ) -> None:
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
     field_type = "text"
     field_id = "text1"
@@ -57,7 +57,7 @@ async def test_get_resource_field_default_options(
 @pytest.mark.deploy_modes("component")
 async def test_get_resource_field_all(nucliadb_reader: AsyncClient, test_resource: Resource) -> None:
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
     field_type = "text"
     field_id = "text1"
@@ -104,7 +104,7 @@ async def test_get_resource_field_all(nucliadb_reader: AsyncClient, test_resourc
 @pytest.mark.deploy_modes("component")
 async def test_get_resource_field_filter_root_fields(nucliadb_reader: AsyncClient, test_resource):
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
     field_type = "text"
     field_id = "text1"
@@ -125,7 +125,7 @@ async def test_get_resource_field_filter_root_fields(nucliadb_reader: AsyncClien
 @pytest.mark.deploy_modes("component")
 async def test_get_resource_field_filter_extracted(nucliadb_reader: AsyncClient, test_resource):
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
     field_type = "text"
     field_id = "text1"
@@ -153,7 +153,7 @@ async def test_get_resource_field_conversation(
     nucliadb_reader: AsyncClient, test_resource: Resource
 ) -> None:
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
     field_type = "conversation"
     field_id = "conv1"
@@ -176,7 +176,7 @@ async def test_get_resource_field_conversation(
 @pytest.mark.deploy_modes("component")
 async def test_resource_endpoints_by_slug(nucliadb_reader: AsyncClient, test_resource):
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rslug = rsc.basic.slug
 
     non_existent_slug = "foobar"

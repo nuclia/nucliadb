@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import audit_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import FieldType
@@ -35,8 +34,7 @@ async def collect_audit_fields(
 
     audit_storage_fields: list[audit_pb2.AuditField] = []
     async with driver.ro_transaction() as txn:
-        kb = KnowledgeBox(txn, storage, message.kbid)
-        resource = Resource(txn, storage, kb, message.uuid)
+        resource = Resource(txn, storage, message.kbid, message.uuid)
         field_keys = await resource.get_fields_ids()
 
         for field_id, field_type in iterate_auditable_fields(field_keys, message):

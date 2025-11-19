@@ -43,7 +43,7 @@ async def test_get_resource_all(
     asyncbenchmark: AsyncBenchmarkFixture,
 ) -> None:
     resource = full_resource
-    kbid = resource.kb.kbid
+    kbid = resource.kbid
     rid = resource.uuid
 
     resp = await asyncbenchmark(
