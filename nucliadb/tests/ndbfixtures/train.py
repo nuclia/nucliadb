@@ -22,7 +22,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from time import time
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import AsyncIterator
 from unittest.mock import patch
 
 import aiohttp
@@ -55,16 +55,12 @@ from nucliadb_protos.resources_pb2 import (
     Position,
     Sentence,
 )
+from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.settings import (
     running_settings,
 )
 from nucliadb_utils.tests import free_port
-
-if TYPE_CHECKING:
-    from nucliadb_protos.train_pb2_grpc import TrainAsyncStub as TrainStub
-else:
-    from nucliadb_protos.train_pb2_grpc import TrainStub
 
 
 @dataclass
