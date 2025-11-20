@@ -22,23 +22,8 @@ from nucliadb_models.search import Image, ResourceProperties, SearchParamDefault
 ParagraphId = str
 
 
-class AugmentedParagraph(BaseModel):
-    text: str | None = None
-
-    neighbours_before: dict[ParagraphId, str] | None = None
-    neighbours_after: dict[ParagraphId, str] | None = None
-
-    image: Image | None = None
-
-
-class AugmentedField(BaseModel):
-    page_preview_image: Image | None = None
-
-
-class AugmentedResource(Resource):
-    def updated_from(self, origin: Resource):
-        for key in origin.model_fields.keys():
-            self.__setattr__(key, getattr(origin, key))
+class AugmentParagraph(BaseModel):
+    id: ParagraphId
 
 
 class AugmentResources(BaseModel):
@@ -48,10 +33,6 @@ class AugmentResources(BaseModel):
     extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
     field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
     # TODO: field name filter, da field prefix filter
-
-
-class AugmentParagraph(BaseModel):
-    id: ParagraphId
 
 
 class AugmentParagraphs(BaseModel):
@@ -78,6 +59,25 @@ class AugmentParagraphs(BaseModel):
 class AugmentRequest(BaseModel):
     resources: AugmentResources
     paragraphs: AugmentParagraphs
+
+
+class AugmentedParagraph(BaseModel):
+    text: str | None = None
+
+    neighbours_before: dict[ParagraphId, str] | None = None
+    neighbours_after: dict[ParagraphId, str] | None = None
+
+    image: Image | None = None
+
+
+class AugmentedField(BaseModel):
+    page_preview_image: Image | None = None
+
+
+class AugmentedResource(Resource):
+    def updated_from(self, origin: Resource):
+        for key in origin.model_fields.keys():
+            self.__setattr__(key, getattr(origin, key))
 
 
 class AugmentResponse(BaseModel):
