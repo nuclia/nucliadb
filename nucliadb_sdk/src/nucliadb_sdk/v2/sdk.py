@@ -462,14 +462,14 @@ SDK_DEFINITION = {
 }
 
 
-def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response) -> BaseModel:
+def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
     content_type = response.headers.get("Content-Type")
     if content_type not in ("application/json", "application/x-ndjson"):
         raise ValueError(f"Unknown content type in response: {content_type}")
 
     if content_type == "application/json":
         # This comes from a request with the X-Synchronous header set to true
-        return response_type.model_validate_json(response.content)
+        return SyncAskResponse.model_validate_json(response.content)
 
     answer = ""
     reasoning: Optional[str] = None
@@ -531,7 +531,94 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
         warnings.warn("No retrieval results found in ask response")
         retrieval_results = KnowledgeboxFindResults(resources={})
 
-    return response_type.model_validate(
+    return SyncAskResponse.model_validate(
+        {
+            "answer": answer,
+            "reasoning": reasoning,
+            "answer_json": answer_json,
+            "status": status,
+            "retrieval_results": retrieval_results,
+            "relations": relations,
+            "learning_id": learning_id,
+            "citations": citations,
+            "citation_footnote_to_context": citation_footnote_to_context,
+            "debug": debug,
+            "metadata": SyncAskMetadata(tokens=tokens, timings=timings),
+            "augmented_context": augmented_context,
+        }
+    )
+
+
+async def ask_response_parser_async(response: httpx.Response) -> SyncAskResponse:
+    content_type = response.headers.get("Content-Type")
+    if content_type not in ("application/json", "application/x-ndjson"):
+        raise ValueError(f"Unknown content type in response: {content_type}")
+
+    if content_type == "application/json":
+        # This comes from a request with the X-Synchronous header set to true
+        return SyncAskResponse.model_validate_json(response.content)
+
+    answer = ""
+    reasoning: Optional[str] = None
+    answer_json = None
+    status = ""
+    retrieval_results = None
+    relations = None
+    learning_id = response.headers.get("NUCLIA-LEARNING-ID")
+    citations: dict[str, Any] = {}
+    citation_footnote_to_context: dict[str, str] = {}
+    tokens = None
+    timings = None
+    error: Optional[str] = None
+    debug = None
+    augmented_context: Optional[AugmentedContext] = None
+    async for line in response.aiter_lines():
+        try:
+            item = AskResponseItem.model_validate_json(line).item
+            if isinstance(item, AnswerAskResponseItem):
+                answer += item.text
+            elif isinstance(item, ReasoningAskResponseItem):
+                if reasoning is None:
+                    reasoning = item.text
+                else:
+                    reasoning += item.text
+            elif isinstance(item, JSONAskResponseItem):
+                answer_json = item.object
+            elif isinstance(item, RelationsAskResponseItem):
+                relations = item.relations
+            elif isinstance(item, StatusAskResponseItem):
+                status = item.status
+                if item.code == ASK_STATUS_CODE_ERROR:
+                    error = item.details or "Unknown error"
+            elif isinstance(item, RetrievalAskResponseItem):
+                retrieval_results = item.results
+            elif isinstance(item, MetadataAskResponseItem):
+                tokens = item.tokens
+                timings = item.timings
+            elif isinstance(item, CitationsAskResponseItem):
+                citations = item.citations
+            elif isinstance(item, FootnoteCitationsAskResponseItem):
+                citation_footnote_to_context = item.footnote_to_context
+            elif isinstance(item, ErrorAskResponseItem):
+                error = item.error
+            elif isinstance(item, DebugAskResponseItem):
+                debug = item.metadata
+            elif isinstance(item, AugmentedContextResponseItem):
+                augmented_context = item.augmented
+            else:
+                warnings.warn(f"Unknown item in ask endpoint response: {item}")
+        except ValidationError:
+            warnings.warn(f"Unknown line in ask endpoint response: {line}")
+            continue
+
+    if error is not None:
+        raise exceptions.AskResponseError(error)
+
+    if retrieval_results is None:
+        warnings.warn("No retrieval results found in ask response")
+        retrieval_results = KnowledgeboxFindResults(resources={})
+
+    return SyncAskResponse.model_validate(
         {
             "answer": answer,
             "reasoning": reasoning,
@@ -665,7 +752,7 @@ def _request_sync_builder(
         )
         if response_type is not None:
             if issubclass(response_type, SyncAskResponse):
-                return ask_response_parser(response_type, resp)  # type: ignore
+                return ask_response_parser(resp)  # type: ignore
             elif issubclass(response_type, BaseModel):
                 return response_type.model_validate_json(resp.content)  # type: ignore
         return None  # type: ignore
@@ -760,7 +847,7 @@ def _request_async_builder(
         )
         if response_type is not None:
             if isinstance(response_type, type) and issubclass(response_type, SyncAskResponse):
-                return ask_response_parser(response_type, resp)  # type: ignore
+                return await ask_response_parser_async(resp)  # type: ignore
             elif isinstance(response_type, type) and issubclass(response_type, BaseModel):
                 return response_type.model_validate_json(resp.content)  # type: ignore
         return None  # type: ignore

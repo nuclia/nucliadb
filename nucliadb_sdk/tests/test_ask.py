@@ -39,7 +39,7 @@ from nucliadb_models.search import (
     StatusAskResponseItem,
     SyncAskResponse,
 )
-from nucliadb_sdk.v2.sdk import ask_response_parser
+from nucliadb_sdk.v2.sdk import ask_response_parser, ask_response_parser_async
 
 
 def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
@@ -142,7 +142,71 @@ def test_ask_response_parser_stream():
     }
     response.iter_lines = unittest.mock.Mock(return_value=raw_lines)
 
-    ask_response = ask_response_parser(SyncAskResponse, response)
+    ask_response = ask_response_parser(response)
+
+    assert ask_response.learning_id == "learning_id"
+    assert ask_response.answer == "This is your Nuclia answer."
+    assert ask_response.reasoning == "test reasoning."
+    assert ask_response.status == "success"
+    assert ask_response.relations.entities["Nuclia"].related_to[0].entity == "Semantic Search"
+    assert ask_response.relations.entities["Nuclia"].related_to[0].entity_subtype == "concept"
+    assert ask_response.citations["some/paragraph/id"] == "This is a citation"
+    assert ask_response.retrieval_results.resources == {}
+    assert ask_response.metadata.tokens.input == 10
+    assert ask_response.metadata.tokens.output == 5
+    assert ask_response.metadata.tokens.input_nuclia == 0.01
+    assert ask_response.metadata.tokens.output_nuclia == 0.005
+    assert ask_response.metadata.timings.generative_first_chunk == 0.1
+    assert ask_response.metadata.timings.generative_total == 0.2
+
+
+async def test_ask_response_parser_async_stream():
+    items = [
+        ReasoningAskResponseItem(text="test"),
+        ReasoningAskResponseItem(text=" reasoning."),
+        AnswerAskResponseItem(text="This is"),
+        AnswerAskResponseItem(text=" your Nuclia answer."),
+        StatusAskResponseItem(code="0", status="success"),
+        RelationsAskResponseItem(
+            relations=Relations(
+                entities={
+                    "Nuclia": EntitySubgraph(
+                        related_to=[
+                            DirectionalRelation(
+                                entity="Semantic Search",
+                                entity_type=EntityType.ENTITY,
+                                entity_subtype="concept",
+                                relation=RelationType.ABOUT,
+                                relation_label="performing",
+                                direction=RelationDirection.OUT,
+                                resource_id="resource_id",
+                            )
+                        ]
+                    )
+                }
+            )
+        ),
+        RetrievalAskResponseItem(results=KnowledgeboxFindResults(resources={})),
+        MetadataAskResponseItem(
+            tokens=AskTokens(input=10, output=5, input_nuclia=0.01, output_nuclia=0.005),
+            timings=AskTimings(generative_first_chunk=0.1, generative_total=0.2),
+        ),
+        CitationsAskResponseItem(citations={"some/paragraph/id": "This is a citation"}),
+    ]
+
+    async def raw_lines_iterator():
+        raw_lines = [AskResponseItem(item=item).model_dump_json() for item in items]
+        for line in raw_lines:
+            yield line
+
+    response = unittest.mock.Mock()
+    response.headers = {
+        "NUCLIA-LEARNING-ID": "learning_id",
+        "Content-Type": "application/x-ndjson",
+    }
+    response.aiter_lines = unittest.mock.Mock(return_value=raw_lines_iterator())
+
+    ask_response = await ask_response_parser_async(response)
 
     assert ask_response.learning_id == "learning_id"
     assert ask_response.answer == "This is your Nuclia answer."
