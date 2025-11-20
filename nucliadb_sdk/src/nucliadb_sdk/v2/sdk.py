@@ -462,22 +462,13 @@ SDK_DEFINITION = {
 }
 
 
-def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response) -> BaseModel:
-    content_type = response.headers.get("Content-Type")
-    if content_type not in ("application/json", "application/x-ndjson"):
-        raise ValueError(f"Unknown content type in response: {content_type}")
-
-    if content_type == "application/json":
-        # This comes from a request with the X-Synchronous header set to true
-        return response_type.model_validate_json(response.content)
-
+def _parse_ask_response_lines(lines_iter: Iterator[str], learning_id: str) -> SyncAskResponse:
     answer = ""
     reasoning: Optional[str] = None
     answer_json = None
     status = ""
     retrieval_results = None
     relations = None
-    learning_id = response.headers.get("NUCLIA-LEARNING-ID")
     citations: dict[str, Any] = {}
     citation_footnote_to_context: dict[str, str] = {}
     tokens = None
@@ -485,7 +476,7 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
     error: Optional[str] = None
     debug = None
     augmented_context: Optional[AugmentedContext] = None
-    for line in response.iter_lines():
+    for line in lines_iter:
         try:
             item = AskResponseItem.model_validate_json(line).item
             if isinstance(item, AnswerAskResponseItem):
@@ -531,7 +522,7 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
         warnings.warn("No retrieval results found in ask response")
         retrieval_results = KnowledgeboxFindResults(resources={})
 
-    return response_type.model_validate(
+    return SyncAskResponse.model_validate(
         {
             "answer": answer,
             "reasoning": reasoning,
@@ -547,6 +538,33 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
             "augmented_context": augmented_context,
         }
     )
+
+
+def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
+    content_type = response.headers.get("Content-Type")
+    if content_type not in ("application/json", "application/x-ndjson"):
+        raise ValueError(f"Unknown content type in response: {content_type}")
+
+    if content_type == "application/json":
+        # This comes from a request with the X-Synchronous header set to true
+        return SyncAskResponse.model_validate_json(response.content)
+
+    learning_id = response.headers.get("NUCLIA-LEARNING-ID") or "unknown"
+    return _parse_ask_response_lines(response.iter_lines(), learning_id)
+
+
+async def ask_response_parser_async(response: httpx.Response) -> SyncAskResponse:
+    content_type = response.headers.get("Content-Type")
+    if content_type not in ("application/json", "application/x-ndjson"):
+        raise ValueError(f"Unknown content type in response: {content_type}")
+
+    if content_type == "application/json":
+        # This comes from a request with the X-Synchronous header set to true
+        return SyncAskResponse.model_validate_json(response.content)
+
+    learning_id = response.headers.get("NUCLIA-LEARNING-ID") or "unknown"
+    lines = [line async for line in response.aiter_lines()]
+    return _parse_ask_response_lines(iter(lines), learning_id)
 
 
 def _parse_list_of_pydantic(
@@ -665,7 +683,7 @@ def _request_sync_builder(
         )
         if response_type is not None:
             if issubclass(response_type, SyncAskResponse):
-                return ask_response_parser(response_type, resp)  # type: ignore
+                return ask_response_parser(resp)  # type: ignore
             elif issubclass(response_type, BaseModel):
                 return response_type.model_validate_json(resp.content)  # type: ignore
         return None  # type: ignore
@@ -760,7 +778,7 @@ def _request_async_builder(
         )
         if response_type is not None:
             if isinstance(response_type, type) and issubclass(response_type, SyncAskResponse):
-                return ask_response_parser(response_type, resp)  # type: ignore
+                return await ask_response_parser_async(resp)  # type: ignore
             elif isinstance(response_type, type) and issubclass(response_type, BaseModel):
                 return response_type.model_validate_json(resp.content)  # type: ignore
         return None  # type: ignore
