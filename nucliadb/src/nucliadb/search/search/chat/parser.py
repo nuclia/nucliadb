@@ -38,6 +38,7 @@ from nucliadb.search.search.query_parser.parsers.common import (
 )
 from nucliadb.search.search.rerankers import NoopReranker, PredictReranker, Reranker
 from nucliadb_models import search as search_models
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.search import FindRequest
 from nucliadb_protos import utils_pb2
@@ -210,11 +211,13 @@ class RAOFindParser:
                 And,
                 DateCreated,
                 DateModified,
+                Field,
                 FieldFilterExpression,
                 Keyword,
                 Not,
                 Or,
                 ParagraphFilterExpression,
+                Resource,
             )
 
             operator = FilterExpression.Operator.AND
@@ -273,12 +276,46 @@ class RAOFindParser:
                             )
 
             if self.item.fields:
-                # TODO: fields
-                ...
+                operands: list[FieldFilterExpression] = []
+                for key in self.item.fields:
+                    parts = key.split("/")
+                    try:
+                        field_type = FieldTypeName.from_abbreviation(parts[0])
+                    except KeyError:  # pragma: no cover
+                        raise InvalidQueryError(
+                            "fields", f"field filter {key} has an invalid field type: {parts[0]}"
+                        )
+                    field_id = parts[1] if len(parts) > 1 else None
+                    operands.append(Field(type=field_type, name=field_id))
+
+                if len(operands) == 1:
+                    field_expression.append(operands[0])
+                elif len(operands) > 1:
+                    field_expression.append(Or(operands=operands))
 
             if self.item.resource_filters:
-                # TODO: key filters
-                ...
+                operands = []
+                for key in self.item.resource_filters:
+                    parts = key.split("/")
+                    if len(parts) == 1:
+                        operands.append(Resource(id=parts[0]))
+                    else:
+                        try:
+                            field_type = FieldTypeName.from_abbreviation(parts[0])
+                        except KeyError:  # pragma: no cover
+                            raise InvalidQueryError(
+                                "resource_filters",
+                                f"resource filter {key} has an invalid field type: {parts[0]}",
+                            )
+                        field_id = parts[2] if len(parts) > 2 else None
+                        operands.append(
+                            And(operands=[Resource(id=parts[0]), Field(type=field_type, name=field_id)])
+                        )
+
+                if len(operands) == 1:
+                    field_expression.append(operands[0])
+                elif len(operands) > 1:
+                    field_expression.append(Or(operands=operands))
 
             field = None
             if len(field_expression) == 1:
