@@ -41,40 +41,25 @@
 import logging
 from typing import Optional, Union
 
-from nidx_protos import nodereader_pb2
 from pydantic import ValidationError
 
 from nucliadb.common.exceptions import InvalidQueryError
-from nucliadb.common.filter_expression import parse_expression
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
 from nucliadb.models.internal import retrieval as retrieval_models
-from nucliadb.models.internal.retrieval import KeywordQuery, RetrievalRequest, SemanticQuery
+from nucliadb.models.internal.retrieval import RetrievalRequest
 from nucliadb.search.search.chat.fetcher import RAOFetcher
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.models import (
-    Filters,
-    GraphQuery,
-    NoopReranker,
-    ParsedQuery,
-    PredictReranker,
-    Query,
-    RankFusion,
-    ReciprocalRankFusion,
     RelationQuery,
-    Reranker,
-    UnitRetrieval,
 )
-from nucliadb.search.search.query_parser.old_filters import OldFilterParams, parse_old_filters
 from nucliadb.search.search.query_parser.parsers.common import (
     parse_keyword_min_score,
     should_disable_vector_search,
 )
-from nucliadb.search.search.utils import filter_hidden_resources
+from nucliadb.search.search.rerankers import NoopReranker, PredictReranker, Reranker
 from nucliadb_models import search as search_models
 from nucliadb_models.filters import FilterExpression
-from nucliadb_models.search import (
-    FindRequest,
-)
+from nucliadb_models.search import FindRequest
 from nucliadb_protos import utils_pb2
 
 logger = logging.getLogger(__name__)
@@ -82,7 +67,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_GENERIC_SEMANTIC_THRESHOLD = 0.7
 
 
-async def rao_parse_find(kbid: str, find_request: FindRequest) -> ParsedQuery:
+async def rao_parse_find(
+    kbid: str, find_request: FindRequest
+) -> tuple[RAOFetcher, RetrievalRequest, Reranker]:
+    # This is a thin layer to convert a FindRequest into a RetrievalRequest +
+    # some bw/c stuff we need while refactoring and decoupling code
+
     fetcher = RAOFetcher(
         kbid,
         query=find_request.query,
@@ -94,40 +84,8 @@ async def rao_parse_find(kbid: str, find_request: FindRequest) -> ParsedQuery:
         query_image=find_request.query_image,
     )
     parser = RAOFindParser(kbid, find_request, fetcher)
-    retrieval_unit = await parser.parse()
-    return ParsedQuery(fetcher=fetcher, retrieval=retrieval_unit, generation=None)
-
-
-def build_retrieval_request(kbid: str, parsed: ParsedQuery) -> RetrievalRequest:
-    retrieval_query = retrieval_models.Query()
-    parsed_keyword = parsed.retrieval.query.keyword
-    if parsed_keyword:
-        retrieval_query.keyword = retrieval_models.KeywordQuery(
-            query=parsed_keyword.query,
-            min_score=parsed_keyword.min_score,
-            with_synonyms=parsed_keyword.is_synonyms_query,
-        )
-    parsed_semantic = parsed.retrieval.query.semantic
-    if parsed_semantic:
-        assert parsed_semantic.query is not None
-        retrieval_query.semantic = retrieval_models.SemanticQuery(
-            query=parsed_semantic.query,
-            vectorset=parsed_semantic.vectorset,
-            min_score=parsed_semantic.min_score,
-        )
-    parsed_graph = parsed.retrieval.query.graph
-    if parsed_graph:
-        retrieval_query.graph = retrieval_models.GraphQuery(
-            query=parsed_graph.query,
-        )
-    retrieval_request = RetrievalRequest(
-        query=retrieval_query,
-        top_k=parsed.retrieval.top_k,
-        # TODO convert to internal filters
-        filters=parsed.retrieval.filters,
-        rank_fusion=parsed.retrieval.rank_fusion,
-    )
-    return retrieval_request
+    retrieval_request, reranker = await parser.parse()
+    return fetcher, retrieval_request, reranker
 
 
 class RAOFindParser:
@@ -137,17 +95,16 @@ class RAOFindParser:
         self.fetcher = fetcher
 
         # cached data while parsing
-        self._query: Optional[Query] = None
-        self._top_k: Optional[int] = None
+        self._query: Optional[retrieval_models.Query] = None
 
-    async def parse(self) -> UnitRetrieval:
+    async def parse(self) -> tuple[RetrievalRequest, Reranker]:
         self._validate_request()
 
-        self._top_k = self.item.top_k
+        top_k = self.item.top_k
 
         # parse search types (features)
 
-        self._query = Query()
+        self._query = retrieval_models.Query()
 
         if search_models.FindOptions.KEYWORD in self.item.features:
             self._query.keyword = await parse_keyword_query(self.item, fetcher=self.fetcher)  # type: ignore
@@ -156,37 +113,37 @@ class RAOFindParser:
             self._query.semantic = await parse_semantic_query(self.item, fetcher=self.fetcher)  # type: ignore
 
         if search_models.FindOptions.RELATIONS in self.item.features:
+            # TODO: /retrieve endpoint doesn't provide relation search, we must
+            # issue a /find with features=relations
+            raise NotImplementedError()
             self._query.relation = await self._parse_relation_query()
 
         if search_models.FindOptions.GRAPH in self.item.features:
             self._query.graph = await self._parse_graph_query()
 
+        # TODO: finish old filter convert
         filters = await self._parse_filters()
 
-        try:
-            rank_fusion = self._parse_rank_fusion()
-        except ValidationError as exc:
-            raise InternalParserError(f"Parsing error in rank fusion: {str(exc)}") from exc
+        # rank fusion is just forwarded to /retrieve
+        rank_fusion = self.item.rank_fusion
+
         try:
             reranker = self._parse_reranker()
         except ValidationError as exc:
             raise InternalParserError(f"Parsing error in reranker: {str(exc)}") from exc
 
-        # Adjust retrieval windows. Our current implementation assume:
-        # `top_k <= reranker.window <= rank_fusion.window`
-        # and as rank fusion is done before reranking, we must ensure rank
-        # fusion window is at least, the reranker window
+        # As we'll call /retrieve, that has rank fusion integrated, we have to
+        # make sure we ask for enough results to rerank.
         if isinstance(reranker, PredictReranker):
-            rank_fusion.window = max(rank_fusion.window, reranker.window)
+            top_k = max(top_k, reranker.window)
 
-        retrieval = UnitRetrieval(
+        retrieval = RetrievalRequest(
             query=self._query,
-            top_k=self._top_k,
+            top_k=top_k,
             filters=filters,
             rank_fusion=rank_fusion,
-            reranker=reranker,
         )
-        return retrieval
+        return retrieval, reranker
 
     def _validate_request(self):
         # synonyms are not compatible with vector/graph search
@@ -218,12 +175,12 @@ class RAOFindParser:
             entry_points=detected_entities, deleted_entity_groups=[], deleted_entities={}
         )
 
-    async def _parse_graph_query(self) -> GraphQuery:
+    async def _parse_graph_query(self) -> retrieval_models.GraphQuery:
         if self.item.graph_query is None:
             raise InvalidQueryError(
                 "graph_query", "Graph query must be provided when using graph search"
             )
-        return GraphQuery(query=self.item.graph_query)
+        return retrieval_models.GraphQuery(query=self.item.graph_query)
 
     async def _get_detected_entities(self) -> list[utils_pb2.RelationNode]:
         """Get entities from request, either automatically detected or
@@ -244,8 +201,12 @@ class RAOFindParser:
 
         return detected_entities
 
-    async def _parse_filters(self) -> Filters:
+    async def _parse_filters(self) -> retrieval_models.Filters:
         assert self._query is not None, "query must be parsed before filters"
+
+        # this is a conversion between /find filters to /retrieve filters. As
+        # /find keeps maintaining old filter style, we must convert from one to
+        # another
 
         has_old_filters = (
             len(self.item.filters) > 0
@@ -260,102 +221,140 @@ class RAOFindParser:
         if self.item.filter_expression is not None and has_old_filters:
             raise InvalidQueryError("filter_expression", "Cannot mix old filters with filter_expression")
 
-        field_expr = None
-        paragraph_expr = None
-        filter_operator = nodereader_pb2.FilterOperator.AND
+        filter_expression = None
 
         if has_old_filters:
-            old_filters = OldFilterParams(
-                label_filters=self.item.filters,
-                keyword_filters=self.item.keyword_filters,
-                range_creation_start=self.item.range_creation_start,
-                range_creation_end=self.item.range_creation_end,
-                range_modification_start=self.item.range_modification_start,
-                range_modification_end=self.item.range_modification_end,
-                fields=self.item.fields,
-                key_filters=self.item.resource_filters,
+            # convert old filters into a filter expression
+
+            from nucliadb_models.filters import (
+                And,
+                DateCreated,
+                DateModified,
+                FieldFilterExpression,
+                Keyword,
+                Not,
+                Or,
+                ParagraphFilterExpression,
             )
-            field_expr, paragraph_expr = await parse_old_filters(old_filters, self.fetcher)
+
+            operator = FilterExpression.Operator.AND
+            field_expression: list[FieldFilterExpression] = []
+            paragraph_expression: list[ParagraphFilterExpression] = []
+
+            if self.item.range_creation_start or self.item.range_creation_end:
+                field_expression.append(
+                    DateCreated(
+                        since=self.item.range_creation_start,
+                        until=self.item.range_creation_end,
+                    )
+                )
+
+            if self.item.range_modification_start or self.item.range_modification_end:
+                field_expression.append(
+                    DateModified(
+                        since=self.item.range_modification_start,
+                        until=self.item.range_modification_end,
+                    )
+                )
+
+            if self.item.filters:
+                # TODO: label filters
+                ...
+
+            if self.item.keyword_filters:
+                # keyword filters
+                for keyword_filter in self.item.keyword_filters:
+                    if isinstance(keyword_filter, str):
+                        field_expression.append(Keyword(word=keyword_filter))
+                    else:
+                        if keyword_filter.all:
+                            field_expression.append(
+                                And(operands=[Keyword(word=word) for word in keyword_filter.all])
+                            )
+                        if keyword_filter.any:
+                            field_expression.append(
+                                Or(operands=[Keyword(word=word) for word in keyword_filter.any])
+                            )
+                        if keyword_filter.none:
+                            field_expression.append(
+                                Not(
+                                    operand=Or(
+                                        operands=[Keyword(word=word) for word in keyword_filter.none]
+                                    )
+                                )
+                            )
+                        if keyword_filter.not_all:
+                            field_expression.append(
+                                Not(
+                                    operand=Or(
+                                        operands=[Keyword(word=word) for word in keyword_filter.not_all]
+                                    )
+                                )
+                            )
+
+            if self.item.fields:
+                # TODO: fields
+                ...
+
+            if self.item.resource_filters:
+                # TODO: key filters
+                ...
+
+            field = None
+            if len(field_expression) == 1:
+                field = field_expression[0]
+            elif len(field_expression) > 1:
+                field = And(operands=field_expression)
+
+            paragraph = None
+            if len(paragraph_expression) == 1:
+                paragraph = paragraph_expression[0]
+            elif len(paragraph_expression) > 1:
+                paragraph = And(operands=paragraph_expression)
+
+            filter_expression = FilterExpression(field=field, paragraph=paragraph, operator=operator)
 
         if self.item.filter_expression is not None:
-            if self.item.filter_expression.field:
-                field_expr = await parse_expression(self.item.filter_expression.field, self.kbid)
-            if self.item.filter_expression.paragraph:
-                paragraph_expr = await parse_expression(self.item.filter_expression.paragraph, self.kbid)
-            if self.item.filter_expression.operator == FilterExpression.Operator.OR:
-                filter_operator = nodereader_pb2.FilterOperator.OR
-            else:
-                filter_operator = nodereader_pb2.FilterOperator.AND
+            filter_expression = self.item.filter_expression
 
-        hidden = await filter_hidden_resources(self.kbid, self.item.show_hidden)
-
-        return Filters(
-            facets=[],
-            field_expression=field_expr,
-            paragraph_expression=paragraph_expr,
-            filter_expression_operator=filter_operator,
+        return retrieval_models.Filters(
+            filter_expression=filter_expression,
+            show_hidden=self.item.show_hidden,
             security=self.item.security,
-            hidden=hidden,
             with_duplicates=self.item.with_duplicates,
         )
 
-    def _parse_rank_fusion(self) -> RankFusion:
-        rank_fusion: RankFusion
-
-        top_k = self.item.top_k
-        window = min(top_k, 500)
-
-        if isinstance(self.item.rank_fusion, search_models.RankFusionName):
-            if self.item.rank_fusion == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
-                rank_fusion = ReciprocalRankFusion(window=window)
-            else:
-                raise InternalParserError(f"Unknown rank fusion algorithm: {self.item.rank_fusion}")
-
-        elif isinstance(self.item.rank_fusion, search_models.ReciprocalRankFusion):
-            user_window = self.item.rank_fusion.window
-            rank_fusion = ReciprocalRankFusion(
-                k=self.item.rank_fusion.k,
-                boosting=self.item.rank_fusion.boosting,
-                window=min(max(user_window or 0, top_k), 500),
-            )
-
-        else:
-            raise InternalParserError(f"Unknown rank fusion {self.item.rank_fusion}")
-
-        return rank_fusion
-
     def _parse_reranker(self) -> Reranker:
-        reranking: Reranker
-
+        reranker: Reranker
         top_k = self.item.top_k
 
         if isinstance(self.item.reranker, search_models.RerankerName):
             if self.item.reranker == search_models.RerankerName.NOOP:
-                reranking = NoopReranker()
+                reranker = NoopReranker()
 
             elif self.item.reranker == search_models.RerankerName.PREDICT_RERANKER:
                 # for predict rearnker, by default, we want a x2 factor with a
                 # top of 200 results
-                reranking = PredictReranker(window=min(top_k * 2, 200))
+                reranker = PredictReranker(window=min(top_k * 2, 200))
 
             else:
                 raise InternalParserError(f"Unknown reranker algorithm: {self.item.reranker}")
 
         elif isinstance(self.item.reranker, search_models.PredictReranker):
             user_window = self.item.reranker.window
-            reranking = PredictReranker(window=min(max(user_window or 0, top_k), 200))
+            reranker = PredictReranker(window=min(max(user_window or 0, top_k), 200))
 
         else:
             raise InternalParserError(f"Unknown reranker {self.item.reranker}")
 
-        return reranking
+        return reranker
 
 
 async def parse_keyword_query(
     item: search_models.BaseSearchRequest,
     *,
     fetcher: RAOFetcher,
-) -> KeywordQuery:
+) -> retrieval_models.KeywordQuery:
     query = item.query
 
     # If there was a rephrase with image, we should use the rephrased query for keyword search
@@ -365,7 +364,7 @@ async def parse_keyword_query(
 
     min_score = parse_keyword_min_score(item.min_score)
 
-    return KeywordQuery(
+    return retrieval_models.KeywordQuery(
         query=query,
         # Synonym checks are done at the retrieval endpoint already
         with_synonyms=item.with_synonyms,
@@ -377,20 +376,20 @@ async def parse_semantic_query(
     item: Union[search_models.SearchRequest, search_models.FindRequest],
     *,
     fetcher: RAOFetcher,
-) -> SemanticQuery:
+) -> retrieval_models.SemanticQuery:
     vectorset = await fetcher.get_vectorset()
     query = await fetcher.get_query_vector()
 
     min_score = await parse_semantic_min_score(item.min_score, fetcher=fetcher)
 
-    return SemanticQuery(query=query, vectorset=vectorset, min_score=min_score)
+    return retrieval_models.SemanticQuery(query=query, vectorset=vectorset, min_score=min_score)
 
 
 async def parse_semantic_min_score(
     min_score: Optional[Union[float, search_models.MinScore]],
     *,
     fetcher: RAOFetcher,
-):
+) -> float:
     if min_score is None:
         min_score = None
     elif isinstance(min_score, float):

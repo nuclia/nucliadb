@@ -33,13 +33,15 @@ from nucliadb.search.api.v1.retrieve import retrieve_endpoint
 from nucliadb.search.predict import AnswerStatusCode, RephraseResponse
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
-from nucliadb.search.search.chat.parser import build_retrieval_request, rao_parse_find
+from nucliadb.search.search.chat.parser import rao_parse_find
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import Metrics
-from nucliadb.search.search.query_parser.models import ParsedQuery, Query, RelationQuery, UnitRetrieval
+from nucliadb.search.search.query_parser.fetcher import Fetcher
+from nucliadb.search.search.query_parser.models import Query, RelationQuery, UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
+from nucliadb.search.search.rerankers import Reranker, get_reranker
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import filters
@@ -103,7 +105,7 @@ async def get_find_results(
     origin: str,
     metrics: Metrics,
     prequeries_strategy: Optional[PreQueriesStrategy] = None,
-) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], ParsedQuery]:
+) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], Fetcher, Reranker]:
     prequeries_results = None
     prefilter_queries_results = None
     queries_results = None
@@ -149,7 +151,7 @@ async def get_find_results(
         prequeries_results = (prefilter_queries_results or []) + (queries_results or [])
 
     with metrics.time("main_query"):
-        main_results, query_parser = await run_main_query(
+        main_results, fetcher, reranker = await run_main_query(
             kbid,
             query,
             item,
@@ -158,7 +160,7 @@ async def get_find_results(
             origin,
             metrics=metrics.child_span("main_query"),
         )
-    return main_results, prequeries_results, query_parser
+    return main_results, prequeries_results, fetcher, reranker
 
 
 def add_resource_filter(request: Union[FindRequest, AskRequest], resources: list[str]):
@@ -233,10 +235,10 @@ async def run_main_query(
     user: str,
     origin: str,
     metrics: Metrics,
-) -> tuple[KnowledgeboxFindResults, ParsedQuery]:
+) -> tuple[KnowledgeboxFindResults, Fetcher, Reranker]:
     find_request = find_request_from_ask_request(item, query)
 
-    find_results, incomplete, parsed_query = await find_retrieval(
+    find_results, incomplete, fetcher, reranker = await find_retrieval(
         kbid,
         find_request,
         ndb_client,
@@ -246,7 +248,7 @@ async def run_main_query(
     )
     if incomplete:
         raise IncompleteFindResultsError()
-    return find_results, parsed_query
+    return find_results, fetcher, reranker
 
 
 async def get_relations_results(
@@ -472,7 +474,7 @@ async def run_prequeries(
     async def _prequery_find(prequery: PreQuery, index: int):
         async with max_parallel_prequeries:
             prequery_id = prequery.id or f"prequery-{index}"
-            find_results, _, _ = await find_retrieval(
+            find_results, _, _, _ = await find_retrieval(
                 kbid,
                 prequery.request,
                 x_ndb_client,
@@ -513,10 +515,10 @@ async def find_retrieval(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     metrics: Metrics,
-) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
+) -> tuple[KnowledgeboxFindResults, bool, Fetcher, Reranker]:
     # TODO: Remove once the feature has been fully rolled out
     if not has_feature(const.Features.ASK_DECOUPLED, context={"kbid": kbid}):
-        return await find(
+        results, incomplete, parsed = await find(
             kbid,
             find_request,
             x_ndb_client,
@@ -524,6 +526,11 @@ async def find_retrieval(
             x_forwarded_for,
             metrics=metrics,
         )
+        # this has already been asserted inside the find() call
+        assert parsed.retrieval.reranker is not None, "find parser must provide a reranking algorithm"
+        reranker = get_reranker(parsed.retrieval.reranker)
+        return results, incomplete, parsed.fetcher, reranker
+
     return await rao_find(
         kbid,
         find_request,
@@ -541,26 +548,25 @@ async def rao_find(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     metrics: Metrics,
-) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
+) -> tuple[KnowledgeboxFindResults, bool, Fetcher, Reranker]:
     """
     Calls to NucliaDB retrieve and augment primitives to perform the text block search.
     It returns the results as KnowledgeboxFindResults to comply with the existing find
     interface (/ask logic is tightly coupled with /find).
 
-        # retrieve
+    # retrieve
     # augment
     # rerank
     # convert results to KnowledgeboxFindResults
     """
-    breakpoint()
-    parsed = await rao_parse_find(kbid, find_request)
-    retrieval_request = build_retrieval_request(kbid, parsed)
-    _ = await retrieve(kbid, retrieval_request)
+    fetcher, retrieval_request, reranker = await rao_parse_find(kbid, find_request)
+
+    _response = await retrieve(kbid, retrieval_request)
 
     # TODO: Implement augmentation
     # TODO: Implement reranking
     # TODO: Adapt results to KnowledgeboxFindResults
-    return KnowledgeboxFindResults(resources={}), False, parsed
+    return KnowledgeboxFindResults(resources={}), False, fetcher, reranker
 
 
 async def retrieve(kbid: str, item: RetrievalRequest) -> RetrievalResponse:

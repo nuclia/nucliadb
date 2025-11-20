@@ -102,7 +102,7 @@ class RAOFetcher(Fetcher):
                     raise SendToPredictError("Predict API didn't return a sentence vectorset")
                 # vectors field is enforced by the data model to have at least one key
                 for vectorset in query_info.sentence.vectors.keys():
-                    vectorset = vectorset
+                    self._vectorset = vectorset
                     break
         assert self._vectorset is not None
         return self._vectorset
