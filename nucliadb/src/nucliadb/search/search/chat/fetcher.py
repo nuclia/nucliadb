@@ -45,15 +45,16 @@ class RAOFetcher(Fetcher):
         generative_model: Optional[str],
         query_image: Optional[Image],
     ):
-        self.kbid = kbid
-        self.query = query
-        self.user_vector = user_vector
-        self.user_vectorset = vectorset
-        self.user_vectorset_validated = False
-        self.rephrase = rephrase
-        self.rephrase_prompt = rephrase_prompt
-        self.generative_model = generative_model
-        self.query_image = query_image
+        super().__init__(
+            kbid,
+            query=query,
+            user_vector=user_vector,
+            vectorset=vectorset,
+            rephrase=rephrase,
+            rephrase_prompt=rephrase_prompt,
+            generative_model=generative_model,
+            query_image=query_image,
+        )
 
         self._query_info: Optional[QueryInfo] = None
         self._vectorset: Optional[str] = None

@@ -26,8 +26,15 @@ from nidx_protos.nodereader_pb2 import (
 )
 from nuclia_models.predict.generative_responses import GenerativeChunk
 
+from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.ids import ParagraphId
 from nucliadb.common.models_utils import to_proto
-from nucliadb.models.internal.retrieval import RetrievalRequest, RetrievalResponse
+from nucliadb.models.internal.retrieval import (
+    RetrievalMatch,
+    RetrievalRequest,
+    RetrievalResponse,
+    ScoreType,
+)
 from nucliadb.search import logger
 from nucliadb.search.api.v1.retrieve import retrieve_endpoint
 from nucliadb.search.predict import AnswerStatusCode, RephraseResponse
@@ -36,16 +43,19 @@ from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.chat.parser import rao_parse_find
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
+from nucliadb.search.search.find_merge import compose_find_resources, hydrate_and_rerank
+from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import Query, RelationQuery, UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
-from nucliadb.search.search.rerankers import Reranker, get_reranker
+from nucliadb.search.search.rerankers import Reranker, RerankingOptions, get_reranker
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import filters
 from nucliadb_models.search import (
+    SCORE_TYPE,
     AskRequest,
     ChatContextMessage,
     ChatModel,
@@ -61,6 +71,7 @@ from nucliadb_models.search import (
     PromptContextOrder,
     Relations,
     RephraseModel,
+    TextPosition,
     parse_rephrase_prompt,
 )
 from nucliadb_protos import audit_pb2
@@ -561,12 +572,35 @@ async def rao_find(
     """
     fetcher, retrieval_request, reranker = await rao_parse_find(kbid, find_request)
 
-    _response = await retrieve(kbid, retrieval_request)
+    retrieval_response = await retrieve(kbid, retrieval_request)
+    matches = retrieval_response.matches
 
-    # TODO: Implement augmentation
-    # TODO: Implement reranking
-    # TODO: Adapt results to KnowledgeboxFindResults
-    return KnowledgeboxFindResults(resources={}), False, fetcher, reranker
+    if retrieval_request.query.keyword:
+        query = retrieval_request.query.keyword.query
+    else:
+        query = ""
+
+    text_blocks, resources, best_matches = await augment_and_rerank(
+        kbid,
+        matches,
+        # here we use the original top_k, so we end up with the number of
+        # results requested by the user
+        top_k=find_request.top_k,
+        resource_hydration_options=ResourceHydrationOptions(
+            show=find_request.show,
+            extracted=find_request.extracted,
+            field_type_filter=find_request.field_type_filter,
+        ),
+        text_block_hydration_options=TextBlockHydrationOptions(),
+        reranker=reranker,
+        reranking_options=RerankingOptions(kbid=kbid, query=query),
+    )
+    find_resources = compose_find_resources(text_blocks, resources)
+    find_results = KnowledgeboxFindResults(
+        query=query, resources=find_resources, best_matches=best_matches
+    )
+
+    return find_results, False, fetcher, reranker
 
 
 async def retrieve(kbid: str, item: RetrievalRequest) -> RetrievalResponse:
@@ -576,13 +610,51 @@ async def retrieve(kbid: str, item: RetrievalRequest) -> RetrievalResponse:
     return await retrieve_endpoint(kbid, item)
 
 
-async def augment() -> None:
-    pass
+async def augment_and_rerank(
+    kbid: str,
+    matches: list[RetrievalMatch],
+    top_k: int,
+    resource_hydration_options: ResourceHydrationOptions,
+    text_block_hydration_options: TextBlockHydrationOptions,
+    reranker: Reranker,
+    reranking_options: RerankingOptions,
+):
+    score_type_map = {
+        ScoreType.SEMANTIC: SCORE_TYPE.VECTOR,
+        ScoreType.KEYWORD: SCORE_TYPE.BM25,
+        ScoreType.RRF: SCORE_TYPE.BOTH,
+        ScoreType.DEFAULT_RERANKER: SCORE_TYPE.RERANKER,
+        ScoreType.GRAPH: SCORE_TYPE.RELATION_RELEVANCE,
+    }
+    text_blocks = []
+    for match in matches:
+        paragraph_id = ParagraphId.from_string(match.id)
+        score_type = score_type_map[match.score.type]
+        text_block = TextBlockMatch(
+            paragraph_id=paragraph_id,
+            scores=match.score.history,
+            score_type=score_type,
+            position=TextPosition(
+                page_number=match.metadata.page,
+                index=0,
+                start=paragraph_id.paragraph_start,
+                end=paragraph_id.paragraph_end,
+            ),
+            order=-1,  # will be populated later
+            fuzzy_search=False,  # we don't have this info anymore
+            is_a_table=match.metadata.is_a_table,
+            representation_file=match.metadata.source_file,
+            field_labels=match.metadata.field_labels,
+            paragraph_labels=match.metadata.paragraph_labels,
+        )
+        text_blocks.append(text_block)
 
-
-async def rerank() -> None:
-    pass
-
-
-def convert_to_knowledgebox_find_results() -> None:
-    pass
+    return await hydrate_and_rerank(
+        text_blocks,
+        kbid,
+        resource_hydration_options=resource_hydration_options,
+        text_block_hydration_options=text_block_hydration_options,
+        reranker=reranker,
+        reranking_options=reranking_options,
+        top_k=top_k,
+    )
