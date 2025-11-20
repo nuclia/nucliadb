@@ -312,7 +312,8 @@ class RAOFindParser:
             elif len(paragraph_expression) > 1:
                 paragraph = And(operands=paragraph_expression)
 
-            filter_expression = FilterExpression(field=field, paragraph=paragraph, operator=operator)
+            if field or paragraph:
+                filter_expression = FilterExpression(field=field, paragraph=paragraph, operator=operator)
 
         if self.item.filter_expression is not None:
             filter_expression = self.item.filter_expression

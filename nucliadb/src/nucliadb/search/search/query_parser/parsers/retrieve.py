@@ -159,14 +159,16 @@ class _RetrievalParser:
             return filters
 
         if self.item.filters.filter_expression is not None:
-            filters.field_expression = await parse_expression(
-                self.item.filters.filter_expression.field,  # type: ignore
-                self.kbid,
-            )
-            filters.paragraph_expression = await parse_expression(
-                self.item.filters.filter_expression.paragraph,  # type: ignore
-                self.kbid,
-            )
+            if self.item.filters.filter_expression.field is not None:
+                filters.field_expression = await parse_expression(
+                    self.item.filters.filter_expression.field,
+                    self.kbid,
+                )
+            if self.item.filters.filter_expression.paragraph is not None:
+                filters.paragraph_expression = await parse_expression(
+                    self.item.filters.filter_expression.paragraph,
+                    self.kbid,
+                )
             if self.item.filters.filter_expression.operator == FilterExpression.Operator.OR:
                 filter_operator = nodereader_pb2.FilterOperator.OR
             else:
