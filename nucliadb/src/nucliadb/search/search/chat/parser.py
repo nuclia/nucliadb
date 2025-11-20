@@ -94,10 +94,8 @@ class RAOFindParser:
             self._query.semantic = await parse_semantic_query(self.item, fetcher=self.fetcher)  # type: ignore
 
         if search_models.FindOptions.RELATIONS in self.item.features:
-            # TODO: /retrieve endpoint doesn't provide relation search, we must
-            # issue a /find with features=relations
-            raise NotImplementedError()
-            self._query.relation = await self._parse_relation_query()
+            # skip, we'll do something about this later on
+            pass
 
         if search_models.FindOptions.GRAPH in self.item.features:
             self._query.graph = await self._parse_graph_query()

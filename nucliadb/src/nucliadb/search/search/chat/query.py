@@ -575,6 +575,29 @@ async def rao_find(
     retrieval_response = await retrieve(kbid, retrieval_request)
     matches = retrieval_response.matches
 
+    relations = None
+    if FindOptions.RELATIONS in find_request.features:
+        # the user asked for a legacy relations search, as we don't support it
+        # in the /retrieve endpoint but we must maintain bw/c with /find
+        # responses, we call it with to get just this part of the response
+        #
+        # TODO: replace this with an sdk call
+        find_response, _, _ = await find(
+            kbid,
+            FindRequest(
+                features=[FindOptions.RELATIONS],
+                # needed for automatic entity detection
+                query=find_request.query,
+                # used for "hardcoded" graph queries
+                query_entities=find_request.query_entities,
+            ),
+            x_ndb_client,
+            x_nucliadb_user,
+            x_forwarded_for,
+            metrics,
+        )
+        relations = find_response.relations
+
     if retrieval_request.query.keyword:
         query = retrieval_request.query.keyword.query
     else:
@@ -597,7 +620,10 @@ async def rao_find(
     )
     find_resources = compose_find_resources(text_blocks, resources)
     find_results = KnowledgeboxFindResults(
-        query=query, resources=find_resources, best_matches=best_matches
+        query=query,
+        resources=find_resources,
+        best_matches=best_matches,
+        relations=relations,
     )
 
     return find_results, False, fetcher, reranker
