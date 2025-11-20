@@ -19,16 +19,39 @@
 #
 import asyncio
 
+import nucliadb_models.resource
+from nucliadb.common import datamanagers
+from nucliadb.ingest.orm.resource import Resource
+from nucliadb.ingest.serialize import (
+    serialize_extra,
+    serialize_origin,
+    serialize_resource,
+    serialize_security,
+)
+from nucliadb.models.internal.augment import (
+    ResourceClassificationLabels,
+    ResourceExtra,
+    ResourceOrigin,
+    ResourceProp,
+    ResourceSecurity,
+    ResourceSummary,
+    ResourceTitle,
+)
+from nucliadb.search.augmentor.metrics import augmentor_observer
 from nucliadb.search.augmentor.models import AugmentedResource
 from nucliadb.search.augmentor.utils import limited_concurrency
-from nucliadb.search.search.hydrator import ResourceHydrationOptions, hydrate_resource_metadata
+from nucliadb.search.search import cache
+from nucliadb.search.search.hydrator import ResourceHydrationOptions
+from nucliadb_models.search import ResourceProperties
+from nucliadb_protos import resources_pb2
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 
 async def augment_resources(
     kbid: str,
     given: list[str],
-    # select: list[ResourceProp],
-    opts: ResourceHydrationOptions,
+    select: list[ResourceProp],
     *,
     concurrency_control: asyncio.Semaphore | None = None,
 ) -> dict[str, AugmentedResource | None]:
@@ -38,7 +61,7 @@ async def augment_resources(
     for rid in given:
         task = asyncio.create_task(
             limited_concurrency(
-                augment_resource(kbid, rid, opts),
+                augment_resource(kbid, rid, select),
                 max_ops=concurrency_control,
             )
         )
@@ -55,16 +78,151 @@ async def augment_resources(
 async def augment_resource(
     kbid: str,
     rid: str,
-    # select: list[ResourceProp],
-    opts: ResourceHydrationOptions,
+    select: list[ResourceProp],
 ) -> AugmentedResource | None:
-    # options = ResourceHydrationOptions()
-    # for prop in select:
-    #     if isinstance(prop, ResourceOrigin):
-    #         options.show.append(ResourceProperties.ORIGIN)
-    #     else:
-    #         raise NotImplementedError(f"resource property not implemented: {prop}")
+    # TODO: make sure we don't repeat any select clause
 
-    # XXX: for now, we delegate hydration, but we augmentor should take ownership
-    augmented = await hydrate_resource_metadata(kbid, rid, opts)
+    resource = await cache.get_resource(kbid, rid)
+    if resource is None:
+        # skip resources that aren't in the DB
+        return None
+
+    return await db_augment_resource(resource, select)
+
+
+@augmentor_observer.wrap({"type": "db_resource"})
+async def db_augment_resource(
+    resource: Resource,
+    select: list[ResourceProp],
+) -> AugmentedResource:
+    title = None
+    summary = None
+    origin = None
+    extra = None
+    security = None
+    labels = None
+
+    basic = None
+    for prop in select:
+        if isinstance(prop, ResourceTitle):
+            if basic is None:
+                basic = await resource.get_basic()
+            if basic is not None:
+                title = basic.title
+
+        elif isinstance(prop, ResourceSummary):
+            if basic is None:
+                basic = await resource.get_basic()
+            if basic is not None:
+                summary = basic.summary
+
+        elif isinstance(prop, ResourceOrigin):
+            # REVIEW: we may want a better hydration than proto to JSON
+            origin = await serialize_origin(resource)
+
+        elif isinstance(prop, ResourceExtra):
+            extra = await serialize_extra(resource)
+
+        elif isinstance(prop, ResourceSecurity):
+            security = await serialize_security(resource)
+
+        elif isinstance(prop, ResourceClassificationLabels):
+            labels = await classification_labels(resource)
+
+        else:
+            raise NotImplementedError(f"resource property not implemented: {prop}")
+
+    augmented = AugmentedResource(
+        id=resource.uuid,
+        title=title,
+        summary=summary,
+        origin=origin,
+        extra=extra,
+        security=security,
+        classification_labels=labels,
+    )
     return augmented
+
+
+async def get_basic(resource: Resource) -> resources_pb2.Basic | None:
+    # HACK: resource.get_basic() always returns a pb, even if it's not in the
+    # DB. Here we really want to know if there's basic or not
+    basic = await datamanagers.resources.get_basic(resource.txn, kbid=resource.kbid, rid=resource.uuid)
+    return basic
+
+
+async def classification_labels(resource: Resource) -> list[tuple[str, str]] | None:
+    basic = await get_basic(resource)
+    if basic is None:
+        return None
+
+    labels = set()
+    for classification in basic.usermetadata.classifications:
+        labels.add((classification.labelset, classification.label))
+    return list(labels)
+
+
+async def augment_resources_deep(
+    kbid: str,
+    given: list[str],
+    opts: ResourceHydrationOptions,
+    *,
+    concurrency_control: asyncio.Semaphore | None = None,
+) -> dict[str, nucliadb_models.resource.Resource | None]:
+    """Augment resources using the Resource model. Depending on the options,
+    this can serialize resource fields, extracted data like text, vectors...
+
+    Thus, this operation can be quite expensive.
+
+    """
+
+    if ResourceProperties.EXTRACTED in opts.show and has_feature(
+        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
+    ):
+        # Returning extracted metadata in search results is deprecated and this flag
+        # will be set to True for all KBs in the future.
+        opts.show.remove(ResourceProperties.EXTRACTED)
+        opts.extracted.clear()
+
+    ops = []
+    for rid in given:
+        task = asyncio.create_task(
+            limited_concurrency(
+                augment_resource_deep(kbid, rid, opts),
+                max_ops=concurrency_control,
+            )
+        )
+        ops.append(task)
+    results: list[nucliadb_models.resource.Resource | None] = await asyncio.gather(*ops)
+
+    augmented: dict[str, nucliadb_models.resource.Resource | None] = {}
+    for rid, augmentation in zip(given, results):
+        augmented[rid] = augmentation
+
+    return augmented
+
+
+@augmentor_observer.wrap({"type": "seialize_resource"})
+async def augment_resource_deep(
+    kbid: str,
+    rid: str,
+    opts: ResourceHydrationOptions,
+) -> nucliadb_models.resource.Resource | None:
+    """Augment a resource using the Resource model. Depending on the options,
+    this can serialize resource fields, extracted data like text, vectors...
+
+    Thus, this operation can be quite expensive.
+
+    """
+    resource = await cache.get_resource(kbid, rid)
+    if resource is None:
+        # skip resources that aren't in the DB
+        return None
+
+    serialized = await serialize_resource(
+        resource,
+        show=opts.show,
+        field_type_filter=opts.field_type_filter,
+        extracted=opts.extracted,
+    )
+    return serialized

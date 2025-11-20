@@ -56,7 +56,7 @@ class _BrokerMessageBuilder:
         # clear the state and generate a new broker message
         self.bm.Clear()
 
-        self.bm.kbid = resource.kb.kbid
+        self.bm.kbid = resource.kbid
         self.bm.uuid = resource.uuid
         basic = await resource.get_basic()
         if basic is not None:
@@ -93,9 +93,7 @@ class _BrokerMessageBuilder:
                     self.bm.link_extracted_data.append(link_extracted_data)
 
             # Field vectors
-            async for vectorset_id, vs in datamanagers.vectorsets.iter(
-                resource.txn, kbid=resource.kb.kbid
-            ):
+            async for vectorset_id, vs in datamanagers.vectorsets.iter(resource.txn, kbid=resource.kbid):
                 await self.generate_field_vectors(
                     type_id, field_id, field, vectorset_id, vs.storage_key_kind
                 )

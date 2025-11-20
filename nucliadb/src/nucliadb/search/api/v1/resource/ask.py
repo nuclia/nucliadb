@@ -23,8 +23,8 @@ from fastapi import Header, Request, Response
 from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
+from nucliadb.common import datamanagers
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.search.api.v1.resource.utils import get_resource_uuid_by_slug
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_SLUG_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import AskRequest, NucliaDBClientType, SyncAskResponse
@@ -105,7 +105,7 @@ async def resource_ask_endpoint_by_slug(
         "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
-    resource_id = await get_resource_uuid_by_slug(kbid, slug)
+    resource_id = await datamanagers.atomic.resources.get_resource_uuid_from_slug(kbid=kbid, slug=slug)
     if resource_id is None:
         return HTTPClientError(status_code=404, detail="Resource not found")
 

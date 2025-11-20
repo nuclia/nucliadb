@@ -69,9 +69,7 @@ async def iterate_sentences(
             # return any
             vectorset_id = None
             async with datamanagers.with_ro_transaction() as txn:
-                async for vectorset_id, vs in datamanagers.vectorsets.iter(
-                    txn=txn, kbid=resource.kb.kbid
-                ):
+                async for vectorset_id, vs in datamanagers.vectorsets.iter(txn=txn, kbid=resource.kbid):
                     break
             assert vectorset_id is not None, "All KBs must have at least a vectorset"
             vo = await field.get_vectors(vectorset_id, vs.storage_key_kind)

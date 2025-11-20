@@ -310,8 +310,8 @@ async def kb_vectorsets(kb: KnowledgeBox) -> list[VectorSetConfig]:
     return vectorsets
 
 
-async def make_field(field: Field, extracted_text: str):
-    vectorsets = await kb_vectorsets(field.resource.kb)
+async def make_field(kb: KnowledgeBox, field: Field, extracted_text: str):
+    vectorsets = await kb_vectorsets(kb)
     await field.set_extracted_text(make_extracted_text(field.id, body=extracted_text))
     await field.set_field_metadata(make_field_metadata(field.id))
     await field.set_large_field_metadata(make_field_large_metadata(field.id))
@@ -596,11 +596,11 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox: str) -
 
         # Title
         title_field = await test_resource.get_field("title", rpb.FieldType.GENERIC, load=False)
-        await make_field(title_field, "MyText")
+        await make_field(kb_obj, title_field, "MyText")
 
         # Summary
         summary_field = await test_resource.get_field("summary", rpb.FieldType.GENERIC, load=False)
-        await make_field(summary_field, "MyText")
+        await make_field(kb_obj, summary_field, "MyText")
 
         # 2.1 FILE FIELD
 
@@ -612,7 +612,7 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox: str) -
 
         file_field = await test_resource.set_field(rpb.FieldType.FILE, "file1", t2)
         await add_field_id(test_resource, file_field)
-        await make_field(file_field, "MyText")
+        await make_field(kb_obj, file_field, "MyText")
 
         # 2.2 LINK FIELD
         li2 = rpb.FieldLink(
@@ -634,14 +634,14 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox: str) -
 
         await linkfield.set_link_extracted_data(ex1)
         await add_field_id(test_resource, linkfield)
-        await make_field(linkfield, "MyText")
+        await make_field(kb_obj, linkfield, "MyText")
 
         # 2.3 TEXT FIELDS
 
         t23 = rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
         textfield = await test_resource.set_field(rpb.FieldType.TEXT, "text1", t23)
         await add_field_id(test_resource, textfield)
-        await make_field(textfield, "MyText")
+        await make_field(kb_obj, textfield, "MyText")
 
         # 2.4 CONVERSATION FIELD
 
@@ -668,7 +668,7 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox: str) -
 
         convfield = await test_resource.set_field(rpb.FieldType.CONVERSATION, "conv1", c2)
         await add_field_id(test_resource, convfield)
-        await make_field(convfield, extracted_text="MyText")
+        await make_field(kb_obj, convfield, extracted_text="MyText")
 
         # Q/A
         field_obj = await test_resource.get_field("link1", type=rpb.FieldType.LINK)

@@ -111,10 +111,10 @@ async def test_get_next_conversation_messages(field_obj, messages):
 
 
 async def test_find_conversation_message(field_obj, messages):
-    assert await chat_prompt.find_conversation_message(field_obj=field_obj, mident="3") == (
-        messages[2],
+    assert await chat_prompt.find_conversation_message(field_obj, ident="3") == (
         1,
         2,
+        messages[2],
     )
 
 
@@ -326,9 +326,20 @@ def test_capped_prompt_context():
 
 
 async def test_hierarchy_promp_context(kb):
-    with mock.patch(
-        "nucliadb.search.search.chat.prompt.get_paragraph_text",
-        side_effect=["Title text", "Summary text"],
+    async def _get_paragraph_text(field, paragraph_id: ParagraphId):
+        return {
+            "r1/f/f1/0-10": "First paragraph text",
+            "r1/f/f1/10-20": "Second paragraph text",
+            "r1/a/title/0-500": "Title text",
+            "r1/a/summary/0-1000": "Summary text",
+        }[paragraph_id.full()]
+
+    with (
+        mock.patch("nucliadb.search.augmentor.paragraphs.cache.get_resource"),
+        mock.patch(
+            "nucliadb.search.augmentor.paragraphs.get_paragraph_text",
+            side_effect=_get_paragraph_text,
+        ),
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         find_results = KnowledgeboxFindResults(
@@ -343,7 +354,7 @@ async def test_hierarchy_promp_context(kb):
                                     score=10,
                                     score_type=SCORE_TYPE.BM25,
                                     order=0,
-                                    text="First Paragraph text",
+                                    text="First paragraph text",
                                 ),
                                 "r1/f/f1/10-20": FindParagraph(
                                     id="r1/f/f1/10-20",
@@ -370,10 +381,10 @@ async def test_hierarchy_promp_context(kb):
         )
         assert (
             context.output["r1/f/f1/0-10"]
-            == "DOCUMENT: Title text \n SUMMARY: Summary text \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n First Paragraph text \n\n \n EXTRACTED BLOCK: \n Second paragraph text"  # noqa
+            == "DOCUMENT: Title text \n SUMMARY: Summary text \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n First paragraph text \n\n \n EXTRACTED BLOCK: \n Second paragraph text"  # noqa
         )
         # Chec that the original text of the paragraphs is preserved
-        assert ordered_paragraphs[0].text == "First Paragraph text"
+        assert ordered_paragraphs[0].text == "First paragraph text"
         assert ordered_paragraphs[1].text == "Second paragraph text"
 
         assert augmented_context.paragraphs["r1/f/f1/0-10"].id == "r1/f/f1/0-10"
@@ -407,9 +418,13 @@ async def test_extend_prompt_context_with_metadata():
     field.get_field_metadata = AsyncMock(return_value=fcm)
     resource.get_field = AsyncMock(return_value=field)
     resource.get_extra = AsyncMock(return_value=extra)
-    with mock.patch(
-        "nucliadb.search.search.chat.prompt.cache.get_resource",
-        return_value=resource,
+    with (
+        mock.patch(
+            "nucliadb.search.search.chat.prompt.cache.get_resource",
+            return_value=resource,
+        ),
+        mock.patch("nucliadb.search.augmentor.resources.get_basic", return_value=basic),
+        mock.patch("nucliadb.search.augmentor.fields.get_basic", return_value=basic),
     ):
         paragraph_id = ParagraphId.from_string("r1/f/f1/0-10")
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))

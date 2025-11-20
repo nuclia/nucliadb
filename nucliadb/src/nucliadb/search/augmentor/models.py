@@ -22,9 +22,13 @@ from dataclasses import dataclass
 from typing_extensions import Self
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
-from nucliadb.common.ids import ParagraphId
-from nucliadb_models.resource import Resource
-from nucliadb_models.search import Image
+from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb_models.conversation import FieldConversation
+from nucliadb_models.file import FieldFile
+from nucliadb_models.link import FieldLink
+from nucliadb_models.metadata import Extra, Origin
+from nucliadb_models.security import ResourceSecurity
+from nucliadb_models.text import FieldText
 from nucliadb_protos import resources_pb2
 
 
@@ -114,6 +118,12 @@ class Paragraph:
 
 
 @dataclass
+class RelatedParagraphs:
+    neighbours_before: list[ParagraphId]
+    neighbours_after: list[ParagraphId]
+
+
+@dataclass
 class AugmentedParagraph:
     id: ParagraphId
 
@@ -121,9 +131,79 @@ class AugmentedParagraph:
     text: str | None
 
     # original image for the paragraph when it has been extracted from an image
-    # or a table
-    source_image: Image | None
+    # or a table. This value is the path to be used in the download endpoint
+    source_image_path: str | None
+
+    # if the paragraph comes from a page, this is the path for the download
+    # endpoint to get the page preview image
+    page_preview_path: str | None
+
+    related: RelatedParagraphs | None
 
 
-# TODO: we should take ownership of this
-AugmentedResource = Resource
+@dataclass
+class BaseAugmentedField:
+    id: FieldId
+
+    text: str | None = None
+
+    # TODO: review tuples vs dict
+    classification_labels: list[tuple[str, str]] | None = None
+    # TODO: review tuples vs dict
+    entities: dict[str, set[str]] | None = None
+
+
+@dataclass
+class AugmentedTextField(BaseAugmentedField):
+    value: FieldText | None = None
+
+
+@dataclass
+class AugmentedFileField(BaseAugmentedField):
+    value: FieldFile | None = None
+
+
+@dataclass
+class AugmentedLinkField(BaseAugmentedField):
+    value: FieldLink | None = None
+
+
+@dataclass
+class AugmentedConversationField(BaseAugmentedField):
+    value: FieldConversation | None = None
+
+
+@dataclass
+class AugmentedGenericField(BaseAugmentedField):
+    value: str | None = None
+
+
+AugmentedField = (
+    BaseAugmentedField
+    | AugmentedTextField
+    | AugmentedFileField
+    | AugmentedLinkField
+    | AugmentedConversationField
+    | AugmentedGenericField
+)
+
+
+@dataclass
+class AugmentedResource:
+    id: str
+
+    title: str | None
+    summary: str | None
+
+    origin: Origin | None
+    extra: Extra | None
+    security: ResourceSecurity | None
+
+    classification_labels: list[tuple[str, str]] | None
+
+
+@dataclass
+class Augmented:
+    resources: dict[str, AugmentedResource]
+    fields: dict[FieldId, AugmentedField]
+    paragraphs: dict[ParagraphId, AugmentedParagraph]

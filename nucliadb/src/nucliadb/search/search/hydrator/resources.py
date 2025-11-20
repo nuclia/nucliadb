@@ -20,9 +20,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.ingest.serialize import serialize_security
+from nucliadb.models.internal.augment import (
+    ResourceOrigin,
+    ResourceProp,
+    ResourceSecurity,
+    ResourceSummary,
+    ResourceTitle,
+)
+from nucliadb.search.augmentor.resources import db_augment_resource
 from nucliadb_models import hydration as hydration_models
 
 
@@ -34,18 +40,21 @@ async def hydrate_resource(
     slug = basic.slug
     hydrated = hydration_models.HydratedResource(id=rid, slug=slug)
 
+    select: list[ResourceProp] = []
     if config.title:
-        hydrated.title = basic.title
+        select.append(ResourceTitle())
     if config.summary:
-        hydrated.summary = basic.summary
-
-    if config.security:
-        hydrated.security = await serialize_security(resource)
-
+        select.append(ResourceSummary())
     if config.origin:
-        origin = await resource.get_origin()
-        if origin is not None:
-            # TODO: we want a better hydration than proto to JSON
-            hydrated.origin = from_proto.origin(origin)
+        select.append(ResourceOrigin())
+    if config.security:
+        select.append(ResourceSecurity())
+
+    augmented = await db_augment_resource(resource, select)
+
+    hydrated.title = augmented.title
+    hydrated.summary = augmented.summary
+    hydrated.origin = augmented.origin
+    hydrated.security = augmented.security
 
     return hydrated

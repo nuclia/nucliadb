@@ -35,6 +35,7 @@ from nucliadb.export_import.exceptions import (
 )
 from nucliadb.export_import.models import ExportedItemType, ExportItem, Metadata
 from nucliadb.ingest.orm.broker_message import generate_broker_message
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_models.configuration import SearchConfiguration
 from nucliadb_models.export_import import Status
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
@@ -201,7 +202,7 @@ async def get_broker_message(
     context: ApplicationContext, kbid: str, rid: str
 ) -> Optional[writer_pb2.BrokerMessage]:
     async with datamanagers.with_ro_transaction() as txn:
-        resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
+        resource = await Resource.get(txn, kbid=kbid, rid=rid)
         if resource is None:
             return None
         resource.disable_vectors = False

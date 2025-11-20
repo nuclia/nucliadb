@@ -344,7 +344,7 @@ async def _get_resource_field(
             if rid is None:
                 raise HTTPException(status_code=404, detail="Resource does not exist")
 
-        resource = ORMResource(txn, storage, kb, rid)
+        resource = ORMResource(txn, storage, kbid, rid)
         field = await resource.get_field(field_id, pb_field_id, load=True)
         if field is None:
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")

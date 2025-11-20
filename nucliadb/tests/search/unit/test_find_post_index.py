@@ -129,7 +129,13 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
         return {rid: Resource(id=rid) for rid in given}
 
     async def mock_augment_paragraph(kbid: str, paragraph_id: ParagraphId, select, metadata):
-        return AugmentedParagraph(id=paragraph_id, text="extracted text", source_image=None)
+        return AugmentedParagraph(
+            id=paragraph_id,
+            text="extracted text",
+            source_image_path=None,
+            page_preview_path=None,
+            related=None,
+        )
 
     async def fake_reranking(kbid: str, item: RerankModel) -> RerankResponse:
         return RerankResponse(
@@ -170,7 +176,7 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
     with (
         patch("nucliadb.search.search.find.get_external_index_manager", return_value=None),
         patch(
-            "nucliadb.search.search.find_merge.augment_resources",
+            "nucliadb.search.search.find_merge.augment_resources_deep",
             side_effect=mock_augment_resources,
         ),
         patch(

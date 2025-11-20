@@ -87,7 +87,7 @@ async def get_extracted_texts(kbid: str, resource_uuids_or_slugs: list[str]) -> 
             if uuid is None:
                 logger.warning(f"Resource {uuid_or_slug} not found in KB", extra={"kbid": kbid})
                 continue
-            resource_orm = Resource(txn=txn, storage=storage, kb=kb_orm, uuid=uuid)
+            resource_orm = Resource(txn=txn, storage=storage, kbid=kbid, uuid=uuid)
             fields = await resource_orm.get_fields(force=True)
             for _, field in fields.items():
                 task = asyncio.create_task(get_extracted_text(uuid_or_slug, field, max_tasks))

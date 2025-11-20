@@ -281,7 +281,7 @@ class IndexMessageBuilder:
         vectorset_configs = [
             vectorset_config
             async for _, vectorset_config in datamanagers.vectorsets.iter(
-                self.resource.txn, kbid=self.resource.kb.kbid
+                self.resource.txn, kbid=self.resource.kbid
             )
         ]
         return vectorset_configs

@@ -278,7 +278,7 @@ async def test_reprocess_resource(
     maindb_driver,
 ) -> None:
     rsc = full_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
 
     from nucliadb.writer.utilities import get_processing
@@ -396,7 +396,7 @@ async def test_resource_endpoints_by_slug_404(
 @pytest.mark.deploy_modes("component")
 async def test_reindex(nucliadb_writer: AsyncClient, full_resource: Resource):
     rsc = full_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{kbid}/resource/{rid}/reindex",

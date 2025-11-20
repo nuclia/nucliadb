@@ -65,7 +65,7 @@ async def test_get_resource_default_options(
     nucliadb_reader: AsyncClient, test_resource: Resource
 ) -> None:
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
 
     resp = await nucliadb_reader.get(
@@ -85,7 +85,7 @@ async def test_get_resource_sequence_ids_are_set_on_resource(
     nucliadb_reader: AsyncClient, test_resource: Resource
 ) -> None:
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
 
     resp = await nucliadb_reader.get(
@@ -111,7 +111,7 @@ async def test_get_resource_all(
     test_resource: Resource,
 ) -> None:
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
 
     resp = await nucliadb_reader.get(
@@ -171,7 +171,7 @@ async def test_get_resource_all(
 @pytest.mark.deploy_modes("component")
 async def test_get_resource_filter_root_fields(nucliadb_reader: AsyncClient, test_resource):
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
 
     resp = await nucliadb_reader.get(
@@ -204,7 +204,7 @@ async def test_get_resource_filter_root_fields(nucliadb_reader: AsyncClient, tes
 @pytest.mark.deploy_modes("component")
 async def test_get_resource_filter_field_types(nucliadb_reader: AsyncClient, test_resource):
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
 
     resp = await nucliadb_reader.get(
@@ -230,7 +230,7 @@ async def test_get_resource_filter_field_types_and_extracted(
     nucliadb_reader: AsyncClient, test_resource
 ):
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
 
     resp = await nucliadb_reader.get(
@@ -261,7 +261,7 @@ async def test_get_resource_filter_field_types_and_extracted(
 @pytest.mark.deploy_modes("component")
 async def test_resource_endpoints_by_slug(nucliadb_reader: AsyncClient, test_resource):
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rslug = rsc.basic.slug
 
     non_existent_slug = "foobar"
@@ -295,7 +295,7 @@ async def test_resource_endpoints_by_slug(nucliadb_reader: AsyncClient, test_res
 @pytest.mark.deploy_modes("component")
 async def test_get_resource_extracted_metadata(nucliadb_reader: AsyncClient, test_resource: Resource):
     rsc = test_resource
-    kbid = rsc.kb.kbid
+    kbid = rsc.kbid
     rid = rsc.uuid
 
     resp = await nucliadb_reader.get(

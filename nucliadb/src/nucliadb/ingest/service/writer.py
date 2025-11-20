@@ -308,8 +308,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def Index(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         async with self.driver.ro_transaction() as txn:
-            kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
-            resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
+            resobj = ResourceORM(txn, self.storage, request.kbid, request.rid)
             bm = await generate_broker_message(resobj)
             transaction = get_transaction_utility()
             partitioning = get_partitioning()
@@ -323,7 +322,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         try:
             async with self.driver.rw_transaction() as txn:
                 kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
-                resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
+                resobj = ResourceORM(txn, self.storage, request.kbid, request.rid)
                 resobj.disable_vectors = not request.reindex_vectors
                 index_message = await get_resource_index_message(resobj, reindex=True)
                 shard = await self.proc.get_or_assign_resource_shard(txn, kbobj, request.rid)

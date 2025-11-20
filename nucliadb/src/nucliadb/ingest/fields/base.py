@@ -118,7 +118,7 @@ class Field(Generic[PbType]):
 
     @property
     def kbid(self) -> str:
-        return self.resource.kb.kbid
+        return self.resource.kbid
 
     @property
     def uuid(self) -> str:

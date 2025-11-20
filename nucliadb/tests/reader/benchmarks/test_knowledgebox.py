@@ -55,7 +55,7 @@ async def test_get_knowledgebox(
     full_resource: Resource,
     asyncbenchmark: AsyncBenchmarkFixture,
 ) -> None:
-    kbid = full_resource.kb.kbid
+    kbid = full_resource.kbid
     resp = await asyncbenchmark(
         nucliadb_reader.get,
         f"/{KB_PREFIX}/{kbid}",
@@ -69,7 +69,7 @@ async def test_get_knowledgebox_by_slug(
     full_resource: Resource,
     asyncbenchmark: AsyncBenchmarkFixture,
 ) -> None:
-    slug = full_resource.kb.kbid
+    slug = full_resource.kbid
     resp = await asyncbenchmark(
         nucliadb_reader.get,
         f"/{KB_PREFIX}/{slug}",

@@ -27,11 +27,11 @@ Backfill the data into the PG catalog
 import logging
 from typing import cast
 
-from nucliadb.common import datamanagers
 from nucliadb.common.catalog import catalog_update, get_catalog
 from nucliadb.common.catalog.pg import PGCatalog
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.ingest.orm.index_message import get_resource_index_message
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -73,7 +73,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                 # Index each resource
                 for rid in resources_to_index:
                     rid = str(rid).replace("-", "")
-                    resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
+                    resource = await Resource.get(txn, kbid=kbid, rid=rid)
                     if resource is None:
                         logger.warning(f"Could not load resource {rid} for kbid {kbid}")
                         continue

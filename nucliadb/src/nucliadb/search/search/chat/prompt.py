@@ -29,12 +29,21 @@ from pydantic import BaseModel
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.search import logger
+from nucliadb.ingest.serialize import serialize_extra, serialize_origin
+from nucliadb.models.internal.augment import ParagraphText
+from nucliadb.search import augmentor, logger
+from nucliadb.search.augmentor.fields import (
+    conversation_answer,
+    conversation_messages_after,
+    field_entities,
+    find_conversation_message,
+)
+from nucliadb.search.augmentor.models import Paragraph
+from nucliadb.search.augmentor.paragraphs import augment_paragraphs
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import (
     get_file_thumbnail_image,
@@ -43,7 +52,6 @@ from nucliadb.search.search.chat.images import (
 )
 from nucliadb.search.search.hydrator import hydrate_field_text, hydrate_resource_text
 from nucliadb.search.search.metrics import Metrics
-from nucliadb.search.search.paragraphs import get_paragraph_text
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.search import (
@@ -185,18 +193,6 @@ async def get_next_conversation_messages(
     return output
 
 
-async def find_conversation_message(
-    field_obj: Conversation, mident: str
-) -> tuple[Optional[resources_pb2.Message], int, int]:
-    cmetadata = await field_obj.get_metadata()
-    for page in range(1, cmetadata.pages + 1):
-        conv = await field_obj.db_get_value(page)
-        for idx, message in enumerate(conv.messages):
-            if message.ident == mident:
-                return message, page, idx
-    return None, -1, -1
-
-
 async def get_expanded_conversation_messages(
     *,
     kb: KnowledgeBoxORM,
@@ -209,27 +205,24 @@ async def get_expanded_conversation_messages(
     if resource is None:  # pragma: no cover
         return []
     field_obj: Conversation = await resource.get_field(field_id, FIELD_TYPE_STR_TO_PB["c"], load=True)  # type: ignore
-    found_message, found_page, found_idx = await find_conversation_message(
-        field_obj=field_obj, mident=mident
-    )
+    found_message = await find_conversation_message(field_obj, mident)
     if found_message is None:  # pragma: no cover
         return []
-    elif found_message.type == resources_pb2.Message.MessageType.QUESTION:
+    page, index, message = found_message
+
+    if message.type == resources_pb2.Message.MessageType.QUESTION:
         # only try to get answer if it was a question
-        return await get_next_conversation_messages(
-            field_obj=field_obj,
-            page=found_page,
-            start_idx=found_idx + 1,
-            num_messages=1,
-            message_type=resources_pb2.Message.MessageType.ANSWER,
-        )
+        answer = await conversation_answer(field_obj, start_from=(page, index + 1))
+        if answer is None:
+            return []
+        else:
+            return [answer]
+
     else:
-        return await get_next_conversation_messages(
-            field_obj=field_obj,
-            page=found_page,
-            start_idx=found_idx + 1,
-            num_messages=max_messages,
+        messages_after = await conversation_messages_after(
+            field_obj, start_from=(page, index + 1), limit=max_messages
         )
+        return messages_after or []
 
 
 async def default_prompt_context(
@@ -409,9 +402,7 @@ async def extend_prompt_context_with_origin_metadata(
         origin = None
         resource = await cache.get_resource(kbid, rid)
         if resource is not None:
-            pb_origin = await resource.get_origin()
-            if pb_origin is not None:
-                origin = from_proto.origin(pb_origin)
+            origin = await serialize_origin(resource)
         return rid, origin
 
     rids = {tb_id.rid for tb_id in text_block_ids}
@@ -442,18 +433,16 @@ async def extend_prompt_context_with_classification_labels(
         labels = set()
         resource = await cache.get_resource(kbid, fid.rid)
         if resource is not None:
-            pb_basic = await resource.get_basic()
-            if pb_basic is not None:
-                # Add the classification labels of the resource
-                for classif in pb_basic.usermetadata.classifications:
-                    labels.add((classif.labelset, classif.label))
-                # Add the classifications labels of the field
-                for fc in pb_basic.computedmetadata.field_classifications:
-                    if fc.field.field == fid.key and fc.field.field_type == fid.pb_type:
-                        for classif in fc.classifications:
-                            if classif.cancelled_by_user:  # pragma: no cover
-                                continue
-                            labels.add((classif.labelset, classif.label))
+            resource_classifications = await augmentor.resources.classification_labels(resource)
+            if resource_classifications:
+                for labelset, label in resource_classifications:
+                    labels.add((labelset, label))
+
+            field_classifications = await augmentor.fields.classification_labels(fid, resource)
+            if field_classifications:
+                for labelset, label in field_classifications:
+                    labels.add((labelset, label))
+
         return _id, list(labels)
 
     classif_labels = await run_concurrently([_get_labels(kbid, tb_id) for tb_id in text_block_ids])
@@ -489,19 +478,10 @@ async def extend_prompt_context_with_ner(
         resource = await cache.get_resource(kbid, fid.rid)
         if resource is not None:
             field = await resource.get_field(fid.key, fid.pb_type, load=False)
-            fcm = await field.get_field_metadata()
-            if fcm is not None:
-                # Data Augmentation + Processor entities
-                for (
-                    data_aumgentation_task_id,
-                    entities_wrapper,
-                ) in fcm.metadata.entities.items():
-                    for entity in entities_wrapper.entities:
-                        ners.setdefault(entity.label, set()).add(entity.text)
-                # Legacy processor entities
-                # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-                for token, family in fcm.metadata.ner.items():
-                    ners.setdefault(family, set()).add(token)
+
+            entities = await field_entities(fid, field)
+            if entities is not None:
+                ners.update(entities)
         return _id, ners
 
     nerss = await run_concurrently([_get_ners(kbid, tb_id) for tb_id in text_block_ids])
@@ -538,9 +518,7 @@ async def extend_prompt_context_with_extra_metadata(
         extra = None
         resource = await cache.get_resource(kbid, rid)
         if resource is not None:
-            pb_extra = await resource.get_extra()
-            if pb_extra is not None:
-                extra = from_proto.extra(pb_extra)
+            extra = await serialize_extra(resource)
         return rid, extra
 
     rids = {tb_id.rid for tb_id in text_block_ids}
@@ -969,68 +947,81 @@ async def hierarchy_prompt_context(
     resources: Dict[str, ExtraCharsParagraph] = {}
 
     # Iterate paragraphs to get extended text
+    paragraphs_to_augment = []
     for paragraph in ordered_paragraphs_copy:
         paragraph_id = ParagraphId.from_string(paragraph.id)
-        extended_paragraph_text = paragraph.text
-        if paragraphs_extra_characters > 0:
-            extended_paragraph_id = ParagraphId(
-                field_id=paragraph_id.field_id,
-                paragraph_start=paragraph_id.paragraph_start,
-                paragraph_end=paragraph_id.paragraph_end + paragraphs_extra_characters,
-            )
-            extended_paragraph_text = await get_paragraph_text(
-                kbid=kbid,
-                paragraph_id=extended_paragraph_id,
-                log_on_missing_field=True,
-            )
         rid = paragraph_id.rid
+
+        if paragraphs_extra_characters > 0:
+            paragraph_id.paragraph_end += paragraphs_extra_characters
+
+        paragraphs_to_augment.append(paragraph_id)
+
         if rid not in resources:
             # Get the title and the summary of the resource
-            title_text = await get_paragraph_text(
-                kbid=kbid,
-                paragraph_id=ParagraphId(
-                    field_id=FieldId(
-                        rid=rid,
-                        type="a",
-                        key="title",
-                    ),
-                    paragraph_start=0,
-                    paragraph_end=500,
+            title_paragraph_id = ParagraphId(
+                field_id=FieldId(
+                    rid=rid,
+                    type="a",
+                    key="title",
                 ),
-                log_on_missing_field=False,
+                paragraph_start=0,
+                paragraph_end=500,
             )
-            summary_text = await get_paragraph_text(
-                kbid=kbid,
-                paragraph_id=ParagraphId(
-                    field_id=FieldId(
-                        rid=rid,
-                        type="a",
-                        key="summary",
-                    ),
-                    paragraph_start=0,
-                    paragraph_end=1000,
+            summary_paragraph_id = ParagraphId(
+                field_id=FieldId(
+                    rid=rid,
+                    type="a",
+                    key="summary",
                 ),
-                log_on_missing_field=False,
+                paragraph_start=0,
+                paragraph_end=1000,
             )
+            paragraphs_to_augment.append(title_paragraph_id)
+            paragraphs_to_augment.append(summary_paragraph_id)
+
             resources[rid] = ExtraCharsParagraph(
-                title=title_text,
-                summary=summary_text,
-                paragraphs=[(paragraph, extended_paragraph_text)],
+                title=title_paragraph_id,
+                summary=summary_paragraph_id,
+                paragraphs=[(paragraph, paragraph_id)],
             )
         else:
-            resources[rid].paragraphs.append((paragraph, extended_paragraph_text))
+            resources[rid].paragraphs.append((paragraph, paragraph_id))
 
     metrics.set("hierarchy_ops", len(resources))
+
+    augmented = await augment_paragraphs(
+        kbid,
+        [Paragraph(id=paragraph_id, metadata=None) for paragraph_id in paragraphs_to_augment],
+        select=[ParagraphText()],
+    )
+
     augmented_paragraphs = set()
 
     # Modify the first paragraph of each resource to include the title and summary of the resource, as well as the
     # extended paragraph text of all the paragraphs in the resource.
     for values in resources.values():
-        title_text = values.title
-        summary_text = values.summary
+        augmented_title = augmented.get(values.title)
+        if augmented_title:
+            title_text = augmented_title.text or ""
+        else:
+            title_text = ""
+
+        augmented_summary = augmented.get(values.summary)
+        if augmented_summary:
+            summary_text = augmented_summary.text or ""
+        else:
+            summary_text = ""
+
         first_paragraph = None
         text_with_hierarchy = ""
-        for paragraph, extended_paragraph_text in values.paragraphs:
+        for paragraph, paragraph_id in values.paragraphs:
+            augmented_paragraph = augmented.get(paragraph_id)
+            if augmented_paragraph:
+                extended_paragraph_text = augmented_paragraph.text or ""
+            else:
+                extended_paragraph_text = ""
+
             if first_paragraph is None:
                 first_paragraph = paragraph
             text_with_hierarchy += "\n EXTRACTED BLOCK: \n " + extended_paragraph_text + " \n\n "
@@ -1311,9 +1302,9 @@ def get_paragraph_page_number(paragraph: FindParagraph) -> Optional[int]:
 
 @dataclass
 class ExtraCharsParagraph:
-    title: str
-    summary: str
-    paragraphs: List[Tuple[FindParagraph, str]]
+    title: ParagraphId
+    summary: ParagraphId
+    paragraphs: List[Tuple[FindParagraph, ParagraphId]]
 
 
 def _clean_paragraph_text(paragraph: FindParagraph) -> str:
