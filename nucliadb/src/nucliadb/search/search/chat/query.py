@@ -572,6 +572,12 @@ async def rao_find(
     """
     fetcher, retrieval_request, reranker = await rao_parse_find(kbid, find_request)
 
+    query = find_request.query
+    rephrased_query = None
+    if retrieval_request.query.keyword:
+        if find_request.query != retrieval_request.query.keyword.query:
+            rephrased_query = retrieval_request.query.keyword.query
+
     retrieval_response = await retrieve(kbid, retrieval_request)
     matches = retrieval_response.matches
 
@@ -587,7 +593,7 @@ async def rao_find(
             FindRequest(
                 features=[FindOptions.RELATIONS],
                 # needed for automatic entity detection
-                query=find_request.query,
+                query=query,
                 # used for "hardcoded" graph queries
                 query_entities=find_request.query_entities,
             ),
@@ -597,11 +603,6 @@ async def rao_find(
             metrics,
         )
         relations = find_response.relations
-
-    if retrieval_request.query.keyword:
-        query = retrieval_request.query.keyword.query
-    else:
-        query = ""
 
     text_blocks, resources, best_matches = await augment_and_rerank(
         kbid,
@@ -616,14 +617,20 @@ async def rao_find(
         ),
         text_block_hydration_options=TextBlockHydrationOptions(),
         reranker=reranker,
-        reranking_options=RerankingOptions(kbid=kbid, query=query),
+        reranking_options=RerankingOptions(kbid=kbid, query=rephrased_query or query),
     )
     find_resources = compose_find_resources(text_blocks, resources)
     find_results = KnowledgeboxFindResults(
         query=query,
+        rephrased_query=query,
         resources=find_resources,
         best_matches=best_matches,
         relations=relations,
+        # legacy fields
+        total=len(text_blocks),
+        page_number=0,
+        page_size=find_request.top_k,
+        next_page=False,
     )
 
     return find_results, False, fetcher, reranker
