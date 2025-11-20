@@ -18,18 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import logging
 from typing import Optional
 
+from nucliadb.common.exceptions import InvalidQueryError
+from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError, convert_relations
 from nucliadb.search.predict_models import QueryModel
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
-from nucliadb_models.search import Image
+from nucliadb_models.search import Image, MaxTokens
 from nucliadb_protos import utils_pb2
-
-logger = logging.getLogger(__name__)
 
 
 class RAOFetcher(Fetcher):
@@ -71,6 +70,8 @@ class RAOFetcher(Fetcher):
                 query_image=self.query_image,
             )
         return self._query_info
+
+    # Retrieval
 
     async def get_rephrased_query(self) -> Optional[str]:
         query_info = await self.query_information()
@@ -134,6 +135,35 @@ class RAOFetcher(Fetcher):
 
         query_vector = query_info.sentence.vectors[vectorset]
         return query_vector
+
+    # Generative
+
+    async def get_visual_llm_enabled(self) -> bool:
+        query_info = await self.query_information()
+        if query_info is None:
+            raise SendToPredictError("Error while using predict's query endpoint")
+
+        return query_info.visual_llm
+
+    async def get_max_context_tokens(self, max_tokens: Optional[MaxTokens]) -> int:
+        query_info = await self.query_information()
+        if query_info is None:
+            raise SendToPredictError("Error while using predict's query endpoint")
+
+        model_max = query_info.max_context
+        if max_tokens is not None and max_tokens.context is not None:
+            if max_tokens.context > model_max:
+                raise InvalidQueryError(
+                    "max_tokens.context",
+                    f"Max context tokens is higher than the model's limit of {model_max}",
+                )
+            return max_tokens.context
+        return model_max
+
+    def get_max_answer_tokens(self, max_tokens: Optional[MaxTokens]) -> Optional[int]:
+        if max_tokens is not None and max_tokens.answer is not None:
+            return max_tokens.answer
+        return None
 
 
 async def query_information(
