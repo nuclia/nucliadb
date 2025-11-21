@@ -61,6 +61,7 @@ impl NidxFixture {
                 merge: Default::default(),
                 metadata: Some(MetadataSettings {
                     database_url: "ignored".to_string(),
+                    disable_migrations: false,
                 }),
                 telemetry: Default::default(),
                 work_path: None,

@@ -173,6 +173,8 @@ fn deserialize_object_store<'de, D: Deserializer<'de>>(deserializer: D) -> Resul
 #[derive(Clone, Debug, Deserialize)]
 pub struct MetadataSettings {
     pub database_url: String,
+    #[serde(default)]
+    pub disable_migrations: bool,
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -409,7 +411,7 @@ impl Settings {
     }
 
     pub async fn from_env_settings(settings: EnvSettings) -> anyhow::Result<Self> {
-        let metadata = NidxMetadata::new(&settings.metadata.as_ref().expect("DB config required").database_url).await?;
+        let metadata = NidxMetadata::new(settings.metadata.as_ref().expect("DB config required")).await?;
         Ok(Self { metadata, settings })
     }
 }

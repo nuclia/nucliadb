@@ -23,6 +23,9 @@ podAnnotations: {}
 podLabels:
   nidxMetrics: "enabled"
 
+# -- Enable maintenance mode, which disables writes while keeping searchers active
+maintenance: false
+
 api:
   # -- Number of replicas for the API deployment
   replicas: 2

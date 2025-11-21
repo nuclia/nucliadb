@@ -34,6 +34,8 @@ pub use merge_job::*;
 pub use segment::*;
 pub use shard::*;
 
+use crate::settings::MetadataSettings;
+
 /// A random ID to identify the lock we use during migration
 const MIGRATION_LOCK_ID: i64 = 5324678839066546102;
 
@@ -43,25 +45,34 @@ pub struct NidxMetadata {
 }
 
 impl NidxMetadata {
-    pub async fn new(database_url: &str) -> sqlx::Result<Self> {
+    pub async fn new(settings: &MetadataSettings) -> sqlx::Result<Self> {
         let pool = sqlx::postgres::PgPoolOptions::new()
             .acquire_timeout(Duration::from_secs(2))
-            .connect(database_url)
+            .connect(&settings.database_url)
             .await?;
 
-        Self::new_with_pool(pool).await
+        if !settings.disable_migrations {
+            Self::run_migrations(&pool).await?;
+        }
+
+        Ok(NidxMetadata { pool })
     }
 
     pub async fn new_with_pool(pool: sqlx::PgPool) -> sqlx::Result<Self> {
+        Self::run_migrations(&pool).await?;
+        Ok(NidxMetadata { pool })
+    }
+
+    async fn run_migrations(pool: &sqlx::PgPool) -> sqlx::Result<()> {
         // Run migrations inside a transaction that holds a global lock, avoids races
         let mut tx = pool.begin().await?;
         sqlx::query!("SELECT pg_advisory_xact_lock($1)", MIGRATION_LOCK_ID)
             .execute(&mut *tx)
             .await?;
-        sqlx::migrate!("./migrations").run(&pool).await?;
+        sqlx::migrate!("./migrations").run(pool).await?;
         tx.commit().await?;
 
-        Ok(NidxMetadata { pool })
+        Ok(())
     }
 
     pub async fn transaction(&self) -> sqlx::Result<sqlx::Transaction<'_, sqlx::Postgres>> {

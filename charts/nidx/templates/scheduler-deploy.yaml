@@ -10,7 +10,11 @@ metadata:
     heritage: "{{ .Release.Service }}"
 spec:
   # Only 1 scheduler max running at a time, even during deployment (stop before starting).
+  {{ if .Values.maintenance }}
+  replicas: 0
+  {{ else }}
   replicas: 1
+  {{ end }}
   strategy:
     type: Recreate
   selector:
