@@ -25,6 +25,7 @@ from nidx_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
 from nucliadb.common import datamanagers
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR
+from nucliadb_models.common import Paragraph
 from nucliadb_models.filters import (
     And,
     DateCreated,
@@ -50,6 +51,7 @@ from nucliadb_models.filters import (
     ResourceMimetype,
     Status,
 )
+from nucliadb_models.metadata import ResourceProcessingStatus
 
 # Filters that end up as a facet
 FacetFilter = (
@@ -178,6 +180,113 @@ def facet_from_filter(expr: FacetFilter) -> str:
         _a: int = "a"
 
     return facet
+
+
+def filter_from_facet(facet: str) -> FacetFilter:
+    expr: FacetFilter
+
+    if facet.startswith("/t/"):
+        value = facet.removeprefix("/t/")
+        expr = OriginTag(tag=value)
+
+    elif facet.startswith("/l/"):
+        value = facet.removeprefix("/l/")
+        parts = value.split("/", maxsplit=1)
+        if len(parts) == 1:
+            type = parts[0]
+            expr = Label(labelset=type)
+        else:
+            type, subtype = parts
+            expr = Label(labelset=type, label=subtype)
+
+    elif facet.startswith("/n/i/"):
+        value = facet.removeprefix("/n/i/")
+        parts = value.split("/", maxsplit=1)
+        if len(parts) == 1:
+            type = parts[0]
+            expr = ResourceMimetype(type=type)
+        else:
+            type, subtype = parts
+            expr = ResourceMimetype(type=type, subtype=subtype)
+
+    elif facet.startswith("/mt/"):
+        value = facet.removeprefix("/mt/")
+        parts = value.split("/", maxsplit=1)
+        if len(parts) == 1:
+            type = parts[0]
+            expr = FieldMimetype(type=type)
+        else:
+            type, subtype = parts
+            expr = FieldMimetype(type=type, subtype=subtype)
+
+    elif facet.startswith("/e/"):
+        value = facet.removeprefix("/e/")
+        parts = value.split("/", maxsplit=1)
+        if len(parts) == 1:
+            subtype = parts[0]
+            expr = Entity(subtype=subtype)
+        else:
+            subtype, value = parts
+            expr = Entity(subtype=subtype, value=value)
+
+    elif facet.startswith("/s/p"):
+        value = facet.removeprefix("/s/p/")
+        expr = Language(language=value, only_primary=True)
+
+    elif facet.startswith("/s/s"):
+        value = facet.removeprefix("/s/s/")
+        expr = Language(language=value, only_primary=False)
+
+    elif facet.startswith("/m/"):
+        value = facet.removeprefix("/m/")
+        parts = value.split("/", maxsplit=1)
+        if len(parts) == 1:
+            field = parts[0]
+            expr = OriginMetadata(field=field)
+        else:
+            field, value = parts
+            expr = OriginMetadata(field=field, value=value)
+
+    elif facet.startswith("/p/"):
+        value = facet.removeprefix("/p/")
+        expr = OriginPath(prefix=value)
+
+    elif facet.startswith("/g/da"):
+        value = facet.removeprefix("/g/da")
+        expr = expr = Generated(by="data-augmentation")
+        if value.removeprefix("/"):
+            expr.da_task = value.removeprefix("/")
+
+    elif facet.startswith("/k/"):
+        value = facet.removeprefix("/k/")
+        try:
+            kind = Paragraph.TypeParagraph(value.upper())
+        except ValueError:
+            raise InvalidQueryError("filters", f"invalid paragraph kind: {value}")
+        expr = Kind(kind=kind)
+
+    elif facet.startswith("/u/o/"):
+        value = facet.removeprefix("/u/o/")
+        expr = OriginCollaborator(collaborator=value)
+
+    elif facet.startswith("/u/s"):
+        value = facet.removeprefix("/u/s")
+        expr = OriginSource()
+        if value.removeprefix("/"):
+            expr.id = value.removeprefix("/")
+
+    elif facet.startswith("/n/s/"):
+        value = facet.removeprefix("/n/s/")
+        try:
+            status = ResourceProcessingStatus(value.upper())
+        except ValueError:
+            raise InvalidQueryError("filters", f"invalid resource processing status: {value}")
+        expr = Status(status=status)
+
+    else:
+        raise InvalidQueryError("filters", f"invalid filter: {facet}")
+
+    return expr
 
 
 def add_and_expression(dest: PBFilterExpression, add: PBFilterExpression):
