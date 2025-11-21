@@ -9,7 +9,11 @@ metadata:
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 spec:
+  {{ if .Values.maintenance }}
+  replicas: 0
+  {{ else }}
   replicas: {{ .Values.api.replicas | default 2 }}
+  {{ end }}
   selector:
     matchLabels:
       app: nidx-api

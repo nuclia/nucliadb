@@ -9,6 +9,9 @@ metadata:
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 spec:
+  {{ if .Values.maintenance }}
+  replicas: 0
+  {{ end }}
   selector:
     matchLabels:
       app: nidx-indexer
