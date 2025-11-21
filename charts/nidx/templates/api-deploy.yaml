@@ -63,10 +63,13 @@ spec:
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["nidx", "api"]
-        {{- with .Values.envFrom }}
         envFrom:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
+          {{- with .Values.envFrom }}
+            {{- toYaml . | nindent 10 }}
+          {{- end }}
+          {{- with .Values.api.envFrom }}
+            {{- toYaml . | nindent 10 }}
+          {{- end }}
         env:
           {{- include "toEnv" .Values.env | nindent 10 }}
           {{- with .Values.api.env }}
