@@ -19,6 +19,7 @@
 #
 
 import asyncio
+from typing import Awaitable
 
 from fastapi import Header, Request
 from fastapi_versioning import version
@@ -36,6 +37,7 @@ from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb_models.augment import (
     AugmentedParagraph,
     AugmentedResource,
+    AugmentParagraphs,
     AugmentRequest,
     AugmentResponse,
 )
@@ -53,7 +55,7 @@ from nucliadb_utils.authentication import requires
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def augment_endpoint(
+async def _augment_endpoint(
     request: Request,
     kbid: str,
     item: AugmentRequest,
@@ -61,29 +63,53 @@ async def augment_endpoint(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> AugmentResponse:
+    return await augment_endpoint(kbid, item)
+
+
+async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
+    async def skip_augment() -> dict:
+        return {}
+
     with request_caches():
         max_ops = asyncio.Semaphore(50)
 
-        resources_to_augment = item.resources.given
-        paragraphs_to_augment, paragraph_selector = parse_paragraph_augment(item)
+        augment_resources_task: Awaitable[dict[str, nucliadb_models.resource.Resource | None]]
+        if item.resources is None:
+            augment_resources_task = skip_augment()
+        else:
+            resources_to_augment = item.resources.given
+            augment_resources_task = asyncio.create_task(
+                augment_resources_deep(
+                    kbid,
+                    given=resources_to_augment,
+                    opts=ResourceHydrationOptions(
+                        show=item.resources.show,
+                        extracted=item.resources.extracted,
+                        field_type_filter=item.resources.field_type_filter,
+                    ),
+                    concurrency_control=max_ops,
+                )
+            )
+
+        augment_paragraphs_task: Awaitable[
+            dict[ParagraphId, nucliadb.search.augmentor.models.AugmentedParagraph | None]
+        ]
+        if item.paragraphs is None:
+            augment_paragraphs_task = skip_augment()
+        else:
+            paragraphs_to_augment, paragraph_selector = parse_paragraph_augment(item.paragraphs)
+            augment_paragraphs_task = asyncio.create_task(
+                augment_paragraphs(
+                    kbid,
+                    given=paragraphs_to_augment,
+                    select=paragraph_selector,
+                    concurrency_control=max_ops,
+                )
+            )
 
         ops = [
-            augment_resources_deep(
-                kbid,
-                given=resources_to_augment,
-                opts=ResourceHydrationOptions(
-                    show=item.resources.show,
-                    extracted=item.resources.extracted,
-                    field_type_filter=item.resources.field_type_filter,
-                ),
-                concurrency_control=max_ops,
-            ),
-            augment_paragraphs(
-                kbid,
-                given=paragraphs_to_augment,
-                select=paragraph_selector,
-                concurrency_control=max_ops,
-            ),
+            augment_resources_task,
+            augment_paragraphs_task,
         ]
 
         resources: dict[str, nucliadb_models.resource.Resource | None]
@@ -113,9 +139,9 @@ async def augment_endpoint(
         )
 
 
-def parse_paragraph_augment(item: AugmentRequest) -> tuple[list[Paragraph], list[ParagraphProp]]:
+def parse_paragraph_augment(item: AugmentParagraphs) -> tuple[list[Paragraph], list[ParagraphProp]]:
     paragraphs_to_augment = []
-    for paragraph in item.paragraphs.given:
+    for paragraph in item.given:
         try:
             paragraph_id = ParagraphId.from_string(paragraph.id)
         except ValueError:
@@ -129,7 +155,7 @@ def parse_paragraph_augment(item: AugmentRequest) -> tuple[list[Paragraph], list
             )
         )
     selector: list[ParagraphProp] = []
-    if item.paragraphs.text:
+    if item.text:
         selector.append(ParagraphText())
 
     return paragraphs_to_augment, selector
