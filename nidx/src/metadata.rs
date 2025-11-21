@@ -33,7 +33,6 @@ pub use index_request::*;
 pub use merge_job::*;
 pub use segment::*;
 pub use shard::*;
-use tracing::info;
 
 use crate::settings::MetadataSettings;
 
