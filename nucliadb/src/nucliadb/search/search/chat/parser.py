@@ -240,6 +240,14 @@ class RAOFindParser:
 
             if self.item.filters:
                 # TODO: label filters
+                #
+                # This conversion is quite costly, as requires access to the
+                # knowledge box labels. The deprecated filters parameter allow
+                # users to mix field and paragraph filters, but to convert them
+                # into a filter expression we need to distinguish them. From
+                # outside NucliaDB, the only thing we could do is calling the
+                # /labelsets endpoint, but this would be costly for a deprecated
+                # parameter. Do we want to?
                 ...
 
             if self.item.keyword_filters:
