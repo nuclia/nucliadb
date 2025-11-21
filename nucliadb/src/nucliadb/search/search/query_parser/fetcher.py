@@ -29,15 +29,10 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError, convert_relations
 from nucliadb.search.predict_models import QueryModel
-from nucliadb.search.search.metrics import (
-    query_parse_dependency_observer,
-)
+from nucliadb.search.search.metrics import query_parse_dependency_observer
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
-from nucliadb_models.search import (
-    Image,
-    MaxTokens,
-)
+from nucliadb_models.search import Image, MaxTokens
 from nucliadb_protos import knowledgebox_pb2, utils_pb2
 
 

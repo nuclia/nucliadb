@@ -61,6 +61,7 @@ from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
     ChatAuditor,
     add_resource_filter,
+    get_answer_stream,
     get_find_results,
     get_relations_results,
     maybe_audit_chat,
@@ -76,10 +77,6 @@ from nucliadb.search.search.metrics import AskMetrics, Metrics
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
 from nucliadb.search.search.rank_fusion import WeightedCombSum
-from nucliadb.search.search.rerankers import (
-    get_reranker,
-)
-from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     SCORE_TYPE,
     AnswerAskResponseItem,
@@ -683,14 +680,11 @@ async def ask(
     predict_answer_stream = None
     if ask_request.generate_answer:
         with metrics.time("stream_start"):
-            predict = get_predict()
             (
                 nuclia_learning_id,
                 nuclia_learning_model,
                 predict_answer_stream,
-            ) = await predict.chat_query_ndjson(
-                kbid=kbid, item=chat_model, extra_headers=extra_predict_headers
-            )
+            ) = await get_answer_stream(kbid=kbid, item=chat_model, extra_headers=extra_predict_headers)
 
     auditor = ChatAuditor(
         kbid=kbid,
@@ -838,7 +832,7 @@ async def retrieval_in_kb(
 ) -> RetrievalResults:
     prequeries = parse_prequeries(ask_request)
     graph_strategy = parse_graph_strategy(ask_request)
-    main_results, prequeries_results, parsed_query = await get_find_results(
+    main_results, prequeries_results, fetcher, reranker = await get_find_results(
         kbid=kbid,
         query=main_query,
         item=ask_request,
@@ -850,10 +844,6 @@ async def retrieval_in_kb(
     )
 
     if graph_strategy is not None:
-        assert parsed_query.retrieval.reranker is not None, (
-            "find parser must provide a reranking algorithm"
-        )
-        reranker = get_reranker(parsed_query.retrieval.reranker)
         graph_results, graph_request = await get_graph_results(
             kbid=kbid,
             query=main_query,
@@ -886,7 +876,7 @@ async def retrieval_in_kb(
     return RetrievalResults(
         main_query=main_results,
         prequeries=prequeries_results,
-        fetcher=parsed_query.fetcher,
+        fetcher=fetcher,
         main_query_weight=main_query_weight,
         best_matches=best_matches,
     )
@@ -926,7 +916,7 @@ async def retrieval_in_resource(
                 )
             add_resource_filter(prequery.request, [resource])
 
-    main_results, prequeries_results, parsed_query = await get_find_results(
+    main_results, prequeries_results, fetcher, _ = await get_find_results(
         kbid=kbid,
         query=main_query,
         item=ask_request,
@@ -949,7 +939,7 @@ async def retrieval_in_resource(
     return RetrievalResults(
         main_query=main_results,
         prequeries=prequeries_results,
-        fetcher=parsed_query.fetcher,
+        fetcher=fetcher,
         main_query_weight=main_query_weight,
         best_matches=best_matches,
     )
