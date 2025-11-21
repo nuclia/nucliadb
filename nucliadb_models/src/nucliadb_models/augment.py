@@ -24,6 +24,7 @@ ParagraphId = str
 
 class AugmentParagraph(BaseModel):
     id: ParagraphId
+    # TODO: paragraph metadata
 
 
 class AugmentResources(BaseModel):
@@ -57,8 +58,8 @@ class AugmentParagraphs(BaseModel):
 
 
 class AugmentRequest(BaseModel):
-    resources: AugmentResources
-    paragraphs: AugmentParagraphs
+    resources: AugmentResources | None = None
+    paragraphs: AugmentParagraphs | None = None
 
 
 class AugmentedParagraph(BaseModel):
