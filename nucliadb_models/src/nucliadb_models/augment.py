@@ -22,9 +22,24 @@ from nucliadb_models.search import Image, ResourceProperties, SearchParamDefault
 ParagraphId = str
 
 
+class ParagraphMetadata(BaseModel):
+    field_labels: list[str]
+    paragraph_labels: list[str]
+
+    is_an_image: bool
+    is_a_table: bool
+
+    # for extracted from visual content (ocr, inception, tables)
+    source_file: str | None
+
+    # for documents (pdf, docx...) only
+    page: int | None
+    in_page_with_visual: bool | None
+
+
 class AugmentParagraph(BaseModel):
     id: ParagraphId
-    # TODO: paragraph metadata
+    metadata: ParagraphMetadata | None = None
 
 
 class AugmentResources(BaseModel):

@@ -67,6 +67,7 @@ from nucliadb_models.augment import (
     AugmentRequest,
     AugmentResources,
     AugmentResponse,
+    ParagraphMetadata,
 )
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -771,7 +772,15 @@ async def hydrate_and_rerank(
             given=[
                 AugmentParagraph(
                     id=paragraph_id,
-                    # TODO: paragraph metadata
+                    metadata=ParagraphMetadata(
+                        field_labels=text_blocks_by_id[paragraph_id].field_labels,
+                        paragraph_labels=text_blocks_by_id[paragraph_id].paragraph_labels,
+                        is_an_image=text_blocks_by_id[paragraph_id].is_an_image,
+                        is_a_table=text_blocks_by_id[paragraph_id].is_a_table,
+                        source_file=text_blocks_by_id[paragraph_id].representation_file,
+                        page=text_blocks_by_id[paragraph_id].position.page_number,
+                        in_page_with_visual=text_blocks_by_id[paragraph_id].page_with_visual,
+                    ),
                 )
                 for paragraph_id in text_block_id_to_hydrate
             ],
