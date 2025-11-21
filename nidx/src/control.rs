@@ -34,17 +34,24 @@ use crate::{NidxMetadata, metrics, settings::EnvSettings, telemetry};
 pub enum ControlRequest {
     Alive,
     Ready,
-    SetLogLevel { level: String },
+    SetLogLevel {
+        level: String,
+    },
+    CheckDatabase {
+        #[arg(action = clap::ArgAction::Set)]
+        enabled: bool,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Alive {
     database: bool,
+    check_database: bool,
 }
 
 impl Alive {
     fn all_ok(&self) -> bool {
-        self.database
+        !self.check_database || self.database
     }
 }
 
@@ -79,6 +86,7 @@ pub struct ControlServer {
     meta: NidxMetadata,
     searcher_synced: Option<bool>,
     nats_client: Option<async_nats::Client>,
+    check_database: bool,
 }
 
 impl ControlServer {
@@ -87,6 +95,7 @@ impl ControlServer {
             meta,
             searcher_synced: has_searcher.then_some(false),
             nats_client,
+            check_database: true,
         }
     }
 
@@ -120,12 +129,24 @@ impl ControlServer {
             ControlRequest::Alive => ControlResponse::Alive(self.alive().await),
             ControlRequest::Ready => self.ready().await,
             ControlRequest::SetLogLevel { level } => telemetry::set_log_level(&level).into(),
+            ControlRequest::CheckDatabase { enabled } => {
+                self.check_database = enabled;
+                ControlResponse::Success
+            }
         }
     }
 
     async fn alive(&self) -> Alive {
-        Alive {
-            database: self.meta.pool.acquire().await.is_ok(),
+        if self.check_database {
+            Alive {
+                database: self.meta.pool.acquire().await.is_ok(),
+                check_database: true,
+            }
+        } else {
+            Alive {
+                database: true,
+                check_database: false,
+            }
         }
     }
 
