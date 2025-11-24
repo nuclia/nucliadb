@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from time import time
 from typing import AsyncGenerator, Iterable, Optional, Union
 
 from nidx_protos.nodereader_pb2 import (
@@ -587,6 +588,9 @@ async def rao_find(
     # rerank
     # convert results to KnowledgeboxFindResults
     """
+    audit = get_audit()
+    start_time = time()
+
     fetcher, retrieval_request, reranker = await rao_parse_find(kbid, find_request)
 
     query = find_request.query
@@ -649,6 +653,24 @@ async def rao_find(
         page_size=find_request.top_k,
         next_page=False,
     )
+
+    # audit request
+    if audit is not None:
+        from nidx_protos.nodereader_pb2 import SearchRequest
+
+        search_time = time() - start_time
+        # TODO: implement audit.retrieve or something like that?
+        audit.search(
+            kbid,
+            x_nucliadb_user,
+            to_proto.client_type(x_ndb_client),
+            x_forwarded_for,
+            # TODO: we don't have this proto anymore
+            SearchRequest(),
+            search_time,
+            len(find_resources),
+            retrieval_rephrased_question=rephrased_query,
+        )
 
     return find_results, False, fetcher, reranker
 
