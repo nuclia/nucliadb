@@ -39,7 +39,10 @@ from nucliadb_models.search import (
 @pytest.fixture()
 def predict():
     predict = mock.AsyncMock()
-    with mock.patch("nucliadb.search.search.chat.query.get_predict", return_value=predict):
+    with (
+        mock.patch("nucliadb.search.search.chat.query.get_predict", return_value=predict),
+        mock.patch("nucliadb.search.search.chat.fetcher.get_predict", return_value=predict),
+    ):
         yield predict
 
 
@@ -56,22 +59,15 @@ def predict():
         ),
         (
             [ChatOptions.KEYWORD, ChatOptions.SEMANTIC],
-            [
-                FindOptions.KEYWORD,
-                FindOptions.SEMANTIC,
-            ],
+            [FindOptions.KEYWORD, FindOptions.SEMANTIC],
         ),
         (
             [ChatOptions.SEMANTIC],
-            [
-                FindOptions.SEMANTIC,
-            ],
+            [FindOptions.SEMANTIC],
         ),
         (
             [ChatOptions.KEYWORD],
-            [
-                FindOptions.KEYWORD,
-            ],
+            [FindOptions.KEYWORD],
         ),
     ],
 )
@@ -85,10 +81,11 @@ async def test_get_find_results_vector_search_is_optional(predict, chat_features
         ask_request.features = chat_features
 
     query_parser = mock.AsyncMock()
+    reranker = mock.AsyncMock()
 
     with mock.patch(
-        "nucliadb.search.search.chat.query.find",
-        return_value=(find_results, False, query_parser),
+        "nucliadb.search.search.chat.query.rao_find",
+        return_value=(find_results, False, query_parser, reranker),
     ) as find_mock:
         await get_find_results(
             kbid="kbid",

@@ -29,7 +29,7 @@ from pytest_mock import MockerFixture
         (f"/kb/{{kbid}}/ask", "kb_ask"),
         # These slugs and ids are harcoded on the test_search_resource fixture
         (f"/kb/{{kbid}}/slug/foobar-slug/ask", "resource_ask"),
-        (f"/kb/{{kbid}}/resource/68b6e3b747864293b71925b7bacaee7/ask", "resource_ask"),
+        (f"/kb/{{kbid}}/resource/68b6e3b747864293b71925b7bacaee77/ask", "resource_ask"),
     ],
 )
 async def test_ask_receives_injected_security_groups(

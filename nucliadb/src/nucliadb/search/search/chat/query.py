@@ -716,6 +716,8 @@ async def augment_and_rerank(
                 index=0,
                 start=paragraph_id.paragraph_start,
                 end=paragraph_id.paragraph_end,
+                start_seconds=[],
+                end_seconds=[],
             ),
             order=-1,  # will be populated later
             fuzzy_search=False,  # we don't have this info anymore
