@@ -128,6 +128,7 @@ async def parse_old_filters(
                 f.field.field_type = parts[1]
                 if len(parts) > 2:
                     f.field.field_id = parts[2]
+                expr.bool_and.operands.append(f)
             key_exprs.append(expr)
 
         if len(key_exprs) == 1:

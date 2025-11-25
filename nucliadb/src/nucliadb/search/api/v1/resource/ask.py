@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from typing import Union
+from uuid import UUID
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
@@ -47,7 +48,7 @@ from ..ask import create_ask_response
 async def resource_ask_endpoint_by_uuid(
     request: Request,
     kbid: str,
-    rid: str,
+    rid: UUID,
     item: AskRequest,
     x_show_consumption: bool = Header(default=False),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
@@ -75,7 +76,7 @@ async def resource_ask_endpoint_by_uuid(
         client_type=x_ndb_client,
         origin=x_forwarded_for,
         x_synchronous=x_synchronous,
-        resource=rid,
+        resource=str(rid),
         extra_predict_headers={"X-Show-Consumption": str(x_show_consumption).lower()},
     )
 

@@ -38,9 +38,7 @@ from nucliadb_protos import writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
-from nucliadb_utils import const
 from nucliadb_utils.fastapi.run import serve_metrics
-from nucliadb_utils.utilities import has_feature
 
 from .settings import settings
 from .utils import delete_resource_from_shard, index_resource_to_shard, wait_for_nidx
@@ -558,10 +556,6 @@ async def run(context: ApplicationContext) -> None:
                 kbids = [kbid async for kbid, _ in datamanagers.kb.get_kbs(txn)]
             # go through each kb and see if shards need to be rebalanced
             for kbid in kbids:
-                if not has_feature(
-                    const.Features.REBALANCE_ENABLED, default=False, context={"kbid": kbid}
-                ):
-                    continue
                 async with locking.distributed_lock(locking.KB_SHARDS_LOCK.format(kbid=kbid)):
                     await rebalance_kb(context, kbid)
     except locking.ResourceLocked as exc:

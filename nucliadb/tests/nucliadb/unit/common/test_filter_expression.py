@@ -1,0 +1,114 @@
+# Copyright (C) 2021 Bosutech XXI S.L.
+#
+# nucliadb is offered under the AGPL v3.0 and as commercial software.
+# For commercial licensing, contact us at info@nuclia.com.
+#
+# AGPL:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
+import pytest
+
+from nucliadb.common.exceptions import InvalidQueryError
+from nucliadb.common.filter_expression import FacetFilter, facet_from_filter, filter_from_facet
+from nucliadb_models.common import Paragraph
+from nucliadb_models.filters import (
+    Entity,
+    FieldMimetype,
+    Generated,
+    Kind,
+    Label,
+    Language,
+    OriginCollaborator,
+    OriginMetadata,
+    OriginPath,
+    OriginSource,
+    OriginTag,
+    ResourceMimetype,
+    Status,
+)
+from nucliadb_models.metadata import ResourceProcessingStatus
+
+
+@pytest.mark.parametrize(
+    "facet,expr",
+    [
+        ("/t/mytag", OriginTag(tag="mytag")),
+        ("/l/labelset", Label(labelset="labelset")),
+        ("/l/labelset/label", Label(labelset="labelset", label="label")),
+        ("/l/labelset/label/...", Label(labelset="labelset", label="label/...")),
+        ("/n/i/image", ResourceMimetype(type="image")),
+        ("/n/i/image/png", ResourceMimetype(type="image", subtype="png")),
+        ("/n/i/image/png/...", ResourceMimetype(type="image", subtype="png/...")),
+        ("/mt/image", FieldMimetype(type="image")),
+        ("/mt/image/png", FieldMimetype(type="image", subtype="png")),
+        ("/mt/image/png/...", FieldMimetype(type="image", subtype="png/...")),
+        ("/e/subtype", Entity(subtype="subtype")),
+        ("/e/subtype/value", Entity(subtype="subtype", value="value")),
+        ("/e/subtype/value/...", Entity(subtype="subtype", value="value/...")),
+        ("/e/subtype/value/...", Entity(subtype="subtype", value="value/...")),
+        ("/s/p/en", Language(language="en", only_primary=True)),
+        ("/s/s/en", Language(language="en", only_primary=False)),
+        ("/m/field/value", OriginMetadata(field="field", value="value")),
+        ("/m/field/value/...", OriginMetadata(field="field", value="value/...")),
+        ("/p/path/to/my/file", OriginPath(prefix="path/to/my/file")),
+        ("/g/da", Generated(by="data-augmentation")),
+        ("/g/da/mytask", Generated(by="data-augmentation", da_task="mytask")),
+        (f"/k/{Paragraph.TypeParagraph.TEXT.value.lower()}", Kind(kind=Paragraph.TypeParagraph.TEXT)),
+        (f"/k/{Paragraph.TypeParagraph.OCR.value.lower()}", Kind(kind=Paragraph.TypeParagraph.OCR)),
+        (
+            f"/k/{Paragraph.TypeParagraph.INCEPTION.value.lower()}",
+            Kind(kind=Paragraph.TypeParagraph.INCEPTION),
+        ),
+        (
+            f"/k/{Paragraph.TypeParagraph.DESCRIPTION.value.lower()}",
+            Kind(kind=Paragraph.TypeParagraph.DESCRIPTION),
+        ),
+        (
+            f"/k/{Paragraph.TypeParagraph.TRANSCRIPT.value.lower()}",
+            Kind(kind=Paragraph.TypeParagraph.TRANSCRIPT),
+        ),
+        (f"/k/{Paragraph.TypeParagraph.TITLE.value.lower()}", Kind(kind=Paragraph.TypeParagraph.TITLE)),
+        (f"/k/{Paragraph.TypeParagraph.TABLE.value.lower()}", Kind(kind=Paragraph.TypeParagraph.TABLE)),
+        ("/u/o/collaborator", OriginCollaborator(collaborator="collaborator")),
+        ("/u/s/source", OriginSource(id="source")),
+        (
+            f"/n/s/{ResourceProcessingStatus.PENDING.value}",
+            Status(status=ResourceProcessingStatus.PENDING),
+        ),
+        (
+            f"/n/s/{ResourceProcessingStatus.PROCESSED.value}",
+            Status(status=ResourceProcessingStatus.PROCESSED),
+        ),
+        (f"/n/s/{ResourceProcessingStatus.ERROR.value}", Status(status=ResourceProcessingStatus.ERROR)),
+        (f"/n/s/{ResourceProcessingStatus.EMPTY.value}", Status(status=ResourceProcessingStatus.EMPTY)),
+        (
+            f"/n/s/{ResourceProcessingStatus.BLOCKED.value}",
+            Status(status=ResourceProcessingStatus.BLOCKED),
+        ),
+        (
+            f"/n/s/{ResourceProcessingStatus.EXPIRED.value}",
+            Status(status=ResourceProcessingStatus.EXPIRED),
+        ),
+    ],
+)
+def test_facet_to_filter_conversions(facet: str, expr: FacetFilter):
+    assert facet_from_filter(expr) == facet
+    assert filter_from_facet(facet) == expr
+
+
+@pytest.mark.parametrize("facet", ["/k/invalid", "/n/s/invalid", "/not/valid"])
+def test_invalid_filters(facet: str):
+    with pytest.raises(InvalidQueryError):
+        filter_from_facet(facet)

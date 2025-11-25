@@ -18,33 +18,68 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Iterable, Optional, Union
+from time import time
+from typing import AsyncGenerator, Iterable, Optional, Union
 
 from nidx_protos.nodereader_pb2 import (
     GraphSearchResponse,
     SearchResponse,
 )
+from nuclia_models.predict.generative_responses import GenerativeChunk
 
+from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.ids import ParagraphId
 from nucliadb.common.models_utils import to_proto
+from nucliadb.models.internal.retrieval import (
+    RerankerScore,
+    RetrievalMatch,
+    RetrievalRequest,
+    RetrievalResponse,
+    ScoreType,
+)
 from nucliadb.search import logger
+from nucliadb.search.api.v1.augment import augment_endpoint
+from nucliadb.search.api.v1.retrieve import retrieve_endpoint
 from nucliadb.search.predict import AnswerStatusCode, RephraseResponse
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
+from nucliadb.search.search.chat.parser import rao_parse_find
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
+from nucliadb.search.search.find_merge import text_block_to_find_paragraph
+from nucliadb.search.search.hydrator import (
+    ResourceHydrationOptions,
+    TextBlockHydrationOptions,
+)
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import Metrics
-from nucliadb.search.search.query_parser.models import ParsedQuery, Query, RelationQuery, UnitRetrieval
+from nucliadb.search.search.paragraphs import highlight_paragraph
+from nucliadb.search.search.query_parser.fetcher import Fetcher
+from nucliadb.search.search.query_parser.models import Query, RelationQuery, UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
+from nucliadb.search.search.rerankers import RerankableItem, Reranker, RerankingOptions, get_reranker
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import filters
+from nucliadb_models.augment import (
+    AugmentedResource,
+    AugmentParagraph,
+    AugmentParagraphs,
+    AugmentRequest,
+    AugmentResources,
+    AugmentResponse,
+    ParagraphMetadata,
+)
 from nucliadb_models.search import (
+    SCORE_TYPE,
     AskRequest,
     ChatContextMessage,
+    ChatModel,
     ChatOptions,
+    FindField,
     FindOptions,
     FindRequest,
+    FindResource,
     KnowledgeboxFindResults,
     NucliaDBClientType,
     PreQueriesStrategy,
@@ -54,12 +89,14 @@ from nucliadb_models.search import (
     PromptContextOrder,
     Relations,
     RephraseModel,
+    TextPosition,
     parse_rephrase_prompt,
 )
 from nucliadb_protos import audit_pb2
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry.errors import capture_exception
-from nucliadb_utils.utilities import get_audit
+from nucliadb_utils import const
+from nucliadb_utils.utilities import get_audit, has_feature
 
 NOT_ENOUGH_CONTEXT_ANSWER = "Not enough data to answer this."
 
@@ -73,6 +110,8 @@ async def rephrase_query(
     generative_model: Optional[str] = None,
     chat_history_relevance_threshold: Optional[float] = None,
 ) -> RephraseResponse:
+    # NOTE: When moving /ask to RAO, this will need to change to whatever client/utility is used
+    # to call NUA predict (internally or externally in the case of onprem).
     predict = get_predict()
     req = RephraseModel(
         question=query,
@@ -95,7 +134,7 @@ async def get_find_results(
     origin: str,
     metrics: Metrics,
     prequeries_strategy: Optional[PreQueriesStrategy] = None,
-) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], ParsedQuery]:
+) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], Fetcher, Reranker]:
     prequeries_results = None
     prefilter_queries_results = None
     queries_results = None
@@ -141,7 +180,7 @@ async def get_find_results(
         prequeries_results = (prefilter_queries_results or []) + (queries_results or [])
 
     with metrics.time("main_query"):
-        main_results, query_parser = await run_main_query(
+        main_results, fetcher, reranker = await run_main_query(
             kbid,
             query,
             item,
@@ -150,7 +189,7 @@ async def get_find_results(
             origin,
             metrics=metrics.child_span("main_query"),
         )
-    return main_results, prequeries_results, query_parser
+    return main_results, prequeries_results, fetcher, reranker
 
 
 def add_resource_filter(request: Union[FindRequest, AskRequest], resources: list[str]):
@@ -225,10 +264,10 @@ async def run_main_query(
     user: str,
     origin: str,
     metrics: Metrics,
-) -> tuple[KnowledgeboxFindResults, ParsedQuery]:
+) -> tuple[KnowledgeboxFindResults, Fetcher, Reranker]:
     find_request = find_request_from_ask_request(item, query)
 
-    find_results, incomplete, parsed_query = await find(
+    find_results, incomplete, fetcher, reranker = await find_retrieval(
         kbid,
         find_request,
         ndb_client,
@@ -238,7 +277,7 @@ async def run_main_query(
     )
     if incomplete:
         raise IncompleteFindResultsError()
-    return find_results, parsed_query
+    return find_results, fetcher, reranker
 
 
 async def get_relations_results(
@@ -464,7 +503,7 @@ async def run_prequeries(
     async def _prequery_find(prequery: PreQuery, index: int):
         async with max_parallel_prequeries:
             prequery_id = prequery.id or f"prequery-{index}"
-            find_results, _, _ = await find(
+            find_results, _, _, _ = await find_retrieval(
                 kbid,
                 prequery.request,
                 x_ndb_client,
@@ -481,3 +520,402 @@ async def run_prequeries(
     for prequery, find_results in ops_results:
         results.append((prequery, find_results))
     return results
+
+
+async def get_answer_stream(
+    kbid: str,
+    item: ChatModel,
+    extra_headers: Optional[dict[str, str]] = None,
+) -> tuple[str, str, AsyncGenerator[GenerativeChunk, None]]:
+    # NOTE: When moving /ask to RAO, this will need to change to whatever client/utility is used
+    # to call NUA predict (internally or externally in the case of onprem).
+    predict = get_predict()
+    return await predict.chat_query_ndjson(
+        kbid=kbid,
+        item=item,
+        extra_headers=extra_headers,
+    )
+
+
+async def find_retrieval(
+    kbid: str,
+    find_request: FindRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    metrics: Metrics,
+) -> tuple[KnowledgeboxFindResults, bool, Fetcher, Reranker]:
+    # TODO: Remove once the feature has been fully rolled out
+    if not has_feature(const.Features.ASK_DECOUPLED, context={"kbid": kbid}):
+        results, incomplete, parsed = await find(
+            kbid,
+            find_request,
+            x_ndb_client,
+            x_nucliadb_user,
+            x_forwarded_for,
+            metrics=metrics,
+        )
+        # this has already been asserted inside the find() call
+        assert parsed.retrieval.reranker is not None, "find parser must provide a reranking algorithm"
+        reranker = get_reranker(parsed.retrieval.reranker)
+        return results, incomplete, parsed.fetcher, reranker
+
+    return await rao_find(
+        kbid,
+        find_request,
+        x_ndb_client,
+        x_nucliadb_user,
+        x_forwarded_for,
+        metrics=metrics,
+    )
+
+
+async def rao_find(
+    kbid: str,
+    find_request: FindRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    metrics: Metrics,
+) -> tuple[KnowledgeboxFindResults, bool, Fetcher, Reranker]:
+    """
+    Calls to NucliaDB retrieve and augment primitives to perform the text block search.
+    It returns the results as KnowledgeboxFindResults to comply with the existing find
+    interface (/ask logic is tightly coupled with /find).
+
+    # retrieve
+    # augment
+    # rerank
+    # convert results to KnowledgeboxFindResults
+    """
+    audit = get_audit()
+    start_time = time()
+
+    fetcher, retrieval_request, reranker = await rao_parse_find(kbid, find_request)
+
+    query = find_request.query
+    rephrased_query = None
+    if retrieval_request.query.keyword:
+        if find_request.query != retrieval_request.query.keyword.query:
+            rephrased_query = retrieval_request.query.keyword.query
+
+    retrieval_response = await retrieve(kbid, retrieval_request)
+    matches = retrieval_response.matches
+
+    relations = None
+    if FindOptions.RELATIONS in find_request.features:
+        # the user asked for a legacy relations search, as we don't support it
+        # in the /retrieve endpoint but we must maintain bw/c with /find
+        # responses, we call it with to get just this part of the response
+        #
+        # TODO: replace this with an sdk call
+        find_response, _, _ = await find(
+            kbid,
+            FindRequest(
+                features=[FindOptions.RELATIONS],
+                # needed for automatic entity detection
+                query=query,
+                # used for "hardcoded" graph queries
+                query_entities=find_request.query_entities,
+            ),
+            x_ndb_client,
+            x_nucliadb_user,
+            x_forwarded_for,
+            metrics,
+        )
+        relations = find_response.relations
+
+    text_blocks, resources, best_matches = await augment_and_rerank(
+        kbid,
+        matches,
+        # here we use the original top_k, so we end up with the number of
+        # results requested by the user
+        top_k=find_request.top_k,
+        resource_hydration_options=ResourceHydrationOptions(
+            show=find_request.show,
+            extracted=find_request.extracted,
+            field_type_filter=find_request.field_type_filter,
+        ),
+        text_block_hydration_options=TextBlockHydrationOptions(),
+        reranker=reranker,
+        reranking_options=RerankingOptions(kbid=kbid, query=rephrased_query or query),
+    )
+    find_resources = compose_find_resources(text_blocks, resources)
+    find_results = KnowledgeboxFindResults(
+        query=query,
+        rephrased_query=query,
+        resources=find_resources,
+        best_matches=best_matches,
+        relations=relations,
+        # legacy fields
+        total=len(text_blocks),
+        page_number=0,
+        page_size=find_request.top_k,
+        next_page=False,
+    )
+
+    # audit request
+    if audit is not None:
+        from nidx_protos.nodereader_pb2 import SearchRequest
+
+        search_time = time() - start_time
+        # TODO: implement audit.retrieve or something like that?
+        audit.search(
+            kbid,
+            x_nucliadb_user,
+            to_proto.client_type(x_ndb_client),
+            x_forwarded_for,
+            # TODO: we don't have this proto anymore
+            SearchRequest(),
+            search_time,
+            len(find_resources),
+            retrieval_rephrased_question=rephrased_query,
+        )
+
+    return find_results, False, fetcher, reranker
+
+
+async def retrieve(kbid: str, item: RetrievalRequest) -> RetrievalResponse:
+    # Parse retrieval struff that will be later done internally at nucliadb and can be removed from here when moved to RAO
+
+    # TODO: replace this for a nucliadb_sdk.retrieve call when moving /ask to RAO
+    return await retrieve_endpoint(kbid, item)
+
+
+async def augment(kbid: str, item: AugmentRequest) -> AugmentResponse:
+    # TODO: replace this for a nucliadb_sdk.augment call when moving /ask to RAO
+    return await augment_endpoint(kbid, item)
+
+
+async def augment_and_rerank(
+    kbid: str,
+    matches: list[RetrievalMatch],
+    top_k: int,
+    resource_hydration_options: ResourceHydrationOptions,
+    text_block_hydration_options: TextBlockHydrationOptions,
+    reranker: Reranker,
+    reranking_options: RerankingOptions,
+):
+    score_type_map = {
+        ScoreType.SEMANTIC: SCORE_TYPE.VECTOR,
+        ScoreType.KEYWORD: SCORE_TYPE.BM25,
+        ScoreType.RRF: SCORE_TYPE.BOTH,
+        ScoreType.DEFAULT_RERANKER: SCORE_TYPE.RERANKER,
+        ScoreType.GRAPH: SCORE_TYPE.RELATION_RELEVANCE,
+    }
+    text_blocks = []
+    for match in matches:
+        paragraph_id = ParagraphId.from_string(match.id)
+        score_type = score_type_map[match.score.type]
+        text_block = TextBlockMatch(
+            paragraph_id=paragraph_id,
+            scores=match.score.history,
+            score_type=score_type,
+            position=TextPosition(
+                page_number=match.metadata.page,
+                index=0,
+                start=paragraph_id.paragraph_start,
+                end=paragraph_id.paragraph_end,
+                start_seconds=[],
+                end_seconds=[],
+            ),
+            order=-1,  # will be populated later
+            fuzzy_search=False,  # we don't have this info anymore
+            is_a_table=match.metadata.is_a_table,
+            representation_file=match.metadata.source_file,
+            field_labels=match.metadata.field_labels,
+            paragraph_labels=match.metadata.paragraph_labels,
+        )
+        text_blocks.append(text_block)
+
+    return await hydrate_and_rerank(
+        text_blocks,
+        kbid,
+        resource_hydration_options=resource_hydration_options,
+        text_block_hydration_options=text_block_hydration_options,
+        reranker=reranker,
+        reranking_options=reranking_options,
+        top_k=top_k,
+    )
+
+
+async def hydrate_and_rerank(
+    text_blocks: Iterable[TextBlockMatch],
+    kbid: str,
+    *,
+    resource_hydration_options: ResourceHydrationOptions,
+    text_block_hydration_options: TextBlockHydrationOptions,
+    reranker: Reranker,
+    reranking_options: RerankingOptions,
+    top_k: int,
+) -> tuple[list[TextBlockMatch], list[AugmentedResource], list[str]]:
+    """Given a list of text blocks from a retrieval operation, hydrate and
+    rerank the results.
+
+    This function returns either the entire list or a subset of updated
+    (hydrated and reranked) text blocks and their corresponding resource
+    metadata. It also returns an ordered list of best matches.
+
+    """
+    # Iterate text blocks to create an "index" for faster access by id and get a
+    # list of text block ids and resource ids to hydrate
+    text_blocks_by_id: dict[str, TextBlockMatch] = {}  # useful for faster access to text blocks later
+    resources_to_hydrate = set()
+    text_block_id_to_hydrate = set()
+
+    for text_block in text_blocks:
+        rid = text_block.paragraph_id.rid
+        paragraph_id = text_block.paragraph_id.full()
+
+        # If we find multiple results (from different indexes) with different
+        # metadata, this statement will only get the metadata from the first on
+        # the list. We assume metadata is the same on all indexes, otherwise
+        # this would be a BUG
+        text_blocks_by_id.setdefault(paragraph_id, text_block)
+
+        # rerankers that need extra results may end with less resources than the
+        # ones we see now, so we'll skip this step and recompute the resources
+        # later
+        if not reranker.needs_extra_results:
+            resources_to_hydrate.add(rid)
+
+        if text_block_hydration_options.only_hydrate_empty and text_block.text:
+            pass
+        else:
+            text_block_id_to_hydrate.add(paragraph_id)
+
+    # hydrate only the strictly needed before rerank
+    augment_request = AugmentRequest(
+        resources=AugmentResources(
+            given=list(resources_to_hydrate),
+            show=resource_hydration_options.show,
+            extracted=resource_hydration_options.extracted,
+            field_type_filter=resource_hydration_options.field_type_filter,
+        ),
+        paragraphs=AugmentParagraphs(
+            given=[
+                AugmentParagraph(
+                    id=paragraph_id,
+                    metadata=ParagraphMetadata(
+                        field_labels=text_blocks_by_id[paragraph_id].field_labels,
+                        paragraph_labels=text_blocks_by_id[paragraph_id].paragraph_labels,
+                        is_an_image=text_blocks_by_id[paragraph_id].is_an_image,
+                        is_a_table=text_blocks_by_id[paragraph_id].is_a_table,
+                        source_file=text_blocks_by_id[paragraph_id].representation_file,
+                        page=text_blocks_by_id[paragraph_id].position.page_number,
+                        in_page_with_visual=text_blocks_by_id[paragraph_id].page_with_visual,
+                    ),
+                )
+                for paragraph_id in text_block_id_to_hydrate
+            ],
+            text=True,
+        ),
+    )
+    augment_response = await augment(kbid, augment_request)
+    augmented_paragraphs = augment_response.paragraphs
+    augmented_resources = augment_response.resources
+
+    # add hydrated text to our text blocks
+    for text_block in text_blocks:
+        augmented_paragraph = augmented_paragraphs.get(text_block.paragraph_id.full(), None)
+        if augmented_paragraph is not None and augmented_paragraph.text is not None:
+            if text_block_hydration_options.highlight:
+                text = highlight_paragraph(
+                    augmented_paragraph.text, words=[], ematches=text_block_hydration_options.ematches
+                )
+            else:
+                text = augmented_paragraph.text
+            text_block.text = text
+
+    # with the hydrated text, rerank and apply new scores to the text blocks
+    to_rerank = [
+        RerankableItem(
+            id=text_block.paragraph_id.full(),
+            score=text_block.score,
+            score_type=text_block.score_type,
+            content=text_block.text or "",  # TODO: add a warning, this shouldn't usually happen
+        )
+        for text_block in text_blocks
+    ]
+    reranked = await reranker.rerank(to_rerank, reranking_options)
+
+    # after reranking, we can cut to the number of results the user wants, so we
+    # don't hydrate unnecessary stuff
+    reranked = reranked[:top_k]
+
+    matches = []
+    for item in reranked:
+        paragraph_id = item.id
+        score = item.score
+        score_type = item.score_type
+
+        text_block = text_blocks_by_id[paragraph_id]
+        text_block.scores.append(RerankerScore(score=score))
+        text_block.score_type = score_type
+
+        matches.append((paragraph_id, score))
+
+    matches.sort(key=lambda x: x[1], reverse=True)
+
+    best_matches = []
+    best_text_blocks = []
+    resources_to_hydrate.clear()
+    for order, (paragraph_id, _) in enumerate(matches):
+        text_block = text_blocks_by_id[paragraph_id]
+        text_block.order = order
+        best_matches.append(paragraph_id)
+        best_text_blocks.append(text_block)
+
+        # now we have removed the text block surplus, fetch resource metadata
+        if reranker.needs_extra_results:
+            rid = ParagraphId.from_string(paragraph_id).rid
+            resources_to_hydrate.add(rid)
+
+    # Finally, fetch resource metadata if we haven't already done it
+    if reranker.needs_extra_results:
+        augmented = await augment(
+            kbid,
+            AugmentRequest(
+                resources=AugmentResources(
+                    given=list(resources_to_hydrate),
+                    show=resource_hydration_options.show,
+                    extracted=resource_hydration_options.extracted,
+                    field_type_filter=resource_hydration_options.field_type_filter,
+                ),
+            ),
+        )
+        augmented_resources = augmented.resources
+
+    resources = [resource for resource in augmented_resources.values()]
+
+    return best_text_blocks, resources, best_matches
+
+
+def compose_find_resources(
+    text_blocks: list[TextBlockMatch],
+    resources: list[AugmentedResource],
+) -> dict[str, FindResource]:
+    find_resources: dict[str, FindResource] = {}
+
+    for resource in resources:
+        rid = resource.id
+        if rid not in find_resources:
+            find_resources[rid] = FindResource(id=rid, fields={})
+            find_resources[rid].updated_from(resource)
+
+    for text_block in text_blocks:
+        rid = text_block.paragraph_id.rid
+        if rid not in find_resources:
+            # resource not found in db, skipping
+            continue
+
+        find_resource = find_resources[rid]
+        field_id = text_block.paragraph_id.field_id.short_without_subfield()
+        find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
+
+        paragraph_id = text_block.paragraph_id.full()
+        find_paragraph = text_block_to_find_paragraph(text_block)
+
+        find_field.paragraphs[paragraph_id] = find_paragraph
+
+    return find_resources

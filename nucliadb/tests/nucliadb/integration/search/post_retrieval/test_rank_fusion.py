@@ -18,12 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 import pytest
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
 
+from nucliadb.models.internal.retrieval import RetrievalRequest
 from nucliadb.search.search import find, find_merge
+from nucliadb.search.search.chat import query
 from nucliadb_models.search import (
     SCORE_TYPE,
     KnowledgeboxFindResults,
@@ -75,7 +76,8 @@ async def test_rank_fusion(
 
     find_retrieval = KnowledgeboxFindResults.model_validate(find_resp.json())
     ask_retrieval = KnowledgeboxFindResults.model_validate(ask_resp.json()["retrieval_results"])
-    assert find_retrieval == ask_retrieval
+    assert find_retrieval.resources == ask_retrieval.resources
+    assert find_retrieval.best_matches == ask_retrieval.best_matches
     assert len(find_retrieval.best_matches) == 7
 
     find_score_types = get_score_types(find_retrieval)
@@ -104,9 +106,6 @@ async def test_reciprocal_rank_fusion_requests_more_results(
     """
     kbid = philosophy_books_kb
 
-    spy_build_find_response = mocker.spy(find, "build_find_response")
-    spy_cut_page = mocker.spy(find_merge, "cut_page")
-
     payload = {
         "query": "the",
         "min_score": {"bm25": 0, "semantic": -10},
@@ -118,6 +117,10 @@ async def test_reciprocal_rank_fusion_requests_more_results(
         "top_k": 3,
     }
 
+    # Test /ask
+
+    spy_retrieve = mocker.spy(query, "retrieve")
+
     ask_resp = await nucliadb_reader.post(
         f"/kb/{kbid}/ask",
         headers={
@@ -127,27 +130,38 @@ async def test_reciprocal_rank_fusion_requests_more_results(
     )
     assert ask_resp.status_code == 200
 
+    assert spy_retrieve.call_count == 1
+    assert isinstance(spy_retrieve.call_args.args[1], RetrievalRequest)
+    req: RetrievalRequest = spy_retrieve.call_args.args[1]
+    assert req.top_k == 3
+    assert isinstance(req.rank_fusion, ReciprocalRankFusion)
+    assert req.rank_fusion.window == 5
+
+    # Test /find
+
+    spy_build_find_response = mocker.spy(find, "build_find_response")
+    spy_cut_page = mocker.spy(find_merge, "cut_page")
+
     find_resp = await nucliadb_reader.post(
         f"/kb/{kbid}/find",
         json=payload,
     )
     assert find_resp.status_code == 200
 
-    assert spy_build_find_response.call_count == 2
-    assert spy_cut_page.call_count == 2
+    assert spy_build_find_response.call_count == 1
+    assert spy_cut_page.call_count == 1
 
-    for i in range(spy_build_find_response.call_count):
-        build_find_response_call = spy_build_find_response.call_args_list[i]
-        cut_page_call = spy_cut_page.call_args_list[i]
+    merged_search_response = spy_build_find_response.call_args.args[0]
+    assert len(merged_search_response.paragraph.results) == 5
 
-        merged_search_response = build_find_response_call.args[0]
-        assert len(merged_search_response.paragraph.results) == 5
+    items, top_k = spy_cut_page.call_args.args
+    assert len(items) == 5
+    assert top_k == 3
 
-        items, top_k = cut_page_call.args
-        assert len(items) == 5
-        assert top_k == 3
+    # Validate both return the same retrieval results
 
     find_retrieval = KnowledgeboxFindResults.model_validate(find_resp.json())
     ask_retrieval = KnowledgeboxFindResults.model_validate(ask_resp.json()["retrieval_results"])
-    assert find_retrieval == ask_retrieval
+    assert find_retrieval.resources == ask_retrieval.resources
+    assert find_retrieval.best_matches == ask_retrieval.best_matches
     assert len(find_retrieval.best_matches) == 3

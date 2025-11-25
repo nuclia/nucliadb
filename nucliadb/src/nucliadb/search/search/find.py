@@ -69,18 +69,16 @@ async def find(
 ) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     external_index_manager = await get_external_index_manager(kbid=kbid)
     if external_index_manager is not None:
-        return await _external_index_retrieval(
+        return await _external_index_find(
             kbid,
             item,
             external_index_manager,
         )
     else:
-        return await _index_node_retrieval(
-            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, metrics
-        )
+        return await _ndb_index_find(kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, metrics)
 
 
-async def _index_node_retrieval(
+async def _ndb_index_find(
     kbid: str,
     item: FindRequest,
     x_ndb_client: NucliaDBClientType,
@@ -173,7 +171,7 @@ async def _index_node_retrieval(
     return search_results, incomplete_results, parsed
 
 
-async def _external_index_retrieval(
+async def _external_index_find(
     kbid: str,
     item: FindRequest,
     external_index_manager: ExternalIndexManager,

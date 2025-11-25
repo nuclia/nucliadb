@@ -22,23 +22,24 @@ from nucliadb_models.search import Image, ResourceProperties, SearchParamDefault
 ParagraphId = str
 
 
-class AugmentedParagraph(BaseModel):
-    text: str | None = None
+class ParagraphMetadata(BaseModel):
+    field_labels: list[str]
+    paragraph_labels: list[str]
 
-    neighbours_before: dict[ParagraphId, str] | None = None
-    neighbours_after: dict[ParagraphId, str] | None = None
+    is_an_image: bool
+    is_a_table: bool
 
-    image: Image | None = None
+    # for extracted from visual content (ocr, inception, tables)
+    source_file: str | None
+
+    # for documents (pdf, docx...) only
+    page: int | None
+    in_page_with_visual: bool | None
 
 
-class AugmentedField(BaseModel):
-    page_preview_image: Image | None = None
-
-
-class AugmentedResource(Resource):
-    def updated_from(self, origin: Resource):
-        for key in origin.model_fields.keys():
-            self.__setattr__(key, getattr(origin, key))
+class AugmentParagraph(BaseModel):
+    id: ParagraphId
+    metadata: ParagraphMetadata | None = None
 
 
 class AugmentResources(BaseModel):
@@ -48,10 +49,6 @@ class AugmentResources(BaseModel):
     extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
     field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
     # TODO: field name filter, da field prefix filter
-
-
-class AugmentParagraph(BaseModel):
-    id: ParagraphId
 
 
 class AugmentParagraphs(BaseModel):
@@ -76,8 +73,27 @@ class AugmentParagraphs(BaseModel):
 
 
 class AugmentRequest(BaseModel):
-    resources: AugmentResources
-    paragraphs: AugmentParagraphs
+    resources: AugmentResources | None = None
+    paragraphs: AugmentParagraphs | None = None
+
+
+class AugmentedParagraph(BaseModel):
+    text: str | None = None
+
+    neighbours_before: dict[ParagraphId, str] | None = None
+    neighbours_after: dict[ParagraphId, str] | None = None
+
+    image: Image | None = None
+
+
+class AugmentedField(BaseModel):
+    page_preview_image: Image | None = None
+
+
+class AugmentedResource(Resource):
+    def updated_from(self, origin: Resource):
+        for key in origin.model_fields.keys():
+            self.__setattr__(key, getattr(origin, key))
 
 
 class AugmentResponse(BaseModel):

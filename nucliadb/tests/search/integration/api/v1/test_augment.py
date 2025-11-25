@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from uuid import uuid4
+
 import pytest
 from httpx import AsyncClient
 
@@ -62,3 +64,38 @@ async def test_augment_api(
         body.paragraphs[f"{rid}/f/smb-wonder/145-234"].text
         == "As one of eight player characters, the player completes levels across the Flower Kingdom."
     )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_augment_malicious_paths(
+    nucliadb_search: AsyncClient,
+    knowledgebox: str,
+) -> None:
+    kbid = knowledgebox
+    rid = uuid4().hex
+
+    for malicious_path in [".", "..", "../../path/to/somewhere/else"]:
+        resp = await nucliadb_search.post(
+            f"/{KB_PREFIX}/{kbid}/augment",
+            json={
+                "paragraphs": {
+                    "given": [
+                        {
+                            "id": f"{rid}/f/smb-wonder/145-234",
+                            "metadata": {
+                                "source_file": malicious_path,
+                                # other non-related metadata
+                                "field_labels": [],
+                                "paragraph_labels": [],
+                                "is_an_image": False,
+                                "is_a_table": False,
+                                "page": None,
+                                "in_page_with_visual": None,
+                            },
+                        },
+                    ],
+                },
+            },
+        )
+        assert resp.status_code == 422
+        assert "Invalid source file path for paragraph" in resp.json()["detail"]
