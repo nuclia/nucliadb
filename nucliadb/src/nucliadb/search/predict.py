@@ -523,11 +523,15 @@ class DummyPredictEngine(PredictEngine):
 
                 timings[vectorset_id] = 0.010
 
+            if len(vectors) == 0:
+                raise ProxiedPredictAPIError(status=404, detail="Knowledge box not found")
+
         # and fake data with the passed one too
-        model = item.semantic_models[0] if item.semantic_models else "<PREDICT-DEFAULT-SEMANTIC-MODEL>"
-        semantic_thresholds[model] = self.default_semantic_threshold
-        vectors[model] = base_vector
-        timings[model] = 0.0
+        if item.semantic_models:
+            model = item.semantic_models[0]
+            semantic_thresholds[model] = self.default_semantic_threshold
+            vectors[model] = base_vector
+            timings[model] = 0.0
 
         return QueryInfo(
             language="en",
@@ -540,7 +544,7 @@ class DummyPredictEngine(PredictEngine):
                 vectors=vectors,
                 timings=timings,
             ),
-            query=model,
+            query=item.text or "<PREDICT-QUERY>",
             rephrased_query="<REPHRASED-QUERY>" if item.rephrase or item.query_image else None,
         )
 
