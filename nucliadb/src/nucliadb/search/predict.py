@@ -523,12 +523,15 @@ class DummyPredictEngine(PredictEngine):
 
                 timings[vectorset_id] = 0.010
 
-            if len(vectors) == 0:
-                raise ProxiedPredictAPIError(status=404, detail="Knowledge box not found")
-
         # and fake data with the passed one too
-        if item.semantic_models:
-            model = item.semantic_models[0]
+        if item.semantic_models is not None:
+            for model in item.semantic_models:
+                semantic_thresholds[model] = self.default_semantic_threshold
+                vectors[model] = base_vector
+                timings[model] = 0.0
+
+        if len(vectors) == 0:
+            model = "<PREDICT-DEFAULT-SEMANTIC-MODEL>"
             semantic_thresholds[model] = self.default_semantic_threshold
             vectors[model] = base_vector
             timings[model] = 0.0

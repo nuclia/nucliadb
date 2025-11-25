@@ -640,12 +640,6 @@ async def test_ask_capped_context(nucliadb_reader: AsyncClient, standalone_knowl
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_on_a_kb_not_found(nucliadb_reader: AsyncClient):
-    resp = await nucliadb_reader.post("/kb/unknown_kb_id/ask", json={"query": "title"})
-    assert resp.status_code == 404
-
-
-@pytest.mark.deploy_modes("standalone")
 async def test_ask_max_tokens(nucliadb_reader: AsyncClient, standalone_knowledgebox, resources):
     # As an integer
     resp = await nucliadb_reader.post(
