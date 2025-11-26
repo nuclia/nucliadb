@@ -446,9 +446,7 @@ class BaseAugmentedField:
 
     text: str | None = None
 
-    # TODO: review tuples vs dict
-    classification_labels: list[tuple[str, str]] | None = None
-    # TODO: review tuples vs dict
+    classification_labels: dict[str, set[str]] | None = None
     entities: dict[str, set[str]] | None = None
 
 
@@ -498,7 +496,7 @@ class AugmentedResource:
     extra: Extra | None
     security: nucliadb_models.security.ResourceSecurity | None
 
-    classification_labels: list[tuple[str, str]] | None
+    classification_labels: dict[str, set[str]] | None
 
 
 @dataclass

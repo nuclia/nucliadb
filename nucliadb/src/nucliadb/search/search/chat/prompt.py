@@ -462,22 +462,27 @@ async def extend_prompt_context_with_classification_labels(
     text_block_ids: list[TextBlockId],
     augmented_context: AugmentedContext,
 ):
-    async def _get_labels(kbid: str, _id: TextBlockId) -> tuple[TextBlockId, list[tuple[str, str]]]:
-        fid = _id if isinstance(_id, FieldId) else _id.field_id
-        labels = set()
-        resource = await cache.get_resource(kbid, fid.rid)
-        if resource is not None:
-            resource_classifications = await augmentor.resources.classification_labels(resource)
-            if resource_classifications:
-                for labelset, label in resource_classifications:
-                    labels.add((labelset, label))
+    async def _get_labels(kbid: str, _id: TextBlockId) -> tuple[TextBlockId, dict[str, set[str]]]:
+        resource = await cache.get_resource(kbid, _id.rid)
+        if resource is None:
+            return _id, {}
 
-            field_classifications = await augmentor.fields.classification_labels(fid, resource)
-            if field_classifications:
-                for labelset, label in field_classifications:
-                    labels.add((labelset, label))
+        all_labels: dict[str, set[str]] = {}
 
-        return _id, list(labels)
+        resource_classifications = await augmentor.resources.classification_labels(resource)
+        if resource_classifications:
+            for labelset, labels in resource_classifications.items():
+                all_labels.setdefault(labelset, set())
+                all_labels[labelset] |= labels
+
+        field_id = _id if isinstance(_id, FieldId) else _id.field_id
+        field_classifications = await augmentor.fields.classification_labels(field_id, resource)
+        if field_classifications:
+            for labelset, labels in field_classifications.items():
+                all_labels.setdefault(labelset, set())
+                all_labels[labelset] |= labels
+
+        return _id, all_labels
 
     classif_labels = await run_concurrently([_get_labels(kbid, tb_id) for tb_id in text_block_ids])
     tb_id_to_labels = {tb_id: labels for tb_id, labels in classif_labels if len(labels) > 0}
@@ -487,8 +492,9 @@ async def extend_prompt_context_with_classification_labels(
             text = context.output.pop(tb_id.full())
 
             labels_text = "DOCUMENT CLASSIFICATION LABELS:"
-            for labelset, label in labels:
-                labels_text += f"\n - {label} ({labelset})"
+            for labelset, labels in labels:
+                for label in labels:
+                    labels_text += f"\n - {label} ({labelset})"
             extended_text = text + "\n\n" + labels_text
 
             context[tb_id.full()] = extended_text

@@ -151,15 +151,15 @@ async def get_basic(resource: Resource) -> resources_pb2.Basic | None:
     return basic
 
 
-async def classification_labels(resource: Resource) -> list[tuple[str, str]] | None:
+async def classification_labels(resource: Resource) -> dict[str, set[str]] | None:
     basic = await get_basic(resource)
     if basic is None:
         return None
 
-    labels = set()
+    labels: dict[str, set[str]] = {}
     for classification in basic.usermetadata.classifications:
-        labels.add((classification.labelset, classification.label))
-    return list(labels)
+        labels.setdefault(classification.labelset, set()).add(classification.label)
+    return labels
 
 
 async def augment_resources_deep(
