@@ -77,7 +77,7 @@ async def hydrate_resource_text(
             field_id = FieldId.from_pb(rid, field_type, field_key)
             runner.schedule(hydrate_field_text(kbid, field_id))
 
-        # Include the summary aswell
+        # Include the summary as well
         runner.schedule(hydrate_field_text(kbid, FieldId(rid=rid, type="a", key="summary")))
 
         # Wait for the results
