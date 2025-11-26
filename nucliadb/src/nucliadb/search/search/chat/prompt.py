@@ -32,8 +32,15 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.ingest.serialize import serialize_extra, serialize_origin
-from nucliadb.models.internal.augment import ConversationText, FieldText, Paragraph, ParagraphText
+from nucliadb.models.internal.augment import (
+    ConversationText,
+    FieldText,
+    Paragraph,
+    ParagraphText,
+    ResourceExtra,
+    ResourceOrigin,
+    ResourceProp,
+)
 from nucliadb.search import augmentor, logger
 from nucliadb.search.augmentor.fields import (
     augment_fields,
@@ -43,6 +50,7 @@ from nucliadb.search.augmentor.fields import (
     find_conversation_message,
 )
 from nucliadb.search.augmentor.paragraphs import augment_paragraphs
+from nucliadb.search.augmentor.resources import augment_resources
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import (
     get_file_thumbnail_image,
@@ -52,7 +60,6 @@ from nucliadb.search.search.chat.images import (
 from nucliadb.search.search.hydrator import hydrate_field_text
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.labels import translate_alias_to_system_label
-from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.search import (
     SCORE_TYPE,
     AugmentedContext,
@@ -367,23 +374,27 @@ async def extend_prompt_context_with_metadata(
     metrics: Metrics,
     augmented_context: AugmentedContext,
 ) -> None:
+    rids: list[str] = []
     text_block_ids: list[TextBlockId] = []
     for text_block_id in context.text_block_ids():
         try:
-            text_block_ids.append(parse_text_block_id(text_block_id))
+            tb_id = parse_text_block_id(text_block_id)
         except ValueError:  # pragma: no cover
             # Some text block ids are not paragraphs nor fields, so they are skipped
             # (e.g. USER_CONTEXT_0, when the user provides extra context)
             continue
+
+        text_block_ids.append(tb_id)
+        rids.append(tb_id.rid)
+
     if len(text_block_ids) == 0:  # pragma: no cover
         return
 
+    select: list[ResourceProp] = []
     ops = 0
     if MetadataExtensionType.ORIGIN in strategy.types:
         ops += 1
-        await extend_prompt_context_with_origin_metadata(
-            context, kbid, text_block_ids, augmented_context
-        )
+        select.append(ResourceOrigin())
 
     if MetadataExtensionType.CLASSIFICATION_LABELS in strategy.types:
         ops += 1
@@ -397,9 +408,42 @@ async def extend_prompt_context_with_metadata(
 
     if MetadataExtensionType.EXTRA_METADATA in strategy.types:
         ops += 1
-        await extend_prompt_context_with_extra_metadata(context, kbid, text_block_ids, augmented_context)
+        select.append(ResourceExtra())
 
     metrics.set("metadata_extension_ops", ops * len(text_block_ids))
+
+    augmented = await augment_resources(
+        kbid,
+        given=rids,
+        select=select,
+    )
+
+    for tb_id in text_block_ids:
+        resource = augmented.get(tb_id.rid)
+        if resource is None:
+            continue
+
+        if resource.origin is not None:
+            text = context.output.pop(tb_id.full())
+            extended_text = text + f"\n\nDOCUMENT METADATA AT ORIGIN:\n{to_yaml(resource.origin)}"
+            context[tb_id.full()] = extended_text
+            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                id=tb_id.full(),
+                text=extended_text,
+                parent=tb_id.full(),
+                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
+            )
+
+        if resource.extra is not None:
+            text = context.output.pop(tb_id.full())
+            extended_text = text + f"\n\nDOCUMENT EXTRA METADATA:\n{to_yaml(resource.extra)}"
+            context[tb_id.full()] = extended_text
+            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                id=tb_id.full(),
+                text=extended_text,
+                parent=tb_id.full(),
+                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
+            )
 
 
 def parse_text_block_id(text_block_id: str) -> TextBlockId:
@@ -410,36 +454,6 @@ def parse_text_block_id(text_block_id: str) -> TextBlockId:
         # When we're doing `full_resource` or `hierarchy` strategies,the text block id
         # is a field id
         return FieldId.from_string(text_block_id)
-
-
-async def extend_prompt_context_with_origin_metadata(
-    context: CappedPromptContext,
-    kbid,
-    text_block_ids: list[TextBlockId],
-    augmented_context: AugmentedContext,
-):
-    async def _get_origin(kbid: str, rid: str) -> tuple[str, Optional[Origin]]:
-        origin = None
-        resource = await cache.get_resource(kbid, rid)
-        if resource is not None:
-            origin = await serialize_origin(resource)
-        return rid, origin
-
-    rids = {tb_id.rid for tb_id in text_block_ids}
-    origins = await run_concurrently([_get_origin(kbid, rid) for rid in rids])
-    rid_to_origin = {rid: origin for rid, origin in origins if origin is not None}
-    for tb_id in text_block_ids:
-        origin = rid_to_origin.get(tb_id.rid)
-        if origin is not None and tb_id.full() in context:
-            text = context.output.pop(tb_id.full())
-            extended_text = text + f"\n\nDOCUMENT METADATA AT ORIGIN:\n{to_yaml(origin)}"
-            context[tb_id.full()] = extended_text
-            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
-                id=tb_id.full(),
-                text=extended_text,
-                parent=tb_id.full(),
-                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
-            )
 
 
 async def extend_prompt_context_with_classification_labels(
@@ -519,36 +533,6 @@ async def extend_prompt_context_with_ner(
 
             extended_text = text + "\n\n" + ners_text
 
-            context[tb_id.full()] = extended_text
-            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
-                id=tb_id.full(),
-                text=extended_text,
-                parent=tb_id.full(),
-                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
-            )
-
-
-async def extend_prompt_context_with_extra_metadata(
-    context: CappedPromptContext,
-    kbid: str,
-    text_block_ids: list[TextBlockId],
-    augmented_context: AugmentedContext,
-):
-    async def _get_extra(kbid: str, rid: str) -> tuple[str, Optional[Extra]]:
-        extra = None
-        resource = await cache.get_resource(kbid, rid)
-        if resource is not None:
-            extra = await serialize_extra(resource)
-        return rid, extra
-
-    rids = {tb_id.rid for tb_id in text_block_ids}
-    extras = await run_concurrently([_get_extra(kbid, rid) for rid in rids])
-    rid_to_extra = {rid: extra for rid, extra in extras if extra is not None}
-    for tb_id in text_block_ids:
-        extra = rid_to_extra.get(tb_id.rid)
-        if extra is not None and tb_id.full() in context:
-            text = context.output.pop(tb_id.full())
-            extended_text = text + f"\n\nDOCUMENT EXTRA METADATA:\n{to_yaml(extra)}"
             context[tb_id.full()] = extended_text
             augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
                 id=tb_id.full(),
