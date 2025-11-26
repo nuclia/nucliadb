@@ -18,11 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from time import time
+
 from fastapi import Header, HTTPException, Request
 from fastapi_versioning import version
 
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.models_utils import to_proto
 from nucliadb.models.internal.retrieval import (
     Metadata,
     RetrievalMatch,
@@ -36,6 +39,7 @@ from nucliadb.search.search.retrieval import text_block_search
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import NucliaDBClientType
 from nucliadb_utils.authentication import requires
+from nucliadb_utils.utilities import get_audit
 
 
 @api.post(
@@ -55,13 +59,26 @@ async def _retrieve_endpoint(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> RetrievalResponse:
-    return await retrieve_endpoint(kbid, item)
+    return await retrieve_endpoint(
+        kbid,
+        item,
+        x_ndb_client=x_ndb_client,
+        x_nucliadb_user=x_nucliadb_user,
+        x_forwarded_for=x_forwarded_for,
+    )
 
 
 async def retrieve_endpoint(
     kbid: str,
     item: RetrievalRequest,
+    *,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
 ) -> RetrievalResponse:
+    audit = get_audit()
+    start_time = time()
+
     try:
         retrieval = await parse_retrieve(kbid, item)
     except InvalidQueryError as err:
@@ -70,13 +87,25 @@ async def retrieve_endpoint(
             detail=str(err),
         )
 
-    text_blocks, _, _, _ = await text_block_search(kbid, retrieval)
+    text_blocks, pb_query, _, _ = await text_block_search(kbid, retrieval)
 
     # cut the top K, we may have more due to extra results used for rank fusion
     text_blocks = text_blocks[: retrieval.top_k]
 
     # convert to response models
     matches = [text_block_match_to_retrieval_match(text_block) for text_block in text_blocks]
+
+    if audit is not None:
+        retrieval_time = time() - start_time
+        audit.retrieve(
+            kbid,
+            x_nucliadb_user,
+            to_proto.client_type(x_ndb_client),
+            x_forwarded_for,
+            retrieval_time,
+            # TODO: add interesting things to audit
+        )
+
     return RetrievalResponse(matches=matches)
 
 
