@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from enum import Enum
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Discriminator, Field, StringConstraints, Tag, model_validator
@@ -149,6 +150,17 @@ FieldProp = Annotated[
 ]
 
 
+class ConversationTextStrategy(str, Enum):
+    MESSAGE = "message"
+    PAGE = "page"
+    FULL = "full"
+
+
+class ConversationText(FieldText):
+    prop: Literal["text"] = "text"
+    strategy: ConversationTextStrategy = ConversationTextStrategy.MESSAGE
+
+
 class ConversationAttachments(SelectProp):
     prop: Literal["attachments"] = "attachments"
     text: bool
@@ -159,16 +171,16 @@ class ConversationAnswer(SelectProp):
     prop: Literal["answer"] = "answer"
 
 
-ConversationProp = (
-    FieldProp
-    | Annotated[
-        (
-            Annotated[ConversationAttachments, Tag("attachments")]
-            | Annotated[ConversationAnswer, Tag("answer")]
-        ),
-        Discriminator(prop_discriminator),
-    ]
-)
+ConversationProp = Annotated[
+    (
+        Annotated[ConversationText, Tag("text")]
+        | Annotated[FieldValue, Tag("value")]
+        | Annotated[FieldEntities, Tag("entities")]
+        | Annotated[ConversationAttachments, Tag("attachments")]
+        | Annotated[ConversationAnswer, Tag("answer")]
+    ),
+    Discriminator(prop_discriminator),
+]
 
 
 class ResourceTitle(SelectProp):

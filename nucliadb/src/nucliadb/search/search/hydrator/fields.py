@@ -19,7 +19,7 @@
 #
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_NAME, FieldId
 from nucliadb.ingest.fields.base import Field
-from nucliadb.models.internal.augment import FieldProp, FieldText, FieldValue
+from nucliadb.models.internal.augment import ConversationProp, FieldProp, FieldText, FieldValue
 from nucliadb.search.augmentor.fields import (
     db_augment_conversation_field,
     db_augment_file_field,
@@ -159,7 +159,7 @@ async def hydrate_conversation_field(
     field_id: FieldId,
     config: hydration_models.ConversationFieldHydration,
 ) -> hydration_models.HydratedConversationField:
-    select: list[FieldProp] = []
+    select: list[ConversationProp] = []
     if config.value:
         select.append(FieldValue())
 

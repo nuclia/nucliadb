@@ -34,9 +34,10 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.serialize import serialize_extra, serialize_origin
-from nucliadb.models.internal.augment import ParagraphText
+from nucliadb.models.internal.augment import ConversationText, FieldText, ParagraphText
 from nucliadb.search import augmentor, logger
 from nucliadb.search.augmentor.fields import (
+    augment_fields,
     conversation_answer,
     conversation_messages_after,
     field_entities,
@@ -50,7 +51,7 @@ from nucliadb.search.search.chat.images import (
     get_page_image,
     get_paragraph_image,
 )
-from nucliadb.search.search.hydrator import hydrate_field_text, hydrate_resource_text
+from nucliadb.search.search.hydrator import hydrate_field_text
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.metadata import Extra, Origin
@@ -267,7 +268,7 @@ async def full_resource_prompt_context(
     context: CappedPromptContext,
     kbid: str,
     ordered_paragraphs: list[FindParagraph],
-    resource: Optional[str],
+    rid: Optional[str],
     strategy: FullResourceStrategy,
     metrics: Metrics,
     augmented_context: AugmentedContext,
@@ -283,15 +284,15 @@ async def full_resource_prompt_context(
         resource: The resource to be included in the context. This is used only when chatting with a specific resource with no retrieval.
         strategy: strategy instance containing, for example, the number of full resources to include in the context.
     """  # noqa: E501
-    if resource is not None:
+    if rid is not None:
         # The user has specified a resource to be included in the context.
-        ordered_resources = [resource]
+        ordered_resources = [rid]
     else:
         # Collect the list of resources in the results (in order of relevance).
         ordered_resources = []
         for paragraph in ordered_paragraphs:
-            resource_uuid = parse_text_block_id(paragraph.id).rid
-            if resource_uuid not in ordered_resources:
+            rid = parse_text_block_id(paragraph.id).rid
+            if rid not in ordered_resources:
                 skip = False
                 if strategy.apply_to is not None:
                     # decide whether the resource should be extended or not
@@ -301,35 +302,56 @@ async def full_resource_prompt_context(
                         )
 
                 if not skip:
-                    ordered_resources.append(resource_uuid)
+                    ordered_resources.append(rid)
+                    # skip when we have enough resource ids
+                    if strategy.count is not None and len(ordered_resources) > strategy.count:
+                        break
+
+    ordered_resources = ordered_resources[: strategy.count]
 
     # For each resource, collect the extracted text from all its fields.
-    resources_extracted_texts = await run_concurrently(
-        [
-            hydrate_resource_text(kbid, resource_uuid, max_concurrent_tasks=MAX_RESOURCE_FIELD_TASKS)
-            for resource_uuid in ordered_resources[: strategy.count]
-        ],
-        max_concurrent=MAX_RESOURCE_TASKS,
-    )
-    added_fields = set()
-    for resource_extracted_texts in resources_extracted_texts:
-        if resource_extracted_texts is None:
+    resource_fields: dict[str, list[FieldId]] = {}
+    for rid in ordered_resources:
+        resource = await cache.get_resource(kbid, rid)
+        if resource is None:
             continue
-        for field, extracted_text in resource_extracted_texts:
+
+        for field_type, field_key in await resource.get_fields(force=True):
+            field_id = FieldId.from_pb(rid, field_type, field_key)
+            resource_fields.setdefault(rid, []).append(field_id)
+
+    augmented_fields = await augment_fields(
+        kbid,
+        given=[field_id for field_ids in resource_fields.values() for field_id in field_ids],
+        select=[
+            FieldText(),
+            ConversationText(),
+        ],
+        concurrency_control=asyncio.Semaphore(MAX_RESOURCE_TASKS * MAX_RESOURCE_FIELD_TASKS),
+    )
+
+    added_fields = set()
+    for rid in resource_fields:
+        for field_id in resource_fields[rid]:
+            augmented_field = augmented_fields.get(field_id)
+            if augmented_field is None or augmented_field.text is None:
+                continue
+            extracted_text = augmented_field.text
+
             # First off, remove the text block ids from paragraphs that belong to
             # the same field, as otherwise the context will be duplicated.
             for tb_id in context.text_block_ids():
-                if tb_id.startswith(field.full()):
+                if tb_id.startswith(field_id.full()):
                     del context[tb_id]
             # Add the extracted text of each field to the context.
-            context[field.full()] = extracted_text
-            augmented_context.fields[field.full()] = AugmentedTextBlock(
-                id=field.full(),
+            context[field_id.full()] = extracted_text
+            augmented_context.fields[field_id.full()] = AugmentedTextBlock(
+                id=field_id.full(),
                 text=extracted_text,
                 augmentation_type=TextBlockAugmentationType.FULL_RESOURCE,
             )
 
-            added_fields.add(field.full())
+            added_fields.add(field_id.full())
 
     metrics.set("full_resource_ops", len(added_fields))
 

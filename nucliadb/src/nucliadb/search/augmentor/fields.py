@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import AsyncIterator
+from typing import AsyncIterator, Sequence, cast
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.models_utils import from_proto
@@ -28,6 +28,8 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal.augment import (
     ConversationAnswer,
     ConversationAttachments,
+    ConversationProp,
+    ConversationText,
     FieldClassificationLabels,
     FieldEntities,
     FieldProp,
@@ -46,13 +48,14 @@ from nucliadb.search.augmentor.models import (
 from nucliadb.search.augmentor.resources import get_basic
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
+from nucliadb_models.common import FieldTypeName
 from nucliadb_protos import resources_pb2
 
 
 async def augment_fields(
     kbid: str,
     given: list[FieldId],
-    select: list[FieldProp],
+    select: list[FieldProp | ConversationProp],
     *,
     concurrency_control: asyncio.Semaphore | None = None,
 ) -> dict[FieldId, AugmentedField | None]:
@@ -79,7 +82,7 @@ async def augment_fields(
 async def augment_field(
     kbid: str,
     field_id: FieldId,
-    select: list[FieldProp],
+    select: Sequence[FieldProp | ConversationProp],
 ) -> AugmentedField | None:
     # TODO: make sure we don't repeat any select clause
 
@@ -103,22 +106,42 @@ async def augment_field(
 async def db_augment_field(
     field: Field,
     field_id: FieldId,
-    select: list[FieldProp],
+    select: Sequence[FieldProp | ConversationProp],
 ) -> AugmentedField:
-    db_augments_by_type = {
-        "t": db_augment_text_field,
-        "f": db_augment_file_field,
-        "u": db_augment_link_field,
-        "c": db_augment_conversation_field,
-        "a": db_augment_generic_field,
-    }
-    return await db_augments_by_type[field_id.type](field, field_id, select)
+    field_type = field_id.type
+
+    # Note we cast `select` to the specific Union type required by the
+    # db_augment_ function. This is safe even if there are props that are not
+    # for a specific field, as they will be ignored
+
+    if field_type == FieldTypeName.TEXT.abbreviation():
+        select = cast(list[FieldProp], select)
+        return await db_augment_text_field(field, field_id, select)
+
+    elif field_type == FieldTypeName.FILE.abbreviation():
+        select = cast(list[FieldProp], select)
+        return await db_augment_file_field(field, field_id, select)
+
+    elif field_type == FieldTypeName.LINK.abbreviation():
+        select = cast(list[FieldProp], select)
+        return await db_augment_link_field(field, field_id, select)
+
+    elif field_type == FieldTypeName.CONVERSATION.abbreviation():
+        select = cast(list[ConversationProp], select)
+        return await db_augment_conversation_field(field, field_id, select)
+
+    elif field_type == FieldTypeName.GENERIC.abbreviation():
+        select = cast(list[FieldProp], select)
+        return await db_augment_generic_field(field, field_id, select)
+
+    else:  # pragma: no cover
+        assert False, f"unknown field type: {field_type}"
 
 
 async def db_augment_text_field(
     field: Field,
     field_id: FieldId,
-    select: list[FieldProp],
+    select: Sequence[FieldProp],
 ) -> AugmentedTextField:
     augmented = AugmentedTextField(id=field.field_id)
 
@@ -144,7 +167,7 @@ async def db_augment_text_field(
 async def db_augment_file_field(
     field: Field,
     field_id: FieldId,
-    select: list[FieldProp],
+    select: Sequence[FieldProp],
 ) -> AugmentedFileField:
     augmented = AugmentedFileField(id=field.field_id)
 
@@ -170,7 +193,7 @@ async def db_augment_file_field(
 async def db_augment_link_field(
     field: Field,
     field_id: FieldId,
-    select: list[FieldProp],
+    select: Sequence[FieldProp],
 ) -> AugmentedLinkField:
     augmented = AugmentedLinkField(id=field.field_id)
 
@@ -196,13 +219,13 @@ async def db_augment_link_field(
 async def db_augment_conversation_field(
     field: Field,
     field_id: FieldId,
-    select: list[FieldProp],
+    select: list[ConversationProp],
 ) -> AugmentedConversationField:
     augmented = AugmentedConversationField(id=field.field_id)
 
     for prop in select:
-        if isinstance(prop, FieldText):
-            # TODO: which text should we augment here?
+        if isinstance(prop, ConversationText):
+            # TODO: implement different conversation text strategies
             raise NotImplementedError()
 
         elif isinstance(prop, FieldValue):
@@ -230,7 +253,7 @@ async def db_augment_conversation_field(
 async def db_augment_generic_field(
     field: Field,
     field_id: FieldId,
-    select: list[FieldProp],
+    select: Sequence[FieldProp],
 ) -> AugmentedGenericField:
     augmented = AugmentedGenericField(id=field.field_id)
 
