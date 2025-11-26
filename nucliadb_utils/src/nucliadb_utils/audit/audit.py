@@ -97,6 +97,17 @@ class AuditStorage:
     ):
         raise NotImplementedError
 
+    def retrieve(
+        self,
+        kbid: str,
+        user: str,
+        client: int,
+        origin: str,
+        retrieval_time: float,
+    ):
+        # TODO: implement audit for /retrieve
+        ...
+
     def report_storage(self, kbid: str, paragraphs: int, fields: int, bytes: int):
         raise NotImplementedError
 

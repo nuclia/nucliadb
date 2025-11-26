@@ -599,7 +599,13 @@ async def rao_find(
         if find_request.query != retrieval_request.query.keyword.query:
             rephrased_query = retrieval_request.query.keyword.query
 
-    retrieval_response = await retrieve(kbid, retrieval_request)
+    retrieval_response = await retrieve(
+        kbid,
+        retrieval_request,
+        x_ndb_client=x_ndb_client,
+        x_nucliadb_user=x_nucliadb_user,
+        x_forwarded_for=x_forwarded_for,
+    )
     matches = retrieval_response.matches
 
     relations = None
@@ -675,11 +681,24 @@ async def rao_find(
     return find_results, False, fetcher, reranker
 
 
-async def retrieve(kbid: str, item: RetrievalRequest) -> RetrievalResponse:
+async def retrieve(
+    kbid: str,
+    item: RetrievalRequest,
+    *,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+) -> RetrievalResponse:
     # Parse retrieval struff that will be later done internally at nucliadb and can be removed from here when moved to RAO
 
     # TODO: replace this for a nucliadb_sdk.retrieve call when moving /ask to RAO
-    return await retrieve_endpoint(kbid, item)
+    return await retrieve_endpoint(
+        kbid,
+        item,
+        x_ndb_client=x_ndb_client,
+        x_nucliadb_user=x_nucliadb_user,
+        x_forwarded_for=x_forwarded_for,
+    )
 
 
 async def augment(kbid: str, item: AugmentRequest) -> AugmentResponse:
