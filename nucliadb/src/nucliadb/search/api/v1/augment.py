@@ -20,22 +20,24 @@
 
 import asyncio
 import os
-from typing import Awaitable
 
 from fastapi import Header, Request
 from fastapi.exceptions import HTTPException
 from fastapi_versioning import version
 
-import nucliadb.search.augmentor.models
-import nucliadb_models
 from nucliadb.common.ids import ParagraphId
-from nucliadb.models.internal.augment import ParagraphProp, ParagraphText
+from nucliadb.models.internal.augment import (
+    Augment,
+    DeepResourceAugment,
+    Metadata,
+    Paragraph,
+    ParagraphAugment,
+    ParagraphProp,
+    ParagraphText,
+)
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.augmentor.models import Metadata, Paragraph
-from nucliadb.search.augmentor.paragraphs import augment_paragraphs
-from nucliadb.search.augmentor.resources import augment_resources_deep
+from nucliadb.search.augmentor import augmentor
 from nucliadb.search.search.cache import request_caches
-from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb_models.augment import (
     AugmentedParagraph,
     AugmentedResource,
@@ -82,54 +84,44 @@ async def _augment_endpoint(
 
 
 async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
-    async def skip_augment() -> dict:
-        return {}
+    augmentations: list[Augment] = []
+
+    if item.resources is not None:
+        augmentations.append(
+            DeepResourceAugment(
+                given=item.resources.given,
+                show=item.resources.show,
+                extracted=item.resources.extracted,
+                field_type_filter=item.resources.field_type_filter,
+            )
+        )
+
+    if item.paragraphs is not None:
+        paragraphs_to_augment, paragraph_selector = parse_paragraph_augment(item.paragraphs)
+        augmentations.append(
+            ParagraphAugment(
+                given=paragraphs_to_augment,
+                select=paragraph_selector,
+            )
+        )
+
+    if len(augmentations) == 0:
+        return AugmentResponse(
+            resources={},
+            paragraphs={},
+        )
 
     with request_caches():
         max_ops = asyncio.Semaphore(50)
 
-        augment_resources_task: Awaitable[dict[str, nucliadb_models.resource.Resource | None]]
-        if item.resources is None:
-            augment_resources_task = skip_augment()
-        else:
-            resources_to_augment = item.resources.given
-            augment_resources_task = asyncio.create_task(
-                augment_resources_deep(
-                    kbid,
-                    given=resources_to_augment,
-                    opts=ResourceHydrationOptions(
-                        show=item.resources.show,
-                        extracted=item.resources.extracted,
-                        field_type_filter=item.resources.field_type_filter,
-                    ),
-                    concurrency_control=max_ops,
-                )
-            )
+        augmented = await augmentor.augment(
+            kbid,
+            augmentations,
+            concurrency_control=max_ops,
+        )
 
-        augment_paragraphs_task: Awaitable[
-            dict[ParagraphId, nucliadb.search.augmentor.models.AugmentedParagraph | None]
-        ]
-        if item.paragraphs is None:
-            augment_paragraphs_task = skip_augment()
-        else:
-            paragraphs_to_augment, paragraph_selector = parse_paragraph_augment(item.paragraphs)
-            augment_paragraphs_task = asyncio.create_task(
-                augment_paragraphs(
-                    kbid,
-                    given=paragraphs_to_augment,
-                    select=paragraph_selector,
-                    concurrency_control=max_ops,
-                )
-            )
-
-        ops = [
-            augment_resources_task,
-            augment_paragraphs_task,
-        ]
-
-        resources: dict[str, nucliadb_models.resource.Resource | None]
-        paragraphs: dict[ParagraphId, nucliadb.search.augmentor.models.AugmentedParagraph | None]
-        resources, paragraphs = await asyncio.gather(*ops)  # type: ignore[assignment]
+        resources = augmented.resources_deep
+        paragraphs = augmented.paragraphs
 
         augmented_resources = {}
         for rid, resource in resources.items():

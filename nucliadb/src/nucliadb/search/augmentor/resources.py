@@ -29,6 +29,7 @@ from nucliadb.ingest.serialize import (
     serialize_security,
 )
 from nucliadb.models.internal.augment import (
+    AugmentedResource,
     ResourceClassificationLabels,
     ResourceExtra,
     ResourceOrigin,
@@ -38,7 +39,6 @@ from nucliadb.models.internal.augment import (
     ResourceTitle,
 )
 from nucliadb.search.augmentor.metrics import augmentor_observer
-from nucliadb.search.augmentor.models import AugmentedResource
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 from nucliadb.search.search.hydrator import ResourceHydrationOptions

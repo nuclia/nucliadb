@@ -26,6 +26,12 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal.augment import (
+    AugmentedConversationField,
+    AugmentedField,
+    AugmentedFileField,
+    AugmentedGenericField,
+    AugmentedLinkField,
+    AugmentedTextField,
     ConversationAnswer,
     ConversationAttachments,
     ConversationProp,
@@ -37,14 +43,6 @@ from nucliadb.models.internal.augment import (
     FieldValue,
 )
 from nucliadb.search import logger
-from nucliadb.search.augmentor.models import (
-    AugmentedConversationField,
-    AugmentedField,
-    AugmentedFileField,
-    AugmentedGenericField,
-    AugmentedLinkField,
-    AugmentedTextField,
-)
 from nucliadb.search.augmentor.resources import get_basic
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
