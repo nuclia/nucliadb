@@ -285,19 +285,19 @@ async def get_field_extracted_text(id: FieldId, field: Field) -> str | None:
         return extracted_text_pb.text
 
 
-async def classification_labels(id: FieldId, resource: Resource) -> list[tuple[str, str]] | None:
+async def classification_labels(id: FieldId, resource: Resource) -> dict[str, set[str]] | None:
     basic = await get_basic(resource)
     if basic is None:
         return None
 
-    labels = set()
+    labels: dict[str, set[str]] = {}
     for fc in basic.computedmetadata.field_classifications:
         if fc.field.field == id.key and fc.field.field_type == id.pb_type:
             for classification in fc.classifications:
                 if classification.cancelled_by_user:  # pragma: no cover
                     continue
-                labels.add((classification.labelset, classification.label))
-    return list(labels)
+                labels.setdefault(classification.labelset, set()).add(classification.label)
+    return labels
 
 
 async def field_entities(id: FieldId, field: Field) -> dict[str, set[str]] | None:
