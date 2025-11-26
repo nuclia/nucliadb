@@ -18,26 +18,23 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import re
+from typing import Any
 
-from nucliadb.common import ids
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.models.internal.augment import (
     Augment,
-    FieldIdPattern,
-    ParagraphIdPattern,
-    ResourceIdPattern,
-)
-from nucliadb.search.augmentor.models import (
     Augmented,
     AugmentedField,
     AugmentedParagraph,
     AugmentedResource,
 )
 from nucliadb.search.augmentor.utils import limited_concurrency
+from nucliadb.search.search.hydrator import ResourceHydrationOptions
+from nucliadb_models.resource import Resource
 
 from .fields import augment_field
 from .paragraphs import augment_paragraph
-from .resources import augment_resource
+from .resources import augment_resource, augment_resource_deep
 
 
 async def augment(
@@ -54,24 +51,34 @@ async def augment(
     inside the context of `nucliadb.search.search.cache` `request_caches`
 
     """
-    augments = {  # type: ignore[var-annotated]
+    augments: dict[str, Any] = {
         "resources": {},
+        "resources.deep": {},
         "fields": {},
         "paragraphs": {},
     }
     for augmentation in augmentations:
         if augmentation.from_ == "resources":
             for id in augmentation.given:
-                if re.match(ResourceIdPattern, id):
+                if isinstance(id, str):
                     rid = id
-                elif re.match(FieldIdPattern, id):
-                    rid = ids.FieldId.from_string(id).rid
-                elif re.match(ParagraphIdPattern, id):
-                    rid = ids.ParagraphId.from_string(id).rid
+                elif isinstance(id, FieldId):
+                    rid = id.rid
+                elif isinstance(id, ParagraphId):
+                    rid = id.rid
                 else:  # pragma: no cover
-                    raise ValueError(f"unexpected id: {id}")
+                    # This is a trick so mypy generates an error if this branch can be reached,
+                    # that is, if we are missing some ifs
+                    _a: int = "a"
 
                 augments["resources"].setdefault(rid, []).extend(augmentation.select)
+
+        elif augmentation.from_ == "resources.deep":
+            for rid in augmentation.given:
+                opts = augments["resources.deep"].setdefault(rid, ResourceHydrationOptions())
+                opts.show.extend(augmentation.show)
+                opts.extracted.extend(augmentation.extracted)
+                opts.field_type_filter.extend(augmentation.field_type_filter)
 
         elif augmentation.from_ == "fields":
             raise NotImplementedError()
@@ -80,17 +87,21 @@ async def augment(
             raise NotImplementedError()
 
         elif augmentation.from_ == "paragraphs":
-            for id in augmentation.given:
-                paragraph_id = ids.ParagraphId.from_string(id)
-                augments["paragraphs"].setdefault(paragraph_id, []).extend(augmentation.select)
+            for paragraph in augmentation.given:
+                select, metadata = augments["paragraphs"].setdefault(paragraph.id, ([], None))
+                select.extend(augmentation.select)
+                # we keep the first metadata object we see
+                metadata = metadata or paragraph.metadata
+                augments["paragraphs"][paragraph.id] = (select, metadata)
 
         else:  # pragma: no cover
             # This is a trick so mypy generates an error if this branch can be reached,
             # that is, if we are missing some ifs
-            _a: int = "a"
+            _b: int = "b"
 
     ops = {  # type: ignore[var-annotated]
         "resources": [],
+        "resources.deep": [],
         "fields": [],
         "paragraphs": [],
     }
@@ -105,6 +116,17 @@ async def augment(
         )
         ops["resources"].append(task)
 
+    for rid, opts in augments["resources.deep"].items():
+        task = asyncio.create_task(
+            limited_concurrency(
+                augment_resource_deep(  # type: ignore[arg-type]
+                    kbid, rid, opts
+                ),
+                max_ops=concurrency_control,
+            )
+        )
+        ops["resources.deep"].append(task)
+
     for field_id, select in augments["fields"].items():
         task = asyncio.create_task(
             limited_concurrency(
@@ -116,27 +138,32 @@ async def augment(
         )
         ops["fields"].append(task)
 
-    for paragraph_id, select in augments["paragraphs"].items():
+    for paragraph_id, (select, metadata) in augments["paragraphs"].items():
         task = asyncio.create_task(
             limited_concurrency(
                 augment_paragraph(  # type: ignore[arg-type]
-                    kbid, paragraph_id, select, None
+                    kbid, paragraph_id, select, metadata
                 ),
                 max_ops=concurrency_control,
             )
         )
         ops["paragraphs"].append(task)
 
-    results = await asyncio.gather(*ops["resources"], *ops["fields"], *ops["paragraphs"])
+    results = await asyncio.gather(
+        *ops["resources"], *ops["resources.deep"], *ops["fields"], *ops["paragraphs"]
+    )
 
     resources: list[AugmentedResource] = results[: len(ops["resources"])]
     del results[: len(ops["resources"])]
+    resources_deep: list[Resource] = results[: len(ops["resources.deep"])]
+    del results[: len(ops["resources.deep"])]
     fields: list[AugmentedField] = results[: len(ops["fields"])]
     del results[: len(ops["fields"])]
     paragraphs: list[AugmentedParagraph] = results[: len(ops["paragraphs"])]
 
     return Augmented(
         resources={resource.id: resource for resource in resources},
+        resources_deep={resource_deep.id: resource_deep for resource_deep in resources_deep},
         fields={field.id: field for field in fields},
         paragraphs={paragraph.id: paragraph for paragraph in paragraphs},
     )

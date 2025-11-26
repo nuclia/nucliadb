@@ -34,7 +34,7 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.serialize import serialize_extra, serialize_origin
-from nucliadb.models.internal.augment import ConversationText, FieldText, ParagraphText
+from nucliadb.models.internal.augment import ConversationText, FieldText, Paragraph, ParagraphText
 from nucliadb.search import augmentor, logger
 from nucliadb.search.augmentor.fields import (
     augment_fields,
@@ -43,7 +43,6 @@ from nucliadb.search.augmentor.fields import (
     field_entities,
     find_conversation_message,
 )
-from nucliadb.search.augmentor.models import Paragraph
 from nucliadb.search.augmentor.paragraphs import augment_paragraphs
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import (
