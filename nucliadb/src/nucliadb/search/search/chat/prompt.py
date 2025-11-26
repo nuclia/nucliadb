@@ -29,7 +29,6 @@ from pydantic import BaseModel
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -656,13 +655,6 @@ async def get_matching_field_ids(
     return extend_field_ids
 
 
-async def get_orm_field(kbid: str, field_id: FieldId) -> Optional[Field]:
-    resource = await cache.get_resource(kbid, field_id.rid)
-    if resource is None:  # pragma: no cover
-        return None
-    return await resource.get_field(key=field_id.key, type=field_id.pb_type, load=False)
-
-
 async def neighbouring_paragraphs_prompt_context(
     context: CappedPromptContext,
     kbid: str,
@@ -684,7 +676,7 @@ async def neighbouring_paragraphs_prompt_context(
     fm_ops = []
     et_ops = []
     for field_id in unique_field_ids:
-        field = await get_orm_field(kbid, field_id)
+        field = await cache.get_field(kbid, field_id)
         if field is None:
             continue
         fm_ops.append(asyncio.create_task(field.get_field_metadata()))
