@@ -37,11 +37,9 @@ from nucliadb.models.internal.augment import (
     FieldText,
     Paragraph,
     ParagraphText,
-    ResourceExtra,
-    ResourceOrigin,
-    ResourceProp,
 )
 from nucliadb.search import augmentor, logger
+from nucliadb.search.api.v1.augment import augment_endpoint
 from nucliadb.search.augmentor.fields import (
     augment_fields,
     conversation_answer,
@@ -50,7 +48,6 @@ from nucliadb.search.augmentor.fields import (
     find_conversation_message,
 )
 from nucliadb.search.augmentor.paragraphs import augment_paragraphs
-from nucliadb.search.augmentor.resources import augment_resources
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import (
     get_file_thumbnail_image,
@@ -59,6 +56,7 @@ from nucliadb.search.search.chat.images import (
 )
 from nucliadb.search.search.hydrator import hydrate_field_text
 from nucliadb.search.search.metrics import Metrics
+from nucliadb_models.augment import AugmentRequest, AugmentResources, ResourceProp
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -394,7 +392,7 @@ async def extend_prompt_context_with_metadata(
     ops = 0
     if MetadataExtensionType.ORIGIN in strategy.types:
         ops += 1
-        select.append(ResourceOrigin())
+        select.append(ResourceProp.ORIGIN)
 
     if MetadataExtensionType.CLASSIFICATION_LABELS in strategy.types:
         ops += 1
@@ -408,18 +406,23 @@ async def extend_prompt_context_with_metadata(
 
     if MetadataExtensionType.EXTRA_METADATA in strategy.types:
         ops += 1
-        select.append(ResourceExtra())
+        select.append(ResourceProp.EXTRA)
 
     metrics.set("metadata_extension_ops", ops * len(text_block_ids))
 
-    augmented = await augment_resources(
+    # TODO: replace this call for sdk.augment or similar
+    augmented = await augment_endpoint(
         kbid,
-        given=rids,
-        select=select,
+        AugmentRequest(
+            resources=AugmentResources(
+                given=rids,
+                select=select,
+            )
+        ),
     )
 
     for tb_id in text_block_ids:
-        resource = augmented.get(tb_id.rid)
+        resource = augmented.resources.get(tb_id.rid)
         if resource is None:
             continue
 
