@@ -13,13 +13,95 @@
 # limitations under the License.
 #
 
-from pydantic import BaseModel
+from enum import Enum
+
+from pydantic import BaseModel, Field
 
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import Image, ResourceProperties, SearchParamDefaults
+from nucliadb_models.utils import FieldIdString
 
+# TODO: use constrained string
 ParagraphId = str
+
+
+# Request
+
+
+class ResourceProp(str, Enum):
+    """Superset of former `show` and `extracted` serializations options."""
+
+    BASIC = "basic"
+    ORIGIN = "origin"
+    EXTRA = "extra"
+    RELATIONS = "relations"
+    VALUES = "values"
+    ERRORS = "errors"
+    SECURITY = "security"
+    EXTRACTED_TEXT = "extracted_text"
+    EXTRACTED_METADATA = "extracted_metadata"
+    EXTRACTED_SHORTENED_METADATA = "extracted_shortened_metadata"
+    EXTRACTED_LARGE_METADATA = "extracted_large_metadata"
+    EXTRACTED_VECTOR = "extracted_vectors"
+    EXTRACTED_LINK = "extracted_link"
+    EXTRACTED_FILE = "extracted_file"
+    EXTRACTED_QA = "extracted_question_answers"
+
+    @classmethod
+    def from_show_and_extracted(
+        cls, show: list[ResourceProperties], extracted: list[ExtractedDataTypeName]
+    ) -> list["ResourceProp"]:
+        _show_to_prop = {
+            ResourceProperties.BASIC: cls.BASIC,
+            ResourceProperties.ORIGIN: cls.ORIGIN,
+            ResourceProperties.EXTRA: cls.EXTRA,
+            ResourceProperties.RELATIONS: cls.RELATIONS,
+            ResourceProperties.VALUES: cls.VALUES,
+            ResourceProperties.ERRORS: cls.ERRORS,
+            ResourceProperties.SECURITY: cls.SECURITY,
+        }
+        _extracted_to_prop = {
+            ExtractedDataTypeName.TEXT: cls.EXTRACTED_TEXT,
+            ExtractedDataTypeName.METADATA: cls.EXTRACTED_METADATA,
+            ExtractedDataTypeName.SHORTENED_METADATA: cls.EXTRACTED_SHORTENED_METADATA,
+            ExtractedDataTypeName.LARGE_METADATA: cls.EXTRACTED_LARGE_METADATA,
+            ExtractedDataTypeName.VECTOR: cls.EXTRACTED_VECTOR,
+            ExtractedDataTypeName.LINK: cls.EXTRACTED_LINK,
+            ExtractedDataTypeName.FILE: cls.EXTRACTED_FILE,
+            ExtractedDataTypeName.QA: cls.EXTRACTED_QA,
+        }
+
+        props = []
+        for s in show:
+            show_prop = _show_to_prop.get(s)
+            # show=extracted is not in the dict
+            if show_prop is None:
+                continue
+            props.append(show_prop)
+
+        if ResourceProperties.EXTRACTED in show:
+            for e in extracted:
+                extracted_prop = _extracted_to_prop[e]
+                props.append(extracted_prop)
+
+        return props
+
+
+class AugmentResources(BaseModel):
+    given: list[str]
+
+    select: list[ResourceProp] = Field(default=[ResourceProp.BASIC])
+    field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+    # TODO: field name filter, da field prefix filter
+
+    classification_labels: bool = False
+
+
+class AugmentFields(BaseModel):
+    given: list[FieldIdString]
+
+    text: bool = False
 
 
 class ParagraphMetadata(BaseModel):
@@ -40,15 +122,6 @@ class ParagraphMetadata(BaseModel):
 class AugmentParagraph(BaseModel):
     id: ParagraphId
     metadata: ParagraphMetadata | None = None
-
-
-class AugmentResources(BaseModel):
-    given: list[str]
-
-    show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
-    extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
-    field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
-    # TODO: field name filter, da field prefix filter
 
 
 class AugmentParagraphs(BaseModel):
@@ -74,7 +147,11 @@ class AugmentParagraphs(BaseModel):
 
 class AugmentRequest(BaseModel):
     resources: AugmentResources | None = None
+    fields: AugmentFields | None = None
     paragraphs: AugmentParagraphs | None = None
+
+
+# Response
 
 
 class AugmentedParagraph(BaseModel):
@@ -87,6 +164,13 @@ class AugmentedParagraph(BaseModel):
 
 
 class AugmentedField(BaseModel):
+    text: str | None = None
+
+    classification_labels: dict[str, list[str]] | None = None
+
+    # former ners
+    entities: dict[str, list[str]] | None = None
+
     page_preview_image: Image | None = None
 
 
