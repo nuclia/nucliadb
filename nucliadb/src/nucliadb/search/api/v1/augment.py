@@ -43,10 +43,12 @@ from nucliadb_models.augment import (
     AugmentedResource,
     AugmentParagraphs,
     AugmentRequest,
+    AugmentResources,
     AugmentResponse,
+    ResourceProp,
 )
-from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.search import NucliaDBClientType
+from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
+from nucliadb_models.search import NucliaDBClientType, ResourceProperties
 from nucliadb_utils.authentication import requires
 
 
@@ -87,11 +89,12 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
     augmentations: list[Augment] = []
 
     if item.resources is not None:
+        show, extracted = parse_resource_augment(item.resources)
         augmentations.append(
             DeepResourceAugment(
                 given=item.resources.given,
-                show=item.resources.show,
-                extracted=item.resources.extracted,
+                show=show,
+                extracted=extracted,
                 field_type_filter=item.resources.field_type_filter,
             )
         )
@@ -144,6 +147,45 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
             resources=augmented_resources,
             paragraphs=augmented_paragraphs,
         )
+
+
+def parse_resource_augment(
+    item: AugmentResources,
+) -> tuple[list[ResourceProperties], list[ExtractedDataTypeName]]:
+    show = []
+    show_extracted = False
+    extracted = []
+
+    _resource_prop_to_show = {
+        ResourceProp.BASIC: ResourceProperties.BASIC,
+        ResourceProp.ORIGIN: ResourceProperties.ORIGIN,
+        ResourceProp.EXTRA: ResourceProperties.EXTRA,
+        ResourceProp.RELATIONS: ResourceProperties.RELATIONS,
+        ResourceProp.VALUES: ResourceProperties.VALUES,
+        ResourceProp.ERRORS: ResourceProperties.ERRORS,
+        ResourceProp.SECURITY: ResourceProperties.SECURITY,
+    }
+    _resource_prop_to_extracted = {
+        ResourceProp.EXTRACTED_TEXT: ExtractedDataTypeName.TEXT,
+        ResourceProp.EXTRACTED_METADATA: ExtractedDataTypeName.METADATA,
+        ResourceProp.EXTRACTED_SHORTENED_METADATA: ExtractedDataTypeName.SHORTENED_METADATA,
+        ResourceProp.EXTRACTED_LARGE_METADATA: ExtractedDataTypeName.LARGE_METADATA,
+        ResourceProp.EXTRACTED_VECTOR: ExtractedDataTypeName.VECTOR,
+        ResourceProp.EXTRACTED_LINK: ExtractedDataTypeName.LINK,
+        ResourceProp.EXTRACTED_FILE: ExtractedDataTypeName.FILE,
+        ResourceProp.EXTRACTED_QA: ExtractedDataTypeName.QA,
+    }
+    for prop in item.select:
+        if prop in _resource_prop_to_show:
+            show.append(_resource_prop_to_show[prop])
+        elif prop in _resource_prop_to_extracted:
+            show_extracted = True
+            extracted.append(_resource_prop_to_extracted[prop])
+
+    if show_extracted:
+        show.append(ResourceProperties.EXTRACTED)
+
+    return show, extracted
 
 
 def parse_paragraph_augment(item: AugmentParagraphs) -> tuple[list[Paragraph], list[ParagraphProp]]:

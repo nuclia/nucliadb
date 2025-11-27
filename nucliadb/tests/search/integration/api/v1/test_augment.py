@@ -44,7 +44,7 @@ async def test_augment_api(
         json={
             "resources": {
                 "given": [rid],
-                "show": ["basic"],
+                "select": ["basic"],
             },
             "paragraphs": {
                 "given": [

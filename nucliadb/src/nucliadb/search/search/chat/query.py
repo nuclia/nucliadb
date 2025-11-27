@@ -21,10 +21,7 @@ import asyncio
 from time import time
 from typing import AsyncGenerator, Iterable, Optional, Union
 
-from nidx_protos.nodereader_pb2 import (
-    GraphSearchResponse,
-    SearchResponse,
-)
+from nidx_protos.nodereader_pb2 import GraphSearchResponse, SearchResponse
 from nuclia_models.predict.generative_responses import GenerativeChunk
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
@@ -69,6 +66,7 @@ from nucliadb_models.augment import (
     AugmentResources,
     AugmentResponse,
     ParagraphMetadata,
+    ResourceProp,
 )
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -803,12 +801,15 @@ async def hydrate_and_rerank(
         else:
             text_block_id_to_hydrate.add(paragraph_id)
 
+    resource_select = ResourceProp.from_show_and_extracted(
+        resource_hydration_options.show, resource_hydration_options.extracted
+    )
+
     # hydrate only the strictly needed before rerank
     augment_request = AugmentRequest(
         resources=AugmentResources(
             given=list(resources_to_hydrate),
-            show=resource_hydration_options.show,
-            extracted=resource_hydration_options.extracted,
+            select=resource_select,
             field_type_filter=resource_hydration_options.field_type_filter,
         ),
         paragraphs=AugmentParagraphs(
@@ -897,8 +898,7 @@ async def hydrate_and_rerank(
             AugmentRequest(
                 resources=AugmentResources(
                     given=list(resources_to_hydrate),
-                    show=resource_hydration_options.show,
-                    extracted=resource_hydration_options.extracted,
+                    select=resource_select,
                     field_type_filter=resource_hydration_options.field_type_filter,
                 ),
             ),

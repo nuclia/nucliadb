@@ -242,6 +242,7 @@ FieldProp = Annotated[
     (
         Annotated[FieldText, Tag("text")]
         | Annotated[FieldValue, Tag("value")]
+        | Annotated[FieldClassificationLabels, Tag("classification_labels")]
         | Annotated[FieldEntities, Tag("entities")]
     ),
     Discriminator(prop_discriminator),
@@ -273,6 +274,7 @@ ConversationProp = Annotated[
     (
         Annotated[ConversationText, Tag("text")]
         | Annotated[FieldValue, Tag("value")]
+        | Annotated[FieldClassificationLabels, Tag("classification_labels")]
         | Annotated[FieldEntities, Tag("entities")]
         | Annotated[ConversationAttachments, Tag("attachments")]
         | Annotated[ConversationAnswer, Tag("answer")]
