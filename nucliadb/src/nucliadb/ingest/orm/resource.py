@@ -142,12 +142,6 @@ class Resource:
             disable_vectors=False,
         )
 
-        # prevent circulat imports
-        from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-
-        kb = KnowledgeBox(txn, await get_storage(), kbid)
-        return await kb.get(rid)
-
     async def set_slug(self):
         basic = await self.get_basic()
         new_key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=basic.slug)
