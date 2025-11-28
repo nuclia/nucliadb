@@ -27,27 +27,17 @@ from nuclia_models.predict.generative_responses import GenerativeChunk
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
 from nucliadb.common.models_utils import to_proto
-from nucliadb.models.internal.retrieval import (
-    RerankerScore,
-    RetrievalMatch,
-    RetrievalRequest,
-    RetrievalResponse,
-    ScoreType,
-)
+from nucliadb.models.internal.retrieval import RerankerScore, RetrievalMatch, ScoreType
 from nucliadb.search import logger
-from nucliadb.search.api.v1.augment import augment_endpoint
-from nucliadb.search.api.v1.retrieve import retrieve_endpoint
 from nucliadb.search.predict import AnswerStatusCode, RephraseResponse
 from nucliadb.search.requesters.utils import Method, nidx_query
+from nucliadb.search.search.chat import rpc
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.chat.parser import rao_parse_find
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.find_merge import text_block_to_find_paragraph
-from nucliadb.search.search.hydrator import (
-    ResourceHydrationOptions,
-    TextBlockHydrationOptions,
-)
+from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.paragraphs import highlight_paragraph
@@ -64,7 +54,6 @@ from nucliadb_models.augment import (
     AugmentParagraphs,
     AugmentRequest,
     AugmentResources,
-    AugmentResponse,
     ParagraphMetadata,
     ResourceProp,
 )
@@ -597,7 +586,7 @@ async def rao_find(
         if find_request.query != retrieval_request.query.keyword.query:
             rephrased_query = retrieval_request.query.keyword.query
 
-    retrieval_response = await retrieve(
+    retrieval_response = await rpc.retrieve(
         kbid,
         retrieval_request,
         x_ndb_client=x_ndb_client,
@@ -677,31 +666,6 @@ async def rao_find(
         )
 
     return find_results, False, fetcher, reranker
-
-
-async def retrieve(
-    kbid: str,
-    item: RetrievalRequest,
-    *,
-    x_ndb_client: NucliaDBClientType,
-    x_nucliadb_user: str,
-    x_forwarded_for: str,
-) -> RetrievalResponse:
-    # Parse retrieval struff that will be later done internally at nucliadb and can be removed from here when moved to RAO
-
-    # TODO: replace this for a nucliadb_sdk.retrieve call when moving /ask to RAO
-    return await retrieve_endpoint(
-        kbid,
-        item,
-        x_ndb_client=x_ndb_client,
-        x_nucliadb_user=x_nucliadb_user,
-        x_forwarded_for=x_forwarded_for,
-    )
-
-
-async def augment(kbid: str, item: AugmentRequest) -> AugmentResponse:
-    # TODO: replace this for a nucliadb_sdk.augment call when moving /ask to RAO
-    return await augment_endpoint(kbid, item)
 
 
 async def augment_and_rerank(
@@ -831,7 +795,7 @@ async def hydrate_and_rerank(
             text=True,
         ),
     )
-    augment_response = await augment(kbid, augment_request)
+    augment_response = await rpc.augment(kbid, augment_request)
     augmented_paragraphs = augment_response.paragraphs
     augmented_resources = augment_response.resources
 
@@ -893,7 +857,7 @@ async def hydrate_and_rerank(
 
     # Finally, fetch resource metadata if we haven't already done it
     if reranker.needs_extra_results:
-        augmented = await augment(
+        augmented = await rpc.augment(
             kbid,
             AugmentRequest(
                 resources=AugmentResources(
