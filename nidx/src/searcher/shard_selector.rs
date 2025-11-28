@@ -26,6 +26,7 @@ use std::{
     hash::{DefaultHasher, Hash as _, Hasher as _},
     pin::pin,
     sync::Arc,
+    time::Duration,
 };
 use tokio_util::sync::CancellationToken;
 use tracing::*;
@@ -75,11 +76,21 @@ impl KubernetesCluster {
             // Read the stream continuously in order to keep the store updated
             let mut stream = pin!(stream);
             let mut prev_pods = HashSet::new();
+            let mut retries = 0;
             loop {
                 tokio::select! {
                     result = stream.try_next() => {
                         if let Err(e) = result {
-                            return Err(e.into())
+                            warn!(?e, "Error updating kubernetes cluster");
+                            if retries > 5 {
+                                return Err(e.into())
+                            } else {
+                                retries += 1;
+                                tokio::time::sleep(Duration::from_secs(5)).await;
+                                continue;
+                            }
+                        } else if retries > 0 {
+                            retries -= 1;
                         }
                         let new_pods = task_reader
                             .state()
