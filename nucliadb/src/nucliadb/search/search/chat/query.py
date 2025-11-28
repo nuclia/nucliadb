@@ -600,9 +600,7 @@ async def rao_find(
         # the user asked for a legacy relations search, as we don't support it
         # in the /retrieve endpoint but we must maintain bw/c with /find
         # responses, we call it with to get just this part of the response
-        #
-        # TODO: replace this with an sdk call
-        find_response, _, _ = await find(
+        find_response, _ = await rpc.find(
             kbid,
             FindRequest(
                 features=[FindOptions.RELATIONS],
