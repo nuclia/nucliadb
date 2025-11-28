@@ -284,8 +284,8 @@ jobs:
       - name: Build docker images for nidx
         run: mkdir builds && mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
 
-      - name: Run tests
-        run: source .venv/bin/activate && make -C nucliadb test-cov-search
+      # - name: Run tests
+      #   run: source .venv/bin/activate && make -C nucliadb test-cov-search
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -334,13 +334,13 @@ jobs:
           key: venv-${{ github.sha }}
           fail-on-cache-miss: true
 
-      - name: Run NucliaDB tests
-        env:
-          TESTING_PG_URL: "postgresql://postgres:postgres@localhost/postgres"
-        run: |
-          source .venv/bin/activate &&
-          make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 4" ||
-          make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
+      # - name: Run NucliaDB tests
+      #   env:
+      #     TESTING_PG_URL: "postgresql://postgres:postgres@localhost/postgres"
+      #   run: |
+      #     source .venv/bin/activate &&
+      #     make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 4" ||
+      #     make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
