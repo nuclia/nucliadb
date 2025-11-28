@@ -38,6 +38,7 @@ from typing import (
 
 import httpx
 import orjson
+from httpx._transports.base import AsyncBaseTransport, BaseTransport
 from nuclia_models.predict.run_agents import RunTextAgentsRequest, RunTextAgentsResponse
 from pydantic import BaseModel, ValidationError
 
@@ -944,6 +945,7 @@ class NucliaDB(_NucliaDBBase):
         url: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = 60.0 * 5,
+        _httpx_transport: Optional[BaseTransport] = None,
     ):
         """
         Create a new instance of the NucliaDB client
@@ -975,7 +977,9 @@ class NucliaDB(_NucliaDBBase):
         >>> sdk = NucliaDB(api_key="api-key", url=\"http://localhost:8080\")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
-        self.session = httpx.Client(headers=self.headers, base_url=self.base_url, timeout=timeout)
+        self.session = httpx.Client(
+            headers=self.headers, base_url=self.base_url, timeout=timeout, transport=_httpx_transport
+        )
 
     def _request(
         self,
@@ -1143,6 +1147,7 @@ class NucliaDBAsync(_NucliaDBBase):
         url: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = 60.0,
+        _httpx_transport: Optional[AsyncBaseTransport] = None,
     ):
         """
         Create a new instance of the NucliaDB client
@@ -1172,7 +1177,9 @@ class NucliaDBAsync(_NucliaDBBase):
         >>> sdk = NucliaDBAsync(api_key="api-key", url="https://mycompany.api.com/api/nucliadb")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
-        self.session = httpx.AsyncClient(headers=self.headers, base_url=self.base_url, timeout=timeout)
+        self.session = httpx.AsyncClient(
+            headers=self.headers, base_url=self.base_url, timeout=timeout, transport=_httpx_transport
+        )
 
     async def _request(
         self,
