@@ -34,6 +34,7 @@ use std::{sync::Arc, time::Duration};
 use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
 use tonic::Request;
+use uuid::Uuid;
 
 struct ManualListNodes(Arc<Mutex<Vec<String>>>, usize);
 impl ListNodes for ManualListNodes {
@@ -308,6 +309,74 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
         different > 0,
         "Shard distribution after scale down + up should be different than originally"
     );
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn test_search_cluster_shards_not_accessible(pool: PgPool) -> anyhow::Result<()> {
+    // Request a shard that does not exist, we should get a NotFound error
+    // This test makes sure we don't get the searchers stuck in a loop asking each other
+    // for the shard.
+    let fixture = NidxFixture::new(pool).await?;
+
+    // Create a cluster with 3 nodes and 2 replicas for each shard
+    let nodes = Arc::new(Mutex::new(Vec::new()));
+    let mut searchers = Vec::new();
+    for i in 0..3 {
+        let searcher_server = GrpcServer::new("localhost:0").await?;
+        let searcher_port = searcher_server.port()?;
+        nodes.lock().unwrap().push(format!("localhost:{searcher_port}"));
+        let list_nodes = ManualListNodes(nodes.clone(), i);
+        let work_dir = tempdir()?;
+        let searcher = SyncedSearcher::new(fixture.settings.metadata.clone(), work_dir.path());
+        let arc_list_nodes = Arc::new(list_nodes);
+        let searcher_api = SearchServer::new(searcher.index_cache(), ShardSelector::new(arc_list_nodes.clone(), 2));
+        searchers.push(format!("localhost:{searcher_port}"));
+        let settings_copy = fixture.settings.clone();
+        let shutdown = CancellationToken::new();
+        tokio::task::spawn(searcher_server.serve(searcher_api.into_router(), shutdown.clone()));
+        tokio::task::spawn(async move {
+            searcher
+                .run(
+                    settings_copy.storage.as_ref().unwrap().object_store.clone(),
+                    settings_copy.searcher.clone().unwrap_or_default(),
+                    shutdown.clone(),
+                    ShardSelector::new(arc_list_nodes, 2),
+                    None,
+                    None,
+                )
+                .await
+        });
+    }
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    // Same behaviour from all nodes
+    let fake_uuid = Uuid::new_v4();
+    for searcher in &searchers {
+        let mut request = Request::new(SearchRequest {
+            shard: fake_uuid.to_string(),
+            result_per_page: 20,
+            body: "Hola".into(),
+            paragraph: true,
+            ..Default::default()
+        });
+        request.set_timeout(Duration::from_secs(1));
+
+        let response = NidxSearcherClient::connect(format!("http://{searcher}"))
+            .await?
+            .search(request)
+            .await;
+
+        let Err(err) = response else {
+            panic!("Expected error response")
+        };
+        assert_eq!(
+            err.code(),
+            tonic::Code::NotFound,
+            "Expected shard NotFound. Cancelled error means timeout which means something went wrong"
+        );
+    }
 
     Ok(())
 }
