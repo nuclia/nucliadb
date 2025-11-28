@@ -24,13 +24,51 @@ from httpx import AsyncClient
 from opentelemetry import trace
 from opentelemetry.trace import format_trace_id
 
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.internal.retrieval import RetrievalRequest, RetrievalResponse
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import KB_PREFIX
+from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.augment import AugmentRequest, AugmentResponse
-from nucliadb_models.search import NucliaDBClientType
+from nucliadb_models.search import FindRequest, KnowledgeboxFindResults, NucliaDBClientType
 from nucliadb_telemetry.fastapi.tracing import NUCLIA_TRACE_ID_HEADER
 from nucliadb_utils.settings import running_settings
+
+
+# TODO: replace this for a sdk.find call when moving /ask to RAO
+async def find(
+    kbid: str,
+    item: FindRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    # XXX: we are losing track of metrics ignoring this. Do we care?
+    metrics: Metrics,
+) -> tuple[KnowledgeboxFindResults, bool]:
+    """RPC to /find endpoint making it look as an internal call."""
+
+    async with get_client() as client:
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kbid}/find",
+            headers={
+                "x-ndb-client": x_ndb_client,
+                "x-nucliadb-user": x_nucliadb_user,
+                "x-forwarded-for": x_forwarded_for,
+            },
+            json=item.model_dump(),
+        )
+        if resp.status_code == 200:
+            incomplete = False
+        elif resp.status_code == 206:
+            incomplete = True
+        elif resp.status_code == 404:
+            raise KnowledgeBoxNotFound()
+        else:
+            raise Exception(f"/find call failed: {resp.status_code} {resp.content.decode()}")
+
+        find_results = KnowledgeboxFindResults.model_validate(resp.json())
+
+    return find_results, incomplete
 
 
 # TODO: replace this for a sdk.retrieve call when moving /ask to RAO
