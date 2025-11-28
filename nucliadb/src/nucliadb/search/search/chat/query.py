@@ -565,15 +565,16 @@ async def rao_find(
     x_forwarded_for: str,
     metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, bool, Fetcher, Reranker]:
-    """
-    Calls to NucliaDB retrieve and augment primitives to perform the text block search.
-    It returns the results as KnowledgeboxFindResults to comply with the existing find
-    interface (/ask logic is tightly coupled with /find).
+    """This is an equivalent implementation of /find but uses the new /retrieve
+    and /augment endpoints under the hood while providing bw/c for the /find
+    response model.
 
-    # retrieve
-    # augment
-    # rerank
-    # convert results to KnowledgeboxFindResults
+    This implementation is provided to comply with the existing /find interface
+    to which /ask is tighly coupled with.
+
+    Note there's an edge case, when users ask for features=relations, in which
+    we fallback to /find, as it's the simplest way to provide bw/c.
+
     """
     audit = get_audit()
     start_time = time()
