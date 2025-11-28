@@ -39,6 +39,9 @@ use super::streams;
 use super::{index_cache::IndexCache, shard_search, shard_suggest};
 use tracing::*;
 
+/// When this header is set, we only try to serve the request from the local node
+const HEADER_LOCAL_ONLY: &str = "nidx-local-only";
+
 #[derive(Clone)]
 struct TelemetryInterceptor;
 #[cfg(feature = "telemetry")]
@@ -101,7 +104,12 @@ macro_rules! shard_request {
         $(, STREAM => $stream_type:ty)?
     } => {{
         let mut errors = Vec::new();
-        let nodes = $self.shard_selector.nodes_for_shard(&$shard_id);
+        let local_only = $request.metadata().contains_key(HEADER_LOCAL_ONLY);
+        let nodes = if local_only {
+            vec![SearcherNode::This]
+        } else {
+            $self.shard_selector.nodes_for_shard(&$shard_id)
+        };
         for node in &nodes {
             debug!(?node, ?$shard_id, concat!("Attempting ", $name));
             let result = match node {
@@ -113,7 +121,9 @@ macro_rules! shard_request {
                 SearcherNode::Remote(hostname) => {
                     match $self.get_client(hostname).await {
                         Ok(mut client) => {
-                            client.$remote_method(Request::new($request.clone()))
+                            let mut request = Request::new($request.get_ref().clone());
+                            request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
+                            client.$remote_method(request)
                                 .await
                                 .map_err(|e| match e.code() {
                                     tonic::Code::NotFound => NidxError::NotFound,
@@ -146,48 +156,48 @@ macro_rules! shard_request {
 #[tonic::async_trait]
 impl NidxSearcher for SearchServer {
     async fn search(&self, request: Request<SearchRequest>) -> Result<Response<SearchResponse>> {
-        let request = request.into_inner();
-        let shard_id = uuid::Uuid::parse_str(&request.shard).map_err(NidxError::from)?;
+        let message = request.get_ref();
+        let shard_id = uuid::Uuid::parse_str(&message.shard).map_err(NidxError::from)?;
         shard_request! {
             "search",
             self,
             request,
             shard_id,
-            LOCAL => shard_search::search(Arc::clone(&self.index_cache), request.clone()).await,
+            LOCAL => shard_search::search(Arc::clone(&self.index_cache), message.clone()).await,
             REMOTE => search
         }
     }
 
     async fn suggest(&self, request: Request<SuggestRequest>) -> Result<Response<SuggestResponse>> {
-        let request = request.into_inner();
-        let shard_id = uuid::Uuid::parse_str(&request.shard).map_err(NidxError::from)?;
+        let message = request.get_ref();
+        let shard_id = uuid::Uuid::parse_str(&message.shard).map_err(NidxError::from)?;
         shard_request! {
             "suggest",
             self,
             request,
             shard_id,
-            LOCAL => shard_suggest::suggest(Arc::clone(&self.index_cache), request.clone()).await,
+            LOCAL => shard_suggest::suggest(Arc::clone(&self.index_cache), message.clone()).await,
             REMOTE => suggest
         }
     }
 
     async fn graph_search(&self, request: Request<GraphSearchRequest>) -> Result<Response<GraphSearchResponse>> {
-        let request = request.into_inner();
-        let shard_id = uuid::Uuid::parse_str(&request.shard).map_err(NidxError::from)?;
+        let message = request.get_ref();
+        let shard_id = uuid::Uuid::parse_str(&message.shard).map_err(NidxError::from)?;
         shard_request! {
             "graph_search",
             self,
             request,
             shard_id,
-            LOCAL => shard_search::graph_search(Arc::clone(&self.index_cache), request.clone()).await,
+            LOCAL => shard_search::graph_search(Arc::clone(&self.index_cache), message.clone()).await,
             REMOTE => graph_search
         }
     }
 
     type ParagraphsStream = Pin<Box<dyn Stream<Item = Result<ParagraphItem, Status>> + Send>>;
     async fn paragraphs(&self, request: Request<StreamRequest>) -> Result<Response<Self::ParagraphsStream>> {
-        let request = request.into_inner();
-        let Some(shard) = &request.shard_id.as_ref() else {
+        let message = request.get_ref();
+        let Some(shard) = &message.shard_id else {
             return Err(NidxError::invalid("Uuid is required").into());
         };
         let shard_id = uuid::Uuid::parse_str(&shard.id).map_err(NidxError::from)?;
@@ -196,7 +206,7 @@ impl NidxSearcher for SearchServer {
             self,
             request,
             shard_id,
-            LOCAL => streams::paragraph_iterator(Arc::clone(&self.index_cache), request.clone()).await,
+            LOCAL => streams::paragraph_iterator(Arc::clone(&self.index_cache), message.clone()).await,
             REMOTE => paragraphs,
             STREAM => Self::ParagraphsStream
         }
@@ -204,8 +214,8 @@ impl NidxSearcher for SearchServer {
 
     type DocumentsStream = Pin<Box<dyn Stream<Item = Result<DocumentItem, Status>> + Send>>;
     async fn documents(&self, request: Request<StreamRequest>) -> Result<Response<Self::DocumentsStream>> {
-        let request = request.into_inner();
-        let Some(shard) = &request.shard_id.as_ref() else {
+        let message = request.get_ref();
+        let Some(shard) = &message.shard_id else {
             return Err(NidxError::invalid("Uuid is required").into());
         };
         let shard_id = uuid::Uuid::parse_str(&shard.id).map_err(NidxError::from)?;
@@ -214,7 +224,7 @@ impl NidxSearcher for SearchServer {
             self,
             request,
             shard_id,
-            LOCAL => streams::document_iterator(Arc::clone(&self.index_cache), request.clone()).await,
+            LOCAL => streams::document_iterator(Arc::clone(&self.index_cache), message.clone()).await,
             REMOTE => documents,
             STREAM => Self::DocumentsStream
         }
