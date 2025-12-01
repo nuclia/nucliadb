@@ -22,7 +22,7 @@ from typing import AsyncIterator
 
 from httpx import AsyncClient
 from opentelemetry import trace
-from opentelemetry.trace import format_trace_id
+from opentelemetry.trace import INVALID_SPAN, format_trace_id
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.internal.retrieval import RetrievalRequest, RetrievalResponse
@@ -130,11 +130,11 @@ def __get_tracing_headers() -> dict[str, str]:
     headers = {}
 
     span = trace.get_current_span()
-    if span is None:
-        return
+    if span is INVALID_SPAN:
+        return {}
 
     trace_id = format_trace_id(span.get_span_context().trace_id)
-    if trace_id:
-        headers[NUCLIA_TRACE_ID_HEADER] = trace_id
-
+    headers = {
+        NUCLIA_TRACE_ID_HEADER: trace_id,
+    }
     return headers
