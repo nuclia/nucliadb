@@ -54,7 +54,6 @@ from nucliadb.search.search.chat.images import (
     get_page_image,
     get_paragraph_image,
 )
-from nucliadb.search.search.hydrator import hydrate_field_text
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.augment import AugmentRequest, AugmentResources, ResourceProp
 from nucliadb_models.labels import translate_alias_to_system_label
@@ -323,6 +322,9 @@ async def full_resource_prompt_context(
             field_id = FieldId.from_pb(rid, field_type, field_key)
             resource_fields.setdefault(rid, []).append(field_id)
 
+        # Include the summary as well
+        resource_fields.setdefault(rid, []).append(FieldId(rid=rid, type="a", key="summary"))
+
     augmented_fields = await augment_fields(
         kbid,
         given=[field_id for field_ids in resource_fields.values() for field_id in field_ids],
@@ -582,25 +584,29 @@ async def field_extension_prompt_context(
             ordered_resources.append(resource_uuid)
 
     extend_field_ids = await get_matching_field_ids(kbid, ordered_resources, strategy)
-    tasks = [hydrate_field_text(kbid, fid) for fid in extend_field_ids]
-    field_extracted_texts = await run_concurrently(tasks)
+    augmented_fields = await augment_fields(
+        kbid,
+        given=[field_id for field_id in extend_field_ids],
+        select=[FieldText()],
+    )
 
-    metrics.set("field_extension_ops", len(field_extracted_texts))
+    metrics.set("field_extension_ops", len(extend_field_ids))
 
-    for result in field_extracted_texts:
-        if result is None:  # pragma: no cover
+    for field_id, augmented_field in augmented_fields.items():
+        if augmented_field is None or augmented_field.text is None:  # pragma: no cover
             continue
-        field, extracted_text = result
+        fid = field_id.full()
+        extracted_text = augmented_field.text
         # First off, remove the text block ids from paragraphs that belong to
         # the same field, as otherwise the context will be duplicated.
         for tb_id in context.text_block_ids():
-            if tb_id.startswith(field.full()):
+            if tb_id.startswith(fid):
                 del context[tb_id]
         # Add the extracted text of each field to the beginning of the context.
-        if field.full() not in context:
-            context[field.full()] = extracted_text
-            augmented_context.fields[field.full()] = AugmentedTextBlock(
-                id=field.full(),
+        if fid not in context:
+            context[fid] = extracted_text
+            augmented_context.fields[fid] = AugmentedTextBlock(
+                id=fid,
                 text=extracted_text,
                 augmentation_type=TextBlockAugmentationType.FIELD_EXTENSION,
             )

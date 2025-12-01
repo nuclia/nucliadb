@@ -17,23 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import logging
 from typing import Optional
 
 from pydantic import BaseModel
 
-from nucliadb.common.ids import FieldId
-from nucliadb.common.maindb.utils import get_driver
-from nucliadb.search.search import cache
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import ResourceProperties
-from nucliadb_telemetry.metrics import Observer
-from nucliadb_utils.asyncio_utils import ConcurrentRunner
-
-logger = logging.getLogger(__name__)
-
-hydrator_observer = Observer("hydrator", labels={"type": ""})
 
 
 class ResourceHydrationOptions(BaseModel):
@@ -59,44 +49,3 @@ class TextBlockHydrationOptions(BaseModel):
 
     # If true, only hydrate the text block if its text is not already populated
     only_hydrate_empty: bool = False
-
-
-@hydrator_observer.wrap({"type": "resource_text"})
-async def hydrate_resource_text(
-    kbid: str, rid: str, *, max_concurrent_tasks: int
-) -> list[tuple[FieldId, str]]:
-    resource = await cache.get_resource(kbid, rid)
-    if resource is None:  # pragma: no cover
-        return []
-
-    # Schedule the extraction of the text of each field in the resource
-    async with get_driver().ro_transaction() as txn:
-        resource.txn = txn
-        runner = ConcurrentRunner(max_tasks=max_concurrent_tasks)
-        for field_type, field_key in await resource.get_fields(force=True):
-            field_id = FieldId.from_pb(rid, field_type, field_key)
-            runner.schedule(hydrate_field_text(kbid, field_id))
-
-        # Include the summary as well
-        runner.schedule(hydrate_field_text(kbid, FieldId(rid=rid, type="a", key="summary")))
-
-        # Wait for the results
-        field_extracted_texts = await runner.wait()
-
-    return [text for text in field_extracted_texts if text is not None]
-
-
-@hydrator_observer.wrap({"type": "field_text"})
-async def hydrate_field_text(
-    kbid: str,
-    field_id: FieldId,
-) -> Optional[tuple[FieldId, str]]:
-    from nucliadb.models.internal.augment import FieldText
-    from nucliadb.search.augmentor.fields import augment_field
-
-    augmented = await augment_field(kbid, field_id, select=[FieldText()])
-    if augmented is None or augmented.text is None:
-        # we haven't found the resource, field or text
-        return None
-
-    return field_id, augmented.text

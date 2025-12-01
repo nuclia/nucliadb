@@ -43,6 +43,7 @@ from nucliadb.models.internal.augment import (
     FieldValue,
 )
 from nucliadb.search import logger
+from nucliadb.search.augmentor.metrics import augmentor_observer
 from nucliadb.search.augmentor.resources import get_basic
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
@@ -77,6 +78,7 @@ async def augment_fields(
     return augmented
 
 
+@augmentor_observer.wrap({"type": "field"})
 async def augment_field(
     kbid: str,
     field_id: FieldId,
@@ -136,6 +138,7 @@ async def db_augment_field(
         assert False, f"unknown field type: {field_type}"
 
 
+@augmentor_observer.wrap({"type": "db_text_field"})
 async def db_augment_text_field(
     field: Field,
     field_id: FieldId,
@@ -162,6 +165,7 @@ async def db_augment_text_field(
     return augmented
 
 
+@augmentor_observer.wrap({"type": "db_file_field"})
 async def db_augment_file_field(
     field: Field,
     field_id: FieldId,
@@ -188,6 +192,7 @@ async def db_augment_file_field(
     return augmented
 
 
+@augmentor_observer.wrap({"type": "db_link_field"})
 async def db_augment_link_field(
     field: Field,
     field_id: FieldId,
@@ -214,6 +219,7 @@ async def db_augment_link_field(
     return augmented
 
 
+@augmentor_observer.wrap({"type": "db_conversation_field"})
 async def db_augment_conversation_field(
     field: Field,
     field_id: FieldId,
@@ -248,6 +254,7 @@ async def db_augment_conversation_field(
     return augmented
 
 
+@augmentor_observer.wrap({"type": "db_generic_field"})
 async def db_augment_generic_field(
     field: Field,
     field_id: FieldId,
@@ -274,6 +281,7 @@ async def db_augment_generic_field(
     return augmented
 
 
+@augmentor_observer.wrap({"type": "field_text"})
 async def get_field_extracted_text(id: FieldId, field: Field) -> str | None:
     extracted_text_pb = await cache.get_field_extracted_text(field)
     if extracted_text_pb is None:  # pragma: no cover
