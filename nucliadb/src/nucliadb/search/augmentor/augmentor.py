@@ -115,7 +115,7 @@ async def augment(
                     # that is, if we are missing some ifs
                     _b: int = "b"
 
-            if augmentation.filter is None:
+            if not augmentation.filter:
                 field_ids = unfiltered_field_ids
             else:
                 field_ids = []

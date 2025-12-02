@@ -33,15 +33,12 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.models.internal.augment import (
-    ConversationText,
-    FieldText,
     Paragraph,
     ParagraphText,
 )
 from nucliadb.search import augmentor, logger
 from nucliadb.search.api.v1.augment import augment_endpoint
 from nucliadb.search.augmentor.fields import (
-    augment_fields,
     conversation_answer,
     conversation_messages_after,
     field_entities,
@@ -316,52 +313,54 @@ async def full_resource_prompt_context(
 
     ordered_resources = ordered_resources[: strategy.count]
 
-    # For each resource, collect the extracted text from all its fields.
-    resource_fields: dict[str, list[FieldId]] = {}
-    for rid in ordered_resources:
-        resource = await cache.get_resource(kbid, rid)
-        if resource is None:
-            continue
-
-        for field_type, field_key in await resource.get_fields(force=True):
-            field_id = FieldId.from_pb(rid, field_type, field_key)
-            resource_fields.setdefault(rid, []).append(field_id)
-
-        # Include the summary as well
-        resource_fields.setdefault(rid, []).append(FieldId(rid=rid, type="a", key="summary"))
-
-    augmented_fields = await augment_fields(
+    # For each resource, collect the extracted text from all its fields and
+    # include the title and summary as well
+    augmented = await augment_endpoint(
         kbid,
-        given=[field_id for field_ids in resource_fields.values() for field_id in field_ids],
-        select=[
-            FieldText(),
-            ConversationText(),
-        ],
-        concurrency_control=asyncio.Semaphore(MAX_RESOURCE_TASKS * MAX_RESOURCE_FIELD_TASKS),
+        AugmentRequest(
+            resources=AugmentResources(
+                given=ordered_resources,
+                select=[
+                    ResourceProp.TITLE,
+                    ResourceProp.SUMMARY,
+                ],
+                fields=AugmentResourceFields(
+                    text=True,
+                    filters=[],
+                ),
+            )
+        ),
     )
 
+    extracted_texts = {}
+    for rid, resource in augmented.resources.items():
+        if resource.title is not None:
+            field_id = FieldId(rid=rid, type="a", key="title").full()
+            extracted_texts[field_id] = resource.title
+        if resource.summary is not None:
+            field_id = FieldId(rid=rid, type="a", key="summary").full()
+            extracted_texts[field_id] = resource.summary
+
+    for field_id, field in augmented.fields.items():
+        if field.text is not None:
+            extracted_texts[field_id] = field.text
+
     added_fields = set()
-    for rid in resource_fields:
-        for field_id in resource_fields[rid]:
-            augmented_field = augmented_fields.get(field_id)
-            if augmented_field is None or augmented_field.text is None:
-                continue
-            extracted_text = augmented_field.text
+    for field_id, extracted_text in extracted_texts.items():
+        # First off, remove the text block ids from paragraphs that belong to
+        # the same field, as otherwise the context will be duplicated.
+        for tb_id in context.text_block_ids():
+            if tb_id.startswith(field_id):
+                del context[tb_id]
+        # Add the extracted text of each field to the context.
+        context[field_id] = extracted_text
+        augmented_context.fields[field_id] = AugmentedTextBlock(
+            id=field_id,
+            text=extracted_text,
+            augmentation_type=TextBlockAugmentationType.FULL_RESOURCE,
+        )
 
-            # First off, remove the text block ids from paragraphs that belong to
-            # the same field, as otherwise the context will be duplicated.
-            for tb_id in context.text_block_ids():
-                if tb_id.startswith(field_id.full()):
-                    del context[tb_id]
-            # Add the extracted text of each field to the context.
-            context[field_id.full()] = extracted_text
-            augmented_context.fields[field_id.full()] = AugmentedTextBlock(
-                id=field_id.full(),
-                text=extracted_text,
-                augmentation_type=TextBlockAugmentationType.FULL_RESOURCE,
-            )
-
-            added_fields.add(field_id.full())
+        added_fields.add(field_id)
 
     metrics.set("full_resource_ops", len(added_fields))
 

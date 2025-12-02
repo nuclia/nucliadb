@@ -111,7 +111,7 @@ class AugmentResourceFields(BaseModel):
 class AugmentResources(BaseModel):
     given: list[str]
 
-    select: list[ResourceProp] = Field(default=[ResourceProp.BASIC])
+    select: list[ResourceProp] = Field(default_factory=list)
 
     field_type_filter: list[FieldTypeName] | None = Field(
         default=None,
