@@ -27,7 +27,7 @@ from typing_extensions import Self
 import nucliadb_models
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import FieldId, ParagraphId
-from nucliadb_models import hydration
+from nucliadb_models import filters, hydration
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.conversation import FieldConversation
 from nucliadb_models.file import FieldFile
@@ -374,10 +374,10 @@ class ConversationAugment(BaseModel, extra="forbid"):
 
 
 class FieldAugment(BaseModel, extra="forbid"):
-    given: list[ResourceId | FieldId | ParagraphId]
+    given: list[ResourceId] | list[FieldId] | list[ParagraphId]
     select: list[FieldProp]
     from_: Literal["fields"] = Field(default="fields", alias="from")
-    filter: Any | None = None
+    filter: list[filters.FieldId | filters.Generated] | None = None
 
 
 class ParagraphAugment(BaseModel, extra="forbid"):

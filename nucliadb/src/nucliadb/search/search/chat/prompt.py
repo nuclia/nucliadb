@@ -26,7 +26,7 @@ from typing import Deque, Dict, List, Optional, Sequence, Tuple, Union, cast
 import yaml
 from pydantic import BaseModel
 
-from nucliadb.common import datamanagers
+import nucliadb_models
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
@@ -55,7 +55,12 @@ from nucliadb.search.search.chat.images import (
     get_paragraph_image,
 )
 from nucliadb.search.search.metrics import Metrics
-from nucliadb_models.augment import AugmentRequest, AugmentResources, ResourceProp
+from nucliadb_models.augment import (
+    AugmentRequest,
+    AugmentResourceFields,
+    AugmentResources,
+    ResourceProp,
+)
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -583,20 +588,54 @@ async def field_extension_prompt_context(
         if resource_uuid not in ordered_resources:
             ordered_resources.append(resource_uuid)
 
-    extend_field_ids = await get_matching_field_ids(kbid, ordered_resources, strategy)
-    augmented_fields = await augment_fields(
+    select = []
+    filters: list[nucliadb_models.filters.FieldId | nucliadb_models.filters.Generated] = []
+    # this strategy exposes a way to access resource title and summary using a
+    # field id. However, as they are resource properties, we must request it as
+    # that
+    for name in strategy.fields:
+        if name == "a/title":
+            select.append(ResourceProp.TITLE)
+        elif name == "a/summary":
+            select.append(ResourceProp.SUMMARY)
+        else:
+            filters.append(nucliadb_models.filters.FieldId(name=name))
+
+    for da_prefix in strategy.data_augmentation_field_prefixes:
+        filters.append(nucliadb_models.filters.Generated(by="data-augmentation", da_task=da_prefix))
+
+    augmented = await augment_endpoint(
         kbid,
-        given=[field_id for field_id in extend_field_ids],
-        select=[FieldText()],
+        AugmentRequest(
+            resources=AugmentResources(
+                given=ordered_resources,
+                select=select,
+                fields=AugmentResourceFields(
+                    text=True,
+                    filters=filters,
+                ),
+            )
+        ),
     )
 
-    metrics.set("field_extension_ops", len(extend_field_ids))
+    # REVIEW: we don't have the field count anymore, is this good enough?
+    metrics.set("field_extension_ops", len(ordered_resources))
 
-    for field_id, augmented_field in augmented_fields.items():
+    extracted_texts = {}
+    # now we need to expose title and summary as fields again, so it gets
+    # consistent with the view we are providing in the API
+    for rid, augmented_resource in augmented.resources.items():
+        if augmented_resource.title:
+            extracted_texts[f"{rid}/a/title"] = augmented_resource.title
+        if augmented_resource.summary:
+            extracted_texts[f"{rid}/a/summary"] = augmented_resource.summary
+
+    for fid, augmented_field in augmented.fields.items():
         if augmented_field is None or augmented_field.text is None:  # pragma: no cover
             continue
-        fid = field_id.full()
-        extracted_text = augmented_field.text
+        extracted_texts[fid] = augmented_field.text
+
+    for fid, extracted_text in extracted_texts.items():
         # First off, remove the text block ids from paragraphs that belong to
         # the same field, as otherwise the context will be duplicated.
         for tb_id in context.text_block_ids():
@@ -615,43 +654,6 @@ async def field_extension_prompt_context(
     for paragraph in ordered_paragraphs:
         if paragraph.id not in context:
             context[paragraph.id] = _clean_paragraph_text(paragraph)
-
-
-async def get_matching_field_ids(
-    kbid: str, ordered_resources: list[str], strategy: FieldExtensionStrategy
-) -> list[FieldId]:
-    extend_field_ids: list[FieldId] = []
-    # Fetch the extracted texts of the specified fields for each resource
-    for resource_uuid in ordered_resources:
-        for field_id in strategy.fields:
-            try:
-                fid = FieldId.from_string(f"{resource_uuid}/{field_id.strip('/')}")
-                extend_field_ids.append(fid)
-            except ValueError:  # pragma: no cover
-                # Invalid field id, skiping
-                continue
-    if len(strategy.data_augmentation_field_prefixes) > 0:
-        for resource_uuid in ordered_resources:
-            all_field_ids = await datamanagers.atomic.resources.get_all_field_ids(
-                kbid=kbid, rid=resource_uuid, for_update=False
-            )
-            if all_field_ids is None:
-                continue
-            for fieldid in all_field_ids.fields:
-                # Generated fields are always text fields starting with "da-"
-                if any(
-                    (
-                        fieldid.field_type == resources_pb2.FieldType.TEXT
-                        and fieldid.field.startswith(f"da-{prefix}-")
-                    )
-                    for prefix in strategy.data_augmentation_field_prefixes
-                ):
-                    extend_field_ids.append(
-                        FieldId.from_pb(
-                            rid=resource_uuid, field_type=fieldid.field_type, key=fieldid.field
-                        )
-                    )
-    return extend_field_ids
 
 
 async def neighbouring_paragraphs_prompt_context(

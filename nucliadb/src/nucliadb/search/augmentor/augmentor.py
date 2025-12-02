@@ -20,7 +20,9 @@
 import asyncio
 from typing import Any
 
-from nucliadb.common.ids import FieldId, ParagraphId
+import nucliadb_models
+from nucliadb.common import datamanagers
+from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR, FieldId, ParagraphId
 from nucliadb.models.internal.augment import (
     Augment,
     Augmented,
@@ -30,6 +32,7 @@ from nucliadb.models.internal.augment import (
 )
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import Resource
 
 from .fields import augment_field
@@ -81,7 +84,62 @@ async def augment(
                 opts.field_type_filter.extend(augmentation.field_type_filter)
 
         elif augmentation.from_ == "fields":
-            raise NotImplementedError()
+            unfiltered_field_ids: list[FieldId] = []
+            for id in augmentation.given:
+                if isinstance(id, str):
+                    # augmenting resource fields
+                    rid = id
+                    all_field_ids = await datamanagers.atomic.resources.get_all_field_ids(
+                        kbid=kbid, rid=rid, for_update=False
+                    )
+                    if all_field_ids is None:
+                        continue
+
+                    unfiltered_field_ids.extend(
+                        (
+                            FieldId.from_pb(
+                                rid=rid, field_type=field_id_pb.field_type, key=field_id_pb.field
+                            )
+                            for field_id_pb in all_field_ids.fields
+                        )
+                    )
+
+                elif isinstance(id, FieldId):
+                    unfiltered_field_ids.append(id)
+
+                elif isinstance(id, ParagraphId):
+                    unfiltered_field_ids.append(id.field_id)
+
+                else:  # pragma: no cover
+                    # This is a trick so mypy generates an error if this branch can be reached,
+                    # that is, if we are missing some ifs
+                    _b: int = "b"
+
+            if augmentation.filter is None:
+                field_ids = unfiltered_field_ids
+            else:
+                field_ids = []
+                for field_id in unfiltered_field_ids:
+                    for filter in augmentation.filter:
+                        if isinstance(filter, nucliadb_models.filters.FieldId):
+                            if filter.name == f"{field_id.type}/{field_id.key}":
+                                field_ids.append(field_id)
+
+                        elif isinstance(filter, nucliadb_models.filters.Generated):
+                            # generated fields are always text fields starting with "da-"
+                            if field_id.type == FIELD_TYPE_NAME_TO_STR[FieldTypeName.TEXT] and (
+                                filter.da_task is None
+                                or field_id.key.startswith(f"da-{filter.da_task}-")
+                            ):
+                                field_ids.append(field_id)
+
+                        else:  # pragma: no cover
+                            # This is a trick so mypy generates an error if this branch can be reached,
+                            # that is, if we are missing some ifs
+                            _c: int = "c"
+
+            for field_id in field_ids:
+                augments["fields"].setdefault(field_id, []).extend(augmentation.select)
 
         elif augmentation.from_ == "conversations":
             raise NotImplementedError()
@@ -97,7 +155,7 @@ async def augment(
         else:  # pragma: no cover
             # This is a trick so mypy generates an error if this branch can be reached,
             # that is, if we are missing some ifs
-            _b: int = "b"
+            _d: int = "d"
 
     ops = {  # type: ignore[var-annotated]
         "resources": [],

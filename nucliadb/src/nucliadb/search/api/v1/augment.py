@@ -25,28 +25,36 @@ from fastapi import Header, Request
 from fastapi.exceptions import HTTPException
 from fastapi_versioning import version
 
+import nucliadb_models
 from nucliadb.common.ids import ParagraphId
 from nucliadb.models.internal.augment import (
     Augment,
     DeepResourceAugment,
+    FieldAugment,
+    FieldText,
     Metadata,
     Paragraph,
     ParagraphAugment,
     ParagraphProp,
     ParagraphText,
+    ResourceAugment,
+    ResourceProp,
+    ResourceSummary,
+    ResourceTitle,
 )
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.augmentor import augmentor
 from nucliadb.search.search.cache import request_caches
 from nucliadb_models.augment import (
+    AugmentedField,
     AugmentedParagraph,
     AugmentedResource,
     AugmentParagraphs,
     AugmentRequest,
     AugmentResources,
     AugmentResponse,
-    ResourceProp,
 )
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import NucliaDBClientType, ResourceProperties
 from nucliadb_utils.authentication import requires
@@ -89,15 +97,42 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
     augmentations: list[Augment] = []
 
     if item.resources is not None:
-        show, extracted = parse_resource_augment(item.resources)
-        augmentations.append(
-            DeepResourceAugment(
-                given=item.resources.given,
-                show=show,
-                extracted=extracted,
-                field_type_filter=item.resources.field_type_filter,
+        show, extracted, resource_select = parse_deep_resource_augment(item.resources)
+        if item.resources.field_type_filter is None:
+            field_type_filter = list(FieldTypeName)
+        else:
+            field_type_filter = item.resources.field_type_filter
+
+        if show:
+            augmentations.append(
+                DeepResourceAugment(
+                    given=item.resources.given,
+                    show=show,
+                    extracted=extracted,
+                    field_type_filter=field_type_filter,
+                )
             )
-        )
+        if resource_select:
+            augmentations.append(
+                ResourceAugment(
+                    given=item.resources.given,  # type: ignore[arg-type]
+                    select=resource_select,
+                )
+            )
+
+        if item.resources.fields is not None:
+            # Augment resource fields with an optional field filter
+            field_select = []
+            if item.resources.fields.text:
+                field_select.append(FieldText())
+
+            augmentations.append(
+                FieldAugment(
+                    given=item.resources.given,  # type: ignore[arg-type]
+                    select=field_select,  # type: ignore[arg-type]
+                    filter=item.resources.fields.filters,
+                )
+            )
 
     if item.paragraphs is not None:
         paragraphs_to_augment, paragraph_selector = parse_paragraph_augment(item.paragraphs)
@@ -111,6 +146,7 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
     if len(augmentations) == 0:
         return AugmentResponse(
             resources={},
+            fields={},
             paragraphs={},
         )
 
@@ -123,19 +159,33 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
             concurrency_control=max_ops,
         )
 
-        resources = augmented.resources_deep
-        paragraphs = augmented.paragraphs
-
         augmented_resources = {}
-        for rid, resource in resources.items():
-            if resource is None:
+        for rid, resource_deep in augmented.resources_deep.items():
+            if resource_deep is None:
                 continue
             augmented_resource = AugmentedResource(id=rid)
-            augmented_resource.updated_from(resource)
+            augmented_resource.updated_from(resource_deep)
             augmented_resources[rid] = augmented_resource
 
+        for rid, resource in augmented.resources.items():
+            if resource is None:
+                continue
+            augmented_resource = augmented_resources.setdefault(rid, AugmentedResource(id=rid))
+            augmented_resource.title = augmented_resource.title or resource.title
+            augmented_resource.summary = augmented_resource.summary or resource.summary
+            # TODO: more properties
+
+        augmented_fields = {}
+        for field_id, field in augmented.fields.items():
+            if field is None:
+                continue
+            augmented_fields[field_id.full()] = AugmentedField(
+                text=field.text,
+                # TODO: more parameters
+            )
+
         augmented_paragraphs = {}
-        for paragraph_id, paragraph in paragraphs.items():
+        for paragraph_id, paragraph in augmented.paragraphs.items():
             if paragraph is None:
                 continue
             augmented_paragraphs[paragraph_id.full()] = AugmentedParagraph(
@@ -145,35 +195,41 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
 
         return AugmentResponse(
             resources=augmented_resources,
+            fields=augmented_fields,
             paragraphs=augmented_paragraphs,
         )
 
 
-def parse_resource_augment(
+def parse_deep_resource_augment(
     item: AugmentResources,
-) -> tuple[list[ResourceProperties], list[ExtractedDataTypeName]]:
+) -> tuple[list[ResourceProperties], list[ExtractedDataTypeName], list[ResourceProp]]:
     show = []
     show_extracted = False
     extracted = []
+    select = []
 
     _resource_prop_to_show = {
-        ResourceProp.BASIC: ResourceProperties.BASIC,
-        ResourceProp.ORIGIN: ResourceProperties.ORIGIN,
-        ResourceProp.EXTRA: ResourceProperties.EXTRA,
-        ResourceProp.RELATIONS: ResourceProperties.RELATIONS,
-        ResourceProp.VALUES: ResourceProperties.VALUES,
-        ResourceProp.ERRORS: ResourceProperties.ERRORS,
-        ResourceProp.SECURITY: ResourceProperties.SECURITY,
+        nucliadb_models.augment.ResourceProp.BASIC: ResourceProperties.BASIC,
+        nucliadb_models.augment.ResourceProp.ORIGIN: ResourceProperties.ORIGIN,
+        nucliadb_models.augment.ResourceProp.EXTRA: ResourceProperties.EXTRA,
+        nucliadb_models.augment.ResourceProp.RELATIONS: ResourceProperties.RELATIONS,
+        nucliadb_models.augment.ResourceProp.VALUES: ResourceProperties.VALUES,
+        nucliadb_models.augment.ResourceProp.ERRORS: ResourceProperties.ERRORS,
+        nucliadb_models.augment.ResourceProp.SECURITY: ResourceProperties.SECURITY,
     }
     _resource_prop_to_extracted = {
-        ResourceProp.EXTRACTED_TEXT: ExtractedDataTypeName.TEXT,
-        ResourceProp.EXTRACTED_METADATA: ExtractedDataTypeName.METADATA,
-        ResourceProp.EXTRACTED_SHORTENED_METADATA: ExtractedDataTypeName.SHORTENED_METADATA,
-        ResourceProp.EXTRACTED_LARGE_METADATA: ExtractedDataTypeName.LARGE_METADATA,
-        ResourceProp.EXTRACTED_VECTOR: ExtractedDataTypeName.VECTOR,
-        ResourceProp.EXTRACTED_LINK: ExtractedDataTypeName.LINK,
-        ResourceProp.EXTRACTED_FILE: ExtractedDataTypeName.FILE,
-        ResourceProp.EXTRACTED_QA: ExtractedDataTypeName.QA,
+        nucliadb_models.augment.ResourceProp.EXTRACTED_TEXT: ExtractedDataTypeName.TEXT,
+        nucliadb_models.augment.ResourceProp.EXTRACTED_METADATA: ExtractedDataTypeName.METADATA,
+        nucliadb_models.augment.ResourceProp.EXTRACTED_SHORTENED_METADATA: ExtractedDataTypeName.SHORTENED_METADATA,
+        nucliadb_models.augment.ResourceProp.EXTRACTED_LARGE_METADATA: ExtractedDataTypeName.LARGE_METADATA,
+        nucliadb_models.augment.ResourceProp.EXTRACTED_VECTOR: ExtractedDataTypeName.VECTOR,
+        nucliadb_models.augment.ResourceProp.EXTRACTED_LINK: ExtractedDataTypeName.LINK,
+        nucliadb_models.augment.ResourceProp.EXTRACTED_FILE: ExtractedDataTypeName.FILE,
+        nucliadb_models.augment.ResourceProp.EXTRACTED_QA: ExtractedDataTypeName.QA,
+    }
+    _resource_prop_to_prop = {
+        nucliadb_models.augment.ResourceProp.TITLE: ResourceTitle(),
+        nucliadb_models.augment.ResourceProp.SUMMARY: ResourceSummary(),
     }
     for prop in item.select:
         if prop in _resource_prop_to_show:
@@ -181,11 +237,17 @@ def parse_resource_augment(
         elif prop in _resource_prop_to_extracted:
             show_extracted = True
             extracted.append(_resource_prop_to_extracted[prop])
+        elif prop in _resource_prop_to_prop:
+            select.append(_resource_prop_to_prop[prop])
 
     if show_extracted:
         show.append(ResourceProperties.EXTRACTED)
 
-    return show, extracted
+    return (
+        show,
+        extracted,
+        select,  # type: ignore
+    )
 
 
 def parse_paragraph_augment(item: AugmentParagraphs) -> tuple[list[Paragraph], list[ParagraphProp]]:
