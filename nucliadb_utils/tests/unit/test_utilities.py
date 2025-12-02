@@ -144,8 +144,8 @@ def test_has_feature():
             "test",
             default=False,
             context={
-                "user_id_md5": hashlib.md5(b"user").hexdigest(),
-                "account_id_md5": hashlib.md5(b"account").hexdigest(),
+                "user_id_sha256": hashlib.sha256(b"user").hexdigest(),
+                "account_id_sha256": hashlib.sha256(b"account").hexdigest(),
                 "account_type": "account-type",
             },
         )

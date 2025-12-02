@@ -39,7 +39,7 @@ class Text(Field[FieldText]):
 
     async def set_value(self, payload: FieldText):
         if payload.md5 == "":
-            payload.md5 = hashlib.md5(payload.body.encode()).hexdigest()
+            payload.md5 = hashlib.md5(payload.body.encode(), usedforsecurity=False).hexdigest()
         await self.db_set_value(payload)
 
     async def get_value(self) -> Optional[FieldText]:

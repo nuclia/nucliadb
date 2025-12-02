@@ -108,7 +108,7 @@ class File(BaseModel):
         if self.md5 is None:
             # In case md5 is not supplied, compute it
             try:
-                result = hashlib.md5(base64.b64decode(self.payload))
+                result = hashlib.md5(base64.b64decode(self.payload), usedforsecurity=False)
                 self.md5 = result.hexdigest()
             except Exception:
                 raise ValueError("MD5 could not be computed")
