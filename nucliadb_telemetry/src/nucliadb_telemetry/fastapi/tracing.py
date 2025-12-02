@@ -377,8 +377,8 @@ class CaptureTraceIdMiddleware(BaseHTTPMiddleware):
         response = None
         try:
             response = await call_next(request)
+            return response
         finally:
             if response is not None:
                 self.capture_trace_id(response)
                 self.expose_trace_id_header(response)
-                return response

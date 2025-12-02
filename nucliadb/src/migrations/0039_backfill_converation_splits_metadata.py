@@ -36,7 +36,7 @@ from nucliadb.ingest.fields.conversation import (
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb_protos import resources_pb2
-from nucliadb_protos.resources_pb2 import SplitMetadata, SplitsMetadata
+from nucliadb_protos.resources_pb2 import SplitsMetadata
 from nucliadb_utils.storages.storage import Storage
 
 logger = logging.getLogger(__name__)
@@ -102,5 +102,5 @@ async def build_splits_metadata(
         if page is None:
             continue
         for message in page.messages:
-            splits_metadata.metadata.setdefault(message.ident, SplitMetadata())
+            splits_metadata.metadata.get_or_create(message.ident)
     return splits_metadata

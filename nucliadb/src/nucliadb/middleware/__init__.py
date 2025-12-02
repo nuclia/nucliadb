@@ -44,9 +44,9 @@ class ProcessTimeHeaderMiddleware(BaseHTTPMiddleware):
         start = time.perf_counter()
         try:
             response = await call_next(request)
+            return response
         finally:
             if response is not None:
                 duration = time.perf_counter() - start
                 self.capture_process_time(response, duration)
                 self.expose_process_time_header(response)
-                return response

@@ -21,7 +21,7 @@ import uuid
 from typing import Any, Optional
 
 from nucliadb.ingest.fields.base import Field
-from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation, SplitMetadata, SplitsMetadata
+from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation, SplitsMetadata
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_utils.storages.storage import StorageField
 
@@ -92,7 +92,7 @@ class Conversation(Field[PBConversation]):
         # to support the hybrid-onprem deployment as the attachments must be stored
         # at the storage services of the client's premises.
         for message in payload.messages:
-            self._splits_metadata.metadata.setdefault(message.ident, SplitMetadata())
+            self._splits_metadata.metadata.get_or_create(message.ident)
             new_message_files = []
             for idx, file in enumerate(message.content.attachments):
                 if self.storage.needs_move(file, self.kbid):

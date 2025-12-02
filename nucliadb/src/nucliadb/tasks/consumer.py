@@ -173,8 +173,6 @@ class NatsTaskConsumer(Generic[MsgType]):
                     },
                 )
                 await msg.ack()
-            finally:
-                return
 
 
 def create_consumer(
