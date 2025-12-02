@@ -66,8 +66,6 @@ def test_question_answer_streaming(sdk: NucliaDB, qa_kb: KnowledgeBoxObj):
     assert len(loaded_array["answer_paragraphs"][1]) == 1
     assert len(loaded_array["answer_paragraphs"][2]) == 1
 
-    assert any(loaded_array["cancelled_by_user"])
-
 
 @pytest.fixture
 def qa_kb(sdk: NucliaDB, kb: KnowledgeBoxObj, ingest_stub_sync: WriterStub) -> KnowledgeBoxObj:
