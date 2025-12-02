@@ -420,9 +420,11 @@ def has_feature(
         context = {}
     if headers is not None:
         if X_USER_HEADER in headers:
-            context["user_id_md5"] = hashlib.md5(headers[X_USER_HEADER].encode("utf-8")).hexdigest()
+            context["user_id_sha256"] = hashlib.sha256(
+                headers[X_USER_HEADER].encode("utf-8")
+            ).hexdigest()
         if X_ACCOUNT_HEADER in headers:
-            context["account_id_md5"] = hashlib.md5(headers[X_ACCOUNT_HEADER].encode()).hexdigest()
+            context["account_id_sha256"] = hashlib.sha256(headers[X_ACCOUNT_HEADER].encode()).hexdigest()
         if X_ACCOUNT_TYPE_HEADER in headers:
             context["account_type"] = headers[X_ACCOUNT_TYPE_HEADER]
     return get_feature_flags().enabled(name, default=default, context=context)

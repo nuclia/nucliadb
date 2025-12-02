@@ -370,7 +370,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         cf.source = self.source  # type: ignore
 
         if md5 is None:
-            md5hash = hashlib.md5(decoded_payload).digest()
+            md5hash = hashlib.md5(decoded_payload, usedforsecurity=False).digest()
             cf.md5 = md5hash.decode()
         else:
             cf.md5 = md5
