@@ -220,8 +220,12 @@ async def augment(
     paragraphs: list[AugmentedParagraph] = results[: len(ops["paragraphs"])]
 
     return Augmented(
-        resources={resource.id: resource for resource in resources},
-        resources_deep={resource_deep.id: resource_deep for resource_deep in resources_deep},
-        fields={field.id: field for field in fields},
-        paragraphs={paragraph.id: paragraph for paragraph in paragraphs},
+        resources={resource.id: resource for resource in resources if resource is not None},
+        resources_deep={
+            resource_deep.id: resource_deep
+            for resource_deep in resources_deep
+            if resource_deep is not None
+        },
+        fields={field.id: field for field in fields if field is not None},
+        paragraphs={paragraph.id: paragraph for paragraph in paragraphs if paragraph is not None},
     )

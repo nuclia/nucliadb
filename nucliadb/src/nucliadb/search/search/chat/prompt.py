@@ -32,10 +32,6 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.models.internal.augment import (
-    Paragraph,
-    ParagraphText,
-)
 from nucliadb.search import augmentor, logger
 from nucliadb.search.api.v1.augment import augment_endpoint
 from nucliadb.search.augmentor.fields import (
@@ -44,7 +40,6 @@ from nucliadb.search.augmentor.fields import (
     field_entities,
     find_conversation_message,
 )
-from nucliadb.search.augmentor.paragraphs import augment_paragraphs
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import (
     get_file_thumbnail_image,
@@ -53,6 +48,8 @@ from nucliadb.search.search.chat.images import (
 )
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.augment import (
+    AugmentParagraph,
+    AugmentParagraphs,
     AugmentRequest,
     AugmentResourceFields,
     AugmentResources,
@@ -1003,10 +1000,21 @@ async def hierarchy_prompt_context(
 
     metrics.set("hierarchy_ops", len(resources))
 
-    augmented = await augment_paragraphs(
+    augmented = await augment_endpoint(
         kbid,
-        [Paragraph(id=paragraph_id, metadata=None) for paragraph_id in paragraphs_to_augment],
-        select=[ParagraphText()],
+        AugmentRequest(
+            paragraphs=AugmentParagraphs(
+                given=[
+                    AugmentParagraph(
+                        id=paragraph_id.full(),
+                        # TODO: populate metadata
+                        metadata=None,
+                    )
+                    for paragraph_id in paragraphs_to_augment
+                ],
+                text=True,
+            )
+        ),
     )
 
     augmented_paragraphs = set()
@@ -1014,13 +1022,13 @@ async def hierarchy_prompt_context(
     # Modify the first paragraph of each resource to include the title and summary of the resource, as well as the
     # extended paragraph text of all the paragraphs in the resource.
     for values in resources.values():
-        augmented_title = augmented.get(values.title)
+        augmented_title = augmented.paragraphs.get(values.title.full())
         if augmented_title:
             title_text = augmented_title.text or ""
         else:
             title_text = ""
 
-        augmented_summary = augmented.get(values.summary)
+        augmented_summary = augmented.paragraphs.get(values.summary.full())
         if augmented_summary:
             summary_text = augmented_summary.text or ""
         else:
@@ -1029,7 +1037,7 @@ async def hierarchy_prompt_context(
         first_paragraph = None
         text_with_hierarchy = ""
         for paragraph, paragraph_id in values.paragraphs:
-            augmented_paragraph = augmented.get(paragraph_id)
+            augmented_paragraph = augmented.paragraphs.get(paragraph_id.full())
             if augmented_paragraph:
                 extended_paragraph_text = augmented_paragraph.text or ""
             else:
