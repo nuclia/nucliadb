@@ -92,7 +92,7 @@ class Conversation(Field[PBConversation]):
         # to support the hybrid-onprem deployment as the attachments must be stored
         # at the storage services of the client's premises.
         for message in payload.messages:
-            self._splits_metadata.metadata.setdefault(message.ident, SplitMetadata())
+            self._splits_metadata.metadata.get_or_create(message.ident)
             new_message_files = []
             for idx, file in enumerate(message.content.attachments):
                 if self.storage.needs_move(file, self.kbid):

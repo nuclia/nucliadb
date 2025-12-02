@@ -44,7 +44,7 @@ dev = [
     "faker>=25.1.0",
     "jsonschema",
     "pdbpp>=0.10.3",
-    "pytest-asyncio~=0.23.0",
+    "pytest-asyncio>=0.23.0",
     "pytest-benchmark",
     "pytest-cov==3.0.0",
     "pytest-docker-fixtures[pg]>=1.4.1",

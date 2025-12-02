@@ -149,8 +149,7 @@ def run():
 
 
 def get_latest_nucliadb() -> Optional[str]:
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(versions.latest_nucliadb())
+    return asyncio.run(versions.latest_nucliadb())
 
 
 async def run_async_nucliadb(settings: Settings) -> uvicorn.Server:
