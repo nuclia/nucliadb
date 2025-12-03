@@ -120,7 +120,7 @@ async def _ndb_index_find(
             pb_response.graph,
             retrieval=parsed.retrieval,
             kbid=kbid,
-            query=pb_query.body,
+            query=item.query,
             rephrased_query=rephrased_query,
             reranker=reranker,
             resource_hydration_options=resource_hydration_options,
