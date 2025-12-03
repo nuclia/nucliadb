@@ -79,7 +79,12 @@ async def build_find_response(
         text_blocks_page, next_page = cut_page(merged_text_blocks, retrieval.top_k)
 
     # hydrate and rerank
-    reranking_options = RerankingOptions(kbid=kbid, query=query)
+    reranking_options = RerankingOptions(
+        kbid=kbid,
+        # if we have a rephrased query, we assume it'll be better for the
+        # reranker model. Otherwise, use the user query
+        query=rephrased_query or query,
+    )
     text_blocks, resources, best_matches = await hydrate_and_rerank(
         text_blocks_page,
         kbid,

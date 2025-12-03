@@ -19,6 +19,7 @@
 #
 
 from typing import Union
+from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
@@ -27,7 +28,10 @@ from pytest_mock import MockerFixture
 from nucliadb.models.internal.retrieval import RetrievalRequest
 from nucliadb.search.search import find, find_merge
 from nucliadb.search.search.chat import query
+from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import KnowledgeboxFindResults, PredictReranker, RerankerName
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.ndbfixtures.resources import smb_wonder_resource
 
 
 @pytest.mark.parametrize(
@@ -155,3 +159,59 @@ async def test_predict_reranker_requests_more_results(
     assert find_retrieval.resources == ask_retrieval.resources
     assert find_retrieval.best_matches == ask_retrieval.best_matches
     assert len(find_retrieval.best_matches) == 5
+
+
+@pytest.mark.parametrize(
+    "features",
+    [
+        ["keyword"],
+        ["semantic"],
+        ["keyword", "semantic"],
+    ],
+)
+@pytest.mark.deploy_modes("standalone")
+async def test_predict_reranker_options(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    knowledgebox: str,
+    mocker: MockerFixture,
+    features: list[str],
+):
+    kbid = knowledgebox
+    await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    predict = get_predict()
+    spy_rerank = mocker.spy(predict, "rerank")
+
+    query = "a super query"
+    find_resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": query,
+            "features": features,
+            "reranker": "predict",
+            "min_score": {"bm25": 0, "semantic": -10},
+        },
+    )
+    assert find_resp.status_code == 200
+
+    assert spy_rerank.call_count == 1
+    assert spy_rerank.call_args.args[1].question == query
+
+    spy_rerank.reset_mock()
+    rephrased_query = "a super rephrased query"
+    with patch("nucliadb.search.search.find.get_rephrased_query", return_value=rephrased_query):
+        find_resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "query": query,
+                "features": features,
+                "reranker": "predict",
+                "min_score": {"bm25": 0, "semantic": -10},
+            },
+        )
+        assert find_resp.status_code == 200
+
+        assert spy_rerank.call_count == 1
+        assert spy_rerank.call_args.args[1].question == rephrased_query
