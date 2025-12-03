@@ -179,7 +179,7 @@ async def test_predict_reranker_options(
     predict = get_predict()
     spy_rerank = mocker.spy(predict, "rerank")
 
-    query = "my simple query"
+    query = "my simple human query"
     find_resp = await nucliadb_reader.post(
         f"/kb/{kbid}/find",
         json={
@@ -194,7 +194,7 @@ async def test_predict_reranker_options(
     assert spy_rerank.call_count == 1
     assert spy_rerank.call_args.args[1].question == query
 
-    rephrased_query = "my rephrased query"
+    rephrased_query = "my human rephrased query"
     with patch("nucliadb.search.search.find.get_rephrased_query", return_value=rephrased_query):
         find_resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",
