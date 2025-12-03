@@ -148,6 +148,7 @@ class PredictReranker(Reranker):
         )
         try:
             response = await predict.rerank(options.kbid, request)
+            logger.info(f"Predict reranker returned scores: {response}")
         except (SendToPredictError, ProxiedPredictAPIError):
             # predict failed, we can't rerank
             reranked = [
@@ -169,6 +170,7 @@ class PredictReranker(Reranker):
             ]
         sort_by_score(reranked)
         best = reranked
+        logger.info(f"NucliaDB reranked as: {best}")
         return best
 
 
