@@ -30,6 +30,8 @@ from nucliadb.search.search import find, find_merge
 from nucliadb.search.search.chat import query
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import KnowledgeboxFindResults, PredictReranker, RerankerName
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.ndbfixtures.resources import smb_wonder_resource
 
 
 @pytest.mark.parametrize(
@@ -170,16 +172,19 @@ async def test_predict_reranker_requests_more_results(
 @pytest.mark.deploy_modes("standalone")
 async def test_predict_reranker_options(
     nucliadb_reader: AsyncClient,
-    philosophy_books_kb: str,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    knowledgebox: str,
     mocker: MockerFixture,
     features: list[str],
 ):
-    kbid = philosophy_books_kb
+    kbid = knowledgebox
+    await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
     predict = get_predict()
     spy_rerank = mocker.spy(predict, "rerank")
 
-    query = "my simple human query"
+    query = "a super query"
     find_resp = await nucliadb_reader.post(
         f"/kb/{kbid}/find",
         json={
@@ -194,7 +199,8 @@ async def test_predict_reranker_options(
     assert spy_rerank.call_count == 1
     assert spy_rerank.call_args.args[1].question == query
 
-    rephrased_query = "my human rephrased query"
+    spy_rerank.reset_mock()
+    rephrased_query = "a super rephrased query"
     with patch("nucliadb.search.search.find.get_rephrased_query", return_value=rephrased_query):
         find_resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",
