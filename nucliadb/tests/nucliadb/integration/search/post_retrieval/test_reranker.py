@@ -159,11 +159,20 @@ async def test_predict_reranker_requests_more_results(
     assert len(find_retrieval.best_matches) == 5
 
 
+@pytest.mark.parametrize(
+    "features",
+    [
+        ["keyword"],
+        ["semantic"],
+        ["keyword", "semantic"],
+    ],
+)
 @pytest.mark.deploy_modes("standalone")
 async def test_predict_reranker_options(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb: str,
     mocker: MockerFixture,
+    features: list[str],
 ):
     kbid = philosophy_books_kb
 
@@ -175,6 +184,7 @@ async def test_predict_reranker_options(
         f"/kb/{kbid}/find",
         json={
             "query": query,
+            "features": features,
             "reranker": "predict",
             "min_score": {"bm25": 0, "semantic": -10},
         },
@@ -190,6 +200,7 @@ async def test_predict_reranker_options(
             f"/kb/{kbid}/find",
             json={
                 "query": query,
+                "features": features,
                 "reranker": "predict",
                 "min_score": {"bm25": 0, "semantic": -10},
             },
