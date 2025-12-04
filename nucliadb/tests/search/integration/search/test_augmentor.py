@@ -35,7 +35,6 @@ from nucliadb.models.internal.augment import (
     ResourceTitle,
 )
 from nucliadb.search.augmentor.augmentor import augment
-from nucliadb_models.hydration import NeighbourParagraphHydration
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.ndbfixtures.resources import cookie_tale_resource, smb_wonder_resource
 
@@ -93,7 +92,7 @@ async def test_augmentor_neighbouring_paragraphs_strategy(
         [
             ParagraphAugment(
                 given=[paragraph_from_id(f"{rid}/f/smb-wonder/99-145")],
-                select=[RelatedParagraphs(neighbours=NeighbourParagraphHydration(before=0, after=0))],
+                select=[RelatedParagraphs(neighbours_before=0, neighbours_after=0)],
             ),
         ],
     )
@@ -108,7 +107,7 @@ async def test_augmentor_neighbouring_paragraphs_strategy(
         [
             ParagraphAugment(
                 given=[paragraph_from_id(f"{rid}/f/smb-wonder/99-145")],
-                select=[RelatedParagraphs(neighbours=NeighbourParagraphHydration(before=10, after=10))],
+                select=[RelatedParagraphs(neighbours_before=10, neighbours_after=10)],
             ),
         ],
     )
@@ -123,7 +122,7 @@ async def test_augmentor_neighbouring_paragraphs_strategy(
         [
             ParagraphAugment(
                 given=[paragraph_from_id(f"{rid}/f/smb-wonder/0-99")],
-                select=[RelatedParagraphs(neighbours=NeighbourParagraphHydration(before=10, after=10))],
+                select=[RelatedParagraphs(neighbours_before=10, neighbours_after=10)],
             ),
         ],
     )
@@ -141,7 +140,7 @@ async def test_augmentor_neighbouring_paragraphs_strategy(
         [
             ParagraphAugment(
                 given=[paragraph_from_id(f"{rid}/f/smb-wonder/145-234")],
-                select=[RelatedParagraphs(neighbours=NeighbourParagraphHydration(before=10, after=10))],
+                select=[RelatedParagraphs(neighbours_before=10, neighbours_after=10)],
             ),
         ],
     )

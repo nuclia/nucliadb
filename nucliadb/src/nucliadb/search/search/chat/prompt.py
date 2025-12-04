@@ -87,19 +87,11 @@ from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import ExtractedText, FieldComputedMetadata
 from nucliadb_utils.utilities import get_storage
 
-MAX_RESOURCE_TASKS = 5
-MAX_RESOURCE_FIELD_TASKS = 4
-
-
 # Number of messages to pull after a match in a message
 # The hope here is it will be enough to get the answer to the question.
 CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
 
 TextBlockId = Union[ParagraphId, FieldId]
-
-
-class ParagraphIdNotFoundInExtractedMetadata(Exception):
-    pass
 
 
 class CappedPromptContext:

@@ -170,8 +170,8 @@ async def db_augment_paragraph(
             related = await related_paragraphs(
                 field,
                 paragraph_id,
-                neighbours_before=prop.neighbours.before,
-                neighbours_after=prop.neighbours.after,
+                neighbours_before=prop.neighbours_before,
+                neighbours_after=prop.neighbours_after,
             )
 
         else:  # pragma: no cover
