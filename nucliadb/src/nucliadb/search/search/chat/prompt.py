@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import copy
 from collections import deque
 from dataclasses import dataclass
@@ -26,34 +25,35 @@ from typing import Deque, Dict, List, Optional, Sequence, Tuple, Union, cast
 import yaml
 from pydantic import BaseModel
 
-from nucliadb.common import datamanagers
+import nucliadb_models
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.ingest.serialize import serialize_extra, serialize_origin
-from nucliadb.models.internal.augment import ParagraphText
-from nucliadb.search import augmentor, logger
+from nucliadb.search import logger
+from nucliadb.search.api.v1.augment import augment_endpoint
 from nucliadb.search.augmentor.fields import (
     conversation_answer,
     conversation_messages_after,
-    field_entities,
     find_conversation_message,
 )
-from nucliadb.search.augmentor.models import Paragraph
-from nucliadb.search.augmentor.paragraphs import augment_paragraphs
-from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import (
     get_file_thumbnail_image,
     get_page_image,
     get_paragraph_image,
 )
-from nucliadb.search.search.hydrator import hydrate_field_text, hydrate_resource_text
 from nucliadb.search.search.metrics import Metrics
+from nucliadb_models.augment import (
+    AugmentFields,
+    AugmentParagraph,
+    AugmentParagraphs,
+    AugmentRequest,
+    AugmentResourceFields,
+    AugmentResources,
+    ResourceProp,
+)
 from nucliadb_models.labels import translate_alias_to_system_label
-from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.search import (
     SCORE_TYPE,
     AugmentedContext,
@@ -81,23 +81,14 @@ from nucliadb_models.search import (
     TextPosition,
 )
 from nucliadb_protos import resources_pb2
-from nucliadb_protos.resources_pb2 import ExtractedText, FieldComputedMetadata
-from nucliadb_utils.asyncio_utils import run_concurrently
+from nucliadb_protos.resources_pb2 import FieldComputedMetadata
 from nucliadb_utils.utilities import get_storage
-
-MAX_RESOURCE_TASKS = 5
-MAX_RESOURCE_FIELD_TASKS = 4
-
 
 # Number of messages to pull after a match in a message
 # The hope here is it will be enough to get the answer to the question.
 CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
 
 TextBlockId = Union[ParagraphId, FieldId]
-
-
-class ParagraphIdNotFoundInExtractedMetadata(Exception):
-    pass
 
 
 class CappedPromptContext:
@@ -267,7 +258,7 @@ async def full_resource_prompt_context(
     context: CappedPromptContext,
     kbid: str,
     ordered_paragraphs: list[FindParagraph],
-    resource: Optional[str],
+    rid: Optional[str],
     strategy: FullResourceStrategy,
     metrics: Metrics,
     augmented_context: AugmentedContext,
@@ -283,15 +274,15 @@ async def full_resource_prompt_context(
         resource: The resource to be included in the context. This is used only when chatting with a specific resource with no retrieval.
         strategy: strategy instance containing, for example, the number of full resources to include in the context.
     """  # noqa: E501
-    if resource is not None:
+    if rid is not None:
         # The user has specified a resource to be included in the context.
-        ordered_resources = [resource]
+        ordered_resources = [rid]
     else:
         # Collect the list of resources in the results (in order of relevance).
         ordered_resources = []
         for paragraph in ordered_paragraphs:
-            resource_uuid = parse_text_block_id(paragraph.id).rid
-            if resource_uuid not in ordered_resources:
+            rid = parse_text_block_id(paragraph.id).rid
+            if rid not in ordered_resources:
                 skip = False
                 if strategy.apply_to is not None:
                     # decide whether the resource should be extended or not
@@ -301,35 +292,61 @@ async def full_resource_prompt_context(
                         )
 
                 if not skip:
-                    ordered_resources.append(resource_uuid)
+                    ordered_resources.append(rid)
+                    # skip when we have enough resource ids
+                    if strategy.count is not None and len(ordered_resources) > strategy.count:
+                        break
 
-    # For each resource, collect the extracted text from all its fields.
-    resources_extracted_texts = await run_concurrently(
-        [
-            hydrate_resource_text(kbid, resource_uuid, max_concurrent_tasks=MAX_RESOURCE_FIELD_TASKS)
-            for resource_uuid in ordered_resources[: strategy.count]
-        ],
-        max_concurrent=MAX_RESOURCE_TASKS,
-    )
-    added_fields = set()
-    for resource_extracted_texts in resources_extracted_texts:
-        if resource_extracted_texts is None:
-            continue
-        for field, extracted_text in resource_extracted_texts:
-            # First off, remove the text block ids from paragraphs that belong to
-            # the same field, as otherwise the context will be duplicated.
-            for tb_id in context.text_block_ids():
-                if tb_id.startswith(field.full()):
-                    del context[tb_id]
-            # Add the extracted text of each field to the context.
-            context[field.full()] = extracted_text
-            augmented_context.fields[field.full()] = AugmentedTextBlock(
-                id=field.full(),
-                text=extracted_text,
-                augmentation_type=TextBlockAugmentationType.FULL_RESOURCE,
+    ordered_resources = ordered_resources[: strategy.count]
+
+    # For each resource, collect the extracted text from all its fields and
+    # include the title and summary as well
+    augmented = await augment_endpoint(
+        kbid,
+        AugmentRequest(
+            resources=AugmentResources(
+                given=ordered_resources,
+                select=[
+                    ResourceProp.TITLE,
+                    ResourceProp.SUMMARY,
+                ],
+                fields=AugmentResourceFields(
+                    text=True,
+                    filters=[],
+                ),
             )
+        ),
+    )
 
-            added_fields.add(field.full())
+    extracted_texts = {}
+    for rid, resource in augmented.resources.items():
+        if resource.title is not None:
+            field_id = FieldId(rid=rid, type="a", key="title").full()
+            extracted_texts[field_id] = resource.title
+        if resource.summary is not None:
+            field_id = FieldId(rid=rid, type="a", key="summary").full()
+            extracted_texts[field_id] = resource.summary
+
+    for field_id, field in augmented.fields.items():
+        if field.text is not None:
+            extracted_texts[field_id] = field.text
+
+    added_fields = set()
+    for field_id, extracted_text in extracted_texts.items():
+        # First off, remove the text block ids from paragraphs that belong to
+        # the same field, as otherwise the context will be duplicated.
+        for tb_id in context.text_block_ids():
+            if tb_id.startswith(field_id):
+                del context[tb_id]
+        # Add the extracted text of each field to the context.
+        context[field_id] = extracted_text
+        augmented_context.fields[field_id] = AugmentedTextBlock(
+            id=field_id,
+            text=extracted_text,
+            augmentation_type=TextBlockAugmentationType.FULL_RESOURCE,
+        )
+
+        added_fields.add(field_id)
 
     metrics.set("full_resource_ops", len(added_fields))
 
@@ -347,39 +364,146 @@ async def extend_prompt_context_with_metadata(
     metrics: Metrics,
     augmented_context: AugmentedContext,
 ) -> None:
+    rids: list[str] = []
+    field_ids: list[str] = []
     text_block_ids: list[TextBlockId] = []
     for text_block_id in context.text_block_ids():
         try:
-            text_block_ids.append(parse_text_block_id(text_block_id))
+            tb_id = parse_text_block_id(text_block_id)
         except ValueError:  # pragma: no cover
             # Some text block ids are not paragraphs nor fields, so they are skipped
             # (e.g. USER_CONTEXT_0, when the user provides extra context)
             continue
+
+        field_id = tb_id if isinstance(tb_id, FieldId) else tb_id.field_id
+
+        text_block_ids.append(tb_id)
+        field_ids.append(field_id.full())
+        rids.append(tb_id.rid)
+
     if len(text_block_ids) == 0:  # pragma: no cover
         return
+
+    resource_select = []
+    field_classification_labels = False
+    field_entities = False
 
     ops = 0
     if MetadataExtensionType.ORIGIN in strategy.types:
         ops += 1
-        await extend_prompt_context_with_origin_metadata(
-            context, kbid, text_block_ids, augmented_context
-        )
+        resource_select.append(ResourceProp.ORIGIN)
 
     if MetadataExtensionType.CLASSIFICATION_LABELS in strategy.types:
         ops += 1
-        await extend_prompt_context_with_classification_labels(
-            context, kbid, text_block_ids, augmented_context
-        )
+        resource_select.append(ResourceProp.CLASSIFICATION_LABELS)
+        field_classification_labels = True
 
     if MetadataExtensionType.NERS in strategy.types:
         ops += 1
-        await extend_prompt_context_with_ner(context, kbid, text_block_ids, augmented_context)
+        field_entities = True
 
     if MetadataExtensionType.EXTRA_METADATA in strategy.types:
         ops += 1
-        await extend_prompt_context_with_extra_metadata(context, kbid, text_block_ids, augmented_context)
+        resource_select.append(ResourceProp.EXTRA)
 
     metrics.set("metadata_extension_ops", ops * len(text_block_ids))
+
+    augment_req = AugmentRequest()
+    if resource_select:
+        augment_req.resources = AugmentResources(
+            given=rids,
+            select=resource_select,
+        )
+    if field_classification_labels or field_entities:
+        augment_req.fields = AugmentFields(
+            given=field_ids,
+            classification_labels=field_classification_labels,
+            entities=field_entities,
+        )
+
+    if augment_req.resources is None and augment_req.fields is None:
+        # nothing to augment
+        return
+
+    # TODO: replace this call for sdk.augment or similar
+    augmented = await augment_endpoint(kbid, augment_req)
+
+    for tb_id in text_block_ids:
+        field_id = tb_id if isinstance(tb_id, FieldId) else tb_id.field_id
+
+        resource = augmented.resources.get(tb_id.rid)
+        field = augmented.fields.get(field_id.full())
+
+        if resource is not None:
+            if resource.origin is not None:
+                text = context.output.pop(tb_id.full())
+                extended_text = text + f"\n\nDOCUMENT METADATA AT ORIGIN:\n{to_yaml(resource.origin)}"
+                context[tb_id.full()] = extended_text
+                augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                    id=tb_id.full(),
+                    text=extended_text,
+                    parent=tb_id.full(),
+                    augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
+                )
+
+            if resource.extra is not None:
+                text = context.output.pop(tb_id.full())
+                extended_text = text + f"\n\nDOCUMENT EXTRA METADATA:\n{to_yaml(resource.extra)}"
+                context[tb_id.full()] = extended_text
+                augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                    id=tb_id.full(),
+                    text=extended_text,
+                    parent=tb_id.full(),
+                    augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
+                )
+
+        if tb_id.full() in context:
+            if (resource is not None and resource.classification_labels) or (
+                field is not None and field.classification_labels
+            ):
+                text = context.output.pop(tb_id.full())
+
+                labels_text = "DOCUMENT CLASSIFICATION LABELS:"
+                if resource is not None and resource.classification_labels:
+                    for labelset, labels in resource.classification_labels.items():
+                        for label in labels:
+                            labels_text += f"\n - {label} ({labelset})"
+
+                if field is not None and field.classification_labels:
+                    for labelset, labels in field.classification_labels.items():
+                        for label in labels:
+                            labels_text += f"\n - {label} ({labelset})"
+
+                extended_text = text + "\n\n" + labels_text
+
+                context[tb_id.full()] = extended_text
+                augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                    id=tb_id.full(),
+                    text=extended_text,
+                    parent=tb_id.full(),
+                    augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
+                )
+
+            if field is not None and field.entities:
+                ners = field.entities
+
+                text = context.output.pop(tb_id.full())
+
+                ners_text = "DOCUMENT NAMED ENTITIES (NERs):"
+                for family, tokens in ners.items():
+                    ners_text += f"\n - {family}:"
+                    for token in sorted(list(tokens)):
+                        ners_text += f"\n   - {token}"
+
+                extended_text = text + "\n\n" + ners_text
+
+                context[tb_id.full()] = extended_text
+                augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                    id=tb_id.full(),
+                    text=extended_text,
+                    parent=tb_id.full(),
+                    augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
+                )
 
 
 def parse_text_block_id(text_block_id: str) -> TextBlockId:
@@ -390,152 +514,6 @@ def parse_text_block_id(text_block_id: str) -> TextBlockId:
         # When we're doing `full_resource` or `hierarchy` strategies,the text block id
         # is a field id
         return FieldId.from_string(text_block_id)
-
-
-async def extend_prompt_context_with_origin_metadata(
-    context: CappedPromptContext,
-    kbid,
-    text_block_ids: list[TextBlockId],
-    augmented_context: AugmentedContext,
-):
-    async def _get_origin(kbid: str, rid: str) -> tuple[str, Optional[Origin]]:
-        origin = None
-        resource = await cache.get_resource(kbid, rid)
-        if resource is not None:
-            origin = await serialize_origin(resource)
-        return rid, origin
-
-    rids = {tb_id.rid for tb_id in text_block_ids}
-    origins = await run_concurrently([_get_origin(kbid, rid) for rid in rids])
-    rid_to_origin = {rid: origin for rid, origin in origins if origin is not None}
-    for tb_id in text_block_ids:
-        origin = rid_to_origin.get(tb_id.rid)
-        if origin is not None and tb_id.full() in context:
-            text = context.output.pop(tb_id.full())
-            extended_text = text + f"\n\nDOCUMENT METADATA AT ORIGIN:\n{to_yaml(origin)}"
-            context[tb_id.full()] = extended_text
-            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
-                id=tb_id.full(),
-                text=extended_text,
-                parent=tb_id.full(),
-                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
-            )
-
-
-async def extend_prompt_context_with_classification_labels(
-    context: CappedPromptContext,
-    kbid: str,
-    text_block_ids: list[TextBlockId],
-    augmented_context: AugmentedContext,
-):
-    async def _get_labels(kbid: str, _id: TextBlockId) -> tuple[TextBlockId, list[tuple[str, str]]]:
-        fid = _id if isinstance(_id, FieldId) else _id.field_id
-        labels = set()
-        resource = await cache.get_resource(kbid, fid.rid)
-        if resource is not None:
-            resource_classifications = await augmentor.resources.classification_labels(resource)
-            if resource_classifications:
-                for labelset, label in resource_classifications:
-                    labels.add((labelset, label))
-
-            field_classifications = await augmentor.fields.classification_labels(fid, resource)
-            if field_classifications:
-                for labelset, label in field_classifications:
-                    labels.add((labelset, label))
-
-        return _id, list(labels)
-
-    classif_labels = await run_concurrently([_get_labels(kbid, tb_id) for tb_id in text_block_ids])
-    tb_id_to_labels = {tb_id: labels for tb_id, labels in classif_labels if len(labels) > 0}
-    for tb_id in text_block_ids:
-        labels = tb_id_to_labels.get(tb_id)
-        if labels is not None and tb_id.full() in context:
-            text = context.output.pop(tb_id.full())
-
-            labels_text = "DOCUMENT CLASSIFICATION LABELS:"
-            for labelset, label in labels:
-                labels_text += f"\n - {label} ({labelset})"
-            extended_text = text + "\n\n" + labels_text
-
-            context[tb_id.full()] = extended_text
-            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
-                id=tb_id.full(),
-                text=extended_text,
-                parent=tb_id.full(),
-                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
-            )
-
-
-async def extend_prompt_context_with_ner(
-    context: CappedPromptContext,
-    kbid: str,
-    text_block_ids: list[TextBlockId],
-    augmented_context: AugmentedContext,
-):
-    async def _get_ners(kbid: str, _id: TextBlockId) -> tuple[TextBlockId, dict[str, set[str]]]:
-        fid = _id if isinstance(_id, FieldId) else _id.field_id
-        ners: dict[str, set[str]] = {}
-        resource = await cache.get_resource(kbid, fid.rid)
-        if resource is not None:
-            field = await resource.get_field(fid.key, fid.pb_type, load=False)
-
-            entities = await field_entities(fid, field)
-            if entities is not None:
-                ners.update(entities)
-        return _id, ners
-
-    nerss = await run_concurrently([_get_ners(kbid, tb_id) for tb_id in text_block_ids])
-    tb_id_to_ners = {tb_id: ners for tb_id, ners in nerss if len(ners) > 0}
-    for tb_id in text_block_ids:
-        ners = tb_id_to_ners.get(tb_id)
-        if ners is not None and tb_id.full() in context:
-            text = context.output.pop(tb_id.full())
-
-            ners_text = "DOCUMENT NAMED ENTITIES (NERs):"
-            for family, tokens in ners.items():
-                ners_text += f"\n - {family}:"
-                for token in sorted(list(tokens)):
-                    ners_text += f"\n   - {token}"
-
-            extended_text = text + "\n\n" + ners_text
-
-            context[tb_id.full()] = extended_text
-            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
-                id=tb_id.full(),
-                text=extended_text,
-                parent=tb_id.full(),
-                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
-            )
-
-
-async def extend_prompt_context_with_extra_metadata(
-    context: CappedPromptContext,
-    kbid: str,
-    text_block_ids: list[TextBlockId],
-    augmented_context: AugmentedContext,
-):
-    async def _get_extra(kbid: str, rid: str) -> tuple[str, Optional[Extra]]:
-        extra = None
-        resource = await cache.get_resource(kbid, rid)
-        if resource is not None:
-            extra = await serialize_extra(resource)
-        return rid, extra
-
-    rids = {tb_id.rid for tb_id in text_block_ids}
-    extras = await run_concurrently([_get_extra(kbid, rid) for rid in rids])
-    rid_to_extra = {rid: extra for rid, extra in extras if extra is not None}
-    for tb_id in text_block_ids:
-        extra = rid_to_extra.get(tb_id.rid)
-        if extra is not None and tb_id.full() in context:
-            text = context.output.pop(tb_id.full())
-            extended_text = text + f"\n\nDOCUMENT EXTRA METADATA:\n{to_yaml(extra)}"
-            context[tb_id.full()] = extended_text
-            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
-                id=tb_id.full(),
-                text=extended_text,
-                parent=tb_id.full(),
-                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
-            )
 
 
 def to_yaml(obj: BaseModel) -> str:
@@ -568,26 +546,64 @@ async def field_extension_prompt_context(
         if resource_uuid not in ordered_resources:
             ordered_resources.append(resource_uuid)
 
-    extend_field_ids = await get_matching_field_ids(kbid, ordered_resources, strategy)
-    tasks = [hydrate_field_text(kbid, fid) for fid in extend_field_ids]
-    field_extracted_texts = await run_concurrently(tasks)
+    select = []
+    filters: list[nucliadb_models.filters.FieldId | nucliadb_models.filters.Generated] = []
+    # this strategy exposes a way to access resource title and summary using a
+    # field id. However, as they are resource properties, we must request it as
+    # that
+    for name in strategy.fields:
+        if name == "a/title":
+            select.append(ResourceProp.TITLE)
+        elif name == "a/summary":
+            select.append(ResourceProp.SUMMARY)
+        else:
+            filters.append(nucliadb_models.filters.FieldId(name=name))
 
-    metrics.set("field_extension_ops", len(field_extracted_texts))
+    for da_prefix in strategy.data_augmentation_field_prefixes:
+        filters.append(nucliadb_models.filters.Generated(by="data-augmentation", da_task=da_prefix))
 
-    for result in field_extracted_texts:
-        if result is None:  # pragma: no cover
+    augmented = await augment_endpoint(
+        kbid,
+        AugmentRequest(
+            resources=AugmentResources(
+                given=ordered_resources,
+                select=select,
+                fields=AugmentResourceFields(
+                    text=True,
+                    filters=filters,
+                ),
+            )
+        ),
+    )
+
+    # REVIEW: we don't have the field count anymore, is this good enough?
+    metrics.set("field_extension_ops", len(ordered_resources))
+
+    extracted_texts = {}
+    # now we need to expose title and summary as fields again, so it gets
+    # consistent with the view we are providing in the API
+    for rid, augmented_resource in augmented.resources.items():
+        if augmented_resource.title:
+            extracted_texts[f"{rid}/a/title"] = augmented_resource.title
+        if augmented_resource.summary:
+            extracted_texts[f"{rid}/a/summary"] = augmented_resource.summary
+
+    for fid, augmented_field in augmented.fields.items():
+        if augmented_field is None or augmented_field.text is None:  # pragma: no cover
             continue
-        field, extracted_text = result
+        extracted_texts[fid] = augmented_field.text
+
+    for fid, extracted_text in extracted_texts.items():
         # First off, remove the text block ids from paragraphs that belong to
         # the same field, as otherwise the context will be duplicated.
         for tb_id in context.text_block_ids():
-            if tb_id.startswith(field.full()):
+            if tb_id.startswith(fid):
                 del context[tb_id]
         # Add the extracted text of each field to the beginning of the context.
-        if field.full() not in context:
-            context[field.full()] = extracted_text
-            augmented_context.fields[field.full()] = AugmentedTextBlock(
-                id=field.full(),
+        if fid not in context:
+            context[fid] = extracted_text
+            augmented_context.fields[fid] = AugmentedTextBlock(
+                id=fid,
                 text=extracted_text,
                 augmentation_type=TextBlockAugmentationType.FIELD_EXTENSION,
             )
@@ -596,50 +612,6 @@ async def field_extension_prompt_context(
     for paragraph in ordered_paragraphs:
         if paragraph.id not in context:
             context[paragraph.id] = _clean_paragraph_text(paragraph)
-
-
-async def get_matching_field_ids(
-    kbid: str, ordered_resources: list[str], strategy: FieldExtensionStrategy
-) -> list[FieldId]:
-    extend_field_ids: list[FieldId] = []
-    # Fetch the extracted texts of the specified fields for each resource
-    for resource_uuid in ordered_resources:
-        for field_id in strategy.fields:
-            try:
-                fid = FieldId.from_string(f"{resource_uuid}/{field_id.strip('/')}")
-                extend_field_ids.append(fid)
-            except ValueError:  # pragma: no cover
-                # Invalid field id, skiping
-                continue
-    if len(strategy.data_augmentation_field_prefixes) > 0:
-        for resource_uuid in ordered_resources:
-            all_field_ids = await datamanagers.atomic.resources.get_all_field_ids(
-                kbid=kbid, rid=resource_uuid, for_update=False
-            )
-            if all_field_ids is None:
-                continue
-            for fieldid in all_field_ids.fields:
-                # Generated fields are always text fields starting with "da-"
-                if any(
-                    (
-                        fieldid.field_type == resources_pb2.FieldType.TEXT
-                        and fieldid.field.startswith(f"da-{prefix}-")
-                    )
-                    for prefix in strategy.data_augmentation_field_prefixes
-                ):
-                    extend_field_ids.append(
-                        FieldId.from_pb(
-                            rid=resource_uuid, field_type=fieldid.field_type, key=fieldid.field
-                        )
-                    )
-    return extend_field_ids
-
-
-async def get_orm_field(kbid: str, field_id: FieldId) -> Optional[Field]:
-    resource = await cache.get_resource(kbid, field_id.rid)
-    if resource is None:  # pragma: no cover
-        return None
-    return await resource.get_field(key=field_id.key, type=field_id.pb_type, load=False)
 
 
 async def neighbouring_paragraphs_prompt_context(
@@ -657,83 +629,51 @@ async def neighbouring_paragraphs_prompt_context(
     retrieved_paragraphs_ids = [
         ParagraphId.from_string(text_block.id) for text_block in ordered_text_blocks
     ]
-    unique_field_ids = list({pid.field_id for pid in retrieved_paragraphs_ids})
 
-    # Get extracted texts and metadatas for all fields
-    fm_ops = []
-    et_ops = []
-    for field_id in unique_field_ids:
-        field = await get_orm_field(kbid, field_id)
-        if field is None:
-            continue
-        fm_ops.append(asyncio.create_task(field.get_field_metadata()))
-        et_ops.append(asyncio.create_task(field.get_extracted_text()))
-
-    field_metadatas: dict[FieldId, FieldComputedMetadata] = {
-        fid: fm for fid, fm in zip(unique_field_ids, await asyncio.gather(*fm_ops)) if fm is not None
-    }
-    extracted_texts: dict[FieldId, ExtractedText] = {
-        fid: et for fid, et in zip(unique_field_ids, await asyncio.gather(*et_ops)) if et is not None
-    }
-
-    def _get_paragraph_text(extracted_text: ExtractedText, pid: ParagraphId) -> str:
-        if pid.field_id.subfield_id:
-            text = extracted_text.split_text.get(pid.field_id.subfield_id) or ""
-        else:
-            text = extracted_text.text
-        return text[pid.paragraph_start : pid.paragraph_end]
+    augmented = await augment_endpoint(
+        kbid,
+        AugmentRequest(
+            paragraphs=AugmentParagraphs(
+                given=[
+                    # TODO: pass metadata to /augment
+                    AugmentParagraph(id=pid.full(), metadata=None)
+                    for pid in retrieved_paragraphs_ids
+                ],
+                text=True,
+                neighbours_before=strategy.before,
+                neighbours_after=strategy.after,
+            )
+        ),
+    )
 
     for pid in retrieved_paragraphs_ids:
-        # Add the retrieved paragraph first
-        field_extracted_text = extracted_texts.get(pid.field_id, None)
-        if field_extracted_text is None:
+        paragraph = augmented.paragraphs.get(pid.full())
+        if paragraph is None:
             continue
-        ptext = _get_paragraph_text(field_extracted_text, pid)
+
+        ptext = paragraph.text or ""
         if ptext and pid.full() not in context:
             context[pid.full()] = ptext
 
         # Now add the neighbouring paragraphs
-        field_extracted_metadata = field_metadatas.get(pid.field_id, None)
-        if field_extracted_metadata is None:
-            continue
+        neighbours = {
+            **(paragraph.neighbours_before or {}),
+            **(paragraph.neighbours_after or {}),
+        }
+        for npid, ntext in neighbours.items():
+            if ParagraphId.from_string(npid) in retrieved_paragraphs_ids or npid in context:
+                # already added
+                continue
 
-        field_pids = [
-            ParagraphId(
-                field_id=pid.field_id,
-                paragraph_start=p.start,
-                paragraph_end=p.end,
-            )
-            for p in field_extracted_metadata.metadata.paragraphs
-        ]
-        try:
-            index = field_pids.index(pid)
-        except ValueError:
-            continue
+            if not ntext:
+                continue
 
-        for neighbour_index in get_neighbouring_indices(
-            index=index,
-            before=strategy.before,
-            after=strategy.after,
-            field_pids=field_pids,
-        ):
-            if neighbour_index == index:
-                # Already handled above
-                continue
-            try:
-                npid = field_pids[neighbour_index]
-            except IndexError:
-                continue
-            if npid in retrieved_paragraphs_ids or npid.full() in context:
-                # Already added
-                continue
-            ptext = _get_paragraph_text(field_extracted_text, npid)
-            if not ptext:
-                continue
-            context[npid.full()] = ptext
-            augmented_context.paragraphs[npid.full()] = AugmentedTextBlock(
-                id=npid.full(),
-                text=ptext,
-                position=get_text_position(npid, neighbour_index, field_extracted_metadata),
+            context[npid] = ntext
+            augmented_context.paragraphs[npid] = AugmentedTextBlock(
+                id=npid,
+                text=ntext,
+                # TODO: implement neighbour positions
+                position=None,
                 parent=pid.full(),
                 augmentation_type=TextBlockAugmentationType.NEIGHBOURING_PARAGRAPHS,
             )
@@ -990,10 +930,21 @@ async def hierarchy_prompt_context(
 
     metrics.set("hierarchy_ops", len(resources))
 
-    augmented = await augment_paragraphs(
+    augmented = await augment_endpoint(
         kbid,
-        [Paragraph(id=paragraph_id, metadata=None) for paragraph_id in paragraphs_to_augment],
-        select=[ParagraphText()],
+        AugmentRequest(
+            paragraphs=AugmentParagraphs(
+                given=[
+                    AugmentParagraph(
+                        id=paragraph_id.full(),
+                        # TODO: populate metadata
+                        metadata=None,
+                    )
+                    for paragraph_id in paragraphs_to_augment
+                ],
+                text=True,
+            )
+        ),
     )
 
     augmented_paragraphs = set()
@@ -1001,13 +952,13 @@ async def hierarchy_prompt_context(
     # Modify the first paragraph of each resource to include the title and summary of the resource, as well as the
     # extended paragraph text of all the paragraphs in the resource.
     for values in resources.values():
-        augmented_title = augmented.get(values.title)
+        augmented_title = augmented.paragraphs.get(values.title.full())
         if augmented_title:
             title_text = augmented_title.text or ""
         else:
             title_text = ""
 
-        augmented_summary = augmented.get(values.summary)
+        augmented_summary = augmented.paragraphs.get(values.summary.full())
         if augmented_summary:
             summary_text = augmented_summary.text or ""
         else:
@@ -1016,7 +967,7 @@ async def hierarchy_prompt_context(
         first_paragraph = None
         text_with_hierarchy = ""
         for paragraph, paragraph_id in values.paragraphs:
-            augmented_paragraph = augmented.get(paragraph_id)
+            augmented_paragraph = augmented.paragraphs.get(paragraph_id.full())
             if augmented_paragraph:
                 extended_paragraph_text = augmented_paragraph.text or ""
             else:

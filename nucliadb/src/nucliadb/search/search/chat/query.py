@@ -21,36 +21,23 @@ import asyncio
 from time import time
 from typing import AsyncGenerator, Iterable, Optional, Union
 
-from nidx_protos.nodereader_pb2 import (
-    GraphSearchResponse,
-    SearchResponse,
-)
+from nidx_protos.nodereader_pb2 import GraphSearchResponse, SearchResponse
 from nuclia_models.predict.generative_responses import GenerativeChunk
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
 from nucliadb.common.models_utils import to_proto
-from nucliadb.models.internal.retrieval import (
-    RerankerScore,
-    RetrievalMatch,
-    RetrievalRequest,
-    RetrievalResponse,
-    ScoreType,
-)
+from nucliadb.models.internal.retrieval import RerankerScore, RetrievalMatch, ScoreType
 from nucliadb.search import logger
-from nucliadb.search.api.v1.augment import augment_endpoint
-from nucliadb.search.api.v1.retrieve import retrieve_endpoint
 from nucliadb.search.predict import AnswerStatusCode, RephraseResponse
 from nucliadb.search.requesters.utils import Method, nidx_query
+from nucliadb.search.search.chat import rpc
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.chat.parser import rao_parse_find
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.find_merge import text_block_to_find_paragraph
-from nucliadb.search.search.hydrator import (
-    ResourceHydrationOptions,
-    TextBlockHydrationOptions,
-)
+from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.paragraphs import highlight_paragraph
@@ -67,8 +54,8 @@ from nucliadb_models.augment import (
     AugmentParagraphs,
     AugmentRequest,
     AugmentResources,
-    AugmentResponse,
     ParagraphMetadata,
+    ResourceProp,
 )
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -578,15 +565,16 @@ async def rao_find(
     x_forwarded_for: str,
     metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, bool, Fetcher, Reranker]:
-    """
-    Calls to NucliaDB retrieve and augment primitives to perform the text block search.
-    It returns the results as KnowledgeboxFindResults to comply with the existing find
-    interface (/ask logic is tightly coupled with /find).
+    """This is an equivalent implementation of /find but uses the new /retrieve
+    and /augment endpoints under the hood while providing bw/c for the /find
+    response model.
 
-    # retrieve
-    # augment
-    # rerank
-    # convert results to KnowledgeboxFindResults
+    This implementation is provided to comply with the existing /find interface
+    to which /ask is tighly coupled with.
+
+    Note there's an edge case, when users ask for features=relations, in which
+    we fallback to /find, as it's the simplest way to provide bw/c.
+
     """
     audit = get_audit()
     start_time = time()
@@ -599,7 +587,13 @@ async def rao_find(
         if find_request.query != retrieval_request.query.keyword.query:
             rephrased_query = retrieval_request.query.keyword.query
 
-    retrieval_response = await retrieve(kbid, retrieval_request)
+    retrieval_response = await rpc.retrieve(
+        kbid,
+        retrieval_request,
+        x_ndb_client=x_ndb_client,
+        x_nucliadb_user=x_nucliadb_user,
+        x_forwarded_for=x_forwarded_for,
+    )
     matches = retrieval_response.matches
 
     relations = None
@@ -607,9 +601,7 @@ async def rao_find(
         # the user asked for a legacy relations search, as we don't support it
         # in the /retrieve endpoint but we must maintain bw/c with /find
         # responses, we call it with to get just this part of the response
-        #
-        # TODO: replace this with an sdk call
-        find_response, _, _ = await find(
+        find_response, _ = await rpc.find(
             kbid,
             FindRequest(
                 features=[FindOptions.RELATIONS],
@@ -673,18 +665,6 @@ async def rao_find(
         )
 
     return find_results, False, fetcher, reranker
-
-
-async def retrieve(kbid: str, item: RetrievalRequest) -> RetrievalResponse:
-    # Parse retrieval struff that will be later done internally at nucliadb and can be removed from here when moved to RAO
-
-    # TODO: replace this for a nucliadb_sdk.retrieve call when moving /ask to RAO
-    return await retrieve_endpoint(kbid, item)
-
-
-async def augment(kbid: str, item: AugmentRequest) -> AugmentResponse:
-    # TODO: replace this for a nucliadb_sdk.augment call when moving /ask to RAO
-    return await augment_endpoint(kbid, item)
 
 
 async def augment_and_rerank(
@@ -784,12 +764,15 @@ async def hydrate_and_rerank(
         else:
             text_block_id_to_hydrate.add(paragraph_id)
 
+    resource_select = ResourceProp.from_show_and_extracted(
+        resource_hydration_options.show, resource_hydration_options.extracted
+    )
+
     # hydrate only the strictly needed before rerank
     augment_request = AugmentRequest(
         resources=AugmentResources(
             given=list(resources_to_hydrate),
-            show=resource_hydration_options.show,
-            extracted=resource_hydration_options.extracted,
+            select=resource_select,
             field_type_filter=resource_hydration_options.field_type_filter,
         ),
         paragraphs=AugmentParagraphs(
@@ -811,7 +794,7 @@ async def hydrate_and_rerank(
             text=True,
         ),
     )
-    augment_response = await augment(kbid, augment_request)
+    augment_response = await rpc.augment(kbid, augment_request)
     augmented_paragraphs = augment_response.paragraphs
     augmented_resources = augment_response.resources
 
@@ -873,13 +856,12 @@ async def hydrate_and_rerank(
 
     # Finally, fetch resource metadata if we haven't already done it
     if reranker.needs_extra_results:
-        augmented = await augment(
+        augmented = await rpc.augment(
             kbid,
             AugmentRequest(
                 resources=AugmentResources(
                     given=list(resources_to_hydrate),
-                    show=resource_hydration_options.show,
-                    extracted=resource_hydration_options.extracted,
+                    select=resource_select,
                     field_type_filter=resource_hydration_options.field_type_filter,
                 ),
             ),

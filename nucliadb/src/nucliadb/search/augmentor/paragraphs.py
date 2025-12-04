@@ -24,6 +24,10 @@ from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal.augment import (
+    AugmentedParagraph,
+    AugmentedRelatedParagraphs,
+    Metadata,
+    Paragraph,
     ParagraphImage,
     ParagraphPage,
     ParagraphProp,
@@ -32,9 +36,7 @@ from nucliadb.models.internal.augment import (
     RelatedParagraphs,
 )
 from nucliadb.search import logger
-from nucliadb.search.augmentor import models as augmentor_models
 from nucliadb.search.augmentor.metrics import augmentor_observer
-from nucliadb.search.augmentor.models import AugmentedParagraph, Metadata, Paragraph
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 from nucliadb.search.search.paragraphs import get_paragraph_from_full_text
@@ -168,8 +170,8 @@ async def db_augment_paragraph(
             related = await related_paragraphs(
                 field,
                 paragraph_id,
-                neighbours_before=prop.neighbours.before,
-                neighbours_after=prop.neighbours.after,
+                neighbours_before=prop.neighbours_before,
+                neighbours_after=prop.neighbours_after,
             )
 
         else:  # pragma: no cover
@@ -204,7 +206,7 @@ async def related_paragraphs(
     *,
     neighbours_before: int = 0,
     neighbours_after: int = 0,
-) -> augmentor_models.RelatedParagraphs | None:
+) -> AugmentedRelatedParagraphs | None:
     field_paragraphs = await get_field_paragraphs(field)
     if field_paragraphs is None:
         return None
@@ -230,7 +232,7 @@ async def related_paragraphs(
         paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end)
         after.append(paragraph_id)
 
-    return augmentor_models.RelatedParagraphs(
+    return AugmentedRelatedParagraphs(
         neighbours_before=before,
         neighbours_after=after,
     )

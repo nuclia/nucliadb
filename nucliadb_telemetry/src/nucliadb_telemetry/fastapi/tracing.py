@@ -28,7 +28,7 @@ from opentelemetry.instrumentation.utils import (
 )
 from opentelemetry.propagators.textmap import Getter, Setter
 from opentelemetry.semconv.trace import SpanAttributes
-from opentelemetry.trace import Span, format_trace_id, set_span_in_context
+from opentelemetry.trace import INVALID_SPAN, Span, format_trace_id, set_span_in_context
 from opentelemetry.trace.status import Status, StatusCode
 from opentelemetry.util.http import (
     OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SANITIZE_FIELDS,
@@ -360,7 +360,7 @@ class OpenTelemetryMiddleware:
 class CaptureTraceIdMiddleware(BaseHTTPMiddleware):
     def capture_trace_id(self, response):
         span = trace.get_current_span()
-        if span is None:
+        if span is INVALID_SPAN:
             return
         trace_id = format_trace_id(span.get_span_context().trace_id)
         response.headers[NUCLIA_TRACE_ID_HEADER] = trace_id

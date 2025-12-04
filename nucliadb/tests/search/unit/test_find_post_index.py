@@ -25,7 +25,7 @@ import pytest
 from nidx_protos import nodereader_pb2, noderesources_pb2
 
 from nucliadb.common.ids import ParagraphId
-from nucliadb.search.augmentor.models import AugmentedParagraph
+from nucliadb.models.internal.augment import AugmentedParagraph
 from nucliadb.search.search.find_merge import build_find_response
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
 from nucliadb.search.search.query_parser.models import (

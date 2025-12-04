@@ -38,6 +38,7 @@ from nucliadb_telemetry.settings import (
     LogOutputType,
     LogSettings,
 )
+from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.tests import free_port
 
@@ -61,10 +62,11 @@ async def standalone_nucliadb(
     with (
         safe_global_config(),
         patch.dict(os.environ, {"DATA_PATH": data_path}, clear=False),
+        patch.object(running_settings, "serving_port", free_port()) as http_port,
     ):
         settings = Settings(
             data_path=data_path,
-            http_port=free_port(),
+            http_port=http_port,
             ingest_grpc_port=free_port(),
             train_grpc_port=free_port(),
             log_format_type=LogFormatType.PLAIN,

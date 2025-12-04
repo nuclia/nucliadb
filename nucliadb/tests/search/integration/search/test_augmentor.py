@@ -25,6 +25,7 @@ from httpx import AsyncClient
 
 from nucliadb.common.ids import ParagraphId
 from nucliadb.models.internal.augment import (
+    Paragraph,
     ParagraphAugment,
     ParagraphText,
     RelatedParagraphs,
@@ -34,7 +35,6 @@ from nucliadb.models.internal.augment import (
     ResourceTitle,
 )
 from nucliadb.search.augmentor.augmentor import augment
-from nucliadb_models.hydration import NeighbourParagraphHydration
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.ndbfixtures.resources import cookie_tale_resource, smb_wonder_resource
 
@@ -91,8 +91,8 @@ async def test_augmentor_neighbouring_paragraphs_strategy(
         kbid,
         [
             ParagraphAugment(
-                given=[f"{rid}/f/smb-wonder/99-145"],
-                select=[RelatedParagraphs(neighbours=NeighbourParagraphHydration(before=0, after=0))],
+                given=[paragraph_from_id(f"{rid}/f/smb-wonder/99-145")],
+                select=[RelatedParagraphs(neighbours_before=0, neighbours_after=0)],
             ),
         ],
     )
@@ -106,8 +106,8 @@ async def test_augmentor_neighbouring_paragraphs_strategy(
         kbid,
         [
             ParagraphAugment(
-                given=[f"{rid}/f/smb-wonder/99-145"],
-                select=[RelatedParagraphs(neighbours=NeighbourParagraphHydration(before=10, after=10))],
+                given=[paragraph_from_id(f"{rid}/f/smb-wonder/99-145")],
+                select=[RelatedParagraphs(neighbours_before=10, neighbours_after=10)],
             ),
         ],
     )
@@ -121,8 +121,8 @@ async def test_augmentor_neighbouring_paragraphs_strategy(
         kbid,
         [
             ParagraphAugment(
-                given=[f"{rid}/f/smb-wonder/0-99"],
-                select=[RelatedParagraphs(neighbours=NeighbourParagraphHydration(before=10, after=10))],
+                given=[paragraph_from_id(f"{rid}/f/smb-wonder/0-99")],
+                select=[RelatedParagraphs(neighbours_before=10, neighbours_after=10)],
             ),
         ],
     )
@@ -139,8 +139,8 @@ async def test_augmentor_neighbouring_paragraphs_strategy(
         kbid,
         [
             ParagraphAugment(
-                given=[f"{rid}/f/smb-wonder/145-234"],
-                select=[RelatedParagraphs(neighbours=NeighbourParagraphHydration(before=10, after=10))],
+                given=[paragraph_from_id(f"{rid}/f/smb-wonder/145-234")],
+                select=[RelatedParagraphs(neighbours_before=10, neighbours_after=10)],
             ),
         ],
     )
@@ -169,7 +169,7 @@ async def test_augmentor_hierarchy_strategy(
                 select=[ResourceTitle(), ResourceSummary()],
             ),
             ParagraphAugment(
-                given=[f"{rid}/f/smb-wonder/99-145"],
+                given=[paragraph_from_id(f"{rid}/f/smb-wonder/99-145")],
                 select=[ParagraphText()],
             ),
         ],
@@ -180,3 +180,10 @@ async def test_augmentor_hierarchy_strategy(
     assert resource.summary == "SMB Wonder: the new Mario game from Nintendo"
     (_, paragraph) = augmented.paragraphs.popitem()
     assert paragraph.text == "SMB Wonder is a side-scrolling plaftorm game.\n"
+
+
+def paragraph_from_id(id: str) -> Paragraph:
+    return Paragraph(
+        id=ParagraphId.from_string(id),
+        metadata=None,
+    )

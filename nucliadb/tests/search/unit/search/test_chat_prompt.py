@@ -19,6 +19,7 @@
 import base64
 from unittest import mock
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 
 import pytest
 
@@ -426,7 +427,8 @@ async def test_extend_prompt_context_with_metadata():
         mock.patch("nucliadb.search.augmentor.resources.get_basic", return_value=basic),
         mock.patch("nucliadb.search.augmentor.fields.get_basic", return_value=basic),
     ):
-        paragraph_id = ParagraphId.from_string("r1/f/f1/0-10")
+        rid = uuid4().hex
+        paragraph_id = ParagraphId.from_string(f"{rid}/f/f1/0-10")
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         context[paragraph_id.full()] = "Paragraph text"
         kbid = "foo"
