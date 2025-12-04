@@ -215,6 +215,9 @@ class AugmentRequest(BaseModel):
 class AugmentedParagraph(BaseModel):
     text: str | None = None
 
+    # REVIEW: this implementation may repeat neighbours that are close. The
+    # other option would be a list of references and return the neighbours as
+    # augmented paragraphs
     neighbours_before: dict[ParagraphId, str] | None = None
     neighbours_after: dict[ParagraphId, str] | None = None
 
