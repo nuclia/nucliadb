@@ -37,7 +37,6 @@ from nucliadb.search.api.v1.augment import augment_endpoint
 from nucliadb.search.augmentor.fields import (
     conversation_answer,
     conversation_messages_after,
-    field_entities,
     find_conversation_message,
 )
 from nucliadb.search.search import cache
@@ -85,7 +84,6 @@ from nucliadb_models.search import (
 )
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import ExtractedText, FieldComputedMetadata
-from nucliadb_utils.asyncio_utils import run_concurrently
 from nucliadb_utils.utilities import get_storage
 
 MAX_RESOURCE_TASKS = 5
@@ -532,40 +530,49 @@ async def extend_prompt_context_with_ner(
     text_block_ids: list[TextBlockId],
     augmented_context: AugmentedContext,
 ):
-    async def _get_ners(kbid: str, _id: TextBlockId) -> tuple[TextBlockId, dict[str, set[str]]]:
-        fid = _id if isinstance(_id, FieldId) else _id.field_id
-        ners: dict[str, set[str]] = {}
-        resource = await cache.get_resource(kbid, fid.rid)
-        if resource is not None:
-            field = await resource.get_field(fid.key, fid.pb_type, load=False)
-
-            entities = await field_entities(fid, field)
-            if entities is not None:
-                ners.update(entities)
-        return _id, ners
-
-    nerss = await run_concurrently([_get_ners(kbid, tb_id) for tb_id in text_block_ids])
-    tb_id_to_ners = {tb_id: ners for tb_id, ners in nerss if len(ners) > 0}
+    field_ids = []
     for tb_id in text_block_ids:
-        ners = tb_id_to_ners.get(tb_id)
-        if ners is not None and tb_id.full() in context:
-            text = context.output.pop(tb_id.full())
+        fid = tb_id if isinstance(tb_id, FieldId) else tb_id.field_id
+        field_ids.append(fid.full())
 
-            ners_text = "DOCUMENT NAMED ENTITIES (NERs):"
-            for family, tokens in ners.items():
-                ners_text += f"\n - {family}:"
-                for token in sorted(list(tokens)):
-                    ners_text += f"\n   - {token}"
-
-            extended_text = text + "\n\n" + ners_text
-
-            context[tb_id.full()] = extended_text
-            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
-                id=tb_id.full(),
-                text=extended_text,
-                parent=tb_id.full(),
-                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
+    augmented = await augment_endpoint(
+        kbid,
+        AugmentRequest(
+            fields=AugmentFields(
+                given=field_ids,
+                # these are the previously called ners
+                entities=True,
             )
+        ),
+    )
+
+    for tb_id in text_block_ids:
+        if tb_id.full() not in context:
+            continue
+
+        field_id = tb_id if isinstance(tb_id, FieldId) else tb_id.field_id
+        field = augmented.fields.get(field_id.full())
+        if field is None or not field.entities:
+            continue
+        ners = field.entities
+
+        text = context.output.pop(tb_id.full())
+
+        ners_text = "DOCUMENT NAMED ENTITIES (NERs):"
+        for family, tokens in ners.items():
+            ners_text += f"\n - {family}:"
+            for token in sorted(list(tokens)):
+                ners_text += f"\n   - {token}"
+
+        extended_text = text + "\n\n" + ners_text
+
+        context[tb_id.full()] = extended_text
+        augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+            id=tb_id.full(),
+            text=extended_text,
+            parent=tb_id.full(),
+            augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
+        )
 
 
 def to_yaml(obj: BaseModel) -> str:
