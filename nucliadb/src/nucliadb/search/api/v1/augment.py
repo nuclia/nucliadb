@@ -39,6 +39,7 @@ from nucliadb.models.internal.augment import (
     ParagraphAugment,
     ParagraphProp,
     ParagraphText,
+    RelatedParagraphs,
     ResourceAugment,
     ResourceProp,
     ResourceSummary,
@@ -46,6 +47,7 @@ from nucliadb.models.internal.augment import (
 )
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.augmentor import augmentor
+from nucliadb.search.augmentor.paragraphs import augment_paragraphs
 from nucliadb.search.search.cache import request_caches
 from nucliadb_models.augment import (
     AugmentedField,
@@ -139,6 +141,10 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
                 )
             )
 
+    if item.fields is not None:
+        # TODO: implement and test, field NERs are not tested for example
+        pass
+
     if item.paragraphs is not None:
         paragraphs_to_augment, paragraph_selector = parse_paragraph_augment(item.paragraphs)
         augmentations.append(
@@ -193,10 +199,57 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
         for paragraph_id, paragraph in augmented.paragraphs.items():
             if paragraph is None:
                 continue
+
             augmented_paragraphs[paragraph_id.full()] = AugmentedParagraph(
                 text=paragraph.text,
                 # TODO: we need multiple calls to augmentor to fulfill this information
             )
+
+        # 2n round trip to augmentor
+        #
+        # There are some augmentations that require some augmented content to be
+        # able to keep augmenting, as neighbour paragraphs.
+        #
+        # However, as many data is already cached (when using cache), this
+        # second round should be orders of magnitude faster than the first round.
+        #
+        if item.paragraphs is not None and (
+            item.paragraphs.neighbours_before or item.paragraphs.neighbours_after
+        ):
+            neighbours = []
+            neighbour_map = {}
+            for paragraph_id, paragraph in augmented.paragraphs.items():
+                if paragraph.related is not None:
+                    for neighbour_before in paragraph.related.neighbours_before:
+                        neighbours.append(Paragraph(id=neighbour_before, metadata=None))
+                        neighbour_map[neighbour_before] = (paragraph_id, "before")
+                    for neighbour_after in paragraph.related.neighbours_after:
+                        neighbours.append(Paragraph(id=neighbour_after, metadata=None))
+                        neighbour_map[neighbour_after] = (paragraph_id, "after")
+
+            augmented_neighbours = await augment_paragraphs(
+                kbid, given=neighbours, select=[ParagraphText()]
+            )
+            for neighbour_paragraph_id, neighbour_paragraph in augmented_neighbours.items():
+                if neighbour_paragraph is None or not neighbour_paragraph.text:
+                    continue
+
+                original_paragraph_id, position = neighbour_map[neighbour_paragraph_id]
+                original_paragraph = augmented_paragraphs[original_paragraph_id.full()]
+                if position == "before":
+                    if original_paragraph.neighbours_before is None:
+                        original_paragraph.neighbours_before = {}
+                    original_paragraph.neighbours_before[neighbour_paragraph_id.full()] = (
+                        neighbour_paragraph.text
+                    )
+                elif position == "after":
+                    if original_paragraph.neighbours_after is None:
+                        original_paragraph.neighbours_after = {}
+                    original_paragraph.neighbours_after[neighbour_paragraph_id.full()] = (
+                        neighbour_paragraph.text
+                    )
+                else:
+                    assert False, f"position should always be before or after, not {position}"
 
         return AugmentResponse(
             resources=augmented_resources,
@@ -290,5 +343,12 @@ def parse_paragraph_augment(item: AugmentParagraphs) -> tuple[list[Paragraph], l
     selector: list[ParagraphProp] = []
     if item.text:
         selector.append(ParagraphText())
+    if item.neighbours_before or item.neighbours_after:
+        selector.append(
+            RelatedParagraphs(
+                neighbours_before=item.neighbours_before or 0,
+                neighbours_after=item.neighbours_after or 0,
+            )
+        )
 
     return paragraphs_to_augment, selector

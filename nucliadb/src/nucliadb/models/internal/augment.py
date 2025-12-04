@@ -27,7 +27,7 @@ from typing_extensions import Self
 import nucliadb_models
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import FieldId, ParagraphId
-from nucliadb_models import filters, hydration
+from nucliadb_models import filters
 from nucliadb_models.augment import ResourceId
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.conversation import FieldConversation
@@ -176,7 +176,8 @@ class ParagraphPage(SelectProp):
 
 class RelatedParagraphs(SelectProp):
     prop: Literal["related"] = "related"
-    neighbours: hydration.NeighbourParagraphHydration
+    neighbours_before: int = Field(ge=0, description="Number of previous paragraphs to hydrate")
+    neighbours_after: int = Field(ge=0, description="Number of following paragraphs to hydrate")
 
 
 ParagraphProp = Annotated[
