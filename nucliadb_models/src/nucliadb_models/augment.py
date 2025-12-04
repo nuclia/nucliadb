@@ -14,18 +14,44 @@
 #
 
 from enum import Enum
+from typing import Annotated
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 from typing_extensions import Self
 
 from nucliadb_models import filters
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import Image, ResourceProperties
-from nucliadb_models.utils import FieldIdString
 
-# TODO: use constrained string
-ParagraphId = str
+ResourceIdPattern = r"^[0-9a-f]{32}$"
+ResourceId = Annotated[
+    str,
+    StringConstraints(pattern=ResourceIdPattern, min_length=32, max_length=32),
+]
+
+FieldIdPattern = r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+(/[^/]{1,128})?$"
+FieldId = Annotated[
+    str,
+    StringConstraints(
+        pattern=FieldIdPattern,
+        min_length=32 + 1 + 1 + 1 + 1 + 0 + 0,
+        # max field id of 250
+        max_length=32 + 1 + 1 + 1 + 250 + 1 + 218,
+    ),
+]
+
+ParagraphIdPattern = r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+(/[^/]{1,128})?/[0-9]+-[0-9]+$"
+ParagraphId = Annotated[
+    str,
+    StringConstraints(
+        # resource-uuid/field-type/field-id/[split-id/]paragraph-id
+        pattern=ParagraphIdPattern,
+        min_length=32 + 1 + 1 + 1 + 1 + 0 + 0 + 1 + 3,
+        # max field id of 250 and 10 digit paragraphs. More than enough
+        max_length=32 + 1 + 1 + 1 + 250 + 1 + 128 + 1 + 21,
+    ),
+]
 
 
 # Request
@@ -98,6 +124,8 @@ class ResourceProp(str, Enum):
 
 class AugmentResourceFields(BaseModel):
     text: bool = False
+    classification_labels: bool = False
+    entities: bool = False  # also known as ners
 
     filters: list[filters.FieldId | filters.Generated]
 
@@ -109,7 +137,7 @@ class AugmentResourceFields(BaseModel):
 
 
 class AugmentResources(BaseModel):
-    given: list[str]
+    given: list[ResourceId]
 
     select: list[ResourceProp] = Field(default_factory=list)
 
@@ -134,9 +162,11 @@ class AugmentResources(BaseModel):
 
 
 class AugmentFields(BaseModel):
-    given: list[FieldIdString]
+    given: list[FieldId]
 
     text: bool = False
+    classification_labels: bool = False
+    entities: bool = False  # also known as ners
 
 
 class ParagraphMetadata(BaseModel):
@@ -210,12 +240,14 @@ class AugmentedField(BaseModel):
 
 
 class AugmentedResource(Resource):
+    classification_labels: dict[str, list[str]] | None = None
+
     def updated_from(self, origin: Resource):
         for key in origin.model_fields.keys():
             self.__setattr__(key, getattr(origin, key))
 
 
 class AugmentResponse(BaseModel):
-    resources: dict[str, AugmentedResource]
-    fields: dict[str, AugmentedField]
-    paragraphs: dict[str, AugmentedParagraph]
+    resources: dict[ResourceId, AugmentedResource]
+    fields: dict[FieldId, AugmentedField]
+    paragraphs: dict[ParagraphId, AugmentedParagraph]

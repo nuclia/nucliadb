@@ -31,6 +31,8 @@ from nucliadb.models.internal.augment import (
     Augment,
     DeepResourceAugment,
     FieldAugment,
+    FieldClassificationLabels,
+    FieldProp,
     FieldText,
     Metadata,
     Paragraph,
@@ -122,9 +124,12 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
 
         if item.resources.fields is not None:
             # Augment resource fields with an optional field filter
-            field_select = []
+            field_select: list[FieldProp] = []
             if item.resources.fields.text:
                 field_select.append(FieldText())
+            # TODO: add missing test for field classification labels...
+            if item.resources.fields.classification_labels:
+                field_select.append(FieldClassificationLabels())
 
             augmentations.append(
                 FieldAugment(

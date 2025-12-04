@@ -48,6 +48,7 @@ from nucliadb.search.search.chat.images import (
 )
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.augment import (
+    AugmentFields,
     AugmentParagraph,
     AugmentParagraphs,
     AugmentRequest,
@@ -490,26 +491,61 @@ async def extend_prompt_context_with_classification_labels(
 
         return _id, all_labels
 
-    classif_labels = await run_concurrently([_get_labels(kbid, tb_id) for tb_id in text_block_ids])
-    tb_id_to_labels = {tb_id: labels for tb_id, labels in classif_labels if len(labels) > 0}
+    rids = []
+    field_ids = []
     for tb_id in text_block_ids:
-        labels = tb_id_to_labels.get(tb_id)
-        if labels is not None and tb_id.full() in context:
-            text = context.output.pop(tb_id.full())
+        rids.append(tb_id.rid)
+        field_id = tb_id if isinstance(tb_id, FieldId) else tb_id.field_id
+        field_ids.append(field_id.full())
 
-            labels_text = "DOCUMENT CLASSIFICATION LABELS:"
-            for labelset, labels in labels:
+    augmented = await augment_endpoint(
+        kbid,
+        AugmentRequest(
+            resources=AugmentResources(
+                given=rids,
+                select=[ResourceProp.CLASSIFICATION_LABELS],
+            ),
+            fields=AugmentFields(
+                given=field_ids,
+                classification_labels=True,
+            ),
+        ),
+    )
+
+    for tb_id in text_block_ids:
+        if tb_id.full() not in context:
+            continue
+
+        field_id = tb_id if isinstance(tb_id, FieldId) else tb_id.field_id
+        resource = augmented.resources.get(field_id.rid)
+        field = augmented.fields.get(field_id.full())
+        if (resource is None or not resource.classification_labels) and (
+            field is None or not field.classification_labels
+        ):
+            continue
+
+        text = context.output.pop(tb_id.full())
+
+        labels_text = "DOCUMENT CLASSIFICATION LABELS:"
+        if resource is not None and resource.classification_labels:
+            for labelset, labels in resource.classification_labels.items():
                 for label in labels:
                     labels_text += f"\n - {label} ({labelset})"
-            extended_text = text + "\n\n" + labels_text
 
-            context[tb_id.full()] = extended_text
-            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
-                id=tb_id.full(),
-                text=extended_text,
-                parent=tb_id.full(),
-                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
-            )
+        if field is not None and field.classification_labels:
+            for labelset, labels in field.classification_labels.items():
+                for label in labels:
+                    labels_text += f"\n - {label} ({labelset})"
+
+        extended_text = text + "\n\n" + labels_text
+
+        context[tb_id.full()] = extended_text
+        augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+            id=tb_id.full(),
+            text=extended_text,
+            parent=tb_id.full(),
+            augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
+        )
 
 
 async def extend_prompt_context_with_ner(

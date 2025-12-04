@@ -21,13 +21,14 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Discriminator, Field, StringConstraints, Tag, model_validator
+from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
 from typing_extensions import Self
 
 import nucliadb_models
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb_models import filters, hydration
+from nucliadb_models.augment import ResourceId
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.conversation import FieldConversation
 from nucliadb_models.file import FieldFile
@@ -61,37 +62,6 @@ def from_discriminator(v: Any) -> str | None:
     else:
         return getattr(v, "from", None)
 
-
-# Ids
-
-ResourceIdPattern = r"^[0-9a-f]{32}$"
-ResourceId = Annotated[
-    str,
-    StringConstraints(pattern=ResourceIdPattern, min_length=32, max_length=32),
-]
-
-FieldIdPattern = r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+(/[^/]{1,128})?$"
-_FieldId = Annotated[
-    str,
-    StringConstraints(
-        pattern=FieldIdPattern,
-        min_length=32 + 1 + 1 + 1 + 1 + 0 + 0,
-        # max field id of 250
-        max_length=32 + 1 + 1 + 1 + 250 + 1 + 218,
-    ),
-]
-
-ParagraphIdPattern = r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+(/[^/]{1,128})?/[0-9]+-[0-9]+$"
-_ParagraphId = Annotated[
-    str,
-    StringConstraints(
-        # resource-uuid/field-type/field-id/[split-id/]paragraph-id
-        pattern=ParagraphIdPattern,
-        min_length=32 + 1 + 1 + 1 + 1 + 0 + 0 + 1 + 3,
-        # max field id of 250 and 10 digit paragraphs. More than enough
-        max_length=32 + 1 + 1 + 1 + 250 + 1 + 128 + 1 + 21,
-    ),
-]
 
 # Complex ids
 
