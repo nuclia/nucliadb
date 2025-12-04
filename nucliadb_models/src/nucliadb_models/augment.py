@@ -125,7 +125,6 @@ class ResourceProp(str, Enum):
 class AugmentResourceFields(BaseModel):
     text: bool = False
     classification_labels: bool = False
-    entities: bool = False  # also known as ners
 
     filters: list[filters.FieldId | filters.Generated]
 
