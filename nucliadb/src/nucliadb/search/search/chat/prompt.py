@@ -375,6 +375,7 @@ async def extend_prompt_context_with_metadata(
     augmented_context: AugmentedContext,
 ) -> None:
     rids: list[str] = []
+    field_ids: list[str] = []
     text_block_ids: list[TextBlockId] = []
     for text_block_id in context.text_block_ids():
         try:
@@ -384,71 +385,135 @@ async def extend_prompt_context_with_metadata(
             # (e.g. USER_CONTEXT_0, when the user provides extra context)
             continue
 
+        field_id = tb_id if isinstance(tb_id, FieldId) else tb_id.field_id
+
         text_block_ids.append(tb_id)
+        field_ids.append(field_id.full())
         rids.append(tb_id.rid)
 
     if len(text_block_ids) == 0:  # pragma: no cover
         return
 
-    select: list[ResourceProp] = []
+    resource_select = []
+    field_classification_labels = False
+    field_entities = False
+
     ops = 0
     if MetadataExtensionType.ORIGIN in strategy.types:
         ops += 1
-        select.append(ResourceProp.ORIGIN)
+        resource_select.append(ResourceProp.ORIGIN)
 
     if MetadataExtensionType.CLASSIFICATION_LABELS in strategy.types:
         ops += 1
-        await extend_prompt_context_with_classification_labels(
-            context, kbid, text_block_ids, augmented_context
-        )
+        resource_select.append(ResourceProp.CLASSIFICATION_LABELS)
+        field_classification_labels = True
 
     if MetadataExtensionType.NERS in strategy.types:
         ops += 1
-        await extend_prompt_context_with_ner(context, kbid, text_block_ids, augmented_context)
+        field_entities = True
 
     if MetadataExtensionType.EXTRA_METADATA in strategy.types:
         ops += 1
-        select.append(ResourceProp.EXTRA)
+        resource_select.append(ResourceProp.EXTRA)
 
     metrics.set("metadata_extension_ops", ops * len(text_block_ids))
 
+    augment_req = AugmentRequest()
+    if resource_select:
+        augment_req.resources = AugmentResources(
+            given=rids,
+            select=resource_select,
+        )
+    if field_classification_labels or field_entities:
+        augment_req.fields = AugmentFields(
+            given=field_ids,
+            classification_labels=field_classification_labels,
+            entities=field_entities,
+        )
+
+    if augment_req.resources is None and augment_req.fields is None:
+        # nothing to augment
+        return
+
     # TODO: replace this call for sdk.augment or similar
-    augmented = await augment_endpoint(
-        kbid,
-        AugmentRequest(
-            resources=AugmentResources(
-                given=rids,
-                select=select,
-            )
-        ),
-    )
+    augmented = await augment_endpoint(kbid, augment_req)
 
     for tb_id in text_block_ids:
+        field_id = tb_id if isinstance(tb_id, FieldId) else tb_id.field_id
+
         resource = augmented.resources.get(tb_id.rid)
-        if resource is None:
-            continue
+        field = augmented.fields.get(field_id.full())
 
-        if resource.origin is not None:
-            text = context.output.pop(tb_id.full())
-            extended_text = text + f"\n\nDOCUMENT METADATA AT ORIGIN:\n{to_yaml(resource.origin)}"
-            context[tb_id.full()] = extended_text
-            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
-                id=tb_id.full(),
-                text=extended_text,
-                parent=tb_id.full(),
-                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
-            )
+        if resource is not None:
+            if resource.origin is not None:
+                text = context.output.pop(tb_id.full())
+                extended_text = text + f"\n\nDOCUMENT METADATA AT ORIGIN:\n{to_yaml(resource.origin)}"
+                context[tb_id.full()] = extended_text
+                augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                    id=tb_id.full(),
+                    text=extended_text,
+                    parent=tb_id.full(),
+                    augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
+                )
 
-        if resource.extra is not None:
-            text = context.output.pop(tb_id.full())
-            extended_text = text + f"\n\nDOCUMENT EXTRA METADATA:\n{to_yaml(resource.extra)}"
-            context[tb_id.full()] = extended_text
-            augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
-                id=tb_id.full(),
-                text=extended_text,
-                parent=tb_id.full(),
-                augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
-            )
+            if resource.extra is not None:
+                text = context.output.pop(tb_id.full())
+                extended_text = text + f"\n\nDOCUMENT EXTRA METADATA:\n{to_yaml(resource.extra)}"
+                context[tb_id.full()] = extended_text
+                augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                    id=tb_id.full(),
+                    text=extended_text,
+                    parent=tb_id.full(),
+                    augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
+                )
+
+        if tb_id.full() in context:
+            if (resource is not None and resource.classification_labels) or (
+                field is not None and field.classification_labels
+            ):
+                text = context.output.pop(tb_id.full())
+
+                labels_text = "DOCUMENT CLASSIFICATION LABELS:"
+                if resource is not None and resource.classification_labels:
+                    for labelset, labels in resource.classification_labels.items():
+                        for label in labels:
+                            labels_text += f"\n - {label} ({labelset})"
+
+                if field is not None and field.classification_labels:
+                    for labelset, labels in field.classification_labels.items():
+                        for label in labels:
+                            labels_text += f"\n - {label} ({labelset})"
+
+                extended_text = text + "\n\n" + labels_text
+
+                context[tb_id.full()] = extended_text
+                augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                    id=tb_id.full(),
+                    text=extended_text,
+                    parent=tb_id.full(),
+                    augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
+                )
+
+            if field is not None and field.entities:
+                ners = field.entities
+
+                text = context.output.pop(tb_id.full())
+
+                ners_text = "DOCUMENT NAMED ENTITIES (NERs):"
+                for family, tokens in ners.items():
+                    ners_text += f"\n - {family}:"
+                    for token in sorted(list(tokens)):
+                        ners_text += f"\n   - {token}"
+
+                extended_text = text + "\n\n" + ners_text
+
+                context[tb_id.full()] = extended_text
+                augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
+                    id=tb_id.full(),
+                    text=extended_text,
+                    parent=tb_id.full(),
+                    augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
+                )
 
 
 def parse_text_block_id(text_block_id: str) -> TextBlockId:
@@ -459,120 +524,6 @@ def parse_text_block_id(text_block_id: str) -> TextBlockId:
         # When we're doing `full_resource` or `hierarchy` strategies,the text block id
         # is a field id
         return FieldId.from_string(text_block_id)
-
-
-async def extend_prompt_context_with_classification_labels(
-    context: CappedPromptContext,
-    kbid: str,
-    text_block_ids: list[TextBlockId],
-    augmented_context: AugmentedContext,
-):
-    rids = []
-    field_ids = []
-    for tb_id in text_block_ids:
-        rids.append(tb_id.rid)
-        field_id = tb_id if isinstance(tb_id, FieldId) else tb_id.field_id
-        field_ids.append(field_id.full())
-
-    augmented = await augment_endpoint(
-        kbid,
-        AugmentRequest(
-            resources=AugmentResources(
-                given=rids,
-                select=[ResourceProp.CLASSIFICATION_LABELS],
-            ),
-            fields=AugmentFields(
-                given=field_ids,
-                classification_labels=True,
-            ),
-        ),
-    )
-
-    for tb_id in text_block_ids:
-        if tb_id.full() not in context:
-            continue
-
-        field_id = tb_id if isinstance(tb_id, FieldId) else tb_id.field_id
-        resource = augmented.resources.get(field_id.rid)
-        field = augmented.fields.get(field_id.full())
-        if (resource is None or not resource.classification_labels) and (
-            field is None or not field.classification_labels
-        ):
-            continue
-
-        text = context.output.pop(tb_id.full())
-
-        labels_text = "DOCUMENT CLASSIFICATION LABELS:"
-        if resource is not None and resource.classification_labels:
-            for labelset, labels in resource.classification_labels.items():
-                for label in labels:
-                    labels_text += f"\n - {label} ({labelset})"
-
-        if field is not None and field.classification_labels:
-            for labelset, labels in field.classification_labels.items():
-                for label in labels:
-                    labels_text += f"\n - {label} ({labelset})"
-
-        extended_text = text + "\n\n" + labels_text
-
-        context[tb_id.full()] = extended_text
-        augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
-            id=tb_id.full(),
-            text=extended_text,
-            parent=tb_id.full(),
-            augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
-        )
-
-
-async def extend_prompt_context_with_ner(
-    context: CappedPromptContext,
-    kbid: str,
-    text_block_ids: list[TextBlockId],
-    augmented_context: AugmentedContext,
-):
-    field_ids = []
-    for tb_id in text_block_ids:
-        fid = tb_id if isinstance(tb_id, FieldId) else tb_id.field_id
-        field_ids.append(fid.full())
-
-    augmented = await augment_endpoint(
-        kbid,
-        AugmentRequest(
-            fields=AugmentFields(
-                given=field_ids,
-                # these are the previously called ners
-                entities=True,
-            )
-        ),
-    )
-
-    for tb_id in text_block_ids:
-        if tb_id.full() not in context:
-            continue
-
-        field_id = tb_id if isinstance(tb_id, FieldId) else tb_id.field_id
-        field = augmented.fields.get(field_id.full())
-        if field is None or not field.entities:
-            continue
-        ners = field.entities
-
-        text = context.output.pop(tb_id.full())
-
-        ners_text = "DOCUMENT NAMED ENTITIES (NERs):"
-        for family, tokens in ners.items():
-            ners_text += f"\n - {family}:"
-            for token in sorted(list(tokens)):
-                ners_text += f"\n   - {token}"
-
-        extended_text = text + "\n\n" + ners_text
-
-        context[tb_id.full()] = extended_text
-        augmented_context.paragraphs[tb_id.full()] = AugmentedTextBlock(
-            id=tb_id.full(),
-            text=extended_text,
-            parent=tb_id.full(),
-            augmentation_type=TextBlockAugmentationType.METADATA_EXTENSION,
-        )
 
 
 def to_yaml(obj: BaseModel) -> str:
