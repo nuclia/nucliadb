@@ -771,6 +771,7 @@ async def conversation_prompt_context(
 
                 attachments: List[resources_pb2.FieldRef] = []
                 if strategy.full:
+                    # TODO: call /augment with full_conversation=True
                     ops += 5
                     extracted_text = await field_obj.get_extracted_text()
                     for current_page in range(1, cmetadata.pages + 1):
@@ -794,6 +795,7 @@ async def conversation_prompt_context(
                                 augmentation_type=TextBlockAugmentationType.CONVERSATION,
                             )
                 else:
+                    # TODO: call /augment with conversation_window=15, anchored_window=False
                     # Add first message
                     extracted_text = await field_obj.get_extracted_text()
                     first_page = await field_obj.db_get_value()
@@ -848,6 +850,7 @@ async def conversation_prompt_context(
                             augmentation_type=TextBlockAugmentationType.CONVERSATION,
                         )
 
+                # TODO: call /augment with conversation_text_attachments=True
                 if strategy.attachments_text:
                     # add on the context the images if vlm enabled
                     for attachment in attachments:
@@ -870,6 +873,7 @@ async def conversation_prompt_context(
                                 augmentation_type=TextBlockAugmentationType.CONVERSATION,
                             )
 
+                # TODO: call /augment with conversation_image_attachments=True
                 if strategy.attachments_images and visual_llm:
                     for attachment in attachments:
                         ops += 1
