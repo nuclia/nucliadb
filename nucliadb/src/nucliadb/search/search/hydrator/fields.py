@@ -17,10 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import cast
+
 from typing_extensions import assert_never
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_NAME, FieldId
 from nucliadb.ingest.fields.base import Field
+from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.models.internal.augment import ConversationProp, FieldProp, FieldText, FieldValue
 from nucliadb.search.augmentor.fields import (
     db_augment_conversation_field,
@@ -163,6 +166,7 @@ async def hydrate_conversation_field(
     if config.value:
         select.append(FieldValue())
 
+    field = cast(Conversation, field)
     augmented = await db_augment_conversation_field(field, field_id, select)
 
     hydrated = hydration_models.HydratedConversationField(

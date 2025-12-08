@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import AsyncIterator, Sequence, cast
+from collections import deque
+from typing import AsyncIterator, Deque, Sequence, cast
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.models_utils import from_proto
@@ -26,21 +27,27 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal.augment import (
+    AnswerSelector,
     AugmentedConversationField,
     AugmentedField,
     AugmentedFileField,
     AugmentedGenericField,
     AugmentedLinkField,
     AugmentedTextField,
-    ConversationAnswer,
     ConversationAttachments,
     ConversationProp,
+    ConversationSelector,
     ConversationText,
     FieldClassificationLabels,
     FieldEntities,
     FieldProp,
     FieldText,
     FieldValue,
+    FullSelector,
+    MessageSelector,
+    NeighboursSelector,
+    PageSelector,
+    WindowSelector,
 )
 from nucliadb.search import logger
 from nucliadb.search.augmentor.metrics import augmentor_observer
@@ -127,6 +134,7 @@ async def db_augment_field(
         return await db_augment_link_field(field, field_id, select)
 
     elif field_type == FieldTypeName.CONVERSATION.abbreviation():
+        field = cast(Conversation, field)
         select = cast(list[ConversationProp], select)
         return await db_augment_conversation_field(field, field_id, select)
 
@@ -221,19 +229,26 @@ async def db_augment_link_field(
 
 @augmentor_observer.wrap({"type": "db_conversation_field"})
 async def db_augment_conversation_field(
-    field: Field,
+    field: Conversation,
     field_id: FieldId,
     select: list[ConversationProp],
 ) -> AugmentedConversationField:
     augmented = AugmentedConversationField(id=field.field_id)
 
     for prop in select:
-        if isinstance(prop, ConversationText):
+        if isinstance(prop, FieldText):
+            if isinstance(prop, ConversationText):
+                selector = prop.selector
+            else:
+                # default when asking for the field text without details
+                selector = MessageSelector()
+
             # TODO(decoupled-ask): implement different conversation text strategies
+            selector
             raise NotImplementedError()
 
         elif isinstance(prop, FieldValue):
-            db_value = await field.get_value()
+            db_value = await field.get_metadata()
             augmented.value = from_proto.field_conversation(db_value)
 
         elif isinstance(prop, FieldClassificationLabels):
@@ -242,11 +257,21 @@ async def db_augment_conversation_field(
         elif isinstance(prop, FieldEntities):
             augmented.entities = await field_entities(field_id, field)
 
-        elif isinstance(prop, ConversationAnswer):
-            raise NotImplementedError()
-
         elif isinstance(prop, ConversationAttachments):
-            raise NotImplementedError()
+            if field_id.subfield_id is None:
+                continue
+
+            # Each message on a conversation field can have attachments as
+            # references to other fields in the same resource.
+            #
+            # Here, we iterate through all the messages matched by the selector
+            # and collect all the attachment references
+            attachments = []
+            async for message in conversation_selector(field, field_id.subfield_id, prop.selector):
+                for ref in message.content.attachments_fields:
+                    field_id = FieldId.from_pb(field.uuid, ref.field_type, ref.field_id, ref.split)
+                    attachments.append(field_id)
+            augmented.attachments = attachments
 
         else:
             logger.warning(f"conversation field property not implemented: {prop}")
@@ -383,3 +408,77 @@ async def conversation_messages_after(
                 break
 
     return messages_after
+
+
+async def conversation_selector(
+    field: Conversation,
+    split: str,
+    selector: ConversationSelector,
+) -> AsyncIterator[resources_pb2.Message]:
+    """Given a conversation, iterate through the messages matched by the
+    selector.
+
+    """
+
+    if isinstance(selector, MessageSelector):
+        found = await find_conversation_message(field, split)
+        if found is None:
+            return
+        _, _, message = found
+        yield message
+
+    elif isinstance(selector, PageSelector):
+        found = await find_conversation_message(field, split)
+        if found is None:
+            return
+        page, _, _ = found
+
+        conversation_page = await field.db_get_value(page)
+        for message in conversation_page.messages:
+            yield message
+
+    elif isinstance(selector, NeighboursSelector):
+        # REVIEW: if we remove the default prompt context thingy, we may not need this
+        raise NotImplementedError()
+
+    elif isinstance(selector, WindowSelector):
+        # Find the position of the `split` message and get the window
+        # surrounding it. If there are not enough preceding/following messages,
+        # the window won't be centered
+        messages: Deque[resources_pb2.Message] = deque(maxlen=selector.size)
+        metadata = await field.get_metadata()
+        pending = -1
+        for page in range(1, metadata.pages + 1):
+            conversation_page = await field.db_get_value(page)
+            for message in conversation_page.messages:
+                messages.append(message)
+                if pending > 0:
+                    pending -= 1
+                if message.ident == split:
+                    pending = (selector.size - 1) // 2
+                if pending == 0:
+                    break
+            if pending == 0:
+                break
+
+        for message in messages:
+            yield message
+
+    elif isinstance(selector, AnswerSelector):
+        found = await find_conversation_message(field, split)
+        if found is None:
+            return
+        page, index, message = found
+
+        answer = await conversation_answer(field, start_from=(page, index))
+        if answer is not None:
+            yield answer
+
+    elif isinstance(selector, FullSelector):
+        async for _, _, message in iter_conversation_messages(field):
+            yield message
+
+    else:  # pragma: no cover
+        # This is a trick so mypy generates an error if this branch can be reached,
+        # that is, if we are missing some ifs
+        _a: int = "a"
