@@ -240,12 +240,19 @@ async def db_augment_conversation_field(
             if isinstance(prop, ConversationText):
                 selector = prop.selector
             else:
-                # default when asking for the field text without details
+                # default when asking for the conversation text without details
                 selector = MessageSelector()
 
-            # TODO(decoupled-ask): implement different conversation text strategies
-            selector
-            raise NotImplementedError()
+            # gather the text from each message matching the selector
+            text = ""
+            extracted_text_pb = await cache.get_field_extracted_text(field)
+            async for message in conversation_selector(field, field_id, selector):
+                if extracted_text_pb is not None and message.ident in extracted_text_pb.split_text:
+                    text += extracted_text_pb.split_text[message.ident]
+                else:
+                    text += message.content.text
+
+            augmented.text = text
 
         elif isinstance(prop, FieldValue):
             db_value = await field.get_metadata()
@@ -258,16 +265,13 @@ async def db_augment_conversation_field(
             augmented.entities = await field_entities(field_id, field)
 
         elif isinstance(prop, ConversationAttachments):
-            if field_id.subfield_id is None:
-                continue
-
             # Each message on a conversation field can have attachments as
             # references to other fields in the same resource.
             #
             # Here, we iterate through all the messages matched by the selector
             # and collect all the attachment references
             attachments = []
-            async for message in conversation_selector(field, field_id.subfield_id, prop.selector):
+            async for message in conversation_selector(field, field_id, prop.selector):
                 for ref in message.content.attachments_fields:
                     field_id = FieldId.from_pb(field.uuid, ref.field_type, ref.field_id, ref.split)
                     attachments.append(field_id)
@@ -357,6 +361,7 @@ async def field_entities(id: FieldId, field: Field) -> dict[str, set[str]] | Non
 async def find_conversation_message(
     field: Conversation, ident: str
 ) -> tuple[int, int, resources_pb2.Message] | None:
+    """Find a message in the conversation identified by `ident`."""
     conversation_metadata = await field.get_metadata()
     for page in range(1, conversation_metadata.pages + 1):
         conversation = await field.db_get_value(page)
@@ -371,6 +376,10 @@ async def iter_conversation_messages(
     *,
     start_from: tuple[int, int] = (1, 0),  # (page, message)
 ) -> AsyncIterator[tuple[int, int, resources_pb2.Message]]:
+    """Iterate through the conversation messages starting from an specific page
+    and index.
+
+    """
     start_page, start_index = start_from
     conversation_metadata = await field.get_metadata()
     for page in range(start_page, conversation_metadata.pages + 1):
@@ -386,6 +395,10 @@ async def conversation_answer(
     *,
     start_from: tuple[int, int] = (1, 0),  # (page, message)
 ) -> resources_pb2.Message | None:
+    """Find the next conversation message of type ANSWER starting from an
+    specific page and index.
+
+    """
     async for _, _, message in iter_conversation_messages(field, start_from=start_from):
         if message.type == resources_pb2.Message.MessageType.ANSWER:
             return message
@@ -412,15 +425,18 @@ async def conversation_messages_after(
 
 async def conversation_selector(
     field: Conversation,
-    split: str,
+    field_id: FieldId,
     selector: ConversationSelector,
 ) -> AsyncIterator[resources_pb2.Message]:
-    """Given a conversation, iterate through the messages matched by the
+    """Given a conversation, iterate through the messages matched by a
     selector.
 
     """
+    split = field_id.subfield_id
 
     if isinstance(selector, MessageSelector):
+        if split is None:
+            return
         found = await find_conversation_message(field, split)
         if found is None:
             return
@@ -428,6 +444,8 @@ async def conversation_selector(
         yield message
 
     elif isinstance(selector, PageSelector):
+        if split is None:
+            return
         found = await find_conversation_message(field, split)
         if found is None:
             return
@@ -442,6 +460,8 @@ async def conversation_selector(
         raise NotImplementedError()
 
     elif isinstance(selector, WindowSelector):
+        if split is None:
+            return
         # Find the position of the `split` message and get the window
         # surrounding it. If there are not enough preceding/following messages,
         # the window won't be centered
@@ -465,6 +485,8 @@ async def conversation_selector(
             yield message
 
     elif isinstance(selector, AnswerSelector):
+        if split is None:
+            return
         found = await find_conversation_message(field, split)
         if found is None:
             return
