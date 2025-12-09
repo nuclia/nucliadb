@@ -210,15 +210,16 @@ async def get_expanded_conversation_messages(
 
     if message.type == resources_pb2.Message.MessageType.QUESTION:
         # only try to get answer if it was a question
-        answer = await conversation_answer(field_obj, start_from=(page, index + 1))
-        if answer is None:
+        found = await conversation_answer(field_obj, start_from=(page, index + 1))
+        if found is None:
             return []
         else:
+            _, _, answer = found
             return [answer]
 
     else:
         messages_after = []
-        async for message in conversation_messages_after(
+        async for _, _, message in conversation_messages_after(
             field_obj, start_from=(page, index + 1), limit=max_messages
         ):
             messages_after.append(message)

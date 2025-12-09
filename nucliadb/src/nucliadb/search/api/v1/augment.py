@@ -20,6 +20,7 @@
 
 import asyncio
 import os
+from typing import cast
 
 from fastapi import Header, Request
 from fastapi.exceptions import HTTPException
@@ -27,6 +28,7 @@ from fastapi_versioning import version
 
 import nucliadb_models
 from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.models.internal import augment as internal_augment
 from nucliadb.models.internal.augment import (
     Augment,
     Augmented,
@@ -52,6 +54,8 @@ from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.augmentor import augmentor
 from nucliadb.search.search.cache import request_caches
 from nucliadb_models.augment import (
+    AugmentedConversationField,
+    AugmentedConversationMessage,
     AugmentedField,
     AugmentedParagraph,
     AugmentedResource,
@@ -343,6 +347,8 @@ def build_augment_response(augmented: Augmented) -> AugmentResponse:
         if field is None:
             continue
 
+        # common augments for all fields
+
         if field.classification_labels is None:
             classification_labels = None
         else:
@@ -355,12 +361,47 @@ def build_augment_response(augmented: Augmented) -> AugmentResponse:
         else:
             entities = {family: list(entity) for family, entity in field.entities.items()}
 
-        response.fields[field_id.full()] = AugmentedField(
-            text=field.text,
-            classification_labels=classification_labels,
-            entities=entities,
-            # TODO(decoupled-ask): add more field parameters
-        )
+        if field_id.type in (
+            FieldTypeName.TEXT.abbreviation(),
+            FieldTypeName.FILE.abbreviation(),
+            FieldTypeName.LINK.abbreviation(),
+            FieldTypeName.GENERIC.abbreviation(),
+        ):
+            response.fields[field_id.full()] = AugmentedField(
+                text=field.text,  # type: ignore # field is instance of any of the above and has the text property
+                classification_labels=classification_labels,
+                entities=entities,
+            )
+
+        elif field_id.type == FieldTypeName.CONVERSATION.abbreviation():
+            field = cast(internal_augment.AugmentedConversationField, field)
+            conversation = AugmentedConversationField(
+                classification_labels=classification_labels,
+                entities=entities,
+            )
+
+            if field.messages is not None:
+                conversation.messages = []
+                for m in field.messages:
+                    if m.attachments is None:
+                        attachments = None
+                    else:
+                        attachments = []
+                        for f in m.attachments:
+                            attachments.append(f.full())
+
+                    conversation.messages.append(
+                        AugmentedConversationMessage(
+                            ident=m.ident,
+                            text=m.text,
+                            attachments=attachments,
+                        )
+                    )
+
+            response.fields[field_id.full()] = conversation
+
+        else:  # pragma: no cover
+            assert False, f"unknown field type: {field_id.type}"
 
     for paragraph_id, paragraph in augmented.paragraphs.items():
         if paragraph is None:

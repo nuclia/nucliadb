@@ -238,6 +238,51 @@ class AugmentedField(BaseModel):
     page_preview_image: Image | None = None
 
 
+class AugmentedConversationMessage(BaseModel):
+    ident: str
+    text: str | None = None
+    attachments: list[FieldId] | None = None
+
+
+class AugmentedConversationField(BaseModel):
+    classification_labels: dict[str, list[str]] | None = None
+    # former ners
+    entities: dict[str, list[str]] | None = None
+
+    messages: list[AugmentedConversationMessage] | None = None
+
+    @property
+    def text(self) -> str | None:
+        """Syntactic sugar to access aggregate text from all messages"""
+        if self.messages is None:
+            return None
+
+        text = ""
+        for message in self.messages:
+            text += message.text or ""
+
+        return text or None
+
+    @property
+    def attachments(self) -> list[FieldId] | None:
+        """Syntactic sugar to access the aggregate of attachments from all messages."""
+        if self.messages is None:
+            return None
+
+        has_attachments = False
+        attachments = []
+        for message in self.messages:
+            if message.attachments is None:
+                continue
+            has_attachments = True
+            attachments.extend(message.attachments)
+
+        if has_attachments:
+            return attachments
+        else:
+            return None
+
+
 class AugmentedResource(Resource):
     classification_labels: dict[str, list[str]] | None = None
 
@@ -248,5 +293,5 @@ class AugmentedResource(Resource):
 
 class AugmentResponse(BaseModel):
     resources: dict[ResourceId, AugmentedResource]
-    fields: dict[FieldId, AugmentedField]
+    fields: dict[FieldId, AugmentedField | AugmentedConversationField]
     paragraphs: dict[ParagraphId, AugmentedParagraph]

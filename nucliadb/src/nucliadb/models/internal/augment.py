@@ -19,7 +19,6 @@
 #
 from dataclasses import dataclass
 from enum import Enum
-from functools import wraps
 from typing import Annotated, Any, Callable, Literal
 
 from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
@@ -51,18 +50,18 @@ class SelectProp(BaseModel):
 
 
 def discriminator(name: str) -> Callable[[Any], str | None]:
-    @wraps
     def _inner(v: Any) -> str | None:
         if isinstance(v, dict):
             return v.get(name, None)
         else:
             return getattr(v, name, None)
 
-    return _inner  # type: ignore
+    return _inner
 
 
 prop_discriminator = discriminator(name="prop")
 from_discriminator = discriminator(name="from")
+name_discriminator = discriminator(name="name")
 
 # Complex ids
 
@@ -297,7 +296,7 @@ ConversationSelector = Annotated[
         | Annotated[AnswerSelector, Tag("answer")]
         | Annotated[FullSelector, Tag("full")]
     ),
-    Discriminator(discriminator("name")),
+    Discriminator(name_discriminator),
 ]
 
 
@@ -419,11 +418,17 @@ class ConversationAugment(BaseModel, extra="forbid"):
     limits: ConversationAugmentLimits | None = Field(default_factory=ConversationAugmentLimits)
 
 
+FieldFilter = Annotated[
+    (Annotated[filters.Field, Tag("field")] | Annotated[filters.Generated, Tag("generated")]),
+    Discriminator(prop_discriminator),
+]
+
+
 class FieldAugment(BaseModel, extra="forbid"):
     given: list[ResourceId] | list[FieldId] | list[ParagraphId]
     select: list[FieldProp]
     from_: Literal["fields"] = Field(default="fields", alias="from")
-    filter: list[filters.Field | filters.Generated] | None = None
+    filter: list[FieldFilter] | None = None
 
 
 class ParagraphAugment(BaseModel, extra="forbid"):
@@ -492,8 +497,6 @@ class AugmentedParagraph:
 class BaseAugmentedField:
     id: FieldId
 
-    text: str | None = None
-
     classification_labels: dict[str, set[str]] | None = None
     entities: dict[str, set[str]] | None = None
 
@@ -502,26 +505,40 @@ class BaseAugmentedField:
 class AugmentedTextField(BaseAugmentedField):
     value: nucliadb_models.text.FieldText | None = None
 
+    text: str | None = None
+
 
 @dataclass
 class AugmentedFileField(BaseAugmentedField):
     value: FieldFile | None = None
+
+    text: str | None = None
 
 
 @dataclass
 class AugmentedLinkField(BaseAugmentedField):
     value: FieldLink | None = None
 
+    text: str | None = None
+
+
+@dataclass
+class AugmentedConversationMessage:
+    ident: str
+    text: str | None = None
+    attachments: list[FieldId] | None = None
+
 
 @dataclass
 class AugmentedConversationField(BaseAugmentedField):
     value: FieldConversation | None = None
-    attachments: list[FieldId] | None = None
+    messages: list[AugmentedConversationMessage] | None = None
 
 
 @dataclass
 class AugmentedGenericField(BaseAugmentedField):
     value: str | None = None
+    text: str | None = None
 
 
 AugmentedField = (

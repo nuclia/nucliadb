@@ -29,6 +29,7 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal.augment import (
     AnswerSelector,
     AugmentedConversationField,
+    AugmentedConversationMessage,
     AugmentedField,
     AugmentedFileField,
     AugmentedGenericField,
@@ -234,25 +235,33 @@ async def db_augment_conversation_field(
     select: list[ConversationProp],
 ) -> AugmentedConversationField:
     augmented = AugmentedConversationField(id=field.field_id)
+    # map (page, index) -> augmented message. The key uniquely identifies and
+    # orders messages
+    messages: dict[tuple[int, int], AugmentedConversationMessage] = {}
 
     for prop in select:
         if isinstance(prop, FieldText):
             if isinstance(prop, ConversationText):
                 selector = prop.selector
             else:
-                # default when asking for the conversation text without details
-                selector = MessageSelector()
+                # when asking for the conversation text without details, we
+                # choose the message if a split is provided in the id or the
+                # full conversation otherwise
+                if field_id.subfield_id is not None:
+                    selector = MessageSelector()
+                else:
+                    selector = FullSelector()
 
             # gather the text from each message matching the selector
-            text = ""
             extracted_text_pb = await cache.get_field_extracted_text(field)
-            async for message in conversation_selector(field, field_id, selector):
+            async for page, index, message in conversation_selector(field, field_id, selector):
+                augmented_message = messages.setdefault(
+                    (page, index), AugmentedConversationMessage(ident=message.ident)
+                )
                 if extracted_text_pb is not None and message.ident in extracted_text_pb.split_text:
-                    text += extracted_text_pb.split_text[message.ident]
+                    augmented_message.text = extracted_text_pb.split_text[message.ident]
                 else:
-                    text += message.content.text
-
-            augmented.text = text
+                    augmented_message.text = message.content.text
 
         elif isinstance(prop, FieldValue):
             db_value = await field.get_metadata()
@@ -270,15 +279,21 @@ async def db_augment_conversation_field(
             #
             # Here, we iterate through all the messages matched by the selector
             # and collect all the attachment references
-            attachments = []
-            async for message in conversation_selector(field, field_id, prop.selector):
+            async for page, index, message in conversation_selector(field, field_id, prop.selector):
+                augmented_message = messages.setdefault(
+                    (page, index), AugmentedConversationMessage(ident=message.ident)
+                )
+                augmented_message.attachments = []
                 for ref in message.content.attachments_fields:
                     field_id = FieldId.from_pb(field.uuid, ref.field_type, ref.field_id, ref.split)
-                    attachments.append(field_id)
-            augmented.attachments = attachments
-
+                    augmented_message.attachments.append(field_id)
         else:
             logger.warning(f"conversation field property not implemented: {prop}")
+
+    if len(messages) > 0:
+        augmented.messages = []
+        for (_page, _index), m in sorted(messages.items()):
+            augmented.messages.append(m)
 
     return augmented
 
@@ -394,14 +409,14 @@ async def conversation_answer(
     field: Conversation,
     *,
     start_from: tuple[int, int] = (1, 0),  # (page, message)
-) -> resources_pb2.Message | None:
+) -> tuple[int, int, resources_pb2.Message] | None:
     """Find the next conversation message of type ANSWER starting from an
     specific page and index.
 
     """
-    async for _, _, message in iter_conversation_messages(field, start_from=start_from):
+    async for page, index, message in iter_conversation_messages(field, start_from=start_from):
         if message.type == resources_pb2.Message.MessageType.ANSWER:
-            return message
+            return page, index, message
     return None
 
 
@@ -410,10 +425,10 @@ async def conversation_messages_after(
     *,
     start_from: tuple[int, int] = (1, 0),  # (page, index)
     limit: int | None = None,
-) -> AsyncIterator[resources_pb2.Message]:
+) -> AsyncIterator[tuple[int, int, resources_pb2.Message]]:
     assert limit is None or limit > 0, "this function can't iterate backwards"
-    async for _, _, message in iter_conversation_messages(field, start_from=start_from):
-        yield message
+    async for page, index, message in iter_conversation_messages(field, start_from=start_from):
+        yield page, index, message
 
         if limit is not None:
             limit -= 1
@@ -425,7 +440,7 @@ async def conversation_selector(
     field: Conversation,
     field_id: FieldId,
     selector: ConversationSelector,
-) -> AsyncIterator[resources_pb2.Message]:
+) -> AsyncIterator[tuple[int, int, resources_pb2.Message]]:
     """Given a conversation, iterate through the messages matched by a
     selector.
 
@@ -438,8 +453,8 @@ async def conversation_selector(
         found = await find_conversation_message(field, split)
         if found is None:
             return
-        _, _, message = found
-        yield message
+        page, index, message = found
+        yield page, index, message
 
     elif isinstance(selector, PageSelector):
         if split is None:
@@ -450,8 +465,8 @@ async def conversation_selector(
         page, _, _ = found
 
         conversation_page = await field.db_get_value(page)
-        for message in conversation_page.messages:
-            yield message
+        for index, message in enumerate(conversation_page.messages):
+            yield page, index, message
 
     elif isinstance(selector, NeighboursSelector):
         selector = cast(NeighboursSelector, selector)
@@ -461,12 +476,13 @@ async def conversation_selector(
         if found is None:
             return
         page, index, message = found
-        yield message
+        yield page, index, message
 
-        async for message in conversation_messages_after(
-            field, start_from=(page, index + 1), limit=selector.after
+        start_from = (page, index + 1)
+        async for page, index, message in conversation_messages_after(
+            field, start_from=start_from, limit=selector.after
         ):
-            yield message
+            yield page, index, message
 
     elif isinstance(selector, WindowSelector):
         if split is None:
@@ -474,13 +490,13 @@ async def conversation_selector(
         # Find the position of the `split` message and get the window
         # surrounding it. If there are not enough preceding/following messages,
         # the window won't be centered
-        messages: Deque[resources_pb2.Message] = deque(maxlen=selector.size)
+        messages: Deque[tuple[int, int, resources_pb2.Message]] = deque(maxlen=selector.size)
         metadata = await field.get_metadata()
         pending = -1
         for page in range(1, metadata.pages + 1):
             conversation_page = await field.db_get_value(page)
-            for message in conversation_page.messages:
-                messages.append(message)
+            for index, message in enumerate(conversation_page.messages):
+                messages.append((page, index, message))
                 if pending > 0:
                     pending -= 1
                 if message.ident == split:
@@ -490,8 +506,8 @@ async def conversation_selector(
             if pending == 0:
                 break
 
-        for message in messages:
-            yield message
+        for page, index, message in messages:
+            yield page, index, message
 
     elif isinstance(selector, AnswerSelector):
         if split is None:
@@ -501,13 +517,14 @@ async def conversation_selector(
             return
         page, index, message = found
 
-        answer = await conversation_answer(field, start_from=(page, index))
-        if answer is not None:
-            yield answer
+        found = await conversation_answer(field, start_from=(page, index))
+        if found is not None:
+            page, index, answer = found
+            yield page, index, answer
 
     elif isinstance(selector, FullSelector):
-        async for _, _, message in iter_conversation_messages(field):
-            yield message
+        async for page, index, message in iter_conversation_messages(field):
+            yield page, index, message
 
     else:  # pragma: no cover
         # This is a trick so mypy generates an error if this branch can be reached,

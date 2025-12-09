@@ -1360,12 +1360,15 @@ async def hydrate_field_text(
     kbid: str,
     field_id: FieldId,
 ) -> Optional[tuple[FieldId, str]]:
-    from nucliadb.models.internal.augment import FieldText
-    from nucliadb.search.augmentor.fields import augment_field
-
-    augmented = await augment_field(kbid, field_id, select=[FieldText()])
-    if augmented is None or augmented.text is None:
-        # we haven't found the resource, field or text
+    field = await cache.get_field(kbid, field_id)
+    if field is None:  # pragma: no cover
         return None
 
-    return field_id, augmented.text
+    extracted_text_pb = await cache.get_field_extracted_text(field)
+    if extracted_text_pb is None:  # pragma: no cover
+        return None
+
+    if field_id.subfield_id:
+        return field_id, extracted_text_pb.split_text[field_id.subfield_id]
+    else:
+        return field_id, extracted_text_pb.text
