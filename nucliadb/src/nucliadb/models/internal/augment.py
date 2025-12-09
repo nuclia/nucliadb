@@ -225,13 +225,13 @@ class MessageSelector(BaseModel):
 
     name: Literal["message"] = "message"
 
-    # id: str | None = None
-    # index: int | None = None
+    id: str | None = None
+    index: Literal["first"] | Literal["last"] | int | None = None
 
-    # @model_validator(mode="after")
-    # def id_or_index(self):
-    #     if self.id is not None and self.index is not None:
-    #         raise ValueError("Can't define both `id` and `index`")
+    @model_validator(mode="after")
+    def id_or_index(self):
+        if self.id is not None and self.index is not None:
+            raise ValueError("Can't define both `id` and `index`")
 
 
 class PageSelector(BaseModel):

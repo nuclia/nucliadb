@@ -448,13 +448,52 @@ async def conversation_selector(
     split = field_id.subfield_id
 
     if isinstance(selector, MessageSelector):
-        if split is None:
+        if selector.id is None and selector.index is None and split is None:
             return
-        found = await find_conversation_message(field, split)
-        if found is None:
-            return
-        page, index, message = found
-        yield page, index, message
+
+        if selector.index is not None:
+            metadata = await field.get_metadata()
+            if metadata is None:
+                # we can't know about pages/messages
+                return
+
+            if isinstance(selector.index, int):
+                page = selector.index // metadata.size + 1
+                index = selector.index % metadata.size
+
+            else:
+                if selector.index == "first":
+                    page, index = (1, 0)
+                elif selector.index == "last":
+                    page = metadata.pages
+                    index = metadata.total % metadata.size
+                else:  # pragma: no cover
+                    # This is a trick so mypy generates an error if this branch can be reached,
+                    # that is, if we are missing some ifs
+                    _a: int = "a"
+
+            found = None
+            async for found in iter_conversation_messages(field, start_from=(page, index)):
+                break
+
+            if found is None:
+                return
+
+            page, index, message = found
+            yield page, index, message
+
+        else:
+            # selector.id takes priority over the field id, as it is more specific
+            if selector.id is not None:
+                split = selector.id
+            assert split is not None
+
+            found = await find_conversation_message(field, split)
+            if found is None:
+                return
+
+            page, index, message = found
+            yield page, index, message
 
     elif isinstance(selector, PageSelector):
         if split is None:
@@ -529,4 +568,4 @@ async def conversation_selector(
     else:  # pragma: no cover
         # This is a trick so mypy generates an error if this branch can be reached,
         # that is, if we are missing some ifs
-        _a: int = "a"
+        _b: int = "b"
