@@ -251,8 +251,7 @@ class NeighboursSelector(BaseModel):
     """
 
     name: Literal["neighbours"] = "neighbours"
-    before: int
-    after: int
+    after: int = Field(ge=1)
 
 
 class WindowSelector(BaseModel):

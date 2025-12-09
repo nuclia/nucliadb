@@ -410,17 +410,15 @@ async def conversation_messages_after(
     *,
     start_from: tuple[int, int] = (1, 0),  # (page, index)
     limit: int | None = None,
-) -> list[resources_pb2.Message] | None:
-    messages_after = []
+) -> AsyncIterator[resources_pb2.Message]:
+    assert limit is None or limit > 0, "this function can't iterate backwards"
     async for _, _, message in iter_conversation_messages(field, start_from=start_from):
-        messages_after.append(message)
+        yield message
 
         if limit is not None:
             limit -= 1
             if limit == 0:
                 break
-
-    return messages_after
 
 
 async def conversation_selector(
@@ -456,8 +454,19 @@ async def conversation_selector(
             yield message
 
     elif isinstance(selector, NeighboursSelector):
-        # REVIEW: if we remove the default prompt context thingy, we may not need this
-        raise NotImplementedError()
+        selector = cast(NeighboursSelector, selector)
+        if split is None:
+            return
+        found = await find_conversation_message(field, split)
+        if found is None:
+            return
+        page, index, message = found
+        yield message
+
+        async for message in conversation_messages_after(
+            field, start_from=(page, index + 1), limit=selector.after
+        ):
+            yield message
 
     elif isinstance(selector, WindowSelector):
         if split is None:

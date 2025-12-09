@@ -217,10 +217,12 @@ async def get_expanded_conversation_messages(
             return [answer]
 
     else:
-        messages_after = await conversation_messages_after(
+        messages_after = []
+        async for message in conversation_messages_after(
             field_obj, start_from=(page, index + 1), limit=max_messages
-        )
-        return messages_after or []
+        ):
+            messages_after.append(message)
+        return messages_after
 
 
 async def default_prompt_context(
