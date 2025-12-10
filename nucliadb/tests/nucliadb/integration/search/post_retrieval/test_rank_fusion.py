@@ -24,7 +24,7 @@ from pytest_mock import MockerFixture
 
 from nucliadb.models.internal.retrieval import RetrievalRequest
 from nucliadb.search.search import find, find_merge
-from nucliadb.search.search.chat import query
+from nucliadb.search.search.chat.query import rpc
 from nucliadb_models.search import (
     SCORE_TYPE,
     KnowledgeboxFindResults,
@@ -119,7 +119,7 @@ async def test_reciprocal_rank_fusion_requests_more_results(
 
     # Test /ask
 
-    spy_retrieve = mocker.spy(query, "retrieve")
+    spy_retrieve = mocker.spy(rpc, "retrieve")
 
     ask_resp = await nucliadb_reader.post(
         f"/kb/{kbid}/ask",

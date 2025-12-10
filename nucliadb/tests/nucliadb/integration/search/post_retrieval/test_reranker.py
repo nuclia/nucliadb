@@ -28,6 +28,7 @@ from pytest_mock import MockerFixture
 from nucliadb.models.internal.retrieval import RetrievalRequest
 from nucliadb.search.search import find, find_merge
 from nucliadb.search.search.chat import query
+from nucliadb.search.search.chat.query import rpc
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import KnowledgeboxFindResults, PredictReranker, RerankerName
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -110,7 +111,7 @@ async def test_predict_reranker_requests_more_results(
 
     # Test /ask
 
-    spy_retrieve = mocker.spy(query, "retrieve")
+    spy_retrieve = mocker.spy(rpc, "retrieve")
     spy_augment_and_rerank = mocker.spy(query, "augment_and_rerank")
 
     ask_resp = await nucliadb_reader.post(

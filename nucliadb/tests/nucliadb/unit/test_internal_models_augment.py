@@ -19,6 +19,7 @@
 #
 from uuid import uuid4
 
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.models.internal import augment
 
 
@@ -37,7 +38,10 @@ def test_augment():
                     "from": "resources",
                 },
                 {
-                    "given": [f"{uuid4().hex}/t/text", f"{uuid4().hex}/f/file"],
+                    "given": [
+                        FieldId.from_string(f"{uuid4().hex}/t/text"),
+                        FieldId.from_string(f"{uuid4().hex}/f/file"),
+                    ],
                     "select": [
                         {"prop": "value"},
                         {"prop": "text"},
@@ -45,7 +49,10 @@ def test_augment():
                     "from": "fields",
                 },
                 {
-                    "given": [f"{uuid4().hex}/t/text/0-10", f"{uuid4().hex}/f/file/20-25"],
+                    "given": [
+                        paragraph_from_id(f"{uuid4().hex}/t/text/0-10"),
+                        paragraph_from_id(f"{uuid4().hex}/f/file/20-25"),
+                    ],
                     "select": [
                         {"prop": "text"},
                         {"prop": "image"},
@@ -88,7 +95,12 @@ def test_field_extension_strategy():
                         {"prop": "text"},
                     ],
                     "from": "fields",
-                    "filter": {"ids": ["a/title"]},
+                    "filter": [
+                        {
+                            "prop": "field",
+                            "name": "a/title",
+                        }
+                    ],
                 }
             ]
         }
@@ -96,7 +108,10 @@ def test_field_extension_strategy():
 
 
 def test_metadata_extension_strategy():
-    paragraph_ids = [f"{uuid4().hex}/t/text/0-10", f"{uuid4().hex}/f/file/20-25"]
+    paragraph_ids = [
+        FieldId.from_string(f"{uuid4().hex}/t/text/0-10"),
+        FieldId.from_string(f"{uuid4().hex}/f/file/20-25"),
+    ]
 
     _ = augment.AugmentRequest.model_validate(
         {
@@ -115,7 +130,10 @@ def test_metadata_extension_strategy():
 
 
 def test_neighbouring_paragraph_strategy():
-    paragraph_ids = [f"{uuid4().hex}/t/text/0-10", f"{uuid4().hex}/f/file/20-25"]
+    paragraph_ids = [
+        paragraph_from_id(f"{uuid4().hex}/t/text/0-10"),
+        paragraph_from_id(f"{uuid4().hex}/f/file/20-25"),
+    ]
 
     _ = augment.AugmentRequest.model_validate(
         {
@@ -139,13 +157,17 @@ def test_neighbouring_paragraph_strategy():
 
 
 def test_hierarchy_strategy():
-    paragraph_ids = [f"{uuid4().hex}/t/text/0-10", f"{uuid4().hex}/f/file/20-25"]
+    paragraph_ids = [
+        paragraph_from_id(f"{uuid4().hex}/t/text/0-10"),
+        paragraph_from_id(f"{uuid4().hex}/f/file/20-25"),
+    ]
+    rids = [paragraph.id.rid for paragraph in paragraph_ids]
 
     _ = augment.AugmentRequest.model_validate(
         {
             "augmentations": [
                 {
-                    "given": paragraph_ids,
+                    "given": rids,
                     "select": [
                         {"prop": "title"},
                         {"prop": "summary"},
@@ -165,13 +187,16 @@ def test_hierarchy_strategy():
 
 
 def test_conversational_strategy():
-    paragraph_ids = [f"{uuid4().hex}/t/text/0-10", f"{uuid4().hex}/f/file/20-25"]
+    field_ids = [
+        FieldId.from_string(f"{uuid4().hex}/t/text"),
+        FieldId.from_string(f"{uuid4().hex}/f/file"),
+    ]
 
     _ = augment.AugmentRequest.model_validate(
         {
             "augmentations": [
                 {
-                    "given": paragraph_ids,
+                    "given": field_ids,
                     "select": [
                         {"prop": "attachments", "text": True, "image": False},
                     ],
@@ -179,15 +204,22 @@ def test_conversational_strategy():
                     "limits": {"max_messages": 5},
                 },
                 {
-                    "given": paragraph_ids,
+                    "given": field_ids,
                     "select": [
                         # we do have this implemented but not exposed. Given a
                         # conversation, if it's a question try to find a
                         # following message marked as answer in the same page
-                        {"prop": "answer"},
+                        {"prop": "answer"}
                     ],
                     "from": "conversations",
                 },
             ]
         }
+    )
+
+
+def paragraph_from_id(id: str) -> augment.Paragraph:
+    return augment.Paragraph(
+        id=ParagraphId.from_string(id),
+        metadata=None,
     )

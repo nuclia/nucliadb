@@ -13,6 +13,8 @@
 # limitations under the License.
 #
 
+from unittest.mock import Mock, patch
+
 import pytest
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
@@ -197,6 +199,13 @@ class TestCaseCaptureTraceIdMiddleware:
         return TestClient(app)
 
     def test_trace_id_header_is_returned(self, client):
+        # if tracing not configured, we don't return it
         response = client.get("/foo/")
+        assert "x-nuclia-trace-id" not in response.headers
 
-        assert response.headers["x-nuclia-trace-id"]
+        # otherwise, we return the header
+        span = Mock()
+        span.get_span_context.return_value = Mock(trace_id=10)
+        with patch("nucliadb_telemetry.fastapi.tracing.trace.get_current_span", return_value=span):
+            response = client.get("/foo/")
+            assert response.headers["x-nuclia-trace-id"] == "0000000000000000000000000000000a"
