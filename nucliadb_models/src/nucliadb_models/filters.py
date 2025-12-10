@@ -22,6 +22,8 @@ import pydantic
 from pydantic import AliasChoices, BaseModel, Discriminator, Tag, field_validator, model_validator
 from typing_extensions import Annotated, Self
 
+from nucliadb_models.utils import FieldIdString
+
 from .common import FieldTypeName, Paragraph
 from .metadata import ResourceProcessingStatus
 from .utils import DateTime, SlugString
@@ -116,8 +118,8 @@ class Field(FilterProp, extra="forbid"):
 class FieldId(FilterProp, extra="forbid"):
     """Matches a field or set of fields"""
 
-    prop: Literal["field"] = "field"
-    name: str = pydantic.Field(
+    prop: Literal["field_id"] = "field_id"
+    id: FieldIdString = pydantic.Field(
         description="Name of the field/s to match. Fields with same name but different type will all match",
     )
 

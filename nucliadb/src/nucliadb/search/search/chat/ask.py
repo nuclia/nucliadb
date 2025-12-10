@@ -56,6 +56,7 @@ from nucliadb.search.search.chat.exceptions import (
     AnswerJsonSchemaTooLong,
     NoRetrievalResultsError,
 )
+from nucliadb.search.search.chat.old_prompt import PromptContextBuilder as OldPromptContextBuilder
 from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
@@ -123,7 +124,9 @@ from nucliadb_models.search import (
     parse_rephrase_prompt,
 )
 from nucliadb_telemetry import errors
+from nucliadb_utils import const
 from nucliadb_utils.exceptions import LimitsExceededError
+from nucliadb_utils.utilities import has_feature
 
 
 @dataclasses.dataclass
@@ -632,19 +635,36 @@ async def ask(
 
     # Now we build the prompt context
     with metrics.time("context_building"):
-        prompt_context_builder = PromptContextBuilder(
-            kbid=kbid,
-            ordered_paragraphs=[match.paragraph for match in retrieval_results.best_matches],
-            resource=resource,
-            user_context=user_context,
-            user_image_context=ask_request.extra_context_images,
-            strategies=ask_request.rag_strategies,
-            image_strategies=ask_request.rag_images_strategies,
-            max_context_characters=tokens_to_chars(generation.max_context_tokens),
-            visual_llm=generation.use_visual_llm,
-            query_image=ask_request.query_image,
-            metrics=metrics.child_span("context_building"),
-        )
+        prompt_context_builder: PromptContextBuilder | OldPromptContextBuilder
+        if has_feature(const.Features.ASK_DECOUPLED, context={"kbid": kbid}):
+            prompt_context_builder = PromptContextBuilder(
+                kbid=kbid,
+                ordered_paragraphs=[match.paragraph for match in retrieval_results.best_matches],
+                resource=resource,
+                user_context=user_context,
+                user_image_context=ask_request.extra_context_images,
+                strategies=ask_request.rag_strategies,
+                image_strategies=ask_request.rag_images_strategies,
+                max_context_characters=tokens_to_chars(generation.max_context_tokens),
+                visual_llm=generation.use_visual_llm,
+                query_image=ask_request.query_image,
+                metrics=metrics.child_span("context_building"),
+            )
+        else:
+            prompt_context_builder = OldPromptContextBuilder(
+                kbid=kbid,
+                ordered_paragraphs=[match.paragraph for match in retrieval_results.best_matches],
+                resource=resource,
+                user_context=user_context,
+                user_image_context=ask_request.extra_context_images,
+                strategies=ask_request.rag_strategies,
+                image_strategies=ask_request.rag_images_strategies,
+                max_context_characters=tokens_to_chars(generation.max_context_tokens),
+                visual_llm=generation.use_visual_llm,
+                query_image=ask_request.query_image,
+                metrics=metrics.child_span("context_building"),
+            )
+
         (
             prompt_context,
             prompt_context_order,

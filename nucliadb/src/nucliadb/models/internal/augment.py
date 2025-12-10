@@ -347,7 +347,7 @@ class FieldAugment(BaseModel, extra="forbid"):
     given: list[ResourceId] | list[FieldId] | list[ParagraphId]
     select: list[FieldProp]
     from_: Literal["fields"] = Field(default="fields", alias="from")
-    filter: list[filters.FieldId | filters.Generated] | None = None
+    filter: list[filters.Field | filters.FieldId | filters.Generated] | None = None
 
 
 class ParagraphAugment(BaseModel, extra="forbid"):

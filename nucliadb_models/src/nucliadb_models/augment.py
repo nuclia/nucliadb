@@ -126,7 +126,7 @@ class AugmentResourceFields(BaseModel):
     text: bool = False
     classification_labels: bool = False
 
-    filters: list[filters.FieldId | filters.Generated]
+    filters: list[filters.FieldId | filters.Field | filters.Generated]
 
     # TODO: review if this is equivalent
 

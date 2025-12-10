@@ -26,12 +26,13 @@ from fastapi.exceptions import HTTPException
 from fastapi_versioning import version
 
 import nucliadb_models
-from nucliadb.common.ids import ParagraphId
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.models.internal.augment import (
     Augment,
     DeepResourceAugment,
     FieldAugment,
     FieldClassificationLabels,
+    FieldEntities,
     FieldProp,
     FieldText,
     Metadata,
@@ -40,6 +41,7 @@ from nucliadb.models.internal.augment import (
     ParagraphProp,
     ParagraphText,
     ResourceAugment,
+    ResourceClassificationLabels,
     ResourceProp,
     ResourceSummary,
     ResourceTitle,
@@ -139,6 +141,22 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
                 )
             )
 
+    if item.fields is not None:
+        select: list[FieldProp] = []
+        if item.fields.text:
+            select.append(FieldText())
+        if item.fields.entities:
+            select.append(FieldEntities())
+        if item.fields.classification_labels:
+            select.append(FieldClassificationLabels())
+
+        augmentations.append(
+            FieldAugment(
+                given=[FieldId.from_string(id) for id in item.fields.given],
+                select=select,
+            )
+        )
+
     if item.paragraphs is not None:
         paragraphs_to_augment, paragraph_selector = parse_paragraph_augment(item.paragraphs)
         augmentations.append(
@@ -178,14 +196,33 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
             augmented_resource = augmented_resources.setdefault(rid, AugmentedResource(id=rid))
             augmented_resource.title = augmented_resource.title or resource.title
             augmented_resource.summary = augmented_resource.summary or resource.summary
+            if resource.classification_labels is not None:
+                augmented_resource.classification_labels = {
+                    labelset: list(labels) for labelset, labels in resource.classification_labels.items()
+                }
             # TODO: more properties
 
         augmented_fields = {}
         for field_id, field in augmented.fields.items():
             if field is None:
                 continue
+
+            if field.classification_labels is None:
+                classification_labels = None
+            else:
+                classification_labels = {
+                    labelset: list(labels) for labelset, labels in field.classification_labels.items()
+                }
+
+            if field.entities is None:
+                entities = None
+            else:
+                entities = {family: list(entity) for family, entity in field.entities.items()}
+
             augmented_fields[field_id.full()] = AugmentedField(
                 text=field.text,
+                classification_labels=classification_labels,
+                entities=entities,
                 # TODO: more parameters
             )
 
@@ -193,6 +230,7 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
         for paragraph_id, paragraph in augmented.paragraphs.items():
             if paragraph is None:
                 continue
+
             augmented_paragraphs[paragraph_id.full()] = AugmentedParagraph(
                 text=paragraph.text,
                 # TODO: we need multiple calls to augmentor to fulfill this information
@@ -235,6 +273,7 @@ def parse_deep_resource_augment(
     _resource_prop_to_prop = {
         nucliadb_models.augment.ResourceProp.TITLE: ResourceTitle(),
         nucliadb_models.augment.ResourceProp.SUMMARY: ResourceSummary(),
+        nucliadb_models.augment.ResourceProp.CLASSIFICATION_LABELS: ResourceClassificationLabels(),
     }
     for prop in item.select:
         if prop in _resource_prop_to_show:
