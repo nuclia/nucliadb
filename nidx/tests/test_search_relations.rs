@@ -340,7 +340,6 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
     let shard_id = setup_knowledge_graph(&mut fixture).await?;
 
     // (:~Anastas)
-    #[allow(deprecated)]
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
@@ -370,7 +369,6 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
 
     // (:~AnXstXsiX)
-    #[allow(deprecated)]
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
@@ -399,7 +397,6 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
     assert_eq!(relations.len(), 0);
 
     // (:~Ansatasia)
-    #[allow(deprecated)]
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
@@ -432,7 +429,6 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
 }
 
 #[sqlx::test]
-#[allow(non_snake_case)]
 async fn test_graph_search_relations(pool: PgPool) -> anyhow::Result<()> {
     let mut fixture = NidxFixture::new(pool).await?;
     let shard_id = setup_knowledge_graph(&mut fixture).await?;

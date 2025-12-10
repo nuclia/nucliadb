@@ -42,19 +42,15 @@ async fn test_vector_normalization_shard(pool: PgPool) -> Result<(), Box<dyn std
     // Create a shard with vector normalization
 
     const KBID: &str = "aabbccddeeff11223344556677889900";
-    #[allow(deprecated)]
     let shard = fixture
         .api_client
         .new_shard(Request::new(NewShardRequest {
             kbid: KBID.to_string(),
-            config: Some(VectorIndexConfig {
-                normalize_vectors: true,
-                ..Default::default()
-            }),
             vectorsets_configs: HashMap::from([(
                 "english".to_string(),
                 VectorIndexConfig {
                     vector_dimension: Some(VECTOR_DIMENSION as u32),
+                    normalize_vectors: true,
                     ..Default::default()
                 },
             )]),

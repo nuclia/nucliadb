@@ -77,7 +77,6 @@ pub fn parse_quoted(schema: &ParagraphSchema, quoted: &str) -> Result<Box<dyn Qu
         .map(|word| Term::from_field_text(schema.text, word))
         .collect();
 
-    #[allow(clippy::comparison_chain)]
     if terms.len() == 1 {
         // phrase queries must have more than one term, so we use a term query
         let term = terms.remove(0); // safe because terms.len() == 1
@@ -213,16 +212,14 @@ mod tests {
         q.unwrap()
     }
 
-    #[allow(clippy::borrowed_box)]
-    fn extract_term_from(query: &Box<dyn Query>) -> &Term {
+    fn extract_term_from(query: &dyn Query) -> &Term {
         let q = query.downcast_ref::<TermQuery>();
         assert!(q.is_some(), "TermQuery expected");
         let q = q.unwrap();
         q.term()
     }
 
-    #[allow(clippy::borrowed_box)]
-    fn extract_phrase_terms_from(query: &Box<dyn Query>) -> Vec<Term> {
+    fn extract_phrase_terms_from(query: &dyn Query) -> Vec<Term> {
         let q = query.downcast_ref::<PhraseQuery>();
         assert!(q.is_some(), "PhraseQuery expected");
         let q = q.unwrap();

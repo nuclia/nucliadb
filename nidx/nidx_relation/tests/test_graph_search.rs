@@ -327,7 +327,6 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
     // (:~Anastas)
-    #[allow(deprecated)]
     let result = search(
         &reader,
         Query::Path(Path {
@@ -348,7 +347,6 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
 
     // (:~AnXstXsia) with fuzzy=1
-    #[allow(deprecated)]
     let result = search(
         &reader,
         Query::Path(Path {
@@ -368,7 +366,6 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     assert_eq!(relations.len(), 0);
 
     // (:~AnXstasia) with fuzzy=1
-    #[allow(deprecated)]
     let result = search(
         &reader,
         Query::Path(Path {
@@ -389,7 +386,6 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
     assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
 
     // (:^~Ana) matches Anna & Anastasia
-    #[allow(deprecated)]
     let result = search(
         &reader,
         Query::Path(Path {
