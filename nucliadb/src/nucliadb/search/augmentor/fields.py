@@ -400,7 +400,7 @@ async def iter_conversation_messages(
     for page in range(start_page, conversation_metadata.pages + 1):
         conversation = await field.db_get_value(page)
         for idx, message in enumerate(conversation.messages[start_index:]):
-            yield (page, idx, message)
+            yield (page, start_index + idx, message)
         # next iteration we want all messages
         start_index = 0
 
@@ -466,7 +466,7 @@ async def conversation_selector(
                     page, index = (1, 0)
                 elif selector.index == "last":
                     page = metadata.pages
-                    index = metadata.total % metadata.size
+                    index = metadata.total % metadata.size - 1
                 else:  # pragma: no cover
                     # This is a trick so mypy generates an error if this branch can be reached,
                     # that is, if we are missing some ifs

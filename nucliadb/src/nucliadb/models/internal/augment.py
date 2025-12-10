@@ -226,12 +226,16 @@ class MessageSelector(BaseModel):
     name: Literal["message"] = "message"
 
     id: str | None = None
-    index: Literal["first"] | Literal["last"] | int | None = None
+    index: Literal["first"] | Literal["last"] | int | None = Field(
+        default=None,
+        description="Index of the message in the conversation. Indexing starts at 0",
+    )
 
     @model_validator(mode="after")
-    def id_or_index(self):
+    def id_or_index(self) -> Self:
         if self.id is not None and self.index is not None:
             raise ValueError("Can't define both `id` and `index`")
+        return self
 
 
 class PageSelector(BaseModel):
@@ -302,7 +306,7 @@ ConversationSelector = Annotated[
 
 class ConversationText(FieldText):
     prop: Literal["text"] = "text"
-    selector: ConversationSelector = Field(default_factory=MessageSelector)
+    selector: ConversationSelector
 
 
 class AttachmentKind(str, Enum):
@@ -319,6 +323,7 @@ class ConversationAttachments(SelectProp):
 ConversationProp = Annotated[
     (
         Annotated[ConversationText, Tag("text")]
+        | Annotated[FieldText, Tag("text")]
         | Annotated[FieldValue, Tag("value")]
         | Annotated[FieldClassificationLabels, Tag("classification_labels")]
         | Annotated[FieldEntities, Tag("entities")]

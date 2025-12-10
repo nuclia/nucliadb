@@ -140,7 +140,17 @@ async def augment(
                 augments["fields"].setdefault(field_id, []).extend(augmentation.select)
 
         elif augmentation.from_ == "conversations":
-            raise NotImplementedError()
+            for id in augmentation.given:
+                if isinstance(id, FieldId):
+                    field_id = id
+                elif isinstance(id, ParagraphId):
+                    field_id = id.field_id
+                else:  # pragma: no cover
+                    # This is a trick so mypy generates an error if this branch can be reached,
+                    # that is, if we are missing some ifs
+                    _d: int = "d"
+
+                augments["fields"].setdefault(field_id, []).extend(augmentation.select)
 
         elif augmentation.from_ == "paragraphs":
             for paragraph in augmentation.given:
