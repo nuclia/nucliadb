@@ -29,8 +29,8 @@ mod top_unique_n;
 use anyhow::anyhow;
 use nidx_protos::graph_query;
 use nidx_protos::graph_query::node::FuzzyMatch;
+use nidx_protos::graph_query::node::MatchKind;
 use nidx_protos::graph_query::node::MatchLocation;
-use nidx_protos::graph_query::node::NewMatchKind;
 use nidx_protos::graph_query::path_query;
 use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::{
@@ -225,7 +225,7 @@ impl RelationSearcher {
                     source: Some(graph_query::Node {
                         value: Some(prefix),
                         node_type: Some(NodeType::Entity.into()),
-                        new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                        match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
                             kind: MatchLocation::Prefix.into(),
                             distance: FUZZY_DISTANCE as u32,
                         })),

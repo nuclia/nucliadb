@@ -217,7 +217,7 @@ fn test_graph_node_exact_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("Computer science".to_string()),
-                new_match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                match_kind: Some(NewMatchKind::Exact(ExactMatch {
                     kind: MatchLocation::Full.into(),
                 })),
                 ..Default::default()
@@ -236,7 +236,7 @@ fn test_graph_node_exact_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("Computer sci".to_string()),
-                new_match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                match_kind: Some(NewMatchKind::Exact(ExactMatch {
                     kind: MatchLocation::Prefix.into(),
                 })),
                 ..Default::default()
@@ -253,7 +253,7 @@ fn test_graph_node_exact_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("Compu".to_string()),
-                new_match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                match_kind: Some(NewMatchKind::Exact(ExactMatch {
                     kind: MatchLocation::Prefix.into(),
                 })),
                 ..Default::default()
@@ -272,7 +272,7 @@ fn test_graph_node_exact_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("Computer".to_string()),
-                new_match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                match_kind: Some(NewMatchKind::Exact(ExactMatch {
                     kind: MatchLocation::Words.into(),
                 })),
                 ..Default::default()
@@ -289,7 +289,7 @@ fn test_graph_node_exact_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("science".to_string()),
-                new_match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                match_kind: Some(NewMatchKind::Exact(ExactMatch {
                     kind: MatchLocation::Words.into(),
                 })),
                 ..Default::default()
@@ -308,7 +308,7 @@ fn test_graph_node_exact_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("sci".to_string()),
-                new_match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                match_kind: Some(NewMatchKind::Exact(ExactMatch {
                     kind: MatchLocation::PrefixWords.into(),
                 })),
                 ..Default::default()
@@ -416,7 +416,7 @@ fn test_graph_node_fuzzy_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("Computer scXence".to_string()),
-                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
                     kind: MatchLocation::Full.into(),
                     distance: 1,
                 })),
@@ -436,7 +436,7 @@ fn test_graph_node_fuzzy_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("CompuXer sci".to_string()),
-                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
                     kind: MatchLocation::Prefix.into(),
                     distance: 1,
                 })),
@@ -454,7 +454,7 @@ fn test_graph_node_fuzzy_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("CoXpu".to_string()),
-                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
                     kind: MatchLocation::Prefix.into(),
                     distance: 1,
                 })),
@@ -474,7 +474,7 @@ fn test_graph_node_fuzzy_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("ComXuter".to_string()),
-                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
                     kind: MatchLocation::Words.into(),
                     distance: 1,
                 })),
@@ -492,7 +492,7 @@ fn test_graph_node_fuzzy_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("sciXnce".to_string()),
-                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
                     kind: MatchLocation::Words.into(),
                     distance: 1,
                 })),
@@ -512,7 +512,7 @@ fn test_graph_node_fuzzy_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("scXen".to_string()),
-                new_match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
                     kind: MatchLocation::PrefixWords.into(),
                     distance: 1,
                 })),
