@@ -699,7 +699,7 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
     type Error = anyhow::Error;
 
     fn try_from(node_pb: &nidx_protos::graph_query::Node) -> Result<Self, Self::Error> {
-        let value = if let Some(value) = node_pb.value.clone() {
+        let value = node_pb.value.clone().map(|value| {
             // Default to exact match to keep backwards compatibility
             let match_kind = node_pb
                 .match_kind
@@ -708,7 +708,7 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
                         kind: MatchLocation::Full as i32,
                     },
                 ));
-            let matcher = match match_kind {
+            match match_kind {
                 nidx_protos::graph_query::node::MatchKind::Exact(exact) => match exact.kind() {
                     MatchLocation::Full => Term::Exact(value),
                     MatchLocation::Prefix => Term::Fuzzy(FuzzyTerm {
@@ -745,11 +745,8 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
                         is_prefix: true,
                     }),
                 },
-            };
-            Some(matcher)
-        } else {
-            None
-        };
+            }
+        });
 
         let node_type = node_pb.node_type.map(NodeType::try_from).transpose()?;
         let node_subtype = node_pb.node_subtype.clone();
