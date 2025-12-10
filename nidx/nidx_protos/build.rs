@@ -21,6 +21,10 @@
 use std::io::Result;
 
 fn main() -> Result<()> {
+    println!("cargo:rerun-if-changed=nidx.proto");
+    println!("cargo:rerun-if-changed=nodereader.proto");
+    println!("cargo:rerun-if-changed=noderesources.proto");
+    println!("cargo:rerun-if-changed=nodewriter.proto");
     println!("cargo:rerun-if-changed=../../nucliadb_protos");
     println!("cargo:rerun-if-changed=src");
     tonic_build::configure().emit_rerun_if_changed(false).compile_protos(
