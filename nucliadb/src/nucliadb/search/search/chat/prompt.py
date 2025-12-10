@@ -527,6 +527,9 @@ def parse_text_block_id(text_block_id: str) -> TextBlockId:
 
 
 def to_yaml(obj: BaseModel) -> str:
+    # FIXME: this dumps enums REALLY poorly, e.g.,
+    # `!!python/object/apply:nucliadb_models.metadata.Source\n- WEB` for
+    # Source.WEB instead of `WEB`
     return yaml.dump(
         obj.model_dump(exclude_none=True, exclude_defaults=True, exclude_unset=True),
         default_flow_style=False,
