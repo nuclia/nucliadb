@@ -27,7 +27,7 @@ from nucliadb_models.search import Image, ResourceProperties
 ResourceIdPattern = r"^([0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
 ResourceId = Annotated[
     str,
-    StringConstraints(pattern=ResourceIdPattern, min_length=32, max_length=32),
+    StringConstraints(pattern=ResourceIdPattern, min_length=32, max_length=36),
 ]
 
 FieldIdPattern = r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+(/[^/]{1,128})?$"
