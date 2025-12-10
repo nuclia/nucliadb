@@ -98,7 +98,8 @@ def test_field_extension_strategy():
                     "filter": [
                         {
                             "prop": "field",
-                            "name": "a/title",
+                            "type": "generic",
+                            "name": "title",
                         }
                     ],
                 }
