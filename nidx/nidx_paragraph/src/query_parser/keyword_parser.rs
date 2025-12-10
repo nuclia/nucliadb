@@ -212,14 +212,16 @@ mod tests {
         q.unwrap()
     }
 
-    fn extract_term_from(query: &dyn Query) -> &Term {
+    #[allow(clippy::borrowed_box)]
+    fn extract_term_from(query: &Box<dyn Query>) -> &Term {
         let q = query.downcast_ref::<TermQuery>();
         assert!(q.is_some(), "TermQuery expected");
         let q = q.unwrap();
         q.term()
     }
 
-    fn extract_phrase_terms_from(query: &dyn Query) -> Vec<Term> {
+    #[allow(clippy::borrowed_box)]
+    fn extract_phrase_terms_from(query: &Box<dyn Query>) -> Vec<Term> {
         let q = query.downcast_ref::<PhraseQuery>();
         assert!(q.is_some(), "PhraseQuery expected");
         let q = q.unwrap();

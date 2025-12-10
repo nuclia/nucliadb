@@ -769,7 +769,7 @@ async def test_ingest_delete_field(
         brain_mock.assert_called_once()
         brain = brain_mock.call_args[0][0]
         assert brain.paragraphs_to_delete == [f"{rid}/f/some_text"]
-        assert brain.sentences_to_delete == [f"{rid}/f/some_text"]
+        assert brain.vectors_to_delete_in_all_vectorsets == [f"{rid}/f/some_text"]
         assert brain.texts_to_delete == [f"{rid}/f/some_text"]
 
 

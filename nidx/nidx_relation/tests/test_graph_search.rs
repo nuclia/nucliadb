@@ -334,7 +334,7 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("Anastas".to_string()),
                 match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
-                    kind: MatchLocation::Full.into(),
+                    kind: MatchLocation::Prefix.into(),
                     distance: 1,
                 })),
                 ..Default::default()
@@ -393,7 +393,7 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("Ana".to_string()),
                 match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
-                    kind: MatchLocation::Full.into(),
+                    kind: MatchLocation::Prefix.into(),
                     distance: 1,
                 })),
                 ..Default::default()
