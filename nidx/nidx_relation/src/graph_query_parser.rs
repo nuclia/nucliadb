@@ -700,9 +700,12 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
 
     fn try_from(node_pb: &nidx_protos::graph_query::Node) -> Result<Self, Self::Error> {
         let value = if let Some(value) = node_pb.value.clone() {
-            let Some(match_kind) = node_pb.match_kind else {
-                return Err(anyhow!("Match kind is required"));
-            };
+            // Default to exact match to keep backwards compatibility
+            let match_kind = node_pb.match_kind.unwrap_or(nidx_protos::graph_query::node::MatchKind::Exact(
+                nidx_protos::graph_query::node::ExactMatch {
+                    kind: MatchLocation::Full as i32,
+                },
+            ));
             let matcher = match match_kind {
                 nidx_protos::graph_query::node::MatchKind::Exact(exact) => match exact.kind() {
                     MatchLocation::Full => Term::Exact(value),

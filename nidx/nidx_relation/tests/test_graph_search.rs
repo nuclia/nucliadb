@@ -21,8 +21,7 @@ mod common;
 
 use std::collections::{HashMap, HashSet};
 
-use nidx_protos::graph_query::node::{ExactMatch, FuzzyMatch, NewMatchKind};
-use nidx_protos::graph_query::node::{MatchKind, MatchLocation};
+use nidx_protos::graph_query::node::{ExactMatch, FuzzyMatch, MatchKind, MatchLocation};
 use nidx_protos::graph_query::path_query::Query;
 use nidx_protos::graph_query::{BoolQuery, FacetFilter, Node, Path, PathQuery, Relation};
 use nidx_protos::graph_search_request::QueryKind;
@@ -217,7 +216,7 @@ fn test_graph_node_exact_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("Computer science".to_string()),
-                match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                match_kind: Some(MatchKind::Exact(ExactMatch {
                     kind: MatchLocation::Full.into(),
                 })),
                 ..Default::default()
@@ -236,7 +235,7 @@ fn test_graph_node_exact_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("Computer sci".to_string()),
-                match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                match_kind: Some(MatchKind::Exact(ExactMatch {
                     kind: MatchLocation::Prefix.into(),
                 })),
                 ..Default::default()
@@ -253,7 +252,7 @@ fn test_graph_node_exact_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("Compu".to_string()),
-                match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                match_kind: Some(MatchKind::Exact(ExactMatch {
                     kind: MatchLocation::Prefix.into(),
                 })),
                 ..Default::default()
@@ -272,7 +271,7 @@ fn test_graph_node_exact_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("Computer".to_string()),
-                match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                match_kind: Some(MatchKind::Exact(ExactMatch {
                     kind: MatchLocation::Words.into(),
                 })),
                 ..Default::default()
@@ -289,7 +288,7 @@ fn test_graph_node_exact_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("science".to_string()),
-                match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                match_kind: Some(MatchKind::Exact(ExactMatch {
                     kind: MatchLocation::Words.into(),
                 })),
                 ..Default::default()
@@ -308,7 +307,7 @@ fn test_graph_node_exact_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("sci".to_string()),
-                match_kind: Some(NewMatchKind::Exact(ExactMatch {
+                match_kind: Some(MatchKind::Exact(ExactMatch {
                     kind: MatchLocation::PrefixWords.into(),
                 })),
                 ..Default::default()
@@ -335,7 +334,10 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
             source: Some(Node {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("Anastas".to_string()),
-                match_kind: MatchKind::DeprecatedFuzzy.into(),
+                match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
+                    kind: MatchLocation::Full.into(),
+                    distance: 1,
+                })),
                 ..Default::default()
             }),
             ..Default::default()
@@ -353,7 +355,10 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
             source: Some(Node {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("AnXstXsia".to_string()),
-                match_kind: MatchKind::DeprecatedFuzzy.into(),
+                match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
+                    kind: MatchLocation::Full.into(),
+                    distance: 1,
+                })),
                 ..Default::default()
             }),
             ..Default::default()
@@ -370,7 +375,10 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
             source: Some(Node {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("AnXstasia".to_string()),
-                match_kind: MatchKind::DeprecatedFuzzy.into(),
+                match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
+                    kind: MatchLocation::Full.into(),
+                    distance: 1,
+                })),
                 ..Default::default()
             }),
             ..Default::default()
@@ -388,7 +396,10 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
             source: Some(Node {
                 node_subtype: Some("PERSON".to_string()),
                 value: Some("Ana".to_string()),
-                match_kind: MatchKind::DeprecatedFuzzy.into(),
+                match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
+                    kind: MatchLocation::Full.into(),
+                    distance: 1,
+                })),
                 ..Default::default()
             }),
             ..Default::default()
@@ -416,7 +427,7 @@ fn test_graph_node_fuzzy_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("Computer scXence".to_string()),
-                match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
                     kind: MatchLocation::Full.into(),
                     distance: 1,
                 })),
@@ -436,7 +447,7 @@ fn test_graph_node_fuzzy_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("CompuXer sci".to_string()),
-                match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
                     kind: MatchLocation::Prefix.into(),
                     distance: 1,
                 })),
@@ -454,7 +465,7 @@ fn test_graph_node_fuzzy_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("CoXpu".to_string()),
-                match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
                     kind: MatchLocation::Prefix.into(),
                     distance: 1,
                 })),
@@ -474,7 +485,7 @@ fn test_graph_node_fuzzy_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("ComXuter".to_string()),
-                match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
                     kind: MatchLocation::Words.into(),
                     distance: 1,
                 })),
@@ -492,7 +503,7 @@ fn test_graph_node_fuzzy_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("sciXnce".to_string()),
-                match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
                     kind: MatchLocation::Words.into(),
                     distance: 1,
                 })),
@@ -512,7 +523,7 @@ fn test_graph_node_fuzzy_matches() -> anyhow::Result<()> {
         Query::Path(Path {
             destination: Some(Node {
                 value: Some("scXen".to_string()),
-                match_kind: Some(NewMatchKind::Fuzzy(FuzzyMatch {
+                match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
                     kind: MatchLocation::PrefixWords.into(),
                     distance: 1,
                 })),

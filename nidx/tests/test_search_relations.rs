@@ -26,7 +26,7 @@ use std::time::SystemTime;
 use common::services::NidxFixture;
 use nidx_protos::VectorIndexConfig;
 use nidx_protos::filter_expression::{Expr, ResourceFilter};
-use nidx_protos::graph_query::node::MatchKind;
+use nidx_protos::graph_query::node::{FuzzyMatch, MatchKind, MatchLocation};
 use nidx_protos::graph_query::path_query;
 use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::prost_types::Timestamp;
@@ -350,7 +350,10 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
                     query: Some(path_query::Query::Path(graph_query::Path {
                         source: Some(graph_query::Node {
                             value: Some("Anastas".to_string()),
-                            match_kind: MatchKind::DeprecatedFuzzy.into(),
+                            match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
+                                kind: MatchLocation::Prefix.into(),
+                                distance: 1,
+                            })),
                             ..Default::default()
                         }),
                         ..Default::default()
@@ -377,7 +380,10 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
                     query: Some(path_query::Query::Path(graph_query::Path {
                         source: Some(graph_query::Node {
                             value: Some("AnXstXsiX".to_string()),
-                            match_kind: MatchKind::DeprecatedFuzzy.into(),
+                            match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
+                                kind: MatchLocation::Full.into(),
+                                distance: 1,
+                            })),
                             ..Default::default()
                         }),
                         ..Default::default()
@@ -403,7 +409,10 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
                     query: Some(path_query::Query::Path(graph_query::Path {
                         source: Some(graph_query::Node {
                             value: Some("Ansatasia".to_string()),
-                            match_kind: MatchKind::DeprecatedFuzzy.into(),
+                            match_kind: Some(MatchKind::Fuzzy(FuzzyMatch {
+                                kind: MatchLocation::Full.into(),
+                                distance: 1,
+                            })),
                             ..Default::default()
                         }),
                         ..Default::default()
