@@ -108,7 +108,7 @@ class Fetcher:
 
     async def get_matryoshka_dimension(self) -> Optional[int]:
         vectorset = await self.get_vectorset()
-        return await get_matryoshka_dimension_cached(self.kbid, vectorset)
+        return await self.get_matryoshka_dimension_cached(self.kbid, vectorset)
 
     async def get_user_vectorset(self) -> Optional[str]:
         """Returns the user's requested vectorset and validates if it does exist
@@ -338,11 +338,10 @@ class Fetcher:
                     "vectorset", f"Vectorset {vectorset} doesn't exist in your Knowledge Box"
                 )
 
-
-@alru_cache(maxsize=1024)
-async def get_matryoshka_dimension_cached(kbid: str, vectorset: str) -> Optional[int]:
-    # This can be safely cached as the matryoshka dimension is not expected to change
-    return await get_matryoshka_dimension(kbid, vectorset)
+    @alru_cache(maxsize=10)
+    async def get_matryoshka_dimension_cached(self, kbid: str, vectorset: str) -> Optional[int]:
+        # This can be safely cached as the matryoshka dimension is not expected to change
+        return await get_matryoshka_dimension(kbid, vectorset)
 
 
 @query_parse_dependency_observer.wrap({"type": "query_information"})

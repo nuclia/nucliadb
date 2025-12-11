@@ -140,7 +140,7 @@ class _RetrievalParser:
 
         # Calculate the matryoshka dimension if applicable
         user_vector = self.item.query.semantic.query
-        matryoshka_dimension = await self.fetcher.get_matryoshka_dimension(self.kbid, vectorset)
+        matryoshka_dimension = await self.fetcher.get_matryoshka_dimension_cached(self.kbid, vectorset)
         if matryoshka_dimension is not None:
             if len(user_vector) < matryoshka_dimension:
                 raise InvalidQueryError(
