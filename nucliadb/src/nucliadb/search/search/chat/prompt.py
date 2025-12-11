@@ -559,11 +559,7 @@ async def field_extension_prompt_context(
             ordered_resources.append(resource_uuid)
 
     select = []
-    filters: list[
-        nucliadb_models.filters.FieldId
-        | nucliadb_models.filters.Field
-        | nucliadb_models.filters.Generated
-    ] = []
+    filters: list[nucliadb_models.filters.Field | nucliadb_models.filters.Generated] = []
     # this strategy exposes a way to access resource title and summary using a
     # field id. However, as they are resource properties, we must request it as
     # that
