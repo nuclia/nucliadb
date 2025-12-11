@@ -128,12 +128,6 @@ class AugmentResourceFields(BaseModel):
 
     filters: list[filters.Field | filters.Generated]
 
-    # TODO: review if this is equivalent
-
-    # field_ids: list[str]
-    # data_augmentation_field_prefixes: list[str]
-    # field_types: list[str]
-
 
 class AugmentResources(BaseModel):
     given: list[ResourceId]
