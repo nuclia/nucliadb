@@ -249,7 +249,7 @@ def parse_deep_resource_augment(
     show = []
     show_extracted = False
     extracted = []
-    select = []
+    select: list[ResourceProp] = []
 
     _resource_prop_to_show = {
         nucliadb_models.augment.ResourceProp.BASIC: ResourceProperties.BASIC,
@@ -270,7 +270,7 @@ def parse_deep_resource_augment(
         nucliadb_models.augment.ResourceProp.EXTRACTED_FILE: ExtractedDataTypeName.FILE,
         nucliadb_models.augment.ResourceProp.EXTRACTED_QA: ExtractedDataTypeName.QA,
     }
-    _resource_prop_to_prop = {
+    _resource_prop_to_prop: dict[nucliadb_models.augment.ResourceProp, ResourceProp] = {
         nucliadb_models.augment.ResourceProp.TITLE: ResourceTitle(),
         nucliadb_models.augment.ResourceProp.SUMMARY: ResourceSummary(),
         nucliadb_models.augment.ResourceProp.CLASSIFICATION_LABELS: ResourceClassificationLabels(),
@@ -290,7 +290,7 @@ def parse_deep_resource_augment(
     return (
         show,
         extracted,
-        select,  # type: ignore
+        select,
     )
 
 
