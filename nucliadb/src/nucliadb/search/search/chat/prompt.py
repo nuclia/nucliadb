@@ -33,13 +33,13 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.search import logger
-from nucliadb.search.api.v1.augment import augment_endpoint
 from nucliadb.search.augmentor.fields import (
     conversation_answer,
     conversation_messages_after,
     find_conversation_message,
 )
 from nucliadb.search.search import cache
+from nucliadb.search.search.chat import rpc
 from nucliadb.search.search.chat.images import (
     get_file_thumbnail_image,
     get_page_image,
@@ -312,7 +312,7 @@ async def full_resource_prompt_context(
 
     # For each resource, collect the extracted text from all its fields and
     # include the title and summary as well
-    augmented = await augment_endpoint(
+    augmented = await rpc.augment(
         kbid,
         AugmentRequest(
             resources=AugmentResources(
@@ -438,7 +438,7 @@ async def extend_prompt_context_with_metadata(
         return
 
     # TODO: replace this call for sdk.augment or similar
-    augmented = await augment_endpoint(kbid, augment_req)
+    augmented = await rpc.augment(kbid, augment_req)
 
     for tb_id in text_block_ids:
         field_id = tb_id if isinstance(tb_id, FieldId) else tb_id.field_id
@@ -580,7 +580,7 @@ async def field_extension_prompt_context(
     for da_prefix in strategy.data_augmentation_field_prefixes:
         filters.append(nucliadb_models.filters.Generated(by="data-augmentation", da_task=da_prefix))
 
-    augmented = await augment_endpoint(
+    augmented = await rpc.augment(
         kbid,
         AugmentRequest(
             resources=AugmentResources(
@@ -980,7 +980,7 @@ async def hierarchy_prompt_context(
 
     metrics.set("hierarchy_ops", len(resources))
 
-    augmented = await augment_endpoint(
+    augmented = await rpc.augment(
         kbid,
         AugmentRequest(
             paragraphs=AugmentParagraphs(
