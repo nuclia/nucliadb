@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+
 import pytest
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
@@ -31,6 +32,7 @@ from nucliadb_models.search import (
     ReciprocalRankFusion,
     RerankerName,
 )
+from nucliadb_utils.featureflagging import Settings
 
 
 @pytest.mark.parametrize(
@@ -94,6 +96,7 @@ def get_score_types(results: KnowledgeboxFindResults) -> set[SCORE_TYPE]:
     return score_types
 
 
+@pytest.mark.skipif(Settings().disable_ask_decoupled_ff, reason="refactored spy")
 @pytest.mark.deploy_modes("standalone")
 async def test_reciprocal_rank_fusion_requests_more_results(
     nucliadb_reader: AsyncClient,

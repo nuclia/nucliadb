@@ -55,17 +55,9 @@ from nucliadb_protos import resources_pb2 as rpb2
 from nucliadb_protos import writer_pb2 as wpb2
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
-
-# TODO: remove this after CI check
-if has_feature(const.Features.ASK_DECOUPLED, context={"kbid": "kbid"}):
-    print("Running tests with ASK_DECOUPLED FF enabled")
-else:
-    print("Running tests with ASK_DECOUPLED FF disabled")
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -348,6 +340,7 @@ async def resources(nucliadb_writer: AsyncClient, standalone_knowledgebox: str):
                     "collaborators": [f"collaborator_{i}"],
                     "metadata": {"foo": "bar"},
                 },
+                "extra": {"metadata": {"bar": "baz"}},
                 "usermetadata": {"classifications": [{"labelset": "ls", "label": f"rs-{i}"}]},
             },
         )
@@ -891,33 +884,64 @@ async def test_ask_rag_strategy_neighbouring_paragraphs(
 async def test_ask_rag_strategy_metadata_extension(
     nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
 ):
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/ask",
-        json={
-            "query": "title",
-            "rag_strategies": [
-                {
-                    "name": "metadata_extension",
-                    "types": ["origin", "extra_metadata", "classification_labels", "ners"],
-                }
-            ],
-            "debug": True,
-        },
-        headers={"X-Synchronous": "True"},
-    )
-    assert resp.status_code == 200, resp.text
-    ask_response = SyncAskResponse.model_validate_json(resp.content)
-    assert ask_response.prompt_context is not None
+    with (
+        patch(
+            "nucliadb.search.augmentor.fields.classification_labels",
+            return_value={"object": {"book", "computer"}},
+        ),
+        patch(
+            "nucliadb.search.augmentor.fields.field_entities",
+            return_value={"PLACE": {"Paris", "Amsterdam"}},
+        ),
+    ):
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/ask",
+            json={
+                "query": "title",
+                "rag_strategies": [
+                    {
+                        "name": "metadata_extension",
+                        "types": ["origin", "extra_metadata", "classification_labels", "ners"],
+                    }
+                ],
+                "debug": True,
+            },
+            headers={"X-Synchronous": "True"},
+        )
+        assert resp.status_code == 200, resp.text
+        ask_response = SyncAskResponse.model_validate_json(resp.content)
+        assert ask_response.prompt_context is not None
 
     # Make sure the text blocks of the context are extended with the metadata
     origin_found = False
+    classification_labels_found = False
+    ners_found = False
+    extra_found = False
     for text_block in ask_response.prompt_context:
         if "DOCUMENT METADATA AT ORIGIN" in text_block:
             origin_found = True
             assert "https://example.com/" in text_block
             assert "collaborator_" in text_block
+        if "DOCUMENT EXTRA METADATA" in text_block:
+            extra_found = True
+            assert "metadata:\n  bar: baz" in text_block
+        if "DOCUMENT CLASSIFICATION LABELS" in text_block:
+            classification_labels_found = True
+            # resource classification
+            assert "- rs-0 (ls)" in text_block or "- rs-1 (ls)" in text_block
+            # field classifications
+            assert "- book (object)" in text_block
+            assert "- computer (object)" in text_block
+        if "DOCUMENT NAMED ENTITIES (NERs)" in text_block:
+            ners_found = True
+            assert "- PLACE" in text_block
+            assert "  - Amsterdam" in text_block
+            assert "  - Paris" in text_block
 
     assert origin_found, ask_response.prompt_context
+    assert extra_found, ask_response.prompt_context
+    assert classification_labels_found, ask_response.prompt_context
+    assert ners_found, ask_response.prompt_context
 
     # Try now combining metadata_extension with another strategy
     for strategy in [

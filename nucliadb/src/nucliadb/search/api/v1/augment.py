@@ -129,7 +129,6 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
             field_select: list[FieldProp] = []
             if item.resources.fields.text:
                 field_select.append(FieldText())
-            # TODO: add missing test for field classification labels...
             if item.resources.fields.classification_labels:
                 field_select.append(FieldClassificationLabels())
 

@@ -31,7 +31,7 @@ async def find(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    # XXX: we are losing track of metrics ignoring this. Do we care?
+    # REVIEW: once in an SDK metrics, we'll lose track of metrics
     metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, bool]:
     from nucliadb.search.search.find import find
