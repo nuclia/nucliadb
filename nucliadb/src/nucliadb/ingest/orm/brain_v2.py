@@ -491,7 +491,7 @@ class ResourceBrain:
         full_field_id = ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
         self.brain.texts_to_delete.append(full_field_id)
         self.brain.paragraphs_to_delete.append(full_field_id)
-        self.brain.sentences_to_delete.append(full_field_id)
+        self.brain.vectors_to_delete_in_all_vectorsets.append(full_field_id)
         self.brain.relation_fields_to_delete.append(field_key)
 
     @observer.wrap({"type": "generate_vectors"})

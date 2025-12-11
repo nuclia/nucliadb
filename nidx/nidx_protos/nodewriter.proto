@@ -57,12 +57,11 @@ message VectorIndexConfig {
 }
 
 message NewShardRequest {
+    reserved 4, 5;
     utils.VectorSimilarity similarity = 1 [deprecated = true];
     string kbid = 2;
     utils.ReleaseChannel release_channel = 3;
-    // indicates whether the shard should normalize vectors on indexing or not
-    bool normalize_vectors = 4 [deprecated = true];
-    VectorIndexConfig config = 5 [deprecated = true];
+
     map<string, VectorIndexConfig> vectorsets_configs = 6;
     bool prewarm_enabled = 7;
 

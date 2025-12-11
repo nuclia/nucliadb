@@ -164,11 +164,13 @@ message Resource {
     map<string, IndexParagraphs> paragraphs = 6; // Paragraphs by field
 
     repeated string paragraphs_to_delete = 7;
-    // DEPRECATED: replaced by vector_prefixes_to_delete in order to support
-    // updates on a subset of the available vectorsets
-    repeated string sentences_to_delete = 8 [deprecated = true];
+
+    // Delete in all vectorsets (e.g: resource deletion)
+    repeated string vectors_to_delete_in_all_vectorsets = 8;
+    // Delete in some vectorsets (e.g: updating some vectors)
     // vectorset_id -> [vector_key_prefix, ...]
     map<string, StringList> vector_prefixes_to_delete = 15;
+
     repeated string relation_fields_to_delete = 16;
     repeated string texts_to_delete = 17;
 

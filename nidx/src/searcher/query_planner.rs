@@ -166,7 +166,6 @@ fn compute_vectors_request(search_request: &SearchRequest) -> anyhow::Result<Opt
     }))
 }
 
-#[allow(deprecated)]
 fn compute_graph_request(search_request: &SearchRequest) -> anyhow::Result<Option<GraphSearchRequest>> {
     let Some(graph_search) = search_request.graph_search.clone() else {
         return Ok(None);
@@ -221,7 +220,6 @@ mod tests {
     use super::*;
     #[test]
     fn proper_propagation() {
-        #[allow(deprecated)]
         let request = SearchRequest {
             result_per_page: 10,
             vector: vec![1.0],

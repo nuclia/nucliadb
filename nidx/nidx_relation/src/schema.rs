@@ -394,7 +394,6 @@ pub fn encode_relation(relation_type: u64, relation_label: &str) -> Vec<u64> {
     out
 }
 
-#[allow(dead_code)]
 pub fn decode_relation(data: &[u64]) -> (u64, String) {
     let buffer = data[0].to_le_bytes();
     let relation_type = buffer[0] as u64;

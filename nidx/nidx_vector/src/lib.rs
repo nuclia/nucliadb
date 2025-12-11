@@ -81,9 +81,7 @@ impl VectorIndexer {
         if let Some(prefixes) = resource.vector_prefixes_to_delete.get(index_name) {
             prefixes.items.clone()
         } else {
-            // DEPRECATED: Bw/c while moving from sentences_to_delete to vector_prefixes_to_delete
-            #[allow(deprecated)]
-            resource.sentences_to_delete.clone()
+            resource.vectors_to_delete_in_all_vectorsets.clone()
         }
     }
 

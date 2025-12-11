@@ -77,7 +77,6 @@ pub fn parse_quoted(schema: &ParagraphSchema, quoted: &str) -> Result<Box<dyn Qu
         .map(|word| Term::from_field_text(schema.text, word))
         .collect();
 
-    #[allow(clippy::comparison_chain)]
     if terms.len() == 1 {
         // phrase queries must have more than one term, so we use a term query
         let term = terms.remove(0); // safe because terms.len() == 1

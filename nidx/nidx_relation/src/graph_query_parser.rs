@@ -30,8 +30,6 @@ use tantivy::tokenizer::TokenizerManager;
 use crate::io_maps;
 use crate::schema::Schema;
 
-const DEFAULT_NODE_VALUE_FUZZY_DISTANCE: u8 = 1;
-
 #[derive(Clone)]
 pub struct FuzzyTerm {
     pub value: String,
@@ -702,56 +700,54 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
 
     fn try_from(node_pb: &nidx_protos::graph_query::Node) -> Result<Self, Self::Error> {
         let value = node_pb.value.clone().map(|value| {
-            if let Some(match_kind) = node_pb.new_match_kind {
-                match match_kind {
-                    nidx_protos::graph_query::node::NewMatchKind::Exact(exact) => match exact.kind() {
-                        MatchLocation::Full => Term::Exact(value),
-                        MatchLocation::Prefix => Term::Fuzzy(FuzzyTerm {
-                            value,
-                            fuzzy_distance: 0,
-                            is_prefix: true,
-                        }),
-                        MatchLocation::Words => Term::ExactWord(value),
-                        MatchLocation::PrefixWords => Term::FuzzyWord(FuzzyTerm {
-                            value,
-                            fuzzy_distance: 0,
-                            is_prefix: true,
-                        }),
+            // Default to exact match to keep backwards compatibility
+            let match_kind = node_pb
+                .match_kind
+                .unwrap_or(nidx_protos::graph_query::node::MatchKind::Exact(
+                    nidx_protos::graph_query::node::ExactMatch {
+                        kind: MatchLocation::Full as i32,
                     },
-                    nidx_protos::graph_query::node::NewMatchKind::Fuzzy(fuzzy) => match fuzzy.kind() {
-                        MatchLocation::Full => Term::Fuzzy(FuzzyTerm {
-                            value,
-                            fuzzy_distance: fuzzy.distance as u8,
-                            is_prefix: false,
-                        }),
-                        MatchLocation::Prefix => Term::Fuzzy(FuzzyTerm {
-                            value,
-                            fuzzy_distance: fuzzy.distance as u8,
-                            is_prefix: true,
-                        }),
-                        MatchLocation::Words => Term::FuzzyWord(FuzzyTerm {
-                            value,
-                            fuzzy_distance: fuzzy.distance as u8,
-                            is_prefix: false,
-                        }),
-                        MatchLocation::PrefixWords => Term::FuzzyWord(FuzzyTerm {
-                            value,
-                            fuzzy_distance: fuzzy.distance as u8,
-                            is_prefix: true,
-                        }),
-                    },
-                }
-            } else {
-                match node_pb.match_kind() {
-                    nidx_protos::graph_query::node::MatchKind::DeprecatedExact => Term::Exact(value),
-                    nidx_protos::graph_query::node::MatchKind::DeprecatedFuzzy => Term::Fuzzy(FuzzyTerm {
+                ));
+            match match_kind {
+                nidx_protos::graph_query::node::MatchKind::Exact(exact) => match exact.kind() {
+                    MatchLocation::Full => Term::Exact(value),
+                    MatchLocation::Prefix => Term::Fuzzy(FuzzyTerm {
                         value,
-                        fuzzy_distance: DEFAULT_NODE_VALUE_FUZZY_DISTANCE,
+                        fuzzy_distance: 0,
                         is_prefix: true,
                     }),
-                }
+                    MatchLocation::Words => Term::ExactWord(value),
+                    MatchLocation::PrefixWords => Term::FuzzyWord(FuzzyTerm {
+                        value,
+                        fuzzy_distance: 0,
+                        is_prefix: true,
+                    }),
+                },
+                nidx_protos::graph_query::node::MatchKind::Fuzzy(fuzzy) => match fuzzy.kind() {
+                    MatchLocation::Full => Term::Fuzzy(FuzzyTerm {
+                        value,
+                        fuzzy_distance: fuzzy.distance as u8,
+                        is_prefix: false,
+                    }),
+                    MatchLocation::Prefix => Term::Fuzzy(FuzzyTerm {
+                        value,
+                        fuzzy_distance: fuzzy.distance as u8,
+                        is_prefix: true,
+                    }),
+                    MatchLocation::Words => Term::FuzzyWord(FuzzyTerm {
+                        value,
+                        fuzzy_distance: fuzzy.distance as u8,
+                        is_prefix: false,
+                    }),
+                    MatchLocation::PrefixWords => Term::FuzzyWord(FuzzyTerm {
+                        value,
+                        fuzzy_distance: fuzzy.distance as u8,
+                        is_prefix: true,
+                    }),
+                },
             }
         });
+
         let node_type = node_pb.node_type.map(NodeType::try_from).transpose()?;
         let node_subtype = node_pb.node_subtype.clone();
 

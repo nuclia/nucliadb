@@ -151,15 +151,11 @@ message RelationPrefixSearchResponse {
 
 message GraphQuery {
     message Node {
+        reserved 4;
+
         optional string value = 1;
         optional utils.RelationNode.NodeType node_type = 2;
         optional string node_subtype = 3;
-
-        enum MatchKind {
-            DEPRECATED_EXACT = 0;
-            DEPRECATED_FUZZY = 1;
-        }
-        MatchKind match_kind = 4 [deprecated = true];
 
         enum MatchLocation {
             // Match full value. Search "Rosa Parks" to find "Rosa Parks"
@@ -181,7 +177,7 @@ message GraphQuery {
             uint32 distance = 2;
         }
 
-        oneof new_match_kind {
+        oneof match_kind {
             ExactMatch exact = 5;
             FuzzyMatch fuzzy = 6;
         }
