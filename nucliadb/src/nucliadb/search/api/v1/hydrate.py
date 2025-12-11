@@ -323,6 +323,8 @@ class Hydrator:
         async with self.max_ops:
             return await aw
 
-    @alru_cache(maxsize=None)
+    @alru_cache(
+        maxsize=None, ttl=30
+    )  # Adding a ttl to avoid memory leak due to self being part of the cache key.
     async def cached_download_page_preview(self, field: Field, page: int) -> Optional[Image]:
         return await download_page_preview(field, page)
