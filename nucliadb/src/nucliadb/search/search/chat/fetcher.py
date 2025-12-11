@@ -63,7 +63,7 @@ class RAOFetcher(Fetcher):
             self._query_info = await query_information(
                 kbid=self.kbid,
                 query=self.query,
-                semantic_model=None,
+                semantic_model=self.user_vectorset,
                 generative_model=self.generative_model,
                 rephrase=self.rephrase,
                 rephrase_prompt=self.rephrase_prompt,
