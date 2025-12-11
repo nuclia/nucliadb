@@ -434,7 +434,7 @@ async def parse_semantic_min_score(
 
 def convert_labels_to_filter_expressions(
     label_filters: Union[list[str], list[Filter]], classification_labels: knowledgebox_pb2.Labels
-) -> tuple[list[FieldFilterExpression], ParagraphFilterExpression]:
+) -> tuple[list[FieldFilterExpression], ParagraphFilterExpression | None]:
     field_expressions: list[FieldFilterExpression] = []
     paragraph_expressions: list[ParagraphFilterExpression] = []
 
@@ -506,5 +506,7 @@ def convert_labels_to_filter_expressions(
         paragraph_expression = paragraph_expressions[0]  # type: ignore
     elif len(paragraph_expressions) > 1:
         paragraph_expression = And(operands=paragraph_expressions)  # type: ignore
+    else:
+        paragraph_expression = None
 
     return field_expressions, paragraph_expression
