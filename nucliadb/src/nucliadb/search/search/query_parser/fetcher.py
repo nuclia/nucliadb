@@ -20,6 +20,7 @@
 import asyncio
 from typing import Optional, TypeVar, Union
 
+from async_lru import alru_cache
 from typing_extensions import TypeIs
 
 from nucliadb.common import datamanagers
@@ -338,6 +339,7 @@ class Fetcher:
                 )
 
 
+@alru_cache(maxsize=1024)
 async def get_matryoshka_dimension_cached(kbid: str, vectorset: str) -> Optional[int]:
     # This can be safely cached as the matryoshka dimension is not expected to change
     return await get_matryoshka_dimension(kbid, vectorset)
