@@ -431,10 +431,7 @@ async def test_extend_prompt_context_with_metadata():
     resource.get_extra = AsyncMock(return_value=extra)
     resource.field_exists = AsyncMock(return_value=True)
     with (
-        mock.patch(
-            "nucliadb.search.search.chat.prompt.cache.get_resource",
-            return_value=resource,
-        ),
+        mock.patch("nucliadb.search.augmentor.fields.cache.get_resource", return_value=resource),
         mock.patch("nucliadb.search.augmentor.resources.get_basic", return_value=basic),
         mock.patch("nucliadb.search.augmentor.fields.get_basic", return_value=basic),
     ):

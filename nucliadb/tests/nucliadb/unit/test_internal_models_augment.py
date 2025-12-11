@@ -144,10 +144,8 @@ def test_neighbouring_paragraph_strategy():
                     "select": [
                         {
                             "prop": "related",
-                            "neighbours": {
-                                "before": 2,
-                                "after": 2,
-                            },
+                            "neighbours_before": 2,
+                            "neighbours_after": 2,
                         },
                     ],
                     "from": "paragraphs",
