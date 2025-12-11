@@ -55,9 +55,17 @@ from nucliadb_protos import resources_pb2 as rpb2
 from nucliadb_protos import writer_pb2 as wpb2
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
+
+# TODO: remove this after CI check
+if has_feature(const.Features.ASK_DECOUPLED, context={"kbid": "kbid"}):
+    print("Running tests with ASK_DECOUPLED FF enabled")
+else:
+    print("Running tests with ASK_DECOUPLED FF disabled")
 
 
 @pytest.fixture(scope="function", autouse=True)
