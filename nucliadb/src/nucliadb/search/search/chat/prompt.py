@@ -437,7 +437,6 @@ async def extend_prompt_context_with_metadata(
         # nothing to augment
         return
 
-    # TODO: replace this call for sdk.augment or similar
     augmented = await rpc.augment(kbid, augment_req)
 
     for tb_id in text_block_ids:
