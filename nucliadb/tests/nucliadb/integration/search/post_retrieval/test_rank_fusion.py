@@ -18,19 +18,21 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+
 import pytest
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
 
 from nucliadb.models.internal.retrieval import RetrievalRequest
 from nucliadb.search.search import find, find_merge
-from nucliadb.search.search.chat import query
+from nucliadb.search.search.chat.query import rpc
 from nucliadb_models.search import (
     SCORE_TYPE,
     KnowledgeboxFindResults,
     ReciprocalRankFusion,
     RerankerName,
 )
+from nucliadb_utils.featureflagging import Settings
 
 
 @pytest.mark.parametrize(
@@ -94,6 +96,7 @@ def get_score_types(results: KnowledgeboxFindResults) -> set[SCORE_TYPE]:
     return score_types
 
 
+@pytest.mark.skipif(Settings().disable_ask_decoupled_ff, reason="refactored spy")
 @pytest.mark.deploy_modes("standalone")
 async def test_reciprocal_rank_fusion_requests_more_results(
     nucliadb_reader: AsyncClient,
@@ -119,7 +122,7 @@ async def test_reciprocal_rank_fusion_requests_more_results(
 
     # Test /ask
 
-    spy_retrieve = mocker.spy(query, "retrieve")
+    spy_retrieve = mocker.spy(rpc, "retrieve")
 
     ask_resp = await nucliadb_reader.post(
         f"/kb/{kbid}/ask",

@@ -17,12 +17,26 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from dataclasses import dataclass
+from enum import Enum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Discriminator, Field, StringConstraints, Tag, model_validator
+from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
 from typing_extensions import Self
 
-from nucliadb_models import hydration
+import nucliadb_models
+from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb_models import filters, hydration
+from nucliadb_models.augment import ResourceId
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.conversation import FieldConversation
+from nucliadb_models.file import FieldFile
+from nucliadb_models.link import FieldLink
+from nucliadb_models.metadata import Extra, Origin
+from nucliadb_models.resource import ExtractedDataTypeName, Resource
+from nucliadb_models.search import ResourceProperties, SearchParamDefaults
+from nucliadb_protos import resources_pb2
 
 
 class SelectProp(BaseModel):
@@ -49,36 +63,91 @@ def from_discriminator(v: Any) -> str | None:
         return getattr(v, "from", None)
 
 
-# Ids
+# Complex ids
 
-ResourceIdPattern = r"^[0-9a-f]{32}$"
-ResourceId = Annotated[
-    str,
-    StringConstraints(pattern=ResourceIdPattern, min_length=32, max_length=32),
-]
 
-FieldIdPattern = r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+(/[^/]{1,128})?$"
-FieldId = Annotated[
-    str,
-    StringConstraints(
-        pattern=FieldIdPattern,
-        min_length=32 + 1 + 1 + 1 + 1 + 0 + 0,
-        # max field id of 250
-        max_length=32 + 1 + 1 + 1 + 250 + 1 + 218,
-    ),
-]
+class Metadata(BaseModel):
+    is_an_image: bool
+    is_a_table: bool
 
-ParagraphIdPattern = r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+(/[^/]{1,128})?/[0-9]+-[0-9]+$"
-ParagraphId = Annotated[
-    str,
-    StringConstraints(
-        # resource-uuid/field-type/field-id/[split-id/]paragraph-id
-        pattern=ParagraphIdPattern,
-        min_length=32 + 1 + 1 + 1 + 1 + 0 + 0 + 1 + 3,
-        # max field id of 250 and 10 digit paragraphs. More than enough
-        max_length=32 + 1 + 1 + 1 + 250 + 1 + 128 + 1 + 21,
-    ),
-]
+    # for extracted from visual content (ocr, inception, tables)
+    source_file: str | None
+
+    # for documents (pdf, docx...) only
+    page: int | None
+    in_page_with_visual: bool | None
+
+    @classmethod
+    def unknown(cls) -> Self:
+        return cls(
+            is_an_image=False,
+            is_a_table=False,
+            source_file=None,
+            page=None,
+            in_page_with_visual=None,
+        )
+
+    @classmethod
+    def from_text_block_match(cls, text_block: TextBlockMatch) -> Self:
+        return cls(
+            is_an_image=text_block.is_an_image,
+            is_a_table=text_block.is_a_table,
+            source_file=text_block.representation_file,
+            page=text_block.position.page_number,
+            in_page_with_visual=text_block.page_with_visual,
+        )
+
+    @classmethod
+    def from_db_paragraph(cls, paragraph: resources_pb2.Paragraph) -> Self:
+        is_an_image = paragraph.kind not in (
+            resources_pb2.Paragraph.TypeParagraph.OCR,
+            resources_pb2.Paragraph.TypeParagraph.INCEPTION,
+        )
+        # REVIEW: can a paragraph be of a different type and still be a table?
+        is_a_table = (
+            paragraph.kind == resources_pb2.Paragraph.TypeParagraph.TABLE
+            or paragraph.representation.is_a_table
+        )
+
+        if paragraph.representation.reference_file:
+            source_file = paragraph.representation.reference_file
+        else:
+            source_file = None
+
+        if paragraph.HasField("page"):
+            page = paragraph.page.page
+            in_page_with_visual = paragraph.page.page_with_visual
+        else:
+            page = None
+            in_page_with_visual = None
+
+        return cls(
+            is_an_image=is_an_image,
+            is_a_table=is_a_table,
+            source_file=source_file,
+            page=page,
+            in_page_with_visual=in_page_with_visual,
+        )
+
+
+class Paragraph(BaseModel):
+    id: ParagraphId
+    metadata: Metadata | None = None
+
+    @classmethod
+    def from_text_block_match(cls, text_block: TextBlockMatch) -> Self:
+        return cls(
+            id=text_block.paragraph_id,
+            metadata=Metadata.from_text_block_match(text_block),
+        )
+
+    @classmethod
+    def from_db_paragraph(cls, id: ParagraphId, paragraph: resources_pb2.Paragraph) -> Self:
+        return cls(
+            id=id,
+            metadata=Metadata.from_db_paragraph(paragraph),
+        )
+
 
 # SELECT props
 
@@ -143,10 +212,22 @@ FieldProp = Annotated[
     (
         Annotated[FieldText, Tag("text")]
         | Annotated[FieldValue, Tag("value")]
+        | Annotated[FieldClassificationLabels, Tag("classification_labels")]
         | Annotated[FieldEntities, Tag("entities")]
     ),
     Discriminator(prop_discriminator),
 ]
+
+
+class ConversationTextStrategy(str, Enum):
+    MESSAGE = "message"
+    PAGE = "page"
+    FULL = "full"
+
+
+class ConversationText(FieldText):
+    prop: Literal["text"] = "text"
+    strategy: ConversationTextStrategy = ConversationTextStrategy.MESSAGE
 
 
 class ConversationAttachments(SelectProp):
@@ -159,16 +240,17 @@ class ConversationAnswer(SelectProp):
     prop: Literal["answer"] = "answer"
 
 
-ConversationProp = (
-    FieldProp
-    | Annotated[
-        (
-            Annotated[ConversationAttachments, Tag("attachments")]
-            | Annotated[ConversationAnswer, Tag("answer")]
-        ),
-        Discriminator(prop_discriminator),
-    ]
-)
+ConversationProp = Annotated[
+    (
+        Annotated[ConversationText, Tag("text")]
+        | Annotated[FieldValue, Tag("value")]
+        | Annotated[FieldClassificationLabels, Tag("classification_labels")]
+        | Annotated[FieldEntities, Tag("entities")]
+        | Annotated[ConversationAttachments, Tag("attachments")]
+        | Annotated[ConversationAnswer, Tag("answer")]
+    ),
+    Discriminator(prop_discriminator),
+]
 
 
 class ResourceTitle(SelectProp):
@@ -239,6 +321,17 @@ class ResourceAugment(BaseModel, extra="forbid"):
     from_: Literal["resources"] = Field(default="resources", alias="from")
 
 
+class DeepResourceAugment(BaseModel, extra="forbid"):
+    given: list[ResourceId]
+
+    # old style serialization parameters
+    show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
+    extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
+    field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+
+    from_: Literal["resources.deep"] = Field(default="resources.deep", alias="from")
+
+
 class ConversationAugmentLimits(BaseModel):
     max_messages: int | None = Field(default=15, ge=0)
 
@@ -251,14 +344,14 @@ class ConversationAugment(BaseModel, extra="forbid"):
 
 
 class FieldAugment(BaseModel, extra="forbid"):
-    given: list[ResourceId | FieldId | ParagraphId]
+    given: list[ResourceId] | list[FieldId] | list[ParagraphId]
     select: list[FieldProp]
     from_: Literal["fields"] = Field(default="fields", alias="from")
-    filter: Any | None = None
+    filter: list[filters.Field | filters.Generated] | None = None
 
 
 class ParagraphAugment(BaseModel, extra="forbid"):
-    given: list[ParagraphId]
+    given: list[Paragraph]
     select: list[ParagraphProp]
     from_: Literal["paragraphs"] = Field(default="paragraphs", alias="from")
 
@@ -271,6 +364,7 @@ class AugmentationLimits(BaseModel, extra="forbid"):
 Augment = Annotated[
     (
         Annotated[ResourceAugment, Tag("resources")]
+        | Annotated[DeepResourceAugment, Tag("resources.deep")]
         | Annotated[FieldAugment, Tag("fields")]
         | Annotated[ConversationAugment, Tag("conversations")]
         | Annotated[ParagraphAugment, Tag("paragraphs")]
@@ -289,3 +383,97 @@ class AugmentRequest(BaseModel, extra="forbid"):
         default=None,
         description="Global hydration limits applied to the whole request",
     )
+
+
+# Augmented data models
+
+
+@dataclass
+class AugmentedRelatedParagraphs:
+    neighbours_before: list[ParagraphId]
+    neighbours_after: list[ParagraphId]
+
+
+@dataclass
+class AugmentedParagraph:
+    id: ParagraphId
+
+    # textual representation of the paragraph
+    text: str | None
+
+    # original image for the paragraph when it has been extracted from an image
+    # or a table. This value is the path to be used in the download endpoint
+    source_image_path: str | None
+
+    # if the paragraph comes from a page, this is the path for the download
+    # endpoint to get the page preview image
+    page_preview_path: str | None
+
+    related: AugmentedRelatedParagraphs | None
+
+
+@dataclass
+class BaseAugmentedField:
+    id: FieldId
+
+    text: str | None = None
+
+    classification_labels: dict[str, set[str]] | None = None
+    entities: dict[str, set[str]] | None = None
+
+
+@dataclass
+class AugmentedTextField(BaseAugmentedField):
+    value: nucliadb_models.text.FieldText | None = None
+
+
+@dataclass
+class AugmentedFileField(BaseAugmentedField):
+    value: FieldFile | None = None
+
+
+@dataclass
+class AugmentedLinkField(BaseAugmentedField):
+    value: FieldLink | None = None
+
+
+@dataclass
+class AugmentedConversationField(BaseAugmentedField):
+    value: FieldConversation | None = None
+
+
+@dataclass
+class AugmentedGenericField(BaseAugmentedField):
+    value: str | None = None
+
+
+AugmentedField = (
+    BaseAugmentedField
+    | AugmentedTextField
+    | AugmentedFileField
+    | AugmentedLinkField
+    | AugmentedConversationField
+    | AugmentedGenericField
+)
+
+
+@dataclass
+class AugmentedResource:
+    id: str
+
+    title: str | None
+    summary: str | None
+
+    origin: Origin | None
+    extra: Extra | None
+    security: nucliadb_models.security.ResourceSecurity | None
+
+    classification_labels: dict[str, set[str]] | None
+
+
+@dataclass
+class Augmented:
+    resources: dict[str, AugmentedResource]
+    resources_deep: dict[str, Resource]
+    fields: dict[FieldId, AugmentedField]
+    paragraphs: dict[ParagraphId, AugmentedParagraph]

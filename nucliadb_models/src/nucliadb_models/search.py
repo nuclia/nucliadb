@@ -2062,8 +2062,10 @@ class FindResource(Resource):
     fields: dict[str, FindField]
 
     def updated_from(self, origin: Resource):
+        find_resource_model_fields = self.model_fields.keys()
         for key in origin.model_fields.keys():
-            self.__setattr__(key, getattr(origin, key))
+            if key in find_resource_model_fields:
+                self.__setattr__(key, getattr(origin, key))
 
 
 class KnowledgeboxFindResults(JsonBaseModel):

@@ -210,8 +210,20 @@ async def hydrate_paragraph(
             # otherwise, this is a fake paragraph. We can't hydrate anything else here
 
             if config.related:
+                if config.related.neighbours is not None:
+                    before = config.related.neighbours.before
+                    after = config.related.neighbours.after
+                else:
+                    before, after = None, None
+
                 hydrated.related, related_ids = await related_paragraphs_refs(
-                    paragraph_id, field_paragraphs_index, config.related
+                    paragraph_id,
+                    field_paragraphs_index,
+                    neighbours_before=before,
+                    neighbours_after=after,
+                    parents=config.related.parents or False,
+                    siblings=config.related.siblings or False,
+                    replacements=config.related.replacements or False,
                 )
                 extra_hydration.related_paragraph_ids = related_ids
 
@@ -259,7 +271,12 @@ async def hydrate_paragraph(
 async def related_paragraphs_refs(
     paragraph_id: ParagraphId,
     index: ParagraphIndex,
-    config: hydration_models.RelatedParagraphHydration,
+    *,
+    neighbours_before: Optional[int] = None,
+    neighbours_after: Optional[int] = None,
+    parents: bool = False,
+    siblings: bool = False,
+    replacements: bool = False,
 ) -> tuple[hydration_models.RelatedParagraphRefs, list[ParagraphId]]:
     """Compute the related paragraph references for a specific `paragraph_id`
     and return them with the plain list of unique related paragraphs (to
@@ -269,36 +286,36 @@ async def related_paragraphs_refs(
     hydrated = hydration_models.RelatedParagraphRefs()
     related = set()
 
-    if config.neighbours:
+    if neighbours_before or neighbours_after:
         hydrated.neighbours = hydration_models.RelatedNeighbourParagraphRefs()
 
-        if config.neighbours.before is not None:
+        if neighbours_before is not None:
             hydrated.neighbours.before = []
-            if config.neighbours.before > 0:
-                for previous_id in index.n_previous(paragraph_id, config.neighbours.before):
+            if neighbours_before > 0:
+                for previous_id in index.n_previous(paragraph_id, neighbours_before):
                     hydrated.neighbours.before.insert(0, previous_id)
                     related.add(ParagraphId.from_string(previous_id))
 
-        if config.neighbours.after is not None:
+        if neighbours_after is not None:
             hydrated.neighbours.after = []
-            if config.neighbours.after > 0:
-                for next_id in index.n_next(paragraph_id, config.neighbours.after):
+            if neighbours_after > 0:
+                for next_id in index.n_next(paragraph_id, neighbours_after):
                     hydrated.neighbours.after.append(next_id)
                     related.add(ParagraphId.from_string(next_id))
 
-    if config.parents:
+    if parents:
         hydrated.parents = []
         for parent_id in index.parents(paragraph_id):
             hydrated.parents.append(parent_id)
             related.add(ParagraphId.from_string(parent_id))
 
-    if config.siblings:
+    if siblings:
         hydrated.siblings = []
         for sibling_id in index.siblings(paragraph_id):
             hydrated.siblings.append(sibling_id)
             related.add(ParagraphId.from_string(sibling_id))
 
-    if config.replacements:
+    if replacements:
         hydrated.replacements = []
         for replacement_id in index.replacements(paragraph_id):
             hydrated.replacements.append(replacement_id)

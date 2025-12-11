@@ -262,6 +262,9 @@ jobs:
     needs:
       - build-nidx-binary
       - build-virtual-env
+    strategy:
+      matrix:
+        disable_ask_decoupled_ff: [ true, false ]
     steps:
       - uses: actions/checkout@v4
       - name: Setup Python
@@ -285,6 +288,8 @@ jobs:
         run: mkdir builds && mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
 
       - name: Run tests
+        env:
+          DISABLE_ASK_DECOUPLED_FF: "${{ matrix.disable_ask_decoupled_ff }}"
         run: source .venv/bin/activate && make -C nucliadb test-cov-search
 
       - name: Upload coverage to Codecov
@@ -304,6 +309,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [0, 1, 2]
+        disable_ask_decoupled_ff: [ true, false ]
 
     services:
       postgres:
@@ -337,6 +343,7 @@ jobs:
       - name: Run NucliaDB tests
         env:
           TESTING_PG_URL: "postgresql://postgres:postgres@localhost/postgres"
+          DISABLE_ASK_DECOUPLED_FF: "${{ matrix.disable_ask_decoupled_ff }}"
         run: |
           source .venv/bin/activate &&
           make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 4" ||

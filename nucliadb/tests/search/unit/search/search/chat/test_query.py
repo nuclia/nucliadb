@@ -84,7 +84,7 @@ async def test_get_find_results_vector_search_is_optional(predict, chat_features
     reranker = mock.AsyncMock()
 
     with mock.patch(
-        "nucliadb.search.search.chat.query.rao_find",
+        "nucliadb.search.search.chat.query.find_retrieval",
         return_value=(find_results, False, query_parser, reranker),
     ) as find_mock:
         await get_find_results(

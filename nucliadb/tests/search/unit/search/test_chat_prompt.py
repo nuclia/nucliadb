@@ -19,10 +19,11 @@
 import base64
 from unittest import mock
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 
 import pytest
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
+from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
 from nucliadb.search.search.chat import prompt as chat_prompt
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.search import (
@@ -326,12 +327,14 @@ def test_capped_prompt_context():
 
 
 async def test_hierarchy_promp_context(kb):
+    rid = uuid4().hex
+
     async def _get_paragraph_text(field, paragraph_id: ParagraphId):
         return {
-            "r1/f/f1/0-10": "First paragraph text",
-            "r1/f/f1/10-20": "Second paragraph text",
-            "r1/a/title/0-500": "Title text",
-            "r1/a/summary/0-1000": "Summary text",
+            f"{rid}/f/f1/0-10": "First paragraph text",
+            f"{rid}/f/f1/10-20": "Second paragraph text",
+            f"{rid}/a/title/0-500": "Title text",
+            f"{rid}/a/summary/0-1000": "Summary text",
         }[paragraph_id.full()]
 
     with (
@@ -344,20 +347,20 @@ async def test_hierarchy_promp_context(kb):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         find_results = KnowledgeboxFindResults(
             resources={
-                "r1": FindResource(
-                    id="r1",
+                f"{rid}": FindResource(
+                    id=f"{rid}",
                     fields={
                         "f/f1": FindField(
                             paragraphs={
-                                "r1/f/f1/0-10": FindParagraph(
-                                    id="r1/f/f1/0-10",
+                                f"{rid}/f/f1/0-10": FindParagraph(
+                                    id=f"{rid}/f/f1/0-10",
                                     score=10,
                                     score_type=SCORE_TYPE.BM25,
                                     order=0,
                                     text="First paragraph text",
                                 ),
-                                "r1/f/f1/10-20": FindParagraph(
-                                    id="r1/f/f1/10-20",
+                                f"{rid}/f/f1/10-20": FindParagraph(
+                                    id=f"{rid}/f/f1/10-20",
                                     score=8,
                                     score_type=SCORE_TYPE.BM25,
                                     order=1,
@@ -380,23 +383,27 @@ async def test_hierarchy_promp_context(kb):
             augmented_context=augmented_context,
         )
         assert (
-            context.output["r1/f/f1/0-10"]
+            context.output[f"{rid}/f/f1/0-10"]
             == "DOCUMENT: Title text \n SUMMARY: Summary text \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n First paragraph text \n\n \n EXTRACTED BLOCK: \n Second paragraph text"  # noqa
         )
         # Chec that the original text of the paragraphs is preserved
         assert ordered_paragraphs[0].text == "First paragraph text"
         assert ordered_paragraphs[1].text == "Second paragraph text"
 
-        assert augmented_context.paragraphs["r1/f/f1/0-10"].id == "r1/f/f1/0-10"
-        assert augmented_context.paragraphs["r1/f/f1/0-10"].text.startswith("DOCUMENT: Title")
-        assert augmented_context.paragraphs["r1/f/f1/0-10"].augmentation_type == "hierarchy"
+        assert augmented_context.paragraphs[f"{rid}/f/f1/0-10"].id == f"{rid}/f/f1/0-10"
+        assert augmented_context.paragraphs[f"{rid}/f/f1/0-10"].text.startswith("DOCUMENT: Title")
+        assert augmented_context.paragraphs[f"{rid}/f/f1/0-10"].augmentation_type == "hierarchy"
 
 
 async def test_extend_prompt_context_with_metadata():
+    rid = uuid4().hex
+
     origin = rpb2.Origin()
     origin.tags.extend(["tag1", "tag2"])
     origin.metadata.update({"foo": "bar"})
+
     basic = rpb2.Basic()
+    basic.uuid = rid
     basic.usermetadata.classifications.append(rpb2.Classification(labelset="ls", label="l1"))
     basic.computedmetadata.field_classifications.append(
         rpb2.FieldClassifications(field=rpb2.FieldID(field="f1", field_type=rpb2.FieldType.FILE))
@@ -404,20 +411,25 @@ async def test_extend_prompt_context_with_metadata():
     basic.computedmetadata.field_classifications[0].classifications.append(
         rpb2.Classification(labelset="ls", label="l2")
     )
+
     extra = rpb2.Extra()
     extra.metadata.update({"key": "value"})
-    resource = mock.Mock()
-    resource.get_origin = AsyncMock(return_value=origin)
-    resource.get_basic = AsyncMock(return_value=basic)
+
     field = mock.Mock()
     fcm = rpb2.FieldComputedMetadata()
     fcm.metadata.entities["processor"].entities.extend(
         [rpb2.FieldEntity(text="Barcelona", label="LOCATION")]
     )
-
     field.get_field_metadata = AsyncMock(return_value=fcm)
+    field.field_id = FieldId.from_string(f"{rid}/f/f1")
+
+    resource = mock.Mock()
+    resource.uuid = rid
+    resource.get_origin = AsyncMock(return_value=origin)
+    resource.get_basic = AsyncMock(return_value=basic)
     resource.get_field = AsyncMock(return_value=field)
     resource.get_extra = AsyncMock(return_value=extra)
+    resource.field_exists = AsyncMock(return_value=True)
     with (
         mock.patch(
             "nucliadb.search.search.chat.prompt.cache.get_resource",
@@ -426,7 +438,7 @@ async def test_extend_prompt_context_with_metadata():
         mock.patch("nucliadb.search.augmentor.resources.get_basic", return_value=basic),
         mock.patch("nucliadb.search.augmentor.fields.get_basic", return_value=basic),
     ):
-        paragraph_id = ParagraphId.from_string("r1/f/f1/0-10")
+        paragraph_id = ParagraphId.from_string(f"{rid}/f/f1/0-10")
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         context[paragraph_id.full()] = "Paragraph text"
         kbid = "foo"

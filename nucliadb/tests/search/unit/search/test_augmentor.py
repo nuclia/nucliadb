@@ -20,8 +20,7 @@
 from unittest.mock import Mock, patch
 
 from nucliadb.common.ids import ParagraphId
-from nucliadb.models.internal.augment import ParagraphText
-from nucliadb.search.augmentor.models import Metadata
+from nucliadb.models.internal.augment import Metadata, ParagraphText
 from nucliadb.search.augmentor.paragraphs import db_augment_paragraph
 from nucliadb.search.augmentor.resources import augment_resource_deep
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
