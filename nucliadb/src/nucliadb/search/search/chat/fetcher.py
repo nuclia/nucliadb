@@ -20,15 +20,18 @@
 
 from typing import Optional
 
+from google.protobuf.json_format import ParseDict
+
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError, convert_relations
 from nucliadb.search.predict_models import QueryModel
+from nucliadb.search.search.chat import rpc
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.search import Image, MaxTokens
-from nucliadb_protos import utils_pb2
+from nucliadb_protos import knowledgebox_pb2, utils_pb2
 
 
 class RAOFetcher(Fetcher):
@@ -135,6 +138,18 @@ class RAOFetcher(Fetcher):
 
         query_vector = query_info.sentence.vectors[vectorset]
         return query_vector
+
+    async def get_classification_labels(self) -> knowledgebox_pb2.Labels:
+        labelsets = await rpc.labelsets(self.kbid)
+
+        # TODO: remove this conversion and refactor code to use API models instead of protobuf
+        kb_labels = knowledgebox_pb2.Labels()
+        for labelset, labels in labelsets.labelsets.items():
+            labelset_pb = knowledgebox_pb2.LabelSet()
+            ParseDict(labels.model_dump(), labelset_pb)
+            kb_labels.labelset[labelset] = labelset_pb
+
+        return kb_labels
 
     # Generative
 
