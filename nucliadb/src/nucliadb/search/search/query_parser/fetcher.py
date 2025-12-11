@@ -338,7 +338,7 @@ class Fetcher:
                     "vectorset", f"Vectorset {vectorset} doesn't exist in your Knowledge Box"
                 )
 
-    @alru_cache(maxsize=None)
+    @alru_cache(maxsize=10)
     async def get_matryoshka_dimension_cached(self, kbid: str, vectorset: str) -> Optional[int]:
         # This can be safely cached as the matryoshka dimension is not expected to change
         return await get_matryoshka_dimension(kbid, vectorset)
