@@ -57,6 +57,7 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
+from tests.ndbfixtures.resources import cookie_tale_resource
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
@@ -703,6 +704,38 @@ async def test_ask_on_resource(nucliadb_reader: AsyncClient, standalone_knowledg
     )
     assert resp.status_code == 200
     SyncAskResponse.model_validate_json(resp.content)
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_with_old_filters(
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    # Simple test trying to filter by a label using old filters. This tests the
+    # filter conversion in the decoupled /ask
+
+    kbid = standalone_knowledgebox
+    await cookie_tale_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={"query": "cookies", "features": ["keyword"], "filters": ["/metadata.language/en"]},
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    ask_resp = SyncAskResponse.model_validate_json(resp.content)
+    assert len(ask_resp.retrieval_best_matches) == 6
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        json={"query": "cookies", "features": ["keyword"], "filters": ["/metadata.language/fr"]},
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    ask_resp = SyncAskResponse.model_validate_json(resp.content)
+    assert len(ask_resp.retrieval_best_matches) == 0
 
 
 @pytest.mark.deploy_modes("standalone")

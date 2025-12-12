@@ -19,11 +19,12 @@
 #
 
 import logging
-from typing import Optional, Union
+from typing import Optional, Type, Union
 
 from pydantic import ValidationError
 
 from nucliadb.common.exceptions import InvalidQueryError
+from nucliadb.common.filter_expression import filter_from_facet
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
 from nucliadb.models.internal import retrieval as retrieval_models
 from nucliadb.models.internal.retrieval import RetrievalRequest
@@ -32,6 +33,7 @@ from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.models import (
     RelationQuery,
 )
+from nucliadb.search.search.query_parser.old_filters import is_paragraph_label, translate_label
 from nucliadb.search.search.query_parser.parsers.common import (
     parse_keyword_min_score,
     should_disable_vector_search,
@@ -39,9 +41,21 @@ from nucliadb.search.search.query_parser.parsers.common import (
 from nucliadb.search.search.rerankers import NoopReranker, PredictReranker, Reranker
 from nucliadb_models import search as search_models
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.filters import FilterExpression
-from nucliadb_models.search import FindRequest
-from nucliadb_protos import utils_pb2
+from nucliadb_models.filters import (
+    And,
+    DateCreated,
+    DateModified,
+    Field,
+    FieldFilterExpression,
+    FilterExpression,
+    Keyword,
+    Not,
+    Or,
+    ParagraphFilterExpression,
+    Resource,
+)
+from nucliadb_models.search import Filter, FindRequest
+from nucliadb_protos import knowledgebox_pb2, utils_pb2
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +114,6 @@ class RAOFindParser:
         if search_models.FindOptions.GRAPH in self.item.features:
             self._query.graph = await self._parse_graph_query()
 
-        # TODO: finish old filter convert
         filters = await self._parse_filters()
 
         # rank fusion is just forwarded to /retrieve
@@ -205,19 +218,6 @@ class RAOFindParser:
         if has_old_filters:
             # convert old filters into a filter expression
 
-            from nucliadb_models.filters import (
-                And,
-                DateCreated,
-                DateModified,
-                Field,
-                FieldFilterExpression,
-                Keyword,
-                Not,
-                Or,
-                ParagraphFilterExpression,
-                Resource,
-            )
-
             operator = FilterExpression.Operator.AND
             field_expression: list[FieldFilterExpression] = []
             paragraph_expression: list[ParagraphFilterExpression] = []
@@ -239,16 +239,14 @@ class RAOFindParser:
                 )
 
             if self.item.filters:
-                # TODO: label filters
-                #
-                # This conversion is quite costly, as requires access to the
-                # knowledge box labels. The deprecated filters parameter allow
-                # users to mix field and paragraph filters, but to convert them
-                # into a filter expression we need to distinguish them. From
-                # outside NucliaDB, the only thing we could do is calling the
-                # /labelsets endpoint, but this would be costly for a deprecated
-                # parameter. Do we want to?
-                ...
+                classification_labels = await self.fetcher.get_classification_labels()
+                field_exprs, paragraph_expr = convert_labels_to_filter_expressions(
+                    self.item.filters, classification_labels
+                )
+                if field_exprs:
+                    field_expression.extend(field_exprs)
+                if paragraph_expr:
+                    paragraph_expression.append(paragraph_expr)
 
             if self.item.keyword_filters:
                 # keyword filters
@@ -256,15 +254,16 @@ class RAOFindParser:
                     if isinstance(keyword_filter, str):
                         field_expression.append(Keyword(word=keyword_filter))
                     else:
+                        # model validates that one and only one of these match
                         if keyword_filter.all:
                             field_expression.append(
                                 And(operands=[Keyword(word=word) for word in keyword_filter.all])
                             )
-                        if keyword_filter.any:
+                        elif keyword_filter.any:
                             field_expression.append(
                                 Or(operands=[Keyword(word=word) for word in keyword_filter.any])
                             )
-                        if keyword_filter.none:
+                        elif keyword_filter.none:
                             field_expression.append(
                                 Not(
                                     operand=Or(
@@ -272,10 +271,10 @@ class RAOFindParser:
                                     )
                                 )
                             )
-                        if keyword_filter.not_all:
+                        elif keyword_filter.not_all:
                             field_expression.append(
                                 Not(
-                                    operand=Or(
+                                    operand=And(
                                         operands=[Keyword(word=word) for word in keyword_filter.not_all]
                                     )
                                 )
@@ -306,16 +305,17 @@ class RAOFindParser:
                     if len(parts) == 1:
                         operands.append(Resource(id=parts[0]))
                     else:
+                        rid = parts[0]
                         try:
-                            field_type = FieldTypeName.from_abbreviation(parts[0])
+                            field_type = FieldTypeName.from_abbreviation(parts[1])
                         except KeyError:  # pragma: no cover
                             raise InvalidQueryError(
                                 "resource_filters",
-                                f"resource filter {key} has an invalid field type: {parts[0]}",
+                                f"resource filter {key} has an invalid field type: {parts[1]}",
                             )
                         field_id = parts[2] if len(parts) > 2 else None
                         operands.append(
-                            And(operands=[Resource(id=parts[0]), Field(type=field_type, name=field_id)])
+                            And(operands=[Resource(id=rid), Field(type=field_type, name=field_id)])
                         )
 
                 if len(operands) == 1:
@@ -432,3 +432,83 @@ async def parse_semantic_min_score(
             min_score = DEFAULT_GENERIC_SEMANTIC_THRESHOLD
 
     return min_score
+
+
+def convert_labels_to_filter_expressions(
+    label_filters: Union[list[str], list[Filter]], classification_labels: knowledgebox_pb2.Labels
+) -> tuple[list[FieldFilterExpression], ParagraphFilterExpression | None]:
+    field_expressions: list[FieldFilterExpression] = []
+    paragraph_expressions: list[ParagraphFilterExpression] = []
+
+    for label_filter in label_filters:
+        if isinstance(label_filter, str):
+            # translate_label
+            if len(label_filter) == 0:
+                raise InvalidQueryError("filters", "Invalid empty label")
+            if label_filter[0] != "/":
+                raise InvalidQueryError(
+                    "filters", f"Invalid label. It must start with a `/`: {label_filter}"
+                )
+
+            label = translate_label(label_filter)
+            facet_filter = filter_from_facet(label)
+
+            if is_paragraph_label(label, classification_labels):
+                paragraph_expressions.append(facet_filter)  # type: ignore[arg-type]
+            else:
+                field_expressions.append(facet_filter)  # type: ignore[arg-type]
+
+        else:
+            combinator: Union[Type[And[FieldFilterExpression]], Type[Or[FieldFilterExpression]]]
+            if label_filter.all:
+                labels = label_filter.all
+                combinator, negate = And, False
+            if label_filter.any:
+                labels = label_filter.any
+                combinator, negate = Or, False
+            if label_filter.none:
+                labels = label_filter.none
+                combinator, negate = And, True
+            if label_filter.not_all:
+                labels = label_filter.not_all
+                combinator, negate = Or, True
+
+            # equivalent to split_labels
+            field = []
+            paragraph = []
+            for label in labels:
+                label = translate_label(label)
+                expr = filter_from_facet(label)
+
+                if negate:
+                    expr = Not(operand=expr)  # type: ignore
+
+                if is_paragraph_label(label, classification_labels):
+                    paragraph.append(expr)
+                else:
+                    field.append(expr)
+
+            if len(paragraph) > 0 and not (combinator == And and negate is False):
+                raise InvalidQueryError(
+                    "filters",
+                    "Paragraph labels can only be used with 'all' filter",
+                )
+
+            if len(field) == 1:
+                field_expressions.append(field[0])  # type: ignore
+            elif len(field) > 1:
+                field_expressions.append(combinator(operands=field))  # type: ignore
+
+            if len(paragraph) == 1:
+                paragraph_expressions.append(paragraph[0])  # type: ignore
+            elif len(paragraph) > 1:
+                paragraph_expressions.append(combinator(operands=paragraph))  # type: ignore
+
+    if len(paragraph_expressions) == 1:
+        paragraph_expression = paragraph_expressions[0]  # type: ignore
+    elif len(paragraph_expressions) > 1:
+        paragraph_expression = And(operands=paragraph_expressions)  # type: ignore
+    else:
+        paragraph_expression = None
+
+    return field_expressions, paragraph_expression

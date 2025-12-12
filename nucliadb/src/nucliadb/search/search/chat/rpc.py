@@ -21,6 +21,7 @@
 from nucliadb.models.internal.retrieval import RetrievalRequest, RetrievalResponse
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.augment import AugmentRequest, AugmentResponse
+from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.search import FindRequest, KnowledgeboxFindResults, NucliaDBClientType
 
 
@@ -67,3 +68,10 @@ async def augment(kbid: str, item: AugmentRequest) -> AugmentResponse:
     from nucliadb.search.api.v1.augment import augment_endpoint
 
     return await augment_endpoint(kbid, item)
+
+
+# TODO: replace this for a sdk.labelsets call when moving /ask to RAO
+async def labelsets(kbid: str) -> KnowledgeBoxLabels:
+    from nucliadb.reader.api.v1.services import get_labelsets
+
+    return await get_labelsets(kbid)
