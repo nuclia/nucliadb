@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing_extensions import assert_never
+
 from nucliadb.common import datamanagers
 from nucliadb.common.catalog.interface import CatalogExpression, CatalogQuery
 from nucliadb.common.exceptions import InvalidQueryError
@@ -191,8 +193,6 @@ async def parse_filter_expression(expr: ResourceFilterExpression, kbid: str) -> 
     elif isinstance(expr, FacetFilter):
         cat.facet = facet_from_filter(expr)
     else:
-        # This is a trick so mypy generates an error if this branch can be reached,
-        # that is, if we are missing some ifs
-        _a: int = "a"
+        assert_never(expr)
 
     return cat

@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing_extensions import assert_never
+
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_NAME, FieldId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.models.internal.augment import ConversationProp, FieldProp, FieldText, FieldValue
@@ -65,9 +67,7 @@ async def hydrate_field(field: Field, field_id: FieldId, config: hydration_model
         return await hydrate_generic_field(field, field_id, config.generic)
 
     else:  # pragma: no cover
-        # This is a trick so mypy generates an error if this branch can be reached,
-        # that is, if we are missing some ifs
-        _a: int = "a"
+        assert_never(field_type)
 
 
 async def hydrate_text_field(

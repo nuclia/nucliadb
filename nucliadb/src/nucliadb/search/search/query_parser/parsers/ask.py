@@ -19,6 +19,8 @@
 #
 from typing import Optional
 
+from typing_extensions import assert_never
+
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
     Generation,
@@ -64,9 +66,7 @@ class _AskParser:
         elif isinstance(self.item.max_tokens, MaxTokens):
             max_tokens = self.item.max_tokens
         else:  # pragma: no cover
-            # This is a trick so mypy generates an error if this branch can be reached,
-            # that is, if we are missing some ifs
-            _a: int = "a"
+            assert_never(self.item.max_tokens)
 
         max_context_tokens = await self.fetcher.get_max_context_tokens(max_tokens)
         max_answer_tokens = self.fetcher.get_max_answer_tokens(max_tokens)

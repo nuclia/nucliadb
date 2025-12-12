@@ -21,6 +21,7 @@
 from typing import Optional, Union
 
 from nidx_protos import nodereader_pb2
+from typing_extensions import assert_never
 
 from nucliadb.common.filter_expression import add_and_expression, parse_expression
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap, RelationTypeMap
@@ -154,9 +155,7 @@ def parse_path_query(expr: graph_requests.GraphPathQuery) -> nodereader_pb2.Grap
         _set_generated_to_pb(expr, pb)
 
     else:  # pragma: no cover
-        # This is a trick so mypy generates an error if this branch can be reached,
-        # that is, if we are missing some ifs
-        _a: int = "a"
+        assert_never(expr)
 
     return pb
 
@@ -183,9 +182,7 @@ def _parse_node_query(expr: graph_requests.GraphNodesQuery) -> nodereader_pb2.Gr
         _set_generated_to_pb(expr, pb)
 
     else:  # pragma: no cover
-        # This is a trick so mypy generates an error if this branch can be reached,
-        # that is, if we are missing some ifs
-        _a: int = "a"
+        assert_never(expr)
 
     return pb
 
@@ -213,9 +210,7 @@ def _parse_relation_query(
         _set_generated_to_pb(expr, pb)
 
     else:  # pragma: no cover
-        # This is a trick so mypy generates an error if this branch can be reached,
-        # that is, if we are missing some ifs
-        _a: int = "a"
+        assert_never(expr)
 
     return pb
 
@@ -231,9 +226,7 @@ def _set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuer
             pb.fuzzy.distance = 1
 
         else:  # pragma: no cover
-            # This is a trick so mypy generates an error if this branch can be reached,
-            # that is, if we are missing some ifs
-            _a: int = "a"
+            assert_never(node.match)
 
     if node.type is not None:
         pb.node_type = RelationNodeTypeMap[node.type]
@@ -264,6 +257,4 @@ def _set_generated_to_pb(generated: graph_requests.Generated, pb: nodereader_pb2
         pb.facet.facet = facet
 
     else:  # pragma: no cover
-        # This is a trick so mypy generates an error if this branch can be reached,
-        # that is, if we are missing some ifs
-        _a: int = "a"
+        assert_never(generated.by)

@@ -25,6 +25,7 @@ from typing import Any, Literal, Union, cast
 
 from psycopg import AsyncCursor, sql
 from psycopg.rows import DictRow, dict_row
+from typing_extensions import assert_never
 
 from nucliadb.common.catalog.interface import (
     Catalog,
@@ -388,10 +389,7 @@ def _prepare_query_search(query: search_models.CatalogQuery, params: dict[str, A
         params["query"] = "%" + query.query + "%"
         return sql.SQL("title ILIKE %(query)s")
     else:  # pragma: no cover
-        # This is a trick so mypy generates an error if this branch can be reached,
-        # that is, if we are missing some ifs
-        _a: int = "a"
-        return sql.SQL("")
+        assert_never(query.match)
 
 
 def _convert_filter(expr: CatalogExpression, filter_params: dict[str, Any]) -> sql.Composable:
