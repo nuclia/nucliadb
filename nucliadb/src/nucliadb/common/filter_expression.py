@@ -21,6 +21,7 @@
 from typing import Union
 
 from nidx_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
+from typing_extensions import assert_never
 
 from nucliadb.common import datamanagers
 from nucliadb.common.exceptions import InvalidQueryError
@@ -119,9 +120,7 @@ async def parse_expression(
     elif isinstance(expr, FacetFilter):
         f.facet.facet = facet_from_filter(expr)
     else:
-        # This is a trick so mypy generates an error if this branch can be reached,
-        # that is, if we are missing some ifs
-        _a: int = "a"
+        assert_never(expr)
 
     return f
 
@@ -175,9 +174,7 @@ def facet_from_filter(expr: FacetFilter) -> str:
     elif isinstance(expr, Status):
         facet = f"/n/s/{expr.status.value}"
     else:
-        # This is a trick so mypy generates an error if this branch can be reached,
-        # that is, if we are missing some ifs
-        _a: int = "a"
+        assert_never(expr)
 
     return facet
 

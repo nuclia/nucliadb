@@ -20,6 +20,8 @@
 import base64
 from typing import Optional, cast
 
+from typing_extensions import assert_never
+
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_NAME, FieldId, ParagraphId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.file import File
@@ -123,8 +125,6 @@ async def download_page_preview(field: Field, page: int) -> Optional[Image]:
         image = None
 
     else:  # pragma: no cover
-        # This is a trick so mypy generates an error if this branch can be reached,
-        # that is, if we are missing some ifs
-        _a: int = "a"
+        assert_never(field_type)
 
     return image

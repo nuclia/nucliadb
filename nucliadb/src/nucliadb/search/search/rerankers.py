@@ -23,6 +23,8 @@ from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from typing import Optional
 
+from typing_extensions import assert_never
+
 from nucliadb.search.predict import ProxiedPredictAPIError, SendToPredictError
 from nucliadb.search.search.query_parser import models as parser_models
 from nucliadb.search.utilities import get_predict
@@ -182,9 +184,7 @@ def get_reranker(reranker: parser_models.Reranker) -> Reranker:
         algorithm = PredictReranker(reranker.window)
 
     else:  # pragma: no cover
-        # This is a trick so mypy generates an error if this branch can be reached,
-        # that is, if we are missing some ifs
-        _a: int = "a"
+        assert_never(reranker)
 
     return algorithm
 

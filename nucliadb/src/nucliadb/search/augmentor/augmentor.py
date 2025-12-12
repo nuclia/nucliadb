@@ -20,6 +20,8 @@
 import asyncio
 from typing import Any
 
+from typing_extensions import assert_never
+
 import nucliadb_models
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR, FieldId, ParagraphId
@@ -70,9 +72,7 @@ async def augment(
                 elif isinstance(id, ParagraphId):
                     rid = id.rid
                 else:  # pragma: no cover
-                    # This is a trick so mypy generates an error if this branch can be reached,
-                    # that is, if we are missing some ifs
-                    _a: int = "a"
+                    assert_never(id)
 
                 augments["resources"].setdefault(rid, []).extend(augmentation.select)
 
@@ -111,9 +111,7 @@ async def augment(
                     unfiltered_field_ids.append(id.field_id)
 
                 else:  # pragma: no cover
-                    # This is a trick so mypy generates an error if this branch can be reached,
-                    # that is, if we are missing some ifs
-                    _b: int = "b"
+                    assert_never(id)
 
             if not augmentation.filter:
                 field_ids = unfiltered_field_ids
@@ -136,9 +134,7 @@ async def augment(
                                 field_ids.append(field_id)
 
                         else:  # pragma: no cover
-                            # This is a trick so mypy generates an error if this branch can be reached,
-                            # that is, if we are missing some ifs
-                            _c: int = "c"
+                            assert_never(filter)
 
             for field_id in field_ids:
                 augments["fields"].setdefault(field_id, []).extend(augmentation.select)
@@ -155,9 +151,7 @@ async def augment(
                 augments["paragraphs"][paragraph.id] = (select, metadata)
 
         else:  # pragma: no cover
-            # This is a trick so mypy generates an error if this branch can be reached,
-            # that is, if we are missing some ifs
-            _d: int = "d"
+            assert_never(augmentation.from_)
 
     ops = {  # type: ignore[var-annotated]
         "resources": [],
