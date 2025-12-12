@@ -18,11 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod common;
-
 use std::collections::HashMap;
 
-use common::services::NidxFixture;
+use crate::common::services::NidxFixture;
 use nidx_protos::filter_expression::date_range_filter::DateField;
 use nidx_protos::filter_expression::{DateRangeFilter, Expr, FilterExpressionList};
 use nidx_protos::prost_types::Timestamp;

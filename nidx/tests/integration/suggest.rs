@@ -18,9 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod common;
-
-use common::services::NidxFixture;
+use crate::common::services::NidxFixture;
 use itertools::Itertools;
 use nidx_protos::{
     FilterExpression, NewShardRequest, SuggestFeatures, SuggestRequest, SuggestResponse, VectorIndexConfig,

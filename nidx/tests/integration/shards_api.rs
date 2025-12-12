@@ -18,8 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod common;
-
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -37,7 +35,7 @@ use nidx::{NidxMetadata, metadata::Shard};
 use nidx_tests::*;
 use nidx_vector::config::{VectorCardinality, VectorConfig};
 
-use common::metadata::{count_deletions, count_indexes, count_merge_jobs, count_segments, count_shards};
+use crate::common::metadata::{count_deletions, count_indexes, count_merge_jobs, count_segments, count_shards};
 
 const VECTOR_CONFIG: VectorConfig = VectorConfig {
     similarity: nidx_vector::config::Similarity::Cosine,
@@ -45,6 +43,7 @@ const VECTOR_CONFIG: VectorConfig = VectorConfig {
     vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 3 },
     flags: vec![],
     vector_cardinality: VectorCardinality::Single,
+    disable_indexes: false,
 };
 
 #[sqlx::test]

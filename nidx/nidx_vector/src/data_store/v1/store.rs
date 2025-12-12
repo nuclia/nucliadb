@@ -219,6 +219,7 @@ mod tests {
         normalize_vectors: false,
         flags: vec![],
         vector_cardinality: VectorCardinality::Single,
+        disable_indexes: false,
     };
 
     #[test]

@@ -106,6 +106,8 @@ pub struct VectorConfig {
     pub vector_cardinality: VectorCardinality,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub flags: Vec<String>,
+    #[serde(default)]
+    pub disable_indexes: bool,
 }
 
 impl VectorConfig {
@@ -144,6 +146,7 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
             vector_type,
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
+            disable_indexes: false,
         })
     }
 }

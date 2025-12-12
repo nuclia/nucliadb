@@ -18,9 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod common;
-
-use common::services::NidxFixture;
+use crate::common::services::NidxFixture;
 use nidx_protos::{
     NewShardRequest, NewVectorSetRequest, ShardId, VectorIndexConfig, VectorSetId, VectorSimilarity, op_status::Status,
 };

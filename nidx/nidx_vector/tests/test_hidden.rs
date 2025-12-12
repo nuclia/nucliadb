@@ -37,6 +37,7 @@ fn test_hidden_search() -> anyhow::Result<()> {
         vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 4 },
         flags: vec![],
         vector_cardinality: VectorCardinality::Single,
+        disable_indexes: false,
     };
 
     // Create two resources, one hidden and one not

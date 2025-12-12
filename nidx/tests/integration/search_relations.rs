@@ -18,12 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod common;
-
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use common::services::NidxFixture;
+use crate::common::services::NidxFixture;
 use nidx_protos::VectorIndexConfig;
 use nidx_protos::filter_expression::{Expr, ResourceFilter};
 use nidx_protos::graph_query::node::{FuzzyMatch, MatchKind, MatchLocation};

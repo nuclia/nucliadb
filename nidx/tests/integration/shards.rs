@@ -18,11 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod common;
-
 use std::collections::HashMap;
 
-use common::services::NidxFixture;
+use crate::common::services::NidxFixture;
 use nidx_protos::{
     EmptyQuery, GetShardRequest, NewShardRequest, ShardId, VectorIndexConfig, nidx::nidx_api_client::NidxApiClient,
 };

@@ -62,6 +62,7 @@ fn test_basic_search(
         normalize_vectors: false,
         flags,
         vector_cardinality: VectorCardinality::Single,
+        disable_indexes: false,
     };
 
     // Creates a resource with some orthogonal vectors, to test search
@@ -163,6 +164,7 @@ fn test_deletions() -> anyhow::Result<()> {
         normalize_vectors: false,
         flags: vec![],
         vector_cardinality: VectorCardinality::Single,
+        disable_indexes: false,
     };
 
     // Creates a couple of resources
@@ -240,6 +242,7 @@ fn test_filtered_search() -> anyhow::Result<()> {
         normalize_vectors: false,
         flags: vec![],
         vector_cardinality: VectorCardinality::Single,
+        disable_indexes: false,
     };
 
     // Create 4 resources

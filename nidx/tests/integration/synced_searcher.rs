@@ -43,6 +43,7 @@ const VECTOR_CONFIG: VectorConfig = VectorConfig {
     vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 3 },
     flags: vec![],
     vector_cardinality: VectorCardinality::Single,
+    disable_indexes: false,
 };
 
 #[sqlx::test]
