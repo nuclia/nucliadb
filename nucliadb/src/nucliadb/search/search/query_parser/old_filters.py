@@ -224,6 +224,7 @@ def is_paragraph_label(label: str, classification_labels: knowledgebox_pb2.Label
     if not label.startswith("/l/"):
         return False
     # Classification labels should have the form /l/labelset/label
+    # REVIEW: there's no technical reason why this has to be like this
     parts = label.split("/")
     if len(parts) < 4:
         return False

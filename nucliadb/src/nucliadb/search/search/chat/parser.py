@@ -254,6 +254,7 @@ class RAOFindParser:
                     if isinstance(keyword_filter, str):
                         field_expression.append(Keyword(word=keyword_filter))
                     else:
+                        # model validates that one and only one of these match
                         if keyword_filter.all:
                             field_expression.append(
                                 And(operands=[Keyword(word=word) for word in keyword_filter.all])
@@ -273,7 +274,7 @@ class RAOFindParser:
                         if keyword_filter.not_all:
                             field_expression.append(
                                 Not(
-                                    operand=Or(
+                                    operand=And(
                                         operands=[Keyword(word=word) for word in keyword_filter.not_all]
                                     )
                                 )
@@ -304,16 +305,17 @@ class RAOFindParser:
                     if len(parts) == 1:
                         operands.append(Resource(id=parts[0]))
                     else:
+                        rid = parts[0]
                         try:
-                            field_type = FieldTypeName.from_abbreviation(parts[0])
+                            field_type = FieldTypeName.from_abbreviation(parts[1])
                         except KeyError:  # pragma: no cover
                             raise InvalidQueryError(
                                 "resource_filters",
-                                f"resource filter {key} has an invalid field type: {parts[0]}",
+                                f"resource filter {key} has an invalid field type: {parts[1]}",
                             )
                         field_id = parts[2] if len(parts) > 2 else None
                         operands.append(
-                            And(operands=[Resource(id=parts[0]), Field(type=field_type, name=field_id)])
+                            And(operands=[Resource(id=rid), Field(type=field_type, name=field_id)])
                         )
 
                 if len(operands) == 1:

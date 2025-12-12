@@ -145,9 +145,7 @@ class RAOFetcher(Fetcher):
         # TODO: remove this conversion and refactor code to use API models instead of protobuf
         kb_labels = knowledgebox_pb2.Labels()
         for labelset, labels in labelsets.labelsets.items():
-            labelset_pb = knowledgebox_pb2.LabelSet()
-            ParseDict(labels.model_dump(), labelset_pb)
-            kb_labels.labelset[labelset] = labelset_pb
+            ParseDict(labels.model_dump(), kb_labels.labelset[labelset])
 
         return kb_labels
 
