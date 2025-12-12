@@ -532,7 +532,7 @@ async def find_retrieval(
     x_forwarded_for: str,
     metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, bool, Fetcher, Reranker]:
-    # TODO: Remove once the feature has been fully rolled out
+    # TODO(decoupled-ask): Remove once the feature has been fully rolled out
     if not has_feature(const.Features.ASK_DECOUPLED, context={"kbid": kbid}):
         results, incomplete, parsed = await find(
             kbid,
@@ -651,13 +651,13 @@ async def rao_find(
         from nidx_protos.nodereader_pb2 import SearchRequest
 
         search_time = time() - start_time
-        # TODO: implement audit.retrieve or something like that?
+        # TODO(decoupled-ask): implement audit.retrieve or something like that?
         audit.search(
             kbid,
             x_nucliadb_user,
             to_proto.client_type(x_ndb_client),
             x_forwarded_for,
-            # TODO: we don't have this proto anymore
+            # TODO(decoupled-ask): we don't have this proto anymore
             SearchRequest(),
             search_time,
             len(find_resources),

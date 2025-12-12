@@ -105,7 +105,7 @@ class AuditStorage:
         origin: str,
         retrieval_time: float,
     ):
-        # TODO: implement audit for /retrieve
+        # TODO(decoupled-ask): implement audit for /retrieve
         ...
 
     def report_storage(self, kbid: str, paragraphs: int, fields: int, bytes: int):

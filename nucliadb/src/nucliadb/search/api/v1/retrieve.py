@@ -103,7 +103,7 @@ async def retrieve_endpoint(
             to_proto.client_type(x_ndb_client),
             x_forwarded_for,
             retrieval_time,
-            # TODO: add interesting things to audit
+            # TODO(decoupled-ask): add interesting things to audit
         )
 
     return RetrievalResponse(matches=matches)

@@ -54,7 +54,7 @@ async def lambs_resource(
 ) -> str:
     """Resource with a conversation between Clarice and Dr. Lecter.
 
-    TODO: more details about the resource, attachments...
+    TODO(decoupled-ask): more details about the resource, attachments...
 
     TL;DR
 

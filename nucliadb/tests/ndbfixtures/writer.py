@@ -101,7 +101,7 @@ async def writer_api_server(
             yield application
 
 
-# TODO: review
+# REVIEW: legacy writer fixtures
 # Legacy from writer/fixtures.py
 
 

@@ -998,10 +998,10 @@ def compute_best_matches(
         for resource in results.resources.values():
             for field in resource.fields.values():
                 for paragraph in field.paragraphs.values():
-                    # TODO: we don't know the score history, as we are using
-                    # find results. Once we move boolean queries inside the new
-                    # retrieval flow we'll move this and have the proper
-                    # information to do this rank fusion
+                    # TODO(decoupled-ask): we don't know the score history, as
+                    # we are using find results. Once we move boolean queries
+                    # inside the new retrieval flow we'll move this and have the
+                    # proper information to do this rank fusion
                     paragraphs.append(
                         _FindParagraph(
                             paragraph_id=ParagraphId.from_string(paragraph.id),

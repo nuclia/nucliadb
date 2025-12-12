@@ -80,7 +80,7 @@ async def augment_resource(
     rid: str,
     select: list[ResourceProp],
 ) -> AugmentedResource | None:
-    # TODO: make sure we don't repeat any select clause
+    # TODO(decoupled-ask): make sure we don't repeat any select clause
 
     resource = await cache.get_resource(kbid, rid)
     if resource is None:
@@ -117,7 +117,7 @@ async def db_augment_resource(
                 summary = basic.summary
 
         elif isinstance(prop, ResourceOrigin):
-            # REVIEW: we may want a better hydration than proto to JSON
+            # REVIEW(decoupled-ask): we may want a better hydration than proto to JSON
             origin = await serialize_origin(resource)
 
         elif isinstance(prop, ResourceExtra):

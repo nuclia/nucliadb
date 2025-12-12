@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import copy
 from collections import deque
 from dataclasses import dataclass
@@ -38,7 +37,6 @@ from nucliadb.search.augmentor.fields import (
     conversation_messages_after,
     find_conversation_message,
 )
-from nucliadb.search.search import cache
 from nucliadb.search.search.chat import rpc
 from nucliadb.search.search.chat.images import (
     get_file_thumbnail_image,
@@ -84,22 +82,14 @@ from nucliadb_models.search import (
     TextPosition,
 )
 from nucliadb_protos import resources_pb2
-from nucliadb_protos.resources_pb2 import ExtractedText, FieldComputedMetadata
+from nucliadb_protos.resources_pb2 import FieldComputedMetadata
 from nucliadb_utils.utilities import get_storage
-
-MAX_RESOURCE_TASKS = 5
-MAX_RESOURCE_FIELD_TASKS = 4
-
 
 # Number of messages to pull after a match in a message
 # The hope here is it will be enough to get the answer to the question.
 CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
 
 TextBlockId = Union[ParagraphId, FieldId]
-
-
-class ParagraphIdNotFoundInExtractedMetadata(Exception):
-    pass
 
 
 class CappedPromptContext:
@@ -593,7 +583,7 @@ async def field_extension_prompt_context(
         ),
     )
 
-    # REVIEW: we don't have the field count anymore, is this good enough?
+    # REVIEW(decoupled-ask): we don't have the field count anymore, is this good enough?
     metrics.set("field_extension_ops", len(ordered_resources))
 
     extracted_texts = {}
@@ -646,83 +636,55 @@ async def neighbouring_paragraphs_prompt_context(
     retrieved_paragraphs_ids = [
         ParagraphId.from_string(text_block.id) for text_block in ordered_text_blocks
     ]
-    unique_field_ids = list({pid.field_id for pid in retrieved_paragraphs_ids})
 
-    # Get extracted texts and metadatas for all fields
-    fm_ops = []
-    et_ops = []
-    for field_id in unique_field_ids:
-        field = await cache.get_field(kbid, field_id)
-        if field is None:
-            continue
-        fm_ops.append(asyncio.create_task(field.get_field_metadata()))
-        et_ops.append(asyncio.create_task(field.get_extracted_text()))
-
-    field_metadatas: dict[FieldId, FieldComputedMetadata] = {
-        fid: fm for fid, fm in zip(unique_field_ids, await asyncio.gather(*fm_ops)) if fm is not None
-    }
-    extracted_texts: dict[FieldId, ExtractedText] = {
-        fid: et for fid, et in zip(unique_field_ids, await asyncio.gather(*et_ops)) if et is not None
-    }
-
-    def _get_paragraph_text(extracted_text: ExtractedText, pid: ParagraphId) -> str:
-        if pid.field_id.subfield_id:
-            text = extracted_text.split_text.get(pid.field_id.subfield_id) or ""
-        else:
-            text = extracted_text.text
-        return text[pid.paragraph_start : pid.paragraph_end]
+    augmented = await rpc.augment(
+        kbid,
+        AugmentRequest(
+            paragraphs=AugmentParagraphs(
+                given=[
+                    # TODO(decoupled-ask): pass metadata to /augment
+                    AugmentParagraph(id=pid.full(), metadata=None)
+                    for pid in retrieved_paragraphs_ids
+                ],
+                text=True,
+                neighbours_before=strategy.before,
+                neighbours_after=strategy.after,
+            )
+        ),
+    )
 
     for pid in retrieved_paragraphs_ids:
-        # Add the retrieved paragraph first
-        field_extracted_text = extracted_texts.get(pid.field_id, None)
-        if field_extracted_text is None:
+        paragraph = augmented.paragraphs.get(pid.full())
+        if paragraph is None:
             continue
-        ptext = _get_paragraph_text(field_extracted_text, pid)
+
+        ptext = paragraph.text or ""
         if ptext and pid.full() not in context:
             context[pid.full()] = ptext
 
         # Now add the neighbouring paragraphs
-        field_extracted_metadata = field_metadatas.get(pid.field_id, None)
-        if field_extracted_metadata is None:
-            continue
-
-        field_pids = [
-            ParagraphId(
-                field_id=pid.field_id,
-                paragraph_start=p.start,
-                paragraph_end=p.end,
-            )
-            for p in field_extracted_metadata.metadata.paragraphs
+        neighbour_ids = [
+            *(paragraph.neighbours_before or []),
+            *(paragraph.neighbours_after or []),
         ]
-        try:
-            index = field_pids.index(pid)
-        except ValueError:
-            continue
+        for npid in neighbour_ids:
+            neighbour = augmented.paragraphs.get(npid)
+            assert neighbour is not None, "augment should never return dangling paragraph references"
 
-        for neighbour_index in get_neighbouring_indices(
-            index=index,
-            before=strategy.before,
-            after=strategy.after,
-            field_pids=field_pids,
-        ):
-            if neighbour_index == index:
-                # Already handled above
+            if ParagraphId.from_string(npid) in retrieved_paragraphs_ids or npid in context:
+                # already added
                 continue
-            try:
-                npid = field_pids[neighbour_index]
-            except IndexError:
+
+            ntext = neighbour.text
+            if not ntext:
                 continue
-            if npid in retrieved_paragraphs_ids or npid.full() in context:
-                # Already added
-                continue
-            ptext = _get_paragraph_text(field_extracted_text, npid)
-            if not ptext:
-                continue
-            context[npid.full()] = ptext
-            augmented_context.paragraphs[npid.full()] = AugmentedTextBlock(
-                id=npid.full(),
-                text=ptext,
-                position=get_text_position(npid, neighbour_index, field_extracted_metadata),
+
+            context[npid] = ntext
+            augmented_context.paragraphs[npid] = AugmentedTextBlock(
+                id=npid,
+                text=ntext,
+                # TODO(decoupled-ask): implement neighbour positions
+                position=None,
                 parent=pid.full(),
                 augmentation_type=TextBlockAugmentationType.NEIGHBOURING_PARAGRAPHS,
             )
@@ -986,7 +948,7 @@ async def hierarchy_prompt_context(
                 given=[
                     AugmentParagraph(
                         id=paragraph_id.full(),
-                        # TODO: populate metadata
+                        # TODO(decoupled-ask): populate metadata
                         metadata=None,
                     )
                     for paragraph_id in paragraphs_to_augment

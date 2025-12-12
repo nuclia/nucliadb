@@ -25,14 +25,14 @@ from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.search import FindRequest, KnowledgeboxFindResults, NucliaDBClientType
 
 
-# TODO: replace this for a sdk.find call when moving /ask to RAO
+# TODO(decoupled-ask): replace this for a sdk.find call when moving /ask to RAO
 async def find(
     kbid: str,
     item: FindRequest,
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    # REVIEW: once in an SDK metrics, we'll lose track of metrics
+    # REVIEW(decoupled-ask): once in an SDK metrics, we'll lose track of metrics
     metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, bool]:
     from nucliadb.search.search.find import find
@@ -43,7 +43,7 @@ async def find(
     return results, incomplete
 
 
-# TODO: replace this for a sdk.retrieve call when moving /ask to RAO
+# TODO(decoupled-ask): replace this for a sdk.retrieve call when moving /ask to RAO
 async def retrieve(
     kbid: str,
     item: RetrievalRequest,
@@ -63,14 +63,14 @@ async def retrieve(
     )
 
 
-# TODO: replace this for a sdk.augment call when moving /ask to RAO
+# TODO(decoupled-ask): replace this for a sdk.augment call when moving /ask to RAO
 async def augment(kbid: str, item: AugmentRequest) -> AugmentResponse:
     from nucliadb.search.api.v1.augment import augment_endpoint
 
     return await augment_endpoint(kbid, item)
 
 
-# TODO: replace this for a sdk.labelsets call when moving /ask to RAO
+# TODO(decoupled-ask): replace this for a sdk.labelsets call when moving /ask to RAO
 async def labelsets(kbid: str) -> KnowledgeBoxLabels:
     from nucliadb.reader.api.v1.services import get_labelsets
 

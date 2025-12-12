@@ -121,7 +121,7 @@ def test_metadata_extension_strategy():
                     "given": paragraph_ids,
                     "select": [
                         {"prop": "origin"},
-                        # TODO: props for classification_labels, ner...
+                        # TODO(decoupled-ask): props for classification_labels, ner...
                     ],
                     "from": "resources",
                 }
@@ -144,10 +144,8 @@ def test_neighbouring_paragraph_strategy():
                     "select": [
                         {
                             "prop": "related",
-                            "neighbours": {
-                                "before": 2,
-                                "after": 2,
-                            },
+                            "neighbours_before": 2,
+                            "neighbours_after": 2,
                         },
                     ],
                     "from": "paragraphs",

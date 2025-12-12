@@ -27,7 +27,7 @@ from typing_extensions import Self
 import nucliadb_models
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import FieldId, ParagraphId
-from nucliadb_models import filters, hydration
+from nucliadb_models import filters
 from nucliadb_models.augment import ResourceId
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.conversation import FieldConversation
@@ -103,7 +103,7 @@ class Metadata(BaseModel):
             resources_pb2.Paragraph.TypeParagraph.OCR,
             resources_pb2.Paragraph.TypeParagraph.INCEPTION,
         )
-        # REVIEW: can a paragraph be of a different type and still be a table?
+        # REVIEW(decoupled-ask): can a paragraph be of a different type and still be a table?
         is_a_table = (
             paragraph.kind == resources_pb2.Paragraph.TypeParagraph.TABLE
             or paragraph.representation.is_a_table
@@ -176,7 +176,8 @@ class ParagraphPage(SelectProp):
 
 class RelatedParagraphs(SelectProp):
     prop: Literal["related"] = "related"
-    neighbours: hydration.NeighbourParagraphHydration
+    neighbours_before: int = Field(ge=0, description="Number of previous paragraphs to hydrate")
+    neighbours_after: int = Field(ge=0, description="Number of following paragraphs to hydrate")
 
 
 ParagraphProp = Annotated[
@@ -357,7 +358,7 @@ class ParagraphAugment(BaseModel, extra="forbid"):
 
 
 class AugmentationLimits(BaseModel, extra="forbid"):
-    # TODO: global augmentation limits (max chars, images, image size...)
+    # TODO(decoupled-ask): global augmentation limits (max chars, images, image size...)
     ...
 
 
