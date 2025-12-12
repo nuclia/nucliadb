@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import asyncio
 import os
 import time
 from functools import wraps
-from inspect import isasyncgenfunction, isgeneratorfunction
+from inspect import isasyncgenfunction, iscoroutinefunction, isgeneratorfunction
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -85,7 +84,7 @@ class Observer:
 
     def wrap(self, labels: Optional[Dict[str, str]] = None) -> Callable[[F], F]:
         def decorator(func):
-            if asyncio.iscoroutinefunction(func):
+            if iscoroutinefunction(func):
 
                 @wraps(func)
                 async def inner(*args, **kwargs):

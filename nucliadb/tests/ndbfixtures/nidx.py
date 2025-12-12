@@ -183,11 +183,12 @@ async def nidx(natsd: str, pg, nidx_storage: dict[str, str]):
     await nc.close()
 
     # Run nidx
+    natsd_url = natsd.replace("localhost", "172.17.0.1").replace("127.0.0.1", "172.17.0.1")
     images.settings["nidx"].setdefault("env", {}).update(
         {
             "RUST_LOG": "info",
             "METADATA__DATABASE_URL": f"postgresql://postgres:postgres@172.17.0.1:{pg[1]}/postgres",
-            "INDEXER__NATS_SERVER": natsd.replace("localhost", "172.17.0.1"),
+            "INDEXER__NATS_SERVER": natsd_url,
             **nidx_storage,
         }
     )

@@ -20,6 +20,7 @@
 import argparse
 import asyncio
 import importlib.metadata
+import inspect
 from asyncio import tasks
 from typing import Callable
 
@@ -89,7 +90,7 @@ def run() -> None:
     finally:
         try:
             for finalizer in finalizers:
-                if asyncio.iscoroutinefunction(finalizer):
+                if inspect.iscoroutinefunction(finalizer):
                     loop.run_until_complete(finalizer())
                 else:
                     finalizer()

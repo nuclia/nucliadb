@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
+import inspect
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
         yield
 
         for finalizer in SYNC_FINALIZERS:
-            if asyncio.iscoroutinefunction(finalizer):
+            if inspect.iscoroutinefunction(finalizer):
                 await finalizer()
             else:
                 finalizer()

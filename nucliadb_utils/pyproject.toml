@@ -30,7 +30,7 @@ dependencies = [
     "nats-py[nkeys]>=2.6.0",
     "PyNaCl",
     "pyjwt>=2.4.0",
-    "mrflagly>=0.2.9",
+    "mrflagly>=0.2.14",
 
     # automatically bumped during release"
     "nidx-protos",

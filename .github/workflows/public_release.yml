@@ -160,7 +160,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.14.1"
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
@@ -185,7 +185,7 @@ jobs:
           source .venv/bin/activate
           nucliadb-extract-openapi-reader /tmp/openapi/nucliadb-reader.json $API_VERSION $GITHUB_SHA
           nucliadb-extract-openapi-writer /tmp/openapi/nucliadb-writer.json $API_VERSION $GITHUB_SHA
-          nucliadb-extract-openapi-search /tmp/openapi/nucliadb-search.json $API_VERSION $GITHUB_SHA 
+          nucliadb-extract-openapi-search /tmp/openapi/nucliadb-search.json $API_VERSION $GITHUB_SHA
           aws s3 cp /tmp/openapi/nucliadb-reader.json s3://nuclia-docs-aws-global-stage-1/api/nucliadb/v$API_VERSION/nucliadb-reader/spec.json
           aws s3 cp /tmp/openapi/nucliadb-writer.json s3://nuclia-docs-aws-global-stage-1/api/nucliadb/v$API_VERSION/nucliadb-writer/spec.json
           aws s3 cp /tmp/openapi/nucliadb-search.json s3://nuclia-docs-aws-global-stage-1/api/nucliadb/v$API_VERSION/nucliadb-search/spec.json

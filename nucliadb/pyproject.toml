@@ -24,9 +24,9 @@ dependencies = [
     # nucliadb dependencies are auto pinned on release
     "nucliadb-telemetry[all]",
     "nucliadb-utils[storages,fastapi,cache]",
-    "nucliadb-protos",
+    "nucliadb-protos[grpc]",
     "nucliadb-models",
-    "nidx-protos",
+    "nidx-protos[grpc]",
 
     "nucliadb-admin-assets>=1.0.0.post1224",
     "nuclia-models>=0.50.0",
