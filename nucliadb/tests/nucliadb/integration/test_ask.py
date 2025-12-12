@@ -1841,7 +1841,7 @@ async def test_ask_neighbouring_paragraphs_rag_strategy(
     assert augmented[0].text == paragraphs[0]
 
     if not has_feature(const.Features.ASK_DECOUPLED, context={"kbid": kbid}):
-        # TODO: we are missing returning positions for neighbour paragraphs
+        # TODO(decoupled-ask): we are missing returning positions for neighbour paragraphs
         assert augmented[0].position
         assert augmented[0].position.start == positions[0][0]
         assert augmented[0].position.end == positions[0][1]

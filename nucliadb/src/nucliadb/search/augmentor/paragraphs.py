@@ -97,7 +97,7 @@ async def augment_paragraph(
             # we are unable to get any paragraph metadata, we can't continue
             return None
 
-    # TODO: make sure we don't repeat any select clause
+    # TODO(decoupled-ask): make sure we don't repeat any select clause
 
     return await db_augment_paragraph(resource, field, paragraph_id, select, metadata)
 

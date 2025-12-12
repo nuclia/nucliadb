@@ -61,6 +61,10 @@ def find_route(scope: Scope, routes: List[Route]) -> Tuple[Optional[str], Option
 
 
 async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+
+    traceback.print_exception(exc)
+
     errors.capture_exception(exc)
     return JSONResponse(
         status_code=500,

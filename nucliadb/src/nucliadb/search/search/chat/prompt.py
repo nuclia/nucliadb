@@ -583,7 +583,7 @@ async def field_extension_prompt_context(
         ),
     )
 
-    # REVIEW: we don't have the field count anymore, is this good enough?
+    # REVIEW(decoupled-ask): we don't have the field count anymore, is this good enough?
     metrics.set("field_extension_ops", len(ordered_resources))
 
     extracted_texts = {}
@@ -642,7 +642,7 @@ async def neighbouring_paragraphs_prompt_context(
         AugmentRequest(
             paragraphs=AugmentParagraphs(
                 given=[
-                    # TODO: pass metadata to /augment
+                    # TODO(decoupled-ask): pass metadata to /augment
                     AugmentParagraph(id=pid.full(), metadata=None)
                     for pid in retrieved_paragraphs_ids
                 ],
@@ -683,7 +683,7 @@ async def neighbouring_paragraphs_prompt_context(
             augmented_context.paragraphs[npid] = AugmentedTextBlock(
                 id=npid,
                 text=ntext,
-                # TODO: implement neighbour positions
+                # TODO(decoupled-ask): implement neighbour positions
                 position=None,
                 parent=pid.full(),
                 augmentation_type=TextBlockAugmentationType.NEIGHBOURING_PARAGRAPHS,
@@ -948,7 +948,7 @@ async def hierarchy_prompt_context(
                 given=[
                     AugmentParagraph(
                         id=paragraph_id.full(),
-                        # TODO: populate metadata
+                        # TODO(decoupled-ask): populate metadata
                         metadata=None,
                     )
                     for paragraph_id in paragraphs_to_augment

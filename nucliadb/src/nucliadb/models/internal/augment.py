@@ -103,7 +103,7 @@ class Metadata(BaseModel):
             resources_pb2.Paragraph.TypeParagraph.OCR,
             resources_pb2.Paragraph.TypeParagraph.INCEPTION,
         )
-        # REVIEW: can a paragraph be of a different type and still be a table?
+        # REVIEW(decoupled-ask): can a paragraph be of a different type and still be a table?
         is_a_table = (
             paragraph.kind == resources_pb2.Paragraph.TypeParagraph.TABLE
             or paragraph.representation.is_a_table
@@ -358,7 +358,7 @@ class ParagraphAugment(BaseModel, extra="forbid"):
 
 
 class AugmentationLimits(BaseModel, extra="forbid"):
-    # TODO: global augmentation limits (max chars, images, image size...)
+    # TODO(decoupled-ask): global augmentation limits (max chars, images, image size...)
     ...
 
 

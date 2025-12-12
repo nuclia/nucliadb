@@ -84,7 +84,7 @@ async def augment_field(
     field_id: FieldId,
     select: Sequence[FieldProp | ConversationProp],
 ) -> AugmentedField | None:
-    # TODO: make sure we don't repeat any select clause
+    # TODO(decoupled-ask): make sure we don't repeat any select clause
 
     rid = field_id.rid
     resource = await cache.get_resource(kbid, rid)
@@ -229,7 +229,7 @@ async def db_augment_conversation_field(
 
     for prop in select:
         if isinstance(prop, ConversationText):
-            # TODO: implement different conversation text strategies
+            # TODO(decoupled-ask): implement different conversation text strategies
             raise NotImplementedError()
 
         elif isinstance(prop, FieldValue):
@@ -322,7 +322,7 @@ async def field_entities(id: FieldId, field: Field) -> dict[str, set[str]] | Non
         for entity in entities_wrapper.entities:
             ners.setdefault(entity.label, set()).add(entity.text)
     # Legacy processor entities
-    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
+    # TODO(decoupled-ask): Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
     for token, family in field_metadata.metadata.ner.items():
         ners.setdefault(family, set()).add(token)
 
