@@ -26,6 +26,7 @@ from unittest.mock import patch
 import pytest
 
 import nucliadb_models.labels
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.models.internal import retrieval as retrieval_models
 from nucliadb.search.search.chat.fetcher import RAOFetcher
 from nucliadb.search.search.chat.parser import RAOFindParser
@@ -151,18 +152,7 @@ rid = uuid.uuid4().hex
             ),
         ),
         (
-            {
-                "filters": [
-                    {
-                        "any": [
-                            "/l/films/horror",
-                            "/l/films/romantic",
-                            "/l/landscapes/beach",
-                            "/l/landscapes/desert",
-                        ]
-                    }
-                ]
-            },
+            {"filters": [{"any": ["/l/films/horror", "/l/films/romantic"]}]},
             FilterExpression(
                 field=Or(
                     operands=[
@@ -176,33 +166,10 @@ rid = uuid.uuid4().hex
                         ),
                     ]
                 ),
-                paragraph=Or(
-                    operands=[
-                        Label(
-                            labelset="landscapes",
-                            label="beach",
-                        ),
-                        Label(
-                            labelset="landscapes",
-                            label="desert",
-                        ),
-                    ]
-                ),
             ),
         ),
         (
-            {
-                "filters": [
-                    {
-                        "none": [
-                            "/l/films/horror",
-                            "/l/films/romantic",
-                            "/l/landscapes/beach",
-                            "/l/landscapes/desert",
-                        ]
-                    }
-                ]
-            },
+            {"filters": [{"none": ["/l/films/horror", "/l/films/romantic"]}]},
             FilterExpression(
                 field=And(
                     operands=[
@@ -220,37 +187,10 @@ rid = uuid.uuid4().hex
                         ),
                     ]
                 ),
-                paragraph=And(
-                    operands=[
-                        Not(
-                            operand=Label(
-                                labelset="landscapes",
-                                label="beach",
-                            )
-                        ),
-                        Not(
-                            operand=Label(
-                                labelset="landscapes",
-                                label="desert",
-                            )
-                        ),
-                    ]
-                ),
             ),
         ),
         (
-            {
-                "filters": [
-                    {
-                        "not_all": [
-                            "/l/films/horror",
-                            "/l/films/romantic",
-                            "/l/landscapes/beach",
-                            "/l/landscapes/desert",
-                        ]
-                    }
-                ]
-            },
+            {"filters": [{"not_all": ["/l/films/horror", "/l/films/romantic"]}]},
             FilterExpression(
                 field=Or(
                     operands=[
@@ -264,22 +204,6 @@ rid = uuid.uuid4().hex
                             operand=Label(
                                 labelset="films",
                                 label="romantic",
-                            )
-                        ),
-                    ]
-                ),
-                paragraph=Or(
-                    operands=[
-                        Not(
-                            operand=Label(
-                                labelset="landscapes",
-                                label="beach",
-                            )
-                        ),
-                        Not(
-                            operand=Label(
-                                labelset="landscapes",
-                                label="desert",
                             )
                         ),
                     ]
@@ -500,13 +424,13 @@ rid = uuid.uuid4().hex
     ],
 )
 async def test_old_filters_parsing(
+    kb_labelsets: KnowledgeBoxLabels,
     filters: dict[str, Any],
     expression: FilterExpression,
 ):
-    kbid = "kbid"
     item = FindRequest(query="query", **filters)
     fetcher = RAOFetcher(
-        kbid,
+        "kbid",
         query=item.query,
         user_vector=item.vector,
         vectorset=item.vectorset,
@@ -515,11 +439,50 @@ async def test_old_filters_parsing(
         generative_model=item.generative_model,
         query_image=item.query_image,
     )
-    parser = RAOFindParser(kbid, item, fetcher)
+    parser = RAOFindParser("kbid", item, fetcher)
     parser._query = retrieval_models.Query()
 
-    kb_labelsets = KnowledgeBoxLabels(
-        uuid=kbid,
+    with patch("nucliadb.search.search.chat.fetcher.rpc.labelsets", return_value=kb_labelsets):
+        parsed_filters = await parser._parse_filters()
+        assert parsed_filters.filter_expression == expression
+
+
+@pytest.mark.parametrize(
+    "filters",
+    [
+        # can't use paragraph labels with any/none/not_all
+        {"filters": [{"any": ["/l/landscapes/beach", "/l/landscapes/desert"]}]},
+        {"filters": [{"none": ["/l/landscapes/beach", "/l/landscapes/desert"]}]},
+        {"filters": [{"not_all": ["/l/landscapes/beach", "/l/landscapes/desert"]}]},
+    ],
+)
+async def test_old_filters_parsing_invalid_combinations(
+    kb_labelsets: KnowledgeBoxLabels,
+    filters: dict[str, Any],
+):
+    item = FindRequest(query="query", **filters)
+    fetcher = RAOFetcher(
+        "kbid",
+        query=item.query,
+        user_vector=item.vector,
+        vectorset=item.vectorset,
+        rephrase=item.rephrase,
+        rephrase_prompt=item.rephrase_prompt,
+        generative_model=item.generative_model,
+        query_image=item.query_image,
+    )
+    parser = RAOFindParser("kbid", item, fetcher)
+    parser._query = retrieval_models.Query()
+
+    with patch("nucliadb.search.search.chat.fetcher.rpc.labelsets", return_value=kb_labelsets):
+        with pytest.raises(InvalidQueryError):
+            await parser._parse_filters()
+
+
+@pytest.fixture
+def kb_labelsets():
+    yield KnowledgeBoxLabels(
+        uuid="kbid",
         labelsets={
             "films": LabelSet(
                 title="Films",
@@ -541,7 +504,3 @@ async def test_old_filters_parsing(
             ),
         },
     )
-
-    with patch("nucliadb.search.search.chat.fetcher.rpc.labelsets", return_value=kb_labelsets):
-        parsed_filters = await parser._parse_filters()
-        assert parsed_filters.filter_expression == expression

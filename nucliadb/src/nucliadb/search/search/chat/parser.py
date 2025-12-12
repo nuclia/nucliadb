@@ -488,7 +488,7 @@ def convert_labels_to_filter_expressions(
                 else:
                     field.append(expr)
 
-            if len(paragraph) > 0 and combinator == "bool_or":
+            if len(paragraph) > 0 and not (combinator == And and negate is False):
                 raise InvalidQueryError(
                     "filters",
                     "Paragraph labels can only be used with 'all' filter",
