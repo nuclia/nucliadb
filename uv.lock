@@ -1858,6 +1858,21 @@ source = { editable = "nidx/nidx_binding" }
 name = "nidx-protos"
 version = "6.9.7"
 source = { editable = "nidx/nidx_protos" }
+dependencies = [
+    { name = "protobuf" },
+]
+
+[package.optional-dependencies]
+grpc = [
+    { name = "grpcio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.76.0" },
+    { name = "protobuf", specifier = ">=6.31.1,<7.0.0" },
+]
+provides-extras = ["grpc"]
 
 [[package]]
 name = "nkeys"
@@ -1924,11 +1939,11 @@ dependencies = [
     { name = "jwcrypto" },
     { name = "mmh3" },
     { name = "multidict" },
-    { name = "nidx-protos" },
+    { name = "nidx-protos", extra = ["grpc"] },
     { name = "nuclia-models" },
     { name = "nucliadb-admin-assets" },
     { name = "nucliadb-models" },
-    { name = "nucliadb-protos" },
+    { name = "nucliadb-protos", extra = ["grpc"] },
     { name = "nucliadb-telemetry", extra = ["all"] },
     { name = "nucliadb-utils", extra = ["cache", "fastapi", "storages"] },
     { name = "oauth2client" },
@@ -1989,11 +2004,11 @@ requires-dist = [
     { name = "jwcrypto", specifier = ">=1.5.6" },
     { name = "mmh3", specifier = ">=3.0.0" },
     { name = "multidict", specifier = ">=6.0.4" },
-    { name = "nidx-protos", editable = "nidx/nidx_protos" },
+    { name = "nidx-protos", extras = ["grpc"], editable = "nidx/nidx_protos" },
     { name = "nuclia-models", specifier = ">=0.50.0" },
     { name = "nucliadb-admin-assets", specifier = ">=1.0.0.post1224" },
     { name = "nucliadb-models", editable = "nucliadb_models" },
-    { name = "nucliadb-protos", editable = "nucliadb_protos" },
+    { name = "nucliadb-protos", extras = ["grpc"], editable = "nucliadb_protos" },
     { name = "nucliadb-telemetry", extras = ["all"], editable = "nucliadb_telemetry" },
     { name = "nucliadb-utils", extras = ["storages", "fastapi", "cache"], editable = "nucliadb_utils" },
     { name = "oauth2client" },
@@ -2075,17 +2090,20 @@ name = "nucliadb-protos"
 version = "6.9.7"
 source = { editable = "nucliadb_protos" }
 dependencies = [
-    { name = "mypy-protobuf" },
     { name = "protobuf" },
-    { name = "types-protobuf" },
+]
+
+[package.optional-dependencies]
+grpc = [
+    { name = "grpcio" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "mypy-protobuf", specifier = ">=3.4.0" },
-    { name = "protobuf", specifier = ">=5" },
-    { name = "types-protobuf", specifier = ">=5" },
+    { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.76.0" },
+    { name = "protobuf", specifier = ">=6.31.1,<7.0.0" },
 ]
+provides-extras = ["grpc"]
 
 [[package]]
 name = "nucliadb-sdk"
