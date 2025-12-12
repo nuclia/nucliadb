@@ -56,7 +56,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         let data_store = DataStoreV2::open(path, &config.vector_type, OpenReason::Search { prewarm })?;
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
-        if !InvertedIndexes::exists(path) {
+        if !InvertedIndexes::exists(path) && !config.disable_indexes {
             build_indexes(path, &data_store)?;
         }
         Box::new(data_store)
@@ -64,7 +64,15 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
 
     let index = open_disk_hnsw(path, prewarm)?;
 
-    let inverted_indexes = InvertedIndexes::open(path, metadata.records, inverted_index::OpenOptions { prewarm })?;
+    let inverted_indexes = if !config.disable_indexes {
+        Some(InvertedIndexes::open(
+            path,
+            metadata.records,
+            inverted_index::OpenOptions { prewarm },
+        )?)
+    } else {
+        None
+    };
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
@@ -160,12 +168,16 @@ fn merge_indexes<DS: DataStore + 'static>(
         },
     };
 
-    build_indexes(segment_path, &data_store)?;
-    let inverted_indexes = InvertedIndexes::open(
-        segment_path,
-        merged_vectors_count as usize,
-        inverted_index::OpenOptions { prewarm: false },
-    )?;
+    let inverted_indexes = if !config.disable_indexes {
+        build_indexes(segment_path, &data_store)?;
+        Some(InvertedIndexes::open(
+            segment_path,
+            merged_vectors_count as usize,
+            inverted_index::OpenOptions { prewarm: false },
+        )?)
+    } else {
+        None
+    };
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
@@ -250,12 +262,15 @@ fn create_indexes<DS: DataStore + 'static>(
         index_metadata: VectorSegmentMeta { tags },
     };
 
-    build_indexes(path, &data_store)?;
-    let inverted_indexes = InvertedIndexes::open(
-        path,
-        vector_count as usize,
-        inverted_index::OpenOptions { prewarm: false },
-    )?;
+    let inverted_indexes = if !config.disable_indexes {
+        Some(InvertedIndexes::open(
+            path,
+            vector_count as usize,
+            inverted_index::OpenOptions { prewarm: false },
+        )?)
+    } else {
+        None
+    };
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
@@ -396,7 +411,7 @@ pub struct OpenSegment {
     metadata: VectorSegmentMetadata,
     data_store: Box<dyn DataStore>,
     index: Box<dyn DiskHnsw>,
-    inverted_indexes: InvertedIndexes,
+    inverted_indexes: Option<InvertedIndexes>,
     alive_bitset: FilterBitSet,
 }
 
@@ -408,7 +423,10 @@ impl AsRef<OpenSegment> for OpenSegment {
 
 impl OpenSegment {
     pub fn apply_deletion(&mut self, key: &str) {
-        if let Some(deleted_ids) = self.inverted_indexes.ids_for_deletion_key(key) {
+        let Some(inverted_indexes) = &self.inverted_indexes else {
+            return;
+        };
+        if let Some(deleted_ids) = inverted_indexes.ids_for_deletion_key(key) {
             for id in deleted_ids {
                 self.alive_bitset.remove(id);
             }
@@ -428,7 +446,9 @@ impl OpenSegment {
     }
 
     pub fn space_usage(&self) -> usize {
-        self.data_store.size_bytes() + self.index.size() + self.inverted_indexes.space_usage()
+        self.data_store.size_bytes()
+            + self.index.size()
+            + self.inverted_indexes.as_ref().map_or(0, InvertedIndexes::space_usage)
     }
 
     pub fn get_paragraph(&self, id: ParagraphAddr) -> ParagraphRef<'_> {
@@ -478,7 +498,7 @@ impl OpenSegment {
         };
         let retriever = Retriever::new(data_store, config, min_score);
 
-        let mut filter_bitset = self.inverted_indexes.filter(filter);
+        let mut filter_bitset = self.inverted_indexes.as_ref().and_then(|ii| ii.filter(filter));
         if let Some(ref mut bitset) = filter_bitset {
             bitset.intersect_with(&self.alive_bitset);
         }
@@ -710,6 +730,7 @@ mod test {
             normalize_vectors: false,
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
+            disable_indexes: false,
         };
         let mut rng = SmallRng::seed_from_u64(1234567890);
         let temp_dir = tempdir()?;
@@ -756,6 +777,7 @@ mod test {
             normalize_vectors: false,
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
+            disable_indexes: false,
         };
         let mut rng = SmallRng::seed_from_u64(1234567890);
 
@@ -834,6 +856,7 @@ mod test {
             normalize_vectors: false,
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
+            disable_indexes: false,
         };
 
         // Create a segment

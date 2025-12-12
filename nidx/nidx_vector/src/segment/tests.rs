@@ -35,6 +35,7 @@ const CONFIG: VectorConfig = VectorConfig {
     vector_type: crate::config::VectorType::DenseF32 { dimension: 128 },
     flags: vec![],
     vector_cardinality: VectorCardinality::Single,
+    disable_indexes: false,
 };
 
 fn create_query() -> Vec<f32> {

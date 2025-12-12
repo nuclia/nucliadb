@@ -162,6 +162,7 @@ mod tests {
             vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 3 },
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
+            disable_indexes: false,
         };
 
         fn merge_scheduler() -> MergeScheduler {

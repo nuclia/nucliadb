@@ -18,9 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod common;
-
-use common::services::NidxFixture;
+use crate::common::services::NidxFixture;
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::time::SystemTime;

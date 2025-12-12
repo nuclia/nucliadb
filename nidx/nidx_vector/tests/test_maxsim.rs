@@ -53,6 +53,7 @@ fn test_maxsim() -> anyhow::Result<()> {
         normalize_vectors: false,
         vector_cardinality: VectorCardinality::Multi,
         flags: vec![],
+        disable_indexes: false,
     };
 
     // Creates a resource with some orthogonal vectors, to test search

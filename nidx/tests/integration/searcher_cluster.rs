@@ -18,9 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod common;
-
-use common::services::NidxFixture;
+use crate::common::services::NidxFixture;
 use nidx::grpc_server::GrpcServer;
 use nidx::searcher::{ListNodes, SyncedSearcher, grpc::SearchServer, shard_selector::ShardSelector};
 use nidx_protos::SearchRequest;
