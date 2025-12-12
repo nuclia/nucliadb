@@ -259,11 +259,11 @@ class RAOFindParser:
                             field_expression.append(
                                 And(operands=[Keyword(word=word) for word in keyword_filter.all])
                             )
-                        if keyword_filter.any:
+                        elif keyword_filter.any:
                             field_expression.append(
                                 Or(operands=[Keyword(word=word) for word in keyword_filter.any])
                             )
-                        if keyword_filter.none:
+                        elif keyword_filter.none:
                             field_expression.append(
                                 Not(
                                     operand=Or(
@@ -271,7 +271,7 @@ class RAOFindParser:
                                     )
                                 )
                             )
-                        if keyword_filter.not_all:
+                        elif keyword_filter.not_all:
                             field_expression.append(
                                 Not(
                                     operand=And(
