@@ -19,8 +19,8 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
+import inspect
 import logging
 from concurrent.futures.thread import ThreadPoolExecutor
 from enum import Enum
@@ -273,7 +273,7 @@ def clear_global_cache():
 async def finalize_utilities():
     to_delete = []
     for key, util in MAIN.items():
-        if hasattr(util, "finalize") and asyncio.iscoroutinefunction(util.finalize):
+        if hasattr(util, "finalize") and inspect.iscoroutinefunction(util.finalize):
             await util.finalize()
         elif hasattr(util, "finalize"):
             util.finalize()
