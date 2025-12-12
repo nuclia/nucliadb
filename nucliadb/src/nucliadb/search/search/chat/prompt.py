@@ -663,15 +663,19 @@ async def neighbouring_paragraphs_prompt_context(
             context[pid.full()] = ptext
 
         # Now add the neighbouring paragraphs
-        neighbours = {
-            **(paragraph.neighbours_before or {}),
-            **(paragraph.neighbours_after or {}),
-        }
-        for npid, ntext in neighbours.items():
+        neighbour_ids = [
+            *(paragraph.neighbours_before or []),
+            *(paragraph.neighbours_after or []),
+        ]
+        for npid in neighbour_ids:
+            neighbour = augmented.paragraphs.get(npid)
+            assert neighbour is not None, "augment should never return dangling paragraph references"
+
             if ParagraphId.from_string(npid) in retrieved_paragraphs_ids or npid in context:
                 # already added
                 continue
 
+            ntext = neighbour.text
             if not ntext:
                 continue
 
