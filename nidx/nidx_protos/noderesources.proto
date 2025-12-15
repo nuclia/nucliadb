@@ -138,6 +138,8 @@ message IndexParagraphs {
 }
 
 message Resource {
+    reserved 12, 13;
+
     ResourceID resource = 1;
 
     IndexMetadata metadata = 2;
@@ -178,9 +180,6 @@ message Resource {
     map<string, IndexRelations> field_relations = 10;
 
     string shard_id = 11;
-
-    map<string, utils.UserVectors> vectors = 12 [deprecated = true]; // vectorset is the key
-    map<string, utils.UserVectorsList> vectors_to_delete = 13 [deprecated = true];  // Vectorset prefix vector id
 
     optional utils.Security security = 14;
 
