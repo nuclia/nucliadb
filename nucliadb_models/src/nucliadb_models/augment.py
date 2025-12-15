@@ -132,7 +132,7 @@ class AugmentResourceFields(BaseModel):
 class AugmentResources(BaseModel):
     given: list[ResourceId]
 
-    # TODO: replace this select for bool fields
+    # TODO(decoupled-ask): replace this select for bool fields
     select: list[ResourceProp] = Field(default_factory=list)
 
     field_type_filter: list[FieldTypeName] | None = Field(
@@ -163,7 +163,7 @@ class AugmentFields(BaseModel):
     entities: bool = False  # also known as ners
 
 
-# TODO: remove unused metadata
+# TODO(decoupled-ask): remove unused metadata
 class ParagraphMetadata(BaseModel):
     field_labels: list[str]
     paragraph_labels: list[str]
@@ -192,19 +192,19 @@ class AugmentParagraphs(BaseModel):
     neighbours_before: int = 0
     neighbours_after: int = 0
 
-    # TODO: implement image strategy
+    # TODO(decoupled-ask): implement image strategy
     # paragraph extracted from an image, return an image
     source_image: bool = False
 
-    # TODO: implement image strategy
+    # TODO(decoupled-ask): implement image strategy
     # paragraph extracted from a table, return table image
     table_image: bool = False
 
-    # TODO: implement image strategy
+    # TODO(decoupled-ask): implement image strategy
     # return page_preview instead of table image if table image enabled
     table_prefers_page_preview: bool = False
 
-    # TODO: implement image strategy
+    # TODO(decoupled-ask): implement image strategy
     # paragraph from a page, return page preview image
     page_preview_image: bool = False
 

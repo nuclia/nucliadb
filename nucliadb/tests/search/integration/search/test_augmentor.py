@@ -419,7 +419,7 @@ async def test_augmentor_conversation_strategy(
         assert augmented_field.messages is None
 
         # Augmenting a split with page selector yields the whole page
-        # TODO: we should test this with a multi-page conversation
+        # TODO(decoupled-ask): we should test this with a multi-page conversation
         augmented = await augment(
             kbid,
             [
@@ -517,7 +517,7 @@ async def test_augmentor_conversation_strategy(
         augmented_field = augmented.fields[field_id]
         assert isinstance(augmented_field, AugmentedConversationField)
         assert augmented_field.messages is not None
-        # FIXME: this comes from the original implementation an doesn't work...
+        # FIXME(decoupled-ask): this comes from the original implementation an doesn't work...
         # assert len(augmented_field.messages) == 3
         # assert {m.ident for m in augmented_field.messages} == {"1", "2", "3"}
 
