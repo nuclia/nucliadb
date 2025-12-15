@@ -190,8 +190,9 @@ message Resource {
 }
 
 message ShardMetadata {
+    reserved 2;
+
     string kbid = 1;
-    utils.ReleaseChannel release_channel = 2;
 }
 
 message StringList {

@@ -74,6 +74,8 @@ message StoredExternalIndexProviderMetadata {
 // CONFIG
 
 message KnowledgeBoxConfig {
+    reserved 8;
+
     string title = 1;
     string description = 2;
     string slug = 5;
@@ -84,8 +86,6 @@ message KnowledgeBoxConfig {
     repeated string enabled_filters = 3 [deprecated = true];
     repeated string enabled_insights = 4 [deprecated = true];
     bool disable_vectors = 6 [deprecated = true];
-    // DEPRECATED: duplicated field also stored in `writer.proto Shards`
-    utils.ReleaseChannel release_channel = 8 [deprecated = true];
 
     bool hidden_resources_enabled = 10;
     bool hidden_resources_hide_on_creation = 11;

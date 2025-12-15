@@ -89,7 +89,6 @@ impl NidxApi for ApiServer {
         Ok(Response::new(noderesources::Shard {
             metadata: Some(ShardMetadata {
                 kbid: shard.kbid.to_string(),
-                release_channel: 0,
             }),
             shard_id: shard_id.to_string(),
             fields: index_stats.get(&IndexKind::Text).map(|s| s.records).unwrap_or(0) as u64,

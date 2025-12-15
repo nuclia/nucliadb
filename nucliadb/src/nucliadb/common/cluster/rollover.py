@@ -39,7 +39,7 @@ from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.common.vector_index_config import nucliadb_index_config_to_nidx
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.migrator.settings import settings
-from nucliadb_protos import utils_pb2, writer_pb2
+from nucliadb_protos import writer_pb2
 from nucliadb_telemetry import errors
 
 from .utils import (
@@ -151,7 +151,6 @@ async def create_rollover_shards(
 
             req = NewShardRequest(
                 kbid=kbid,
-                release_channel=utils_pb2.ReleaseChannel.STABLE,
                 vectorsets_configs=vectorsets,
             )
 

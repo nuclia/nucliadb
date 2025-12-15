@@ -57,10 +57,9 @@ message VectorIndexConfig {
 }
 
 message NewShardRequest {
-    reserved 4, 5;
+    reserved 3, 4, 5;
     utils.VectorSimilarity similarity = 1 [deprecated = true];
     string kbid = 2;
-    utils.ReleaseChannel release_channel = 3;
 
     map<string, VectorIndexConfig> vectorsets_configs = 6;
     bool prewarm_enabled = 7;
