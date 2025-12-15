@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 import functools
 import inspect
 import typing
@@ -137,7 +136,7 @@ def requires(
 
             return websocket_wrapper
 
-        elif asyncio.iscoroutinefunction(func):
+        elif inspect.iscoroutinefunction(func):
             # Handle async request/response functions.
             @functools.wraps(func)
             async def async_wrapper(*args: typing.Any, **kwargs: typing.Any) -> Response:

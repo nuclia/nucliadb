@@ -3,7 +3,7 @@ requires = [
     "pdm-backend",
     # Pin grpio-tools so `make protos` compile with the version we want
     # To use grpc stubs, you need a newer dependency than what was used to build this module
-    "grpcio-tools>=1.71.0,==1.71.0,<1.72.0",
+    "grpcio-tools==1.76.0",
     "mypy-protobuf==3.6.0",
 ]
 build-backend = "pdm.backend"
@@ -24,6 +24,12 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 requires-python = ">=3.10, <4"
+dependencies = [
+    "protobuf>=6.31.1,<7.0.0"
+]
+
+[project.optional-dependencies]
+grpc = ["grpcio>=1.76.0"]
 
 [project.urls]
 Homepage = "https://nuclia.com"

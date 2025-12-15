@@ -1631,38 +1631,16 @@ wheels = [
 
 [[package]]
 name = "mrflagly"
-version = "0.2.11"
+version = "0.2.14"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/60/36/75cb8aa00fcb3b3629984dcb9f7ebb1be1d7beacab6d3f45eee3c98d8c4c/mrflagly-0.2.11-cp310-cp310-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:9cedd660557f43b6b71bf56a31c340df696925e9817e616db5c73045a5b7e26f", size = 2192729, upload-time = "2024-10-03T11:41:56.158Z" },
-    { url = "https://files.pythonhosted.org/packages/25/c7/26fdd4489eabdb8d07b4a94226e93b51c7b05b917a23f0436dcd79f19fb4/mrflagly-0.2.11-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e77a04e34bdd0ddb660cce9fc31c93174022dd62e2dfe34c9286a77d9259e7ee", size = 1190536, upload-time = "2024-10-03T11:41:57.769Z" },
-    { url = "https://files.pythonhosted.org/packages/b0/a4/873de4b248f39f6b958f98408c9a352cb019217bf53922d37b82de8a1427/mrflagly-0.2.11-cp310-cp310-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:3cd08aea65055fd0dec488b90656e32a29851703a3b17828c867366158afaf4f", size = 1056007, upload-time = "2024-10-03T11:41:59.088Z" },
-    { url = "https://files.pythonhosted.org/packages/a9/fb/2d35e468df56047f8b4546f5cb1c95dba77bdd523d1b09e74719ec0b52b2/mrflagly-0.2.11-cp310-cp310-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:91dbae58a0e1759acc55e5abff6695ca38d57c54da2a53752645fb6e92500308", size = 1245611, upload-time = "2024-10-03T11:42:00.96Z" },
-    { url = "https://files.pythonhosted.org/packages/6e/20/aaaeab39f9fe52469ef2ff5b8e78f929c6db4dbb201c906b429fcd9b2cef/mrflagly-0.2.11-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:52735f0657779c49fd4536a1d036a58c6981c0571da7ed0ae55b10fd2873be14", size = 1201138, upload-time = "2024-10-03T11:42:02.38Z" },
-    { url = "https://files.pythonhosted.org/packages/c6/08/e3e2e44059ca32718390c5e56a859657209fcbefd631627f0f9d0483ec77/mrflagly-0.2.11-cp310-none-win32.whl", hash = "sha256:d357da90c1da1a3d13d4c3c018628f277760c52ed3bb6a684dbdcf23cd4d07f9", size = 905005, upload-time = "2024-10-03T11:42:03.736Z" },
-    { url = "https://files.pythonhosted.org/packages/22/0a/8fcea1ef28b316aadfaf50702462d28254c35c81d2042dd02771c5ff2be4/mrflagly-0.2.11-cp310-none-win_amd64.whl", hash = "sha256:604593b1d56b19559638b9d8e8e0f83f325db7616060f70eb8248dafa9b62bd5", size = 963287, upload-time = "2024-10-03T11:42:05.214Z" },
-    { url = "https://files.pythonhosted.org/packages/2c/dc/3e67478365ef4e0b1c27fb95f323c25df40634ba91395917d0b6ead3dc43/mrflagly-0.2.11-cp311-cp311-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:09d629c079059e0c5538851d1332c14efef6eafc0e99f4fb1de80cf46ebb66dd", size = 2192729, upload-time = "2024-10-03T11:42:06.838Z" },
-    { url = "https://files.pythonhosted.org/packages/b0/03/d2cde5c7598e16f8330341b3d5f5bec15c29cc9c27730c24d8dacdb07978/mrflagly-0.2.11-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:306f786e367a550a82ce6d381d9c4bdb2f8cf500004986d21b1aa508d01d754a", size = 1190537, upload-time = "2024-10-03T11:42:08.746Z" },
-    { url = "https://files.pythonhosted.org/packages/15/e9/2d9df060d1ab48da89597596c031ba9d5c7d5cef5cd9ea11ecfe1835ab5c/mrflagly-0.2.11-cp311-cp311-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:c560f3fba55457a9c3fd2df40f56f680b4d17b3cf32a325788da4517309b2dcb", size = 1056029, upload-time = "2024-10-03T11:42:11.007Z" },
-    { url = "https://files.pythonhosted.org/packages/0b/50/282eb89921a6d00b19dd6af21a18a36fe6faf17c0b1d3baf7183756b6d0b/mrflagly-0.2.11-cp311-cp311-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:80222f61a1941da3bf85c51b62823b1adc501fb07c304d15223ccfe7ca9fb05f", size = 1245648, upload-time = "2024-10-03T11:42:12.331Z" },
-    { url = "https://files.pythonhosted.org/packages/a8/7f/d13c9fe51bf351a5ab61d54ee55e4ba2f247dbcf5db36ff4744e210c7cfe/mrflagly-0.2.11-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:cfa9ed75837297fce70eac24c15cd8aabede487371467566076386ee3a3ed84a", size = 1201190, upload-time = "2024-10-03T11:42:14.009Z" },
-    { url = "https://files.pythonhosted.org/packages/d6/22/fc019aaf9d4d6182d9cce6224d218062aa58cb8c9ee3807238d72953563a/mrflagly-0.2.11-cp311-none-win32.whl", hash = "sha256:1bd42e11ca74d7bed38f886fe722db204bd47bbf603613071c0bbd1c1b5a2ff7", size = 905007, upload-time = "2024-10-03T11:42:15.442Z" },
-    { url = "https://files.pythonhosted.org/packages/80/c1/4d685120fef27a5da1283e3a953be8239d4a9858bc09b70b14f8d0967d59/mrflagly-0.2.11-cp311-none-win_amd64.whl", hash = "sha256:17d8b9c14cc0208cbbeff8b30322171555e67e42ebef7dc65f84fd1f80e9a73f", size = 963288, upload-time = "2024-10-03T11:42:16.997Z" },
-    { url = "https://files.pythonhosted.org/packages/96/7b/b37c868be9f462b061133aabae5077d8bd2618dc84d079eb34e20a8a0805/mrflagly-0.2.11-cp312-cp312-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:964dc546616ecea8bd9795fae28a20d8cf555fa64f458b836ff246650b3aabca", size = 2192713, upload-time = "2024-10-03T11:42:18.407Z" },
-    { url = "https://files.pythonhosted.org/packages/9c/c0/2ccca192eedc2bd22e28253f5241a78746f615a3a24bcb6decbafe99de4e/mrflagly-0.2.11-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:46f67cfcb5a0e6ae586fb4ad49cfe726be7e4a85c5bcf60fc35bb9bafbd4fac4", size = 1190477, upload-time = "2024-10-03T11:42:20.014Z" },
-    { url = "https://files.pythonhosted.org/packages/88/61/eb67f16b12a687b1cd4ffb2a77ddf14f4df85a912ac0a08c3f20c398197d/mrflagly-0.2.11-cp312-cp312-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:e0ae91811a94987a3e29a4ac4af65a56eaca2b5c83e3a24d0fb4dcb60276df2a", size = 1245645, upload-time = "2024-10-03T11:42:21.44Z" },
-    { url = "https://files.pythonhosted.org/packages/f8/fa/84fa05dbbdab8ec67af8377a96963b31ae8f557a41e10444e7bcaa62e9ef/mrflagly-0.2.11-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:34a8a0b4473931b5f978f8170de95bcea9cfda2558aebe284e6e05e6a18296c4", size = 1201188, upload-time = "2024-10-03T11:42:23.039Z" },
-    { url = "https://files.pythonhosted.org/packages/11/7f/ff38903e019dd3d74b24a531065b63f040941269288229a28fab56489093/mrflagly-0.2.11-cp312-none-win32.whl", hash = "sha256:05c039cd3bb67b708232e2fbab76ab67dd6d4d3cc88eff73bf6aaa971025ebf1", size = 904994, upload-time = "2024-10-03T11:42:24.247Z" },
-    { url = "https://files.pythonhosted.org/packages/06/12/5cacfab26d7459adf6ad3951b6e5dace8d7e39f990912e7b9c35806abe1f/mrflagly-0.2.11-cp312-none-win_amd64.whl", hash = "sha256:e05d02119e6ca7627d93580148a35aa20d0896e0768efb876dffd9522270a0ff", size = 963572, upload-time = "2024-10-03T11:42:26.187Z" },
-    { url = "https://files.pythonhosted.org/packages/2e/52/ef2e93d751b1aae8e36b7412c3797e4034d99374765092af8be5828fba8b/mrflagly-0.2.11-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:5d97082ba91178af93616108fe376f24fd7ada8c21244f0f1c0b26bfec352ef4", size = 1144268, upload-time = "2025-03-31T13:52:15.787Z" },
-    { url = "https://files.pythonhosted.org/packages/a2/cd/dd412a6e4708f4cc3ac71cf83ca11f3a70dee5fc3f8f4f0b8241ec501ab1/mrflagly-0.2.11-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:b2435ed5edf47febfe46e21e7ea092f9e9379587c428f2b39785ed07583937e2", size = 1098182, upload-time = "2025-03-31T13:52:18.047Z" },
-    { url = "https://files.pythonhosted.org/packages/35/d7/f33fae21fb7d2fd00122223c18a9e5a9a2a576b4f26beb63fc135c7f07e1/mrflagly-0.2.11-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:588bb5a217d93902bf69c63815e768750e19853576c0bdadf426a77dac7a12d5", size = 1180793, upload-time = "2025-03-31T13:52:19.693Z" },
-    { url = "https://files.pythonhosted.org/packages/81/36/6c50706cdbeb046e611298b922cdbff7087111ed3e9a998af95b5d7f145a/mrflagly-0.2.11-cp39-abi3-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:25b76f62141db7fba45fb04b18d7349b25235a9e75d4a7420ffb7358b7878dda", size = 1057466, upload-time = "2025-03-31T13:52:21.097Z" },
-    { url = "https://files.pythonhosted.org/packages/e4/b6/b5224ee8db37fcb7b20a4be5fad4700e2ccb3dc66e9031aa2963ba34fc31/mrflagly-0.2.11-cp39-abi3-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:019edb975f799006884f9243b6429ca50bb34b3737333b0b1726722e5f17d253", size = 1265914, upload-time = "2025-03-31T13:52:22.545Z" },
-    { url = "https://files.pythonhosted.org/packages/72/66/e6eb1f7b1e9dc5f390ae3c8f8fcdc540f3e277e986c78c7c6b4fd6a4bb55/mrflagly-0.2.11-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c6bcb212f60372342f46e713ab4e948654449d929aebdfba175e1ef9e5ee34e6", size = 1223281, upload-time = "2025-03-31T13:52:24.128Z" },
-    { url = "https://files.pythonhosted.org/packages/fb/08/2667f13e14adfca468f50e3a35a845ff5199fad4d074071ef1d4656112b5/mrflagly-0.2.11-cp39-abi3-win_amd64.whl", hash = "sha256:ff73e6a1145c8c84e13fcfa2442c872d8c665f87a214753c3ca41fff6ffede2e", size = 974409, upload-time = "2025-03-31T13:52:25.438Z" },
-    { url = "https://files.pythonhosted.org/packages/76/a6/d6dd7f8cf1caf7aea9a26a19725021eece0f82c7dc9cb5a424982ea5f754/mrflagly-0.2.11-pp310-pypy310_pp73-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:9f3799b71de56ed53a0623c0a6fea288156fbccff4c091d285375bbc4070622d", size = 1246253, upload-time = "2024-10-03T11:42:59.161Z" },
-    { url = "https://files.pythonhosted.org/packages/a9/21/e01afb18a7e7238269c24bf3f22bc9ea14d8d34cb06fef87f186e1e7d7f8/mrflagly-0.2.11-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2319afaf912bb254ebd239e51f4c7f4a2996be79c15b20ff44f9eb0f8fe40efc", size = 1202418, upload-time = "2024-10-03T11:43:00.99Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/b8/7383297daa5cbeae7a5330727e93f6c625c4e11bd641b90d949551843c01/mrflagly-0.2.14-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:e15e777b554988844b221fae4b2f30e48d16b94bf02c10905497629ef327fd54", size = 1380382, upload-time = "2025-12-12T16:00:48.126Z" },
+    { url = "https://files.pythonhosted.org/packages/09/01/f4854507dffe95c091b3c95570a573e219916976dc29c8a37b6ecfcff539/mrflagly-0.2.14-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:a29b22d3e43dafedd706993e3cd0d7ea383353e9bf0381d35641d11fa3ab4165", size = 1324068, upload-time = "2025-12-12T16:00:50.018Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/86/eda1ff8b3e5451817db1b86053f51b9a03b3a56880ba3b155a9048e9147b/mrflagly-0.2.14-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:667477cb21e5832821a6c316e13a643876c4c177f6af24fc2576e9e03360b51d", size = 1448991, upload-time = "2025-12-12T16:00:51.616Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/19/4e41d02157f98ba3f971f3f9348b43eddb3e7d83ee81cf2e65a31f250346/mrflagly-0.2.14-cp310-abi3-manylinux_2_28_armv7l.whl", hash = "sha256:7d4c41a41f064da68d96d650ea9bf495bf353fb9faeb4882640c23de5fb585ee", size = 1298990, upload-time = "2025-12-12T16:00:53.192Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/49/2b43dd9ea49741b90e844ac5e475434fb2a20ebe2fe6eb1ed82470c1d5e4/mrflagly-0.2.14-cp310-abi3-manylinux_2_28_i686.whl", hash = "sha256:31c1f115489d93442a8f94d526e38e9912929d11ddb09906f9df1f13951e1111", size = 1389504, upload-time = "2025-12-12T16:00:55.13Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/8e/7ad19339766e6e3cc9d5535f2e3976f580a1f02fc802e1a04d58112d429b/mrflagly-0.2.14-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:1ebae9fed3ac61369713c85844729e0b0f419e2c719b89dbeb6639b6f2c909ae", size = 1486441, upload-time = "2025-12-12T16:00:56.925Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/08/a77ff5c4d48758f544df241e08b44d26a02b9fd99b5ae54eba37ac53a39b/mrflagly-0.2.14-cp310-abi3-win_amd64.whl", hash = "sha256:e993c58f084041626b04916973d23b970300be17986a93b45c4e43e187dc8cd6", size = 1182187, upload-time = "2025-12-12T16:00:58.806Z" },
 ]
 
 [[package]]
@@ -1858,6 +1836,21 @@ source = { editable = "nidx/nidx_binding" }
 name = "nidx-protos"
 version = "6.9.7"
 source = { editable = "nidx/nidx_protos" }
+dependencies = [
+    { name = "protobuf" },
+]
+
+[package.optional-dependencies]
+grpc = [
+    { name = "grpcio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.76.0" },
+    { name = "protobuf", specifier = ">=6.31.1,<7.0.0" },
+]
+provides-extras = ["grpc"]
 
 [[package]]
 name = "nkeys"
@@ -1924,11 +1917,11 @@ dependencies = [
     { name = "jwcrypto" },
     { name = "mmh3" },
     { name = "multidict" },
-    { name = "nidx-protos" },
+    { name = "nidx-protos", extra = ["grpc"] },
     { name = "nuclia-models" },
     { name = "nucliadb-admin-assets" },
     { name = "nucliadb-models" },
-    { name = "nucliadb-protos" },
+    { name = "nucliadb-protos", extra = ["grpc"] },
     { name = "nucliadb-telemetry", extra = ["all"] },
     { name = "nucliadb-utils", extra = ["cache", "fastapi", "storages"] },
     { name = "oauth2client" },
@@ -1989,11 +1982,11 @@ requires-dist = [
     { name = "jwcrypto", specifier = ">=1.5.6" },
     { name = "mmh3", specifier = ">=3.0.0" },
     { name = "multidict", specifier = ">=6.0.4" },
-    { name = "nidx-protos", editable = "nidx/nidx_protos" },
+    { name = "nidx-protos", extras = ["grpc"], editable = "nidx/nidx_protos" },
     { name = "nuclia-models", specifier = ">=0.50.0" },
     { name = "nucliadb-admin-assets", specifier = ">=1.0.0.post1224" },
     { name = "nucliadb-models", editable = "nucliadb_models" },
-    { name = "nucliadb-protos", editable = "nucliadb_protos" },
+    { name = "nucliadb-protos", extras = ["grpc"], editable = "nucliadb_protos" },
     { name = "nucliadb-telemetry", extras = ["all"], editable = "nucliadb_telemetry" },
     { name = "nucliadb-utils", extras = ["storages", "fastapi", "cache"], editable = "nucliadb_utils" },
     { name = "oauth2client" },
@@ -2075,17 +2068,20 @@ name = "nucliadb-protos"
 version = "6.9.7"
 source = { editable = "nucliadb_protos" }
 dependencies = [
-    { name = "mypy-protobuf" },
     { name = "protobuf" },
-    { name = "types-protobuf" },
+]
+
+[package.optional-dependencies]
+grpc = [
+    { name = "grpcio" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "mypy-protobuf", specifier = ">=3.4.0" },
-    { name = "protobuf", specifier = ">=5" },
-    { name = "types-protobuf", specifier = ">=5" },
+    { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.76.0" },
+    { name = "protobuf", specifier = ">=6.31.1,<7.0.0" },
 ]
+provides-extras = ["grpc"]
 
 [[package]]
 name = "nucliadb-sdk"
@@ -2328,7 +2324,7 @@ requires-dist = [
     { name = "google-auth", marker = "extra == 'storages'", specifier = ">=2.4.1" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "mmh3", specifier = ">=3.0.0" },
-    { name = "mrflagly", specifier = ">=0.2.9" },
+    { name = "mrflagly", specifier = ">=0.2.14" },
     { name = "nats-py", extras = ["nkeys"], specifier = ">=2.6.0" },
     { name = "nidx-protos", editable = "nidx/nidx_protos" },
     { name = "nucliadb-protos", editable = "nucliadb_protos" },
@@ -3508,16 +3504,16 @@ wheels = [
 
 [[package]]
 name = "pytest-docker-fixtures"
-version = "1.4.1"
+version = "1.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "docker" },
     { name = "pytest" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/69/a4/19744cbed14b9056b14ded4e466ff0a0918e400db6c4325e3436e1ee5eb0/pytest_docker_fixtures-1.4.1.tar.gz", hash = "sha256:b04f2a9e980c2709ba950c9ecabcb533f8175aede1fd4dd46862928f5d7d136d", size = 11166, upload-time = "2025-11-18T14:51:20.823Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a8/fa/249702cb610b734792493ca0bd305211003a9d79c9710ba76fba0404482c/pytest_docker_fixtures-1.4.2.tar.gz", hash = "sha256:1261094c7a50cb03e80eff16daaf5a6c36c512915d2e3634d2f52b9bddff7078", size = 11325, upload-time = "2025-12-01T13:44:01.284Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/30/03/76fbea51ec209887c3c65b9d60443c228afc5d76339cb47b2b55fbc449cc/pytest_docker_fixtures-1.4.1-py3-none-any.whl", hash = "sha256:95db69da43cb49db798ba50e8ee2832358e979d6fba91613d02c8021f4a5b9c1", size = 14309, upload-time = "2025-11-18T14:51:19.869Z" },
+    { url = "https://files.pythonhosted.org/packages/09/a1/c0dff3c5f7c8e8e1244a10d028fac851d78518f420560c54cfa5a839514b/pytest_docker_fixtures-1.4.2-py3-none-any.whl", hash = "sha256:0ed36ede25c646f775c2d7a09c7811a9a5ab9cb3003994caeb53d84efbfcae7b", size = 14407, upload-time = "2025-12-01T13:43:59.942Z" },
 ]
 
 [package.optional-dependencies]
