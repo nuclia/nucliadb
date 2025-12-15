@@ -215,8 +215,8 @@ class AugmentRequest(BaseModel):
 class AugmentedParagraph(BaseModel):
     text: str | None = None
 
-    neighbours_before: dict[ParagraphId, str] | None = None
-    neighbours_after: dict[ParagraphId, str] | None = None
+    neighbours_before: list[ParagraphId] | None = None
+    neighbours_after: list[ParagraphId] | None = None
 
     image: Image | None = None
 
