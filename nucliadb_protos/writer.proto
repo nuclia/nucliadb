@@ -298,6 +298,8 @@ message ShardObject {
 }
 
 message Shards {
+    reserved 6;
+
     repeated ShardObject shards = 1;
     string kbid = 2;
 
@@ -310,7 +312,6 @@ message Shards {
     // DEPRECATED: use vectorset configurations instead
     knowledgebox.SemanticModelMetadata model = 5 [deprecated = true];
 
-    utils.ReleaseChannel release_channel = 6;
     map<string, string> extra = 7;
 }
 

@@ -413,7 +413,7 @@ impl TextReaderService {
         // Offset to search from
         let results = request.result_per_page as usize;
         let extra_result = results + 1;
-        let maybe_order = request.order.clone();
+        let maybe_order = request.order;
         let valid_facet_iter = request
             .faceted
             .iter()

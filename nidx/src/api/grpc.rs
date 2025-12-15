@@ -89,7 +89,6 @@ impl NidxApi for ApiServer {
         Ok(Response::new(noderesources::Shard {
             metadata: Some(ShardMetadata {
                 kbid: shard.kbid.to_string(),
-                release_channel: 0,
             }),
             shard_id: shard_id.to_string(),
             fields: index_stats.get(&IndexKind::Text).map(|s| s.records).unwrap_or(0) as u64,
@@ -167,7 +166,6 @@ impl NidxApi for ApiServer {
         Ok(Response::new(OpStatus {
             status: op_status::Status::Ok.into(),
             detail: "Vectorset successfully created".to_string(),
-            ..Default::default()
         }))
     }
 
@@ -186,7 +184,6 @@ impl NidxApi for ApiServer {
         Ok(Response::new(OpStatus {
             status: op_status::Status::Ok.into(),
             detail: "Vectorset successfully deleted".to_string(),
-            ..Default::default()
         }))
     }
 

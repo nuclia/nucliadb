@@ -272,7 +272,7 @@ impl Searcher<'_> {
         } else if self.facets.is_empty() {
             // Only query no facets
             let extra_result = self.results + 1;
-            match self.request.order.clone() {
+            match self.request.order {
                 Some(order) => {
                     let sort_field = order.sort_by();
                     let custom_collector = self.custom_order_collector(order, extra_result);
@@ -312,7 +312,7 @@ impl Searcher<'_> {
         } else {
             let extra_result = self.results + 1;
 
-            match self.request.order.clone() {
+            match self.request.order {
                 Some(order) => {
                     let sort_field = order.sort_by();
                     let custom_collector = self.custom_order_collector(order, extra_result);

@@ -72,15 +72,6 @@ class ExtractedDataTypeName(str, Enum):
     QA = "question_answers"
 
 
-class ReleaseChannel(str, Enum):
-    """
-    Deprecated. No longer used.
-    """
-
-    STABLE = "STABLE"
-    EXPERIMENTAL = "EXPERIMENTAL"
-
-
 class KnowledgeBoxConfig(BaseModel):
     slug: Optional[SlugString] = Field(
         default=None, title="Slug", description="Slug for the Knowledge Box."

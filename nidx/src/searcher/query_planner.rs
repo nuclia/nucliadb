@@ -106,7 +106,7 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> anyhow::Result<
     Ok(Some(ParagraphSearchRequest {
         uuid: "".to_string(),
         body: search_request.body.clone(),
-        order: search_request.order.clone(),
+        order: search_request.order,
         faceted: search_request.faceted.clone(),
         result_per_page: search_request.result_per_page,
         with_duplicates: search_request.with_duplicates,
@@ -130,7 +130,7 @@ fn compute_texts_request(search_request: &SearchRequest) -> Option<DocumentSearc
 
     Some(DocumentSearchRequest {
         body: search_request.body.clone(),
-        order: search_request.order.clone(),
+        order: search_request.order,
         faceted: search_request.faceted.clone(),
         result_per_page: search_request.result_per_page,
         only_faceted: search_request.only_faceted,

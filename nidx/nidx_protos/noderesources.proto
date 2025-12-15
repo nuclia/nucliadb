@@ -138,6 +138,8 @@ message IndexParagraphs {
 }
 
 message Resource {
+    reserved 12, 13;
+
     ResourceID resource = 1;
 
     IndexMetadata metadata = 2;
@@ -179,9 +181,6 @@ message Resource {
 
     string shard_id = 11;
 
-    map<string, utils.UserVectors> vectors = 12 [deprecated = true]; // vectorset is the key
-    map<string, utils.UserVectorsList> vectors_to_delete = 13 [deprecated = true];  // Vectorset prefix vector id
-
     optional utils.Security security = 14;
 
     // Boleans to indicate if the indexing needs to be done
@@ -190,8 +189,9 @@ message Resource {
 }
 
 message ShardMetadata {
+    reserved 2;
+
     string kbid = 1;
-    utils.ReleaseChannel release_channel = 2;
 }
 
 message StringList {

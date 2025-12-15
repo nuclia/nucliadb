@@ -383,7 +383,6 @@ fn test_order_by() -> anyhow::Result<()> {
     let order = OrderBy {
         sort_by: OrderField::Created as i32,
         r#type: 0,
-        ..Default::default()
     };
 
     // TODO: we need two resources to test any order (creation/modification dates)
