@@ -146,9 +146,7 @@ async def augment(
                 elif isinstance(id, ParagraphId):
                     field_id = id.field_id
                 else:  # pragma: no cover
-                    # This is a trick so mypy generates an error if this branch can be reached,
-                    # that is, if we are missing some ifs
-                    _d: int = "d"
+                    assert_never(id)
 
                 augments["fields"].setdefault(field_id, []).extend(augmentation.select)
 

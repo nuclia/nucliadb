@@ -21,6 +21,8 @@ import asyncio
 from collections import deque
 from typing import AsyncIterator, Deque, Sequence, cast
 
+from typing_extensions import assert_never
+
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
@@ -461,16 +463,17 @@ async def conversation_selector(
                 page = selector.index // metadata.size + 1
                 index = selector.index % metadata.size
 
-            else:
+            elif isinstance(selector.index, str):
                 if selector.index == "first":
                     page, index = (1, 0)
                 elif selector.index == "last":
                     page = metadata.pages
                     index = metadata.total % metadata.size - 1
                 else:  # pragma: no cover
-                    # This is a trick so mypy generates an error if this branch can be reached,
-                    # that is, if we are missing some ifs
-                    _a: int = "a"
+                    assert_never(selector.index)
+
+            else:  # pragma: no cover
+                assert_never(selector.index)
 
             found = None
             async for found in iter_conversation_messages(field, start_from=(page, index)):
@@ -566,6 +569,4 @@ async def conversation_selector(
             yield page, index, message
 
     else:  # pragma: no cover
-        # This is a trick so mypy generates an error if this branch can be reached,
-        # that is, if we are missing some ifs
-        _b: int = "b"
+        assert_never(selector)
