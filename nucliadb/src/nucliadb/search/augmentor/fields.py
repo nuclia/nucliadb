@@ -287,7 +287,9 @@ async def db_augment_conversation_field(
                 )
                 augmented_message.attachments = []
                 for ref in message.content.attachments_fields:
-                    field_id = FieldId.from_pb(field.uuid, ref.field_type, ref.field_id, ref.split)
+                    field_id = FieldId.from_pb(
+                        field.uuid, ref.field_type, ref.field_id, ref.split or None
+                    )
                     augmented_message.attachments.append(field_id)
         else:
             logger.warning(f"conversation field property not implemented: {prop}")

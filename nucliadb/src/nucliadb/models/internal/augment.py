@@ -316,7 +316,7 @@ class AttachmentKind(str, Enum):
 
 class ConversationAttachments(SelectProp):
     prop: Literal["attachments"] = "attachments"
-    kind: AttachmentKind
+    # kind: AttachmentKind
     selector: ConversationSelector = Field(default_factory=FullSelector)
 
 

@@ -27,6 +27,7 @@ from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.models.internal.augment import (
     AnswerSelector,
     AugmentedConversationField,
+    ConversationAttachments,
     ConversationAugment,
     ConversationText,
     FieldAugment,
@@ -196,7 +197,7 @@ async def test_augmentor_hierarchy_strategy(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_augmentor_conversation_strategy(
+async def test_augmentor_conversation_strategy_text(
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
@@ -552,6 +553,92 @@ async def test_augmentor_conversation_strategy(
         augmented_field = augmented.fields[field_id]
         assert isinstance(augmented_field, AugmentedConversationField)
         assert augmented_field.messages is None
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_augmentor_conversation_strategy_attachments(
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    knowledgebox: str,
+) -> None:
+    kbid = knowledgebox
+
+    rid = await lambs_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    with request_caches():
+        field_id = FieldId.from_string(f"{rid}/c/lambs")
+        split_2_id = FieldId.from_string(f"{rid}/c/lambs/2")
+
+        # All conversation attachments
+        augmented = await augment(
+            kbid,
+            [
+                FieldAugment(given=[], select=[]),
+                ConversationAugment(
+                    given=[field_id],
+                    select=[
+                        ConversationAttachments(selector=FullSelector()),
+                    ],
+                ),
+            ],
+        )
+        augmented_field = augmented.fields[field_id]
+        assert isinstance(augmented_field, AugmentedConversationField)
+        assert augmented_field.messages is not None
+        assert len(augmented_field.messages) == 12
+        assert augmented_field.messages[2 - 1].attachments == [
+            FieldId.from_string(f"{rid}/f/attachment:lamb")
+        ]
+        assert augmented_field.messages[11 - 1].attachments == [
+            FieldId.from_string(f"{rid}/f/attachment:blue-suit")
+        ]
+
+        # All conversation attachments by split id
+        augmented = await augment(
+            kbid,
+            [
+                FieldAugment(given=[], select=[]),
+                ConversationAugment(
+                    given=[split_2_id],
+                    select=[
+                        ConversationAttachments(selector=FullSelector()),
+                    ],
+                ),
+            ],
+        )
+        augmented_field = augmented.fields[field_id]
+        assert isinstance(augmented_field, AugmentedConversationField)
+        assert augmented_field.messages is not None
+        assert len(augmented_field.messages) == 12
+        assert augmented_field.messages[2 - 1].attachments == [
+            FieldId.from_string(f"{rid}/f/attachment:lamb")
+        ]
+        assert augmented_field.messages[11 - 1].attachments == [
+            FieldId.from_string(f"{rid}/f/attachment:blue-suit")
+        ]
+
+        # Get attachments for a single split
+        augmented = await augment(
+            kbid,
+            [
+                FieldAugment(given=[], select=[]),
+                ConversationAugment(
+                    given=[split_2_id],
+                    select=[
+                        ConversationAttachments(selector=MessageSelector()),
+                    ],
+                ),
+            ],
+        )
+        augmented_field = augmented.fields[field_id]
+        assert isinstance(augmented_field, AugmentedConversationField)
+        assert augmented_field.messages is not None
+        assert len(augmented_field.messages) == 1
+        assert augmented_field.messages[0].ident == "2"
+        assert augmented_field.messages[0].attachments == [
+            FieldId.from_string(f"{rid}/f/attachment:lamb")
+        ]
 
 
 def paragraph_from_id(id: str) -> Paragraph:
