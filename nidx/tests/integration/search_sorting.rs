@@ -108,7 +108,7 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
             .searcher_client
             .search(SearchRequest {
                 shard: shard_id.clone(),
-                order: order.clone(),
+                order,
                 document: true,
                 vectorset: "english".to_string(),
                 result_per_page: page_size,
@@ -130,7 +130,6 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
     let order = Some(nidx_protos::OrderBy {
         sort_by: nidx_protos::order_by::OrderField::Created.into(),
         r#type: nidx_protos::order_by::OrderType::Asc.into(),
-        ..Default::default()
     });
     let fields = do_search(&mut fixture, shard_id.clone(), order, 5).await;
     let mut sorted_fields = fields.clone();
@@ -144,7 +143,6 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
     let order = Some(nidx_protos::OrderBy {
         sort_by: nidx_protos::order_by::OrderField::Modified.into(),
         r#type: nidx_protos::order_by::OrderType::Asc.into(),
-        ..Default::default()
     });
     let fields = do_search(&mut fixture, shard_id.clone(), order, 5).await;
 
@@ -159,7 +157,6 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
     let order = Some(nidx_protos::OrderBy {
         sort_by: nidx_protos::order_by::OrderField::Created.into(),
         r#type: nidx_protos::order_by::OrderType::Desc.into(),
-        ..Default::default()
     });
     let fields = do_search(&mut fixture, shard_id.clone(), order, 5).await;
 
@@ -175,7 +172,6 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
     let order = Some(nidx_protos::OrderBy {
         sort_by: nidx_protos::order_by::OrderField::Modified.into(),
         r#type: nidx_protos::order_by::OrderType::Desc.into(),
-        ..Default::default()
     });
     let fields = do_search(&mut fixture, shard_id.clone(), order, 5).await;
 

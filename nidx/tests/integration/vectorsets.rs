@@ -141,7 +141,6 @@ async fn test_add_vectorset_to_shard(pool: PgPool) -> anyhow::Result<()> {
                 vector_dimension: Some(3),
                 ..Default::default()
             }),
-            ..Default::default()
         }))
         .await?;
 

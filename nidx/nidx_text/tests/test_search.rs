@@ -347,7 +347,6 @@ fn test_int_order_pagination() {
         order: Some(OrderBy {
             r#type: OrderType::Desc.into(),
             sort_by: OrderField::Created.into(),
-            ..Default::default()
         }),
         min_score: f32::MIN,
         ..Default::default()

@@ -166,7 +166,6 @@ impl NidxApi for ApiServer {
         Ok(Response::new(OpStatus {
             status: op_status::Status::Ok.into(),
             detail: "Vectorset successfully created".to_string(),
-            ..Default::default()
         }))
     }
 
@@ -185,7 +184,6 @@ impl NidxApi for ApiServer {
         Ok(Response::new(OpStatus {
             status: op_status::Status::Ok.into(),
             detail: "Vectorset successfully deleted".to_string(),
-            ..Default::default()
         }))
     }
 

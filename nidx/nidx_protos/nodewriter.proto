@@ -6,6 +6,8 @@ import public "nidx_protos/noderesources.proto";
 
 
 message OpStatus {
+    reserved 3, 4, 5, 6;
+
     enum Status {
         OK = 0;
         WARNING = 1;
@@ -13,11 +15,6 @@ message OpStatus {
     }
     Status status = 1;
     string detail = 2;
-
-    uint64 field_count = 3 [deprecated = true];
-    uint64 paragraph_count = 5 [deprecated = true];
-    uint64 sentence_count = 6 [deprecated = true];
-    string shard_id = 4 [deprecated = true];
 }
 
 // Implemented at nucliadb_object_storage
@@ -57,8 +54,8 @@ message VectorIndexConfig {
 }
 
 message NewShardRequest {
-    reserved 3, 4, 5;
-    utils.VectorSimilarity similarity = 1 [deprecated = true];
+    reserved 1, 3, 4, 5;
+
     string kbid = 2;
 
     map<string, VectorIndexConfig> vectorsets_configs = 6;
@@ -67,8 +64,8 @@ message NewShardRequest {
 }
 
 message NewVectorSetRequest {
+    reserved 2, 3;
+
     noderesources.VectorSetID id = 1;
-    utils.VectorSimilarity similarity = 2 [deprecated = true];
-    bool normalize_vectors = 3 [deprecated = true];
     VectorIndexConfig config = 4;
 }

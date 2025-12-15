@@ -24,6 +24,8 @@ message Faceted {
 
 
 message OrderBy {
+    reserved 1;
+
     enum OrderType {
       DESC = 0;
       ASC = 1;
@@ -32,7 +34,7 @@ message OrderBy {
         CREATED = 0;
         MODIFIED = 1;
     }
-    string field = 1 [deprecated = true];
+
     OrderType type = 2;
     OrderField sort_by = 3;
 }
