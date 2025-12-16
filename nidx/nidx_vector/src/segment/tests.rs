@@ -24,7 +24,7 @@ use std::time::Instant;
 use tempfile::tempdir;
 
 use crate::VectorR;
-use crate::config::{Similarity, VectorCardinality, VectorConfig, flags};
+use crate::config::{IndexSet, Similarity, VectorCardinality, VectorConfig, flags};
 use crate::data_store::{DataStoreV1, DataStoreV2};
 use crate::formula::{AtomClause, Clause, Formula};
 use crate::segment::{self, Elem};
@@ -35,7 +35,7 @@ const CONFIG: VectorConfig = VectorConfig {
     vector_type: crate::config::VectorType::DenseF32 { dimension: 128 },
     flags: vec![],
     vector_cardinality: VectorCardinality::Single,
-    disable_indexes: false,
+    indexes: IndexSet::Paragraph,
 };
 
 fn create_query() -> Vec<f32> {

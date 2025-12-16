@@ -405,7 +405,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::config::{Similarity, VectorCardinality, VectorConfig, VectorType};
+    use crate::config::{IndexSet, Similarity, VectorCardinality, VectorConfig, VectorType};
     use crate::indexer::{ResourceWrapper, index_resource};
     use crate::segment;
 
@@ -419,7 +419,7 @@ mod tests {
             vector_type: VectorType::DenseF32 { dimension: 3 },
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
-            disable_indexes: false,
+            indexes: IndexSet::Paragraph,
         };
         let raw_sentences = [
             (
@@ -515,7 +515,7 @@ mod tests {
             vector_type: VectorType::DenseF32 { dimension: 3 },
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
-            disable_indexes: false,
+            indexes: IndexSet::Paragraph,
         };
         let raw_sentences = [
             (
@@ -630,7 +630,7 @@ mod tests {
             vector_type: VectorType::DenseF32 { dimension: 3 },
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
-            disable_indexes: false,
+            indexes: IndexSet::Paragraph,
         };
         let raw_sentences = [
             (

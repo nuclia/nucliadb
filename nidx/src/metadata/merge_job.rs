@@ -119,7 +119,7 @@ impl MergeJob {
 
 #[cfg(test)]
 mod tests {
-    use nidx_vector::config::{VectorCardinality, VectorConfig};
+    use nidx_vector::config::{IndexSet, VectorCardinality, VectorConfig};
     use tokio::task::JoinSet;
     use uuid::Uuid;
 
@@ -134,7 +134,7 @@ mod tests {
         vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 3 },
         flags: vec![],
         vector_cardinality: VectorCardinality::Single,
-        disable_indexes: false,
+        indexes: IndexSet::Paragraph,
     };
 
     #[sqlx::test]

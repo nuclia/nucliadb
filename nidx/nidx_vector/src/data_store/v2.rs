@@ -105,13 +105,15 @@ impl DataStoreV2 {
                 let paragraph = store.get_paragraph(paragraph_addr);
                 let p_vectors = paragraph.vectors(&paragraph_addr).map(|v| store.get_vector(v).vector());
 
-                let Some(override_metadata) = &mut override_metadata else {
-                    panic!()
-                };
-
-                // Entry is removed so if it appears in other segments it is not copied again
-                let Some(metadata) = override_metadata.remove(paragraph.id()) else {
-                    continue;
+                let metadata = if let Some(override_metadata) = &mut override_metadata {
+                    // Entry is removed so if it appears in other segments it is not copied again
+                    let metadata = override_metadata.remove(paragraph.id());
+                    if metadata.is_none() {
+                        continue;
+                    };
+                    metadata
+                } else {
+                    None
                 };
 
                 // Write to new store
@@ -130,12 +132,16 @@ impl DataStoreV2 {
                     }
                 }
 
-                paragraphs.write_paragraph_ref(
-                    paragraph,
-                    first_vector,
-                    last_vector - first_vector + 1,
-                    Some(&metadata),
-                )?;
+                if let Some(metadata) = metadata {
+                    paragraphs.write_paragraph_ref(
+                        paragraph,
+                        first_vector,
+                        last_vector - first_vector + 1,
+                        Some(metadata.as_slice()),
+                    )?;
+                } else {
+                    paragraphs.write_paragraph_ref(paragraph, first_vector, last_vector - first_vector + 1, None)?;
+                }
 
                 p_idx += 1;
             }

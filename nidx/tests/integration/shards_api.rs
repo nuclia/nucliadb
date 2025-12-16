@@ -33,7 +33,7 @@ use nidx::metadata::{Deletion, Index, Segment};
 use nidx::scheduler::{purge_deleted_shards_and_indexes, purge_deletions, purge_segments};
 use nidx::{NidxMetadata, metadata::Shard};
 use nidx_tests::*;
-use nidx_vector::config::{VectorCardinality, VectorConfig};
+use nidx_vector::config::{IndexSet, VectorCardinality, VectorConfig};
 
 use crate::common::metadata::{count_deletions, count_indexes, count_merge_jobs, count_segments, count_shards};
 
@@ -43,7 +43,7 @@ const VECTOR_CONFIG: VectorConfig = VectorConfig {
     vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 3 },
     flags: vec![],
     vector_cardinality: VectorCardinality::Single,
-    disable_indexes: false,
+    indexes: IndexSet::Paragraph,
 };
 
 #[sqlx::test]

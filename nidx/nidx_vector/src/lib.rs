@@ -49,6 +49,7 @@ use tracing::instrument;
 pub use indexer::SEGMENT_TAGS;
 pub use request_types::VectorSearchRequest;
 
+use crate::config::IndexSet;
 use crate::indexer::index_relations;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
@@ -75,11 +76,13 @@ impl VectorIndexer {
         index_name: &str,
         use_default_vectorset: bool,
     ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
-        // if indexing == Paragraphs {
-        // let vectorset_resource = ResourceWrapper::new_vectorset_resource(resource, index_name, use_default_vectorset);
-        // index_resource(vectorset_resource, output_dir, config)
-        // } else {
-        index_relations(resource, output_dir, config)
+        if matches!(config.indexes, IndexSet::Paragraph) {
+            let vectorset_resource =
+                ResourceWrapper::new_vectorset_resource(resource, index_name, use_default_vectorset);
+            index_resource(vectorset_resource, output_dir, config)
+        } else {
+            index_relations(resource, output_dir, config)
+        }
     }
 
     pub fn deletions_for_resource(&self, resource: &Resource, index_name: &str) -> Vec<String> {
@@ -146,17 +149,20 @@ fn open_segments(
     }
 
     // TODO, proper collection of deletions by seq
-    let deletions = open_index.deletions().map(|d| d.0.as_str()).collect::<HashSet<_>>();
-    for (s, _) in &mut open_segments {
-        s.apply_deletions(&deletions);
+    if matches!(config.indexes, IndexSet::Paragraph) {
+        for (deletion, deletion_seq) in open_index.deletions() {
+            for (segment, segment_seq) in &mut open_segments {
+                if deletion_seq > *segment_seq {
+                    segment.apply_deletion(deletion.as_str());
+                }
+            }
+        }
+    } else {
+        let deletions = open_index.deletions().map(|d| d.0.as_str()).collect::<HashSet<_>>();
+        for (s, _) in &mut open_segments {
+            s.apply_deletions(&deletions);
+        }
     }
-    // for (deletion, deletion_seq) in open_index.deletions() {
-    //     for (segment, segment_seq) in &mut open_segments {
-    //         if deletion_seq > *segment_seq {
-    //             segment.apply_deletion(deletion.as_str());
-    //         }
-    //     }
-    // }
 
     Ok(open_segments.into_iter().map(|(dp, _)| dp).collect())
 }

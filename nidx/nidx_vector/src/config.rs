@@ -95,6 +95,13 @@ pub enum VectorCardinality {
     Multi,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+pub enum IndexSet {
+    #[default]
+    Paragraph,
+    Relation,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VectorConfig {
     #[serde(default)]
@@ -107,7 +114,7 @@ pub struct VectorConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub flags: Vec<String>,
     #[serde(default)]
-    pub disable_indexes: bool,
+    pub indexes: IndexSet,
 }
 
 impl VectorConfig {
@@ -146,7 +153,7 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
             vector_type,
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
-            disable_indexes: false,
+            indexes: IndexSet::Paragraph,
         })
     }
 }

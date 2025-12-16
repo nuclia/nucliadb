@@ -53,7 +53,7 @@ fn test_indexer() -> anyhow::Result<()> {
         normalize_vectors: false,
         flags: vec![],
         vector_cardinality: VectorCardinality::Single,
-        disable_indexes: true,
+        indexes: IndexSet::Relation,
     };
 
     let resource = Resource {

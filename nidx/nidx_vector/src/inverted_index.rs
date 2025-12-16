@@ -27,6 +27,7 @@ use tracing::warn;
 
 use crate::{
     ParagraphAddr, VectorR,
+    config::IndexSet,
     data_store::{DataStore, iter_paragraphs},
     formula::{BooleanOperator, Clause, Formula},
 };
@@ -119,7 +120,7 @@ impl IndexBuilder {
     }
 }
 
-/// Build indexes from a nodes.kv file.
+/// Build indexes from a DataStore.
 pub fn build_indexes(work_path: &Path, data_store: &impl DataStore) -> VectorR<()> {
     let mut field_builder = IndexBuilder::new();
     let mut label_builder = IndexBuilder::new();
@@ -155,19 +156,15 @@ pub struct OpenOptions {
     pub prewarm: bool,
 }
 
-pub struct InvertedIndexes {
+pub struct ParagraphInvertedIndexes {
     field_index: FstIndexReader,
     label_index: FstIndexReader,
     records: usize,
 }
 
-impl InvertedIndexes {
+impl ParagraphInvertedIndexes {
     pub fn space_usage(&self) -> usize {
         self.field_index.space_usage() + self.label_index.space_usage()
-    }
-
-    pub fn exists(path: &Path) -> bool {
-        path.join(file::INDEX_MAP).exists()
     }
 
     pub fn open(work_path: &Path, records: usize, options: OpenOptions) -> VectorR<Self> {
@@ -249,5 +246,54 @@ impl InvertedIndexes {
                 }
             }
         }
+    }
+}
+
+pub struct RelationInvertedIndexes {
+    field_index: FstIndexReader,
+}
+
+impl RelationInvertedIndexes {
+    pub fn space_usage(&self) -> usize {
+        self.field_index.space_usage()
+    }
+
+    pub fn open(work_path: &Path, options: OpenOptions) -> VectorR<Self> {
+        let map = Arc::new(InvertedMapReader::open(
+            &work_path.join(file::INDEX_MAP),
+            options.prewarm,
+        )?);
+        let field_index = FstIndexReader::open(&work_path.join(file::FIELD_INDEX), map, options.prewarm)?;
+
+        Ok(Self { field_index })
+    }
+}
+
+pub enum InvertedIndexes {
+    Paragraph(ParagraphInvertedIndexes),
+    Relation(RelationInvertedIndexes),
+}
+
+impl InvertedIndexes {
+    pub fn open(index_type: &IndexSet, work_path: &Path, records: usize, options: OpenOptions) -> VectorR<Self> {
+        match index_type {
+            IndexSet::Paragraph => Ok(InvertedIndexes::Paragraph(ParagraphInvertedIndexes::open(
+                work_path, records, options,
+            )?)),
+            IndexSet::Relation => Ok(InvertedIndexes::Relation(RelationInvertedIndexes::open(
+                work_path, options,
+            )?)),
+        }
+    }
+
+    pub fn space_usage(&self) -> usize {
+        match self {
+            InvertedIndexes::Paragraph(indexes) => indexes.space_usage(),
+            InvertedIndexes::Relation(indexes) => indexes.field_index.space_usage(),
+        }
+    }
+
+    pub fn exists(path: &Path) -> bool {
+        path.join(file::INDEX_MAP).exists()
     }
 }

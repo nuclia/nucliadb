@@ -256,6 +256,7 @@ mod tests {
     use std::sync::Arc;
 
     use nidx_tests::little_prince;
+    use nidx_vector::config::IndexSet;
     use nidx_vector::config::Similarity;
     use nidx_vector::config::VectorCardinality;
     use nidx_vector::config::VectorConfig;
@@ -282,7 +283,7 @@ mod tests {
         vector_type: VectorType::DenseF32 { dimension: 3 },
         flags: vec![],
         vector_cardinality: VectorCardinality::Single,
-        disable_indexes: false,
+        indexes: IndexSet::Paragraph,
     };
 
     #[sqlx::test]

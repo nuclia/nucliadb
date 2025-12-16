@@ -211,7 +211,10 @@ pub fn merge(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::VectorCardinality, segment::Elem};
+    use crate::{
+        config::{IndexSet, VectorCardinality},
+        segment::Elem,
+    };
 
     const VECTOR_CONFIG: VectorConfig = VectorConfig {
         vector_type: VectorType::DenseF32 { dimension: 3 },
@@ -219,7 +222,7 @@ mod tests {
         normalize_vectors: false,
         flags: vec![],
         vector_cardinality: VectorCardinality::Single,
-        disable_indexes: false,
+        indexes: IndexSet::Paragraph,
     };
 
     #[test]
