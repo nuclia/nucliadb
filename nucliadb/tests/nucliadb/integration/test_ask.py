@@ -24,6 +24,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
+from nidx_protos.nodereader_pb2 import SearchRequest, SearchResponse
 from nuclia_models.predict.generative_responses import (
     CitationsGenerativeResponse,
     FootnoteCitationsGenerativeResponse,
@@ -31,10 +32,21 @@ from nuclia_models.predict.generative_responses import (
     JSONGenerativeResponse,
     StatusGenerativeResponse,
 )
+from pytest_mock import MockerFixture
 
+from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.ids import ParagraphId
+from nucliadb.models.internal.retrieval import (
+    KeywordScore,
+    ScoreSource,
+    ScoreType,
+)
 from nucliadb.search.predict import AnswerStatusCode, DummyPredictEngine
+from nucliadb.search.search.query_parser.models import UnitRetrieval
+from nucliadb.search.search.retrieval import text_block_search
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
+    SCORE_TYPE,
     AskRequest,
     AskResponseItem,
     AugmentedTextBlock,
@@ -44,12 +56,14 @@ from nucliadb_models.search import (
     FindRequest,
     FullResourceStrategy,
     HierarchyResourceStrategy,
+    Image,
     MetadataExtensionStrategy,
     MetadataExtensionType,
     PreQueriesStrategy,
     PreQuery,
     RagStrategies,
     SyncAskResponse,
+    TextPosition,
 )
 from nucliadb_protos import resources_pb2 as rpb2
 from nucliadb_protos import writer_pb2 as wpb2
@@ -58,6 +72,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 from tests.ndbfixtures.resources import cookie_tale_resource
+from tests.ndbfixtures.resources.lambs import lambs_resource
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
@@ -1946,3 +1961,292 @@ async def test_ask_query_image(nucliadb_reader: AsyncClient, standalone_knowledg
     assert predict.calls[1][1].query_context_images["QUERY_IMAGE"].content_type == "image/png"
     assert predict.calls[1][1].query_context_images["QUERY_IMAGE"].b64encoded == "dummy_base64_image"
     assert predict.calls[1][1].question == "whatever"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_conversational_strategy(
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    mocker: MockerFixture,
+):
+    kbid = standalone_knowledgebox
+    rid = await lambs_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    # FIXME(sc-13624): due to a bug in conversation field indexing, search is
+    # not reliable. Thus, we mock here the results of a search to the index to
+    # control the search results and properly test the RAG strategy
+
+    async def mock_text_block_search(
+        kbid: str, retrieval: UnitRetrieval
+    ) -> tuple[list[TextBlockMatch], SearchRequest, SearchResponse, list[str]]:
+        _, pb_query, shards_response, queried_shards = await text_block_search(kbid, retrieval)
+
+        text_blocks = [
+            TextBlockMatch(
+                paragraph_id=ParagraphId.from_string(f"{rid}/c/lambs/10/0-35"),
+                score_type=SCORE_TYPE.BM25,
+                scores=[
+                    KeywordScore(
+                        score=3.1989123821258545, source=ScoreSource.INDEX, type=ScoreType.KEYWORD
+                    )
+                ],
+                position=TextPosition(index=0, start=0, end=35),
+                order=0,
+                paragraph_labels=[
+                    "/l/art/film",
+                    "/l/genre/thriller",
+                    "/l/genre/horror",
+                    "/l/genre/psychological",
+                ],
+                fuzzy_search=False,
+            )
+        ]
+
+        return text_blocks, pb_query, shards_response, queried_shards
+
+    with (
+        patch("nucliadb.search.search.find.text_block_search", side_effect=mock_text_block_search),
+        # TODO(decoupled-ask): replace this with a proper mock for /retrieve
+        patch("nucliadb.search.api.v1.retrieve.text_block_search", side_effect=mock_text_block_search),
+    ):
+        data: SyncAskResponse
+
+        # TEST: full=True augments the whole conversation as paragraphs
+
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/ask",
+            headers={"x-synchronous": "true"},
+            json={
+                "query": "Orion is looking splendid tonight",
+                "top_k": 1,
+                "min_score": {"bm25": 0},
+                "reranker": "noop",
+                "rag_strategies": [
+                    {
+                        "name": "conversation",
+                        "full": True,
+                        "max_messages": 1,
+                        "attachments_text": False,
+                        "attachments_images": False,
+                    },
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        data = SyncAskResponse.model_validate_json(resp.content)
+
+        # validate we are enforcing the mock
+        assert data.retrieval_results.best_matches == [f"{rid}/c/lambs/10/0-35"], (
+            "we are actually enforcing this with a mock"
+        )
+        assert data.retrieval_results.resources.keys() == {rid}
+        assert data.retrieval_results.resources[rid].fields.keys() == {"/c/lambs"}
+        assert data.retrieval_results.resources[rid].fields["/c/lambs"].paragraphs.keys() == {
+            f"{rid}/c/lambs/10/0-35"
+        }
+
+        augmented = data.augmented_context
+        assert augmented is not None
+        assert len(augmented.paragraphs) == 12
+        # FIXME(decoupled-ask,sc-13624): uncomment this once the fix is merged
+        # assert f"{rid}/c/lambs/10/0-35" in augmented.paragraphs
+        # augmented.paragraphs[f"{rid}/c/lambs/10/0-35"].id == f"{rid}/c/lambs/10/0-35"
+        # augmented.paragraphs[f"{rid}/c/lambs/10/0-35"].parent == f"{rid}/c/lambs/10/0-35"
+
+        # TEST: max_messages=1 will return the first conversation message (that
+        # nobody asked for) and the matched split and
+
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/ask",
+            headers={"x-synchronous": "true"},
+            json={
+                "query": "Orion is looking splendid tonight",
+                "top_k": 1,
+                "min_score": {"bm25": 0},
+                "reranker": "noop",
+                "rag_strategies": [
+                    {
+                        "name": "conversation",
+                        "full": False,
+                        "max_messages": 1,
+                        "attachments_text": False,
+                        "attachments_images": False,
+                    },
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        data = SyncAskResponse.model_validate_json(resp.content)
+
+        augmented = data.augmented_context
+        assert augmented is not None
+        # FIXME(decoupled-ask,sc-13624): uncomment this once the fix is merged
+        # assert augmented.paragraphs.keys() == {f"{rid}/c/lambs/1/0-10", f"{rid}/c/lambs/10/0-35"}
+
+        # TEST: max_messages=3 will return the first conversation message (that
+        # nobody asked for), the matched split and a window surrounding it
+
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/ask",
+            headers={"x-synchronous": "true"},
+            json={
+                "query": "Orion is looking splendid tonight",
+                "top_k": 1,
+                "min_score": {"bm25": 0},
+                "reranker": "noop",
+                "rag_strategies": [
+                    {
+                        "name": "conversation",
+                        "full": False,
+                        "max_messages": 3,
+                        "attachments_text": False,
+                        "attachments_images": False,
+                    },
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        data = SyncAskResponse.model_validate_json(resp.content)
+
+        augmented = data.augmented_context
+        assert augmented is not None
+        # FIXME(decoupled-ask,sc-13624): uncomment this once the fix is merged
+        # assert augmented.paragraphs.keys() == {
+        #     f"{rid}/c/lambs/1/0-10",
+        #     f"{rid}/c/lambs/9/0-130",
+        #     f"{rid}/c/lambs/10/0-35",
+        #     f"{rid}/c/lambs/11/0-72",
+        # }
+
+        # TEST: with max_messages exceeding, we'll get an window with an offset
+
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/ask",
+            headers={"x-synchronous": "true"},
+            json={
+                "query": "Orion is looking splendid tonight",
+                "top_k": 1,
+                "min_score": {"bm25": 0},
+                "reranker": "noop",
+                "rag_strategies": [
+                    {
+                        "name": "conversation",
+                        "full": False,
+                        "max_messages": 7,
+                        "attachments_text": False,
+                        "attachments_images": False,
+                    },
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        data = SyncAskResponse.model_validate_json(resp.content)
+
+        augmented = data.augmented_context
+        assert augmented is not None
+        # FIXME(decoupled-ask,sc-13624): uncomment this once the fix is merged
+        # assert augmented.paragraphs.keys() == {
+        #     f"{rid}/c/lambs/1/0-10",
+        #     f"{rid}/c/lambs/6/0-80",
+        #     f"{rid}/c/lambs/7/0-191",
+        #     f"{rid}/c/lambs/8/0-12",
+        #     f"{rid}/c/lambs/9/0-130",
+        #     f"{rid}/c/lambs/10/0-35",
+        #     f"{rid}/c/lambs/11/0-72",
+        #     f"{rid}/c/lambs/12/0-28",
+        # }
+
+        # TEST: with max_messages exceeding, we'll get an window with an offset
+
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/ask",
+            headers={"x-synchronous": "true"},
+            json={
+                "query": "Orion is looking splendid tonight",
+                "top_k": 1,
+                "min_score": {"bm25": 0},
+                "reranker": "noop",
+                "rag_strategies": [
+                    {
+                        "name": "conversation",
+                        "full": False,
+                        "max_messages": 7,
+                        "attachments_text": False,
+                        "attachments_images": False,
+                    },
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        data = SyncAskResponse.model_validate_json(resp.content)
+
+        augmented = data.augmented_context
+        assert augmented is not None
+        # FIXME(decoupled-ask,sc-13624): uncomment this once the fix is merged
+        # assert augmented.paragraphs.keys() == {
+        #     f"{rid}/c/lambs/1/0-10",
+        #     f"{rid}/c/lambs/6/0-80",
+        #     f"{rid}/c/lambs/7/0-191",
+        #     f"{rid}/c/lambs/8/0-12",
+        #     f"{rid}/c/lambs/9/0-130",
+        #     f"{rid}/c/lambs/10/0-35",
+        #     f"{rid}/c/lambs/11/0-72",
+        #     f"{rid}/c/lambs/12/0-28",
+        # }
+
+        # TEST: text and image attachments
+
+        image = Image(b64encoded="my image", content_type="image/png")
+        with (
+            patch("nucliadb.search.search.chat.old_prompt.get_file_thumbnail_image", return_value=image),
+            patch("nucliadb.search.search.chat.prompt.get_file_thumbnail_image", return_value=image),
+        ):
+            from nucliadb.search.search.chat import ask
+
+            spy = mocker.spy(ask, "get_answer_stream")
+
+            resp = await nucliadb_reader.post(
+                f"/kb/{kbid}/ask",
+                headers={"x-synchronous": "true"},
+                json={
+                    "query": "Orion is looking splendid tonight",
+                    "top_k": 1,
+                    "min_score": {"bm25": 0},
+                    "reranker": "noop",
+                    "rag_strategies": [
+                        {
+                            "name": "conversation",
+                            "full": True,
+                            "max_messages": 1,
+                            "attachments_text": True,
+                            "attachments_images": True,
+                        },
+                    ],
+                },
+            )
+            assert resp.status_code == 200
+            data = SyncAskResponse.model_validate_json(resp.content)
+
+            augmented = data.augmented_context
+            assert augmented is not None
+            assert len(augmented.paragraphs) == 14
+            # FIXME(decoupled-ask,sc-13624): uncomment this once the fix is merged
+            # assert {
+            #     f"{rid}/c/attachment:blue-suit/0-19",
+            #     f"{rid}/c/attachment:lamb/0-70",
+            # }.issubset(augmented.paragraphs.keys())
+
+            # FIXME(decoupled-ask,sc-13624): uncomment this once the fix is merged
+            # assert f"{rid}/c/lambs/10/0-35" in augmented.paragraphs
+            # augmented.paragraphs[f"{rid}/c/lambs/10/0-35"].id == f"{rid}/c/lambs/10/0-35"
+            # augmented.paragraphs[f"{rid}/c/lambs/10/0-35"].parent == f"{rid}/c/lambs/10/0-35"
+
+            # images are sent to the LLM but not returned, we spy the method
+            # that sends to Predict API to validate we are sending the context
+            assert spy.call_args.kwargs["item"].query_context_images == {
+                f"{rid}/f/attachment:lamb/0-0": image,
+                f"{rid}/f/attachment:blue-suit/0-0": image,
+            }
+            del spy
