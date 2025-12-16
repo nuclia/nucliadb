@@ -88,7 +88,7 @@ async def cookie_tale_resource(
         async for vectorset_id, vs in datamanagers.vectorsets.iter(txn, kbid=kbid):
             vectorsets[vectorset_id] = vs
     # use a controlled random seed for vector generation
-    random.seed(63)
+    random.seed(16)
 
     bmb = BrokerMessageBuilder(
         kbid=kbid,

@@ -755,7 +755,7 @@ async def lambs_resource(
                 },
                 "attachment:blue-suit": {
                     "file": {
-                        "filename": "clarice-blue-suite.pdf",
+                        "filename": "clarice-blue-suit.pdf",
                         "content_type": "application/pdf",
                         "payload": base64.b64encode(b"some content we're not going to check").decode(),
                     }
@@ -770,7 +770,7 @@ async def lambs_resource(
         async for vectorset_id, vs in datamanagers.vectorsets.iter(txn, kbid=kbid):
             vectorsets[vectorset_id] = vs
     # use a controlled random seed for vector generation
-    random.seed(63)
+    random.seed(32)
 
     bmb = BrokerMessageBuilder(
         kbid=kbid,
