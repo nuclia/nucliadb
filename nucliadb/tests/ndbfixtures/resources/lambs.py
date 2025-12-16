@@ -783,9 +783,7 @@ async def lambs_resource(
     file_field.add_paragraph(
         "A beautiful picture of some happy lambs in the middle of a green field",
         vectors={
-            vectorset_id: [
-                random.random() for _ in range(config.vectorset_index_config.vector_dimension)
-            ]
+            vectorset_id: [random.random()] * config.vectorset_index_config.vector_dimension
             for i, (vectorset_id, config) in enumerate(vectorsets.items())
         },
         kind=Paragraph.TypeParagraph.INCEPTION,
@@ -795,9 +793,7 @@ async def lambs_resource(
     file_field.add_paragraph(
         "Clarice's blue suit",
         vectors={
-            vectorset_id: [
-                random.random() for _ in range(config.vectorset_index_config.vector_dimension)
-            ]
+            vectorset_id: [random.random()] * config.vectorset_index_config.vector_dimension
             for i, (vectorset_id, config) in enumerate(vectorsets.items())
         },
         kind=Paragraph.TypeParagraph.TEXT,
