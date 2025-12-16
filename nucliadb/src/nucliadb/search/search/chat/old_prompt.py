@@ -266,7 +266,7 @@ async def default_prompt_context(
                 )
                 for msg in expanded_msgs:
                     text = msg.content.text.strip()
-                    pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
+                    pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text)}"
                     context[pid] = text
 
 
@@ -847,7 +847,7 @@ async def conversation_prompt_context(
                                 text = extracted_text.split_text.get(ident, message.content.text.strip())
                             else:
                                 text = message.content.text.strip()
-                            pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
+                            pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text)}"
                             attachments.extend(message.content.attachments_fields)
                             if pid in context:
                                 continue
@@ -870,7 +870,7 @@ async def conversation_prompt_context(
                         else:
                             text = message.content.text.strip()
                         attachments.extend(message.content.attachments_fields)
-                        pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
+                        pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text)}"
                         if pid in context:
                             continue
                         context[pid] = text
@@ -902,7 +902,7 @@ async def conversation_prompt_context(
                         ops += 1
                         text = message.content.text.strip()
                         attachments.extend(message.content.attachments_fields)
-                        pid = f"{rid}/{field_type}/{field_id}/{message.ident}/0-{len(message.content.text) + 1}"
+                        pid = f"{rid}/{field_type}/{field_id}/{message.ident}/0-{len(message.content.text)}"
                         if pid in context:
                             continue
                         context[pid] = text
@@ -922,7 +922,9 @@ async def conversation_prompt_context(
                         )  # type: ignore
                         extracted_text = await field.get_extracted_text()
                         if extracted_text is not None:
-                            pid = f"{rid}/{field_type}/{attachment.field_id}/0-{len(extracted_text.text) + 1}"
+                            pid = (
+                                f"{rid}/{field_type}/{attachment.field_id}/0-{len(extracted_text.text)}"
+                            )
                             if pid in context:
                                 continue
                             text = f"Attachment {attachment.field_id}: {extracted_text.text}\n\n"
