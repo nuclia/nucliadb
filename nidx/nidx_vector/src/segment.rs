@@ -33,7 +33,7 @@ use core::f32;
 use rayon::prelude::*;
 
 use std::cmp::Reverse;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::iter::empty;
 use std::path::Path;
 use std::time::Instant;
@@ -119,7 +119,35 @@ pub fn merge(segment_path: &Path, operants: &[&OpenSegment], config: &VectorConf
             .iter()
             .map(|dp| (dp.alive_paragraphs(), dp.data_store.as_ref()))
             .collect();
-        DataStoreV2::merge(segment_path, node_producers, config)?;
+
+        // Dedup: search for all copies of a key
+        let mut paragraph_alive_fields: HashMap<String, Vec<String>> = HashMap::new();
+        for segment in &operants {
+            // TODO: Maybe iterate only alive paragraphs?
+            for paragraph_id in 0..segment.data_store.stored_paragraph_count() {
+                let paragraph = segment.data_store.get_paragraph(ParagraphAddr(paragraph_id));
+                let fields: Vec<String>;
+                (fields, _) = bincode::decode_from_slice(paragraph.metadata(), bincode::config::standard()).unwrap();
+                for f in fields {
+                    // TODO: Pass deletions here
+                    // Maybe don't apply deletions beforehand?
+                    let deletions: HashSet<String> = HashSet::new();
+                    if !deletions.contains(f.as_str()) && !deletions.contains(&f[..33]) {
+                        paragraph_alive_fields
+                            .entry(paragraph.id().to_string())
+                            .or_default()
+                            .push(f);
+                    }
+                }
+            }
+        }
+        // TODO: Wrap this into a Deduplicator
+        let override_metadata: HashMap<_, _> = paragraph_alive_fields
+            .into_iter()
+            .map(|(k, v)| (k, bincode::encode_to_vec(v, bincode::config::standard()).unwrap()))
+            .collect();
+
+        DataStoreV2::merge(segment_path, node_producers, config, Some(override_metadata))?;
         let data_store = DataStoreV2::open(segment_path, &config.vector_type, OpenReason::Create)?;
         merge_indexes(segment_path, data_store, operants, config)
     }
@@ -254,8 +282,6 @@ fn create_indexes<DS: DataStore + 'static>(
 
     let index = open_disk_hnsw(path, false)?;
 
-    build_indexes(path, &data_store)?;
-
     let metadata = VectorSegmentMetadata {
         path: path.to_path_buf(),
         records: data_store.stored_paragraph_count() as usize,
@@ -263,6 +289,7 @@ fn create_indexes<DS: DataStore + 'static>(
     };
 
     let inverted_indexes = if !config.disable_indexes {
+        build_indexes(path, &data_store)?;
         Some(InvertedIndexes::open(
             path,
             vector_count as usize,
@@ -424,11 +451,39 @@ impl AsRef<OpenSegment> for OpenSegment {
 impl OpenSegment {
     pub fn apply_deletion(&mut self, key: &str) {
         let Some(inverted_indexes) = &self.inverted_indexes else {
+            // Dedupe mode
+            // TODO: Pass as a batch and check correctly
+            // TODO: Create and use a field -> paragraph index?
+            for paragraph_id in 0..self.data_store.stored_paragraph_count() {
+                let paragraph = self.data_store.get_paragraph(ParagraphAddr(paragraph_id));
+                let fields: Vec<String>;
+                (fields, _) = bincode::decode_from_slice(paragraph.metadata(), bincode::config::standard()).unwrap();
+                if fields.iter().all(|f| f.starts_with(key)) {
+                    self.alive_bitset.remove(ParagraphAddr(paragraph_id));
+                }
+            }
             return;
         };
         if let Some(deleted_ids) = inverted_indexes.ids_for_deletion_key(key) {
             for id in deleted_ids {
                 self.alive_bitset.remove(id);
+            }
+        }
+    }
+
+    pub fn apply_deletions(&mut self, keys: &HashSet<&str>) {
+        // Dedupe mode
+        // TODO: Pass as a batch and check correctly
+        // TODO: Create and use a field -> paragraph index?
+        for paragraph_id in 0..self.data_store.stored_paragraph_count() {
+            let paragraph = self.data_store.get_paragraph(ParagraphAddr(paragraph_id));
+            let fields: Vec<String>;
+            (fields, _) = bincode::decode_from_slice(paragraph.metadata(), bincode::config::standard()).unwrap();
+            if fields
+                .iter()
+                .all(|f| keys.contains(f.as_str()) || keys.contains(&f[..32]))
+            {
+                self.alive_bitset.remove(ParagraphAddr(paragraph_id));
             }
         }
     }

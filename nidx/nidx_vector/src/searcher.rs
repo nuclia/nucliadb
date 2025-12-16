@@ -206,14 +206,17 @@ impl TryFrom<ScoredParagraph<'_>> for DocumentScored {
     type Error = String;
     fn try_from(paragraph: ScoredParagraph) -> Result<Self, Self::Error> {
         let id = paragraph.id().to_string();
-        let metadata = paragraph.metadata().map(SentenceMetadata::decode);
+
+        // TODO: We need to skip metadata decoding here
+        // let metadata = paragraph.metadata().map(SentenceMetadata::decode);
+
         let labels = paragraph.labels();
-        let Ok(metadata) = metadata.transpose() else {
-            return Err("The metadata could not be decoded".to_string());
-        };
+        // let Ok(metadata) = metadata.transpose() else {
+        //     return Err("The metadata could not be decoded".to_string());
+        // };
         Ok(DocumentScored {
             labels,
-            metadata,
+            metadata: None,
             doc_id: Some(DocumentVectorIdentifier { id }),
             score: paragraph.score(),
         })

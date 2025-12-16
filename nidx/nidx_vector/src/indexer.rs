@@ -21,8 +21,8 @@ use crate::config::{VectorCardinality, VectorConfig};
 use crate::multivector::extract_multi_vectors;
 use crate::segment::{self, Elem};
 use crate::{VectorSegmentMetadata, utils};
-use nidx_protos::{noderesources, prost::*};
-use std::collections::HashMap;
+use nidx_protos::{Resource, noderesources, prost::*};
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::time::Instant;
 use tracing::*;
@@ -153,6 +153,77 @@ pub fn index_resource(
         .cloned()
         .collect();
     let segment = segment::create(output_path, elems, config, tags)?;
+
+    let v = time.elapsed().as_millis();
+    debug!("Main index set resource: ends {v} ms");
+
+    Ok(Some(segment.into_metadata()))
+}
+
+pub fn index_relations(
+    resource: &Resource,
+    output_path: &Path,
+    config: &VectorConfig,
+) -> anyhow::Result<Option<VectorSegmentMetadata>> {
+    let time = Instant::now();
+
+    debug!("Updating main index");
+    let v = time.elapsed().as_millis();
+    debug!("Creating elements for the main index: starts {v} ms");
+
+    let mut entity_fields = HashMap::new();
+    for (field, relations) in &resource.field_relations {
+        let field = format!("{}/{}", resource.resource.as_ref().unwrap().uuid, field);
+        for relation in &relations.relations {
+            let from = relation
+                .relation
+                .as_ref()
+                .unwrap()
+                .source
+                .as_ref()
+                .unwrap()
+                .value
+                .clone();
+            entity_fields
+                .entry(from)
+                .or_insert_with(HashSet::new)
+                .insert(field.clone());
+
+            let to = relation.relation.as_ref().unwrap().to.as_ref().unwrap().value.clone();
+            entity_fields
+                .entry(to)
+                .or_insert_with(HashSet::new)
+                .insert(field.clone());
+        }
+    }
+
+    let mut elems = Vec::new();
+    for node_vector in &resource.relation_node_vectors {
+        let v = node_vector.vector.clone();
+        let n = node_vector.node.as_ref().unwrap().value.clone();
+        let fields = entity_fields.get(&n);
+        let Some(fields) = fields else {
+            continue;
+        };
+        elems.push(Elem::new(
+            n,
+            v,
+            vec![],
+            Some(bincode::encode_to_vec(fields, bincode::config::standard())?),
+        ));
+    }
+
+    let v = time.elapsed().as_millis();
+    debug!("Creating elements for the main index: ends {v} ms");
+
+    let v = time.elapsed().as_millis();
+    debug!("Main index set resource: starts {v} ms");
+
+    if elems.is_empty() {
+        return Ok(None);
+    }
+
+    let segment = segment::create(output_path, elems, config, HashSet::new())?;
 
     let v = time.elapsed().as_millis();
     debug!("Main index set resource: ends {v} ms");
