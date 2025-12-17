@@ -19,11 +19,9 @@
 #
 
 import asyncio
-import os
 from typing import cast
 
 from fastapi import Header, Request
-from fastapi.exceptions import HTTPException
 from fastapi_versioning import version
 
 import nucliadb_models
@@ -70,13 +68,6 @@ from nucliadb_models.search import NucliaDBClientType, ResourceProperties
 from nucliadb_utils.authentication import requires
 
 
-class MaliciousStoragePath(Exception):
-    """Raised when a path used to access blob storage has a malicious intent
-    (e.g., uses ../ to try to access other resources)"""
-
-    ...
-
-
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/augment",
     status_code=200,
@@ -94,13 +85,7 @@ async def _augment_endpoint(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> AugmentResponse:
-    try:
-        return await augment_endpoint(kbid, item)
-    except MaliciousStoragePath as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=str(exc),
-        )
+    return await augment_endpoint(kbid, item)
 
 
 async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
@@ -281,16 +266,6 @@ def parse_paragraph_augment(item: AugmentParagraphs) -> tuple[list[Paragraph], l
                 page=paragraph.metadata.page,
                 in_page_with_visual=paragraph.metadata.in_page_with_visual,
             )
-
-            # metadata provided in the API can't be trusted, we must check for
-            # malicious intent
-            if metadata.source_file:
-                # normalize the path and look for access to parent directories. In a
-                # bucket URL, this could mean trying to access another part of the
-                # bucket or even another bucket
-                normalized = os.path.normpath(metadata.source_file)
-                if normalized.startswith("../") or normalized in (".", ".."):
-                    raise MaliciousStoragePath(f"Invalid source file path for paragraph {paragraph.id}")
 
         paragraphs_to_augment.append(Paragraph(id=paragraph_id, metadata=metadata))
 
