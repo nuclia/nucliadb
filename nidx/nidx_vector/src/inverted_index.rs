@@ -39,30 +39,6 @@ mod file {
     pub const LABEL_INDEX: &str = "label.fst";
 }
 
-/// The key for the field index. [uuid_as_bytes, field_type/field_name]
-fn field_id_key(paragraph_key: &str) -> Option<Vec<u8>> {
-    let mut parts = paragraph_key.split('/');
-    if let Some(uuid) = parts.next() {
-        if let Some(field_type) = parts.next() {
-            if let Some(field_name) = parts.next() {
-                return Some(
-                    [
-                        uuid::Uuid::parse_str(uuid).unwrap().as_bytes(),
-                        field_type.as_bytes(),
-                        "/".as_bytes(),
-                        field_name.as_bytes(),
-                    ]
-                    .concat(),
-                );
-            }
-        } else {
-            return Some(uuid::Uuid::parse_str(uuid).unwrap().as_bytes().to_vec());
-        }
-    }
-    warn!(?paragraph_key, "Unable to parse field id from key");
-    None
-}
-
 /// Helper to build indexes when the input is not sorted by key
 struct IndexBuilder {
     ordered_keys: BTreeMap<Vec<u8>, Vec<u32>>,

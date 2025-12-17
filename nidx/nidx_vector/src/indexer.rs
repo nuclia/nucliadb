@@ -20,11 +20,11 @@
 use crate::config::{VectorCardinality, VectorConfig};
 use crate::multivector::extract_multi_vectors;
 use crate::segment::{self, Elem};
+use crate::utils::field_id;
 use crate::{VectorSegmentMetadata, utils};
 use nidx_protos::{Resource, noderesources, prost::*};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::time::Instant;
 use tracing::*;
 
 pub const SEGMENT_TAGS: &[&str] = &["/q/h"];
@@ -102,11 +102,7 @@ pub fn index_resource(
     output_path: &Path,
     config: &VectorConfig,
 ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
-    let time = Instant::now();
-
-    debug!("Updating main index");
-    let v = time.elapsed().as_millis();
-    debug!("Creating elements for the main index: starts {v} ms");
+    debug!("Creating elements for the main index");
 
     let mut elems = Vec::new();
     let normalize_vectors = config.normalize_vectors;
@@ -136,11 +132,6 @@ pub fn index_resource(
             }
         }
     }
-    let v = time.elapsed().as_millis();
-    debug!("Creating elements for the main index: ends {v} ms");
-
-    let v = time.elapsed().as_millis();
-    debug!("Main index set resource: starts {v} ms");
 
     if elems.is_empty() {
         return Ok(None);
@@ -152,12 +143,20 @@ pub fn index_resource(
         .filter(|t| SEGMENT_TAGS.contains(&t.as_str()))
         .cloned()
         .collect();
+
+    debug!("Creating the segment");
     let segment = segment::create(output_path, elems, config, tags)?;
 
-    let v = time.elapsed().as_millis();
-    debug!("Main index set resource: ends {v} ms");
-
     Ok(Some(segment.into_metadata()))
+}
+
+fn encode_metadata_field(rid: &str, fields: &HashSet<&String>) -> Vec<u8> {
+    let encoded_fields: Vec<_> = fields
+        .iter()
+        .map(|f| format!("{rid}/{f}"))
+        .filter_map(|f| field_id::key(&f))
+        .collect();
+    bincode::encode_to_vec(encoded_fields, bincode::config::standard()).unwrap()
 }
 
 pub fn index_relations(
@@ -165,15 +164,11 @@ pub fn index_relations(
     output_path: &Path,
     config: &VectorConfig,
 ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
-    let time = Instant::now();
-
-    debug!("Updating main index");
-    let v = time.elapsed().as_millis();
-    debug!("Creating elements for the main index: starts {v} ms");
+    debug!("Creating elements for the main index");
 
     let mut entity_fields = HashMap::new();
+    let rid = &resource.resource.as_ref().unwrap().uuid;
     for (field, relations) in &resource.field_relations {
-        let field = format!("{}/{}", resource.resource.as_ref().unwrap().uuid, field);
         for relation in &relations.relations {
             let from = relation
                 .relation
@@ -184,16 +179,10 @@ pub fn index_relations(
                 .unwrap()
                 .value
                 .clone();
-            entity_fields
-                .entry(from)
-                .or_insert_with(HashSet::new)
-                .insert(field.clone());
+            entity_fields.entry(from).or_insert_with(HashSet::new).insert(field);
 
             let to = relation.relation.as_ref().unwrap().to.as_ref().unwrap().value.clone();
-            entity_fields
-                .entry(to)
-                .or_insert_with(HashSet::new)
-                .insert(field.clone());
+            entity_fields.entry(to).or_insert_with(HashSet::new).insert(field);
         }
     }
 
@@ -205,28 +194,15 @@ pub fn index_relations(
         let Some(fields) = fields else {
             continue;
         };
-        elems.push(Elem::new(
-            n,
-            v,
-            vec![],
-            Some(bincode::encode_to_vec(fields, bincode::config::standard())?),
-        ));
+        elems.push(Elem::new(n, v, vec![], Some(encode_metadata_field(rid, &fields))));
     }
-
-    let v = time.elapsed().as_millis();
-    debug!("Creating elements for the main index: ends {v} ms");
-
-    let v = time.elapsed().as_millis();
-    debug!("Main index set resource: starts {v} ms");
 
     if elems.is_empty() {
         return Ok(None);
     }
 
+    debug!("Creating the segment");
     let segment = segment::create(output_path, elems, config, HashSet::new())?;
-
-    let v = time.elapsed().as_millis();
-    debug!("Main index set resource: ends {v} ms");
 
     Ok(Some(segment.into_metadata()))
 }

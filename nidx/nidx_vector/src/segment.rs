@@ -27,6 +27,7 @@ use crate::formula::Formula;
 use crate::hnsw::{self, *};
 use crate::inverted_index::{self, InvertedIndexes};
 use crate::inverted_index::{FilterBitSet, build_indexes};
+use crate::utils::field_id::{self, resource_part};
 use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use core::f32;
@@ -458,22 +459,20 @@ impl OpenSegment {
                 }
             }
             InvertedIndexes::Relation(indexes) => {
+                let keys: HashSet<_> = keys.iter().flat_map(|k| field_id::key(k)).collect();
+
                 let mut affected_paragraphs = HashSet::new();
-                for key in keys {
-                    println!("Apply deletions {key:?}");
-                    if let Some(paragraphs) = indexes.ids_for_deletion_key(key) {
-                        affected_paragraphs.extend(paragraphs);
-                    }
+                for key in &keys {
+                    affected_paragraphs.extend(indexes.ids_for_field_key(key))
                 }
                 for paragraph_id in affected_paragraphs {
                     let paragraph = self.data_store.get_paragraph(paragraph_id);
-                    let fields: Vec<String>;
+                    let fields: Vec<Vec<u8>>;
                     (fields, _) =
                         bincode::decode_from_slice(paragraph.metadata(), bincode::config::standard()).unwrap();
                     if fields
                         .iter()
-                        .all(|f| keys.contains(f.as_str()) || keys.contains(&f[..32]))
-                    // TODO: Match using field key function
+                        .all(|f| keys.contains(f) || keys.contains(field_id::resource_part(f)))
                     {
                         self.alive_bitset.remove(paragraph_id);
                     }

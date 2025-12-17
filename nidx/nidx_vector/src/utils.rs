@@ -22,6 +22,39 @@ pub fn normalize_vector(vector: &[f32]) -> Vec<f32> {
     vector.iter().map(|x| *x / magnitude).collect()
 }
 
+pub mod field_id {
+    use tracing::warn;
+
+    /// The key for the field index. [uuid_as_bytes, field_type/field_name]
+    pub fn key(field_id: &str) -> Option<Vec<u8>> {
+        let mut parts = field_id.split('/');
+        if let Some(uuid) = parts.next() {
+            if let Some(field_type) = parts.next() {
+                if let Some(field_name) = parts.next() {
+                    return Some(
+                        [
+                            uuid::Uuid::parse_str(uuid).unwrap().as_bytes(),
+                            field_type.as_bytes(),
+                            "/".as_bytes(),
+                            field_name.as_bytes(),
+                        ]
+                        .concat(),
+                    );
+                }
+            } else {
+                return Some(uuid::Uuid::parse_str(uuid).unwrap().as_bytes().to_vec());
+            }
+        }
+        warn!(?field_id, "Unable to parse field id from str");
+        None
+    }
+
+    /// Returns the resource part of the key, the first 128 bits (uuid size)
+    pub fn resource_part(key: &[u8]) -> &[u8] {
+        &key[0..8]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

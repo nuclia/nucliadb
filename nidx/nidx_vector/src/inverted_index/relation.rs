@@ -33,6 +33,11 @@ pub struct RelationInvertedIndexes {
     field_index: FstIndexReader,
 }
 
+fn decode_metadata_field(data: &[u8]) -> Vec<Vec<u8>> {
+    let (fields, _) = bincode::decode_from_slice(data, bincode::config::standard()).unwrap();
+    fields
+}
+
 impl RelationInvertedIndexes {
     pub fn space_usage(&self) -> usize {
         self.field_index.space_usage()
@@ -48,13 +53,8 @@ impl RelationInvertedIndexes {
         Ok(Self { field_index })
     }
 
-    pub fn ids_for_deletion_key(&self, key: &str) -> Option<impl Iterator<Item = ParagraphAddr>> {
-        Some(
-            self.field_index
-                .get_prefix(key.as_bytes())
-                .into_iter()
-                .map(ParagraphAddr),
-        )
+    pub fn ids_for_field_key(&self, field_key: &[u8]) -> impl Iterator<Item = ParagraphAddr> {
+        self.field_index.get_prefix(field_key).into_iter().map(ParagraphAddr)
     }
 
     pub fn build(work_path: &Path, data_store: &impl DataStore) -> VectorR<()> {
@@ -62,12 +62,10 @@ impl RelationInvertedIndexes {
 
         for paragraph_addr in iter_paragraphs(data_store) {
             let paragraph = data_store.get_paragraph(paragraph_addr);
-            let fields: Vec<String>;
-            (fields, _) = bincode::decode_from_slice(paragraph.metadata(), bincode::config::standard()).unwrap(); //TODO
+            let fields = decode_metadata_field(paragraph.metadata());
 
-            for field in &fields {
-                println!("Index field {fields:?}");
-                field_builder.insert(field.as_bytes().to_vec(), paragraph_addr);
+            for field_key in fields {
+                field_builder.insert(field_key, paragraph_addr);
             }
         }
 
