@@ -26,7 +26,6 @@ from pydantic import BaseModel
 
 import nucliadb_models
 from nucliadb.common.ids import (
-    FIELD_TYPE_PB_TO_STR,
     FIELD_TYPE_STR_TO_NAME,
     FIELD_TYPE_STR_TO_PB,
     FieldId,
