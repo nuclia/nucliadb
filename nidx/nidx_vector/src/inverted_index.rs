@@ -20,7 +20,6 @@
 use std::{collections::BTreeMap, path::Path};
 
 use fst_index::FstIndexWriter;
-use tracing::warn;
 
 use crate::{ParagraphAddr, VectorR, config::IndexSet, data_store::DataStore};
 use paragraph::ParagraphInvertedIndexes;

@@ -194,7 +194,7 @@ pub fn index_relations(
         let Some(fields) = fields else {
             continue;
         };
-        elems.push(Elem::new(n, v, vec![], Some(encode_metadata_field(rid, &fields))));
+        elems.push(Elem::new(n, v, vec![], Some(encode_metadata_field(rid, fields))));
     }
 
     if elems.is_empty() {

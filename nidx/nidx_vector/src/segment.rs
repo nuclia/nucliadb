@@ -27,7 +27,7 @@ use crate::formula::Formula;
 use crate::hnsw::{self, *};
 use crate::inverted_index::{self, InvertedIndexes};
 use crate::inverted_index::{FilterBitSet, build_indexes};
-use crate::utils::field_id::{self, resource_part};
+use crate::utils::field_id;
 use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use core::f32;
@@ -701,7 +701,7 @@ mod test {
 
     use crate::{
         ParagraphAddr, VectorAddr,
-        config::{IndexSet, Similarity, VectorCardinality, VectorConfig},
+        config::VectorConfig,
         formula::Formula,
         vector_types::dense_f32::{dot_similarity, encode_vector},
     };
@@ -780,14 +780,7 @@ mod test {
 
     #[test]
     fn test_save_recall_aligned_data() -> anyhow::Result<()> {
-        let config = VectorConfig {
-            similarity: Similarity::Dot,
-            vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
-            normalize_vectors: false,
-            flags: vec![],
-            vector_cardinality: VectorCardinality::Single,
-            indexes: IndexSet::Paragraph,
-        };
+        let config = VectorConfig::for_paragraphs(crate::config::VectorType::DenseF32 { dimension: DIMENSION });
         let mut rng = SmallRng::seed_from_u64(1234567890);
         let temp_dir = tempdir()?;
 
@@ -827,14 +820,7 @@ mod test {
 
     #[test]
     fn test_save_recall_aligned_data_after_merge() -> anyhow::Result<()> {
-        let config = VectorConfig {
-            similarity: Similarity::Dot,
-            vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
-            normalize_vectors: false,
-            flags: vec![],
-            vector_cardinality: VectorCardinality::Single,
-            indexes: IndexSet::Paragraph,
-        };
+        let config = VectorConfig::for_paragraphs(crate::config::VectorType::DenseF32 { dimension: DIMENSION });
         let mut rng = SmallRng::seed_from_u64(1234567890);
 
         // Create two segments with random data of different length
@@ -906,14 +892,7 @@ mod test {
             center = random_nearby_vector(&mut rng, &center, 0.1);
         }
 
-        let config = VectorConfig {
-            similarity: Similarity::Dot,
-            vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
-            normalize_vectors: false,
-            flags: vec![],
-            vector_cardinality: VectorCardinality::Single,
-            indexes: IndexSet::Paragraph,
-        };
+        let config = VectorConfig::for_paragraphs(crate::config::VectorType::DenseF32 { dimension: DIMENSION });
 
         // Create a segment
         let temp_dir = tempdir()?;

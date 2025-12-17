@@ -36,6 +36,7 @@ const CONFIG: VectorConfig = VectorConfig {
     flags: vec![],
     vector_cardinality: VectorCardinality::Single,
     indexes: IndexSet::Paragraph,
+    metadata: crate::config::Metadata::SentenceProto,
 };
 
 fn create_query() -> Vec<f32> {

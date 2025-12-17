@@ -102,6 +102,13 @@ pub enum IndexSet {
     Relation,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+pub enum Metadata {
+    #[default]
+    SentenceProto,
+    FieldList,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VectorConfig {
     #[serde(default)]
@@ -115,9 +122,35 @@ pub struct VectorConfig {
     pub flags: Vec<String>,
     #[serde(default)]
     pub indexes: IndexSet,
+    #[serde(default)]
+    pub metadata: Metadata,
 }
 
 impl VectorConfig {
+    pub const fn for_paragraphs(vector_type: VectorType) -> Self {
+        Self {
+            vector_type,
+            similarity: Similarity::Dot,
+            normalize_vectors: false,
+            vector_cardinality: VectorCardinality::Single,
+            flags: vec![],
+            indexes: IndexSet::Paragraph,
+            metadata: Metadata::SentenceProto,
+        }
+    }
+
+    pub const fn for_relations(vector_type: VectorType) -> Self {
+        Self {
+            vector_type,
+            similarity: Similarity::Dot,
+            normalize_vectors: false,
+            vector_cardinality: VectorCardinality::Single,
+            flags: vec![],
+            indexes: IndexSet::Relation,
+            metadata: Metadata::FieldList,
+        }
+    }
+
     pub fn similarity_function(&self) -> fn(&[u8], &[u8]) -> f32 {
         match (&self.similarity, &self.vector_type) {
             (Similarity::Dot, VectorType::DenseF32 { .. }) => dense_f32::dot_similarity,
@@ -154,6 +187,7 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
             indexes: IndexSet::Paragraph,
+            metadata: Metadata::SentenceProto,
         })
     }
 }

@@ -207,16 +207,15 @@ impl TryFrom<ScoredParagraph<'_>> for DocumentScored {
     fn try_from(paragraph: ScoredParagraph) -> Result<Self, Self::Error> {
         let id = paragraph.id().to_string();
 
-        // TODO: We need to skip metadata decoding here
-        // let metadata = paragraph.metadata().map(SentenceMetadata::decode);
+        let metadata = paragraph.metadata().map(SentenceMetadata::decode);
 
         let labels = paragraph.labels();
-        // let Ok(metadata) = metadata.transpose() else {
-        //     return Err("The metadata could not be decoded".to_string());
-        // };
+        let Ok(metadata) = metadata.transpose() else {
+            return Err("The metadata could not be decoded".to_string());
+        };
         Ok(DocumentScored {
             labels,
-            metadata: None,
+            metadata,
             doc_id: Some(DocumentVectorIdentifier { id }),
             score: paragraph.score(),
         })
@@ -405,7 +404,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::config::{IndexSet, Similarity, VectorCardinality, VectorConfig, VectorType};
+    use crate::config::{Similarity, VectorConfig, VectorType};
     use crate::indexer::{ResourceWrapper, index_resource};
     use crate::segment;
 
@@ -413,14 +412,8 @@ mod tests {
     fn test_key_prefix_search() -> anyhow::Result<()> {
         let dir = TempDir::new().unwrap();
         let segment_path = dir.path();
-        let vsc = VectorConfig {
-            similarity: Similarity::Cosine,
-            normalize_vectors: false,
-            vector_type: VectorType::DenseF32 { dimension: 3 },
-            flags: vec![],
-            vector_cardinality: VectorCardinality::Single,
-            indexes: IndexSet::Paragraph,
-        };
+        let mut vsc = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 3 });
+        vsc.similarity = Similarity::Dot;
         let raw_sentences = [
             (
                 "6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1/1".to_string(),
@@ -509,14 +502,8 @@ mod tests {
     fn test_new_vector_reader() -> anyhow::Result<()> {
         let dir = TempDir::new().unwrap();
         let segment_path = dir.path();
-        let vsc = VectorConfig {
-            similarity: Similarity::Cosine,
-            normalize_vectors: false,
-            vector_type: VectorType::DenseF32 { dimension: 3 },
-            flags: vec![],
-            vector_cardinality: VectorCardinality::Single,
-            indexes: IndexSet::Paragraph,
-        };
+        let mut vsc = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 3 });
+        vsc.similarity = Similarity::Cosine;
         let raw_sentences = [
             (
                 "9cb39c75f8d9498d8f82d92b173011f5/f/field/0-1".to_string(),
@@ -624,14 +611,8 @@ mod tests {
     fn test_vectors_deduplication() -> anyhow::Result<()> {
         let dir = TempDir::new().unwrap();
         let segment_path = dir.path();
-        let vsc = VectorConfig {
-            similarity: Similarity::Cosine,
-            normalize_vectors: false,
-            vector_type: VectorType::DenseF32 { dimension: 3 },
-            flags: vec![],
-            vector_cardinality: VectorCardinality::Single,
-            indexes: IndexSet::Paragraph,
-        };
+        let mut vsc = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 3 });
+        vsc.similarity = Similarity::Dot;
         let raw_sentences = [
             (
                 "9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string(),

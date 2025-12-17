@@ -20,41 +20,21 @@
 
 mod common;
 
-use std::collections::HashSet;
-
 use nidx_protos::{
-    IndexRelation, IndexRelations, Relation, RelationNode, RelationNodeVector, Resource, ResourceId, VectorSentence,
+    IndexRelation, IndexRelations, Relation, RelationNode, RelationNodeVector, Resource, ResourceId,
     relation::RelationType, relation_node::NodeType,
 };
-use nidx_types::{
-    prefilter::{FieldId, PrefilterResult},
-    query_language::{BooleanExpression, BooleanOperation, Operator},
-};
+use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher, config::*};
-use rstest::rstest;
 use tempfile::tempdir;
 
 use crate::common::TestOpener;
-
-fn sentence(index: usize) -> VectorSentence {
-    let mut vector: Vec<f32> = [0.0; DIMENSION].into();
-    vector[index] = 1.0;
-
-    VectorSentence { vector, metadata: None }
-}
 
 const DIMENSION: usize = 4;
 
 #[test]
 fn test_indexer() -> anyhow::Result<()> {
-    let config = VectorConfig {
-        similarity: Similarity::Dot,
-        vector_type: VectorType::DenseF32 { dimension: DIMENSION },
-        normalize_vectors: false,
-        flags: vec![],
-        vector_cardinality: VectorCardinality::Single,
-        indexes: IndexSet::Relation,
-    };
+    let config = VectorConfig::for_relations(VectorType::DenseF32 { dimension: DIMENSION });
 
     let resource = Resource {
         resource: Some(ResourceId {
