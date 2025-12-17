@@ -19,6 +19,8 @@
 #
 import asyncio
 
+from typing_extensions import assert_never
+
 import nucliadb_models.resource
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.resource import Resource
@@ -130,7 +132,7 @@ async def db_augment_resource(
             labels = await classification_labels(resource)
 
         else:
-            raise NotImplementedError(f"resource property not implemented: {prop}")
+            assert_never(prop)
 
     augmented = AugmentedResource(
         id=resource.uuid,

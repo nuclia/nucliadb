@@ -334,12 +334,6 @@ class ResourceSummary(SelectProp):
     prop: Literal["summary"] = "summary"
 
 
-class ResourceBasic(SelectProp):
-    """Same as show=["basic"] using GET resource or search endpoints"""
-
-    prop: Literal["basic"] = "basic"
-
-
 class ResourceOrigin(SelectProp):
     """Same as show=["origin"] using GET resource or search endpoints"""
 
@@ -375,7 +369,6 @@ ResourceProp = Annotated[
     (
         Annotated[ResourceTitle, Tag("title")]
         | Annotated[ResourceSummary, Tag("summary")]
-        | Annotated[ResourceBasic, Tag("basic")]
         | Annotated[ResourceOrigin, Tag("origin")]
         | Annotated[ResourceExtra, Tag("extra")]
         | Annotated[ResourceSecurity, Tag("security")]
