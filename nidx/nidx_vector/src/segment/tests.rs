@@ -131,7 +131,7 @@ fn single_graph() {
     let elems = vec![Elem::new(key.clone(), vector.clone(), vec![], None)];
     let mut segment = segment::create(temp_dir.path(), elems.clone(), &CONFIG, HashSet::new()).unwrap();
     let formula = Formula::new();
-    segment.apply_deletion(&key);
+    segment.apply_deletions(&[key.as_str()].into());
     let result = segment.search(&vector, &formula, true, 5, &CONFIG, -1.0);
     assert_eq!(result.count(), 0);
 
@@ -182,10 +182,10 @@ fn data_merge() -> anyhow::Result<()> {
     assert!(dp.get_paragraph(result[0].paragraph()).id() == key0);
     let mut dp0 = segment::open(dp0.metadata, &v1_config).unwrap();
     let mut dp1 = segment::open(dp1.metadata, &v1_config).unwrap();
-    dp0.apply_deletion(&key0);
-    dp0.apply_deletion(&key1);
-    dp1.apply_deletion(&key0);
-    dp1.apply_deletion(&key1);
+    dp0.apply_deletions(&[key0.as_str()].into());
+    dp0.apply_deletions(&[key1.as_str()].into());
+    dp1.apply_deletions(&[key0.as_str()].into());
+    dp1.apply_deletions(&[key1.as_str()].into());
     let work = &[&dp1, &dp0];
 
     let dp_path = tempdir()?;
@@ -230,10 +230,10 @@ fn data_merge_v2() -> anyhow::Result<()> {
     assert!(dp.get_paragraph(result[0].paragraph()).id() == key0);
     let mut dp0 = segment::open(dp0.metadata, &CONFIG).unwrap();
     let mut dp1 = segment::open(dp1.metadata, &CONFIG).unwrap();
-    dp0.apply_deletion(&key0);
-    dp0.apply_deletion(&key1);
-    dp1.apply_deletion(&key0);
-    dp1.apply_deletion(&key1);
+    dp0.apply_deletions(&[key0.as_str()].into());
+    dp0.apply_deletions(&[key1.as_str()].into());
+    dp1.apply_deletions(&[key0.as_str()].into());
+    dp1.apply_deletions(&[key1.as_str()].into());
     let work = &[&dp1, &dp0];
 
     let dp_path = tempdir()?;
@@ -281,10 +281,10 @@ fn data_merge_mixed() -> anyhow::Result<()> {
     assert!(dp.get_paragraph(result[0].paragraph()).id() == key0);
     let mut dp0 = segment::open(dp0.metadata, &CONFIG).unwrap();
     let mut dp1 = segment::open(dp1.metadata, &CONFIG).unwrap();
-    dp0.apply_deletion(&key0);
-    dp0.apply_deletion(&key1);
-    dp1.apply_deletion(&key0);
-    dp1.apply_deletion(&key1);
+    dp0.apply_deletions(&[key0.as_str()].into());
+    dp0.apply_deletions(&[key1.as_str()].into());
+    dp1.apply_deletions(&[key0.as_str()].into());
+    dp1.apply_deletions(&[key1.as_str()].into());
     let work = &[&dp1, &dp0];
 
     let dp_path = tempdir()?;
@@ -326,7 +326,7 @@ fn label_filtering_test() {
         assert_eq!(result_0.len(), 1);
     }
 
-    segment.apply_deletion("6e5a546a9a5c480f8579472016b1ee14/f/field");
+    segment.apply_deletions(&["6e5a546a9a5c480f8579472016b1ee14/f/field"].into());
     for i in 0..5 {
         let formula = queries[i..i + 1].iter().fold(Formula::new(), |mut acc, i| {
             acc.extend(i.clone());
@@ -447,8 +447,8 @@ fn fast_data_merge() -> VectorR<()> {
     }
 
     // Merge with deletions
-    big_segment.apply_deletion("00000000000000000000000000000000/f/file/0-100");
-    small_segment.apply_deletion("00000000000000000000000000000002/f/file/0-100");
+    big_segment.apply_deletions(&["00000000000000000000000000000000/f/file/0-100"].into());
+    small_segment.apply_deletions(&["00000000000000000000000000000002/f/file/0-100"].into());
     let work = [&big_segment, &small_segment];
     let output_dir = tempfile::tempdir()?;
     let t = Instant::now();

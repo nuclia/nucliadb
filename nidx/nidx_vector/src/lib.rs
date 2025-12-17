@@ -41,7 +41,7 @@ use nidx_types::{OpenIndexMetadata, SegmentMetadata};
 use searcher::Searcher;
 use segment::OpenSegment;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::Path;
 use thiserror::Error;
 use tracing::instrument;
@@ -148,20 +148,15 @@ fn open_segments(
         open_segments.push((open_segment, seq));
     }
 
-    // TODO, proper collection of deletions by seq
-    if matches!(config.indexes, IndexSet::Paragraph) {
-        for (deletion, deletion_seq) in open_index.deletions() {
-            for (segment, segment_seq) in &mut open_segments {
-                if deletion_seq > *segment_seq {
-                    segment.apply_deletion(deletion.as_str());
-                }
-            }
+    let mut deletions = open_index.deletions().peekable();
+    let mut deletions_so_far = HashSet::new();
+    for (segment, segment_seq) in &mut open_segments {
+        while let Some(d) = deletions.peek()
+            && d.1 > *segment_seq
+        {
+            deletions_so_far.insert(deletions.next().unwrap().0.as_str());
         }
-    } else {
-        let deletions = open_index.deletions().map(|d| d.0.as_str()).collect::<HashSet<_>>();
-        for (s, _) in &mut open_segments {
-            s.apply_deletions(&deletions);
-        }
+        segment.apply_deletions(&deletions_so_far);
     }
 
     Ok(open_segments.into_iter().map(|(dp, _)| dp).collect())

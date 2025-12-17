@@ -26,10 +26,9 @@ use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, Paragra
 use crate::formula::Formula;
 use crate::hnsw::{self, *};
 use crate::inverted_index::{self, InvertedIndexes};
-use crate::inverted_index::{FilterBitSet, ParagraphInvertedIndexes, build_indexes};
+use crate::inverted_index::{FilterBitSet, build_indexes};
 use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
-use anyhow::anyhow;
 use core::f32;
 use rayon::prelude::*;
 
@@ -50,7 +49,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
         if !InvertedIndexes::exists(path) {
-            build_indexes(path, &data_store)?;
+            build_indexes(path, &config.indexes, &data_store)?;
         }
         Box::new(data_store)
     } else {
@@ -58,7 +57,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
         if !InvertedIndexes::exists(path) {
-            build_indexes(path, &data_store)?;
+            build_indexes(path, &config.indexes, &data_store)?;
         }
         Box::new(data_store)
     };
@@ -199,7 +198,7 @@ fn merge_indexes<DS: DataStore + 'static>(
         },
     };
 
-    build_indexes(segment_path, &data_store)?;
+    build_indexes(segment_path, &config.indexes, &data_store)?;
     let inverted_indexes = InvertedIndexes::open(
         &config.indexes,
         segment_path,
@@ -289,7 +288,7 @@ fn create_indexes<DS: DataStore + 'static>(
         index_metadata: VectorSegmentMeta { tags },
     };
 
-    build_indexes(path, &data_store)?;
+    build_indexes(path, &config.indexes, &data_store)?;
     let inverted_indexes = InvertedIndexes::open(
         &config.indexes,
         path,
@@ -447,32 +446,38 @@ impl AsRef<OpenSegment> for OpenSegment {
 }
 
 impl OpenSegment {
-    pub fn apply_deletion(&mut self, key: &str) {
+    pub fn apply_deletions(&mut self, keys: &HashSet<&str>) {
         match &self.inverted_indexes {
             InvertedIndexes::Paragraph(indexes) => {
-                if let Some(deleted_ids) = indexes.ids_for_deletion_key(key) {
-                    for id in deleted_ids {
-                        self.alive_bitset.remove(id);
+                for key in keys {
+                    if let Some(deleted_ids) = indexes.ids_for_deletion_key(key) {
+                        for id in deleted_ids {
+                            self.alive_bitset.remove(id);
+                        }
                     }
                 }
             }
-            InvertedIndexes::Relation(_) => todo!(),
-        }
-    }
-
-    pub fn apply_deletions(&mut self, keys: &HashSet<&str>) {
-        // Dedupe mode
-        // TODO: Pass as a batch and check correctly
-        // TODO: Create and use a field -> paragraph index?
-        for paragraph_id in 0..self.data_store.stored_paragraph_count() {
-            let paragraph = self.data_store.get_paragraph(ParagraphAddr(paragraph_id));
-            let fields: Vec<String>;
-            (fields, _) = bincode::decode_from_slice(paragraph.metadata(), bincode::config::standard()).unwrap();
-            if fields
-                .iter()
-                .all(|f| keys.contains(f.as_str()) || keys.contains(&f[..32]))
-            {
-                self.alive_bitset.remove(ParagraphAddr(paragraph_id));
+            InvertedIndexes::Relation(indexes) => {
+                let mut affected_paragraphs = HashSet::new();
+                for key in keys {
+                    println!("Apply deletions {key:?}");
+                    if let Some(paragraphs) = indexes.ids_for_deletion_key(key) {
+                        affected_paragraphs.extend(paragraphs);
+                    }
+                }
+                for paragraph_id in affected_paragraphs {
+                    let paragraph = self.data_store.get_paragraph(paragraph_id);
+                    let fields: Vec<String>;
+                    (fields, _) =
+                        bincode::decode_from_slice(paragraph.metadata(), bincode::config::standard()).unwrap();
+                    if fields
+                        .iter()
+                        .all(|f| keys.contains(f.as_str()) || keys.contains(&f[..32]))
+                    // TODO: Match using field key function
+                    {
+                        self.alive_bitset.remove(paragraph_id);
+                    }
+                }
             }
         }
     }
