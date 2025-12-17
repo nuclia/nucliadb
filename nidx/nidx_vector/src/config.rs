@@ -103,7 +103,7 @@ pub enum IndexSet {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub enum Metadata {
+pub enum ParagraphMetadata {
     #[default]
     SentenceProto,
     FieldList,
@@ -123,7 +123,7 @@ pub struct VectorConfig {
     #[serde(default)]
     pub indexes: IndexSet,
     #[serde(default)]
-    pub metadata: Metadata,
+    pub paragraph_metadata: ParagraphMetadata,
 }
 
 impl VectorConfig {
@@ -135,7 +135,7 @@ impl VectorConfig {
             vector_cardinality: VectorCardinality::Single,
             flags: vec![],
             indexes: IndexSet::Paragraph,
-            metadata: Metadata::SentenceProto,
+            paragraph_metadata: ParagraphMetadata::SentenceProto,
         }
     }
 
@@ -147,7 +147,7 @@ impl VectorConfig {
             vector_cardinality: VectorCardinality::Single,
             flags: vec![],
             indexes: IndexSet::Relation,
-            metadata: Metadata::FieldList,
+            paragraph_metadata: ParagraphMetadata::FieldList,
         }
     }
 
@@ -187,7 +187,7 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
             indexes: IndexSet::Paragraph,
-            metadata: Metadata::SentenceProto,
+            paragraph_metadata: ParagraphMetadata::SentenceProto,
         })
     }
 }

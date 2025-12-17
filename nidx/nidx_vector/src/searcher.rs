@@ -19,6 +19,7 @@
 //
 
 use crate::ParagraphAddr;
+use crate::config::ParagraphMetadata;
 use crate::config::VectorCardinality;
 use crate::config::VectorConfig;
 use crate::data_store::ParagraphRef;
@@ -29,6 +30,8 @@ use crate::segment::OpenSegment;
 use crate::utils;
 use crate::{VectorErr, VectorR};
 use crate::{formula::*, query_io};
+
+use anyhow::anyhow;
 use nidx_protos::prost::*;
 use nidx_protos::{DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchResponse};
 use nidx_types::prefilter::PrefilterResult;
@@ -128,6 +131,27 @@ impl<'a> ScoredParagraph<'a> {
             .map(|va| self.segment.get_vector(va).vector())
             .collect()
     }
+    pub fn try_to_document_scored(&self, metadata_kind: &ParagraphMetadata) -> anyhow::Result<DocumentScored> {
+        let id = self.id().to_string();
+
+        let metadata = if matches!(metadata_kind, ParagraphMetadata::SentenceProto) {
+            let metadata = self.metadata().map(SentenceMetadata::decode);
+            let Ok(metadata) = metadata.transpose() else {
+                return Err(anyhow!("The metadata could not be decoded"));
+            };
+            metadata
+        } else {
+            None
+        };
+
+        let labels = self.labels();
+        Ok(DocumentScored {
+            labels,
+            metadata,
+            doc_id: Some(DocumentVectorIdentifier { id }),
+            score: self.score(),
+        })
+    }
 }
 
 // Fixed-sized sorted collection
@@ -199,26 +223,6 @@ fn segment_matches(expression: &BooleanExpression<String>, labels: &HashSet<Stri
             operator: Operator::Or,
             operands,
         }) => operands.iter().any(|op| segment_matches(op, labels)),
-    }
-}
-
-impl TryFrom<ScoredParagraph<'_>> for DocumentScored {
-    type Error = String;
-    fn try_from(paragraph: ScoredParagraph) -> Result<Self, Self::Error> {
-        let id = paragraph.id().to_string();
-
-        let metadata = paragraph.metadata().map(SentenceMetadata::decode);
-
-        let labels = paragraph.labels();
-        let Ok(metadata) = metadata.transpose() else {
-            return Err("The metadata could not be decoded".to_string());
-        };
-        Ok(DocumentScored {
-            labels,
-            metadata,
-            doc_id: Some(DocumentVectorIdentifier { id }),
-            score: paragraph.score(),
-        })
     }
 }
 
@@ -327,7 +331,7 @@ impl Searcher {
 
         let documents = result
             .into_iter()
-            .flat_map(DocumentScored::try_from)
+            .flat_map(|sp| sp.try_to_document_scored(&self.config.paragraph_metadata))
             .collect::<Vec<_>>();
         let v = time.elapsed().as_millis();
 
