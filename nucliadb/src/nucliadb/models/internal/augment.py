@@ -18,8 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from dataclasses import dataclass
-from enum import Enum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Callable, Literal
 
 from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
 from typing_extensions import Self
@@ -49,19 +48,19 @@ class SelectProp(BaseModel):
         return self
 
 
-def prop_discriminator(v: Any) -> str | None:
-    if isinstance(v, dict):
-        return v.get("prop", None)
-    else:
-        return getattr(v, "prop", None)
+def discriminator(name: str) -> Callable[[Any], str | None]:
+    def _inner(v: Any) -> str | None:
+        if isinstance(v, dict):
+            return v.get(name, None)
+        else:
+            return getattr(v, name, None)
+
+    return _inner
 
 
-def from_discriminator(v: Any) -> str | None:
-    if isinstance(v, dict):
-        return v.get("from", None)
-    else:
-        return getattr(v, "from", None)
-
+prop_discriminator = discriminator(name="prop")
+from_discriminator = discriminator(name="from")
+name_discriminator = discriminator(name="name")
 
 # Complex ids
 
@@ -220,35 +219,108 @@ FieldProp = Annotated[
 ]
 
 
-class ConversationTextStrategy(str, Enum):
-    MESSAGE = "message"
-    PAGE = "page"
-    FULL = "full"
+class MessageSelector(BaseModel):
+    """Selects the message specified by the field id."""
+
+    name: Literal["message"] = "message"
+
+    id: str | None = None
+    index: Literal["first"] | Literal["last"] | int | None = Field(
+        default=None,
+        description="Index of the message in the conversation. Indexing starts at 0",
+    )
+
+    @model_validator(mode="after")
+    def id_or_index(self) -> Self:
+        if self.id is not None and self.index is not None:
+            raise ValueError("Can't define both `id` and `index`")
+        return self
+
+
+class PageSelector(BaseModel):
+    """Selects all messages from the page of the message specified by the field
+    id.
+
+    """
+
+    name: Literal["page"] = "page"
+
+
+class NeighboursSelector(BaseModel):
+    """Selects a bunch of messages preceding or following the one specified by
+    the field id.
+
+    """
+
+    name: Literal["neighbours"] = "neighbours"
+    after: int = Field(ge=1)
+
+
+class WindowSelector(BaseModel):
+    """Selects a window of certain size around the message specified by the
+    field id.
+
+    If size=1, this behaves as MessageSelector.
+
+    If, for example, size=5 and there are 2 messages preceding and 2 following,
+    it behaves as a NeighbourSelector(before=2, after=2). However, if there's
+    not enough messages before/after, the window will be offset. For example, if
+    the selected message is the first on the conversation and size=5, it'll
+    select the first 5 messages of the conversation.
+
+    """
+
+    name: Literal["window"] = "window"
+    size: int = Field(ge=1)
+
+
+class AnswerSelector(BaseModel):
+    """Search for the next message of type ANSWER. For ids containing the split,
+    search starts from that message rather than the beginning of the
+    conversation.
+
+    """
+
+    name: Literal["answer"] = "answer"
+
+
+class FullSelector(BaseModel):
+    """Selects the whole conversation"""
+
+    name: Literal["full"] = "full"
+
+
+ConversationSelector = Annotated[
+    (
+        Annotated[MessageSelector, Tag("message")]
+        | Annotated[PageSelector, Tag("page")]
+        | Annotated[NeighboursSelector, Tag("neighbours")]
+        | Annotated[WindowSelector, Tag("window")]
+        | Annotated[AnswerSelector, Tag("answer")]
+        | Annotated[FullSelector, Tag("full")]
+    ),
+    Discriminator(name_discriminator),
+]
 
 
 class ConversationText(FieldText):
     prop: Literal["text"] = "text"
-    strategy: ConversationTextStrategy = ConversationTextStrategy.MESSAGE
+    selector: ConversationSelector
 
 
 class ConversationAttachments(SelectProp):
     prop: Literal["attachments"] = "attachments"
-    text: bool
-    image: bool
-
-
-class ConversationAnswer(SelectProp):
-    prop: Literal["answer"] = "answer"
+    selector: ConversationSelector = Field(default_factory=FullSelector)
 
 
 ConversationProp = Annotated[
     (
         Annotated[ConversationText, Tag("text")]
+        | Annotated[FieldText, Tag("text")]
         | Annotated[FieldValue, Tag("value")]
         | Annotated[FieldClassificationLabels, Tag("classification_labels")]
         | Annotated[FieldEntities, Tag("entities")]
         | Annotated[ConversationAttachments, Tag("attachments")]
-        | Annotated[ConversationAnswer, Tag("answer")]
     ),
     Discriminator(prop_discriminator),
 ]
@@ -344,11 +416,17 @@ class ConversationAugment(BaseModel, extra="forbid"):
     limits: ConversationAugmentLimits | None = Field(default_factory=ConversationAugmentLimits)
 
 
+FieldFilter = Annotated[
+    (Annotated[filters.Field, Tag("field")] | Annotated[filters.Generated, Tag("generated")]),
+    Discriminator(prop_discriminator),
+]
+
+
 class FieldAugment(BaseModel, extra="forbid"):
     given: list[ResourceId] | list[FieldId] | list[ParagraphId]
     select: list[FieldProp]
     from_: Literal["fields"] = Field(default="fields", alias="from")
-    filter: list[filters.Field | filters.Generated] | None = None
+    filter: list[FieldFilter] | None = None
 
 
 class ParagraphAugment(BaseModel, extra="forbid"):
@@ -417,8 +495,6 @@ class AugmentedParagraph:
 class BaseAugmentedField:
     id: FieldId
 
-    text: str | None = None
-
     classification_labels: dict[str, set[str]] | None = None
     entities: dict[str, set[str]] | None = None
 
@@ -427,25 +503,40 @@ class BaseAugmentedField:
 class AugmentedTextField(BaseAugmentedField):
     value: nucliadb_models.text.FieldText | None = None
 
+    text: str | None = None
+
 
 @dataclass
 class AugmentedFileField(BaseAugmentedField):
     value: FieldFile | None = None
+
+    text: str | None = None
 
 
 @dataclass
 class AugmentedLinkField(BaseAugmentedField):
     value: FieldLink | None = None
 
+    text: str | None = None
+
+
+@dataclass
+class AugmentedConversationMessage:
+    ident: str
+    text: str | None = None
+    attachments: list[FieldId] | None = None
+
 
 @dataclass
 class AugmentedConversationField(BaseAugmentedField):
     value: FieldConversation | None = None
+    messages: list[AugmentedConversationMessage] | None = None
 
 
 @dataclass
 class AugmentedGenericField(BaseAugmentedField):
     value: str | None = None
+    text: str | None = None
 
 
 AugmentedField = (

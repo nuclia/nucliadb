@@ -197,7 +197,8 @@ def test_conversational_strategy():
                 {
                     "given": field_ids,
                     "select": [
-                        {"prop": "attachments", "text": True, "image": False},
+                        {"prop": "attachments", "kind": "text"},
+                        {"prop": "attachments", "kind": "image"},
                     ],
                     "from": "conversations",
                     "limits": {"max_messages": 5},
@@ -208,7 +209,10 @@ def test_conversational_strategy():
                         # we do have this implemented but not exposed. Given a
                         # conversation, if it's a question try to find a
                         # following message marked as answer in the same page
-                        {"prop": "answer"}
+                        {
+                            "prop": "text",
+                            "selector": {"name": "answer"},
+                        },
                     ],
                     "from": "conversations",
                 },

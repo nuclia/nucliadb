@@ -132,6 +132,7 @@ class AugmentResourceFields(BaseModel):
 class AugmentResources(BaseModel):
     given: list[ResourceId]
 
+    # TODO(decoupled-ask): replace this select for bool fields
     select: list[ResourceProp] = Field(default_factory=list)
 
     field_type_filter: list[FieldTypeName] | None = Field(
@@ -161,7 +162,50 @@ class AugmentFields(BaseModel):
     classification_labels: bool = False
     entities: bool = False  # also known as ners
 
+    # When enabled, augment all the messages from the conversation. This is
+    # incompatible with max_conversation_messages defined
+    full_conversation: bool = False
 
+    # When `full` disbled, this option controls the max amount of messages to be
+    # augmented. This number will be a best-effort window centered around the
+    # selected message. In addition, the 1st message of the conversation will
+    # always be included.
+    #
+    # This option is combinable with attachments.
+    max_conversation_messages: int | None = None
+
+    # Given a message, if it's a question, try to find an answer. Otherwise,
+    # return a window of messages following the requested one.
+    #
+    # This was previously done without explicit user consent, now it's an option.
+    conversation_answer_or_messages_after: bool = False
+
+    # Both attachment options will only add attachments for the full or the 1st
+    # + window, not answer nor messages after
+
+    # include conversation text attachments
+    conversation_text_attachments: bool = False
+    # include conversation image attachments
+    conversation_image_attachments: bool = False
+
+    @model_validator(mode="after")
+    def validate_cross_options(self):
+        if self.full_conversation and self.max_conversation_messages is not None:
+            raise ValueError(
+                "`full_conversation` and `max_conversation_messages` are not compatible together"
+            )
+        if (
+            (self.conversation_text_attachments or self.conversation_image_attachments)
+            and self.full_conversation is False
+            and self.max_conversation_messages is None
+        ):
+            raise ValueError(
+                "Attachments are only compatible with `full_conversation` and `max_conversation_messages`"
+            )
+        return self
+
+
+# TODO(decoupled-ask): remove unused metadata
 class ParagraphMetadata(BaseModel):
     field_labels: list[str]
     paragraph_labels: list[str]
@@ -190,15 +234,19 @@ class AugmentParagraphs(BaseModel):
     neighbours_before: int = 0
     neighbours_after: int = 0
 
+    # TODO(decoupled-ask): implement image strategy
     # paragraph extracted from an image, return an image
     source_image: bool = False
 
+    # TODO(decoupled-ask): implement image strategy
     # paragraph extracted from a table, return table image
     table_image: bool = False
 
+    # TODO(decoupled-ask): implement image strategy
     # return page_preview instead of table image if table image enabled
     table_prefers_page_preview: bool = False
 
+    # TODO(decoupled-ask): implement image strategy
     # paragraph from a page, return page preview image
     page_preview_image: bool = False
 
@@ -232,6 +280,51 @@ class AugmentedField(BaseModel):
     page_preview_image: Image | None = None
 
 
+class AugmentedConversationMessage(BaseModel):
+    ident: str
+    text: str | None = None
+    attachments: list[FieldId] | None = None
+
+
+class AugmentedConversationField(BaseModel):
+    classification_labels: dict[str, list[str]] | None = None
+    # former ners
+    entities: dict[str, list[str]] | None = None
+
+    messages: list[AugmentedConversationMessage] | None = None
+
+    @property
+    def text(self) -> str | None:
+        """Syntactic sugar to access aggregate text from all messages"""
+        if self.messages is None:
+            return None
+
+        text = ""
+        for message in self.messages:
+            text += message.text or ""
+
+        return text or None
+
+    @property
+    def attachments(self) -> list[FieldId] | None:
+        """Syntactic sugar to access the aggregate of attachments from all messages."""
+        if self.messages is None:
+            return None
+
+        has_attachments = False
+        attachments = []
+        for message in self.messages:
+            if message.attachments is None:
+                continue
+            has_attachments = True
+            attachments.extend(message.attachments)
+
+        if has_attachments:
+            return attachments
+        else:
+            return None
+
+
 class AugmentedResource(Resource):
     classification_labels: dict[str, list[str]] | None = None
 
@@ -242,5 +335,5 @@ class AugmentedResource(Resource):
 
 class AugmentResponse(BaseModel):
     resources: dict[ResourceId, AugmentedResource]
-    fields: dict[FieldId, AugmentedField]
+    fields: dict[FieldId, AugmentedField | AugmentedConversationField]
     paragraphs: dict[ParagraphId, AugmentedParagraph]

@@ -75,6 +75,8 @@ message Position {
     uint64 end = 3;
 
     // For pdfs/documents only
+    // FIXME: this should be an optional, otherwise the Python bindings always
+    // output a default page 0, false information in most of the cases
     uint64 page_number = 4;
     bool in_page = 7;
 

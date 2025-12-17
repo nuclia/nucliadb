@@ -19,23 +19,30 @@
 #
 
 import asyncio
-import os
+from typing import cast
 
 from fastapi import Header, Request
-from fastapi.exceptions import HTTPException
 from fastapi_versioning import version
 
 import nucliadb_models
 from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.models.internal import augment as internal_augment
 from nucliadb.models.internal.augment import (
     Augment,
     Augmented,
+    ConversationAttachments,
+    ConversationAugment,
+    ConversationProp,
+    ConversationSelector,
+    ConversationText,
     DeepResourceAugment,
     FieldAugment,
     FieldClassificationLabels,
     FieldEntities,
     FieldProp,
     FieldText,
+    FullSelector,
+    MessageSelector,
     Metadata,
     Paragraph,
     ParagraphAugment,
@@ -47,11 +54,14 @@ from nucliadb.models.internal.augment import (
     ResourceProp,
     ResourceSummary,
     ResourceTitle,
+    WindowSelector,
 )
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.augmentor import augmentor
 from nucliadb.search.search.cache import request_caches
 from nucliadb_models.augment import (
+    AugmentedConversationField,
+    AugmentedConversationMessage,
     AugmentedField,
     AugmentedParagraph,
     AugmentedResource,
@@ -64,13 +74,6 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import NucliaDBClientType, ResourceProperties
 from nucliadb_utils.authentication import requires
-
-
-class MaliciousStoragePath(Exception):
-    """Raised when a path used to access blob storage has a malicious intent
-    (e.g., uses ../ to try to access other resources)"""
-
-    ...
 
 
 @api.post(
@@ -90,13 +93,7 @@ async def _augment_endpoint(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> AugmentResponse:
-    try:
-        return await augment_endpoint(kbid, item)
-    except MaliciousStoragePath as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=str(exc),
-        )
+    return await augment_endpoint(kbid, item)
 
 
 async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
@@ -180,6 +177,7 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
             )
 
     if item.fields is not None:
+        given = [FieldId.from_string(id) for id in item.fields.given]
         select: list[FieldProp] = []
         if item.fields.text:
             select.append(FieldText())
@@ -190,10 +188,43 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
 
         augmentations.append(
             FieldAugment(
-                given=[FieldId.from_string(id) for id in item.fields.given],
+                given=given,
                 select=select,
             )
         )
+
+        conversation_select: list[ConversationProp] = []
+        selector: ConversationSelector
+
+        if item.fields.full_conversation:
+            selector = FullSelector()
+            conversation_select.append(ConversationText(selector=selector))
+            if item.fields.conversation_text_attachments or item.fields.conversation_image_attachments:
+                conversation_select.append(ConversationAttachments(selector=selector))
+
+        elif item.fields.max_conversation_messages is not None:
+            # we want to always get the first conversation and the window
+            # requested by the user
+            first_selector = MessageSelector(index="first")
+            window_selector = WindowSelector(size=item.fields.max_conversation_messages)
+            conversation_select.append(ConversationText(selector=first_selector))
+            conversation_select.append(ConversationText(selector=window_selector))
+            if item.fields.conversation_text_attachments or item.fields.conversation_image_attachments:
+                conversation_select.append(ConversationAttachments(selector=first_selector))
+                conversation_select.append(ConversationAttachments(selector=window_selector))
+
+        if item.fields.conversation_answer_or_messages_after:
+            # TODO: how should we implement this OR? Maybe search for the answer
+            # in a first iteration and the window in the second
+            pass
+
+        if conversation_select:
+            augmentations.append(
+                ConversationAugment(
+                    given=given,  # type: ignore
+                    select=conversation_select,
+                )
+            )
 
     if item.paragraphs is not None:
         paragraphs_to_augment, paragraph_selector = parse_paragraph_augment(item.paragraphs)
@@ -278,16 +309,6 @@ def parse_paragraph_augment(item: AugmentParagraphs) -> tuple[list[Paragraph], l
                 in_page_with_visual=paragraph.metadata.in_page_with_visual,
             )
 
-            # metadata provided in the API can't be trusted, we must check for
-            # malicious intent
-            if metadata.source_file:
-                # normalize the path and look for access to parent directories. In a
-                # bucket URL, this could mean trying to access another part of the
-                # bucket or even another bucket
-                normalized = os.path.normpath(metadata.source_file)
-                if normalized.startswith("../") or normalized in (".", ".."):
-                    raise MaliciousStoragePath(f"Invalid source file path for paragraph {paragraph.id}")
-
         paragraphs_to_augment.append(Paragraph(id=paragraph_id, metadata=metadata))
 
     selector: list[ParagraphProp] = []
@@ -343,6 +364,8 @@ def build_augment_response(augmented: Augmented) -> AugmentResponse:
         if field is None:
             continue
 
+        # common augments for all fields
+
         if field.classification_labels is None:
             classification_labels = None
         else:
@@ -355,12 +378,47 @@ def build_augment_response(augmented: Augmented) -> AugmentResponse:
         else:
             entities = {family: list(entity) for family, entity in field.entities.items()}
 
-        response.fields[field_id.full()] = AugmentedField(
-            text=field.text,
-            classification_labels=classification_labels,
-            entities=entities,
-            # TODO(decoupled-ask): add more field parameters
-        )
+        if field_id.type in (
+            FieldTypeName.TEXT.abbreviation(),
+            FieldTypeName.FILE.abbreviation(),
+            FieldTypeName.LINK.abbreviation(),
+            FieldTypeName.GENERIC.abbreviation(),
+        ):
+            response.fields[field_id.full()] = AugmentedField(
+                text=field.text,  # type: ignore # field is instance of any of the above and has the text property
+                classification_labels=classification_labels,
+                entities=entities,
+            )
+
+        elif field_id.type == FieldTypeName.CONVERSATION.abbreviation():
+            field = cast(internal_augment.AugmentedConversationField, field)
+            conversation = AugmentedConversationField(
+                classification_labels=classification_labels,
+                entities=entities,
+            )
+
+            if field.messages is not None:
+                conversation.messages = []
+                for m in field.messages:
+                    if m.attachments is None:
+                        attachments = None
+                    else:
+                        attachments = []
+                        for f in m.attachments:
+                            attachments.append(f.full())
+
+                    conversation.messages.append(
+                        AugmentedConversationMessage(
+                            ident=m.ident,
+                            text=m.text,
+                            attachments=attachments,
+                        )
+                    )
+
+            response.fields[field_id.full()] = conversation
+
+        else:  # pragma: no cover
+            assert False, f"unknown field type: {field_id.type}"
 
     for paragraph_id, paragraph in augmented.paragraphs.items():
         if paragraph is None:

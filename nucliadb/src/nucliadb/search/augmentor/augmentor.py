@@ -140,7 +140,15 @@ async def augment(
                 augments["fields"].setdefault(field_id, []).extend(augmentation.select)
 
         elif augmentation.from_ == "conversations":
-            raise NotImplementedError()
+            for id in augmentation.given:
+                if isinstance(id, FieldId):
+                    field_id = id
+                elif isinstance(id, ParagraphId):
+                    field_id = id.field_id
+                else:  # pragma: no cover
+                    assert_never(id)
+
+                augments["fields"].setdefault(field_id, []).extend(augmentation.select)
 
         elif augmentation.from_ == "paragraphs":
             for paragraph in augmentation.given:

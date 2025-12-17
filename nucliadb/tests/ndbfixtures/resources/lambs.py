@@ -18,14 +18,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import base64
+import random
 
 from google.protobuf.json_format import ParseDict
 from httpx import AsyncClient
 
+from nucliadb.common import datamanagers
 from nucliadb.writer.api.v1.router import KB_PREFIX
 from nucliadb_models.conversation import (
     MessageType,
 )
+from nucliadb_protos.resources_pb2 import FieldType, Paragraph
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.ndbfixtures.resources._vectors import (
@@ -44,6 +48,7 @@ from tests.ndbfixtures.resources._vectors import (
     lambs_title_vector,
 )
 from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import wait_for_sync
 
 
@@ -114,6 +119,12 @@ async def lambs_resource(
                             "to": [clarice],
                             "content": {
                                 "text": "Well, Clarice, have the lambs stopped screaming...?",
+                                "attachments_fields": [
+                                    {
+                                        "field_type": "file",
+                                        "field_id": "attachment:lamb",
+                                    },
+                                ],
                             },
                             "type": MessageType.QUESTION.value,
                         },
@@ -189,6 +200,12 @@ async def lambs_resource(
                             "to": [clarice],
                             "content": {
                                 "text": "Goodbye, Clarice... You looked - so very lovely today in your blue suit.",
+                                "attachments_fields": [
+                                    {
+                                        "field_type": "file",
+                                        "field_id": "attachment:blue-suit",
+                                    },
+                                ],
                             },
                         },
                         {
@@ -718,6 +735,72 @@ async def lambs_resource(
 
     # ingest the processed BM
     await inject_message(nucliadb_ingest_grpc, processor_bm)
+    await wait_for_sync()
+
+    # now, we'll patch the resource, add the attachments and generate a broker
+    # message from processor to add extracted data.
+    #
+    # We could do it in a single POST but this makes it easier to reproduce the
+    # processor bm
+    resp = await nucliadb_writer.patch(
+        f"/{KB_PREFIX}/{kbid}/resource/{rid}",
+        json={
+            "files": {
+                "attachment:lamb": {
+                    "file": {
+                        "filename": "lamb.png",
+                        "content_type": "image/png",
+                        "payload": base64.b64encode(b"some content we're not going to check").decode(),
+                    }
+                },
+                "attachment:blue-suit": {
+                    "file": {
+                        "filename": "clarice-blue-suit.pdf",
+                        "content_type": "application/pdf",
+                        "payload": base64.b64encode(b"some content we're not going to check").decode(),
+                    }
+                },
+            }
+        },
+    )
+    assert resp.status_code == 200
+
+    vectorsets = {}
+    async with datamanagers.with_ro_transaction() as txn:
+        async for vectorset_id, vs in datamanagers.vectorsets.iter(txn, kbid=kbid):
+            vectorsets[vectorset_id] = vs
+    # use a controlled random seed for vector generation
+    random.seed(32)
+
+    bmb = BrokerMessageBuilder(
+        kbid=kbid,
+        rid=rid,
+        slug=slug,
+        source=BrokerMessage.MessageSource.PROCESSOR,
+    )
+
+    file_field = bmb.field_builder("attachment:lamb", FieldType.FILE)
+    file_field.add_paragraph(
+        "A beautiful picture of some happy lambs in the middle of a green field",
+        vectors={
+            vectorset_id: [random.random()] * config.vectorset_index_config.vector_dimension
+            for i, (vectorset_id, config) in enumerate(vectorsets.items())
+        },
+        kind=Paragraph.TypeParagraph.INCEPTION,
+    )
+
+    file_field = bmb.field_builder("attachment:blue-suit", FieldType.FILE)
+    file_field.add_paragraph(
+        "Clarice's blue suit",
+        vectors={
+            vectorset_id: [random.random()] * config.vectorset_index_config.vector_dimension
+            for i, (vectorset_id, config) in enumerate(vectorsets.items())
+        },
+        kind=Paragraph.TypeParagraph.TEXT,
+    )
+
+    attachments_bm = bmb.build()
+    await inject_message(nucliadb_ingest_grpc, attachments_bm)
     await wait_for_sync()
 
     return rid

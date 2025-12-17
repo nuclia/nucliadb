@@ -190,7 +190,7 @@ def keyword_result_to_text_block_match(item: ParagraphResult) -> TextBlockMatch:
         scores=[KeywordScore(score=item.score.bm25)],
         score_type=SCORE_TYPE.BM25,
         order=0,  # NOTE: this will be filled later
-        text="",  # NOTE: this will be filled later too
+        text=None,  # NOTE: this will be filled later too
         position=TextPosition(
             page_number=item.metadata.position.page_number,
             index=item.metadata.position.index,
@@ -204,7 +204,7 @@ def keyword_result_to_text_block_match(item: ParagraphResult) -> TextBlockMatch:
         paragraph_labels=list(item.labels),
         fuzzy_search=fuzzy_result,
         is_a_table=item.metadata.representation.is_a_table,
-        representation_file=item.metadata.representation.file,
+        representation_file=item.metadata.representation.file or None,
         page_with_visual=item.metadata.page_with_visual,
     )
 
@@ -232,7 +232,7 @@ def semantic_result_to_text_block_match(item: DocumentScored) -> TextBlockMatch:
         scores=[SemanticScore(score=item.score)],
         score_type=SCORE_TYPE.VECTOR,
         order=0,  # NOTE: this will be filled later
-        text="",  # NOTE: this will be filled later too
+        text=None,  # NOTE: this will be filled later too
         position=TextPosition(
             page_number=item.metadata.position.page_number,
             index=item.metadata.position.index,
@@ -246,7 +246,7 @@ def semantic_result_to_text_block_match(item: DocumentScored) -> TextBlockMatch:
         paragraph_labels=list(item.labels),
         fuzzy_search=False,  # semantic search doesn't have fuzziness
         is_a_table=item.metadata.representation.is_a_table,
-        representation_file=item.metadata.representation.file,
+        representation_file=item.metadata.representation.file or None,
         page_with_visual=item.metadata.page_with_visual,
     )
 
@@ -278,7 +278,7 @@ def graph_results_to_text_block_matches(item: GraphSearchResponse) -> list[TextB
                 scores=[GraphScore(score=FAKE_GRAPH_SCORE)],
                 score_type=SCORE_TYPE.RELATION_RELEVANCE,
                 order=0,  # NOTE: this will be filled later
-                text="",  # NOTE: this will be filled later too
+                text=None,  # NOTE: this will be filled later too
                 position=TextPosition(
                     page_number=0,
                     index=0,
