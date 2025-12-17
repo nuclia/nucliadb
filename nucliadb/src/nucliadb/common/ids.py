@@ -127,6 +127,9 @@ class FieldId:
         else:
             return f"{self.rid}/{self.type}/{self.key}/{self.subfield_id}"
 
+    def full_without_subfield(self) -> str:
+        return f"{self.rid}/{self.type}/{self.key}"
+
     def short_without_subfield(self) -> str:
         return f"/{self.type}/{self.key}"
 

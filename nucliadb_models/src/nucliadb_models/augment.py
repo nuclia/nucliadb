@@ -162,6 +162,48 @@ class AugmentFields(BaseModel):
     classification_labels: bool = False
     entities: bool = False  # also known as ners
 
+    # When enabled, augment all the messages from the conversation. This is
+    # incompatible with max_conversation_messages defined
+    full_conversation: bool = False
+
+    # When `full` disbled, this option controls the max amount of messages to be
+    # augmented. This number will be a best-effort window centered around the
+    # selected message. In addition, the 1st message of the conversation will
+    # always be included.
+    #
+    # This option is combinable with attachments.
+    max_conversation_messages: int | None = None
+
+    # Given a message, if it's a question, try to find an answer. Otherwise,
+    # return a window of messages following the requested one.
+    #
+    # This was previously done without explicit user consent, now it's an option.
+    conversation_answer_or_messages_after: bool = False
+
+    # Both attachment options will only add attachments for the full or the 1st
+    # + window, not answer nor messages after
+
+    # include conversation text attachments
+    conversation_text_attachments: bool = False
+    # include conversation image attachments
+    conversation_image_attachments: bool = False
+
+    @model_validator(mode="after")
+    def validate_cross_options(self):
+        if self.full_conversation and self.max_conversation_messages is not None:
+            raise ValueError(
+                "`full_conversation` and `max_conversation_messages` are not compatible together"
+            )
+        if (
+            (self.conversation_text_attachments or self.conversation_image_attachments)
+            and self.full_conversation is False
+            and self.max_conversation_messages is None
+        ):
+            raise ValueError(
+                "Attachments are only compatible with `full_conversation` and `max_conversation_messages`"
+            )
+        return self
+
 
 # TODO(decoupled-ask): remove unused metadata
 class ParagraphMetadata(BaseModel):

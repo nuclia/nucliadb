@@ -30,12 +30,19 @@ from nucliadb.models.internal import augment as internal_augment
 from nucliadb.models.internal.augment import (
     Augment,
     Augmented,
+    ConversationAttachments,
+    ConversationAugment,
+    ConversationProp,
+    ConversationSelector,
+    ConversationText,
     DeepResourceAugment,
     FieldAugment,
     FieldClassificationLabels,
     FieldEntities,
     FieldProp,
     FieldText,
+    FullSelector,
+    MessageSelector,
     Metadata,
     Paragraph,
     ParagraphAugment,
@@ -47,6 +54,7 @@ from nucliadb.models.internal.augment import (
     ResourceProp,
     ResourceSummary,
     ResourceTitle,
+    WindowSelector,
 )
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.augmentor import augmentor
@@ -169,6 +177,7 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
             )
 
     if item.fields is not None:
+        given = [FieldId.from_string(id) for id in item.fields.given]
         select: list[FieldProp] = []
         if item.fields.text:
             select.append(FieldText())
@@ -179,10 +188,43 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
 
         augmentations.append(
             FieldAugment(
-                given=[FieldId.from_string(id) for id in item.fields.given],
+                given=given,
                 select=select,
             )
         )
+
+        conversation_select: list[ConversationProp] = []
+        selector: ConversationSelector
+
+        if item.fields.full_conversation:
+            selector = FullSelector()
+            conversation_select.append(ConversationText(selector=selector))
+            if item.fields.conversation_text_attachments or item.fields.conversation_image_attachments:
+                conversation_select.append(ConversationAttachments(selector=selector))
+
+        elif item.fields.max_conversation_messages is not None:
+            # we want to always get the first conversation and the window
+            # requested by the user
+            first_selector = MessageSelector(index="first")
+            window_selector = WindowSelector(size=item.fields.max_conversation_messages)
+            conversation_select.append(ConversationText(selector=first_selector))
+            conversation_select.append(ConversationText(selector=window_selector))
+            if item.fields.conversation_text_attachments or item.fields.conversation_image_attachments:
+                conversation_select.append(ConversationAttachments(selector=first_selector))
+                conversation_select.append(ConversationAttachments(selector=window_selector))
+
+        if item.fields.conversation_answer_or_messages_after:
+            # TODO: how should we implement this OR? Maybe search for the answer
+            # in a first iteration and the window in the second
+            pass
+
+        if conversation_select:
+            augmentations.append(
+                ConversationAugment(
+                    given=given,  # type: ignore
+                    select=conversation_select,
+                )
+            )
 
     if item.paragraphs is not None:
         paragraphs_to_augment, paragraph_selector = parse_paragraph_augment(item.paragraphs)

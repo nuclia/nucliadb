@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from dataclasses import dataclass
-from enum import Enum
 from typing import Annotated, Any, Callable, Literal
 
 from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
@@ -309,14 +308,8 @@ class ConversationText(FieldText):
     selector: ConversationSelector
 
 
-class AttachmentKind(str, Enum):
-    TEXT = "text"
-    IMAGE = "image"
-
-
 class ConversationAttachments(SelectProp):
     prop: Literal["attachments"] = "attachments"
-    # kind: AttachmentKind
     selector: ConversationSelector = Field(default_factory=FullSelector)
 
 

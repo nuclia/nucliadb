@@ -2051,8 +2051,9 @@ async def test_ask_conversational_strategy(
         augmented = data.augmented_context
         assert augmented is not None
         assert data.prompt_context is not None, "we have debug=true for this"
-        assert len(data.prompt_context) == 12
         assert len(augmented.paragraphs) == 11
+        assert augmented.paragraphs[f"{rid}/c/lambs/4/0-26"].text == "Where are you, Dr. Lecter?"
+        assert len(data.prompt_context) == 12
         assert [m.id for m in data.retrieval_best_matches] == [f"{rid}/c/lambs/10/0-35"]
         assert (
             data.retrieval_results.resources[rid]
@@ -2226,9 +2227,14 @@ async def test_ask_conversational_strategy(
             assert augmented is not None
             assert len(augmented.paragraphs) == 13
             assert {
-                f"{rid}/c/attachment:blue-suit/0-19",
-                f"{rid}/c/attachment:lamb/0-70",
+                f"{rid}/f/attachment:blue-suit/0-19",
+                f"{rid}/f/attachment:lamb/0-70",
             }.issubset(augmented.paragraphs.keys())
+
+            assert (
+                augmented.paragraphs[f"{rid}/f/attachment:blue-suit/0-19"].text
+                == "Attachment attachment:blue-suit: Clarice's blue suit\n\n"
+            )
 
             # images are sent to the LLM but not returned, we spy the method
             # that sends to Predict API to validate we are sending the context
