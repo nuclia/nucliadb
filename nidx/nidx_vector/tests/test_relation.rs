@@ -20,6 +20,8 @@
 
 mod common;
 
+use std::hash::{DefaultHasher, Hash, Hasher};
+
 use nidx_protos::{
     IndexRelation, IndexRelations, Relation, RelationNode, RelationNodeVector, Resource, ResourceId,
     relation::RelationType, relation_node::NodeType,
@@ -30,10 +32,59 @@ use tempfile::tempdir;
 
 use crate::common::TestOpener;
 
-const DIMENSION: usize = 4;
+const DIMENSION: usize = 8;
+
+fn relation(from: &str, relation: &str, to: &str) -> IndexRelation {
+    IndexRelation {
+        relation: Some(Relation {
+            source: Some(RelationNode {
+                value: from.into(),
+                ntype: NodeType::Entity as i32,
+                subtype: "animal".into(),
+            }),
+            to: Some(RelationNode {
+                value: to.into(),
+                ntype: NodeType::Entity as i32,
+                subtype: "animal".into(),
+            }),
+            relation: RelationType::Entity as i32,
+            relation_label: relation.into(),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn normalize(v: Vec<f32>) -> Vec<f32> {
+    let mut modulus = 0.0;
+    for w in &v {
+        modulus += w * w;
+    }
+    modulus = modulus.powf(0.5);
+
+    v.into_iter().map(|w| w / modulus).collect()
+}
+
+fn vector_for(value: &str) -> Vec<f32> {
+    let mut s = DefaultHasher::new();
+    value.hash(&mut s);
+    let hash = s.finish();
+    normalize(hash.to_le_bytes().map(|v| v as f32).to_vec())
+}
+
+fn node_vector(value: &str) -> RelationNodeVector {
+    RelationNodeVector {
+        node: Some(RelationNode {
+            value: value.into(),
+            ntype: NodeType::Entity as i32,
+            subtype: "animal".into(),
+        }),
+        vector: vector_for(value),
+    }
+}
 
 #[test]
-fn test_indexer() -> anyhow::Result<()> {
+fn test_index_merge_relations() -> anyhow::Result<()> {
     let config = VectorConfig::for_relations(VectorType::DenseF32 { dimension: DIMENSION });
 
     let resource = Resource {
@@ -45,77 +96,18 @@ fn test_indexer() -> anyhow::Result<()> {
             (
                 "a/title".into(),
                 IndexRelations {
-                    relations: vec![IndexRelation {
-                        relation: Some(Relation {
-                            source: Some(RelationNode {
-                                value: "dog".into(),
-                                ntype: NodeType::Entity as i32,
-                                subtype: "animal".into(),
-                            }),
-                            to: Some(RelationNode {
-                                value: "cat".into(),
-                                ntype: NodeType::Entity as i32,
-                                subtype: "animal".into(),
-                            }),
-                            relation: RelationType::Entity as i32,
-                            relation_label: "bigger than".into(),
-                            ..Default::default()
-                        }),
-                        ..Default::default()
-                    }],
+                    relations: vec![relation("dog", "bigger than", "cat")],
                 },
             ),
             (
                 "f/file".into(),
                 IndexRelations {
-                    relations: vec![IndexRelation {
-                        relation: Some(Relation {
-                            source: Some(RelationNode {
-                                value: "dog".into(),
-                                ntype: NodeType::Entity as i32,
-                                subtype: "animal".into(),
-                            }),
-                            to: Some(RelationNode {
-                                value: "fish".into(),
-                                ntype: NodeType::Entity as i32,
-                                subtype: "animal".into(),
-                            }),
-                            relation: RelationType::Entity as i32,
-                            relation_label: "bigger than".into(),
-                            ..Default::default()
-                        }),
-                        ..Default::default()
-                    }],
+                    relations: vec![relation("dog", "bigger than", "fish")],
                 },
             ),
         ]
         .into(),
-        relation_node_vectors: vec![
-            RelationNodeVector {
-                node: Some(RelationNode {
-                    value: "dog".into(),
-                    ntype: NodeType::Entity as i32,
-                    subtype: "animal".into(),
-                }),
-                vector: vec![1.0, 0.0, 0.0, 0.0],
-            },
-            RelationNodeVector {
-                node: Some(RelationNode {
-                    value: "cat".into(),
-                    ntype: NodeType::Entity as i32,
-                    subtype: "animal".into(),
-                }),
-                vector: vec![0.0, 1.0, 0.0, 0.0],
-            },
-            RelationNodeVector {
-                node: Some(RelationNode {
-                    value: "fish".into(),
-                    ntype: NodeType::Entity as i32,
-                    subtype: "animal".into(),
-                }),
-                vector: vec![0.0, 0.0, 1.0, 0.0],
-            },
-        ],
+        relation_node_vectors: vec![node_vector("dog"), node_vector("cat"), node_vector("fish")],
         ..Default::default()
     };
 
@@ -129,10 +121,10 @@ fn test_indexer() -> anyhow::Result<()> {
         config.clone(),
         TestOpener::new(vec![(segment_meta.clone(), 1i64.into())], vec![]),
     )?;
-    let search_for = vec![1.0, 0.0, 0.0, 0.0];
+    let search_for = vector_for("dog");
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for,
+            vector: search_for.clone(),
             result_per_page: 10,
             ..Default::default()
         },
@@ -141,7 +133,7 @@ fn test_indexer() -> anyhow::Result<()> {
 
     assert_eq!(results.documents.len(), 3);
     assert_eq!(results.documents[0].score, 1.0);
-    assert_eq!(results.documents[1].score, 0.0);
+    assert!(results.documents[1].score < 1.0);
 
     // Search with a deletion
     let searcher = VectorSearcher::open(
@@ -151,19 +143,20 @@ fn test_indexer() -> anyhow::Result<()> {
             vec![("00112233445566778899aabbccddeeff/a/title".into(), 2u64.into())],
         ),
     )?;
-    let search_for = vec![1.0, 0.0, 0.0, 0.0];
+
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for,
+            vector: search_for.clone(),
             result_per_page: 10,
             ..Default::default()
         },
         &PrefilterResult::All,
     )?;
 
+    println!("{:?}", results);
     assert_eq!(results.documents.len(), 2);
     assert_eq!(results.documents[0].score, 1.0);
-    assert_eq!(results.documents[1].score, 0.0);
+    assert!(results.documents[1].score < 1.0);
 
     /////////////////////////////////
 
@@ -176,89 +169,22 @@ fn test_indexer() -> anyhow::Result<()> {
             (
                 "a/title".into(),
                 IndexRelations {
-                    relations: vec![IndexRelation {
-                        relation: Some(Relation {
-                            source: Some(RelationNode {
-                                value: "dog".into(),
-                                ntype: NodeType::Entity as i32,
-                                subtype: "animal".into(),
-                            }),
-                            to: Some(RelationNode {
-                                value: "cat".into(),
-                                ntype: NodeType::Entity as i32,
-                                subtype: "animal".into(),
-                            }),
-                            relation: RelationType::Entity as i32,
-                            relation_label: "bigger than".into(),
-                            ..Default::default()
-                        }),
-                        ..Default::default()
-                    }],
+                    relations: vec![relation("dog", "bigger than", "cat")],
                 },
             ),
             (
                 "f/file".into(),
                 IndexRelations {
-                    relations: vec![IndexRelation {
-                        relation: Some(Relation {
-                            source: Some(RelationNode {
-                                value: "sheep".into(),
-                                ntype: NodeType::Entity as i32,
-                                subtype: "animal".into(),
-                            }),
-                            to: Some(RelationNode {
-                                value: "rat".into(),
-                                ntype: NodeType::Entity as i32,
-                                subtype: "animal".into(),
-                            }),
-                            relation: RelationType::Entity as i32,
-                            relation_label: "bigger than".into(),
-                            ..Default::default()
-                        }),
-                        ..Default::default()
-                    }],
+                    relations: vec![relation("sheep", "bigger than", "rat")],
                 },
             ),
         ]
         .into(),
         relation_node_vectors: vec![
-            RelationNodeVector {
-                node: Some(RelationNode {
-                    value: "dog".into(),
-                    ntype: NodeType::Entity as i32,
-                    subtype: "animal".into(),
-                }),
-                vector: vec![1.0, 0.0, 0.0, 0.0],
-            },
-            RelationNodeVector {
-                node: Some(RelationNode {
-                    value: "cat".into(),
-                    ntype: NodeType::Entity as i32,
-                    subtype: "animal".into(),
-                }),
-                vector: vec![0.0, 1.0, 0.0, 0.0],
-            },
-            RelationNodeVector {
-                node: Some(RelationNode {
-                    value: "sheep".into(),
-                    ntype: NodeType::Entity as i32,
-                    subtype: "animal".into(),
-                }),
-                vector: vec![
-                    0.0,
-                    0.0,
-                    std::f32::consts::FRAC_1_SQRT_2,
-                    std::f32::consts::FRAC_1_SQRT_2,
-                ],
-            },
-            RelationNodeVector {
-                node: Some(RelationNode {
-                    value: "rat".into(),
-                    ntype: NodeType::Entity as i32,
-                    subtype: "animal".into(),
-                }),
-                vector: vec![0.0, 0.0, 0.0, 1.0],
-            },
+            node_vector("dog"),
+            node_vector("cat"),
+            node_vector("sheep"),
+            node_vector("rat"),
         ],
         ..Default::default()
     };
@@ -285,10 +211,10 @@ fn test_indexer() -> anyhow::Result<()> {
         config.clone(),
         TestOpener::new(vec![(merged_meta.clone(), 1i64.into())], vec![]),
     )?;
-    let search_for = vec![1.0, 0.0, 0.0, 0.0];
+
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for,
+            vector: search_for.clone(),
             result_per_page: 10,
             ..Default::default()
         },
@@ -297,7 +223,7 @@ fn test_indexer() -> anyhow::Result<()> {
 
     assert_eq!(results.documents.len(), 5);
     assert_eq!(results.documents[0].score, 1.0);
-    assert_eq!(results.documents[1].score, 0.0);
+    assert!(results.documents[1].score < 1.0);
 
     // Deleting one title does nothing, as the other segment has the same entity in the same field
     let searcher = VectorSearcher::open(
@@ -307,10 +233,10 @@ fn test_indexer() -> anyhow::Result<()> {
             vec![("00112233445566778899aabbccddeeff/a/title".into(), 2u64.into())],
         ),
     )?;
-    let search_for = vec![1.0, 0.0, 0.0, 0.0];
+
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for,
+            vector: search_for.clone(),
             result_per_page: 10,
             ..Default::default()
         },
@@ -319,7 +245,7 @@ fn test_indexer() -> anyhow::Result<()> {
 
     assert_eq!(results.documents.len(), 5);
     assert_eq!(results.documents[0].score, 1.0);
-    assert_eq!(results.documents[1].score, 0.0);
+    assert!(results.documents[1].score < 1.0);
 
     // Deleting both titles eliminates cat
     let searcher = VectorSearcher::open(
@@ -332,10 +258,10 @@ fn test_indexer() -> anyhow::Result<()> {
             ],
         ),
     )?;
-    let search_for = vec![1.0, 0.0, 0.0, 0.0];
+
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for,
+            vector: vector_for("cat"),
             result_per_page: 10,
             ..Default::default()
         },
@@ -343,8 +269,7 @@ fn test_indexer() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(results.documents.len(), 4);
-    assert_eq!(results.documents[0].score, 1.0);
-    assert_eq!(results.documents[1].score, 0.0);
+    assert!(results.documents[0].score < 1.0);
 
     // TODO: test deletions applied during merge
 

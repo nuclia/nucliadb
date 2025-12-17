@@ -119,20 +119,19 @@ pub fn merge(segment_path: &Path, operants: &[&OpenSegment], config: &VectorConf
             .collect();
 
         // Dedup: search for all copies of a key
-        let mut paragraph_alive_fields: HashMap<String, Vec<String>> = HashMap::new();
+        let mut paragraph_alive_fields: HashMap<String, Vec<Vec<u8>>> = HashMap::new();
         if matches!(config.indexes, IndexSet::Relation) {
             for segment in &operants {
-                // TODO: Maybe iterate only alive paragraphs?
-                for paragraph_id in 0..segment.data_store.stored_paragraph_count() {
-                    let paragraph = segment.data_store.get_paragraph(ParagraphAddr(paragraph_id));
-                    let fields: Vec<String>;
-                    (fields, _) =
+                for paragraph_id in segment.alive_paragraphs() {
+                    let paragraph = segment.data_store.get_paragraph(paragraph_id);
+                    let field_keys: Vec<Vec<u8>>;
+                    (field_keys, _) =
                         bincode::decode_from_slice(paragraph.metadata(), bincode::config::standard()).unwrap();
-                    for f in fields {
+                    for f in field_keys {
                         // TODO: Pass deletions here
                         // Maybe don't apply deletions beforehand?
-                        let deletions: HashSet<String> = HashSet::new();
-                        if !deletions.contains(f.as_str()) && !deletions.contains(&f[..33]) {
+                        let deletions: HashSet<Vec<u8>> = HashSet::new();
+                        if !deletions.contains(&f) && !deletions.contains(field_id::resource_part(&f)) {
                             paragraph_alive_fields
                                 .entry(paragraph.id().to_string())
                                 .or_default()
