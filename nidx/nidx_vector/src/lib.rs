@@ -51,7 +51,7 @@ use tracing::instrument;
 pub use indexer::SEGMENT_TAGS;
 pub use request_types::VectorSearchRequest;
 
-use crate::config::IndexSet;
+use crate::config::IndexEntity;
 use crate::indexer::index_relations;
 use crate::utils::FieldKey;
 
@@ -79,7 +79,7 @@ impl VectorIndexer {
         index_name: &str,
         use_default_vectorset: bool,
     ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
-        if matches!(config.indexes, IndexSet::Paragraph) {
+        if matches!(config.entity, IndexEntity::Paragraph) {
             let vectorset_resource =
                 ResourceWrapper::new_vectorset_resource(resource, index_name, use_default_vectorset);
             index_resource(vectorset_resource, output_dir, config)

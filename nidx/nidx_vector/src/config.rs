@@ -96,7 +96,7 @@ pub enum VectorCardinality {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub enum IndexSet {
+pub enum IndexEntity {
     #[default]
     Paragraph,
     Relation,
@@ -121,9 +121,7 @@ pub struct VectorConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub flags: Vec<String>,
     #[serde(default)]
-    pub indexes: IndexSet,
-    #[serde(default)]
-    pub paragraph_metadata: ParagraphMetadata,
+    pub entity: IndexEntity,
 }
 
 impl VectorConfig {
@@ -134,8 +132,7 @@ impl VectorConfig {
             normalize_vectors: false,
             vector_cardinality: VectorCardinality::Single,
             flags: vec![],
-            indexes: IndexSet::Paragraph,
-            paragraph_metadata: ParagraphMetadata::SentenceProto,
+            entity: IndexEntity::Paragraph,
         }
     }
 
@@ -146,8 +143,7 @@ impl VectorConfig {
             normalize_vectors: false,
             vector_cardinality: VectorCardinality::Single,
             flags: vec![],
-            indexes: IndexSet::Relation,
-            paragraph_metadata: ParagraphMetadata::FieldList,
+            entity: IndexEntity::Relation,
         }
     }
 
@@ -186,8 +182,7 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
             vector_type,
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
-            indexes: IndexSet::Paragraph,
-            paragraph_metadata: ParagraphMetadata::SentenceProto,
+            entity: IndexEntity::Paragraph,
         })
     }
 }

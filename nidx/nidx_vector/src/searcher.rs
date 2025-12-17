@@ -19,12 +19,9 @@
 //
 
 use crate::ParagraphAddr;
-use crate::config::ParagraphMetadata;
-use crate::config::VectorCardinality;
-use crate::config::VectorConfig;
+use crate::config::{IndexEntity, VectorCardinality, VectorConfig};
 use crate::data_store::ParagraphRef;
-use crate::multivector::extract_multi_vectors;
-use crate::multivector::maxsim_similarity;
+use crate::multivector::{extract_multi_vectors, maxsim_similarity};
 use crate::request_types::VectorSearchRequest;
 use crate::segment::OpenSegment;
 use crate::utils;
@@ -131,10 +128,10 @@ impl<'a> ScoredParagraph<'a> {
             .map(|va| self.segment.get_vector(va).vector())
             .collect()
     }
-    pub fn try_to_document_scored(&self, metadata_kind: &ParagraphMetadata) -> anyhow::Result<DocumentScored> {
+    pub fn try_to_document_scored(&self, index_entity: &IndexEntity) -> anyhow::Result<DocumentScored> {
         let id = self.id().to_string();
 
-        let metadata = if matches!(metadata_kind, ParagraphMetadata::SentenceProto) {
+        let metadata = if matches!(index_entity, IndexEntity::Paragraph) {
             let metadata = self.metadata().map(SentenceMetadata::decode);
             let Ok(metadata) = metadata.transpose() else {
                 return Err(anyhow!("The metadata could not be decoded"));
@@ -331,7 +328,7 @@ impl Searcher {
 
         let documents = result
             .into_iter()
-            .flat_map(|sp| sp.try_to_document_scored(&self.config.paragraph_metadata))
+            .flat_map(|sp| sp.try_to_document_scored(&self.config.entity))
             .collect::<Vec<_>>();
         let v = time.elapsed().as_millis();
 
