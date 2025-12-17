@@ -23,6 +23,7 @@ import random
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
+from nucliadb.common.ids import ParagraphId
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import FieldType
@@ -103,15 +104,26 @@ async def cookie_tale_resource(
     ## Add a text field with paragraphs and paragraph relations
 
     text_field = bmb.field_builder(text_field_id, FieldType.TEXT)
-    extracted_text = [
-        "Once upon a time, there was a group of people called Nucliers. ",
-        "One of them was an excellent cook and use to bring amazing cookies to their gatherings. ",
-        "Chocolate, peanut butter and other delicious kinds of cookies. ",
-        "Everyone loved them and those cookies are now part of their story. ",
+    paragraphs = [
+        (
+            ParagraphId.from_string(f"{rid}/t/cookie-tale/0-63"),
+            "Once upon a time, there was a group of people called Nucliers. ",
+        ),
+        (
+            ParagraphId.from_string(f"{rid}/t/cookie-tale/63-151"),
+            "One of them was an excellent cook and use to bring amazing cookies to their gatherings. ",
+        ),
+        (
+            ParagraphId.from_string(f"{rid}/t/cookie-tale/151-214"),
+            "Chocolate, peanut butter and other delicious kinds of cookies. ",
+        ),
+        (
+            ParagraphId.from_string(f"{rid}/t/cookie-tale/214-281"),
+            "Everyone loved them and those cookies are now part of their story. ",
+        ),
     ]
-    paragraph_ids = []
     paragraph_pbs = []
-    for paragraph in extracted_text:
+    for expected_paragraph_id, paragraph in paragraphs:
         paragraph_id, paragraph_pb = text_field.add_paragraph(
             paragraph,
             vectors={
@@ -119,17 +131,17 @@ async def cookie_tale_resource(
                 for i, (vectorset_id, config) in enumerate(vectorsets.items())
             },
         )
-        paragraph_ids.append(paragraph_id)
         paragraph_pbs.append(paragraph_pb)
+        assert paragraph_id == expected_paragraph_id
 
     # add paragraph relations
 
     title_paragraph_id = list(title_field.iter_paragraphs())[0][0]
     paragraph_pbs[1].relations.parents.append(title_paragraph_id.full())
 
-    paragraph_pbs[1].relations.siblings.append(paragraph_ids[0].full())
+    paragraph_pbs[1].relations.siblings.append(paragraphs[0][0].full())
 
-    paragraph_pbs[1].relations.replacements.extend([paragraph_ids[2].full(), paragraph_ids[3].full()])
+    paragraph_pbs[1].relations.replacements.extend([paragraphs[2][0].full(), paragraphs[3][0].full()])
 
     ## Add a file field with some visual content, pages and a table
 
