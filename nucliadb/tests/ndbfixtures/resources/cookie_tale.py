@@ -106,19 +106,19 @@ async def cookie_tale_resource(
     text_field = bmb.field_builder(text_field_id, FieldType.TEXT)
     paragraphs = [
         (
-            ParagraphId.from_string(f"{rid}/t/cookie-tale/0-63"),
+            ParagraphId.from_string(f"{rid}/t/{text_field_id}/0-63"),
             "Once upon a time, there was a group of people called Nucliers. ",
         ),
         (
-            ParagraphId.from_string(f"{rid}/t/cookie-tale/63-151"),
+            ParagraphId.from_string(f"{rid}/t/{text_field_id}/63-151"),
             "One of them was an excellent cook and use to bring amazing cookies to their gatherings. ",
         ),
         (
-            ParagraphId.from_string(f"{rid}/t/cookie-tale/151-214"),
+            ParagraphId.from_string(f"{rid}/t/{text_field_id}/151-214"),
             "Chocolate, peanut butter and other delicious kinds of cookies. ",
         ),
         (
-            ParagraphId.from_string(f"{rid}/t/cookie-tale/214-281"),
+            ParagraphId.from_string(f"{rid}/t/{text_field_id}/214-281"),
             "Everyone loved them and those cookies are now part of their story. ",
         ),
     ]
@@ -147,7 +147,7 @@ async def cookie_tale_resource(
 
     file_field = bmb.field_builder(file_field_id, FieldType.FILE)
 
-    (_, paragraph_pb) = file_field.add_paragraph(
+    (paragraph_id, paragraph_pb) = file_field.add_paragraph(
         "A yummy image of some cookies",
         kind=resources_pb2.Paragraph.TypeParagraph.INCEPTION,
         vectors={
@@ -156,6 +156,7 @@ async def cookie_tale_resource(
         },
     )
     paragraph_pb.representation.reference_file = "cookies.png"
+    assert paragraph_id == ParagraphId.from_string(f"{rid}/f/{file_field_id}/0-29")
 
     # upload a source "image" for this paragraph
     sf = storage.file_extracted(bmb.bm.kbid, bmb.bm.uuid, "f", file_field_id, "generated/cookies.png")
@@ -170,7 +171,7 @@ async def cookie_tale_resource(
 
     # add a table.
 
-    (_, paragraph_pb) = file_field.add_paragraph(
+    (paragraph_id, paragraph_pb) = file_field.add_paragraph(
         "|Ingredient|Quantity|\n|Peanut butter|100g|\n...",
         kind=resources_pb2.Paragraph.TypeParagraph.TABLE,
         vectors={
@@ -180,6 +181,7 @@ async def cookie_tale_resource(
     )
     paragraph_pb.representation.is_a_table = True
     paragraph_pb.representation.reference_file = "ingredients_table.png"
+    assert paragraph_id == ParagraphId.from_string(f"{rid}/f/{file_field_id}/29-75")
 
     # unused right now, but this would be the source image for the table
     sf = storage.file_extracted(
@@ -195,16 +197,16 @@ async def cookie_tale_resource(
     )
 
     # add a normal paragraph in the same page
-    (_, paragraph_pb) = file_field.add_paragraph(
+    (paragraph_id, paragraph_pb) = file_field.add_paragraph(
         "Above you can see a table with all the ingredients",
         vectors={
             vectorset_id: [random.random()] * config.vectorset_index_config.vector_dimension
             for i, (vectorset_id, config) in enumerate(vectorsets.items())
         },
     )
-
     paragraph_pb.page.page = 1
     paragraph_pb.page.page_with_visual = True
+    assert paragraph_id == ParagraphId.from_string(f"{rid}/f/{file_field_id}/75-125")
 
     bm = bmb.build()
 
