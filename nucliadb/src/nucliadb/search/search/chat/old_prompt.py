@@ -27,7 +27,7 @@ import yaml
 from pydantic import BaseModel
 
 from nucliadb.common import datamanagers
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
@@ -922,9 +922,8 @@ async def conversation_prompt_context(
                         )  # type: ignore
                         extracted_text = await field.get_extracted_text()
                         if extracted_text is not None:
-                            pid = (
-                                f"{rid}/{field_type}/{attachment.field_id}/0-{len(extracted_text.text)}"
-                            )
+                            attachment_field_type = FIELD_TYPE_PB_TO_STR[attachment.field_type]
+                            pid = f"{rid}/{attachment_field_type}/{attachment.field_id}/0-{len(extracted_text.text)}"
                             if pid in context:
                                 continue
                             text = f"Attachment {attachment.field_id}: {extracted_text.text}\n\n"
