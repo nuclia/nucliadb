@@ -127,7 +127,8 @@ pub fn merge(
 
         // If the metadata represents the list of fields the paragraph appears in, we need to get the new list as the
         // union of the fields in all segments, taking deletions into account
-        let override_metadata = if matches!(config.paragraph_metadata, crate::config::ParagraphMetadata::FieldList) {
+        let paragraph_deduplicator = if matches!(config.paragraph_metadata, crate::config::ParagraphMetadata::FieldList)
+        {
             let mut per_paragraph_alive_fields: HashMap<String, Vec<FieldKey>> = HashMap::new();
             for (segment, deletions) in &operants {
                 for paragraph_id in segment.alive_paragraphs() {
@@ -140,7 +141,7 @@ pub fn merge(
                     }
                 }
             }
-            // TODO: Wrap this into a Deduplicator
+
             Some(
                 per_paragraph_alive_fields
                     .into_iter()
@@ -150,7 +151,7 @@ pub fn merge(
         } else {
             None
         };
-        DataStoreV2::merge(segment_path, node_producers, config, override_metadata)?;
+        DataStoreV2::merge(segment_path, node_producers, config, paragraph_deduplicator)?;
 
         let data_store = DataStoreV2::open(segment_path, &config.vector_type, OpenReason::Create)?;
         merge_indexes(segment_path, data_store, segments, config)
@@ -532,20 +533,18 @@ impl OpenSegment {
         };
         let retriever = Retriever::new(data_store, config, min_score);
 
-        // TODO: Hard to read
-        let filter_bitset = filter
-            .has_filter()
-            .then(|| {
-                let InvertedIndexes::Paragraph(inverted_indexes) = &self.inverted_indexes else {
-                    unreachable!("Cannot filter without paragraph indexes");
-                };
-                let mut filter_bitset = inverted_indexes.filter(filter);
-                if let Some(ref mut bitset) = filter_bitset {
-                    bitset.intersect_with(&self.alive_bitset);
-                }
-                filter_bitset
-            })
-            .flatten();
+        let filter_bitset = if filter.non_empty() {
+            let InvertedIndexes::Paragraph(inverted_indexes) = &self.inverted_indexes else {
+                unreachable!("Cannot filter without paragraph indexes");
+            };
+            let mut filter_bitset = inverted_indexes.filter(filter);
+            if let Some(ref mut bitset) = filter_bitset {
+                bitset.intersect_with(&self.alive_bitset);
+            }
+            filter_bitset
+        } else {
+            None
+        };
         // If we have no filters, just the deletions
         let bitset = filter_bitset.as_ref().unwrap_or(&self.alive_bitset);
 

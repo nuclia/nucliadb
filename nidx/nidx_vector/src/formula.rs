@@ -95,7 +95,7 @@ impl Formula {
     {
         self.clauses.push(clause.into())
     }
-    pub fn has_filter(&self) -> bool {
+    pub fn non_empty(&self) -> bool {
         !self.clauses.is_empty()
     }
 }

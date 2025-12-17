@@ -88,7 +88,7 @@ impl DataStoreV2 {
         path: &Path,
         producers: Vec<(impl Iterator<Item = ParagraphAddr>, &dyn DataStore)>,
         config: &VectorConfig,
-        mut override_metadata: Option<HashMap<String, Vec<u8>>>,
+        mut paragraph_deduplicator: Option<HashMap<String, Vec<u8>>>,
     ) -> VectorR<()> {
         let mut paragraphs = ParagraphStoreWriter::new(path)?;
         let mut vectors = VectorStoreWriter::new(path, &config.vector_type)?;
@@ -105,9 +105,9 @@ impl DataStoreV2 {
                 let paragraph = store.get_paragraph(paragraph_addr);
                 let p_vectors = paragraph.vectors(&paragraph_addr).map(|v| store.get_vector(v).vector());
 
-                let metadata = if let Some(override_metadata) = &mut override_metadata {
+                let metadata = if let Some(paragraph_deduplicator) = &mut paragraph_deduplicator {
                     // Entry is removed so if it appears in other segments it is not copied again
-                    let metadata = override_metadata.remove(paragraph.id());
+                    let metadata = paragraph_deduplicator.remove(paragraph.id());
                     if metadata.is_none() {
                         continue;
                     };
