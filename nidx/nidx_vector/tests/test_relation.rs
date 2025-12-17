@@ -126,6 +126,7 @@ fn test_index_merge_relations() -> anyhow::Result<()> {
         &VectorSearchRequest {
             vector: search_for.clone(),
             result_per_page: 10,
+            with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
@@ -148,6 +149,7 @@ fn test_index_merge_relations() -> anyhow::Result<()> {
         &VectorSearchRequest {
             vector: search_for.clone(),
             result_per_page: 10,
+            with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
@@ -210,6 +212,7 @@ fn test_index_merge_relations() -> anyhow::Result<()> {
         &VectorSearchRequest {
             vector: search_for.clone(),
             result_per_page: 10,
+            with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
@@ -229,6 +232,7 @@ fn test_index_merge_relations() -> anyhow::Result<()> {
             vec![],
         ),
     )?;
+    assert_eq!(merged_meta.records, 5);
 
     let searcher = VectorSearcher::open(
         config.clone(),
@@ -239,6 +243,7 @@ fn test_index_merge_relations() -> anyhow::Result<()> {
         &VectorSearchRequest {
             vector: search_for.clone(),
             result_per_page: 10,
+            with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
@@ -261,6 +266,7 @@ fn test_index_merge_relations() -> anyhow::Result<()> {
         &VectorSearchRequest {
             vector: search_for.clone(),
             result_per_page: 10,
+            with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
@@ -286,6 +292,7 @@ fn test_index_merge_relations() -> anyhow::Result<()> {
         &VectorSearchRequest {
             vector: vector_for("cat"),
             result_per_page: 10,
+            with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
@@ -294,7 +301,7 @@ fn test_index_merge_relations() -> anyhow::Result<()> {
     assert_eq!(results.documents.len(), 4);
     assert!(results.documents[0].score < 1.0);
 
-    // TODO: test deletions applied during merge
+    // Test deletions applied during merge
     let segment_dir_merge = tempdir()?;
     let merged_meta = VectorIndexer.merge(
         segment_dir_merge.path(),
@@ -305,12 +312,13 @@ fn test_index_merge_relations() -> anyhow::Result<()> {
                 (segment_meta2.clone(), 2i64.into()),
             ],
             vec![
-                ("00112233445566778899aabbccddeeff/a/fake".into(), 1u64.into()),
-                ("00112233445566778899aabbccddeeff/a/title".into(), 2u64.into()),
-                ("ffeeddccbbaa99887766554433221100/a/title".into(), 2u64.into()),
+                ("00112233445566778899aabbccddeeff/a/fake".into(), 3u64.into()),
+                ("00112233445566778899aabbccddeeff/a/title".into(), 3u64.into()),
+                ("ffeeddccbbaa99887766554433221100/a/title".into(), 3u64.into()),
             ],
         ),
     )?;
+    assert_eq!(merged_meta.records, 4);
 
     let searcher = VectorSearcher::open(
         config.clone(),
@@ -321,6 +329,7 @@ fn test_index_merge_relations() -> anyhow::Result<()> {
         &VectorSearchRequest {
             vector: search_for.clone(),
             result_per_page: 10,
+            with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,

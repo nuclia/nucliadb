@@ -26,7 +26,14 @@ pub fn normalize_vector(vector: &[f32]) -> Vec<f32> {
     vector.iter().map(|x| *x / magnitude).collect()
 }
 
-#[derive(Eq)]
+/// Represents a field id as encoded in the indexes:
+///   Resource ID (UUID): encoded in binary
+///   Field type (string): e.g: t, a
+///   Separator `/`
+///   Field name (string): e.g: title
+///
+/// For deletions, this can also be just the resource ID, in which case only the UUID is encoded.
+#[derive(Clone, Eq)]
 pub enum FieldKey<'a> {
     Owned(Vec<u8>),
     Borrowed(&'a [u8]),
@@ -97,6 +104,13 @@ impl<'a> FieldKey<'a> {
         match self {
             FieldKey::Owned(d) => d,
             FieldKey::Borrowed(d) => d,
+        }
+    }
+
+    pub fn to_owned(&self) -> FieldKey<'static> {
+        match self {
+            FieldKey::Owned(d) => FieldKey::Owned(d.clone()),
+            FieldKey::Borrowed(d) => FieldKey::Owned(d.to_vec()),
         }
     }
 }

@@ -23,7 +23,7 @@ mod tests;
 
 use crate::config::{VectorConfig, flags};
 use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, ParagraphRef, VectorRef};
-use crate::field_list_metadata::paragraph_is_deleted;
+use crate::field_list_metadata::{paragraph_alive_fields, paragraph_is_deleted};
 use crate::formula::Formula;
 use crate::hnsw::{self, *};
 use crate::inverted_index::{self, InvertedIndexes};
@@ -35,7 +35,7 @@ use core::f32;
 use rayon::prelude::*;
 
 use std::cmp::Reverse;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::iter::empty;
 use std::path::Path;
 use std::time::Instant;
@@ -85,7 +85,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
 
 pub fn merge(
     segment_path: &Path,
-    mut operants: Vec<(OpenSegment, HashSet<&str>)>,
+    mut operants: Vec<(&OpenSegment, &HashSet<FieldKey>)>,
     config: &VectorConfig,
 ) -> VectorR<OpenSegment> {
     // Sort largest operant first so we reuse as much of the HNSW as possible
@@ -99,7 +99,7 @@ pub fn merge(
         }
     }
 
-    let segments = operants.iter().map(|(s, _)| s).collect();
+    let segments = operants.iter().map(|(s, _)| *s).collect();
 
     // Creating the node store
     if config.flags.contains(&flags::FORCE_DATA_STORE_V1.to_string()) {
@@ -128,28 +128,25 @@ pub fn merge(
         // If the metadata represents the list of fields the paragraph appears in, we need to get the new list as the
         // union of the fields in all segments, taking deletions into account
         let override_metadata = if matches!(config.paragraph_metadata, crate::config::ParagraphMetadata::FieldList) {
-            // TODO
-
-            // let mut paragraph_key_alive_fields: HashMap<String, Vec<Vec<u8>>> = HashMap::new();
-            // for (segment, deletions) in &operants {
-            //     for paragraph_id in segment.alive_paragraphs() {
-            //         let paragraph = segment.data_store.get_paragraph(paragraph_id);
-            //         for f in paragraph_alive_fields(paragraph, deletions) {
-            //             paragraph_key_alive_fields
-            //                 .entry(paragraph.id().to_string())
-            //                 .or_default()
-            //                 .push(f);
-            //         }
-            //     }
-            // }
-            // // TODO: Wrap this into a Deduplicator
-            // Some(
-            //     paragraph_key_alive_fields
-            //         .into_iter()
-            //         .map(|(k, v)| (k, bincode::encode_to_vec(v, bincode::config::standard()).unwrap()))
-            //         .collect(),
-            // )
-            None
+            let mut per_paragraph_alive_fields: HashMap<String, Vec<FieldKey>> = HashMap::new();
+            for (segment, deletions) in &operants {
+                for paragraph_id in segment.alive_paragraphs() {
+                    let paragraph = segment.data_store.get_paragraph(paragraph_id);
+                    for f in paragraph_alive_fields(&paragraph, deletions) {
+                        per_paragraph_alive_fields
+                            .entry(paragraph.id().to_string())
+                            .or_default()
+                            .push(f.to_owned());
+                    }
+                }
+            }
+            // TODO: Wrap this into a Deduplicator
+            Some(
+                per_paragraph_alive_fields
+                    .into_iter()
+                    .map(|(k, v)| (k, bincode::encode_to_vec(v, bincode::config::standard()).unwrap()))
+                    .collect(),
+            )
         } else {
             None
         };
@@ -451,24 +448,20 @@ impl AsRef<OpenSegment> for OpenSegment {
 }
 
 impl OpenSegment {
-    pub fn apply_deletions(&mut self, keys: &HashSet<&str>) {
+    pub fn apply_deletions(&mut self, keys: &HashSet<FieldKey>) {
         match &self.inverted_indexes {
             InvertedIndexes::Paragraph(indexes) => {
                 for key in keys {
-                    if let Some(deleted_ids) = indexes.ids_for_deletion_key(key) {
-                        for id in deleted_ids {
-                            self.alive_bitset.remove(id);
-                        }
+                    for id in indexes.ids_for_deletion_key(key) {
+                        self.alive_bitset.remove(id);
                     }
                 }
             }
             InvertedIndexes::Relation(indexes) => {
-                let keys: HashSet<_> = keys.iter().flat_map(|k| FieldKey::from_field_id(k)).collect();
-
                 let affected_paragraphs = keys.iter().flat_map(|k| indexes.ids_for_field_key(k));
                 for paragraph_id in affected_paragraphs {
                     let paragraph = self.data_store.get_paragraph(paragraph_id);
-                    if paragraph_is_deleted(&paragraph, &keys) {
+                    if paragraph_is_deleted(&paragraph, keys) {
                         self.alive_bitset.remove(paragraph_id);
                     }
                 }
@@ -837,8 +830,10 @@ mod test {
             HashSet::new(),
         )?;
 
+        let no_dels = HashSet::new();
+        let work = vec![(&dp1, &no_dels), (&dp2, &no_dels)];
         let path_merged = tempdir()?;
-        let merged_dp = merge(path_merged.path(), &[&dp1, &dp2], &config)?;
+        let merged_dp = merge(path_merged.path(), work, &config)?;
 
         for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2.into_iter()).enumerate() {
             let vector = merged_dp.data_store.get_vector(VectorAddr(i as u32));

@@ -53,6 +53,7 @@ pub use request_types::VectorSearchRequest;
 
 use crate::config::IndexSet;
 use crate::indexer::index_relations;
+use crate::utils::FieldKey;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct ParagraphAddr(u32);
@@ -102,7 +103,7 @@ impl VectorIndexer {
         config: VectorConfig,
         open_index: impl OpenIndexMetadata<VectorSegmentMeta>,
     ) -> anyhow::Result<VectorSegmentMetadata> {
-        let mut open_segments = Vec::new();
+        let mut open_segments: Vec<(OpenSegment, HashSet<FieldKey>)> = Vec::new();
 
         let mut segment_deletions = segment_deletions(&open_index);
         while let Some((segment, deletions)) = segment_deletions.next() {
@@ -112,7 +113,8 @@ impl VectorIndexer {
         }
 
         // Do the merge
-        let open_destination = segment::merge(work_dir, open_segments, &config)?;
+        let open_segments_ref = open_segments.iter().map(|(s, d)| (s, d)).collect();
+        let open_destination = segment::merge(work_dir, open_segments_ref, &config)?;
 
         Ok(open_destination.into_metadata())
     }
@@ -167,7 +169,7 @@ where
 {
     segments: S,
     deletions: Peekable<D>,
-    deletions_so_far: HashSet<&'a str>,
+    deletions_so_far: HashSet<FieldKey<'a>>,
 }
 
 /// Should be SegmentDeletions::new but this runs into less problems with type inference
@@ -185,17 +187,19 @@ fn segment_deletions<'a>(
     }
 }
 
-impl<'a, S, D> SegmentDeletions<'a, S, D>
+impl<'a: 'b, 'b, S, D> SegmentDeletions<'a, S, D>
 where
     S: Iterator<Item = (VectorSegmentMetadata, nidx_types::Seq)>,
     D: Iterator<Item = (&'a String, nidx_types::Seq)>,
 {
-    fn next(&mut self) -> Option<(VectorSegmentMetadata, &HashSet<&'a str>)> {
+    fn next(&mut self) -> Option<(VectorSegmentMetadata, &HashSet<FieldKey<'b>>)> {
         let (segment, segment_seq) = self.segments.next()?;
         while let Some(d) = self.deletions.peek()
             && d.1 > segment_seq
         {
-            self.deletions_so_far.insert(self.deletions.next().unwrap().0.as_str());
+            if let Some(key) = FieldKey::from_field_id(self.deletions.next().unwrap().0) {
+                self.deletions_so_far.insert(key);
+            }
         }
         Some((segment, &self.deletions_so_far))
     }

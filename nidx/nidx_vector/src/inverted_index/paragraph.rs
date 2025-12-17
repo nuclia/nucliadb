@@ -121,8 +121,8 @@ impl ParagraphInvertedIndexes {
         })
     }
 
-    pub fn ids_for_deletion_key(&self, key: &str) -> Option<impl Iterator<Item = ParagraphAddr>> {
-        FieldKey::from_field_id(key).map(|key| self.field_index.get_prefix(key.bytes()).into_iter().map(ParagraphAddr))
+    pub fn ids_for_deletion_key(&self, key: &FieldKey) -> impl Iterator<Item = ParagraphAddr> {
+        self.field_index.get_prefix(key.bytes()).into_iter().map(ParagraphAddr)
     }
 
     pub fn filter(&self, formula: &Formula) -> Option<FilterBitSet> {
