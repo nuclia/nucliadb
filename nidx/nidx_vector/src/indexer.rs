@@ -18,9 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::config::{VectorCardinality, VectorConfig};
+use crate::field_list_metadata::encode_field_list_metadata;
 use crate::multivector::extract_multi_vectors;
 use crate::segment::{self, Elem};
-use crate::utils::field_id;
+use crate::utils::FieldKey;
 use crate::{VectorSegmentMetadata, utils};
 use nidx_protos::{Resource, noderesources, prost::*};
 use std::collections::{HashMap, HashSet};
@@ -154,9 +155,9 @@ fn encode_metadata_field(rid: &str, fields: &HashSet<&String>) -> Vec<u8> {
     let encoded_fields: Vec<_> = fields
         .iter()
         .map(|f| format!("{rid}/{f}"))
-        .filter_map(|f| field_id::key(&f))
+        .filter_map(|f| FieldKey::from_field_id(&f))
         .collect();
-    bincode::encode_to_vec(encoded_fields, bincode::config::standard()).unwrap()
+    encode_field_list_metadata(&encoded_fields)
 }
 
 pub fn index_relations(

@@ -31,7 +31,7 @@ use crate::{
     ParagraphAddr, VectorR,
     data_store::{DataStore, iter_paragraphs},
     formula::{BooleanOperator, Clause, Formula},
-    utils::field_id,
+    utils::FieldKey,
 };
 
 pub struct ParagraphInvertedIndexes {
@@ -83,8 +83,8 @@ impl ParagraphInvertedIndexes {
             let key = paragraph.id();
             let labels = paragraph.labels();
 
-            if let Some(key) = field_id::key(key) {
-                field_builder.insert(key, paragraph_addr);
+            if let Some(key) = FieldKey::from_field_id(key) {
+                field_builder.insert(key.bytes().to_vec(), paragraph_addr);
             }
             for l in labels {
                 label_builder.insert(labels_key(&l), paragraph_addr);
@@ -122,7 +122,7 @@ impl ParagraphInvertedIndexes {
     }
 
     pub fn ids_for_deletion_key(&self, key: &str) -> Option<impl Iterator<Item = ParagraphAddr>> {
-        field_id::key(key).map(|key| self.field_index.get_prefix(&key).into_iter().map(ParagraphAddr))
+        FieldKey::from_field_id(key).map(|key| self.field_index.get_prefix(key.bytes()).into_iter().map(ParagraphAddr))
     }
 
     pub fn filter(&self, formula: &Formula) -> Option<FilterBitSet> {
@@ -150,7 +150,7 @@ impl ParagraphInvertedIndexes {
                     }
                     crate::formula::AtomClause::KeyPrefixSet(field_ids) => &mut field_ids
                         .iter()
-                        .filter_map(|id| field_id::key(id).map(|k| self.field_index.get(&k)))
+                        .filter_map(|id| FieldKey::from_field_id(id).map(|k| self.field_index.get(k.bytes())))
                         .flatten()
                         .flatten(),
                 };

@@ -107,7 +107,7 @@ struct IndexOperations {
 }
 
 impl<T: for<'de> Deserialize<'de>> OpenIndexMetadata<T> for IndexOperations {
-    fn segments(&self) -> impl Iterator<Item = (SegmentMetadata<T>, Seq)> {
+    fn segments(&self) -> impl DoubleEndedIterator<Item = (SegmentMetadata<T>, Seq)> {
         self.operations.0.iter().flat_map(|op| {
             op.segment_ids.iter().map(|segment_id| {
                 let location = self.sync_metadata.segment_location(&self.index_id, segment_id);
@@ -116,7 +116,7 @@ impl<T: for<'de> Deserialize<'de>> OpenIndexMetadata<T> for IndexOperations {
         })
     }
 
-    fn deletions(&self) -> impl Iterator<Item = (&String, Seq)> {
+    fn deletions(&self) -> impl DoubleEndedIterator<Item = (&String, Seq)> {
         self.operations
             .0
             .iter()

@@ -21,20 +21,21 @@
 #[cfg(test)]
 mod tests;
 
-use crate::config::{IndexSet, VectorConfig, flags};
+use crate::config::{VectorConfig, flags};
 use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, ParagraphRef, VectorRef};
+use crate::field_list_metadata::paragraph_is_deleted;
 use crate::formula::Formula;
 use crate::hnsw::{self, *};
 use crate::inverted_index::{self, InvertedIndexes};
 use crate::inverted_index::{FilterBitSet, build_indexes};
-use crate::utils::field_id;
+use crate::utils::FieldKey;
 use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use core::f32;
 use rayon::prelude::*;
 
 use std::cmp::Reverse;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::iter::empty;
 use std::path::Path;
 use std::time::Instant;
@@ -82,27 +83,33 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
     })
 }
 
-pub fn merge(segment_path: &Path, operants: &[&OpenSegment], config: &VectorConfig) -> VectorR<OpenSegment> {
+pub fn merge(
+    segment_path: &Path,
+    mut operants: Vec<(OpenSegment, HashSet<&str>)>,
+    config: &VectorConfig,
+) -> VectorR<OpenSegment> {
     // Sort largest operant first so we reuse as much of the HNSW as possible
-    let mut operants = operants.to_vec();
-    operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.metadata.records));
+    operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.0.metadata.records));
 
     // Tags for all segments are the same (this should not happen, prepare_merge ensures it)
-    let tags = &operants[0].metadata.index_metadata.tags;
-    for dp in &operants {
-        if &dp.metadata.index_metadata.tags != tags {
+    let tags = &operants[0].0.metadata.index_metadata.tags;
+    for (segment, _) in &operants {
+        if &segment.metadata.index_metadata.tags != tags {
             return Err(crate::VectorErr::InconsistentMergeSegmentTags);
         }
     }
+
+    let segments = operants.iter().map(|(s, _)| s).collect();
 
     // Creating the node store
     if config.flags.contains(&flags::FORCE_DATA_STORE_V1.to_string()) {
         // V1 can only merge from V1
         let mut node_producers = Vec::new();
-        for dp in &operants {
+        for (segment, _) in &operants {
             node_producers.push((
-                dp.alive_paragraphs(),
-                dp.data_store
+                segment.alive_paragraphs(),
+                segment
+                    .data_store
                     .as_any()
                     .downcast_ref::<DataStoreV1>()
                     .ok_or(VectorErr::InconsistentMergeDataStore)?,
@@ -111,47 +118,45 @@ pub fn merge(segment_path: &Path, operants: &[&OpenSegment], config: &VectorConf
 
         DataStoreV1::merge(segment_path, node_producers.as_mut_slice(), config)?;
         let data_store = DataStoreV1::open(segment_path, &config.vector_type, OpenReason::Create)?;
-        merge_indexes(segment_path, data_store, operants, config)
+        merge_indexes(segment_path, data_store, segments, config)
     } else {
         let node_producers = operants
             .iter()
-            .map(|dp| (dp.alive_paragraphs(), dp.data_store.as_ref()))
+            .map(|(s, _)| (s.alive_paragraphs(), s.data_store.as_ref()))
             .collect();
 
-        // Dedup: search for all copies of a key
-        let mut paragraph_alive_fields: HashMap<String, Vec<Vec<u8>>> = HashMap::new();
-        if matches!(config.indexes, IndexSet::Relation) {
-            for segment in &operants {
-                for paragraph_id in segment.alive_paragraphs() {
-                    let paragraph = segment.data_store.get_paragraph(paragraph_id);
-                    let field_keys: Vec<Vec<u8>>;
-                    (field_keys, _) =
-                        bincode::decode_from_slice(paragraph.metadata(), bincode::config::standard()).unwrap();
-                    for f in field_keys {
-                        // TODO: Pass deletions here
-                        // Maybe don't apply deletions beforehand?
-                        let deletions: HashSet<Vec<u8>> = HashSet::new();
-                        if !deletions.contains(&f) && !deletions.contains(field_id::resource_part(&f)) {
-                            paragraph_alive_fields
-                                .entry(paragraph.id().to_string())
-                                .or_default()
-                                .push(f);
-                        }
-                    }
-                }
-            }
-            // TODO: Wrap this into a Deduplicator
-            let override_metadata: HashMap<_, _> = paragraph_alive_fields
-                .into_iter()
-                .map(|(k, v)| (k, bincode::encode_to_vec(v, bincode::config::standard()).unwrap()))
-                .collect();
-            DataStoreV2::merge(segment_path, node_producers, config, Some(override_metadata))?;
+        // If the metadata represents the list of fields the paragraph appears in, we need to get the new list as the
+        // union of the fields in all segments, taking deletions into account
+        let override_metadata = if matches!(config.paragraph_metadata, crate::config::ParagraphMetadata::FieldList) {
+            // TODO
+
+            // let mut paragraph_key_alive_fields: HashMap<String, Vec<Vec<u8>>> = HashMap::new();
+            // for (segment, deletions) in &operants {
+            //     for paragraph_id in segment.alive_paragraphs() {
+            //         let paragraph = segment.data_store.get_paragraph(paragraph_id);
+            //         for f in paragraph_alive_fields(paragraph, deletions) {
+            //             paragraph_key_alive_fields
+            //                 .entry(paragraph.id().to_string())
+            //                 .or_default()
+            //                 .push(f);
+            //         }
+            //     }
+            // }
+            // // TODO: Wrap this into a Deduplicator
+            // Some(
+            //     paragraph_key_alive_fields
+            //         .into_iter()
+            //         .map(|(k, v)| (k, bincode::encode_to_vec(v, bincode::config::standard()).unwrap()))
+            //         .collect(),
+            // )
+            None
         } else {
-            DataStoreV2::merge(segment_path, node_producers, config, None)?;
-        }
+            None
+        };
+        DataStoreV2::merge(segment_path, node_producers, config, override_metadata)?;
 
         let data_store = DataStoreV2::open(segment_path, &config.vector_type, OpenReason::Create)?;
-        merge_indexes(segment_path, data_store, operants, config)
+        merge_indexes(segment_path, data_store, segments, config)
     }
 }
 
@@ -458,21 +463,12 @@ impl OpenSegment {
                 }
             }
             InvertedIndexes::Relation(indexes) => {
-                let keys: HashSet<_> = keys.iter().flat_map(|k| field_id::key(k)).collect();
+                let keys: HashSet<_> = keys.iter().flat_map(|k| FieldKey::from_field_id(k)).collect();
 
-                let mut affected_paragraphs = HashSet::new();
-                for key in &keys {
-                    affected_paragraphs.extend(indexes.ids_for_field_key(key))
-                }
+                let affected_paragraphs = keys.iter().flat_map(|k| indexes.ids_for_field_key(k));
                 for paragraph_id in affected_paragraphs {
                     let paragraph = self.data_store.get_paragraph(paragraph_id);
-                    let fields: Vec<Vec<u8>>;
-                    (fields, _) =
-                        bincode::decode_from_slice(paragraph.metadata(), bincode::config::standard()).unwrap();
-                    if fields
-                        .iter()
-                        .all(|f| keys.contains(f) || keys.contains(field_id::resource_part(f)))
-                    {
+                    if paragraph_is_deleted(&paragraph, &keys) {
                         self.alive_bitset.remove(paragraph_id);
                     }
                 }

@@ -194,6 +194,29 @@ fn test_index_merge_relations() -> anyhow::Result<()> {
         .index_resource(segment_dir2.path(), &config, &resource2, "default", true)?
         .unwrap();
 
+    // Search with a deletion that does not apply
+    let searcher = VectorSearcher::open(
+        config.clone(),
+        TestOpener::new(
+            vec![
+                (segment_meta.clone(), 1i64.into()),
+                (segment_meta2.clone(), 2i64.into()),
+            ],
+            vec![("ffeeddccbbaa99887766554433221100/f/file".into(), 2u64.into())],
+        ),
+    )?;
+
+    let results = searcher.search(
+        &VectorSearchRequest {
+            vector: search_for.clone(),
+            result_per_page: 10,
+            ..Default::default()
+        },
+        &PrefilterResult::All,
+    )?;
+
+    assert_eq!(results.documents.len(), 5);
+
     let segment_dir_merge = tempdir()?;
     let merged_meta = VectorIndexer.merge(
         segment_dir_merge.path(),
@@ -272,6 +295,40 @@ fn test_index_merge_relations() -> anyhow::Result<()> {
     assert!(results.documents[0].score < 1.0);
 
     // TODO: test deletions applied during merge
+    let segment_dir_merge = tempdir()?;
+    let merged_meta = VectorIndexer.merge(
+        segment_dir_merge.path(),
+        config.clone(),
+        TestOpener::new(
+            vec![
+                (segment_meta.clone(), 1i64.into()),
+                (segment_meta2.clone(), 2i64.into()),
+            ],
+            vec![
+                ("00112233445566778899aabbccddeeff/a/fake".into(), 1u64.into()),
+                ("00112233445566778899aabbccddeeff/a/title".into(), 2u64.into()),
+                ("ffeeddccbbaa99887766554433221100/a/title".into(), 2u64.into()),
+            ],
+        ),
+    )?;
+
+    let searcher = VectorSearcher::open(
+        config.clone(),
+        TestOpener::new(vec![(merged_meta.clone(), 1i64.into())], vec![]),
+    )?;
+
+    let results = searcher.search(
+        &VectorSearchRequest {
+            vector: search_for.clone(),
+            result_per_page: 10,
+            ..Default::default()
+        },
+        &PrefilterResult::All,
+    )?;
+
+    assert_eq!(results.documents.len(), 4);
+    assert_eq!(results.documents[0].score, 1.0);
+    assert!(results.documents[1].score < 1.0);
 
     Ok(())
 }

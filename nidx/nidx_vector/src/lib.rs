@@ -21,6 +21,7 @@
 pub mod config;
 mod data_store;
 mod data_types;
+mod field_list_metadata;
 pub mod formula;
 mod hnsw;
 mod indexer;
@@ -42,6 +43,7 @@ use searcher::Searcher;
 use segment::OpenSegment;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::iter::Peekable;
 use std::path::Path;
 use thiserror::Error;
 use tracing::instrument;
@@ -100,11 +102,17 @@ impl VectorIndexer {
         config: VectorConfig,
         open_index: impl OpenIndexMetadata<VectorSegmentMeta>,
     ) -> anyhow::Result<VectorSegmentMetadata> {
-        let open_segments = open_segments(open_index, &config)?;
-        let open_segments_ref = open_segments.iter().collect::<Vec<_>>();
+        let mut open_segments = Vec::new();
+
+        let mut segment_deletions = segment_deletions(&open_index);
+        while let Some((segment, deletions)) = segment_deletions.next() {
+            let mut open_segment = segment::open(segment, &config)?;
+            open_segment.apply_deletions(deletions);
+            open_segments.push((open_segment, deletions.clone()));
+        }
 
         // Do the merge
-        let open_destination = segment::merge(work_dir, &open_segments_ref, &config)?;
+        let open_destination = segment::merge(work_dir, open_segments, &config)?;
 
         Ok(open_destination.into_metadata())
     }
@@ -142,24 +150,55 @@ fn open_segments(
 ) -> VectorR<Vec<OpenSegment>> {
     let mut open_segments = Vec::new();
 
-    for (metadata, seq) in open_index.segments() {
-        let open_segment = segment::open(metadata, config)?;
-
-        open_segments.push((open_segment, seq));
+    let mut segment_deletions = segment_deletions(&open_index);
+    while let Some((segment, deletions)) = segment_deletions.next() {
+        let mut open_segment = segment::open(segment, config)?;
+        open_segment.apply_deletions(deletions);
+        open_segments.push(open_segment);
     }
 
-    let mut deletions = open_index.deletions().peekable();
-    let mut deletions_so_far = HashSet::new();
-    for (segment, segment_seq) in &mut open_segments {
-        while let Some(d) = deletions.peek()
-            && d.1 > *segment_seq
+    Ok(open_segments)
+}
+
+struct SegmentDeletions<'a, S, D>
+where
+    S: Iterator,
+    D: Iterator,
+{
+    segments: S,
+    deletions: Peekable<D>,
+    deletions_so_far: HashSet<&'a str>,
+}
+
+/// Should be SegmentDeletions::new but this runs into less problems with type inference
+fn segment_deletions<'a>(
+    open_index: &'a impl OpenIndexMetadata<VectorSegmentMeta>,
+) -> SegmentDeletions<
+    'a,
+    impl Iterator<Item = (VectorSegmentMetadata, nidx_types::Seq)>,
+    impl Iterator<Item = (&'a String, nidx_types::Seq)>,
+> {
+    SegmentDeletions {
+        segments: open_index.segments().rev(),
+        deletions: open_index.deletions().rev().peekable(),
+        deletions_so_far: HashSet::new(),
+    }
+}
+
+impl<'a, S, D> SegmentDeletions<'a, S, D>
+where
+    S: Iterator<Item = (VectorSegmentMetadata, nidx_types::Seq)>,
+    D: Iterator<Item = (&'a String, nidx_types::Seq)>,
+{
+    fn next(&mut self) -> Option<(VectorSegmentMetadata, &HashSet<&'a str>)> {
+        let (segment, segment_seq) = self.segments.next()?;
+        while let Some(d) = self.deletions.peek()
+            && d.1 > segment_seq
         {
-            deletions_so_far.insert(deletions.next().unwrap().0.as_str());
+            self.deletions_so_far.insert(self.deletions.next().unwrap().0.as_str());
         }
-        segment.apply_deletions(&deletions_so_far);
+        Some((segment, &self.deletions_so_far))
     }
-
-    Ok(open_segments.into_iter().map(|(dp, _)| dp).collect())
 }
 
 #[derive(Debug, Error)]

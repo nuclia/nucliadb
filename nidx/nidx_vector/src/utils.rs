@@ -17,21 +17,55 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::hash::Hash;
+
+use tracing::warn;
+
 pub fn normalize_vector(vector: &[f32]) -> Vec<f32> {
     let magnitude = f32::sqrt(vector.iter().fold(0.0, |acc, x| acc + x.powi(2)));
     vector.iter().map(|x| *x / magnitude).collect()
 }
 
-pub mod field_id {
-    use tracing::warn;
+#[derive(Eq)]
+pub enum FieldKey<'a> {
+    Owned(Vec<u8>),
+    Borrowed(&'a [u8]),
+}
 
-    /// The key for the field index. [uuid_as_bytes, field_type/field_name]
-    pub fn key(field_id: &str) -> Option<Vec<u8>> {
+impl<'a> PartialEq for FieldKey<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.bytes() == other.bytes()
+    }
+}
+
+impl<'a> Hash for FieldKey<'a> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.bytes().hash(state)
+    }
+}
+
+impl<'a> bincode::Encode for FieldKey<'a> {
+    fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
+        self.bytes().encode(encoder)
+    }
+}
+
+impl<'a, 'de: 'a, Context> bincode::BorrowDecode<'de, Context> for FieldKey<'a> {
+    fn borrow_decode<D: bincode::de::BorrowDecoder<'de, Context = Context>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        let bytes = <&[u8]>::borrow_decode(decoder)?;
+        Ok(Self::Borrowed(bytes))
+    }
+}
+
+impl<'a> FieldKey<'a> {
+    pub fn from_field_id(field_id: &str) -> Option<Self> {
         let mut parts = field_id.split('/');
         if let Some(uuid) = parts.next() {
             if let Some(field_type) = parts.next() {
                 if let Some(field_name) = parts.next() {
-                    return Some(
+                    return Some(FieldKey::Owned(
                         [
                             uuid::Uuid::parse_str(uuid).unwrap().as_bytes(),
                             field_type.as_bytes(),
@@ -39,19 +73,31 @@ pub mod field_id {
                             field_name.as_bytes(),
                         ]
                         .concat(),
-                    );
+                    ));
                 }
             } else {
-                return Some(uuid::Uuid::parse_str(uuid).unwrap().as_bytes().to_vec());
+                return Some(FieldKey::Owned(
+                    uuid::Uuid::parse_str(uuid).unwrap().as_bytes().to_vec(),
+                ));
             }
         }
         warn!(?field_id, "Unable to parse field id from str");
         None
     }
 
-    /// Returns the resource part of the key, the first 128 bits (uuid size)
-    pub fn resource_part(key: &[u8]) -> &[u8] {
-        &key[0..8]
+    pub fn from_bytes(bytes: &'a [u8]) -> Self {
+        Self::Borrowed(bytes)
+    }
+
+    pub fn resource_id(&self) -> &[u8] {
+        &self.bytes()[0..8]
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        match self {
+            FieldKey::Owned(d) => d,
+            FieldKey::Borrowed(d) => d,
+        }
     }
 }
 
