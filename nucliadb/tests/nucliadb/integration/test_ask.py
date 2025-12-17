@@ -42,6 +42,7 @@ from nucliadb.models.internal.retrieval import (
     ScoreType,
 )
 from nucliadb.search.predict import AnswerStatusCode, DummyPredictEngine
+from nucliadb.search.search.chat import ask
 from nucliadb.search.search.query_parser.models import UnitRetrieval
 from nucliadb.search.search.retrieval import text_block_search
 from nucliadb.search.utilities import get_predict
@@ -2203,8 +2204,6 @@ async def test_ask_conversational_strategy(
             patch("nucliadb.search.search.chat.old_prompt.get_file_thumbnail_image", return_value=image),
             patch("nucliadb.search.search.chat.prompt.get_file_thumbnail_image", return_value=image),
         ):
-            from nucliadb.search.search.chat import ask
-
             spy = mocker.spy(ask, "get_answer_stream")
 
             resp = await nucliadb_reader.post(
