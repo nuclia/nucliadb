@@ -114,7 +114,7 @@ async def db_paragraph_metadata(field: Field, paragraph_id: ParagraphId) -> Meta
         return None
 
     for paragraph in field_paragraphs:
-        field_paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end).full()
+        field_paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end)
         if field_paragraph_id == paragraph_id:
             return Metadata.from_db_paragraph(paragraph)
     else:
