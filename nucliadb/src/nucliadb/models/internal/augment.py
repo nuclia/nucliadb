@@ -98,7 +98,7 @@ class Metadata(BaseModel):
 
     @classmethod
     def from_db_paragraph(cls, paragraph: resources_pb2.Paragraph) -> Self:
-        is_an_image = paragraph.kind not in (
+        is_an_image = paragraph.kind in (
             resources_pb2.Paragraph.TypeParagraph.OCR,
             resources_pb2.Paragraph.TypeParagraph.INCEPTION,
         )
