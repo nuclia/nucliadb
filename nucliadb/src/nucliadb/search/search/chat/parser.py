@@ -306,13 +306,7 @@ class RAOFindParser:
                         operands.append(Resource(id=parts[0]))
                     else:
                         rid = parts[0]
-                        try:
-                            field_type = FieldTypeName.from_abbreviation(parts[1])
-                        except KeyError:  # pragma: no cover
-                            raise InvalidQueryError(
-                                "resource_filters",
-                                f"resource filter {key} has an invalid field type: {parts[1]}",
-                            )
+                        field_type = FieldTypeName.from_abbreviation(parts[1])
                         field_id = parts[2] if len(parts) > 2 else None
                         operands.append(
                             And(operands=[Resource(id=rid), Field(type=field_type, name=field_id)])

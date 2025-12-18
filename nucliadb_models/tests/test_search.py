@@ -13,10 +13,12 @@
 # limitations under the License.
 #
 
+import uuid
+
 import pytest
 from pydantic_core import ValidationError
 
-from nucliadb_models import search
+from nucliadb_models import common, search
 
 
 def test_filter_model_validator():
@@ -174,3 +176,36 @@ def test_ask_rename_context_to_chat_history():
 
     with pytest.raises(ValidationError):
         search.AskRequest(query="", context=payload, chat_history=payload)
+
+
+# resource filters
+
+
+def test_resource_filters_uuid_validation():
+    valid_filters = [
+        f"{uuid.uuid4()}",
+        str(uuid.uuid4()),
+        str(uuid.uuid4().hex),
+        *[
+            f"{uuid.uuid4()}/{field_type_name.abbreviation()}"
+            for field_type_name in common.FieldTypeName
+        ],
+        *[
+            f"{uuid.uuid4()}/{field_type_name.abbreviation()}/myfield"
+            for field_type_name in common.FieldTypeName
+        ],
+    ]
+
+    for request_type in [search.BaseSearchRequest, search.AskRequest]:
+        request_type(query="", resource_filters=valid_filters)
+
+        with pytest.raises(
+            ValidationError, match=r"resource id filter 'not-a-uuid' should be a valid UUID"
+        ):
+            request_type(query="", resource_filters=["not-a-uuid"])
+
+        rid = uuid.uuid4()
+        with pytest.raises(
+            ValidationError, match=rf"resource filter {rid}/z has an invalid field type: z"
+        ):
+            request_type(query="", resource_filters=[f"{rid}/z"])
