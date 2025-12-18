@@ -652,11 +652,7 @@ async def neighbouring_paragraphs_prompt_context(
         kbid,
         AugmentRequest(
             paragraphs=AugmentParagraphs(
-                given=[
-                    # TODO(decoupled-ask): pass metadata to /augment
-                    AugmentParagraph(id=pid.full(), metadata=None)
-                    for pid in retrieved_paragraphs_ids
-                ],
+                given=[AugmentParagraph(id=pid.full()) for pid in retrieved_paragraphs_ids],
                 text=True,
                 neighbours_before=strategy.before,
                 neighbours_after=strategy.after,
@@ -930,12 +926,7 @@ async def hierarchy_prompt_context(
         AugmentRequest(
             paragraphs=AugmentParagraphs(
                 given=[
-                    AugmentParagraph(
-                        id=paragraph_id.full(),
-                        # TODO(decoupled-ask): populate metadata
-                        metadata=None,
-                    )
-                    for paragraph_id in paragraphs_to_augment
+                    AugmentParagraph(id=paragraph_id.full()) for paragraph_id in paragraphs_to_augment
                 ],
                 text=True,
             )
