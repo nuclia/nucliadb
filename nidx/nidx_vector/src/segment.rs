@@ -21,7 +21,7 @@
 #[cfg(test)]
 mod tests;
 
-use crate::config::{IndexEntity, VectorConfig, flags};
+use crate::config::{VectorConfig, flags};
 use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, ParagraphRef, VectorRef};
 use crate::field_list_metadata::{paragraph_alive_fields, paragraph_is_deleted};
 use crate::formula::Formula;
@@ -51,7 +51,7 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
         if !InvertedIndexes::exists(path) {
-            build_indexes(path, &config.entity, &data_store)?;
+            build_indexes(path, config, &data_store)?;
         }
         Box::new(data_store)
     } else {
@@ -59,19 +59,15 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
         if !InvertedIndexes::exists(path) {
-            build_indexes(path, &config.entity, &data_store)?;
+            build_indexes(path, config, &data_store)?;
         }
         Box::new(data_store)
     };
 
     let index = open_disk_hnsw(path, prewarm)?;
 
-    let inverted_indexes = InvertedIndexes::open(
-        &config.entity,
-        path,
-        metadata.records,
-        inverted_index::OpenOptions { prewarm },
-    )?;
+    let inverted_indexes =
+        InvertedIndexes::open(config, path, metadata.records, inverted_index::OpenOptions { prewarm })?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
@@ -127,7 +123,7 @@ pub fn merge(
 
         // If the metadata represents the list of fields the paragraph appears in, we need to get the new list as the
         // union of the fields in all segments, taking deletions into account
-        let paragraph_deduplicator = if matches!(config.entity, IndexEntity::Relation) {
+        let paragraph_deduplicator = if config.deduplicate_keys() {
             let mut per_paragraph_alive_fields: HashMap<String, Vec<FieldKey>> = HashMap::new();
             for (segment, deletions) in &operants {
                 for paragraph_id in segment.alive_paragraphs() {
@@ -200,9 +196,9 @@ fn merge_indexes<DS: DataStore + 'static>(
         },
     };
 
-    build_indexes(segment_path, &config.entity, &data_store)?;
+    build_indexes(segment_path, config, &data_store)?;
     let inverted_indexes = InvertedIndexes::open(
-        &config.entity,
+        config,
         segment_path,
         merged_vectors_count as usize,
         inverted_index::OpenOptions { prewarm: false },
@@ -290,9 +286,9 @@ fn create_indexes<DS: DataStore + 'static>(
         index_metadata: VectorSegmentMeta { tags },
     };
 
-    build_indexes(path, &config.entity, &data_store)?;
+    build_indexes(path, config, &data_store)?;
     let inverted_indexes = InvertedIndexes::open(
-        &config.entity,
+        config,
         path,
         vector_count as usize,
         inverted_index::OpenOptions { prewarm: false },
