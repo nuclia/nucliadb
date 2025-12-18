@@ -114,8 +114,6 @@ impl NidxApi for ApiServer {
 
         Ok(Response::new(ShardCreated {
             id: shard.id.to_string(),
-            // TODO: index versions
-            ..Default::default()
         }))
     }
 

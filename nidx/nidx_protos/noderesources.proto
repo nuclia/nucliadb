@@ -24,32 +24,9 @@ message ShardIds {
 }
 
 message ShardCreated {
+    reserved 2, 3, 4, 5;
+
     string id = 1;
-    enum DocumentService {
-        DOCUMENT_V0 = 0;
-        DOCUMENT_V1 = 1;
-        DOCUMENT_V2 = 2;
-        DOCUMENT_V3 = 3;
-    }
-    DocumentService document_service = 2;
-    enum ParagraphService {
-        PARAGRAPH_V0 = 0;
-        PARAGRAPH_V1 = 1;
-        PARAGRAPH_V2 = 2;
-        PARAGRAPH_V3 = 3;
-    }
-    ParagraphService paragraph_service = 3;
-    enum VectorService {
-        VECTOR_V0 = 0;
-        VECTOR_V1 = 1;
-    }
-    VectorService vector_service = 4;
-    enum RelationService {
-        RELATION_V0 = 0;
-        RELATION_V1 = 1;
-        RELATION_V2 = 2;
-    }
-    RelationService relation_service = 5;
 }
 
 message ResourceID {
