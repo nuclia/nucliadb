@@ -69,27 +69,34 @@ impl<'a, 'de: 'a, Context> bincode::BorrowDecode<'de, Context> for FieldKey<'a> 
 impl<'a> FieldKey<'a> {
     pub fn from_field_id(field_id: &str) -> Option<Self> {
         let mut parts = field_id.split('/');
-        if let Some(uuid) = parts.next() {
-            if let Some(field_type) = parts.next() {
-                if let Some(field_name) = parts.next() {
-                    return Some(FieldKey::Owned(
-                        [
-                            uuid::Uuid::parse_str(uuid).unwrap().as_bytes(),
-                            field_type.as_bytes(),
-                            "/".as_bytes(),
-                            field_name.as_bytes(),
-                        ]
-                        .concat(),
-                    ));
-                }
+        let Some(uuid) = parts.next() else {
+            warn!(?field_id, "Unable to parse field id: empty");
+            return None;
+        };
+        let Ok(rid) = uuid::Uuid::parse_str(uuid) else {
+            warn!(?field_id, "Unable to parse field id: invalid UUID");
+            return None;
+        };
+        if let Some(field_type) = parts.next() {
+            if let Some(field_name) = parts.next() {
+                Some(FieldKey::Owned(
+                    [
+                        rid.as_bytes(),
+                        field_type.as_bytes(),
+                        "/".as_bytes(),
+                        field_name.as_bytes(),
+                    ]
+                    .concat(),
+                ))
             } else {
-                return Some(FieldKey::Owned(
-                    uuid::Uuid::parse_str(uuid).unwrap().as_bytes().to_vec(),
-                ));
+                warn!(?field_id, "Unable to parse field id: has field type but no name");
+                None
             }
+        } else {
+            Some(FieldKey::Owned(
+                uuid::Uuid::parse_str(uuid).unwrap().as_bytes().to_vec(),
+            ))
         }
-        warn!(?field_id, "Unable to parse field id from str");
-        None
     }
 
     pub fn from_bytes(bytes: &'a [u8]) -> Self {

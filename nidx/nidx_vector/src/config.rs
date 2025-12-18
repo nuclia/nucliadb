@@ -102,13 +102,6 @@ pub enum IndexEntity {
     Relation,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub enum ParagraphMetadata {
-    #[default]
-    SentenceProto,
-    FieldList,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VectorConfig {
     #[serde(default)]
