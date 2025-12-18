@@ -303,7 +303,11 @@ class RAOFindParser:
                 for key in self.item.resource_filters:
                     parts = key.split("/")
                     if len(parts) == 1:
-                        operands.append(Resource(id=parts[0]))
+                        try:
+                            operands.append(Resource(id=parts[0]))
+                        except ValidationError as exc:
+                            reason = exc.errors()[0]["msg"]
+                            raise InvalidQueryError("resource_filters", reason)
                     else:
                         rid = parts[0]
                         try:

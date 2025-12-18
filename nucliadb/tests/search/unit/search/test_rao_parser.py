@@ -448,17 +448,22 @@ async def test_old_filters_parsing(
 
 
 @pytest.mark.parametrize(
-    "filters",
+    "filters,error",
     [
         # can't use paragraph labels with any/none/not_all
-        {"filters": [{"any": ["/l/landscapes/beach", "/l/landscapes/desert"]}]},
-        {"filters": [{"none": ["/l/landscapes/beach", "/l/landscapes/desert"]}]},
-        {"filters": [{"not_all": ["/l/landscapes/beach", "/l/landscapes/desert"]}]},
+        ({"filters": [{"any": ["/l/landscapes/beach", "/l/landscapes/desert"]}]}, None),
+        ({"filters": [{"none": ["/l/landscapes/beach", "/l/landscapes/desert"]}]}, None),
+        ({"filters": [{"not_all": ["/l/landscapes/beach", "/l/landscapes/desert"]}]}, None),
+        (
+            {"resource_filters": ["not-a-uuid"]},
+            r"^Invalid query. Error in resource_filters: Value error, resource id filter 'not-a-uuid' should be a valid UUID$",
+        ),
     ],
 )
 async def test_old_filters_parsing_invalid_combinations(
     kb_labelsets: KnowledgeBoxLabels,
     filters: dict[str, Any],
+    error: str | None,
 ):
     item = FindRequest(query="query", **filters)
     fetcher = RAOFetcher(
@@ -475,7 +480,7 @@ async def test_old_filters_parsing_invalid_combinations(
     parser._query = retrieval_models.Query()
 
     with patch("nucliadb.search.search.chat.fetcher.rpc.labelsets", return_value=kb_labelsets):
-        with pytest.raises(InvalidQueryError):
+        with pytest.raises(InvalidQueryError, match=error):
             await parser._parse_filters()
 
 
