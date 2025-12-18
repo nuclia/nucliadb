@@ -23,6 +23,7 @@ use crate::multivector::extract_multi_vectors;
 use crate::segment::{self, Elem};
 use crate::utils::FieldKey;
 use crate::{VectorSegmentMetadata, utils};
+use anyhow::anyhow;
 use nidx_protos::{Resource, noderesources, prost::*};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -168,34 +169,50 @@ pub fn index_relations(
     debug!("Creating elements for the main index");
 
     let mut entity_fields = HashMap::new();
-    let rid = &resource.resource.as_ref().unwrap().uuid;
+    let Some(resource_id) = &resource.resource else {
+        return Err(anyhow!("resource_id required"));
+    };
+    let rid = &resource_id.uuid;
+
     for (field, relations) in &resource.field_relations {
         for relation in &relations.relations {
-            let from = relation
-                .relation
-                .as_ref()
-                .unwrap()
-                .source
-                .as_ref()
-                .unwrap()
-                .value
-                .clone();
-            entity_fields.entry(from).or_insert_with(HashSet::new).insert(field);
+            let Some(relation) = &relation.relation else {
+                return Err(anyhow!("relation required"));
+            };
+            let Some(source) = &relation.source else {
+                return Err(anyhow!("relation source node required"));
+            };
+            entity_fields
+                .entry(source.value.clone())
+                .or_insert_with(HashSet::new)
+                .insert(field);
 
-            let to = relation.relation.as_ref().unwrap().to.as_ref().unwrap().value.clone();
-            entity_fields.entry(to).or_insert_with(HashSet::new).insert(field);
+            let Some(to) = &relation.to else {
+                return Err(anyhow!("relation to node required"));
+            };
+            entity_fields
+                .entry(to.value.clone())
+                .or_insert_with(HashSet::new)
+                .insert(field);
         }
     }
 
     let mut elems = Vec::new();
     for node_vector in &resource.relation_node_vectors {
-        let v = node_vector.vector.clone();
-        let n = node_vector.node.as_ref().unwrap().value.clone();
-        let fields = entity_fields.get(&n);
+        let vector = node_vector.vector.clone();
+        let Some(node) = &node_vector.node else {
+            return Err(anyhow!("relation node required"));
+        };
+        let fields = entity_fields.get(&node.value);
         let Some(fields) = fields else {
             continue;
         };
-        elems.push(Elem::new(n, v, vec![], Some(encode_metadata_field(rid, fields))));
+        elems.push(Elem::new(
+            node.value.clone(),
+            vector,
+            vec![],
+            Some(encode_metadata_field(rid, fields)),
+        ));
     }
 
     if elems.is_empty() {
