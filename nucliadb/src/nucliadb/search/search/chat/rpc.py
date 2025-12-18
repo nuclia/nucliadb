@@ -18,11 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from nucliadb.common.ids import FieldId
 from nucliadb.models.internal.retrieval import RetrievalRequest, RetrievalResponse
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.augment import AugmentRequest, AugmentResponse
 from nucliadb_models.labels import KnowledgeBoxLabels
-from nucliadb_models.search import FindRequest, KnowledgeboxFindResults, NucliaDBClientType
+from nucliadb_models.search import FindRequest, Image, KnowledgeboxFindResults, NucliaDBClientType
 
 
 # TODO(decoupled-ask): replace this for a sdk.find call when moving /ask to RAO
@@ -75,3 +76,9 @@ async def labelsets(kbid: str) -> KnowledgeBoxLabels:
     from nucliadb.reader.api.v1.services import get_labelsets
 
     return await get_labelsets(kbid)
+
+
+async def download_image(kbid: str, field_id: FieldId, path: str, *, mime_type: str) -> Image | None:
+    from nucliadb.search.search.hydrator.images import download_image
+
+    return await download_image(kbid, field_id, path, mime_type=mime_type)

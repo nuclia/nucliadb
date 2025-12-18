@@ -44,8 +44,6 @@ from nucliadb.search.augmentor.fields import (
 from nucliadb.search.search.chat import rpc
 from nucliadb.search.search.chat.images import (
     get_file_thumbnail_image,
-    get_page_image,
-    get_paragraph_image,
 )
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.augment import (
@@ -1081,7 +1079,12 @@ class PromptContextBuilder:
                 # page_image_id: rid/f/myfield/0
                 page_image_id = "/".join([pid.field_id.full(), str(paragraph_page_number)])
                 if page_image_id not in context.images:
-                    image = await get_page_image(self.kbid, pid, paragraph_page_number)
+                    image = await rpc.download_image(
+                        self.kbid,
+                        pid.field_id,
+                        f"generated/extracted_images_{paragraph_page_number}.png",
+                        mime_type="image/png",
+                    )
                     if image is not None:
                         ops += 1
                         context.images[page_image_id] = image
@@ -1101,7 +1104,9 @@ class PromptContextBuilder:
             if (add_table or add_paragraph) and (
                 paragraph.reference is not None and paragraph.reference != ""
             ):
-                pimage = await get_paragraph_image(self.kbid, pid, paragraph.reference)
+                pimage = await rpc.download_image(
+                    self.kbid, pid.field_id, f"generated/{paragraph.reference}", mime_type="image/png"
+                )
                 if pimage is not None:
                     ops += 1
                     context.images[paragraph.id] = pimage

@@ -29,6 +29,7 @@ from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
 
+# DEPRECATED(decoupled-ask): remove once old_prompt.py is removed
 async def get_page_image(kbid: str, paragraph_id: ParagraphId, page_number: int) -> Optional[Image]:
     storage = await get_storage(service_name=SERVICE_NAME)
     sf = storage.file_extracted(
@@ -48,6 +49,7 @@ async def get_page_image(kbid: str, paragraph_id: ParagraphId, page_number: int)
     return image
 
 
+# DEPRECATED(decoupled-ask): remove once old_prompt.py is removed
 async def get_paragraph_image(kbid: str, paragraph_id: ParagraphId, reference: str) -> Optional[Image]:
     storage = await get_storage(service_name=SERVICE_NAME)
     sf = storage.file_extracted(
