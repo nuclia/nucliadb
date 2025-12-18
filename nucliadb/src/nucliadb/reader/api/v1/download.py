@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import urllib.parse
-from enum import Enum
 from typing import Optional
 
 from fastapi import HTTPException
@@ -39,11 +38,6 @@ from nucliadb_utils.storages.storage import ObjectMetadata, Range, StorageField
 from nucliadb_utils.utilities import get_storage
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
-
-
-class DownloadType(Enum):
-    EXTRACTED = "extracted"
-    FIELD = "field"
 
 
 @api.get(
