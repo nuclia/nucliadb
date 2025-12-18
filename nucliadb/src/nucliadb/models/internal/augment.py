@@ -184,6 +184,7 @@ ParagraphProp = Annotated[
         Annotated[ParagraphText, Tag("text")]
         | Annotated[ParagraphImage, Tag("image")]
         | Annotated[ParagraphTable, Tag("table")]
+        | Annotated[ParagraphPage, Tag("page")]
         | Annotated[RelatedParagraphs, Tag("related")]
     ),
     Discriminator(prop_discriminator),
