@@ -77,16 +77,6 @@ class Metadata(BaseModel):
     in_page_with_visual: bool | None
 
     @classmethod
-    def unknown(cls) -> Self:
-        return cls(
-            is_an_image=False,
-            is_a_table=False,
-            source_file=None,
-            page=None,
-            in_page_with_visual=None,
-        )
-
-    @classmethod
     def from_text_block_match(cls, text_block: TextBlockMatch) -> Self:
         return cls(
             is_an_image=text_block.is_an_image,
