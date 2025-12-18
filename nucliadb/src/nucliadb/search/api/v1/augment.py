@@ -46,7 +46,10 @@ from nucliadb.models.internal.augment import (
     Metadata,
     Paragraph,
     ParagraphAugment,
+    ParagraphImage,
+    ParagraphPage,
     ParagraphProp,
+    ParagraphTable,
     ParagraphText,
     RelatedParagraphs,
     ResourceAugment,
@@ -106,7 +109,7 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
         max_ops = asyncio.Semaphore(50)
 
         first_augmented = await augmentor.augment(kbid, augmentations, concurrency_control=max_ops)
-        response = build_augment_response(first_augmented)
+        response = build_augment_response(item, first_augmented)
 
         # 2nd round trip to augmentor
         #
@@ -321,11 +324,17 @@ def parse_paragraph_augment(item: AugmentParagraphs) -> tuple[list[Paragraph], l
                 neighbours_after=item.neighbours_after or 0,
             )
         )
+    if item.source_image:
+        selector.append(ParagraphImage())
+    if item.table_image:
+        selector.append(ParagraphTable(prefer_page_preview=item.table_prefers_page_preview))
+    if item.page_preview_image:
+        selector.append(ParagraphPage(preview=True))
 
     return paragraphs_to_augment, selector
 
 
-def build_augment_response(augmented: Augmented) -> AugmentResponse:
+def build_augment_response(item: AugmentRequest, augmented: Augmented) -> AugmentResponse:
     response = AugmentResponse(
         resources={},
         fields={},
@@ -433,7 +442,12 @@ def build_augment_response(augmented: Augmented) -> AugmentResponse:
             augmented_paragraph.neighbours_after = list(
                 map(lambda x: x.full(), paragraph.related.neighbours_after)
             )
-        # TODO(decoupled-ask): add more paragraph parameters
+        augmented_paragraph.source_image = paragraph.source_image_path
+        if item.paragraphs is not None and item.paragraphs.table_prefers_page_preview:
+            augmented_paragraph.table_image = paragraph.page_preview_path
+        else:
+            augmented_paragraph.table_image = paragraph.source_image_path
+        augmented_paragraph.page_preview_image = paragraph.page_preview_path
         response.paragraphs[paragraph_id.full()] = augmented_paragraph
 
     return response

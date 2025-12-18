@@ -18,14 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 import pytest
 from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_models.augment import AugmentResponse
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.ndbfixtures.resources import smb_wonder_resource
+from tests.ndbfixtures.resources import cookie_tale_resource, smb_wonder_resource
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -62,4 +61,84 @@ async def test_augment_api(
     assert (
         body.paragraphs[f"{rid}/f/smb-wonder/145-234"].text
         == "As one of eight player characters, the player completes levels across the Flower Kingdom."
+    )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_augment_api_images(
+    nucliadb_search: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    knowledgebox: str,
+) -> None:
+    kbid = knowledgebox
+    rid = await cookie_tale_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    resp = await nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/augment",
+        json={
+            "paragraphs": {
+                "given": [
+                    {"id": f"{rid}/f/cookie-recipie/0-29"},
+                ],
+                "source_image": True,
+            },
+        },
+    )
+    assert resp.status_code == 200
+    body = AugmentResponse.model_validate(resp.json())
+    assert body.paragraphs[f"{rid}/f/cookie-recipie/0-29"].source_image == "generated/cookies.png"
+
+    resp = await nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/augment",
+        json={
+            "paragraphs": {
+                "given": [
+                    {"id": f"{rid}/f/cookie-recipie/29-75"},
+                ],
+                "table_image": True,
+            },
+        },
+    )
+    assert resp.status_code == 200
+    body = AugmentResponse.model_validate(resp.json())
+    assert (
+        body.paragraphs[f"{rid}/f/cookie-recipie/29-75"].table_image == "generated/ingredients_table.png"
+    )
+
+    resp = await nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/augment",
+        json={
+            "paragraphs": {
+                "given": [
+                    {"id": f"{rid}/f/cookie-recipie/29-75"},
+                ],
+                "table_image": True,
+                "table_prefers_page_preview": True,
+            },
+        },
+    )
+    assert resp.status_code == 200
+    body = AugmentResponse.model_validate(resp.json())
+    assert (
+        body.paragraphs[f"{rid}/f/cookie-recipie/29-75"].table_image
+        == "generated/extracted_images_1.png"
+    )
+
+    resp = await nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/augment",
+        json={
+            "paragraphs": {
+                "given": [
+                    {"id": f"{rid}/f/cookie-recipie/29-75"},
+                ],
+                "page_preview_image": True,
+            },
+        },
+    )
+    assert resp.status_code == 200
+    body = AugmentResponse.model_validate(resp.json())
+    assert (
+        body.paragraphs[f"{rid}/f/cookie-recipie/29-75"].page_preview_image
+        == "generated/extracted_images_1.png"
     )
