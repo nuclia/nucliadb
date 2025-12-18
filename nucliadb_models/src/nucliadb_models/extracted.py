@@ -15,7 +15,7 @@
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .common import (
     Classification,
@@ -123,7 +123,7 @@ class LinkExtractedData(BaseModel):
     metadata: Optional[Dict[str, str]] = None
     link_thumbnail: Optional[CloudLink] = None
     link_preview: Optional[CloudLink] = None
-    field: Optional[str] = None
+    field: Optional[str] = Field(default=None, title="Link Extracted Data Field")
     link_image: Optional[CloudLink] = None
     description: Optional[str] = None
     type: Optional[str] = None
@@ -134,7 +134,7 @@ class LinkExtractedData(BaseModel):
 class NestedPosition(BaseModel):
     start: Optional[int] = None
     end: Optional[int] = None
-    page: Optional[int] = None
+    page: Optional[int] = Field(default=None, title="Position Page")
 
 
 class NestedListPosition(BaseModel):

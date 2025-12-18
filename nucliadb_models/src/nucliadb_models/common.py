@@ -235,7 +235,7 @@ class Sentence(BaseModel):
 
 
 class PageInformation(BaseModel):
-    page: Optional[int] = None
+    page: Optional[int] = Field(default=None, title="Page Information Page")
     page_with_visual: Optional[bool] = None
 
 

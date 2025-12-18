@@ -20,6 +20,7 @@ from uuid import UUID
 
 import pydantic
 from pydantic import AliasChoices, BaseModel, Discriminator, Tag, field_validator, model_validator
+from pydantic.config import ConfigDict
 from typing_extensions import Annotated, Self
 
 from .common import FieldTypeName, Paragraph
@@ -33,7 +34,10 @@ class And(BaseModel, Generic[F], extra="forbid"):
     """AND of other expressions"""
 
     operands: Sequence[F] = pydantic.Field(
-        serialization_alias="and", validation_alias=AliasChoices("operands", "and"), min_length=1
+        title="And Operands",
+        serialization_alias="and",
+        validation_alias=AliasChoices("operands", "and"),
+        min_length=1,
     )
 
     @pydantic.model_serializer
@@ -45,7 +49,10 @@ class Or(BaseModel, Generic[F], extra="forbid"):
     """OR of other expressions"""
 
     operands: Sequence[F] = pydantic.Field(
-        serialization_alias="or", validation_alias=AliasChoices("operands", "or"), min_length=1
+        title="Or Operands",
+        serialization_alias="or",
+        validation_alias=AliasChoices("operands", "or"),
+        min_length=1,
     )
 
     @pydantic.model_serializer
@@ -57,7 +64,7 @@ class Not(BaseModel, Generic[F], extra="forbid"):
     """NOT another expression"""
 
     operand: F = pydantic.Field(
-        serialization_alias="not", validation_alias=AliasChoices("operand", "not")
+        title="Not Operand", serialization_alias="not", validation_alias=AliasChoices("operand", "not")
     )
 
     @pydantic.model_serializer
@@ -77,6 +84,8 @@ class FilterProp(BaseModel):
 
 class Resource(FilterProp, extra="forbid"):
     """Matches all fields of a resource given its id or slug"""
+
+    model_config = ConfigDict(title="Resource Filter")
 
     prop: Literal["resource"] = "resource"
     id: Optional[str] = pydantic.Field(default=None, description="UUID of the resource to match")
@@ -109,6 +118,7 @@ class Field(FilterProp, extra="forbid"):
     type: FieldTypeName = pydantic.Field(description="Type of the field to match, ")
     name: Optional[str] = pydantic.Field(
         default=None,
+        title="Field Filter",
         description="Name of the field to match. If blank, matches all fields of the given type",
     )
 
@@ -235,7 +245,7 @@ class OriginMetadata(FilterProp, extra="forbid"):
     """Matches metadata from the origin"""
 
     prop: Literal["origin_metadata"] = "origin_metadata"
-    field: str = pydantic.Field(description="Metadata field")
+    field: str = pydantic.Field(title="Origin Metadata Field", description="Metadata field")
     value: Optional[str] = pydantic.Field(
         default=None,
         description="Value of the metadata field. If blank, matches any document with the given metadata field set (to any value)",
@@ -389,7 +399,7 @@ class FilterExpression(BaseModel, extra="forbid"):
         OR = "or"
 
     field: Optional[FieldFilterExpression] = pydantic.Field(
-        default=None, description="Filter to apply to fields"
+        default=None, title="Field Filters", description="Filter to apply to fields"
     )
     paragraph: Optional[ParagraphFilterExpression] = pydantic.Field(
         default=None, description="Filter to apply to each text block"
@@ -413,4 +423,6 @@ class CatalogFilterExpression(BaseModel, extra="forbid"):
     `filters`, `range_*`, `with_status`.
     """
 
-    resource: ResourceFilterExpression = pydantic.Field(description="Filter to apply to resources")
+    resource: ResourceFilterExpression = pydantic.Field(
+        title="Resource filters", description="Filter to apply to resources"
+    )

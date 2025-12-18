@@ -42,6 +42,7 @@ class AgentsFilter(BaseModel):
 
 class ResourceAgentsRequest(BaseModel):
     filters: Optional[list[AgentsFilter]] = Field(
+        title="Resource Agent Filters",
         default=None,
         description="Filters to apply to the agents. If None, all curently configured agents are applied.",
     )
