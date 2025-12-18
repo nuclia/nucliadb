@@ -225,7 +225,7 @@ pub fn index_relation_nodes(
     Ok(Some(segment.into_metadata()))
 }
 
-pub fn index_relation_labels(
+pub fn index_relation_edges(
     resource: &Resource,
     output_path: &Path,
     config: &VectorConfig,
@@ -252,7 +252,7 @@ pub fn index_relation_labels(
     }
 
     let mut elems = Vec::new();
-    for rel_vector in &resource.relation_label_vectors {
+    for rel_vector in &resource.relation_edge_vectors {
         let vector = rel_vector.vector.clone();
         let fields = entity_fields.get(&rel_vector.relation_label);
         let Some(fields) = fields else {

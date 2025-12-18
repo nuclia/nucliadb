@@ -23,7 +23,7 @@ mod common;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use nidx_protos::{
-    IndexRelation, IndexRelations, Relation, RelationLabelVector, RelationNode, RelationNodeVector, Resource,
+    IndexRelation, IndexRelations, Relation, RelationEdgeVector, RelationNode, RelationNodeVector, Resource,
     ResourceId, relation::RelationType, relation_node::NodeType,
 };
 use nidx_types::prefilter::PrefilterResult;
@@ -778,7 +778,7 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
 fn test_relations_labels() -> anyhow::Result<()> {
     // Basic test for relation labels, other testing covered by relation nodes, this only needs
     // to check the indexing part which is the only thing different
-    let config = VectorConfig::for_relation_labels(VectorType::DenseF32 { dimension: 4 });
+    let config = VectorConfig::for_relation_edges(VectorType::DenseF32 { dimension: 4 });
 
     let resource = Resource {
         resource: Some(ResourceId {
@@ -805,13 +805,13 @@ fn test_relations_labels() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_label_vectors: vec![
-            RelationLabelVector {
+        relation_edge_vectors: vec![
+            RelationEdgeVector {
                 relation_type: RelationType::Entity as i32,
                 relation_label: "faster than".into(),
                 vector: vec![1.0, 0.0, 0.0, 0.0],
             },
-            RelationLabelVector {
+            RelationEdgeVector {
                 relation_type: RelationType::Entity as i32,
                 relation_label: "bigger than".into(),
                 vector: vec![0.0, 1.0, 0.0, 0.0],
