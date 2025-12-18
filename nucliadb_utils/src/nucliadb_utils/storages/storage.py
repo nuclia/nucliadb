@@ -437,19 +437,18 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         bucket: str,
         key: str,
         range: Optional[Range] = None,
-    ):
+    ) -> AsyncGenerator[bytes, None]:
         destination: StorageField = self.field_klass(storage=self, bucket=bucket, fullkey=key)
         try:
             async for data in destination.iter_data(range=range):
                 yield data
         except KeyError:
-            yield None
+            pass
 
     async def downloadbytes(self, bucket: str, key: str) -> BytesIO:
         result = BytesIO()
         async for data in self.download(bucket, key):
-            if data is not None:
-                result.write(data)
+            result.write(data)
 
         result.seek(0)
         return result
@@ -467,18 +466,15 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         # this is covered by other tests
         if cf.source == self.source:
             async for data in self.download(cf.bucket_name, cf.uri):
-                if data is not None:
-                    yield data
+                yield data
         elif cf.source == CloudFile.FLAPS:
             flaps_storage = await get_nuclia_storage()
             async for data in flaps_storage.download(cf):
-                if data is not None:
-                    yield data
+                yield data
         elif cf.source == CloudFile.LOCAL:
             local_storage = get_local_storage()
             async for data in local_storage.download(cf.bucket_name, cf.uri):
-                if data is not None:
-                    yield data
+                yield data
 
     async def upload_pb(self, sf: StorageField, payload: Any):
         await self.upload_object(sf.bucket, sf.key, payload.SerializeToString())
