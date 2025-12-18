@@ -42,7 +42,7 @@ pub enum IndexKind {
     Vector,
     Relation,
     VectorRelationNode,
-    VectorRelationLabel,
+    VectorRelationEdge,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, sqlx::Type, Serialize, Deserialize)]
@@ -80,7 +80,7 @@ pub enum IndexConfig {
     Vector(VectorConfig),
     Relation(RelationConfig),
     VectorRelationNode(VectorConfig),
-    VectorRelationLabel(VectorConfig),
+    VectorRelationEdge(VectorConfig),
 }
 
 impl Index {
@@ -253,7 +253,7 @@ impl Index {
 
     pub fn config<T: for<'de> Deserialize<'de> + 'static>(&self) -> anyhow::Result<T> {
         let config_type = match self.kind {
-            IndexKind::Vector | IndexKind::VectorRelationNode | IndexKind::VectorRelationLabel => {
+            IndexKind::Vector | IndexKind::VectorRelationNode | IndexKind::VectorRelationEdge => {
                 TypeId::of::<VectorConfig>()
             }
             IndexKind::Text => TypeId::of::<TextConfig>(),
@@ -282,7 +282,7 @@ impl IndexConfig {
             Self::Vector(_) => IndexKind::Vector,
             Self::Relation(_) => IndexKind::Relation,
             Self::VectorRelationNode(_) => IndexKind::VectorRelationNode,
-            Self::VectorRelationLabel(_) => IndexKind::VectorRelationLabel,
+            Self::VectorRelationEdge(_) => IndexKind::VectorRelationEdge,
         }
     }
 }
@@ -298,7 +298,7 @@ impl Serialize for IndexConfig {
             Self::Vector(config) => config.serialize(serializer),
             Self::Relation(config) => config.serialize(serializer),
             Self::VectorRelationNode(config) => config.serialize(serializer),
-            Self::VectorRelationLabel(config) => config.serialize(serializer),
+            Self::VectorRelationEdge(config) => config.serialize(serializer),
         }
     }
 }
@@ -308,7 +308,7 @@ impl From<VectorConfig> for IndexConfig {
         match value.entity {
             nidx_vector::config::IndexEntity::Paragraph => Self::Vector(value),
             nidx_vector::config::IndexEntity::RelationNode => Self::VectorRelationNode(value),
-            nidx_vector::config::IndexEntity::RelationLabel => Self::VectorRelationLabel(value),
+            nidx_vector::config::IndexEntity::RelationEdge => Self::VectorRelationEdge(value),
         }
     }
 }

@@ -100,7 +100,7 @@ pub enum IndexEntity {
     #[default]
     Paragraph,
     RelationNode,
-    RelationLabel,
+    RelationEdge,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -141,14 +141,14 @@ impl VectorConfig {
         }
     }
 
-    pub const fn for_relation_labels(vector_type: VectorType) -> Self {
+    pub const fn for_relation_edges(vector_type: VectorType) -> Self {
         Self {
             vector_type,
             similarity: Similarity::Dot,
             normalize_vectors: false,
             vector_cardinality: VectorCardinality::Single,
             flags: vec![],
-            entity: IndexEntity::RelationLabel,
+            entity: IndexEntity::RelationEdge,
         }
     }
 
@@ -168,7 +168,7 @@ impl VectorConfig {
     pub fn deduplicate_keys(&self) -> bool {
         match self.entity {
             IndexEntity::Paragraph => false,
-            IndexEntity::RelationNode | IndexEntity::RelationLabel => true,
+            IndexEntity::RelationNode | IndexEntity::RelationEdge => true,
         }
     }
 }
