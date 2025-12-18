@@ -61,6 +61,7 @@ async def adjust_kb_vectorsets(kbid: str, bm: BrokerMessage):
 
                 new.append(ev)
 
+    bm.ClearField("field_vectors")
     bm.field_vectors.extend(new)
 
 

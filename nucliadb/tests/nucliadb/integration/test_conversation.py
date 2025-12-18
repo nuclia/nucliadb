@@ -50,6 +50,7 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.ndbfixtures.resources._vectors import lambs_split_6_vector
 from tests.ndbfixtures.resources.lambs import lambs_resource
 from tests.utils import inject_message
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
@@ -783,7 +784,7 @@ async def test_replace_conversation_with_put_endpoint_deletes_previous_pages(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_conversation_keyword_search(
+async def test_conversation_search(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
@@ -792,6 +793,7 @@ async def test_conversation_keyword_search(
     kbid = standalone_knowledgebox
     rid = await lambs_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
+    # Test keyword search retrieves the right message
     message_text = "Orion is looking splendid tonight, and Arcturus, the Herdsman, with his flock..."
     message_full_id = f"{rid}/c/lambs/6/0-80"
     resp = await nucliadb_reader.post(
@@ -800,6 +802,24 @@ async def test_conversation_keyword_search(
             "query": message_text,
             "features": ["keyword"],
             "top_k": 1,
+        },
+    )
+    assert resp.status_code == 200
+    results = KnowledgeboxFindResults.model_validate(resp.json())
+    assert message_full_id in results.best_matches
+    assert (
+        results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text == message_text
+    )
+
+    # Test semantic search retrieves the right message
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "vector": lambs_split_6_vector[:512],
+            "features": ["semantic"],
+            "top_k": 1,
+            "reranker": "noop",
+            "vectorset": "multilingual",
         },
     )
     assert resp.status_code == 200
