@@ -176,7 +176,7 @@ pub async fn run_job(
     let index2 = index.clone();
     let merged: NewSegment = tokio::task::spawn_blocking(move || {
         span.in_scope(|| match index.kind {
-            IndexKind::Vector => VectorIndexer
+            IndexKind::Vector | IndexKind::VectorRelationNode | IndexKind::VectorRelationLabel => VectorIndexer
                 .merge(&work_path, index2.config().unwrap(), merge_inputs)
                 .map(|x| x.into()),
             IndexKind::Text => TextIndexer

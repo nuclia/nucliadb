@@ -29,4 +29,5 @@ mod shards_api;
 mod suggest;
 mod synced_searcher;
 mod vector_normalization;
+mod vector_relation_index;
 mod vectorsets;

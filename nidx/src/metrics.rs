@@ -84,6 +84,8 @@ impl EncodeLabelValue for IndexKindLabel {
             IndexKind::Paragraph => "paragraph",
             IndexKind::Vector => "vector",
             IndexKind::Relation => "relation",
+            IndexKind::VectorRelationNode => "vector_relation_node",
+            IndexKind::VectorRelationLabel => "vector_relation_label",
         };
         encoder.write_str(txt)
     }
