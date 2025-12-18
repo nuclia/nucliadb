@@ -544,6 +544,13 @@ async def _tus_patch(
         )
 
     storage_manager = get_storage_manager()
+
+    # We consider this to be the last chunk if we have the size stored and we've reached it
+    current_chunk_size = int(request.headers["content-length"])
+    upload_finished = dm.get("size") is not None and dm.offset + current_chunk_size >= dm.get("size")
+    if not upload_finished:
+        validate_intermediate_tus_chunk(current_chunk_size, storage_manager)
+
     read_bytes = await storage_manager.append(
         dm,
         storage_manager.iterate_body_chunks(request, storage_manager.chunk_size),
@@ -562,8 +569,6 @@ async def _tus_patch(
             ["Upload-Offset", "Tus-Resumable", "Tus-Upload-Finished"]
         ),
     }
-
-    upload_finished = dm.get("size") is not None and dm.offset >= dm.get("size")
     if upload_finished:
         rid = dm.get("rid", rid)
         if rid is None:
@@ -613,7 +618,6 @@ async def _tus_patch(
 
         headers["NDB-Seq"] = f"{seqid}"
     else:
-        validate_intermediate_tus_chunk(read_bytes, storage_manager)
         await dm.save()
 
     return Response(headers=headers)

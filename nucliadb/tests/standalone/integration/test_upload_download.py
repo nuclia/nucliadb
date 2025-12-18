@@ -29,6 +29,7 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_
 from nucliadb.writer.settings import settings as writer_settings
 from nucliadb.writer.tus import TUSUPLOAD, get_storage_manager
 from nucliadb_models import content_types
+from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.storages.storage import Storage
 
 
@@ -285,6 +286,53 @@ async def test_file_tus_supports_empty_files(
     )
     assert resp.status_code == 200, resp.text
     assert resp.headers["Tus-Upload-Finished"] == "1"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_tus_uploads_handles_invalid_intermediate_chunk_size(
+    gcs_storage: GCSStorage,
+    configure_redis_dm,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+
+    language = "ca"
+    filename = "image.jpeg"
+    content_type = "image/jpeg"
+    upload_metadata = ",".join(
+        [
+            f"filename {header_encode(filename)}",
+            f"language {header_encode(language)}",
+        ]
+    )
+    # Set a total upload length of 50000 bytes
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/tusupload",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": upload_metadata,
+            "content-type": content_type,
+            "upload-length": "50000",
+        },
+    )
+    assert resp.status_code == 201, resp.json()
+    url = resp.headers["location"]
+
+    # Now try to upload an intermediate chunk smaller than the minimum upload size
+    resp = await nucliadb_writer.patch(
+        url,
+        content=b"foobar",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-offset": "0",
+            "content-length": "6",
+        },
+    )
+    assert resp.status_code == 412
+    error_detail = resp.json().get("detail")
+    assert "Intermediate" in error_detail
 
 
 @pytest.mark.deploy_modes("standalone")
