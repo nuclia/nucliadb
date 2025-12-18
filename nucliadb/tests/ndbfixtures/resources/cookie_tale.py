@@ -144,6 +144,22 @@ async def cookie_tale_resource(
     paragraph_pbs[1].relations.replacements.extend([paragraphs[2][0].full(), paragraphs[3][0].full()])
 
     ## Add a file field with some visual content, pages and a table
+    ##
+    ## cookies.pdf
+    ## +-------------------------------+
+    ## |      +--------------+         |
+    ## |      |              | <-------|--- cookies image (cookies.png)
+    ## |      +--------------+  page 0 |
+    ## +-------------------------------+
+    ## |      +---+---+---+--+         |
+    ## |      +---+---+---+--+ <-------|--- ingredients table (ingredients_table.png)
+    ## |      |   |   |   |  |         |
+    ## |      +---+---+---+--+         |
+    ## |      Above you...      page 1 |
+    ## +-----------^-------------------+
+    ##             |
+    ##             +----------------------- text paragraph
+    ##
 
     file_field = bmb.field_builder(file_field_id, FieldType.FILE)
 
@@ -183,7 +199,7 @@ async def cookie_tale_resource(
     paragraph_pb.representation.reference_file = "ingredients_table.png"
     assert paragraph_id == ParagraphId.from_string(f"{rid}/f/{file_field_id}/29-75")
 
-    # unused right now, but this would be the source image for the table
+    # this is an image representing the table, i.e., the image of the table
     sf = storage.file_extracted(
         bmb.bm.kbid, bmb.bm.uuid, "f", file_field_id, "generated/ingredients_table.png"
     )
