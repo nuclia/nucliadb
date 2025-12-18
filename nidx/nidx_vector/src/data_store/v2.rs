@@ -132,16 +132,12 @@ impl DataStoreV2 {
                     }
                 }
 
-                if let Some(metadata) = metadata {
-                    paragraphs.write_paragraph_ref(
-                        paragraph,
-                        first_vector,
-                        last_vector - first_vector + 1,
-                        Some(metadata.as_slice()),
-                    )?;
-                } else {
-                    paragraphs.write_paragraph_ref(paragraph, first_vector, last_vector - first_vector + 1, None)?;
-                }
+                paragraphs.write_paragraph_ref(
+                    paragraph,
+                    first_vector,
+                    last_vector - first_vector + 1,
+                    metadata.as_deref(),
+                )?;
 
                 p_idx += 1;
             }
