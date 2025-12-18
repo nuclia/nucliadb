@@ -24,7 +24,6 @@ from fastapi import HTTPException
 from fastapi.requests import Request
 from fastapi.responses import Response
 from fastapi_versioning import version
-from starlette.datastructures import Headers
 from starlette.responses import StreamingResponse
 
 from nucliadb.common import datamanagers
@@ -56,7 +55,14 @@ async def download_extract_file_rslug_prefix(
     field_id: str,
     download_field: str,
 ) -> Response:
-    return await _download_extract_file(request, kbid, field_type, field_id, download_field, rslug=rslug)
+    return await _download_extract_file(
+        kbid,
+        field_type,
+        field_id,
+        download_field,
+        rslug=rslug,
+        range_request=request.headers.get("range"),
+    )
 
 
 @api.get(
@@ -75,17 +81,19 @@ async def download_extract_file_rid_prefix(
     field_id: str,
     download_field: str,
 ) -> Response:
-    return await _download_extract_file(request, kbid, field_type, field_id, download_field, rid=rid)
+    return await _download_extract_file(
+        kbid, field_type, field_id, download_field, rid=rid, range_request=request.headers.get("range")
+    )
 
 
 async def _download_extract_file(
-    request: Request,
     kbid: str,
     field_type: FieldTypeName,
     field_id: str,
     download_field: str,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
+    range_request: Optional[str] = None,
 ) -> Response:
     rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
 
@@ -96,7 +104,7 @@ async def _download_extract_file(
 
     sf = storage.file_extracted(kbid, rid, field_type_letter, field_id, download_field)
 
-    return await download_api(sf, request.headers)
+    return await download_api(sf, range_request)
 
 
 @api.get(
@@ -114,7 +122,9 @@ async def download_field_file_rslug_prefix(
     field_id: str,
     inline: bool = False,
 ) -> Response:
-    return await _download_field_file(request, kbid, field_id, rslug=rslug, inline=inline)
+    return await _download_field_file(
+        kbid, field_id, rslug=rslug, range_request=request.headers.get("range"), inline=inline
+    )
 
 
 @api.get(
@@ -132,15 +142,17 @@ async def download_field_file_rid_prefix(
     field_id: str,
     inline: bool = False,
 ) -> Response:
-    return await _download_field_file(request, kbid, field_id, rid=rid, inline=inline)
+    return await _download_field_file(
+        kbid, field_id, rid=rid, range_request=request.headers.get("range"), inline=inline
+    )
 
 
 async def _download_field_file(
-    request: Request,
     kbid: str,
     field_id: str,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
+    range_request: Optional[str] = None,
     inline: bool = False,
 ) -> Response:
     rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
@@ -149,7 +161,7 @@ async def _download_field_file(
 
     sf = storage.file_field(kbid, rid, field_id)
 
-    return await download_api(sf, request.headers, inline=inline)
+    return await download_api(sf, range_request=range_request, inline=inline)
 
 
 @api.get(
@@ -169,7 +181,12 @@ async def download_field_conversation_rslug_prefix(
     file_num: int,
 ) -> Response:
     return await _download_field_conversation_attachment(
-        request, kbid, field_id, message_id, file_num, rslug=rslug
+        kbid,
+        field_id,
+        message_id,
+        file_num,
+        rslug=rslug,
+        range_request=request.headers.get("range"),
     )
 
 
@@ -190,18 +207,23 @@ async def download_field_conversation_attachment_rid_prefix(
     file_num: int,
 ) -> Response:
     return await _download_field_conversation_attachment(
-        request, kbid, field_id, message_id, file_num, rid=rid
+        kbid,
+        field_id,
+        message_id,
+        file_num,
+        rid=rid,
+        range_request=request.headers.get("range"),
     )
 
 
 async def _download_field_conversation_attachment(
-    request: Request,
     kbid: str,
     field_id: str,
     message_id: str,
     file_num: int,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
+    range_request: Optional[str] = None,
 ) -> Response:
     rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
 
@@ -211,10 +233,10 @@ async def _download_field_conversation_attachment(
         kbid, rid, field_id, message_id, attachment_index=file_num
     )
 
-    return await download_api(sf, request.headers)
+    return await download_api(sf, range_request)
 
 
-async def download_api(sf: StorageField, headers: Headers, inline: bool = False):
+async def download_api(sf: StorageField, range_request: Optional[str] = None, inline: bool = False):
     metadata: Optional[ObjectMetadata] = await sf.exists()
     if metadata is None:
         raise HTTPException(status_code=404, detail="Specified file doesn't exist")
@@ -234,9 +256,8 @@ async def download_api(sf: StorageField, headers: Headers, inline: bool = False)
     }
 
     range = Range()
-    if "range" in headers and file_size > -1:
+    if range_request and file_size > -1:
         status_code = 206
-        range_request = headers["range"]
         try:
             start, end, range_size = parse_media_range(range_request, file_size)
         except NotImplementedError:
