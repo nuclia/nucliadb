@@ -38,7 +38,6 @@ pub async fn create_shard(
 
     let mut tx = meta.transaction().await?;
     let shard = Shard::create(&mut *tx, kbid).await?;
-    // TODO: Rename to be closer to API naming? Includes changing DB type, Kind enums, etc.
     Index::create(&mut *tx, shard.id, "text", IndexConfig::new_text()).await?;
     Index::create(&mut *tx, shard.id, "paragraph", IndexConfig::new_paragraph()).await?;
     Index::create(&mut *tx, shard.id, "relation", IndexConfig::new_relation()).await?;

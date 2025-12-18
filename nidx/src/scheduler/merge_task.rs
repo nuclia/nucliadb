@@ -111,7 +111,7 @@ impl MergeScheduler {
                 IndexKind::Text | IndexKind::Paragraph | IndexKind::Relation => {
                     log_merge::plan_merges(&self.merge_settings.log, index.segments)
                 }
-                IndexKind::Vector => vector_merge::plan_merges(&self.merge_settings.vector, index.segments),
+                IndexKind::Vector | IndexKind::VectorRelationNode | IndexKind::VectorRelationLabel => vector_merge::plan_merges(&self.merge_settings.vector, index.segments),
             };
 
             for m in merges {
