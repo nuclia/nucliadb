@@ -27,6 +27,10 @@ from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
+from nucliadb.ingest.fields.file import File
+from nucliadb.ingest.fields.generic import Generic
+from nucliadb.ingest.fields.link import Link
+from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal.augment import (
     AnswerSelector,
@@ -124,14 +128,17 @@ async def db_augment_field(
     # for a specific field, as they will be ignored
 
     if field_type == FieldTypeName.TEXT.abbreviation():
+        field = cast(Text, field)
         select = cast(list[FieldProp], select)
         return await db_augment_text_field(field, field_id, select)
 
     elif field_type == FieldTypeName.FILE.abbreviation():
         select = cast(list[FieldProp], select)
+        field = cast(File, field)
         return await db_augment_file_field(field, field_id, select)
 
     elif field_type == FieldTypeName.LINK.abbreviation():
+        field = cast(Link, field)
         select = cast(list[FieldProp], select)
         return await db_augment_link_field(field, field_id, select)
 
@@ -141,6 +148,7 @@ async def db_augment_field(
         return await db_augment_conversation_field(field, field_id, select)
 
     elif field_type == FieldTypeName.GENERIC.abbreviation():
+        field = cast(Generic, field)
         select = cast(list[FieldProp], select)
         return await db_augment_generic_field(field, field_id, select)
 
@@ -150,7 +158,7 @@ async def db_augment_field(
 
 @augmentor_observer.wrap({"type": "db_text_field"})
 async def db_augment_text_field(
-    field: Field,
+    field: Text,
     field_id: FieldId,
     select: Sequence[FieldProp],
 ) -> AugmentedTextField:
@@ -170,6 +178,8 @@ async def db_augment_text_field(
 
         elif isinstance(prop, FieldValue):
             db_value = await field.get_value()
+            if db_value is None:
+                continue
             augmented.value = from_proto.field_text(db_value)
 
         else:  # pragma: no cover
@@ -180,7 +190,7 @@ async def db_augment_text_field(
 
 @augmentor_observer.wrap({"type": "db_file_field"})
 async def db_augment_file_field(
-    field: Field,
+    field: File,
     field_id: FieldId,
     select: Sequence[FieldProp],
 ) -> AugmentedFileField:
@@ -200,6 +210,8 @@ async def db_augment_file_field(
 
         elif isinstance(prop, FieldValue):
             db_value = await field.get_value()
+            if db_value is None:
+                continue
             augmented.value = from_proto.field_file(db_value)
 
         else:  # pragma: no cover
@@ -210,7 +222,7 @@ async def db_augment_file_field(
 
 @augmentor_observer.wrap({"type": "db_link_field"})
 async def db_augment_link_field(
-    field: Field,
+    field: Link,
     field_id: FieldId,
     select: Sequence[FieldProp],
 ) -> AugmentedLinkField:
@@ -230,6 +242,8 @@ async def db_augment_link_field(
 
         elif isinstance(prop, FieldValue):
             db_value = await field.get_value()
+            if db_value is None:
+                continue
             augmented.value = from_proto.field_link(db_value)
 
         else:  # pragma: no cover
@@ -313,7 +327,7 @@ async def db_augment_conversation_field(
 
 @augmentor_observer.wrap({"type": "db_generic_field"})
 async def db_augment_generic_field(
-    field: Field,
+    field: Generic,
     field_id: FieldId,
     select: Sequence[FieldProp],
 ) -> AugmentedGenericField:

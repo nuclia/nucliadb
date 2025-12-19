@@ -24,6 +24,10 @@ from typing_extensions import assert_never
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_NAME, FieldId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
+from nucliadb.ingest.fields.file import File
+from nucliadb.ingest.fields.generic import Generic
+from nucliadb.ingest.fields.link import Link
+from nucliadb.ingest.fields.text import Text
 from nucliadb.models.internal.augment import ConversationProp, FieldProp, FieldText, FieldValue
 from nucliadb.search.augmentor.fields import (
     db_augment_conversation_field,
@@ -47,26 +51,31 @@ async def hydrate_field(field: Field, field_id: FieldId, config: hydration_model
     if field_type == FieldTypeName.TEXT:
         if not config.text is not None:
             return
+        field = cast(Text, field)
         return await hydrate_text_field(field, field_id, config.text)
 
     elif field_type == FieldTypeName.FILE is not None:
         if not config.file:
             return
+        field = cast(File, field)
         return await hydrate_file_field(field, field_id, config.file)
 
     elif field_type == FieldTypeName.LINK is not None:
         if not config.link:
             return
+        field = cast(Link, field)
         return await hydrate_link_field(field, field_id, config.link)
 
     elif field_type == FieldTypeName.CONVERSATION is not None:
         if not config.conversation:
             return
+        field = cast(Conversation, field)
         return await hydrate_conversation_field(field, field_id, config.conversation)
 
     elif field_type == FieldTypeName.GENERIC is not None:
         if not config.generic:
             return
+        field = cast(Generic, field)
         return await hydrate_generic_field(field, field_id, config.generic)
 
     else:  # pragma: no cover
@@ -74,7 +83,7 @@ async def hydrate_field(field: Field, field_id: FieldId, config: hydration_model
 
 
 async def hydrate_text_field(
-    field: Field,
+    field: Text,
     field_id: FieldId,
     config: hydration_models.TextFieldHydration,
 ) -> hydration_models.HydratedTextField:
@@ -102,7 +111,7 @@ async def hydrate_text_field(
 
 
 async def hydrate_file_field(
-    field: Field,
+    field: File,
     field_id: FieldId,
     config: hydration_models.FileFieldHydration,
 ) -> hydration_models.HydratedFileField:
@@ -130,7 +139,7 @@ async def hydrate_file_field(
 
 
 async def hydrate_link_field(
-    field: Field,
+    field: Link,
     field_id: FieldId,
     config: hydration_models.LinkFieldHydration,
 ) -> hydration_models.HydratedLinkField:
@@ -158,7 +167,7 @@ async def hydrate_link_field(
 
 
 async def hydrate_conversation_field(
-    field: Field,
+    field: Conversation,
     field_id: FieldId,
     config: hydration_models.ConversationFieldHydration,
 ) -> hydration_models.HydratedConversationField:
@@ -166,7 +175,6 @@ async def hydrate_conversation_field(
     if config.value:
         select.append(FieldValue())
 
-    field = cast(Conversation, field)
     augmented = await db_augment_conversation_field(field, field_id, select)
 
     hydrated = hydration_models.HydratedConversationField(
@@ -182,7 +190,7 @@ async def hydrate_conversation_field(
 
 
 async def hydrate_generic_field(
-    field: Field,
+    field: Generic,
     field_id: FieldId,
     config: hydration_models.GenericFieldHydration,
 ) -> hydration_models.HydratedGenericField:
