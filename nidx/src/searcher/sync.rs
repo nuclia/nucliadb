@@ -421,6 +421,14 @@ impl ShardIndexes {
             .map(|i| i.id)
             .next()
     }
+
+    pub fn vector_relation_node_index(&self, name: &str) -> Option<IndexId> {
+        self.0
+            .iter()
+            .filter(|i| i.kind == IndexKind::VectorRelationNode && i.name == name)
+            .map(|i| i.id)
+            .next()
+    }
 }
 
 pub struct SyncMetadata {

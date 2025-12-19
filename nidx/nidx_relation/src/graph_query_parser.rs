@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -23,7 +25,9 @@ use nidx_protos::graph_query::node::MatchLocation;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator};
-use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery, TermSetQuery};
+use tantivy::query::{
+    AllQuery, BooleanQuery, BoostQuery, EmptyQuery, FuzzyTermQuery, Occur, Query, TermQuery, TermSetQuery,
+};
 use tantivy::schema::{Facet, Field, IndexRecordOption};
 use tantivy::tokenizer::TokenizerManager;
 
@@ -43,6 +47,7 @@ pub enum Term {
     ExactWord(String),
     Fuzzy(FuzzyTerm),
     FuzzyWord(FuzzyTerm),
+    FromContext(String),
 }
 
 #[derive(Default, Clone)]
@@ -138,13 +143,20 @@ struct NodeSchemaFields {
     node_subtype: Field,
 }
 
+#[derive(Default)]
+pub struct GraphQueryContext {
+    pub node_vector_results: HashMap<String, Vec<(String, f32)>>,
+    pub edge_vector_results: HashMap<String, Vec<(String, f32)>>,
+}
+
 pub struct GraphQueryParser<'a> {
     schema: &'a Schema,
+    context: GraphQueryContext,
 }
 
 impl<'a> GraphQueryParser<'a> {
-    pub fn new(schema: &'a Schema) -> Self {
-        Self { schema }
+    pub fn new(schema: &'a Schema, context: GraphQueryContext) -> Self {
+        Self { schema, context }
     }
 
     pub fn parse_bool(&self, query: BoolGraphQuery) -> Box<dyn Query> {
@@ -465,9 +477,31 @@ impl<'a> GraphQueryParser<'a> {
     }
 
     fn has_node_value(&self, value: &Term, exact_field: Field, tokenized_field: Field) -> Option<Box<dyn Query>> {
+        if let Term::FromContext(key) = value {
+            let Some(keys) = self.context.node_vector_results.get(key) else {
+                return Some(Box::new(EmptyQuery));
+            };
+
+            return Some(Box::new(BooleanQuery::union(
+                keys.iter()
+                    .map(|(value, score)| {
+                        let q: Box<dyn Query> = Box::new(BoostQuery::new(
+                            Box::new(TermQuery::new(
+                                tantivy::Term::from_field_text(exact_field, &self.schema.normalize(value)),
+                                IndexRecordOption::Basic,
+                            )),
+                            *score,
+                        ));
+                        q
+                    })
+                    .collect(),
+            )));
+        }
+
         let text_value = match value {
             Term::Exact(value) | Term::ExactWord(value) => value,
             Term::Fuzzy(fuzzy) | Term::FuzzyWord(fuzzy) => &fuzzy.value,
+            Term::FromContext(_) => unreachable!(),
         };
         if text_value.is_empty() {
             return None;
@@ -513,6 +547,7 @@ impl<'a> GraphQueryParser<'a> {
                     ))
                 }
             }
+            Term::FromContext(_) => unreachable!(),
         };
 
         Some(query)
@@ -703,7 +738,8 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
             // Default to exact match to keep backwards compatibility
             let match_kind = node_pb
                 .match_kind
-                .unwrap_or(nidx_protos::graph_query::node::MatchKind::Exact(
+                .as_ref()
+                .unwrap_or(&nidx_protos::graph_query::node::MatchKind::Exact(
                     nidx_protos::graph_query::node::ExactMatch {
                         kind: MatchLocation::Full as i32,
                     },
@@ -745,6 +781,7 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
                         is_prefix: true,
                     }),
                 },
+                nidx_protos::graph_query::node::MatchKind::Vector(_) => Term::FromContext(value),
             }
         });
 

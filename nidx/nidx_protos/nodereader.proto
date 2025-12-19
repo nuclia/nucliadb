@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package nodereader;
 
-import public "nidx_protos/noderesources.proto";
 import "google/protobuf/timestamp.proto";
+import public "nidx_protos/noderesources.proto";
 import public "nucliadb_protos/utils.proto";
 
 message StreamFilter {
@@ -17,18 +17,16 @@ message StreamFilter {
     repeated string labels = 2;
 }
 
-
 message Faceted {
     repeated string labels = 1;
 }
-
 
 message OrderBy {
     reserved 1;
 
     enum OrderType {
-      DESC = 0;
-      ASC = 1;
+        DESC = 0;
+        ASC = 1;
     }
     enum OrderField {
         CREATED = 0;
@@ -179,15 +177,31 @@ message GraphQuery {
             uint32 distance = 2;
         }
 
+        message VectorMatch {
+            repeated float vector = 1;
+        }
+
         oneof match_kind {
             ExactMatch exact = 5;
             FuzzyMatch fuzzy = 6;
+            VectorMatch vector = 7;
         }
     }
 
     message Relation {
         optional string value = 1;
         optional utils.Relation.RelationType relation_type = 2;
+
+        message ExactMatch {}
+
+        message VectorMatch {
+            repeated float vector = 1;
+        }
+
+        oneof match_kind {
+            ExactMatch exact = 3;
+            VectorMatch vector = 4;
+        }
     }
 
     message Path {
@@ -351,7 +365,6 @@ message SearchRequest {
     GraphSearch graph_search = 29;
 }
 
-
 enum SuggestFeatures {
     ENTITIES = 0;
     PARAGRAPHS = 1;
@@ -367,7 +380,6 @@ message SuggestRequest {
     optional FilterExpression paragraph_filter = 8;
     FilterOperator filter_operator = 9;
 }
-
 
 message SuggestResponse {
     int32 total = 1;

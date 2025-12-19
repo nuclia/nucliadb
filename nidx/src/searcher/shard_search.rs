@@ -22,13 +22,16 @@ use std::sync::Arc;
 
 use nidx_paragraph::ParagraphSearcher;
 use nidx_protos::{GraphSearchRequest, GraphSearchResponse, SearchRequest, SearchResponse};
-use nidx_relation::RelationSearcher;
+use nidx_relation::{RelationSearcher, graph_query_parser::GraphQueryContext};
 use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
 use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::VectorSearcher;
 use tracing::{Span, instrument};
 
-use crate::errors::{NidxError, NidxResult};
+use crate::{
+    errors::{NidxError, NidxResult},
+    searcher::query_planner::GraphIndexQueries,
+};
 
 use super::{
     index_cache::IndexCache,
@@ -126,9 +129,13 @@ fn blocking_search(
         .paragraphs_request
         .map(|request| move || paragraph_searcher.unwrap().search(&request, prefilter));
 
-    let relation_task = index_queries
-        .relations_request
-        .map(|request| move || relation_searcher.unwrap().graph_search(&request, prefilter));
+    let relation_task = index_queries.relations_request.map(|request| {
+        move || {
+            relation_searcher
+                .unwrap()
+                .graph_search(&request.relations_request, prefilter, GraphQueryContext::default())
+        }
+    });
 
     let vector_task = index_queries
         .vectors_request
@@ -210,6 +217,41 @@ pub async fn graph_search(
         PrefilterResult::All
     };
 
+    let mut context = GraphQueryContext::default();
+    let graph_queries = GraphIndexQueries::build(graph_request);
+    if !graph_queries.vector_node_requests.is_empty() {
+        // TODO: Use correct index
+        // TODO: Extract and reuse with paragraph search
+        let Some(vector_node_index_id) = indexes.vector_relation_node_index("relation_node") else {
+            return Err(NidxError::NotFound);
+        };
+        let vector_node_searcher = index_cache.get(&vector_node_index_id).await?;
+        let mut tasks = tokio::task::JoinSet::new();
+        for (key, request) in graph_queries.vector_node_requests {
+            let prefilter = prefilter.clone();
+            let vector_node_searcher = vector_node_searcher.clone();
+            let current = Span::current();
+            tasks.spawn(async move {
+                current.in_scope(|| {
+                    let searcher: &VectorSearcher = vector_node_searcher.as_ref().into();
+                    (key, searcher.search(&request, &prefilter))
+                })
+            });
+        }
+
+        while let Some(task) = tasks.join_next().await {
+            let (key, results) = task?;
+            context.node_vector_results.insert(
+                key,
+                results?
+                    .documents
+                    .iter()
+                    .map(|d| (d.doc_id.clone().unwrap().id, d.score))
+                    .collect(),
+            );
+        }
+    }
+
     if matches!(prefilter, PrefilterResult::None) {
         return Ok(GraphSearchResponse::default());
     }
@@ -219,7 +261,7 @@ pub async fn graph_search(
     let results = tokio::task::spawn_blocking(move || {
         current.in_scope(|| {
             let searcher: &RelationSearcher = relation_searcher.as_ref().into();
-            searcher.graph_search(&graph_request, &prefilter)
+            searcher.graph_search(&graph_queries.relations_request, &prefilter, context)
         })
     })
     .await??;

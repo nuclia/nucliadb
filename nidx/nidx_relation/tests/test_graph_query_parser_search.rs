@@ -25,7 +25,8 @@ use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::{IndexRelations, Resource, ResourceId};
 use nidx_relation::graph_query_parser::{
-    Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, PathQuery, Relation, RelationQuery, Term,
+    Expression, FuzzyTerm, GraphQuery, GraphQueryContext, GraphQueryParser, Node, NodeQuery, PathQuery, Relation,
+    RelationQuery, Term,
 };
 use nidx_relation::{RelationConfig, RelationIndexer, RelationSchema, RelationSearcher};
 use tantivy::TantivyDocument;
@@ -60,7 +61,7 @@ impl SearchResult {
 
 fn inner_graph_search(reader: &RelationSearcher, query: GraphQuery) -> anyhow::Result<SearchResult> {
     let schema = &reader.reader.schema;
-    let parser = GraphQueryParser::new(schema);
+    let parser = GraphQueryParser::new(schema, GraphQueryContext::default());
     let index_query = parser.parse(query);
 
     let collector = TopDocs::with_limit(1000_usize);

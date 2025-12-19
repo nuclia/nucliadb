@@ -57,6 +57,8 @@ use tantivy::{
 use tracing::{error, instrument};
 use uuid::Uuid;
 
+use crate::graph_query_parser::GraphQueryContext;
+
 /// Minimum length for a word to be accepted as a entity to search for
 /// suggestions. Low values can provide too much noise and higher ones can
 /// remove important words from suggestion
@@ -211,8 +213,9 @@ impl RelationSearcher {
         &self,
         request: &GraphSearchRequest,
         prefilter: &PrefilterResult,
+        context: GraphQueryContext,
     ) -> anyhow::Result<GraphSearchResponse> {
-        self.reader.graph_search(request, prefilter)
+        self.reader.graph_search(request, prefilter, context)
     }
 
     #[instrument(name = "relation::suggest", skip_all)]
@@ -253,7 +256,7 @@ impl RelationSearcher {
             }),
             ..Default::default()
         };
-        let response = self.graph_search(&request, &PrefilterResult::All)?;
+        let response = self.graph_search(&request, &PrefilterResult::All, GraphQueryContext::default())?;
         Ok(response.nodes)
     }
 
