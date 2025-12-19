@@ -54,6 +54,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.ndbfixtures.resources._vectors import lambs_split_6_vector
 from tests.ndbfixtures.resources.lambs import lambs_resource
 from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 
@@ -861,36 +862,18 @@ async def test_conversation_search(
     resp.raise_for_status()
 
     # Inject synthetic processed data for the new message
-    bm = BrokerMessage()
-    bm.source = BrokerMessage.MessageSource.PROCESSOR
-    bm.uuid = rid
-    bm.kbid = kbid
-    field = FieldID(field="lambs", field_type=FieldType.CONVERSATION)
-    etw = ExtractedTextWrapper()
-    etw.field.MergeFrom(field)
-    etw.body.split_text[new_message_split_id] = new_message_text
-    bm.extracted_text.append(etw)
-    evw = ExtractedVectorsWrapper()
-    evw.field.MergeFrom(field)
-    evw.vectors.split_vectors[new_message_split_id].vectors.append(
-        Vector(
-            start=0,
-            end=len(new_message_text),
-            start_paragraph=0,
-            end_paragraph=len(new_message_text),
-            vector=new_message_vector,
-        )
+    bmb = BrokerMessageBuilder(
+        kbid=kbid,
+        rid=rid,
+        source=BrokerMessage.MessageSource.PROCESSOR,
     )
-    bm.field_vectors.append(evw)
-    fcmw = FieldComputedMetadataWrapper()
-    fcmw.field.MergeFrom(field)
-    paragraph = Paragraph(
-        start=0,
-        end=len(new_message_text),
-        kind=Paragraph.TypeParagraph.TEXT,
+    conv = bmb.field_builder("lambs", FieldType.CONVERSATION)
+    conv.add_paragraph(
+        text=new_message_text,
+        split=new_message_split_id,
+        vectors={"multilingual": new_message_vector},
     )
-    fcmw.metadata.split_metadata[new_message_split_id].paragraphs.append(paragraph)
-    bm.field_metadata.append(fcmw)
+    bm = bmb.build()
     await inject_message(nucliadb_ingest_grpc, bm)
     await mark_dirty()
     await wait_for_sync()
