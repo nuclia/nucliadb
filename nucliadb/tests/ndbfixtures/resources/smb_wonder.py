@@ -99,7 +99,9 @@ async def smb_wonder_resource(
         paragraph_id, _ = field_builder.add_paragraph(
             paragraph,
             vectors={
-                vectorset_id: [random.random()] * config.vectorset_index_config.vector_dimension
+                vectorset_id: [
+                    random.random() for _ in range(config.vectorset_index_config.vector_dimension)
+                ]
                 for i, (vectorset_id, config) in enumerate(vectorsets.items())
             },
         )

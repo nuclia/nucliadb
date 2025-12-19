@@ -115,7 +115,9 @@ async def cookie_tale_resource(
         paragraph_id, paragraph_pb = text_field.add_paragraph(
             paragraph,
             vectors={
-                vectorset_id: [random.random()] * config.vectorset_index_config.vector_dimension
+                vectorset_id: [
+                    random.random() for _ in range(config.vectorset_index_config.vector_dimension)
+                ]
                 for i, (vectorset_id, config) in enumerate(vectorsets.items())
             },
         )
@@ -139,7 +141,9 @@ async def cookie_tale_resource(
         "A yummy image of some cookies",
         kind=resources_pb2.Paragraph.TypeParagraph.INCEPTION,
         vectors={
-            vectorset_id: [random.random()] * config.vectorset_index_config.vector_dimension
+            vectorset_id: [
+                random.random() for _ in range(config.vectorset_index_config.vector_dimension)
+            ]
             for i, (vectorset_id, config) in enumerate(vectorsets.items())
         },
     )
@@ -162,7 +166,9 @@ async def cookie_tale_resource(
         "|Ingredient|Quantity|\n|Peanut butter|100g|\n...",
         kind=resources_pb2.Paragraph.TypeParagraph.TABLE,
         vectors={
-            vectorset_id: [random.random()] * config.vectorset_index_config.vector_dimension
+            vectorset_id: [
+                random.random() for _ in range(config.vectorset_index_config.vector_dimension)
+            ]
             for i, (vectorset_id, config) in enumerate(vectorsets.items())
         },
     )
@@ -186,7 +192,9 @@ async def cookie_tale_resource(
     (_, paragraph_pb) = file_field.add_paragraph(
         "Above you can see a table with all the ingredients",
         vectors={
-            vectorset_id: [random.random()] * config.vectorset_index_config.vector_dimension
+            vectorset_id: [
+                random.random() for _ in range(config.vectorset_index_config.vector_dimension)
+            ]
             for i, (vectorset_id, config) in enumerate(vectorsets.items())
         },
     )
