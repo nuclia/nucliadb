@@ -22,23 +22,13 @@ mod common;
 
 use common::{TestOpener, resource};
 use nidx_types::{prefilter::PrefilterResult, query_language::BooleanExpression};
-use nidx_vector::{
-    VectorIndexer, VectorSearchRequest, VectorSearcher,
-    config::{VectorCardinality, VectorConfig},
-};
+use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher, config::VectorConfig};
 use std::collections::HashSet;
 use tempfile::tempdir;
 
 #[test]
 fn test_hidden_search() -> anyhow::Result<()> {
-    let config = VectorConfig {
-        normalize_vectors: false,
-        similarity: nidx_vector::config::Similarity::Dot,
-        vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 4 },
-        flags: vec![],
-        vector_cardinality: VectorCardinality::Single,
-        disable_indexes: false,
-    };
+    let config = VectorConfig::for_paragraphs(nidx_vector::config::VectorType::DenseF32 { dimension: 4 });
 
     // Create two resources, one hidden and one not
     let labels = vec!["/q/h".to_string()];

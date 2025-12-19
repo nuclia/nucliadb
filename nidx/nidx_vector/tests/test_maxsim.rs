@@ -19,7 +19,7 @@
 //
 
 use nidx_protos::VectorSentence;
-use nidx_vector::config::{Similarity, VectorCardinality, VectorConfig, VectorType};
+use nidx_vector::config::{VectorCardinality, VectorConfig, VectorType};
 use tempfile::tempdir;
 
 mod common;
@@ -47,14 +47,8 @@ fn test_maxsim() -> anyhow::Result<()> {
     use nidx_types::prefilter::PrefilterResult;
     use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher};
 
-    let config = VectorConfig {
-        similarity: Similarity::Dot,
-        vector_type: VectorType::DenseF32 { dimension: 5 },
-        normalize_vectors: false,
-        vector_cardinality: VectorCardinality::Multi,
-        flags: vec![],
-        disable_indexes: false,
-    };
+    let mut config = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 5 });
+    config.vector_cardinality = VectorCardinality::Multi;
 
     // Creates a resource with some orthogonal vectors, to test search
     let mut resource = resource(vec![], vec![]);

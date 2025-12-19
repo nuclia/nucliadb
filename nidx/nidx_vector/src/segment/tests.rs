@@ -24,10 +24,11 @@ use std::time::Instant;
 use tempfile::tempdir;
 
 use crate::VectorR;
-use crate::config::{Similarity, VectorCardinality, VectorConfig, flags};
+use crate::config::{IndexEntity, Similarity, VectorCardinality, VectorConfig, flags};
 use crate::data_store::{DataStoreV1, DataStoreV2};
 use crate::formula::{AtomClause, Clause, Formula};
 use crate::segment::{self, Elem};
+use crate::utils::FieldKey;
 
 const CONFIG: VectorConfig = VectorConfig {
     similarity: Similarity::Cosine,
@@ -35,7 +36,7 @@ const CONFIG: VectorConfig = VectorConfig {
     vector_type: crate::config::VectorType::DenseF32 { dimension: 128 },
     flags: vec![],
     vector_cardinality: VectorCardinality::Single,
-    disable_indexes: false,
+    entity: IndexEntity::Paragraph,
 };
 
 fn create_query() -> Vec<f32> {
@@ -131,7 +132,7 @@ fn single_graph() {
     let elems = vec![Elem::new(key.clone(), vector.clone(), vec![], None)];
     let mut segment = segment::create(temp_dir.path(), elems.clone(), &CONFIG, HashSet::new()).unwrap();
     let formula = Formula::new();
-    segment.apply_deletion(&key);
+    segment.apply_deletions(&[FieldKey::from_field_id(&key).unwrap()].into());
     let result = segment.search(&vector, &formula, true, 5, &CONFIG, -1.0);
     assert_eq!(result.count(), 0);
 
@@ -165,7 +166,8 @@ fn data_merge() -> anyhow::Result<()> {
     let dp1 = segment::create(dp1_path.path(), elems1, &v1_config, HashSet::new()).unwrap();
     assert!(dp1.data_store.as_any().downcast_ref::<DataStoreV1>().is_some());
 
-    let work = &[&dp1, &dp0];
+    let no_dels = HashSet::new();
+    let work = vec![(&dp1, &no_dels), (&dp0, &no_dels)];
 
     let dp_path = tempdir()?;
     let dp = segment::merge(dp_path.path(), work, &v1_config).unwrap();
@@ -182,11 +184,12 @@ fn data_merge() -> anyhow::Result<()> {
     assert!(dp.get_paragraph(result[0].paragraph()).id() == key0);
     let mut dp0 = segment::open(dp0.metadata, &v1_config).unwrap();
     let mut dp1 = segment::open(dp1.metadata, &v1_config).unwrap();
-    dp0.apply_deletion(&key0);
-    dp0.apply_deletion(&key1);
-    dp1.apply_deletion(&key0);
-    dp1.apply_deletion(&key1);
-    let work = &[&dp1, &dp0];
+    dp0.apply_deletions(&[FieldKey::from_field_id(&key0).unwrap()].into());
+    dp0.apply_deletions(&[FieldKey::from_field_id(&key1).unwrap()].into());
+    dp1.apply_deletions(&[FieldKey::from_field_id(&key0).unwrap()].into());
+    dp1.apply_deletions(&[FieldKey::from_field_id(&key1).unwrap()].into());
+    let no_dels = HashSet::new();
+    let work = vec![(&dp1, &no_dels), (&dp0, &no_dels)];
 
     let dp_path = tempdir()?;
     let dp = segment::merge(dp_path.path(), work, &v1_config).unwrap();
@@ -213,7 +216,8 @@ fn data_merge_v2() -> anyhow::Result<()> {
     let dp1 = segment::create(dp1_path.path(), elems1, &CONFIG, HashSet::new()).unwrap();
     assert!(dp1.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
 
-    let work = &[&dp1, &dp0];
+    let no_dels = HashSet::new();
+    let work = vec![(&dp1, &no_dels), (&dp0, &no_dels)];
 
     let dp_path = tempdir()?;
     let dp = segment::merge(dp_path.path(), work, &CONFIG).unwrap();
@@ -230,11 +234,12 @@ fn data_merge_v2() -> anyhow::Result<()> {
     assert!(dp.get_paragraph(result[0].paragraph()).id() == key0);
     let mut dp0 = segment::open(dp0.metadata, &CONFIG).unwrap();
     let mut dp1 = segment::open(dp1.metadata, &CONFIG).unwrap();
-    dp0.apply_deletion(&key0);
-    dp0.apply_deletion(&key1);
-    dp1.apply_deletion(&key0);
-    dp1.apply_deletion(&key1);
-    let work = &[&dp1, &dp0];
+    dp0.apply_deletions(&[FieldKey::from_field_id(&key0).unwrap()].into());
+    dp0.apply_deletions(&[FieldKey::from_field_id(&key1).unwrap()].into());
+    dp1.apply_deletions(&[FieldKey::from_field_id(&key0).unwrap()].into());
+    dp1.apply_deletions(&[FieldKey::from_field_id(&key1).unwrap()].into());
+    let no_dels = HashSet::new();
+    let work = vec![(&dp1, &no_dels), (&dp0, &no_dels)];
 
     let dp_path = tempdir()?;
     let dp = segment::merge(dp_path.path(), work, &CONFIG).unwrap();
@@ -264,7 +269,8 @@ fn data_merge_mixed() -> anyhow::Result<()> {
     let dp1 = segment::create(dp1_path.path(), elems1, &CONFIG, HashSet::new()).unwrap();
     assert!(dp1.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
 
-    let work = &[&dp1, &dp0];
+    let no_dels = HashSet::new();
+    let work = vec![(&dp1, &no_dels), (&dp0, &no_dels)];
 
     let dp_path = tempdir()?;
     let dp = segment::merge(dp_path.path(), work, &CONFIG).unwrap();
@@ -281,11 +287,12 @@ fn data_merge_mixed() -> anyhow::Result<()> {
     assert!(dp.get_paragraph(result[0].paragraph()).id() == key0);
     let mut dp0 = segment::open(dp0.metadata, &CONFIG).unwrap();
     let mut dp1 = segment::open(dp1.metadata, &CONFIG).unwrap();
-    dp0.apply_deletion(&key0);
-    dp0.apply_deletion(&key1);
-    dp1.apply_deletion(&key0);
-    dp1.apply_deletion(&key1);
-    let work = &[&dp1, &dp0];
+    dp0.apply_deletions(&[FieldKey::from_field_id(&key0).unwrap()].into());
+    dp0.apply_deletions(&[FieldKey::from_field_id(&key1).unwrap()].into());
+    dp1.apply_deletions(&[FieldKey::from_field_id(&key0).unwrap()].into());
+    dp1.apply_deletions(&[FieldKey::from_field_id(&key1).unwrap()].into());
+    let no_dels = HashSet::new();
+    let work = vec![(&dp1, &no_dels), (&dp0, &no_dels)];
 
     let dp_path = tempdir()?;
     let dp = segment::merge(dp_path.path(), work, &CONFIG).unwrap();
@@ -326,7 +333,7 @@ fn label_filtering_test() {
         assert_eq!(result_0.len(), 1);
     }
 
-    segment.apply_deletion("6e5a546a9a5c480f8579472016b1ee14/f/field");
+    segment.apply_deletions(&[FieldKey::from_field_id("6e5a546a9a5c480f8579472016b1ee14/f/field").unwrap()].into());
     for i in 0..5 {
         let formula = queries[i..i + 1].iter().fold(Formula::new(), |mut acc, i| {
             acc.extend(i.clone());
@@ -430,10 +437,11 @@ fn fast_data_merge() -> VectorR<()> {
     )?;
 
     // Merge without deletions
-    let work = [&big_segment, &small_segment];
+    let no_dels = HashSet::new();
+    let work = vec![(&big_segment, &no_dels), (&small_segment, &no_dels)];
     let output_dir = tempfile::tempdir()?;
     let t = Instant::now();
-    let dp = segment::merge(output_dir.path(), &work, &CONFIG)?;
+    let dp = segment::merge(output_dir.path(), work, &CONFIG)?;
     let fast_merge_time = t.elapsed();
 
     for (i, v) in search_vectors.iter().enumerate() {
@@ -447,12 +455,14 @@ fn fast_data_merge() -> VectorR<()> {
     }
 
     // Merge with deletions
-    big_segment.apply_deletion("00000000000000000000000000000000/f/file/0-100");
-    small_segment.apply_deletion("00000000000000000000000000000002/f/file/0-100");
-    let work = [&big_segment, &small_segment];
+    big_segment
+        .apply_deletions(&[FieldKey::from_field_id("00000000000000000000000000000000/f/file/0-100").unwrap()].into());
+    small_segment
+        .apply_deletions(&[FieldKey::from_field_id("00000000000000000000000000000002/f/file/0-100").unwrap()].into());
+    let work = vec![(&big_segment, &no_dels), (&small_segment, &no_dels)];
     let output_dir = tempfile::tempdir()?;
     let t = Instant::now();
-    let dp = segment::merge(output_dir.path(), &work, &CONFIG)?;
+    let dp = segment::merge(output_dir.path(), work, &CONFIG)?;
     let slow_merge_time = t.elapsed();
 
     for (i, v) in search_vectors.iter().enumerate() {

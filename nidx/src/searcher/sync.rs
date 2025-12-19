@@ -597,7 +597,7 @@ impl GuardedIndexMetadata {
 mod tests {
     use std::{io::BufWriter, path::Path, sync::Arc};
 
-    use nidx_vector::config::{VectorCardinality, VectorConfig};
+    use nidx_vector::config::{VectorConfig, VectorType};
     use object_store::{ObjectStore, PutPayload};
     use tempfile::tempdir;
 
@@ -608,14 +608,7 @@ mod tests {
         searcher::sync::{Operations, SyncMetadata, sync_index},
     };
 
-    const VECTOR_CONFIG: VectorConfig = VectorConfig {
-        similarity: nidx_vector::config::Similarity::Cosine,
-        normalize_vectors: false,
-        vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 3 },
-        flags: vec![],
-        vector_cardinality: VectorCardinality::Single,
-        disable_indexes: false,
-    };
+    const VECTOR_CONFIG: VectorConfig = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 3 });
 
     #[sqlx::test]
     async fn test_load_index_metadata(pool: sqlx::PgPool) -> anyhow::Result<()> {

@@ -29,7 +29,7 @@ use crate::{
 use super::{DataStore, OpenReason, ParagraphAddr, VectorAddr};
 pub use paragraph_store::StoredParagraph;
 use paragraph_store::{ParagraphStore, ParagraphStoreWriter};
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 use vector_store::{VectorStore, VectorStoreWriter};
 
 mod paragraph_store;
@@ -88,6 +88,7 @@ impl DataStoreV2 {
         path: &Path,
         producers: Vec<(impl Iterator<Item = ParagraphAddr>, &dyn DataStore)>,
         config: &VectorConfig,
+        mut paragraph_deduplicator: Option<HashMap<String, Vec<u8>>>,
     ) -> VectorR<()> {
         let mut paragraphs = ParagraphStoreWriter::new(path)?;
         let mut vectors = VectorStoreWriter::new(path, &config.vector_type)?;
@@ -103,6 +104,17 @@ impl DataStoreV2 {
                 // Retrieve paragraph and vectors
                 let paragraph = store.get_paragraph(paragraph_addr);
                 let p_vectors = paragraph.vectors(&paragraph_addr).map(|v| store.get_vector(v).vector());
+
+                let metadata = if let Some(paragraph_deduplicator) = &mut paragraph_deduplicator {
+                    // Entry is removed so if it appears in other segments it is not copied again
+                    let metadata = paragraph_deduplicator.remove(paragraph.id());
+                    if metadata.is_none() {
+                        continue;
+                    };
+                    metadata
+                } else {
+                    None
+                };
 
                 // Write to new store
                 let (first_vector, last_vector) = vectors.write(p_idx, p_vectors)?;
@@ -120,7 +132,13 @@ impl DataStoreV2 {
                     }
                 }
 
-                paragraphs.write_paragraph_ref(paragraph, first_vector, last_vector - first_vector + 1)?;
+                paragraphs.write_paragraph_ref(
+                    paragraph,
+                    first_vector,
+                    last_vector - first_vector + 1,
+                    metadata.as_deref(),
+                )?;
+
                 p_idx += 1;
             }
         }

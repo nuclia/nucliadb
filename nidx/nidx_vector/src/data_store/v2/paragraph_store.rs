@@ -146,12 +146,13 @@ impl ParagraphStoreWriter {
         paragraph: ParagraphRef,
         first_vector: u32,
         num_vectors: u32,
+        override_metadata: Option<&[u8]>,
     ) -> VectorR<u32> {
         let labels = paragraph.labels();
         let paragraph = StoredParagraph {
             key: paragraph.id(),
             labels: labels.iter().map(|x| x.as_str()).collect(),
-            metadata: paragraph.metadata(),
+            metadata: override_metadata.unwrap_or(paragraph.metadata()),
             first_vector,
             num_vectors,
         };

@@ -32,19 +32,12 @@ use nidx::{
 use nidx_protos::{IndexMessage, TypeMessage};
 use nidx_tests::*;
 use nidx_types::prefilter::PrefilterResult;
-use nidx_vector::config::{VectorCardinality, VectorConfig};
+use nidx_vector::config::{VectorConfig, VectorType};
 use nidx_vector::{VectorSearchRequest, VectorSearcher};
 use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
 
-const VECTOR_CONFIG: VectorConfig = VectorConfig {
-    similarity: nidx_vector::config::Similarity::Cosine,
-    normalize_vectors: false,
-    vector_type: nidx_vector::config::VectorType::DenseF32 { dimension: 3 },
-    flags: vec![],
-    vector_cardinality: VectorCardinality::Single,
-    disable_indexes: false,
-};
+const VECTOR_CONFIG: VectorConfig = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 3 });
 
 #[sqlx::test]
 async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {

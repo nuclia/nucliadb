@@ -110,14 +110,14 @@ struct MergeInputs {
 }
 
 impl<T: for<'de> Deserialize<'de>> OpenIndexMetadata<T> for MergeInputs {
-    fn segments(&self) -> impl Iterator<Item = (SegmentMetadata<T>, Seq)> {
+    fn segments(&self) -> impl DoubleEndedIterator<Item = (SegmentMetadata<T>, Seq)> {
         self.segments
             .iter()
             .enumerate()
             .map(|(idx, segment)| (segment.metadata(self.work_dir.join(idx.to_string())), segment.seq))
     }
 
-    fn deletions(&self) -> impl Iterator<Item = (&String, Seq)> {
+    fn deletions(&self) -> impl DoubleEndedIterator<Item = (&String, Seq)> {
         self.deletions
             .iter()
             .flat_map(|del| del.keys.iter().map(|key| (key, del.seq)))

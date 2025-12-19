@@ -256,8 +256,6 @@ mod tests {
     use std::sync::Arc;
 
     use nidx_tests::little_prince;
-    use nidx_vector::config::Similarity;
-    use nidx_vector::config::VectorCardinality;
     use nidx_vector::config::VectorConfig;
     use nidx_vector::config::VectorType;
     use object_store::ObjectStore;
@@ -276,14 +274,7 @@ mod tests {
         metadata::{Index, IndexConfig, Shard},
     };
 
-    const VECTOR_CONFIG: VectorConfig = VectorConfig {
-        similarity: Similarity::Cosine,
-        normalize_vectors: false,
-        vector_type: VectorType::DenseF32 { dimension: 3 },
-        flags: vec![],
-        vector_cardinality: VectorCardinality::Single,
-        disable_indexes: false,
-    };
+    const VECTOR_CONFIG: VectorConfig = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 3 });
 
     #[sqlx::test]
     async fn test_export_and_import(pool_source: sqlx::PgPool) -> anyhow::Result<()> {
