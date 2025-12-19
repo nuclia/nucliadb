@@ -328,7 +328,7 @@ async def test_get_resource_extracted_metadata(nucliadb_reader: AsyncClient, tes
 @pytest.mark.deploy_modes("component")
 async def test_head_resource(nucliadb_reader: AsyncClient, test_resource: Resource):
     kbid = test_resource.kbid
-    slug = test_resource.basic.slug
+    slug = test_resource.basic.slug  # type: ignore
     uuid = test_resource.uuid
 
     # By UUID

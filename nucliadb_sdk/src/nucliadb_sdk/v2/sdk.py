@@ -167,6 +167,16 @@ SDK_DEFINITION = {
         path_params=(),
     ),
     # Resource Endpoints
+    "head_resource": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}",
+        method="HEAD",
+        path_params=("kbid", "rid"),
+    ),
+    "head_resource_by_slug": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/slug/{slug}",
+        method="HEAD",
+        path_params=("kbid", "slug"),
+    ),
     "create_resource": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resources",
         method="POST",
@@ -1034,6 +1044,8 @@ class NucliaDB(_NucliaDBBase):
     )
     list_knowledge_boxes = _request_sync_builder("list_knowledge_boxes", type(None), KnowledgeBoxList)
     # Resource Endpoints
+    head_resource = _request_sync_builder("head_resource", type(None), type(None))
+    head_resource_by_slug = _request_sync_builder("head_resource_by_slug", type(None), type(None))
     create_resource = _request_sync_builder("create_resource", CreateResourcePayload, ResourceCreated)
     update_resource = _request_sync_builder("update_resource", UpdateResourcePayload, ResourceUpdated)
     update_resource_by_slug = _request_sync_builder(
@@ -1234,6 +1246,8 @@ class NucliaDBAsync(_NucliaDBBase):
     )
     list_knowledge_boxes = _request_async_builder("list_knowledge_boxes", type(None), KnowledgeBoxList)
     # Resource Endpoints
+    head_resource = _request_async_builder("head_resource", type(None), type(None))
+    head_resource_by_slug = _request_async_builder("head_resource_by_slug", type(None), type(None))
     create_resource = _request_async_builder("create_resource", CreateResourcePayload, ResourceCreated)
     update_resource = _request_async_builder("update_resource", UpdateResourcePayload, ResourceUpdated)
     update_resource_by_slug = _request_async_builder(

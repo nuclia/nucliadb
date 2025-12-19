@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional, Union
+from typing import Optional, Union, cast
 
 from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
@@ -102,6 +102,7 @@ async def head_resource(
     if all([rslug, rid]) or not any([rslug, rid]):
         raise ValueError("Either rid or rslug must be provided, but not both")
     if rid is None:
+        rslug = cast(str, rslug)
         rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(kbid=kbid, slug=rslug)
         if rid is None:
             raise HTTPException(status_code=404, detail="Resource does not exist")

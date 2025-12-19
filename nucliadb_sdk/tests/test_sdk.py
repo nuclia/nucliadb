@@ -70,6 +70,12 @@ def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.catalog(kbid=kb.uuid, query="foo")
     sdk.update_resource(kbid=kb.uuid, rid=resource.id, title="Resource2")
     sdk.update_resource_by_slug(kbid=kb.uuid, rslug="resource", title="Resource3")
+    with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
+        sdk.head_resource(kbid=kb.uuid, rid="nonexistent")
+    sdk.head_resource(kbid=kb.uuid, rid=resource.id)
+    with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
+        sdk.head_resource_by_slug(kbid=kb.uuid, slug="nonexistent")
+    sdk.head_resource_by_slug(kbid=kb.uuid, slug="resource")
 
     # Reindex / Reprocess
     sdk.reindex_resource(kbid=kb.uuid, rid=resource.id)
