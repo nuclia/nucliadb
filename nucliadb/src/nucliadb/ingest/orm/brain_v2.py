@@ -20,7 +20,7 @@
 import logging
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Optional
+from typing import Iterator, Optional
 
 from nidx_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nidx_protos.noderesources_pb2 import (
@@ -126,9 +126,13 @@ class ResourceBrain:
     ):
         if skip_texts is not None:
             self.brain.skip_texts = skip_texts
+
         field_text = extracted_text.text
-        for _, split in extracted_text.split_text.items():
-            field_text += f" {split} "
+
+        for split_id in self.sorted_splits(extracted_text):
+            split_text = extracted_text.split_text[split_id]
+            field_text += f"{split_text} "
+
         self.brain.texts[field_key].text = field_text
 
         if replace_field:
@@ -219,6 +223,10 @@ class ResourceBrain:
         skip_texts_index: Optional[bool],
         append_splits: Optional[set[str]] = None,
     ) -> None:
+        """
+        append_splits: when provided, only the splits in this set will be indexed. This is used for conversation appends, to
+                       avoid reindexing all previous messages of the conversation.
+        """
         # We need to add the extracted text to the texts section of the Resource so that
         # the paragraphs can be indexed
         self.apply_field_text(
@@ -238,6 +246,10 @@ class ResourceBrain:
             append_splits=append_splits,
         )
 
+    def sorted_splits(self, extracted_text: ExtractedText) -> Iterator[str]:
+        for split in sorted(extracted_text.split_text.keys()):
+            yield split
+
     @observer.wrap({"type": "apply_field_paragraphs"})
     def apply_field_paragraphs(
         self,
@@ -255,13 +267,21 @@ class ResourceBrain:
         unique_paragraphs: set[str] = set()
         user_paragraph_classifications = self._get_paragraph_user_classifications(user_field_metadata)
         paragraph_pages = ParagraphPages(page_positions) if page_positions else None
+
         # Splits of the field
-        for subfield, field_metadata in field_computed_metadata.split_metadata.items():
-            if should_skip_split_indexing(subfield, replace_field, append_splits):
+
+        # Used to adjust the paragraph start/end when indexing splits, as they are all
+        # concatenated in the main text part of the brain Resource.
+        split_offset = 0
+        for subfield in self.sorted_splits(extracted_text):
+            if subfield not in field_computed_metadata.split_metadata or should_skip_split_indexing(
+                subfield, replace_field, append_splits
+            ):
+                # We're skipping this split but we need to adjust the offset as we have added the text
+                # of this split to the main text
+                split_offset += len(extracted_text.split_text[subfield]) + 1  # +1 for the space
                 continue
-            if subfield not in extracted_text.split_text:
-                # No extracted text for this split
-                continue
+            field_metadata = field_computed_metadata.split_metadata[subfield]
             extracted_text_str = extracted_text.split_text[subfield]
             for idx, paragraph in enumerate(field_metadata.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
@@ -288,8 +308,8 @@ class ResourceBrain:
                     representation.file = paragraph.representation.reference_file
                     representation.is_a_table = paragraph.representation.is_a_table
                 p = BrainParagraph(
-                    start=paragraph.start,
-                    end=paragraph.end,
+                    start=paragraph.start + split_offset,
+                    end=paragraph.end + split_offset,
                     field=field_key,
                     split=subfield,
                     index=idx,
@@ -304,6 +324,7 @@ class ResourceBrain:
                         representation=representation,
                     ),
                 )
+                split_offset = p.end + 1  # +1 for the space
                 paragraph_kind_label = f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
                 paragraph_labels = {paragraph_kind_label}
                 paragraph_labels.update(

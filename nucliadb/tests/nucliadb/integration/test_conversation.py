@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import random
 from datetime import datetime
 from typing import Optional
 from unittest.mock import patch
@@ -49,7 +50,11 @@ from nucliadb_protos.resources_pb2 import (
     Vector,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.ndbfixtures.resources._vectors import lambs_split_6_vector
+from tests.ndbfixtures.resources.lambs import lambs_resource
 from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 
@@ -778,3 +783,105 @@ async def test_replace_conversation_with_put_endpoint_deletes_previous_pages(
     body = resp.json()
     assert len(body["value"]["messages"]) == 1
     assert body["value"]["messages"][0]["ident"] == "x"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_conversation_search(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+    rid = await lambs_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    message_text = "Orion is looking splendid tonight, and Arcturus, the Herdsman, with his flock..."
+    message_id = f"{rid}/c/lambs/6/0-80"
+    message_vector = lambs_split_6_vector[:512]
+
+    async def _test_keyword_search(message_text: str, message_id: str):
+        # Test keyword search retrieves the right message
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "query": message_text,
+                "features": ["keyword"],
+                "top_k": 1,
+            },
+        )
+        assert resp.status_code == 200
+        results = KnowledgeboxFindResults.model_validate(resp.json())
+        assert message_id in results.best_matches
+        assert (
+            results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text
+            == message_text
+        )
+
+    async def _test_semantic_search(message_text: str, message_id: str, message_vector: list[float]):
+        # Test semantic search retrieves the right message
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "vector": message_vector,
+                "features": ["semantic"],
+                "top_k": 1,
+                "reranker": "noop",
+                "vectorset": "multilingual",
+            },
+        )
+        assert resp.status_code == 200
+        results = KnowledgeboxFindResults.model_validate(resp.json())
+        assert message_id in results.best_matches
+        assert (
+            results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text
+            == message_text
+        )
+
+    await _test_keyword_search(message_text, message_id)
+    await _test_semantic_search(message_text, message_id, message_vector)
+
+    # Add another message to the conversation, to test that indexing works on partial updates too
+    new_message_text = "Foo barba foo barba foo."
+    new_message_vector = [random.uniform(-1, 1) for _ in range(512)]
+    new_message_split_id = "new_message"
+    new_message_id = f"{rid}/c/lambs/{new_message_split_id}/0-{len(new_message_text)}"
+
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages",
+        json=[
+            {
+                "to": ["reader"],
+                "who": "narrator",
+                "timestamp": datetime.now().isoformat(),
+                "content": {"text": new_message_text},
+                "ident": new_message_split_id,
+                "type": MessageType.UNSET.value,
+            }
+        ],
+    )
+    resp.raise_for_status()
+
+    # Inject synthetic processed data for the new message
+    bmb = BrokerMessageBuilder(
+        kbid=kbid,
+        rid=rid,
+        source=BrokerMessage.MessageSource.PROCESSOR,
+    )
+    conv = bmb.field_builder("lambs", FieldType.CONVERSATION)
+    conv.add_paragraph(
+        text=new_message_text,
+        split=new_message_split_id,
+        vectors={"multilingual": new_message_vector},
+    )
+    bm = bmb.build()
+    await inject_message(nucliadb_ingest_grpc, bm)
+    await mark_dirty()
+    await wait_for_sync()
+
+    # Previous searches still work
+    await _test_keyword_search(message_text, message_id)
+    await _test_semantic_search(message_text, message_id, message_vector)
+
+    # New message is searchable too
+    await _test_keyword_search(new_message_text, new_message_id)
+    await _test_semantic_search(new_message_text, new_message_id, new_message_vector)
