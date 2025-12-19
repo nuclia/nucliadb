@@ -50,6 +50,8 @@ from nucliadb.models.internal.augment import (
     FieldProp,
     FieldText,
     FieldValue,
+    FileProp,
+    FileThumbnail,
     FullSelector,
     MessageSelector,
     NeighboursSelector,
@@ -62,6 +64,7 @@ from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 from nucliadb_models.common import FieldTypeName
 from nucliadb_protos import resources_pb2
+from nucliadb_utils.storages.storage import STORAGE_FILE_EXTRACTED
 
 
 async def augment_fields(
@@ -119,7 +122,7 @@ async def augment_field(
 async def db_augment_field(
     field: Field,
     field_id: FieldId,
-    select: Sequence[FieldProp | ConversationProp],
+    select: Sequence[FieldProp | FileProp | ConversationProp],
 ) -> AugmentedField:
     field_type = field_id.type
 
@@ -133,8 +136,8 @@ async def db_augment_field(
         return await db_augment_text_field(field, field_id, select)
 
     elif field_type == FieldTypeName.FILE.abbreviation():
-        select = cast(list[FieldProp], select)
         field = cast(File, field)
+        select = cast(list[FileProp], select)
         return await db_augment_file_field(field, field_id, select)
 
     elif field_type == FieldTypeName.LINK.abbreviation():
@@ -192,7 +195,7 @@ async def db_augment_text_field(
 async def db_augment_file_field(
     field: File,
     field_id: FieldId,
-    select: Sequence[FieldProp],
+    select: Sequence[FileProp],
 ) -> AugmentedFileField:
     augmented = AugmentedFileField(id=field.field_id)
 
@@ -213,6 +216,23 @@ async def db_augment_file_field(
             if db_value is None:
                 continue
             augmented.value = from_proto.field_file(db_value)
+
+        elif isinstance(prop, FileThumbnail):
+            thumbnail = await field.thumbnail()
+            if thumbnail is None:
+                continue
+
+            # When ingesting file processed data, we move thumbnails to a owned
+            # path. The thumbnail.key must then match this path so we can safely
+            # return a path that can be used with the download API to get the
+            # actual image
+            _expected_prefix = STORAGE_FILE_EXTRACTED.format(
+                kbid=field.kbid, uuid=field.uuid, field_type=field_id.type, field=field_id.key, key=""
+            )
+            assert thumbnail.key.startswith(_expected_prefix), (
+                "we use a hardcoded path for file thumbnails and we assume is this"
+            )
+            augmented.thumbnail_path = thumbnail.key.removeprefix(_expected_prefix)
 
         else:  # pragma: no cover
             assert_never(prop)

@@ -210,6 +210,24 @@ FieldProp = Annotated[
 ]
 
 
+class FileThumbnail(SelectProp):
+    """File field thumbnail image"""
+
+    prop: Literal["thumbnail"] = "thumbnail"
+
+
+FileProp = Annotated[
+    (
+        Annotated[FieldText, Tag("text")]
+        | Annotated[FieldValue, Tag("value")]
+        | Annotated[FieldClassificationLabels, Tag("classification_labels")]
+        | Annotated[FieldEntities, Tag("entities")]
+        | Annotated[FileThumbnail, Tag("thumbnail")]
+    ),
+    Discriminator(prop_discriminator),
+]
+
+
 class MessageSelector(BaseModel):
     """Selects the message specified by the field id."""
 
@@ -495,6 +513,7 @@ class AugmentedFileField(BaseAugmentedField):
     value: FieldFile | None = None
 
     text: str | None = None
+    thumbnail_path: str | None = None
 
 
 @dataclass

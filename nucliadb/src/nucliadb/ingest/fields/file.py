@@ -108,3 +108,17 @@ class File(Field[FieldFile]):
             )
             self.file_extracted_data = await self.storage.download_pb(sf, FileExtractedData)
         return self.file_extracted_data
+
+    async def thumbnail(self) -> StorageField | None:
+        """Access the file field thumbnail."""
+        fed = await self.get_file_extracted_data()
+        if fed is None:
+            return None
+        if not fed.HasField("file_thumbnail"):
+            return None
+
+        sf: StorageField = self.storage.file_extracted(
+            self.kbid, self.uuid, self.type, self.id, "file_thumbnail"
+        )
+        sf.field = fed.file_thumbnail
+        return sf
