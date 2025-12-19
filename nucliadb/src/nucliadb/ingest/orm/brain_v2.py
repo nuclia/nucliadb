@@ -275,6 +275,9 @@ class ResourceBrain:
         split_offset = 0
         for subfield in self.sorted_splits(extracted_text):
             if subfield not in field_computed_metadata.split_metadata:
+                # No computed metadata for this split, but we need to adjust the offset as we have added the text
+                # of this split to the main text
+                split_offset += len(extracted_text.split_text[subfield]) + 1  # +1 for the space
                 continue
             field_metadata = field_computed_metadata.split_metadata[subfield]
             if should_skip_split_indexing(subfield, replace_field, append_splits):
@@ -324,7 +327,7 @@ class ResourceBrain:
                         representation=representation,
                     ),
                 )
-                split_offset = p.end + 1
+                split_offset = p.end + 1  # +1 for the space
                 paragraph_kind_label = f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
                 paragraph_labels = {paragraph_kind_label}
                 paragraph_labels.update(
