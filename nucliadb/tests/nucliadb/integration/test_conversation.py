@@ -793,38 +793,110 @@ async def test_conversation_search(
     kbid = standalone_knowledgebox
     rid = await lambs_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
-    # Test keyword search retrieves the right message
     message_text = "Orion is looking splendid tonight, and Arcturus, the Herdsman, with his flock..."
-    message_full_id = f"{rid}/c/lambs/6/0-80"
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "query": message_text,
-            "features": ["keyword"],
-            "top_k": 1,
-        },
-    )
-    assert resp.status_code == 200
-    results = KnowledgeboxFindResults.model_validate(resp.json())
-    assert message_full_id in results.best_matches
-    assert (
-        results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text == message_text
-    )
+    message_id = f"{rid}/c/lambs/6/0-80"
+    message_vector = lambs_split_6_vector[:512]
 
-    # Test semantic search retrieves the right message
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "vector": lambs_split_6_vector[:512],
-            "features": ["semantic"],
-            "top_k": 1,
-            "reranker": "noop",
-            "vectorset": "multilingual",
-        },
+    async def _test_keyword_search(message_text: str, message_id: str):
+        # Test keyword search retrieves the right message
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "query": message_text,
+                "features": ["keyword"],
+                "top_k": 1,
+            },
+        )
+        assert resp.status_code == 200
+        results = KnowledgeboxFindResults.model_validate(resp.json())
+        assert message_id in results.best_matches
+        assert (
+            results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text
+            == message_text
+        )
+
+    async def _test_semantic_search(message_text: str, message_id: str, message_vector: list[float]):
+        # Test semantic search retrieves the right message
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "vector": message_vector,
+                "features": ["semantic"],
+                "top_k": 1,
+                "reranker": "noop",
+                "vectorset": "multilingual",
+            },
+        )
+        assert resp.status_code == 200
+        results = KnowledgeboxFindResults.model_validate(resp.json())
+        assert message_id in results.best_matches
+        assert (
+            results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text
+            == message_text
+        )
+
+    await _test_keyword_search(message_text, message_id)
+    await _test_semantic_search(message_text, message_id, message_vector)
+
+    # Add another message to the conversation, to test that indexing works on partial updates too
+    new_message_text = "The Pleiades are also visible to the naked eye."
+    new_message_vector = [0.7878] * 512
+    new_message_id = f"{rid}/c/lambs/new_message/0-47"
+
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages",
+        json=[
+            {
+                "to": ["reader"],
+                "who": "narrator",
+                "timestamp": datetime.now().isoformat(),
+                "content": {"text": new_message_text},
+                "ident": "new_message",
+                "type": MessageType.UNSET.value,
+            }
+        ],
     )
-    assert resp.status_code == 200
-    results = KnowledgeboxFindResults.model_validate(resp.json())
-    assert message_full_id in results.best_matches
-    assert (
-        results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text == message_text
+    resp.raise_for_status()
+
+    # Inject synthetic processed data for the new message
+    bm = BrokerMessage()
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    bm.uuid = rid
+    bm.kbid = kbid
+    field = FieldID(field="lambs", field_type=FieldType.CONVERSATION)
+    etw = ExtractedTextWrapper()
+    etw.field.MergeFrom(field)
+    etw.body.split_text["new_message"] = new_message_text
+    bm.extracted_text.append(etw)
+    evw = ExtractedVectorsWrapper()
+    evw.field.MergeFrom(field)
+    evw.vectors.split_vectors["new_message"].vectors.append(
+        Vector(
+            start=0,
+            end=len(new_message_text),
+            start_paragraph=0,
+            end_paragraph=len(new_message_text),
+            vector=new_message_vector,
+        )
     )
+    bm.field_vectors.append(evw)
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.MergeFrom(field)
+    paragraph = Paragraph(
+        start=0,
+        end=len(new_message_text),
+        kind=Paragraph.TypeParagraph.TEXT,
+    )
+    fcmw.metadata.split_metadata["new_message"].paragraphs.append(paragraph)
+    bm.field_metadata.append(fcmw)
+    await inject_message(nucliadb_ingest_grpc, bm)
+    await mark_dirty()
+    await wait_for_sync()
+
+    # Previous searches still work
+    await _test_keyword_search(message_text, message_id)
+    await _test_semantic_search(message_text, message_id, message_vector)
+
+    # New message is searchable too
+    await _test_keyword_search(new_message_text, new_message_id)
+    await _test_semantic_search(new_message_text, new_message_id, new_message_vector)
