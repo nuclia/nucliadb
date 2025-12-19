@@ -52,7 +52,6 @@ from nucliadb.models.internal.augment import (
     PageSelector,
     WindowSelector,
 )
-from nucliadb.search import logger
 from nucliadb.search.augmentor.metrics import augmentor_observer
 from nucliadb.search.augmentor.resources import get_basic
 from nucliadb.search.augmentor.utils import limited_concurrency
@@ -173,6 +172,9 @@ async def db_augment_text_field(
             db_value = await field.get_value()
             augmented.value = from_proto.field_text(db_value)
 
+        else:  # pragma: no cover
+            assert_never(prop)
+
     return augmented
 
 
@@ -200,6 +202,9 @@ async def db_augment_file_field(
             db_value = await field.get_value()
             augmented.value = from_proto.field_file(db_value)
 
+        else:  # pragma: no cover
+            assert_never(prop)
+
     return augmented
 
 
@@ -226,6 +231,9 @@ async def db_augment_link_field(
         elif isinstance(prop, FieldValue):
             db_value = await field.get_value()
             augmented.value = from_proto.field_link(db_value)
+
+        else:  # pragma: no cover
+            assert_never(prop)
 
     return augmented
 
@@ -291,8 +299,9 @@ async def db_augment_conversation_field(
                         field.uuid, ref.field_type, ref.field_id, ref.split or None
                     )
                     augmented_message.attachments.append(field_id)
-        else:
-            logger.warning(f"conversation field property not implemented: {prop}")
+
+        else:  # pragma: no cover
+            assert_never(prop)
 
     if len(messages) > 0:
         augmented.messages = []
@@ -325,6 +334,9 @@ async def db_augment_generic_field(
         elif isinstance(prop, FieldValue):
             db_value = await field.get_value()
             augmented.value = db_value
+
+        else:  # pragma: no cover
+            assert_never(prop)
 
     return augmented
 
