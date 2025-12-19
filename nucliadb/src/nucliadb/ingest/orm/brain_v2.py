@@ -282,9 +282,6 @@ class ResourceBrain:
             field_metadata = field_computed_metadata.split_metadata[subfield]
             if should_skip_split_indexing(subfield, replace_field, append_splits):
                 continue
-            if subfield not in extracted_text.split_text:
-                # No extracted text for this split
-                continue
             extracted_text_str = extracted_text.split_text[subfield]
             for idx, paragraph in enumerate(field_metadata.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
