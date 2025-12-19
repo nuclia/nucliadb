@@ -839,9 +839,10 @@ async def test_conversation_search(
     await _test_semantic_search(message_text, message_id, message_vector)
 
     # Add another message to the conversation, to test that indexing works on partial updates too
-    new_message_text = "The Pleiades are also visible to the naked eye."
+    new_message_text = "Foo barba foo barba foo."
     new_message_vector = [0.7878] * 512
-    new_message_id = f"{rid}/c/lambs/new_message/0-47"
+    new_message_split_id = "new_message"
+    new_message_id = f"{rid}/c/lambs/{new_message_split_id}/0-{len(new_message_text)}"
 
     resp = await nucliadb_writer.put(
         f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages",
@@ -851,7 +852,7 @@ async def test_conversation_search(
                 "who": "narrator",
                 "timestamp": datetime.now().isoformat(),
                 "content": {"text": new_message_text},
-                "ident": "new_message",
+                "ident": new_message_split_id,
                 "type": MessageType.UNSET.value,
             }
         ],
@@ -866,11 +867,11 @@ async def test_conversation_search(
     field = FieldID(field="lambs", field_type=FieldType.CONVERSATION)
     etw = ExtractedTextWrapper()
     etw.field.MergeFrom(field)
-    etw.body.split_text["new_message"] = new_message_text
+    etw.body.split_text[new_message_split_id] = new_message_text
     bm.extracted_text.append(etw)
     evw = ExtractedVectorsWrapper()
     evw.field.MergeFrom(field)
-    evw.vectors.split_vectors["new_message"].vectors.append(
+    evw.vectors.split_vectors[new_message_split_id].vectors.append(
         Vector(
             start=0,
             end=len(new_message_text),
@@ -887,7 +888,7 @@ async def test_conversation_search(
         end=len(new_message_text),
         kind=Paragraph.TypeParagraph.TEXT,
     )
-    fcmw.metadata.split_metadata["new_message"].paragraphs.append(paragraph)
+    fcmw.metadata.split_metadata[new_message_split_id].paragraphs.append(paragraph)
     bm.field_metadata.append(fcmw)
     await inject_message(nucliadb_ingest_grpc, bm)
     await mark_dirty()
