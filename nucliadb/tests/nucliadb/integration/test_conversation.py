@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import random
 from datetime import datetime
 from typing import Optional
 from unittest.mock import patch
@@ -840,7 +841,7 @@ async def test_conversation_search(
 
     # Add another message to the conversation, to test that indexing works on partial updates too
     new_message_text = "Foo barba foo barba foo."
-    new_message_vector = [0.7878] * 512
+    new_message_vector = [random.uniform(-1, 1) for _ in range(512)]
     new_message_split_id = "new_message"
     new_message_id = f"{rid}/c/lambs/{new_message_split_id}/0-{len(new_message_text)}"
 
