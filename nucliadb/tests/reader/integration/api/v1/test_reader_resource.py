@@ -323,3 +323,30 @@ async def test_get_resource_extracted_metadata(nucliadb_reader: AsyncClient, tes
     assert metadata["entities"]["my-task-id"]["entities"][0]["text"] == "document"
     assert metadata["entities"]["my-task-id"]["entities"][0]["label"] == "NOUN"
     assert len(metadata["entities"]["my-task-id"]["entities"][0]["positions"]) == 2
+
+
+@pytest.mark.deploy_modes("component")
+async def test_head_resource(nucliadb_reader: AsyncClient, test_resource: Resource):
+    kbid = test_resource.kbid
+    slug = test_resource.basic.slug
+    uuid = test_resource.uuid
+
+    # By UUID
+    resp = await nucliadb_reader.head(
+        f"/kb/{kbid}/resource/{uuid}",
+    )
+    assert resp.status_code == 200
+    resp = await nucliadb_reader.head(
+        f"/kb/{kbid}/resource/non-existent-uuid",
+    )
+    assert resp.status_code == 404
+
+    # By slug
+    resp = await nucliadb_reader.head(
+        f"/kb/{kbid}/slug/{slug}",
+    )
+    assert resp.status_code == 200
+    resp = await nucliadb_reader.head(
+        f"/kb/{kbid}/slug/non-existent-slug",
+    )
+    assert resp.status_code == 404
