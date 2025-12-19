@@ -41,6 +41,9 @@ from nucliadb.models.internal.augment import (
     FieldEntities,
     FieldProp,
     FieldText,
+    FileAugment,
+    FileProp,
+    FileThumbnail,
     FullSelector,
     MessageSelector,
     Metadata,
@@ -66,6 +69,7 @@ from nucliadb_models.augment import (
     AugmentedConversationField,
     AugmentedConversationMessage,
     AugmentedField,
+    AugmentedFileField,
     AugmentedParagraph,
     AugmentedResource,
     AugmentParagraphs,
@@ -189,12 +193,25 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
         if item.fields.classification_labels:
             select.append(FieldClassificationLabels())
 
-        augmentations.append(
-            FieldAugment(
-                given=given,
-                select=select,
+        if len(select) > 0:
+            augmentations.append(
+                FieldAugment(
+                    given=given,
+                    select=select,
+                )
             )
-        )
+
+        file_select: list[FileProp] = []
+        if item.fields.file_thumbnail:
+            file_select.append(FileThumbnail())
+
+        if len(file_select) > 0:
+            augmentations.append(
+                FileAugment(
+                    given=given,  # type: ignore
+                    select=file_select,
+                )
+            )
 
         conversation_select: list[ConversationProp] = []
         selector: ConversationSelector
@@ -221,7 +238,7 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
             # in a first iteration and the window in the second
             pass
 
-        if conversation_select:
+        if len(conversation_select) > 0:
             augmentations.append(
                 ConversationAugment(
                     given=given,  # type: ignore
@@ -389,7 +406,6 @@ def build_augment_response(item: AugmentRequest, augmented: Augmented) -> Augmen
 
         if field_id.type in (
             FieldTypeName.TEXT.abbreviation(),
-            FieldTypeName.FILE.abbreviation(),
             FieldTypeName.LINK.abbreviation(),
             FieldTypeName.GENERIC.abbreviation(),
         ):
@@ -397,6 +413,15 @@ def build_augment_response(item: AugmentRequest, augmented: Augmented) -> Augmen
                 text=field.text,  # type: ignore # field is instance of any of the above and has the text property
                 classification_labels=classification_labels,
                 entities=entities,
+            )
+
+        elif field_id.type == FieldTypeName.FILE.abbreviation():
+            field = cast(internal_augment.AugmentedFileField, field)
+            response.fields[field_id.full()] = AugmentedFileField(
+                text=field.text,  # type: ignore # field is instance of any of the above and has the text property
+                classification_labels=classification_labels,
+                entities=entities,
+                thumbnail_image=field.thumbnail_path,
             )
 
         elif field_id.type == FieldTypeName.CONVERSATION.abbreviation():

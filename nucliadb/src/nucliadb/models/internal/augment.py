@@ -407,6 +407,12 @@ class DeepResourceAugment(BaseModel, extra="forbid"):
     from_: Literal["resources.deep"] = Field(default="resources.deep", alias="from")
 
 
+class FileAugment(BaseModel, extra="forbid"):
+    given: list[FieldId | ParagraphId]
+    select: list[FileProp]
+    from_: Literal["files"] = Field(default="files", alias="from")
+
+
 class ConversationAugmentLimits(BaseModel):
     max_messages: int | None = Field(default=15, ge=0)
 
@@ -415,6 +421,7 @@ class ConversationAugment(BaseModel, extra="forbid"):
     given: list[FieldId | ParagraphId]
     select: list[ConversationProp]
     from_: Literal["conversations"] = Field(default="conversations", alias="from")
+    # TODO(decoupled-storage): remove?
     limits: ConversationAugmentLimits | None = Field(default_factory=ConversationAugmentLimits)
 
 
@@ -447,6 +454,7 @@ Augment = Annotated[
         Annotated[ResourceAugment, Tag("resources")]
         | Annotated[DeepResourceAugment, Tag("resources.deep")]
         | Annotated[FieldAugment, Tag("fields")]
+        | Annotated[FileAugment, Tag("files")]
         | Annotated[ConversationAugment, Tag("conversations")]
         | Annotated[ParagraphAugment, Tag("paragraphs")]
     ),

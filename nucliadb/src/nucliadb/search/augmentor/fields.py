@@ -218,21 +218,7 @@ async def db_augment_file_field(
             augmented.value = from_proto.field_file(db_value)
 
         elif isinstance(prop, FileThumbnail):
-            thumbnail = await field.thumbnail()
-            if thumbnail is None:
-                continue
-
-            # When ingesting file processed data, we move thumbnails to a owned
-            # path. The thumbnail.key must then match this path so we can safely
-            # return a path that can be used with the download API to get the
-            # actual image
-            _expected_prefix = STORAGE_FILE_EXTRACTED.format(
-                kbid=field.kbid, uuid=field.uuid, field_type=field_id.type, field=field_id.key, key=""
-            )
-            assert thumbnail.key.startswith(_expected_prefix), (
-                "we use a hardcoded path for file thumbnails and we assume is this"
-            )
-            augmented.thumbnail_path = thumbnail.key.removeprefix(_expected_prefix)
+            augmented.thumbnail_path = await get_file_thumbnail_path(field, field_id)
 
         else:  # pragma: no cover
             assert_never(prop)
@@ -421,6 +407,26 @@ async def field_entities(id: FieldId, field: Field) -> dict[str, set[str]] | Non
         ners.setdefault(family, set()).add(token)
 
     return ners
+
+
+async def get_file_thumbnail_path(field: File, field_id: FieldId) -> str | None:
+    thumbnail = await field.thumbnail()
+    if thumbnail is None:
+        return None
+
+    # When ingesting file processed data, we move thumbnails to a owned
+    # path. The thumbnail.key must then match this path so we can safely
+    # return a path that can be used with the download API to get the
+    # actual image
+    _expected_prefix = STORAGE_FILE_EXTRACTED.format(
+        kbid=field.kbid, uuid=field.uuid, field_type=field_id.type, field=field_id.key, key=""
+    )
+    assert thumbnail.key.startswith(_expected_prefix), (
+        "we use a hardcoded path for file thumbnails and we assume is this"
+    )
+    thumbnail_path = thumbnail.key.removeprefix(_expected_prefix)
+
+    return thumbnail_path
 
 
 async def find_conversation_message(

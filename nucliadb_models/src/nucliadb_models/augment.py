@@ -162,6 +162,9 @@ class AugmentFields(BaseModel):
     classification_labels: bool = False
     entities: bool = False  # also known as ners
 
+    # For file fields, augment the path to the thumbnail image
+    file_thumbnail: bool = False
+
     # When enabled, augment all the messages from the conversation. This is
     # incompatible with max_conversation_messages defined
     full_conversation: bool = False
@@ -281,8 +284,20 @@ class AugmentedField(BaseModel):
     # former ners
     entities: dict[str, list[str]] | None = None
 
+
+class AugmentedFileField(BaseModel):
+    text: str | None = None
+
+    classification_labels: dict[str, list[str]] | None = None
+
+    # former ners
+    entities: dict[str, list[str]] | None = None
+
     # TODO(decoupled-ask): implement image strategy
     page_preview_image: str | None = None
+
+    # Path for the download API to retrieve the file thumbnail image
+    thumbnail_image: str | None = None
 
 
 class AugmentedConversationMessage(BaseModel):
@@ -340,5 +355,5 @@ class AugmentedResource(Resource):
 
 class AugmentResponse(BaseModel):
     resources: dict[ResourceId, AugmentedResource]
-    fields: dict[FieldId, AugmentedField | AugmentedConversationField]
+    fields: dict[FieldId, AugmentedField | AugmentedFileField | AugmentedConversationField]
     paragraphs: dict[ParagraphId, AugmentedParagraph]

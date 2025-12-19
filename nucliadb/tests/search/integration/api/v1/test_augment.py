@@ -18,11 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from unittest.mock import patch
+
 import pytest
 from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
-from nucliadb_models.augment import AugmentResponse
+from nucliadb_models.augment import AugmentedFileField, AugmentResponse
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.ndbfixtures.resources import cookie_tale_resource, smb_wonder_resource
 
@@ -142,3 +144,33 @@ async def test_augment_api_images(
         body.paragraphs[f"{rid}/f/cookie-recipie/29-75"].page_preview_image
         == "generated/extracted_images_1.png"
     )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_augment_api_file_thumbnails(
+    nucliadb_search: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    knowledgebox: str,
+) -> None:
+    kbid = knowledgebox
+    rid = await cookie_tale_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    # TODO(decoupled-ask): add a ndbfixtures file field with thumbnails and check this without a mock
+    with patch("nucliadb.search.augmentor.fields.get_file_thumbnail_path", return_value="mythumbnail"):
+        resp = await nucliadb_search.post(
+            f"/{KB_PREFIX}/{kbid}/augment",
+            json={
+                "fields": {
+                    "given": [f"{rid}/f/cookie-recipie"],
+                    "file_thumbnail": True,
+                },
+            },
+        )
+        assert resp.status_code == 200
+
+        body: AugmentResponse = AugmentResponse.model_validate(resp.json())
+        assert f"{rid}/f/cookie-recipie" in body.fields
+        field = body.fields[f"{rid}/f/cookie-recipie"]
+        assert isinstance(field, AugmentedFileField)
+        assert field.thumbnail_image == "mythumbnail"
