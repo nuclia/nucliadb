@@ -19,12 +19,14 @@
 #
 import logging
 import uuid
+from typing import AsyncIterator, cast
 
 from nucliadb.common import datamanagers
+from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.ingest.orm.index_message import get_resource_index_message
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.migrator.context import ExecutionContext
-from nucliadb_protos.resources_pb2 import FieldType
+from nucliadb_protos.writer_pb2 import ShardObject, Shards
 
 logger = logging.getLogger(__name__)
 
@@ -36,73 +38,99 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     """
     Reindex resources that have conversation fields
     """
-    affected_resource_ids = set()
-    async with datamanagers.with_ro_transaction() as txn:
-        async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
-            field_ids = await datamanagers.resources.get_all_field_ids(
-                txn, kbid=kbid, rid=rid, for_update=False
-            )
-            if field_ids is None:
-                continue
-            for fid in field_ids.fields:
-                if fid.field_type == FieldType.CONVERSATION:
-                    affected_resource_ids.add(rid)
-                    break
-
-    if len(affected_resource_ids) == 0:
-        logger.info(
-            "Migration 41: No resources with conversation fields to reindex in KB",
-            extra={"kbid": kbid},
-        )
-        return
-
     kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=kbid, for_update=False)
-    if kb_shards is None:
+    if kb_shards is not None:
+        async for rid in iter_affected_resource_ids(context, kbid):
+            await reindex_resource(context, kbid, rid, kb_shards)
+    else:
         logger.warning(
             "Migration 41: KB shards not found, skipping reindexing",
             extra={"kbid": kbid},
         )
-        return
 
-    logger.info(
-        f"Migration 41: Reindexing {len(affected_resource_ids)} resources with conversation fields in KB",
-        extra={"kbid": kbid},
-    )
-    for rid in affected_resource_ids:
-        async with datamanagers.with_ro_transaction() as rs_txn:
-            resource = await Resource.get(rs_txn, kbid=kbid, rid=rid)
-            if resource is None:
-                logger.warning(
-                    "Migration 41: Resource not found, skipping reindexing",
-                    extra={"kbid": kbid, "rid": rid},
-                )
-                continue
-            shard_id = await datamanagers.resources.get_resource_shard_id(
-                rs_txn, kbid=kbid, rid=rid, for_update=False
-            )
-            if shard_id is None:
-                logger.warning(
-                    "Migration 41: Shard ID not found for resource, skipping reindexing",
-                    extra={"kbid": kbid, "rid": rid},
-                )
-                continue
-            shard = next((shard for shard in kb_shards.shards if shard.shard == shard_id), None)
-            if shard is None:
-                logger.warning(
-                    "Migration 41: Shard not found for resource, skipping reindexing",
-                    extra={"kbid": kbid, "rid": rid, "shard_id": shard_id},
-                )
-                continue
-            index_message = await get_resource_index_message(resource, reindex=True)
-            await context.shard_manager.add_resource(
-                shard,
-                index_message,
-                0,
-                partition="0",
-                kb=kbid,
-                reindex_id=uuid.uuid4().hex,
-            )
-            logger.info(
-                "Migration 41: Resource reindexed",
+
+async def reindex_resource(
+    context: ExecutionContext,
+    kbid: str,
+    rid: str,
+    kb_shards: Shards,
+) -> None:
+    """
+    Reindex a single resource
+    """
+    async with datamanagers.with_ro_transaction() as rs_txn:
+        # Fetch the resource
+        resource = await Resource.get(rs_txn, kbid=kbid, rid=rid)
+        if resource is None:
+            logger.warning(
+                "Migration 41: Resource not found, skipping reindexing",
                 extra={"kbid": kbid, "rid": rid},
             )
+            return
+
+        # Get the shard for the resource
+        shard: ShardObject | None = None
+        shard_id = await datamanagers.resources.get_resource_shard_id(
+            rs_txn, kbid=kbid, rid=rid, for_update=False
+        )
+        if shard_id is not None:
+            shard = next((shard for shard in kb_shards.shards if shard.shard == shard_id), None)
+        if shard is None:
+            logger.warning(
+                "Migration 41: Shard not found for resource, skipping reindexing",
+                extra={"kbid": kbid, "rid": rid, "shard_id": shard_id},
+            )
+            return
+
+        # Create the index message and reindex the resource
+        index_message = await get_resource_index_message(resource, reindex=True)
+        await context.shard_manager.add_resource(
+            shard,
+            index_message,
+            0,
+            partition="0",
+            kb=kbid,
+            reindex_id=uuid.uuid4().hex,
+        )
+        logger.info(
+            "Migration 41: Resource reindexed",
+            extra={"kbid": kbid, "rid": rid},
+        )
+
+
+async def iter_affected_resource_ids(context: ExecutionContext, kbid: str) -> AsyncIterator[str]:
+    start = ""
+    while True:
+        keys_batch = await get_batch(context, kbid, start)
+        if keys_batch is None:
+            break
+        start = keys_batch[-1]
+        for key in keys_batch:
+            # The keys have the format /kbs/{kbid}/r/{rid}/f/c/{field_id}
+            rid = key.split("/")[4]
+            yield rid
+
+
+async def get_batch(context: ExecutionContext, kbid: str, start: str) -> list[str] | None:
+    """
+    Get a batch of resource keys that hold conversation fields for the given KB.
+    Starting after the given start key.
+    Returns None if no more keys are found.
+    """
+    batch_size = 100
+    async with context.kv_driver.rw_transaction() as txn:
+        txn = cast(PGTransaction, txn)
+        async with txn.connection.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT key FROM resources
+                WHERE key ~ ('^/kbs/' || %s || '/r/[^/]*/f/c/[^/]*$')
+                AND key > %s
+                ORDER BY key
+                LIMIT %s""",
+                (kbid, start, batch_size),
+            )
+            rows = await cur.fetchall()
+            if len(rows) == 0:
+                return None
+            return [row[0] for row in rows]
