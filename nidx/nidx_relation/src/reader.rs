@@ -30,7 +30,7 @@ use tantivy::{Index, IndexReader};
 use uuid::Uuid;
 
 use crate::graph_collector::{Selector, TopUniqueCollector};
-use crate::graph_query_parser::{BoolGraphQuery, BoolNodeQuery, GraphQueryParser};
+use crate::graph_query_parser::{BoolGraphQuery, BoolNodeQuery, GraphQueryContext, GraphQueryParser};
 use crate::schema::{Schema, decode_node, decode_relation, encode_field_id};
 use crate::top_unique_n::TopUniqueN;
 use crate::{RelationConfig, io_maps};
@@ -99,6 +99,7 @@ impl RelationsReaderService {
         &self,
         request: &GraphSearchRequest,
         prefilter: &PrefilterResult,
+        context: GraphQueryContext,
     ) -> anyhow::Result<GraphSearchResponse> {
         // No query? Empty graph
         let Some(query) = &request.query else {
@@ -110,21 +111,23 @@ impl RelationsReaderService {
 
         let top_k = request.top_k as usize;
 
+        let parser = GraphQueryParser::new(&self.schema, context);
+
         match request.kind() {
-            QueryKind::Path => self.paths_graph_search(query, prefilter, top_k),
-            QueryKind::Nodes => self.nodes_graph_search(query, prefilter, top_k),
-            QueryKind::Relations => self.relations_graph_search(query, prefilter, top_k),
+            QueryKind::Path => self.paths_graph_search(parser, query, prefilter, top_k),
+            QueryKind::Nodes => self.nodes_graph_search(parser, query, prefilter, top_k),
+            QueryKind::Relations => self.relations_graph_search(parser, query, prefilter, top_k),
         }
     }
 
     fn paths_graph_search(
         &self,
+        parser: GraphQueryParser,
         query: &nidx_protos::graph_query::PathQuery,
         prefilter: &PrefilterResult,
         top_k: usize,
     ) -> anyhow::Result<GraphSearchResponse> {
         let query = BoolGraphQuery::try_from(query)?;
-        let parser = GraphQueryParser::new(&self.schema);
         let index_query = parser.parse_bool(query);
         let index_query = self.apply_prefilter(index_query, prefilter);
 
@@ -170,12 +173,12 @@ impl RelationsReaderService {
 
     fn nodes_graph_search(
         &self,
+        parser: GraphQueryParser,
         query: &nidx_protos::graph_query::PathQuery,
         prefilter: &PrefilterResult,
         top_k: usize,
     ) -> anyhow::Result<GraphSearchResponse> {
         let query = BoolNodeQuery::try_from(query)?;
-        let parser = GraphQueryParser::new(&self.schema);
         let (source_query, destination_query) = parser.parse_bool_node(query);
         let source_query = self.apply_prefilter(source_query, prefilter);
         let destination_query = self.apply_prefilter(destination_query, prefilter);
@@ -214,12 +217,12 @@ impl RelationsReaderService {
 
     fn relations_graph_search(
         &self,
+        parser: GraphQueryParser,
         query: &nidx_protos::graph_query::PathQuery,
         prefilter: &PrefilterResult,
         top_k: usize,
     ) -> anyhow::Result<GraphSearchResponse> {
         let query = BoolGraphQuery::try_from(query)?;
-        let parser = GraphQueryParser::new(&self.schema);
         let index_query = parser.parse_bool(query);
         let index_query = self.apply_prefilter(index_query, prefilter);
 

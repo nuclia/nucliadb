@@ -292,7 +292,6 @@ impl Searcher {
         prefilter: &PrefilterResult,
     ) -> anyhow::Result<VectorSearchResponse> {
         let time = Instant::now();
-
         let mut formula = Formula::new();
 
         if let PrefilterResult::Some(valid_fields) = prefilter {
