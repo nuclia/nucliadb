@@ -54,7 +54,7 @@ async def download_extract_file_rslug_prefix(
     field_type: FieldTypeName,
     field_id: str,
     download_field: str,
-    range_header: Annotated[str | None, RANGE_HEADER] = None,
+    range: Annotated[str | None, RANGE_HEADER] = None,
 ) -> Response:
     return await _download_extract_file(
         kbid,
@@ -62,7 +62,7 @@ async def download_extract_file_rslug_prefix(
         field_id,
         download_field,
         rslug=rslug,
-        range_request=range_header,
+        range_request=range,
     )
 
 
@@ -81,10 +81,10 @@ async def download_extract_file_rid_prefix(
     field_type: FieldTypeName,
     field_id: str,
     download_field: str,
-    range_header: Annotated[str | None, RANGE_HEADER] = None,
+    range: Annotated[str | None, RANGE_HEADER] = None,
 ) -> Response:
     return await _download_extract_file(
-        kbid, field_type, field_id, download_field, rid=rid, range_request=range_header
+        kbid, field_type, field_id, download_field, rid=rid, range_request=range
     )
 
 
@@ -123,11 +123,9 @@ async def download_field_file_rslug_prefix(
     rslug: str,
     field_id: str,
     inline: bool = False,
-    range_header: Annotated[str | None, RANGE_HEADER] = None,
+    range: Annotated[str | None, RANGE_HEADER] = None,
 ) -> Response:
-    return await _download_field_file(
-        kbid, field_id, rslug=rslug, range_request=range_header, inline=inline
-    )
+    return await _download_field_file(kbid, field_id, rslug=rslug, range_request=range, inline=inline)
 
 
 @api.get(
@@ -144,9 +142,9 @@ async def download_field_file_rid_prefix(
     rid: str,
     field_id: str,
     inline: bool = False,
-    range_header: Annotated[str | None, RANGE_HEADER] = None,
+    range: Annotated[str | None, RANGE_HEADER] = None,
 ) -> Response:
-    return await _download_field_file(kbid, field_id, rid=rid, range_request=range_header, inline=inline)
+    return await _download_field_file(kbid, field_id, rid=rid, range_request=range, inline=inline)
 
 
 async def _download_field_file(
@@ -181,7 +179,7 @@ async def download_field_conversation_rslug_prefix(
     field_id: str,
     message_id: str,
     file_num: int,
-    range_header: Annotated[str | None, RANGE_HEADER] = None,
+    range: Annotated[str | None, RANGE_HEADER] = None,
 ) -> Response:
     return await _download_field_conversation_attachment(
         kbid,
@@ -189,7 +187,7 @@ async def download_field_conversation_rslug_prefix(
         message_id,
         file_num,
         rslug=rslug,
-        range_request=range_header,
+        range_request=range,
     )
 
 
@@ -208,7 +206,7 @@ async def download_field_conversation_attachment_rid_prefix(
     field_id: str,
     message_id: str,
     file_num: int,
-    range_header: Annotated[str | None, RANGE_HEADER] = None,
+    range: Annotated[str | None, RANGE_HEADER] = None,
 ) -> Response:
     return await _download_field_conversation_attachment(
         kbid,
@@ -216,7 +214,7 @@ async def download_field_conversation_attachment_rid_prefix(
         message_id,
         file_num,
         rid=rid,
-        range_request=range_header,
+        range_request=range,
     )
 
 
