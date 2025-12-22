@@ -27,6 +27,10 @@ from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
+from nucliadb.ingest.fields.file import File
+from nucliadb.ingest.fields.generic import Generic
+from nucliadb.ingest.fields.link import Link
+from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal.augment import (
     AnswerSelector,
@@ -46,19 +50,21 @@ from nucliadb.models.internal.augment import (
     FieldProp,
     FieldText,
     FieldValue,
+    FileProp,
+    FileThumbnail,
     FullSelector,
     MessageSelector,
     NeighboursSelector,
     PageSelector,
     WindowSelector,
 )
-from nucliadb.search import logger
 from nucliadb.search.augmentor.metrics import augmentor_observer
 from nucliadb.search.augmentor.resources import get_basic
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 from nucliadb_models.common import FieldTypeName
 from nucliadb_protos import resources_pb2
+from nucliadb_utils.storages.storage import STORAGE_FILE_EXTRACTED
 
 
 async def augment_fields(
@@ -116,7 +122,7 @@ async def augment_field(
 async def db_augment_field(
     field: Field,
     field_id: FieldId,
-    select: Sequence[FieldProp | ConversationProp],
+    select: Sequence[FieldProp | FileProp | ConversationProp],
 ) -> AugmentedField:
     field_type = field_id.type
 
@@ -125,14 +131,17 @@ async def db_augment_field(
     # for a specific field, as they will be ignored
 
     if field_type == FieldTypeName.TEXT.abbreviation():
+        field = cast(Text, field)
         select = cast(list[FieldProp], select)
         return await db_augment_text_field(field, field_id, select)
 
     elif field_type == FieldTypeName.FILE.abbreviation():
-        select = cast(list[FieldProp], select)
+        field = cast(File, field)
+        select = cast(list[FileProp], select)
         return await db_augment_file_field(field, field_id, select)
 
     elif field_type == FieldTypeName.LINK.abbreviation():
+        field = cast(Link, field)
         select = cast(list[FieldProp], select)
         return await db_augment_link_field(field, field_id, select)
 
@@ -142,6 +151,7 @@ async def db_augment_field(
         return await db_augment_conversation_field(field, field_id, select)
 
     elif field_type == FieldTypeName.GENERIC.abbreviation():
+        field = cast(Generic, field)
         select = cast(list[FieldProp], select)
         return await db_augment_generic_field(field, field_id, select)
 
@@ -151,7 +161,7 @@ async def db_augment_field(
 
 @augmentor_observer.wrap({"type": "db_text_field"})
 async def db_augment_text_field(
-    field: Field,
+    field: Text,
     field_id: FieldId,
     select: Sequence[FieldProp],
 ) -> AugmentedTextField:
@@ -171,16 +181,21 @@ async def db_augment_text_field(
 
         elif isinstance(prop, FieldValue):
             db_value = await field.get_value()
+            if db_value is None:
+                continue
             augmented.value = from_proto.field_text(db_value)
+
+        else:  # pragma: no cover
+            assert_never(prop)
 
     return augmented
 
 
 @augmentor_observer.wrap({"type": "db_file_field"})
 async def db_augment_file_field(
-    field: Field,
+    field: File,
     field_id: FieldId,
-    select: Sequence[FieldProp],
+    select: Sequence[FileProp],
 ) -> AugmentedFileField:
     augmented = AugmentedFileField(id=field.field_id)
 
@@ -198,14 +213,22 @@ async def db_augment_file_field(
 
         elif isinstance(prop, FieldValue):
             db_value = await field.get_value()
+            if db_value is None:
+                continue
             augmented.value = from_proto.field_file(db_value)
+
+        elif isinstance(prop, FileThumbnail):
+            augmented.thumbnail_path = await get_file_thumbnail_path(field, field_id)
+
+        else:  # pragma: no cover
+            assert_never(prop)
 
     return augmented
 
 
 @augmentor_observer.wrap({"type": "db_link_field"})
 async def db_augment_link_field(
-    field: Field,
+    field: Link,
     field_id: FieldId,
     select: Sequence[FieldProp],
 ) -> AugmentedLinkField:
@@ -225,7 +248,12 @@ async def db_augment_link_field(
 
         elif isinstance(prop, FieldValue):
             db_value = await field.get_value()
+            if db_value is None:
+                continue
             augmented.value = from_proto.field_link(db_value)
+
+        else:  # pragma: no cover
+            assert_never(prop)
 
     return augmented
 
@@ -291,8 +319,9 @@ async def db_augment_conversation_field(
                         field.uuid, ref.field_type, ref.field_id, ref.split or None
                     )
                     augmented_message.attachments.append(field_id)
-        else:
-            logger.warning(f"conversation field property not implemented: {prop}")
+
+        else:  # pragma: no cover
+            assert_never(prop)
 
     if len(messages) > 0:
         augmented.messages = []
@@ -304,7 +333,7 @@ async def db_augment_conversation_field(
 
 @augmentor_observer.wrap({"type": "db_generic_field"})
 async def db_augment_generic_field(
-    field: Field,
+    field: Generic,
     field_id: FieldId,
     select: Sequence[FieldProp],
 ) -> AugmentedGenericField:
@@ -325,6 +354,9 @@ async def db_augment_generic_field(
         elif isinstance(prop, FieldValue):
             db_value = await field.get_value()
             augmented.value = db_value
+
+        else:  # pragma: no cover
+            assert_never(prop)
 
     return augmented
 
@@ -375,6 +407,26 @@ async def field_entities(id: FieldId, field: Field) -> dict[str, set[str]] | Non
         ners.setdefault(family, set()).add(token)
 
     return ners
+
+
+async def get_file_thumbnail_path(field: File, field_id: FieldId) -> str | None:
+    thumbnail = await field.thumbnail()
+    if thumbnail is None:
+        return None
+
+    # When ingesting file processed data, we move thumbnails to a owned
+    # path. The thumbnail.key must then match this path so we can safely
+    # return a path that can be used with the download API to get the
+    # actual image
+    _expected_prefix = STORAGE_FILE_EXTRACTED.format(
+        kbid=field.kbid, uuid=field.uuid, field_type=field_id.type, field=field_id.key, key=""
+    )
+    assert thumbnail.key.startswith(_expected_prefix), (
+        "we use a hardcoded path for file thumbnails and we assume is this"
+    )
+    thumbnail_path = thumbnail.key.removeprefix(_expected_prefix)
+
+    return thumbnail_path
 
 
 async def find_conversation_message(

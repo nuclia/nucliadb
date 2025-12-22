@@ -139,7 +139,7 @@ async def augment(
             for field_id in field_ids:
                 augments["fields"].setdefault(field_id, []).extend(augmentation.select)
 
-        elif augmentation.from_ == "conversations":
+        elif augmentation.from_ == "files" or augmentation.from_ == "conversations":
             for id in augmentation.given:
                 if isinstance(id, FieldId):
                     field_id = id

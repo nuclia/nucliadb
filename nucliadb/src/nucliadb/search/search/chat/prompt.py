@@ -44,8 +44,6 @@ from nucliadb.search.augmentor.fields import (
 from nucliadb.search.search.chat import rpc
 from nucliadb.search.search.chat.images import (
     get_file_thumbnail_image,
-    get_page_image,
-    get_paragraph_image,
 )
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.augment import (
@@ -652,11 +650,7 @@ async def neighbouring_paragraphs_prompt_context(
         kbid,
         AugmentRequest(
             paragraphs=AugmentParagraphs(
-                given=[
-                    # TODO(decoupled-ask): pass metadata to /augment
-                    AugmentParagraph(id=pid.full(), metadata=None)
-                    for pid in retrieved_paragraphs_ids
-                ],
+                given=[AugmentParagraph(id=pid.full()) for pid in retrieved_paragraphs_ids],
                 text=True,
                 neighbours_before=strategy.before,
                 neighbours_after=strategy.after,
@@ -930,12 +924,7 @@ async def hierarchy_prompt_context(
         AugmentRequest(
             paragraphs=AugmentParagraphs(
                 given=[
-                    AugmentParagraph(
-                        id=paragraph_id.full(),
-                        # TODO(decoupled-ask): populate metadata
-                        metadata=None,
-                    )
-                    for paragraph_id in paragraphs_to_augment
+                    AugmentParagraph(id=paragraph_id.full()) for paragraph_id in paragraphs_to_augment
                 ],
                 text=True,
             )
@@ -1090,7 +1079,12 @@ class PromptContextBuilder:
                 # page_image_id: rid/f/myfield/0
                 page_image_id = "/".join([pid.field_id.full(), str(paragraph_page_number)])
                 if page_image_id not in context.images:
-                    image = await get_page_image(self.kbid, pid, paragraph_page_number)
+                    image = await rpc.download_image(
+                        self.kbid,
+                        pid.field_id,
+                        f"generated/extracted_images_{paragraph_page_number}.png",
+                        mime_type="image/png",
+                    )
                     if image is not None:
                         ops += 1
                         context.images[page_image_id] = image
@@ -1110,7 +1104,9 @@ class PromptContextBuilder:
             if (add_table or add_paragraph) and (
                 paragraph.reference is not None and paragraph.reference != ""
             ):
-                pimage = await get_paragraph_image(self.kbid, pid, paragraph.reference)
+                pimage = await rpc.download_image(
+                    self.kbid, pid.field_id, f"generated/{paragraph.reference}", mime_type="image/png"
+                )
                 if pimage is not None:
                     ops += 1
                     context.images[paragraph.id] = pimage

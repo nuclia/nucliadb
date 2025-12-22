@@ -41,12 +41,18 @@ from nucliadb.models.internal.augment import (
     FieldEntities,
     FieldProp,
     FieldText,
+    FileAugment,
+    FileProp,
+    FileThumbnail,
     FullSelector,
     MessageSelector,
     Metadata,
     Paragraph,
     ParagraphAugment,
+    ParagraphImage,
+    ParagraphPage,
     ParagraphProp,
+    ParagraphTable,
     ParagraphText,
     RelatedParagraphs,
     ResourceAugment,
@@ -63,6 +69,7 @@ from nucliadb_models.augment import (
     AugmentedConversationField,
     AugmentedConversationMessage,
     AugmentedField,
+    AugmentedFileField,
     AugmentedParagraph,
     AugmentedResource,
     AugmentParagraphs,
@@ -106,7 +113,7 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
         max_ops = asyncio.Semaphore(50)
 
         first_augmented = await augmentor.augment(kbid, augmentations, concurrency_control=max_ops)
-        response = build_augment_response(first_augmented)
+        response = build_augment_response(item, first_augmented)
 
         # 2nd round trip to augmentor
         #
@@ -186,12 +193,25 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
         if item.fields.classification_labels:
             select.append(FieldClassificationLabels())
 
-        augmentations.append(
-            FieldAugment(
-                given=given,
-                select=select,
+        if len(select) > 0:
+            augmentations.append(
+                FieldAugment(
+                    given=given,
+                    select=select,
+                )
             )
-        )
+
+        file_select: list[FileProp] = []
+        if item.fields.file_thumbnail:
+            file_select.append(FileThumbnail())
+
+        if len(file_select) > 0:
+            augmentations.append(
+                FileAugment(
+                    given=given,  # type: ignore
+                    select=file_select,
+                )
+            )
 
         conversation_select: list[ConversationProp] = []
         selector: ConversationSelector
@@ -218,7 +238,7 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
             # in a first iteration and the window in the second
             pass
 
-        if conversation_select:
+        if len(conversation_select) > 0:
             augmentations.append(
                 ConversationAugment(
                     given=given,  # type: ignore
@@ -321,11 +341,17 @@ def parse_paragraph_augment(item: AugmentParagraphs) -> tuple[list[Paragraph], l
                 neighbours_after=item.neighbours_after or 0,
             )
         )
+    if item.source_image:
+        selector.append(ParagraphImage())
+    if item.table_image:
+        selector.append(ParagraphTable(prefer_page_preview=item.table_prefers_page_preview))
+    if item.page_preview_image:
+        selector.append(ParagraphPage(preview=True))
 
     return paragraphs_to_augment, selector
 
 
-def build_augment_response(augmented: Augmented) -> AugmentResponse:
+def build_augment_response(item: AugmentRequest, augmented: Augmented) -> AugmentResponse:
     response = AugmentResponse(
         resources={},
         fields={},
@@ -380,7 +406,6 @@ def build_augment_response(augmented: Augmented) -> AugmentResponse:
 
         if field_id.type in (
             FieldTypeName.TEXT.abbreviation(),
-            FieldTypeName.FILE.abbreviation(),
             FieldTypeName.LINK.abbreviation(),
             FieldTypeName.GENERIC.abbreviation(),
         ):
@@ -388,6 +413,15 @@ def build_augment_response(augmented: Augmented) -> AugmentResponse:
                 text=field.text,  # type: ignore # field is instance of any of the above and has the text property
                 classification_labels=classification_labels,
                 entities=entities,
+            )
+
+        elif field_id.type == FieldTypeName.FILE.abbreviation():
+            field = cast(internal_augment.AugmentedFileField, field)
+            response.fields[field_id.full()] = AugmentedFileField(
+                text=field.text,  # type: ignore # field is instance of any of the above and has the text property
+                classification_labels=classification_labels,
+                entities=entities,
+                thumbnail_image=field.thumbnail_path,
             )
 
         elif field_id.type == FieldTypeName.CONVERSATION.abbreviation():
@@ -433,7 +467,12 @@ def build_augment_response(augmented: Augmented) -> AugmentResponse:
             augmented_paragraph.neighbours_after = list(
                 map(lambda x: x.full(), paragraph.related.neighbours_after)
             )
-        # TODO(decoupled-ask): add more paragraph parameters
+        augmented_paragraph.source_image = paragraph.source_image_path
+        if item.paragraphs is not None and item.paragraphs.table_prefers_page_preview:
+            augmented_paragraph.table_image = paragraph.page_preview_path
+        else:
+            augmented_paragraph.table_image = paragraph.source_image_path
+        augmented_paragraph.page_preview_image = paragraph.page_preview_path
         response.paragraphs[paragraph_id.full()] = augmented_paragraph
 
     return response

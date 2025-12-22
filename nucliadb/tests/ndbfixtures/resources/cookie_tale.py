@@ -19,13 +19,17 @@
 #
 import base64
 import random
+import uuid
+from datetime import datetime, timedelta
 
+import jwt
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
+from nucliadb.common.ids import ParagraphId
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 from nucliadb_protos import resources_pb2
-from nucliadb_protos.resources_pb2 import FieldType
+from nucliadb_protos.resources_pb2 import CloudFile, FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.utilities import get_storage
@@ -103,15 +107,26 @@ async def cookie_tale_resource(
     ## Add a text field with paragraphs and paragraph relations
 
     text_field = bmb.field_builder(text_field_id, FieldType.TEXT)
-    extracted_text = [
-        "Once upon a time, there was a group of people called Nucliers. ",
-        "One of them was an excellent cook and use to bring amazing cookies to their gatherings. ",
-        "Chocolate, peanut butter and other delicious kinds of cookies. ",
-        "Everyone loved them and those cookies are now part of their story. ",
+    paragraphs = [
+        (
+            ParagraphId.from_string(f"{rid}/t/{text_field_id}/0-63"),
+            "Once upon a time, there was a group of people called Nucliers. ",
+        ),
+        (
+            ParagraphId.from_string(f"{rid}/t/{text_field_id}/63-151"),
+            "One of them was an excellent cook and use to bring amazing cookies to their gatherings. ",
+        ),
+        (
+            ParagraphId.from_string(f"{rid}/t/{text_field_id}/151-214"),
+            "Chocolate, peanut butter and other delicious kinds of cookies. ",
+        ),
+        (
+            ParagraphId.from_string(f"{rid}/t/{text_field_id}/214-281"),
+            "Everyone loved them and those cookies are now part of their story. ",
+        ),
     ]
-    paragraph_ids = []
     paragraph_pbs = []
-    for paragraph in extracted_text:
+    for expected_paragraph_id, paragraph in paragraphs:
         paragraph_id, paragraph_pb = text_field.add_paragraph(
             paragraph,
             vectors={
@@ -121,23 +136,39 @@ async def cookie_tale_resource(
                 for i, (vectorset_id, config) in enumerate(vectorsets.items())
             },
         )
-        paragraph_ids.append(paragraph_id)
         paragraph_pbs.append(paragraph_pb)
+        assert paragraph_id == expected_paragraph_id
 
     # add paragraph relations
 
     title_paragraph_id = list(title_field.iter_paragraphs())[0][0]
     paragraph_pbs[1].relations.parents.append(title_paragraph_id.full())
 
-    paragraph_pbs[1].relations.siblings.append(paragraph_ids[0].full())
+    paragraph_pbs[1].relations.siblings.append(paragraphs[0][0].full())
 
-    paragraph_pbs[1].relations.replacements.extend([paragraph_ids[2].full(), paragraph_ids[3].full()])
+    paragraph_pbs[1].relations.replacements.extend([paragraphs[2][0].full(), paragraphs[3][0].full()])
 
     ## Add a file field with some visual content, pages and a table
+    ##
+    ## cookies.pdf
+    ## +-------------------------------+
+    ## |      +--------------+         |
+    ## |      |              | <-------|--- cookies image (cookies.png)
+    ## |      +--------------+  page 0 |
+    ## +-------------------------------+
+    ## |      +---+---+---+--+         |
+    ## |      +---+---+---+--+ <-------|--- ingredients table (ingredients_table.png)
+    ## |      |   |   |   |  |         |
+    ## |      +---+---+---+--+         |
+    ## |      Above you...      page 1 |
+    ## +-----------^-------------------+
+    ##             |
+    ##             +----------------------- text paragraph
+    ##
 
     file_field = bmb.field_builder(file_field_id, FieldType.FILE)
 
-    (_, paragraph_pb) = file_field.add_paragraph(
+    (paragraph_id, paragraph_pb) = file_field.add_paragraph(
         "A yummy image of some cookies",
         kind=resources_pb2.Paragraph.TypeParagraph.INCEPTION,
         vectors={
@@ -148,6 +179,7 @@ async def cookie_tale_resource(
         },
     )
     paragraph_pb.representation.reference_file = "cookies.png"
+    assert paragraph_id == ParagraphId.from_string(f"{rid}/f/{file_field_id}/0-29")
 
     # upload a source "image" for this paragraph
     sf = storage.file_extracted(bmb.bm.kbid, bmb.bm.uuid, "f", file_field_id, "generated/cookies.png")
@@ -162,7 +194,7 @@ async def cookie_tale_resource(
 
     # add a table.
 
-    (_, paragraph_pb) = file_field.add_paragraph(
+    (paragraph_id, paragraph_pb) = file_field.add_paragraph(
         "|Ingredient|Quantity|\n|Peanut butter|100g|\n...",
         kind=resources_pb2.Paragraph.TypeParagraph.TABLE,
         vectors={
@@ -174,8 +206,9 @@ async def cookie_tale_resource(
     )
     paragraph_pb.representation.is_a_table = True
     paragraph_pb.representation.reference_file = "ingredients_table.png"
+    assert paragraph_id == ParagraphId.from_string(f"{rid}/f/{file_field_id}/29-75")
 
-    # unused right now, but this would be the source image for the table
+    # this is an image representing the table, i.e., the image of the table
     sf = storage.file_extracted(
         bmb.bm.kbid, bmb.bm.uuid, "f", file_field_id, "generated/ingredients_table.png"
     )
@@ -189,7 +222,7 @@ async def cookie_tale_resource(
     )
 
     # add a normal paragraph in the same page
-    (_, paragraph_pb) = file_field.add_paragraph(
+    (paragraph_id, paragraph_pb) = file_field.add_paragraph(
         "Above you can see a table with all the ingredients",
         vectors={
             vectorset_id: [
@@ -198,14 +231,46 @@ async def cookie_tale_resource(
             for i, (vectorset_id, config) in enumerate(vectorsets.items())
         },
     )
-
     paragraph_pb.page.page = 1
     paragraph_pb.page.page_with_visual = True
+    assert paragraph_id == ParagraphId.from_string(f"{rid}/f/{file_field_id}/75-125")
+
+    # upload thumbnail and add it to file extracted data (we don't have builder for this)
+
+    now = datetime.now()
+
+    sf = storage.file_extracted(kbid, rid, "f", file_field_id, "file_thumbnail")
+    await storage.chunked_upload_object(sf.bucket, sf.key, payload=b"cookie recipie (file) thumbnail")
+
+    file_extracted_data = file_field._file
+    file_extracted_data.language = "en"
+    file_extracted_data.file_thumbnail.uri = jwt.encode(
+        {
+            "iss": "urn:processing_slow",
+            "sub": "file",
+            "aud": "urn:proxy",
+            "exp": int((now + timedelta(days=7)).timestamp()),
+            "iat": int(now.timestamp()),
+            "jti": uuid.uuid4().hex,
+            "bucket_name": "ncl-proxy-storage-gcp-stage-1",
+            "filename": "thumbnail.jpg",
+            "uri": f"kbs/{kbid}/r/{rid}/e/f/{file_field_id}/file_thumbnail",
+            "size": 179054,
+            "content_type": "image/jpeg",
+        },
+        "a-string-secret-at-least-256-bits-long",
+        "HS256",
+    )
+    file_extracted_data.file_thumbnail.source = CloudFile.Source.LOCAL
+
+    # build the broker message
 
     bm = bmb.build()
 
     # customize fields we don't want to overwrite from the writer BM
     bm.origin.url = "my://url"
+
+    bm.file_extracted_data.append(file_extracted_data)
 
     # ingest the processed BM
     await inject_message(nucliadb_ingest_grpc, bm)

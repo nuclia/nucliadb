@@ -22,7 +22,7 @@ from typing_extensions import Self
 from nucliadb_models import filters
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
-from nucliadb_models.search import Image, ResourceProperties
+from nucliadb_models.search import ResourceProperties
 
 ResourceIdPattern = r"^([0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
 ResourceId = Annotated[
@@ -162,6 +162,9 @@ class AugmentFields(BaseModel):
     classification_labels: bool = False
     entities: bool = False  # also known as ners
 
+    # For file fields, augment the path to the thumbnail image
+    file_thumbnail: bool = False
+
     # When enabled, augment all the messages from the conversation. This is
     # incompatible with max_conversation_messages defined
     full_conversation: bool = False
@@ -234,21 +237,23 @@ class AugmentParagraphs(BaseModel):
     neighbours_before: int = 0
     neighbours_after: int = 0
 
-    # TODO(decoupled-ask): implement image strategy
     # paragraph extracted from an image, return an image
     source_image: bool = False
 
-    # TODO(decoupled-ask): implement image strategy
     # paragraph extracted from a table, return table image
     table_image: bool = False
 
-    # TODO(decoupled-ask): implement image strategy
     # return page_preview instead of table image if table image enabled
     table_prefers_page_preview: bool = False
 
-    # TODO(decoupled-ask): implement image strategy
     # paragraph from a page, return page preview image
     page_preview_image: bool = False
+
+    @model_validator(mode="after")
+    def table_options_work_together(self) -> Self:
+        if not self.table_image and self.table_prefers_page_preview:
+            raise ValueError("`table_prefers_page_preview` can only be enabled with `table_image`")
+        return self
 
 
 class AugmentRequest(BaseModel):
@@ -266,7 +271,9 @@ class AugmentedParagraph(BaseModel):
     neighbours_before: list[ParagraphId] | None = None
     neighbours_after: list[ParagraphId] | None = None
 
-    image: Image | None = None
+    source_image: str | None = None
+    table_image: str | None = None
+    page_preview_image: str | None = None
 
 
 class AugmentedField(BaseModel):
@@ -277,7 +284,20 @@ class AugmentedField(BaseModel):
     # former ners
     entities: dict[str, list[str]] | None = None
 
-    page_preview_image: Image | None = None
+
+class AugmentedFileField(BaseModel):
+    text: str | None = None
+
+    classification_labels: dict[str, list[str]] | None = None
+
+    # former ners
+    entities: dict[str, list[str]] | None = None
+
+    # TODO(decoupled-ask): implement image strategy
+    page_preview_image: str | None = None
+
+    # Path for the download API to retrieve the file thumbnail image
+    thumbnail_image: str | None = None
 
 
 class AugmentedConversationMessage(BaseModel):
@@ -335,5 +355,5 @@ class AugmentedResource(Resource):
 
 class AugmentResponse(BaseModel):
     resources: dict[ResourceId, AugmentedResource]
-    fields: dict[FieldId, AugmentedField | AugmentedConversationField]
+    fields: dict[FieldId, AugmentedField | AugmentedFileField | AugmentedConversationField]
     paragraphs: dict[ParagraphId, AugmentedParagraph]

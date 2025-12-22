@@ -38,6 +38,9 @@ from nucliadb.models.internal.augment import (
     PageSelector,
     Paragraph,
     ParagraphAugment,
+    ParagraphImage,
+    ParagraphPage,
+    ParagraphTable,
     ParagraphText,
     RelatedParagraphs,
     ResourceAugment,
@@ -639,6 +642,105 @@ async def test_augmentor_conversation_strategy_attachments(
         assert augmented_field.messages[0].attachments == [
             FieldId.from_string(f"{rid}/f/attachment:lamb")
         ]
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_augmentor_paragraph_image(
+    augmentor_kb: tuple[str, dict[str, str]],
+) -> None:
+    kbid, rids = augmentor_kb
+    rid = rids["cookie-tale"]
+
+    # paragraph with a source image
+    paragraph = paragraph_from_id(f"{rid}/f/cookie-recipie/0-29")
+
+    augmented = await augment(
+        kbid,
+        [
+            ParagraphAugment(
+                given=[paragraph],
+                select=[ParagraphImage()],
+            )
+        ],
+    )
+    assert paragraph.id in augmented.paragraphs
+    assert augmented.paragraphs[paragraph.id].source_image_path == "generated/cookies.png"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_augmentor_paragraph_table(
+    augmentor_kb: tuple[str, dict[str, str]],
+) -> None:
+    kbid, rids = augmentor_kb
+    rid = rids["cookie-tale"]
+
+    # paragraph with a table in a page with visuals (the table)
+    paragraph = paragraph_from_id(f"{rid}/f/cookie-recipie/29-75")
+
+    # tables can return their original image, but they are not considered images
+
+    augmented = await augment(
+        kbid,
+        [
+            ParagraphAugment(
+                given=[paragraph],
+                select=[ParagraphImage()],
+            )
+        ],
+    )
+    assert paragraph.id in augmented.paragraphs
+    assert augmented.paragraphs[paragraph.id].source_image_path is None
+
+    augmented = await augment(
+        kbid,
+        [
+            ParagraphAugment(
+                given=[paragraph],
+                select=[ParagraphTable()],
+            )
+        ],
+    )
+    assert paragraph.id in augmented.paragraphs
+    assert augmented.paragraphs[paragraph.id].source_image_path == "generated/ingredients_table.png"
+
+    # as this table is in a page with visual content, we can select the page preview instead
+
+    augmented = await augment(
+        kbid,
+        [
+            ParagraphAugment(
+                given=[paragraph],
+                select=[ParagraphTable(prefer_page_preview=True)],
+            )
+        ],
+    )
+    assert paragraph.id in augmented.paragraphs
+    assert augmented.paragraphs[paragraph.id].source_image_path is None
+    assert augmented.paragraphs[paragraph.id].page_preview_path == "generated/extracted_images_1.png"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_augmentor_paragraph_page_images(
+    augmentor_kb: tuple[str, dict[str, str]],
+) -> None:
+    kbid, rids = augmentor_kb
+    rid = rids["cookie-tale"]
+
+    # we can obtain a page preview given a paragraph from a page with visual
+    # content
+    paragraph = paragraph_from_id(f"{rid}/f/cookie-recipie/75-125")
+
+    augmented = await augment(
+        kbid,
+        [
+            ParagraphAugment(
+                given=[paragraph],
+                select=[ParagraphPage()],
+            )
+        ],
+    )
+    assert paragraph.id in augmented.paragraphs
+    assert augmented.paragraphs[paragraph.id].page_preview_path == "generated/extracted_images_1.png"
 
 
 def paragraph_from_id(id: str) -> Paragraph:

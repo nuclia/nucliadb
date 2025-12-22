@@ -77,16 +77,6 @@ class Metadata(BaseModel):
     in_page_with_visual: bool | None
 
     @classmethod
-    def unknown(cls) -> Self:
-        return cls(
-            is_an_image=False,
-            is_a_table=False,
-            source_file=None,
-            page=None,
-            in_page_with_visual=None,
-        )
-
-    @classmethod
     def from_text_block_match(cls, text_block: TextBlockMatch) -> Self:
         return cls(
             is_an_image=text_block.is_an_image,
@@ -98,7 +88,7 @@ class Metadata(BaseModel):
 
     @classmethod
     def from_db_paragraph(cls, paragraph: resources_pb2.Paragraph) -> Self:
-        is_an_image = paragraph.kind not in (
+        is_an_image = paragraph.kind in (
             resources_pb2.Paragraph.TypeParagraph.OCR,
             resources_pb2.Paragraph.TypeParagraph.INCEPTION,
         )
@@ -184,6 +174,7 @@ ParagraphProp = Annotated[
         Annotated[ParagraphText, Tag("text")]
         | Annotated[ParagraphImage, Tag("image")]
         | Annotated[ParagraphTable, Tag("table")]
+        | Annotated[ParagraphPage, Tag("page")]
         | Annotated[RelatedParagraphs, Tag("related")]
     ),
     Discriminator(prop_discriminator),
@@ -214,6 +205,24 @@ FieldProp = Annotated[
         | Annotated[FieldValue, Tag("value")]
         | Annotated[FieldClassificationLabels, Tag("classification_labels")]
         | Annotated[FieldEntities, Tag("entities")]
+    ),
+    Discriminator(prop_discriminator),
+]
+
+
+class FileThumbnail(SelectProp):
+    """File field thumbnail image"""
+
+    prop: Literal["thumbnail"] = "thumbnail"
+
+
+FileProp = Annotated[
+    (
+        Annotated[FieldText, Tag("text")]
+        | Annotated[FieldValue, Tag("value")]
+        | Annotated[FieldClassificationLabels, Tag("classification_labels")]
+        | Annotated[FieldEntities, Tag("entities")]
+        | Annotated[FileThumbnail, Tag("thumbnail")]
     ),
     Discriminator(prop_discriminator),
 ]
@@ -334,12 +343,6 @@ class ResourceSummary(SelectProp):
     prop: Literal["summary"] = "summary"
 
 
-class ResourceBasic(SelectProp):
-    """Same as show=["basic"] using GET resource or search endpoints"""
-
-    prop: Literal["basic"] = "basic"
-
-
 class ResourceOrigin(SelectProp):
     """Same as show=["origin"] using GET resource or search endpoints"""
 
@@ -375,7 +378,6 @@ ResourceProp = Annotated[
     (
         Annotated[ResourceTitle, Tag("title")]
         | Annotated[ResourceSummary, Tag("summary")]
-        | Annotated[ResourceBasic, Tag("basic")]
         | Annotated[ResourceOrigin, Tag("origin")]
         | Annotated[ResourceExtra, Tag("extra")]
         | Annotated[ResourceSecurity, Tag("security")]
@@ -405,6 +407,12 @@ class DeepResourceAugment(BaseModel, extra="forbid"):
     from_: Literal["resources.deep"] = Field(default="resources.deep", alias="from")
 
 
+class FileAugment(BaseModel, extra="forbid"):
+    given: list[FieldId | ParagraphId]
+    select: list[FileProp]
+    from_: Literal["files"] = Field(default="files", alias="from")
+
+
 class ConversationAugmentLimits(BaseModel):
     max_messages: int | None = Field(default=15, ge=0)
 
@@ -413,6 +421,7 @@ class ConversationAugment(BaseModel, extra="forbid"):
     given: list[FieldId | ParagraphId]
     select: list[ConversationProp]
     from_: Literal["conversations"] = Field(default="conversations", alias="from")
+    # TODO(decoupled-storage): remove?
     limits: ConversationAugmentLimits | None = Field(default_factory=ConversationAugmentLimits)
 
 
@@ -445,6 +454,7 @@ Augment = Annotated[
         Annotated[ResourceAugment, Tag("resources")]
         | Annotated[DeepResourceAugment, Tag("resources.deep")]
         | Annotated[FieldAugment, Tag("fields")]
+        | Annotated[FileAugment, Tag("files")]
         | Annotated[ConversationAugment, Tag("conversations")]
         | Annotated[ParagraphAugment, Tag("paragraphs")]
     ),
@@ -511,6 +521,7 @@ class AugmentedFileField(BaseAugmentedField):
     value: FieldFile | None = None
 
     text: str | None = None
+    thumbnail_path: str | None = None
 
 
 @dataclass

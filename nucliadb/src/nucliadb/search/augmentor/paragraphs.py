@@ -91,48 +91,9 @@ async def augment_paragraph(
         return None
     field = await resource.get_field(field_id.key, field_id.pb_type)
 
-    if metadata is None:
-        metadata = await db_paragraph_metadata(field, paragraph_id)
-        if metadata is None:
-            # we are unable to get any paragraph metadata, we can't continue
-            return None
-
     # TODO(decoupled-ask): make sure we don't repeat any select clause
 
     return await db_augment_paragraph(resource, field, paragraph_id, select, metadata)
-
-
-async def db_paragraph_metadata(field: Field, paragraph_id: ParagraphId) -> Metadata | None:
-    """Obtain paragraph metadata from the source of truth (maindb/blob).
-
-    This operation may require data from blob storage, which makes it costly.
-
-    """
-    field_paragraphs = await get_field_paragraphs(field)
-    if field_paragraphs is None:
-        # We don't have paragraph metadata for this field, we can't do anything
-        return None
-
-    for paragraph in field_paragraphs:
-        field_paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end).full()
-        if field_paragraph_id == paragraph_id:
-            return Metadata.from_db_paragraph(paragraph)
-    else:
-        return Metadata.unknown()
-
-
-async def get_field_paragraphs(field: Field) -> Sequence[resources_pb2.Paragraph] | None:
-    field_metadata = await field.get_field_metadata()
-    if field_metadata is None:
-        return None
-
-    field_id = field.field_id
-    if field_id.subfield_id is None:
-        field_paragraphs = field_metadata.metadata.paragraphs
-    else:
-        field_paragraphs = field_metadata.split_metadata[field_id.subfield_id].paragraphs
-
-    return field_paragraphs
 
 
 async def db_augment_paragraph(
@@ -140,8 +101,24 @@ async def db_augment_paragraph(
     field: Field,
     paragraph_id: ParagraphId,
     select: list[ParagraphProp],
-    metadata: Metadata,
+    metadata: Metadata | None,
 ) -> AugmentedParagraph:
+    # we use an accessor to get the metadata to avoid unnecessary DB round
+    # trips. With this, we'll only fetch it one and only if we need it
+    _metadata = metadata
+    _metadata_available = True
+
+    async def access_metadata() -> Metadata | None:
+        nonlocal _metadata, _metadata_available
+
+        if _metadata is None and _metadata_available:
+            _metadata = await db_paragraph_metadata(field, paragraph_id)
+
+        if _metadata is None:
+            _metadata_available = False
+
+        return _metadata
+
     text = None
     image_path = None
     page_preview_path = None
@@ -151,10 +128,16 @@ async def db_augment_paragraph(
             text = await get_paragraph_text(field, paragraph_id)
 
         elif isinstance(prop, ParagraphImage):
+            metadata = await access_metadata()
+            if metadata is None:
+                continue
             if metadata.is_an_image and metadata.source_file:
                 image_path = f"generated/{metadata.source_file}"
 
         elif isinstance(prop, ParagraphTable):
+            metadata = await access_metadata()
+            if metadata is None:
+                continue
             if metadata.is_a_table:
                 if prop.prefer_page_preview and metadata.page and metadata.in_page_with_visual:
                     page_preview_path = f"generated/extracted_images_{metadata.page}.png"
@@ -163,6 +146,9 @@ async def db_augment_paragraph(
 
         elif isinstance(prop, ParagraphPage):
             if prop.preview:
+                metadata = await access_metadata()
+                if metadata is None:
+                    continue
                 if metadata.page and metadata.in_page_with_visual:
                     page_preview_path = f"generated/extracted_images_{metadata.page}.png"
 
@@ -184,6 +170,40 @@ async def db_augment_paragraph(
         page_preview_path=page_preview_path,
         related=related,
     )
+
+
+async def db_paragraph_metadata(field: Field, paragraph_id: ParagraphId) -> Metadata | None:
+    """Obtain paragraph metadata from the source of truth (maindb/blob).
+
+    This operation may require data from blob storage, which makes it costly.
+
+    """
+    field_paragraphs = await get_field_paragraphs(field)
+    if field_paragraphs is None:
+        # We don't have paragraph metadata for this field, we can't do anything
+        return None
+
+    for paragraph in field_paragraphs:
+        field_paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end)
+        if field_paragraph_id == paragraph_id:
+            metadata = Metadata.from_db_paragraph(paragraph)
+            return metadata
+    else:
+        return None
+
+
+async def get_field_paragraphs(field: Field) -> Sequence[resources_pb2.Paragraph] | None:
+    field_metadata = await field.get_field_metadata()
+    if field_metadata is None:
+        return None
+
+    field_id = field.field_id
+    if field_id.subfield_id is None:
+        field_paragraphs = field_metadata.metadata.paragraphs
+    else:
+        field_paragraphs = field_metadata.split_metadata[field_id.subfield_id].paragraphs
+
+    return field_paragraphs
 
 
 @augmentor_observer.wrap({"type": "paragraph_text"})
