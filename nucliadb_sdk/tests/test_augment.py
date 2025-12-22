@@ -15,5 +15,5 @@ import nucliadb_sdk
 from nucliadb.models.internal.augment import AugmentRequest
 
 
-def test_retrieve(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
-    _ = sdk._augment(AugmentRequest())
+def test_retrieve(docs_dataset: str, sdk: nucliadb_sdk.NucliaDB):
+    _ = sdk._augment(kbid=docs_dataset, content=AugmentRequest())
