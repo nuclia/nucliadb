@@ -516,16 +516,20 @@ async def test_prompt_context_image_context_builder():
         user_context=["Carrots are orange"],
         image_strategies=[PageImageStrategy(count=10), TableImageStrategy(), ParagraphImageStrategy()],
     )
-    module = "nucliadb.search.search.chat.prompt"
     with (
-        mock.patch(f"{module}.get_paragraph_page_number", return_value=1),
+        mock.patch("nucliadb.search.search.chat.prompt.get_paragraph_page_number", return_value=1),
+        mock.patch("nucliadb.search.search.chat.old_prompt.get_paragraph_page_number", return_value=1),
         mock.patch(
-            f"{module}.get_page_image",
+            "nucliadb.search.search.chat.old_prompt.get_page_image",
             return_value=Image(b64encoded="page_image_data", content_type="image/png"),
         ),
         mock.patch(
-            f"{module}.get_paragraph_image",
+            "nucliadb.search.search.chat.old_prompt.get_paragraph_image",
             return_value=Image(b64encoded="table_image_data", content_type="image/png"),
+        ),
+        mock.patch(
+            "nucliadb.search.search.chat.prompt.rpc.download_image",
+            return_value=Image(b64encoded=f"an-image", content_type="image/png"),
         ),
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
