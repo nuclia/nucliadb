@@ -41,7 +41,7 @@ spec:
           uri:
             regex: '^/api/v\d+/kb/[^/]+/(entitiesgroup|labelset|custom-synonyms|export|import|notifications|processing-status)s?.*'
         - method:
-            regex: "GET|OPTIONS"
+            regex: "GET|HEAD|OPTIONS"
           uri:
             regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+$'
         - method:

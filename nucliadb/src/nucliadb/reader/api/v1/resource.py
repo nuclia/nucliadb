@@ -17,11 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional, Union
+from typing import Optional, Union, cast
 
 from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 
+from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.models_utils import from_proto, to_proto
@@ -56,6 +57,57 @@ from nucliadb_protos.writer_pb2 import FieldStatus
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.utilities import get_audit, get_storage
+
+
+@api.head(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
+    status_code=200,
+    summary="Head Resource (by id)",
+    responses={404: {"description": "Resource does not exist"}},
+    tags=["Resources"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def head_resource_by_uuid(
+    request: Request,
+    kbid: str,
+    rid: str,
+):
+    return await head_resource(kbid=kbid, rid=rid)
+
+
+@api.head(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
+    status_code=200,
+    summary="Head Resource (by slug)",
+    responses={404: {"description": "Resource does not exist"}},
+    tags=["Resources"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def head_resource_by_slug(
+    request: Request,
+    kbid: str,
+    rslug: str,
+):
+    return await head_resource(kbid=kbid, rslug=rslug)
+
+
+async def head_resource(
+    *,
+    kbid: str,
+    rslug: Optional[str] = None,
+    rid: Optional[str] = None,
+) -> None:
+    if all([rslug, rid]) or not any([rslug, rid]):
+        raise ValueError("Either rid or rslug must be provided, but not both")
+    if rid is None:
+        rslug = cast(str, rslug)
+        rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(kbid=kbid, slug=rslug)
+        if rid is None:
+            raise HTTPException(status_code=404, detail="Resource does not exist")
+    if not await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid):
+        raise HTTPException(status_code=404, detail="Resource does not exist")
 
 
 @api.get(
