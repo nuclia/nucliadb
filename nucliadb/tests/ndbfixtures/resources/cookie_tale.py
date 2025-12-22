@@ -19,14 +19,17 @@
 #
 import base64
 import random
+import uuid
+from datetime import datetime, timedelta
 
+import jwt
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import ParagraphId
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 from nucliadb_protos import resources_pb2
-from nucliadb_protos.resources_pb2 import FieldType
+from nucliadb_protos.resources_pb2 import CloudFile, FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.utilities import get_storage
@@ -224,10 +227,42 @@ async def cookie_tale_resource(
     paragraph_pb.page.page_with_visual = True
     assert paragraph_id == ParagraphId.from_string(f"{rid}/f/{file_field_id}/75-125")
 
+    # upload thumbnail and add it to file extracted data (we don't have builder for this)
+
+    now = datetime.now()
+
+    sf = storage.file_extracted(kbid, rid, "l", file_field_id, "file_thumbnail")
+    await storage.chunked_upload_object(sf.bucket, sf.key, payload=b"cookie recipie (file) thumbnail")
+
+    file_extracted_data = file_field._file
+    file_extracted_data.language = "en"
+    file_extracted_data.file_thumbnail.uri = jwt.encode(
+        {
+            "iss": "urn:processing_slow",
+            "sub": "file",
+            "aud": "urn:proxy",
+            "exp": int((now + timedelta(days=7)).timestamp()),
+            "iat": int(now.timestamp()),
+            "jti": uuid.uuid4().hex,
+            "bucket_name": "ncl-proxy-storage-gcp-stage-1",
+            "filename": "thumbnail.jpg",
+            "uri": f"kbs/{kbid}/r/{rid}/e/f/{file_field_id}/file_thumbnail",
+            "size": 179054,
+            "content_type": "image/jpeg",
+        },
+        "a-string-secret-at-least-256-bits-long",
+        "HS256",
+    )
+    file_extracted_data.file_thumbnail.source = CloudFile.Source.LOCAL
+
+    # build the broker message
+
     bm = bmb.build()
 
     # customize fields we don't want to overwrite from the writer BM
     bm.origin.url = "my://url"
+
+    bm.file_extracted_data.append(file_extracted_data)
 
     # ingest the processed BM
     await inject_message(nucliadb_ingest_grpc, bm)
