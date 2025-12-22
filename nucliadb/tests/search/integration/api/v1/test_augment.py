@@ -150,6 +150,7 @@ async def test_augment_api_file_thumbnails(
     nucliadb_search: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
     knowledgebox: str,
 ) -> None:
     kbid = knowledgebox
@@ -171,3 +172,10 @@ async def test_augment_api_file_thumbnails(
     field = body.fields[f"{rid}/f/cookie-recipie"]
     assert isinstance(field, AugmentedFileField)
     assert field.thumbnail_image == "file_thumbnail"
+
+    # the path returned can be used to download the thumbnail
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/resource/{rid}/file/cookie-recipie/download/extracted/{field.thumbnail_image}"
+    )
+    assert resp.status_code == 200
+    assert resp.content == b"cookie recipie (file) thumbnail"

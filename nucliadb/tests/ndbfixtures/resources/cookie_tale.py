@@ -231,7 +231,7 @@ async def cookie_tale_resource(
 
     now = datetime.now()
 
-    sf = storage.file_extracted(kbid, rid, "l", file_field_id, "file_thumbnail")
+    sf = storage.file_extracted(kbid, rid, "f", file_field_id, "file_thumbnail")
     await storage.chunked_upload_object(sf.bucket, sf.key, payload=b"cookie recipie (file) thumbnail")
 
     file_extracted_data = file_field._file
