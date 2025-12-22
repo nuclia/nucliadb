@@ -19,6 +19,8 @@
 #
 import logging
 
+from fastapi import Header
+
 SERVICE_NAME = "nucliadb.reader"
 logger = logging.getLogger(SERVICE_NAME)
 
@@ -35,3 +37,6 @@ class EndpointFilter(logging.Filter):
 
 # Add filter to the logger
 logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
+
+
+RANGE_HEADER = Header(description="Standard HTTP Range header that enable multipart requests")
