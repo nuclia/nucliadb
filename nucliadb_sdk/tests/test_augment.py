@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import nucliadb_sdk
-from nucliadb.models.internal.augment import AugmentRequest
+from nucliadb_models.augment import AugmentRequest
 
 
 def test_retrieve(docs_dataset: str, sdk: nucliadb_sdk.NucliaDB):
