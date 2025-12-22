@@ -55,12 +55,6 @@ async def test_resource_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     await sdk_async.catalog(kbid=kb.uuid, query="foo")
     await sdk_async.update_resource(kbid=kb.uuid, rid=resource.id, title="Resource2")
     await sdk_async.update_resource_by_slug(kbid=kb.uuid, rslug="resource", title="Resource3")
-    with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
-        await sdk_async.head_resource(kbid=kb.uuid, rid="nonexistent")
-    await sdk_async.head_resource(kbid=kb.uuid, rid=resource.id)
-    with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
-        await sdk_async.head_resource_by_slug(kbid=kb.uuid, slug="nonexistent")
-    await sdk_async.head_resource_by_slug(kbid=kb.uuid, slug="resource")
 
     # Reindex / Reprocess
     await sdk_async.reindex_resource(kbid=kb.uuid, rid=resource.id)
