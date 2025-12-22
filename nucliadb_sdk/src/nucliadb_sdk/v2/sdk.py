@@ -42,6 +42,8 @@ from httpx._transports.base import AsyncBaseTransport, BaseTransport
 from nuclia_models.predict.run_agents import RunTextAgentsRequest, RunTextAgentsResponse
 from pydantic import BaseModel, ValidationError
 
+from nucliadb.models.internal.retrieval import RetrievalRequest, RetrievalResponse
+from nucliadb_models.augment import AugmentRequest, AugmentResponse
 from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
     EntitiesGroup,
@@ -338,6 +340,17 @@ SDK_DEFINITION = {
         method="POST",
         path_params=("kbid",),
     ),
+    "retrieve": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/retrieve",
+        method="POST",
+        path_params=("kbid",),
+    ),
+    "augment": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/augment",
+        method="POST",
+        path_params=("kbid",),
+    ),
+    # Misc
     "summarize": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/summarize",
         method="POST",
@@ -348,6 +361,7 @@ SDK_DEFINITION = {
         method="POST",
         path_params=("kbid",),
     ),
+    # Import/export
     "start_export": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/export",
         method="POST",
@@ -378,6 +392,7 @@ SDK_DEFINITION = {
         method="GET",
         path_params=("kbid", "import_id"),
     ),
+    # Training
     "trainset": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/trainset",
         method="GET",
@@ -1094,6 +1109,10 @@ class NucliaDB(_NucliaDBBase):
     feedback = _request_sync_builder("feedback", FeedbackRequest, type(None))
     start_export = _request_sync_builder("start_export", type(None), CreateExportResponse)
     export_status = _request_sync_builder("export_status", type(None), StatusResponse)
+    _retrieve = _request_sync_builder("retrieve", RetrievalRequest, RetrievalResponse)
+    _augment = _request_sync_builder("augment", AugmentRequest, AugmentResponse)
+
+    # misc
     download_export = _request_iterator_sync_builder("download_export")
     create_kb_from_import = _request_sync_builder(
         "create_kb_from_import", type(None), NewImportedKbResponse
@@ -1115,6 +1134,7 @@ class NucliaDB(_NucliaDBBase):
     get_configuration_schema = _request_json_sync_builder("get_configuration_schema")
     # Learning config generative providers
     get_generative_providers = _request_json_sync_builder("get_generative_providers")
+
     # Custom synonyms
     set_custom_synonyms = _request_sync_builder("set_custom_synonyms", KnowledgeBoxSynonyms, type(None))
     get_custom_synonyms = _request_sync_builder("get_custom_synonyms", type(None), KnowledgeBoxSynonyms)
@@ -1296,6 +1316,9 @@ class NucliaDBAsync(_NucliaDBBase):
     feedback = _request_async_builder("feedback", FeedbackRequest, type(None))
     start_export = _request_async_builder("start_export", type(None), CreateExportResponse)
     export_status = _request_async_builder("export_status", type(None), StatusResponse)
+    _retrieve = _request_async_builder("retrieve", RetrievalRequest, RetrievalResponse)
+    _augment = _request_async_builder("augment", AugmentRequest, AugmentResponse)
+
     download_export = _request_iterator_async_builder("download_export")
     create_kb_from_import = _request_async_builder(
         "create_kb_from_import", type(None), NewImportedKbResponse
@@ -1317,6 +1340,7 @@ class NucliaDBAsync(_NucliaDBBase):
     get_configuration_schema = _request_json_async_builder("get_configuration_schema")
     # Learning config generative providers
     get_generative_providers = _request_json_async_builder("get_generative_providers")
+
     # Custom synonyms
     set_custom_synonyms = _request_async_builder("set_custom_synonyms", KnowledgeBoxSynonyms, type(None))
     get_custom_synonyms = _request_async_builder("get_custom_synonyms", type(None), KnowledgeBoxSynonyms)
