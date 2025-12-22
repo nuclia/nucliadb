@@ -198,7 +198,7 @@ class Paragraph(BaseModel):
 class Paragraphs(BaseModel):
     results: list[Paragraph] = []
     facets: Optional[FacetsResult] = None
-    query: Optional[str] = None
+    query: Optional[str] = Field(default=None, title="Paragraphs Query")
     total: int = 0
     page_number: int = 0
     page_size: int = 20
@@ -220,7 +220,7 @@ class ResourceResult(BaseModel):
 class Resources(BaseModel):
     results: list[ResourceResult]
     facets: Optional[FacetsResult] = None
-    query: Optional[str] = None
+    query: Optional[str] = Field(default=None, title="Resources Query")
     total: int = 0
     page_number: int = 0
     page_size: int = 20
@@ -473,7 +473,7 @@ class SearchParamDefaults:
     )
     filters = ParamDefault(
         default=[],
-        title="Filters",
+        title="Search Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
     )
     resource_filters = ParamDefault(
@@ -743,7 +743,7 @@ class CatalogQuery(BaseModel):
 class CatalogRequest(BaseModel):
     query: Union[str, CatalogQuery] = ParamDefault(
         default="",
-        title="Query",
+        title="Catalog Request Query",
         description="The query to search for",
     ).to_pydantic_field()
     filter_expression: Optional[CatalogFilterExpression] = (
@@ -763,7 +763,7 @@ class CatalogRequest(BaseModel):
     # Deprecated filter parameters
     filters: Union[list[str], list[Filter]] = Field(
         default=[],
-        title="Filters",
+        title="Catalog Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
         deprecated="Use filter_expression instead",
     )
@@ -851,7 +851,7 @@ class BaseSearchRequest(AuditMetadataBase):
     fields: list[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: Union[list[str], list[Filter]] = Field(
         default=[],
-        title="Filters",
+        title="Search Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
     )
     top_k: int = SearchParamDefaults.top_k.to_pydantic_field()
@@ -1126,6 +1126,7 @@ class ChatModel(BaseModel):
         description="Seed use for the generative model for a deterministic output.",
     )
     reasoning: Union[Reasoning, bool] = Field(
+        title="Reasoning options",
         default=False,
         description=(
             "Reasoning options for the generative model. "
@@ -1593,7 +1594,7 @@ class AskRequest(AuditMetadataBase):
     fields: list[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: Union[list[str], list[Filter]] = Field(
         default=[],
-        title="Filters",
+        title="Search Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
     )
     keyword_filters: Union[list[str], list[Filter]] = Field(
@@ -1809,6 +1810,7 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
 
     reasoning: Union[Reasoning, bool] = Field(
         default=False,
+        title="Reasoning options",
         description=(
             "Reasoning options for the generative model. "
             "Set to True to enable default reasoning, False to disable, or provide a Reasoning object for custom options."
@@ -2088,7 +2090,7 @@ class KnowledgeboxFindResults(JsonBaseModel):
 
     resources: dict[str, FindResource]
     relations: Optional[Relations] = None
-    query: Optional[str] = None
+    query: Optional[str] = Field(default=None, title="Find Results Query")
     rephrased_query: Optional[str] = None
     total: int = 0
     page_number: int = Field(
@@ -2283,7 +2285,7 @@ class SyncAskResponse(BaseModel):
     )
     reasoning: Optional[str] = Field(
         default=None,
-        title="Reasoning",
+        title="Reasoning steps",
         description="The reasoning steps followed by the LLM to generate the answer. This is returned only if the reasoning feature is enabled in the request.",  # noqa: E501
     )
     answer_json: Optional[dict[str, Any]] = Field(

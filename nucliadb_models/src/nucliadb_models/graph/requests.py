@@ -122,7 +122,9 @@ class GraphFilterExpression(BaseModel, extra="forbid"):
     Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters
     """
 
-    field: FieldFilterExpression = Field(description="Filter to apply to fields")
+    field: FieldFilterExpression = Field(
+        title="Graph Field Filters", description="Filter to apply to fields"
+    )
 
 
 class BaseGraphSearchRequest(BaseModel):
@@ -174,7 +176,7 @@ GraphPathQuery = Annotated[
 
 
 class GraphSearchRequest(BaseGraphSearchRequest):
-    query: GraphPathQuery
+    query: GraphPathQuery = Field(title="Graph Path Query")
 
 
 # Nodes search
@@ -192,7 +194,7 @@ GraphNodesQuery = Annotated[
 
 
 class GraphNodesSearchRequest(BaseGraphSearchRequest):
-    query: GraphNodesQuery
+    query: GraphNodesQuery = Field(title="Graph Nodes Query")
 
 
 # Relations search
@@ -210,7 +212,7 @@ GraphRelationsQuery = Annotated[
 
 
 class GraphRelationsSearchRequest(BaseGraphSearchRequest):
-    query: GraphRelationsQuery
+    query: GraphRelationsQuery = Field(title="Graph Relations Query")
 
 
 # We need this to avoid issues with pydantic and generic types defined in another module
