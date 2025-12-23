@@ -21,9 +21,9 @@
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.models.internal.retrieval import RetrievalResponse
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.tests.vectors import Q
+from nucliadb_models.retrieval import RetrievalResponse
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.ndbfixtures.resources import smb_wonder_resource
 

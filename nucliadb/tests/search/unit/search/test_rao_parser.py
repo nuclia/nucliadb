@@ -27,9 +27,9 @@ import pytest
 
 import nucliadb_models.labels
 from nucliadb.common.exceptions import InvalidQueryError
-from nucliadb.models.internal import retrieval as retrieval_models
 from nucliadb.search.search.chat.fetcher import RAOFetcher
 from nucliadb.search.search.chat.parser import RAOFindParser
+from nucliadb_models import retrieval as retrieval_models
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.filters import (
     And,

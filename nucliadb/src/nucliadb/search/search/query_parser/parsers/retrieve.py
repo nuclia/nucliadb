@@ -22,7 +22,6 @@ from pydantic import ValidationError
 
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.filter_expression import parse_expression
-from nucliadb.models.internal.retrieval import RetrievalRequest
 from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.fetcher import Fetcher
@@ -40,6 +39,7 @@ from nucliadb.search.search.query_parser.parsers.common import query_with_synony
 from nucliadb.search.search.utils import filter_hidden_resources
 from nucliadb_models import search as search_models
 from nucliadb_models.filters import FilterExpression
+from nucliadb_models.retrieval import RetrievalRequest
 from nucliadb_models.search import MAX_RANK_FUSION_WINDOW
 
 

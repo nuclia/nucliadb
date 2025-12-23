@@ -19,10 +19,10 @@
 #
 
 from nucliadb.common.ids import FieldId
-from nucliadb.models.internal.retrieval import RetrievalRequest, RetrievalResponse
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.augment import AugmentRequest, AugmentResponse
 from nucliadb_models.labels import KnowledgeBoxLabels
+from nucliadb_models.retrieval import RetrievalRequest, RetrievalResponse
 from nucliadb_models.search import FindRequest, Image, KnowledgeboxFindResults, NucliaDBClientType
 
 

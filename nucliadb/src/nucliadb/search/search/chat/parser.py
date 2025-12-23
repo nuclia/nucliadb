@@ -26,8 +26,6 @@ from pydantic import ValidationError
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.filter_expression import filter_from_facet
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
-from nucliadb.models.internal import retrieval as retrieval_models
-from nucliadb.models.internal.retrieval import RetrievalRequest
 from nucliadb.search.search.chat.fetcher import RAOFetcher
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.models import (
@@ -39,6 +37,7 @@ from nucliadb.search.search.query_parser.parsers.common import (
     should_disable_vector_search,
 )
 from nucliadb.search.search.rerankers import NoopReranker, PredictReranker, Reranker
+from nucliadb_models import retrieval as retrieval_models
 from nucliadb_models import search as search_models
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.filters import (
@@ -54,6 +53,7 @@ from nucliadb_models.filters import (
     ParagraphFilterExpression,
     Resource,
 )
+from nucliadb_models.retrieval import RetrievalRequest
 from nucliadb_models.search import Filter, FindRequest
 from nucliadb_protos import knowledgebox_pb2, utils_pb2
 

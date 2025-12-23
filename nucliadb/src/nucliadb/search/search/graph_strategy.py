@@ -33,7 +33,6 @@ from sentry_sdk import capture_exception
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import FieldId, ParagraphId
-from nucliadb.models.internal.retrieval import GraphScore
 from nucliadb.search import logger
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat.query import (
@@ -56,6 +55,7 @@ from nucliadb_models.internal.predict import (
     RerankModel,
 )
 from nucliadb_models.resource import ExtractedDataTypeName
+from nucliadb_models.retrieval import GraphScore
 from nucliadb_models.search import (
     SCORE_TYPE,
     AskRequest,

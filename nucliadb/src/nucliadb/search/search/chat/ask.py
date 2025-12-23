@@ -40,13 +40,6 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.external_index_providers.base import ScoredTextBlock
 from nucliadb.common.ids import ParagraphId
-from nucliadb.models.internal.retrieval import (
-    GraphScore,
-    KeywordScore,
-    RerankerScore,
-    RrfScore,
-    SemanticScore,
-)
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger, predict
 from nucliadb.search.predict import (
@@ -79,6 +72,13 @@ from nucliadb.search.search.metrics import AskMetrics, Metrics
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
 from nucliadb.search.search.rank_fusion import WeightedCombSum
+from nucliadb_models.retrieval import (
+    GraphScore,
+    KeywordScore,
+    RerankerScore,
+    RrfScore,
+    SemanticScore,
+)
 from nucliadb_models.search import (
     SCORE_TYPE,
     AnswerAskResponseItem,

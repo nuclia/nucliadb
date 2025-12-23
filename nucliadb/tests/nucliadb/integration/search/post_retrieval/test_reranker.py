@@ -25,11 +25,11 @@ import pytest
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
 
-from nucliadb.models.internal.retrieval import RetrievalRequest
 from nucliadb.search.search import find, find_merge
 from nucliadb.search.search.chat import query
 from nucliadb.search.search.chat.query import rpc
 from nucliadb.search.utilities import get_predict
+from nucliadb_models.retrieval import RetrievalRequest
 from nucliadb_models.search import KnowledgeboxFindResults, PredictReranker, RerankerName
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.featureflagging import Settings

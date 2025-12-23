@@ -27,7 +27,6 @@ from nuclia_models.predict.generative_responses import GenerativeChunk
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
 from nucliadb.common.models_utils import to_proto
-from nucliadb.models.internal.retrieval import RerankerScore, RetrievalMatch, ScoreType
 from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode, RephraseResponse
 from nucliadb.search.requesters.utils import Method, nidx_query
@@ -57,6 +56,7 @@ from nucliadb_models.augment import (
     ParagraphMetadata,
     ResourceProp,
 )
+from nucliadb_models.retrieval import RerankerScore, RetrievalMatch, ScoreType
 from nucliadb_models.search import (
     SCORE_TYPE,
     AskRequest,
