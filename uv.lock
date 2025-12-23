@@ -1829,12 +1829,12 @@ nkeys = [
 
 [[package]]
 name = "nidx-binding"
-version = "6.9.7"
+version = "6.10.0"
 source = { editable = "nidx/nidx_binding" }
 
 [[package]]
 name = "nidx-protos"
-version = "6.9.7"
+version = "6.10.0"
 source = { editable = "nidx/nidx_protos" }
 dependencies = [
     { name = "protobuf" },
@@ -1884,7 +1884,7 @@ wheels = [
 
 [[package]]
 name = "nucliadb"
-version = "6.9.7"
+version = "6.10.0"
 source = { editable = "nucliadb" }
 dependencies = [
     { name = "aiobotocore" },
@@ -2021,7 +2021,7 @@ wheels = [
 
 [[package]]
 name = "nucliadb-dataset"
-version = "6.9.7"
+version = "6.10.0"
 source = { editable = "nucliadb_dataset" }
 dependencies = [
     { name = "aiohttp" },
@@ -2054,7 +2054,7 @@ requires-dist = [
 
 [[package]]
 name = "nucliadb-models"
-version = "6.9.7"
+version = "6.10.0"
 source = { editable = "nucliadb_models" }
 dependencies = [
     { name = "pydantic" },
@@ -2065,7 +2065,7 @@ requires-dist = [{ name = "pydantic", specifier = ">=2.6,!=2.11.5,!=2.11.6" }]
 
 [[package]]
 name = "nucliadb-protos"
-version = "6.9.7"
+version = "6.10.0"
 source = { editable = "nucliadb_protos" }
 dependencies = [
     { name = "protobuf" },
@@ -2085,7 +2085,7 @@ provides-extras = ["grpc"]
 
 [[package]]
 name = "nucliadb-sdk"
-version = "6.9.7"
+version = "6.10.0"
 source = { editable = "nucliadb_sdk" }
 dependencies = [
     { name = "httpx" },
@@ -2106,7 +2106,7 @@ requires-dist = [
 
 [[package]]
 name = "nucliadb-telemetry"
-version = "6.9.7"
+version = "6.10.0"
 source = { editable = "nucliadb_telemetry" }
 dependencies = [
     { name = "orjson" },
@@ -2270,7 +2270,7 @@ provides-extras = ["otel", "grpc", "nats", "fastapi", "all"]
 
 [[package]]
 name = "nucliadb-utils"
-version = "6.9.7"
+version = "6.10.0"
 source = { editable = "nucliadb_utils" }
 dependencies = [
     { name = "aiohttp" },
@@ -2346,7 +2346,7 @@ provides-extras = ["cache", "fastapi", "storages"]
 
 [[package]]
 name = "nucliadb-workspace"
-version = "6.9.7"
+version = "6.10.0"
 source = { virtual = "." }
 dependencies = [
     { name = "nucliadb" },
