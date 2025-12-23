@@ -1,4 +1,4 @@
-target-version = "py39"
+target-version = "py310"
 line-length = 105
 
 exclude = [
@@ -13,6 +13,7 @@ select = [
     "W",   # pycodestyle warnings
     "F",   # pyflakes
     "I",   # isort
+    "UP007",
 ]
 
 ignore = [
