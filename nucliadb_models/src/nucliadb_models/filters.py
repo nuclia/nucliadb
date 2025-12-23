@@ -99,7 +99,7 @@ class Resource(FilterProp, extra="forbid"):
             try:
                 UUID(v)
             except ValueError:
-                raise ValueError(f"resource id filter '{v}' should be a valid UUID")
+                raise ValueError("Invalid UUID")
         return v
 
     @model_validator(mode="after")
