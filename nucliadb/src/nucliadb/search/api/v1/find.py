@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
-from typing import Optional, Union
 
 from fastapi import Body, Header, Query, Request, Response
 from fastapi.openapi.models import Example
@@ -83,16 +82,16 @@ async def find_knowledgebox(
     response: Response,
     kbid: str,
     query: str = fastapi_query(SearchParamDefaults.query),
-    filter_expression: Optional[str] = fastapi_query(SearchParamDefaults.filter_expression),
+    filter_expression: str | None = fastapi_query(SearchParamDefaults.filter_expression),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
-    top_k: Optional[int] = fastapi_query(SearchParamDefaults.top_k),
-    min_score: Optional[float] = Query(
+    top_k: int | None = fastapi_query(SearchParamDefaults.top_k),
+    min_score: float | None = Query(
         default=None,
         description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
         deprecated=True,
     ),
-    min_score_semantic: Optional[float] = Query(
+    min_score_semantic: float | None = Query(
         default=None,
         description="Minimum semantic similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
     ),
@@ -101,15 +100,13 @@ async def find_knowledgebox(
         description="Minimum bm25 score to filter paragraph and document index results",
         ge=0,
     ),
-    vectorset: Optional[str] = fastapi_query(SearchParamDefaults.vectorset),
-    range_creation_start: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_start),
-    range_creation_end: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_end),
-    range_modification_start: Optional[DateTime] = fastapi_query(
+    vectorset: str | None = fastapi_query(SearchParamDefaults.vectorset),
+    range_creation_start: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_end),
+    range_modification_start: DateTime | None = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
-    range_modification_end: Optional[DateTime] = fastapi_query(
-        SearchParamDefaults.range_modification_end
-    ),
+    range_modification_end: DateTime | None = fastapi_query(SearchParamDefaults.range_modification_end),
     features: list[FindOptions] = fastapi_query(
         SearchParamDefaults.search_features,
         default=[
@@ -130,14 +127,14 @@ async def find_knowledgebox(
     show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
     rank_fusion: RankFusionName = fastapi_query(SearchParamDefaults.rank_fusion),
     reranker: RerankerName = fastapi_query(SearchParamDefaults.reranker),
-    search_configuration: Optional[str] = Query(
+    search_configuration: str | None = Query(
         default=None,
         description="Load find parameters from this configuration. Parameters in the request override parameters from the configuration.",
     ),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> Union[KnowledgeboxFindResults, HTTPClientError]:
+) -> KnowledgeboxFindResults | HTTPClientError:
     try:
         expr = FilterExpression.model_validate_json(filter_expression) if filter_expression else None
 
@@ -195,7 +192,7 @@ async def find_post_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> Union[KnowledgeboxFindResults, HTTPClientError]:
+) -> KnowledgeboxFindResults | HTTPClientError:
     return await _find_endpoint(response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
 
 
@@ -206,7 +203,7 @@ async def _find_endpoint(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-) -> Union[KnowledgeboxFindResults, HTTPClientError]:
+) -> KnowledgeboxFindResults | HTTPClientError:
     if item.search_configuration is not None:
         search_config = await datamanagers.atomic.search_configurations.get(
             kbid=kbid, name=item.search_configuration

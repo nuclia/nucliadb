@@ -19,7 +19,7 @@
 #
 import asyncio
 import logging
-from typing import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 
 from nucliadb_telemetry.errors import capture_exception
 

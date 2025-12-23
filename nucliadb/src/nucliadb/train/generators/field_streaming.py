@@ -19,7 +19,7 @@
 #
 
 import asyncio
-from typing import AsyncGenerator, AsyncIterable, Optional
+from collections.abc import AsyncGenerator, AsyncIterable
 
 from nidx_protos.nodereader_pb2 import DocumentItem, StreamRequest
 
@@ -45,7 +45,7 @@ def field_streaming_batch_generator(
     kbid: str,
     trainset: TrainSet,
     shard_replica_id: str,
-    filter_expression: Optional[FilterExpression],
+    filter_expression: FilterExpression | None,
 ) -> AsyncGenerator[FieldStreamingBatch, None]:
     generator = generate_field_streaming_payloads(kbid, trainset, shard_replica_id, filter_expression)
     batch_generator = batchify(generator, trainset.batch_size, FieldStreamingBatch)
@@ -53,7 +53,7 @@ def field_streaming_batch_generator(
 
 
 async def generate_field_streaming_payloads(
-    kbid: str, trainset: TrainSet, shard_replica_id: str, filter_expression: Optional[FilterExpression]
+    kbid: str, trainset: TrainSet, shard_replica_id: str, filter_expression: FilterExpression | None
 ) -> AsyncGenerator[FieldSplitData, None]:
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
@@ -192,7 +192,7 @@ async def _fetch_basic(kbid: str, fsd: FieldSplitData):
         fsd.basic.CopyFrom(basic)
 
 
-async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> Optional[ExtractedText]:
+async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> ExtractedText | None:
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
@@ -208,7 +208,7 @@ async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> Op
 
 async def get_field_metadata(
     kbid: str, rid: str, field: str, field_type: str
-) -> Optional[FieldComputedMetadata]:
+) -> FieldComputedMetadata | None:
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
@@ -222,7 +222,7 @@ async def get_field_metadata(
     return field_metadata
 
 
-async def get_field_basic(kbid: str, rid: str, field: str, field_type: str) -> Optional[Basic]:
+async def get_field_basic(kbid: str, rid: str, field: str, field_type: str) -> Basic | None:
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:

@@ -17,8 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from collections.abc import AsyncGenerator
 from datetime import datetime
-from typing import AsyncGenerator
 from uuid import uuid4
 
 from fastapi_versioning import version

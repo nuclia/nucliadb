@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional
 
 from nidx_protos import nodereader_pb2
 from pydantic import ValidationError
@@ -64,7 +63,7 @@ async def parse_find(
     kbid: str,
     item: FindRequest,
     *,
-    fetcher: Optional[Fetcher] = None,
+    fetcher: Fetcher | None = None,
 ) -> ParsedQuery:
     fetcher = fetcher or fetcher_for_find(kbid, item)
     parser = _FindParser(kbid, item, fetcher)
@@ -92,8 +91,8 @@ class _FindParser:
         self.fetcher = fetcher
 
         # cached data while parsing
-        self._query: Optional[Query] = None
-        self._top_k: Optional[int] = None
+        self._query: Query | None = None
+        self._top_k: int | None = None
 
     async def parse(self) -> UnitRetrieval:
         self._validate_request()

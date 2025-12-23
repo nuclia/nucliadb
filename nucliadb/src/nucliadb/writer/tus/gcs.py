@@ -28,7 +28,6 @@ import tempfile
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from typing import Optional
 from urllib.parse import quote_plus
 
 import aiohttp
@@ -74,11 +73,11 @@ RETRIABLE_EXCEPTIONS = (
 
 
 class GCloudBlobStore(BlobStore):
-    _session: Optional[aiohttp.ClientSession] = None
+    _session: aiohttp.ClientSession | None = None
     loop = None
     upload_url: str
     object_base_url: str
-    json_credentials: Optional[str]
+    json_credentials: str | None
     bucket: str
     location: str
     project: str
@@ -123,7 +122,7 @@ class GCloudBlobStore(BlobStore):
         project: str,
         bucket_labels,
         object_base_url: str,
-        json_credentials: Optional[str],
+        json_credentials: str | None,
     ):
         self.bucket = bucket
         self.source = CloudFile.Source.GCS

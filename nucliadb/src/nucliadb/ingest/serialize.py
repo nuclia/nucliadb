@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional, Union
 
 import nucliadb_models as models
 from nucliadb.common import datamanagers
@@ -66,13 +65,13 @@ from nucliadb_utils.utilities import get_storage
 
 async def serialize(
     kbid: str,
-    rid: Optional[str],
+    rid: str | None,
     show: list[ResourceProperties],
     field_type_filter: list[FieldTypeName],
     extracted: list[ExtractedDataTypeName],
-    service_name: Optional[str] = None,
-    slug: Optional[str] = None,
-) -> Optional[Resource]:
+    service_name: str | None = None,
+    slug: str | None = None,
+) -> Resource | None:
     driver = get_driver()
     async with driver.ro_transaction() as txn:
         return await managed_serialize(
@@ -90,13 +89,13 @@ async def serialize(
 async def managed_serialize(
     txn: Transaction,
     kbid: str,
-    rid: Optional[str],
+    rid: str | None,
     show: list[ResourceProperties],
     field_type_filter: list[FieldTypeName],
     extracted: list[ExtractedDataTypeName],
-    service_name: Optional[str] = None,
-    slug: Optional[str] = None,
-) -> Optional[Resource]:
+    service_name: str | None = None,
+    slug: str | None = None,
+) -> Resource | None:
     orm_resource = await get_orm_resource(txn, kbid, rid=rid, slug=slug, service_name=service_name)
     if orm_resource is None:
         return None
@@ -107,10 +106,10 @@ async def managed_serialize(
 async def get_orm_resource(
     txn: Transaction,
     kbid: str,
-    rid: Optional[str],
-    slug: Optional[str] = None,
-    service_name: Optional[str] = None,
-) -> Optional[ORMResource]:
+    rid: str | None,
+    slug: str | None = None,
+    service_name: str | None = None,
+) -> ORMResource | None:
     storage = await get_storage(service_name=service_name)
 
     kb = KnowledgeBox(txn, storage, kbid)
@@ -299,7 +298,7 @@ async def serialize_resource(
     return resource
 
 
-async def serialize_origin(resource: ORMResource) -> Optional[Origin]:
+async def serialize_origin(resource: ORMResource) -> Origin | None:
     origin = await resource.get_origin()
     if origin is None:
         return None
@@ -307,7 +306,7 @@ async def serialize_origin(resource: ORMResource) -> Optional[Origin]:
     return from_proto.origin(origin)
 
 
-async def serialize_extra(resource: ORMResource) -> Optional[Extra]:
+async def serialize_extra(resource: ORMResource) -> Extra | None:
     extra = await resource.get_extra()
     if extra is None:
         return None
@@ -332,9 +331,9 @@ async def serialize_security(resource: ORMResource) -> ResourceSecurity:
 
 async def serialize_field_errors(
     field: Field,
-    serialized: Union[
-        TextFieldData, FileFieldData, LinkFieldData, ConversationFieldData, GenericFieldData
-    ],
+    serialized: (
+        TextFieldData | FileFieldData | LinkFieldData | ConversationFieldData | GenericFieldData
+    ),
 ):
     status = await field.get_status()
     if status is None:
@@ -398,30 +397,28 @@ async def set_resource_field_extracted_data(
         field_data.link = await serialize_link_extracted_data(field)
 
 
-async def serialize_extracted_text(field: Field) -> Optional[ExtractedText]:
+async def serialize_extracted_text(field: Field) -> ExtractedText | None:
     data_et = await field.get_extracted_text()
     if data_et is None:
         return None
     return from_proto.extracted_text(data_et)
 
 
-async def serialize_extracted_metadata(
-    field: Field, *, shortened: bool
-) -> Optional[FieldComputedMetadata]:
+async def serialize_extracted_metadata(field: Field, *, shortened: bool) -> FieldComputedMetadata | None:
     data_fcm = await field.get_field_metadata()
     if data_fcm is None:
         return None
     return from_proto.field_computed_metadata(data_fcm, shortened)
 
 
-async def serialize_extracted_large_metadata(field: Field) -> Optional[LargeComputedMetadata]:
+async def serialize_extracted_large_metadata(field: Field) -> LargeComputedMetadata | None:
     data_lcm = await field.get_large_field_metadata()
     if data_lcm is None:
         return None
     return from_proto.large_computed_metadata(data_lcm)
 
 
-async def serialize_extracted_vectors(field: Field) -> Optional[VectorObject]:
+async def serialize_extracted_vectors(field: Field) -> VectorObject | None:
     # XXX: our extracted API is not vectorset-compatible, so we'll get the
     # first vectorset and return the values. Ideally, we should provide a
     # way to select a vectorset
@@ -436,21 +433,21 @@ async def serialize_extracted_vectors(field: Field) -> Optional[VectorObject]:
     return from_proto.vector_object(data_vec)
 
 
-async def serialize_extracted_question_answers(field: Field) -> Optional[FieldQuestionAnswers]:
+async def serialize_extracted_question_answers(field: Field) -> FieldQuestionAnswers | None:
     qa = await field.get_question_answers()
     if qa is None:
         return None
     return from_proto.field_question_answers(qa)
 
 
-async def serialize_file_extracted_data(field: File) -> Optional[FileExtractedData]:
+async def serialize_file_extracted_data(field: File) -> FileExtractedData | None:
     data_fed = await field.get_file_extracted_data()
     if data_fed is None:
         return None
     return from_proto.file_extracted_data(data_fed)
 
 
-async def serialize_link_extracted_data(field: Link) -> Optional[LinkExtractedData]:
+async def serialize_link_extracted_data(field: Link) -> LinkExtractedData | None:
     data_led = await field.get_link_extracted_data()
     if data_led is None:
         return None

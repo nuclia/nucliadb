@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional
 
 from fastapi import HTTPException, Request
 from fastapi_versioning import version
@@ -57,7 +56,7 @@ async def get_partitions_prefix(request: Request, kbid: str, prefix: str) -> Tra
     return await get_partitions(kbid, prefix=prefix)
 
 
-async def get_partitions(kbid: str, prefix: Optional[str] = None) -> TrainSetPartitions:
+async def get_partitions(kbid: str, prefix: str | None = None) -> TrainSetPartitions:
     try:
         all_keys = await get_kb_partitions(kbid, prefix)
     except ShardNotFound:

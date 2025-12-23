@@ -19,7 +19,7 @@
 #
 import asyncio
 import importlib.metadata
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 from nucliadb import health
 from nucliadb.backups.tasks import initialize_consumers as initialize_backup_consumers

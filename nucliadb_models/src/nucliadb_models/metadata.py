@@ -15,7 +15,7 @@
 import warnings
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Self
@@ -49,7 +49,7 @@ class RelationNodeType(str, Enum):
 class RelationEntity(BaseModel):
     value: str
     type: RelationNodeType
-    group: Optional[str] = None
+    group: str | None = None
 
     @model_validator(mode="after")
     def check_relation_is_valid(self) -> Self:
@@ -60,20 +60,20 @@ class RelationEntity(BaseModel):
 
 
 class RelationMetadata(BaseModel):
-    paragraph_id: Optional[str] = None
-    source_start: Optional[int] = None
-    source_end: Optional[int] = None
-    to_start: Optional[int] = None
-    to_end: Optional[int] = None
-    data_augmentation_task_id: Optional[str] = None
+    paragraph_id: str | None = None
+    source_start: int | None = None
+    source_end: int | None = None
+    to_start: int | None = None
+    to_end: int | None = None
+    data_augmentation_task_id: str | None = None
 
 
 class Relation(BaseModel):
     relation: RelationType
-    label: Optional[str] = None
-    metadata: Optional[RelationMetadata] = None
+    label: str | None = None
+    metadata: RelationMetadata | None = None
 
-    from_: Optional[RelationEntity] = Field(default=None, alias="from")
+    from_: RelationEntity | None = Field(default=None, alias="from")
     to: RelationEntity
 
     @model_validator(mode="after")
@@ -100,9 +100,9 @@ class Relation(BaseModel):
 
 
 class InputMetadata(BaseModel):
-    metadata: Dict[str, str] = {}
-    language: Optional[str] = None
-    languages: Optional[List[str]] = Field(default=None, max_length=1024)
+    metadata: dict[str, str] = {}
+    language: str | None = None
+    languages: list[str] | None = Field(default=None, max_length=1024)
 
 
 class ResourceProcessingStatus(Enum):
@@ -120,7 +120,7 @@ class Metadata(InputMetadata):
 
 class FieldClassification(BaseModel):
     field: FieldID
-    classifications: List[Classification] = []
+    classifications: list[Classification] = []
 
 
 class ComputedMetadata(BaseModel):
@@ -129,12 +129,12 @@ class ComputedMetadata(BaseModel):
     without having to load the whole computed metadata field.
     """
 
-    field_classifications: List[FieldClassification] = []
+    field_classifications: list[FieldClassification] = []
 
 
 class UserMetadata(BaseModel):
-    classifications: List[UserClassification] = []
-    relations: List[Relation] = []
+    classifications: list[UserClassification] = []
+    relations: list[Relation] = []
 
 
 class TokenSplit(BaseModel):
@@ -154,7 +154,7 @@ class TokenSplit(BaseModel):
 
 
 class ParagraphAnnotation(BaseModel):
-    classifications: List[UserClassification] = []
+    classifications: list[UserClassification] = []
     key: str
 
 
@@ -169,12 +169,12 @@ class VisualSelection(BaseModel):
     left: float
     right: float
     bottom: float
-    token_ids: List[int]
+    token_ids: list[int]
 
 
 class PageSelections(BaseModel):
     page: int
-    visual: List[VisualSelection]
+    visual: list[VisualSelection]
 
     def __init__(self, **data):
         warnings.warn(
@@ -190,53 +190,53 @@ class UserFieldMetadata(BaseModel):
     Field-level metadata set by the user via the rest api
     """
 
-    paragraphs: List[ParagraphAnnotation] = []
-    question_answers: List[QuestionAnswerAnnotation] = []
+    paragraphs: list[ParagraphAnnotation] = []
+    question_answers: list[QuestionAnswerAnnotation] = []
     field: FieldID
 
 
 class Basic(BaseModel):
-    icon: Optional[str] = None
-    title: Optional[str] = None
-    summary: Optional[str] = None
-    thumbnail: Optional[str] = None
-    created: Optional[datetime] = None
-    modified: Optional[datetime] = None
-    metadata: Optional[Metadata] = None
-    usermetadata: Optional[UserMetadata] = None
-    fieldmetadata: Optional[List[UserFieldMetadata]] = None
-    computedmetadata: Optional[ComputedMetadata] = None
-    uuid: Optional[str] = None
-    last_seqid: Optional[int] = None
-    last_account_seq: Optional[int] = None
+    icon: str | None = None
+    title: str | None = None
+    summary: str | None = None
+    thumbnail: str | None = None
+    created: datetime | None = None
+    modified: datetime | None = None
+    metadata: Metadata | None = None
+    usermetadata: UserMetadata | None = None
+    fieldmetadata: list[UserFieldMetadata] | None = None
+    computedmetadata: ComputedMetadata | None = None
+    uuid: str | None = None
+    last_seqid: int | None = None
+    last_account_seq: int | None = None
 
 
 class InputOrigin(BaseModel):
-    source_id: Optional[str] = None
-    url: Optional[str] = None
-    created: Optional[DateTime] = Field(
+    source_id: str | None = None
+    url: str | None = None
+    created: DateTime | None = Field(
         default=None,
         description="Creation date of the resource at the origin system. This can be later used for date range filtering on search endpoints. Have a look at the advanced search documentation page: https://docs.nuclia.dev/docs/rag/advanced/search/#date-filtering",
     )
-    modified: Optional[DateTime] = Field(
+    modified: DateTime | None = Field(
         default=None,
         description="Modification date of the resource at the origin system. This can be later used for date range filtering on search endpoints.  Have a look at the advanced search documentation page: https://docs.nuclia.dev/docs/rag/advanced/search/#date-filtering",
     )
-    metadata: Dict[str, str] = Field(
+    metadata: dict[str, str] = Field(
         default={},
         title="Metadata",
         description="Generic metadata from the resource at the origin system. It can later be used for filtering on search endpoints with '/origin.metadata/{key}/{value}'",
     )
-    tags: List[str] = Field(
+    tags: list[str] = Field(
         default=[],
         title="Tags",
         description="Resource tags about the origin system. It can later be used for filtering on search endpoints with '/origin.tags/{tag}'",
         max_length=300,
     )
-    collaborators: List[str] = Field(default=[], max_length=100)
-    filename: Optional[str] = None
-    related: List[str] = Field(default=[], max_length=100)
-    path: Optional[str] = Field(
+    collaborators: list[str] = Field(default=[], max_length=100)
+    filename: str | None = None
+    related: list[str] = Field(default=[], max_length=100)
+    path: str | None = Field(
         default=None,
         description="Path of the original resource. Typically used to store folder structure information of the resource at the origin system. It can be later used for filtering on search endpoints with '/origin.path/{path}'",
         max_length=2048,
@@ -253,10 +253,10 @@ class InputOrigin(BaseModel):
 class Origin(InputOrigin):
     # Created and modified are redefined to
     # use native datetime objects and skip validation
-    created: Optional[datetime] = None
-    modified: Optional[datetime] = None
+    created: datetime | None = None
+    modified: datetime | None = None
 
-    tags: List[str] = Field(
+    tags: list[str] = Field(
         default=[],
         title="Tags",
         description="Resource tags about the origin system. It can later be used for filtering on search endpoints with '/origin.tags/{tag}'",
@@ -268,11 +268,11 @@ class Origin(InputOrigin):
         API = "API"
         PYSDK = "PYSDK"
 
-    source: Optional[Source] = Source.API
+    source: Source | None = Source.API
 
 
 class Extra(BaseModel):
-    metadata: Dict[Any, Any] = Field(
+    metadata: dict[Any, Any] = Field(
         ...,
         title="Metadata",
         description="Arbitrary JSON metadata provided by the user that is not meant to be searchable, but can be serialized on results.",  # noqa
@@ -280,4 +280,4 @@ class Extra(BaseModel):
 
 
 class Relations(BaseModel):
-    relations: Optional[List[Relation]] = None
+    relations: list[Relation] | None = None

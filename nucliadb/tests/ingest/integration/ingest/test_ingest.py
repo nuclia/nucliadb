@@ -212,7 +212,7 @@ async def test_ingest_messages_autocommit(kbid: str, processor, dummy_nidx_utili
 
 async def test_ingest_error_message(kbid: str, storage: Storage, processor, maindb_driver: Driver):
     filename = f"{dirname(__file__)}/assets/resource.pb"
-    with open(filename, "r") as f:
+    with open(filename) as f:
         data = base64.b64decode(f.read())
     message0: BrokerMessage = BrokerMessage()
     message0.ParseFromString(data)
@@ -222,7 +222,7 @@ async def test_ingest_error_message(kbid: str, storage: Storage, processor, main
     await processor.process(message=message0, seqid=1)
 
     filename = f"{dirname(__file__)}/assets/error.pb"
-    with open(filename, "r") as f:
+    with open(filename) as f:
         data = base64.b64decode(f.read())
     message1: BrokerMessage = BrokerMessage()
     message1.ParseFromString(data)

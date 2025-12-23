@@ -19,8 +19,9 @@
 
 import asyncio
 import json
+from collections.abc import Sequence
 from enum import Enum, auto
-from typing import Any, Optional, Sequence, TypeVar, Union, overload
+from typing import Any, TypeVar, overload
 
 from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
@@ -60,7 +61,7 @@ METHODS = {
     Method.GRAPH: graph_search_shard,
 }
 
-REQUEST_TYPE = Union[SuggestRequest, SearchRequest, GraphSearchRequest]
+REQUEST_TYPE = SuggestRequest | SearchRequest | GraphSearchRequest
 
 T = TypeVar(
     "T",
@@ -75,7 +76,7 @@ async def nidx_query(
     kbid: str,
     method: Method,
     pb_query: SuggestRequest,
-    timeout: Optional[float] = None,
+    timeout: float | None = None,
 ) -> tuple[list[SuggestResponse], list[str]]: ...
 
 
@@ -84,7 +85,7 @@ async def nidx_query(
     kbid: str,
     method: Method,
     pb_query: SearchRequest,
-    timeout: Optional[float] = None,
+    timeout: float | None = None,
 ) -> tuple[list[SearchResponse], list[str]]: ...
 
 
@@ -93,7 +94,7 @@ async def nidx_query(
     kbid: str,
     method: Method,
     pb_query: GraphSearchRequest,
-    timeout: Optional[float] = None,
+    timeout: float | None = None,
 ) -> tuple[list[GraphSearchResponse], list[str]]: ...
 
 
@@ -101,8 +102,8 @@ async def nidx_query(
     kbid: str,
     method: Method,
     pb_query: REQUEST_TYPE,
-    timeout: Optional[float] = None,
-) -> tuple[Sequence[Union[T, BaseException]], list[str]]:
+    timeout: float | None = None,
+) -> tuple[Sequence[T | BaseException], list[str]]:
     timeout = timeout or settings.search_timeout
     shard_manager = get_shard_manager()
     try:
@@ -133,7 +134,7 @@ async def nidx_query(
         )
 
     try:
-        results: list[Union[T, BaseException]] = await asyncio.wait_for(
+        results: list[T | BaseException] = await asyncio.wait_for(
             asyncio.gather(*ops, return_exceptions=True),
             timeout=timeout,
         )
@@ -159,7 +160,7 @@ async def nidx_query(
     return results, queried_shards
 
 
-def validate_nidx_query_results(results: list[Any]) -> Optional[HTTPException]:
+def validate_nidx_query_results(results: list[Any]) -> HTTPException | None:
     """
     Validate the results of a nidx query and return an exception if any error is found
 

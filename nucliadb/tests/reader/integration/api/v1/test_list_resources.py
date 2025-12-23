@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 import pytest
 from httpx import AsyncClient
@@ -46,8 +45,8 @@ PAGINATION_TEST_SCENARIOS = [
 async def test_list_resources(
     nucliadb_reader: AsyncClient,
     simple_resources: tuple[str, list[str]],
-    page: Optional[int],
-    size: Optional[int],
+    page: int | None,
+    size: int | None,
     expected_resources_count: int,
     expected_is_last_page: bool,
 ) -> None:

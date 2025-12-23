@@ -42,12 +42,10 @@ def test_get_mapped_roles():
         },
     )
 
-    assert set(auth.get_mapped_roles(settings=settings, data={"group": "managers"})) == set(
-        [
-            NucliaDBRoles.READER.value,
-            NucliaDBRoles.MANAGER.value,
-        ]
-    )
+    assert set(auth.get_mapped_roles(settings=settings, data={"group": "managers"})) == {
+        NucliaDBRoles.READER.value,
+        NucliaDBRoles.MANAGER.value,
+    }
 
     # no values
     assert auth.get_mapped_roles(settings=Settings(auth_policy_user_default_roles=[]), data={}) == []

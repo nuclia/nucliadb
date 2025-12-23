@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Optional
 from uuid import uuid4
 
 from nidx_protos.noderesources_pb2 import Resource
@@ -75,11 +74,11 @@ async def test_create_resource_orm_with_basic(
     r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
     assert r is not None
 
-    b2: Optional[PBBasic] = await r.get_basic()
+    b2: PBBasic | None = await r.get_basic()
     assert b2 is not None
     assert b2.icon == "text/plain"
 
-    o2: Optional[PBOrigin] = await r.get_origin()
+    o2: PBOrigin | None = await r.get_origin()
     assert o2 is None
 
     o2 = PBOrigin()

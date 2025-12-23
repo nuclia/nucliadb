@@ -19,8 +19,9 @@
 import heapq
 import json
 from collections import defaultdict
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
-from typing import Any, Collection, Iterable, Optional, Union
+from typing import Any
 
 from nidx_protos import nodereader_pb2
 from nuclia_models.predict.generative_responses import (
@@ -319,8 +320,8 @@ async def get_graph_results(
     graph_strategy: GraphStrategy,
     text_block_reranker: Reranker,
     metrics: Metrics,
-    generative_model: Optional[str] = None,
-    shards: Optional[list[str]] = None,
+    generative_model: str | None = None,
+    shards: list[str] | None = None,
 ) -> tuple[KnowledgeboxFindResults, FindRequest]:
     relations = Relations(entities={})
     explored_entities: set[FrozenRelationNode] = set()
@@ -466,7 +467,7 @@ async def get_graph_results(
 async def fuzzy_search_entities(
     kbid: str,
     query: str,
-) -> Optional[RelatedEntities]:
+) -> RelatedEntities | None:
     """Fuzzy find entities in KB given a query using the same methodology as /suggest, but split by words."""
 
     # Build an OR for each word in the query matching with fuzzy any word in any
@@ -494,7 +495,7 @@ async def fuzzy_search_entities(
     # merge shard results while deduplicating repeated entities across shards
     unique_entities: set[RelatedEntity] = set()
     for response in results:
-        unique_entities.update((RelatedEntity(family=e.subtype, value=e.value) for e in response.nodes))
+        unique_entities.update(RelatedEntity(family=e.subtype, value=e.value) for e in response.nodes)
 
     return RelatedEntities(entities=list(unique_entities), total=len(unique_entities))
 
@@ -573,7 +574,7 @@ async def rank_relations_generative(
     kbid: str,
     user: str,
     top_k: int,
-    generative_model: Optional[str] = None,
+    generative_model: str | None = None,
     score_threshold: float = 2,
     max_rels_to_eval: int = 100,
 ) -> tuple[Relations, dict[str, list[float]]]:
@@ -651,7 +652,7 @@ async def rank_relations_generative(
     if response_json is None or status is None or status.code != "0":
         raise ValueError("No JSON response found")
 
-    scored_unique_triplets: list[dict[str, Union[str, Any]]] = response_json.object["triplets"]
+    scored_unique_triplets: list[dict[str, str | Any]] = response_json.object["triplets"]
 
     if len(scored_unique_triplets) != len(unique_triplets):
         raise ValueError("Mismatch between input and output triplets")
@@ -717,7 +718,7 @@ def build_text_blocks_from_relations(
     This is a hacky way to generate paragraphs from relations, and it is not the intended use of TextBlockMatch.
     """
     # Build a set of unique triplets with their scores
-    triplets: dict[tuple[str, str, str], tuple[float, Relations, Optional[ParagraphId]]] = defaultdict(
+    triplets: dict[tuple[str, str, str], tuple[float, Relations, ParagraphId | None]] = defaultdict(
         lambda: (0.0, Relations(entities={}), None)
     )
     paragraph_count = 0

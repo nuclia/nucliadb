@@ -22,7 +22,7 @@ import asyncio
 import importlib.metadata
 import inspect
 from asyncio import tasks
-from typing import Callable
+from collections.abc import Callable
 
 from nucliadb.train.uploader import start_upload
 from nucliadb_telemetry import errors

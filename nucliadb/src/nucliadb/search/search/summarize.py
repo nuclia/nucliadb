@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Optional
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.utils import get_driver
@@ -36,7 +35,7 @@ from nucliadb_models.search import (
 from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_utils.utilities import get_storage
 
-ExtractedTexts = list[tuple[str, str, Optional[ExtractedText]]]
+ExtractedTexts = list[tuple[str, str, ExtractedText | None]]
 
 MAX_GET_EXTRACTED_TEXT_OPS = 20
 
@@ -46,7 +45,7 @@ class NoResourcesToSummarize(Exception):
 
 
 async def summarize(
-    kbid: str, request: SummarizeRequest, extra_predict_headers: Optional[dict[str, str]]
+    kbid: str, request: SummarizeRequest, extra_predict_headers: dict[str, str] | None
 ) -> SummarizedResponse:
     predict_request = SummarizeModel()
     predict_request.generative_model = request.generative_model
@@ -115,14 +114,14 @@ async def get_extracted_texts(kbid: str, resource_uuids_or_slugs: list[str]) -> 
 
 async def get_extracted_text(
     uuid_or_slug, field: Field, max_operations: asyncio.Semaphore
-) -> tuple[str, str, Optional[ExtractedText]]:
+) -> tuple[str, str, ExtractedText | None]:
     async with max_operations:
         extracted_text = await field.get_extracted_text(force=True)
         field_key = f"{field.type}/{field.id}"
         return uuid_or_slug, field_key, extracted_text
 
 
-async def get_resource_uuid(kbobj: KnowledgeBox, uuid_or_slug: str) -> Optional[str]:
+async def get_resource_uuid(kbobj: KnowledgeBox, uuid_or_slug: str) -> str | None:
     """
     Return the uuid of the resource with the given uuid_or_slug.
     """

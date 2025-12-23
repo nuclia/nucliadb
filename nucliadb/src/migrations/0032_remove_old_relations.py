@@ -26,7 +26,6 @@ is stored in object storage.
 """
 
 import logging
-from typing import Optional
 
 from nucliadb.migrator.context import ExecutionContext
 
@@ -34,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 async def migrate(context: ExecutionContext) -> None:
-    start: Optional[str] = ""
+    start: str | None = ""
     while True:
         if start is None:
             break
@@ -45,7 +44,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     pass
 
 
-async def do_batch(context: ExecutionContext, start: str) -> Optional[str]:
+async def do_batch(context: ExecutionContext, start: str) -> str | None:
     logger.info(f"Running batch from {start}")
     async with context.kv_driver.rw_transaction() as txn:
         async with txn.connection.cursor() as cur:  # type: ignore

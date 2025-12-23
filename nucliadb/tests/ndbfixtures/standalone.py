@@ -20,9 +20,9 @@
 import base64
 import logging
 import os
+from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import AsyncIterator, Iterator
 from unittest.mock import patch
 
 import pytest

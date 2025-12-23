@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import import logger
@@ -43,7 +43,7 @@ from nucliadb_telemetry import errors
 
 
 async def export_kb(
-    context: ApplicationContext, kbid: str, metadata: Optional[ExportMetadata] = None
+    context: ApplicationContext, kbid: str, metadata: ExportMetadata | None = None
 ) -> AsyncGenerator[bytes, None]:
     """Export the data of a knowledgebox to a stream of bytes.
 

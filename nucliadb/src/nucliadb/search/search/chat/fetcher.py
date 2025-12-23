@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional
 
 from google.protobuf.json_format import ParseDict
 
@@ -40,12 +39,12 @@ class RAOFetcher(Fetcher):
         kbid: str,
         *,
         query: str,
-        user_vector: Optional[list[float]],
-        vectorset: Optional[str],
+        user_vector: list[float] | None,
+        vectorset: str | None,
         rephrase: bool,
-        rephrase_prompt: Optional[str],
-        generative_model: Optional[str],
-        query_image: Optional[Image],
+        rephrase_prompt: str | None,
+        generative_model: str | None,
+        query_image: Image | None,
     ):
         super().__init__(
             kbid,
@@ -58,8 +57,8 @@ class RAOFetcher(Fetcher):
             query_image=query_image,
         )
 
-        self._query_info: Optional[QueryInfo] = None
-        self._vectorset: Optional[str] = None
+        self._query_info: QueryInfo | None = None
+        self._vectorset: str | None = None
 
     async def query_information(self) -> QueryInfo:
         if self._query_info is None:
@@ -76,7 +75,7 @@ class RAOFetcher(Fetcher):
 
     # Retrieval
 
-    async def get_rephrased_query(self) -> Optional[str]:
+    async def get_rephrased_query(self) -> str | None:
         query_info = await self.query_information()
         return query_info.rephrased_query
 
@@ -88,7 +87,7 @@ class RAOFetcher(Fetcher):
             detected_entities = []
         return detected_entities
 
-    async def get_semantic_min_score(self) -> Optional[float]:
+    async def get_semantic_min_score(self) -> float | None:
         query_info = await self.query_information()
         vectorset = await self.get_vectorset()
         return query_info.semantic_thresholds.get(vectorset, None)
@@ -158,7 +157,7 @@ class RAOFetcher(Fetcher):
 
         return query_info.visual_llm
 
-    async def get_max_context_tokens(self, max_tokens: Optional[MaxTokens]) -> int:
+    async def get_max_context_tokens(self, max_tokens: MaxTokens | None) -> int:
         query_info = await self.query_information()
         if query_info is None:
             raise SendToPredictError("Error while using predict's query endpoint")
@@ -173,7 +172,7 @@ class RAOFetcher(Fetcher):
             return max_tokens.context
         return model_max
 
-    def get_max_answer_tokens(self, max_tokens: Optional[MaxTokens]) -> Optional[int]:
+    def get_max_answer_tokens(self, max_tokens: MaxTokens | None) -> int | None:
         if max_tokens is not None and max_tokens.answer is not None:
             return max_tokens.answer
         return None
@@ -182,11 +181,11 @@ class RAOFetcher(Fetcher):
 async def query_information(
     kbid: str,
     query: str,
-    semantic_model: Optional[str],
-    generative_model: Optional[str] = None,
+    semantic_model: str | None,
+    generative_model: str | None = None,
     rephrase: bool = False,
-    rephrase_prompt: Optional[str] = None,
-    query_image: Optional[Image] = None,
+    rephrase_prompt: str | None = None,
+    query_image: Image | None = None,
 ) -> QueryInfo:
     # NOTE: When moving /ask to RAO, this will need to change to whatever client/utility is used
     # to call NUA predict (internally or externally in the case of onprem).

@@ -18,10 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from enum import Enum
 from inspect import iscoroutinefunction
-from typing import Any, Callable, Type
+from typing import Any
 
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils import logger
@@ -33,7 +33,7 @@ class ListenerPriority(Enum):
 
 
 class Signal:
-    def __init__(self, payload_model: Type):
+    def __init__(self, payload_model: type):
         self.payload_model_type = payload_model
         self.callbacks: dict[str, tuple[Callable[..., Awaitable], int]] = {}
 

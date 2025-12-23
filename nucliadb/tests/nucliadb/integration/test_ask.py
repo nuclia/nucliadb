@@ -444,15 +444,13 @@ async def test_ask_full_resource_rag_strategy_with_exclude(
             retrieval = item.item.results
             break
     assert retrieval is not None
-    paragraphs_ids = set(
-        (
-            paragraph.id
-            for resource in retrieval.resources.values()
-            for field in resource.fields.values()
-            for paragraph in field.paragraphs.values()
-        )
-    )
-    assert paragraphs_ids == set((f"{resource1}/a/title/0-11", f"{resource2}/a/title/0-11"))
+    paragraphs_ids = {
+        paragraph.id
+        for resource in retrieval.resources.values()
+        for field in resource.fields.values()
+        for paragraph in field.paragraphs.values()
+    }
+    assert paragraphs_ids == {f"{resource1}/a/title/0-11", f"{resource2}/a/title/0-11"}
 
     # Make sure the prompt context is properly crafted
     assert predict.calls[-2][0] == "chat_query_ndjson"  # type: ignore
@@ -1350,7 +1348,7 @@ async def test_ask_graph_strategy_inner_fuzzy_prefix_search(
     related = await fuzzy_search_entities(kbid, "Did Leonard and Joseph perform in the same film?")
     assert related is not None
     assert related.total == 2 == len(related.entities)
-    assert set((r.value, r.family) for r in related.entities) == {
+    assert {(r.value, r.family) for r in related.entities} == {
         ("Leonardo DiCaprio", "ACTOR"),
         ("Joseph Gordon-Levitt", "ACTOR"),
     }

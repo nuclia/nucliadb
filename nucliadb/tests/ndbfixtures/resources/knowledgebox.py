@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import pytest
 from httpx import AsyncClient

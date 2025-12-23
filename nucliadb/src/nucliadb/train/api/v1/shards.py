@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
-from typing import Optional
 
 import google.protobuf.message
 import pydantic
@@ -63,7 +62,7 @@ async def object_get_response(
     )
 
 
-async def get_trainset(request: Request) -> tuple[TrainSet, Optional[FilterExpression]]:
+async def get_trainset(request: Request) -> tuple[TrainSet, FilterExpression | None]:
     if request.headers.get("Content-Type") == "application/json":
         try:
             trainset_model = TrainSetModel.model_validate(await request.json())

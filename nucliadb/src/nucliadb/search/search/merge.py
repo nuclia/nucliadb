@@ -20,7 +20,8 @@
 import asyncio
 import datetime
 import math
-from typing import Any, Iterable, Optional, Set, Union
+from collections.abc import Iterable
+from typing import Any
 
 from nidx_protos.nodereader_pb2 import (
     DocumentResult,
@@ -79,7 +80,7 @@ from .paragraphs import get_paragraph_text, get_text_sentence
 Bm25Score = tuple[float, float]
 TimestampScore = datetime.datetime
 TitleScore = str
-SortValue = Union[Bm25Score, TimestampScore, TitleScore]
+SortValue = Bm25Score | TimestampScore | TitleScore
 
 
 def relation_node_type_to_entity_type(node_type: RelationNode.NodeType.ValueType) -> EntityType:
@@ -100,7 +101,7 @@ def entity_type_to_relation_node_type(node_type: EntityType) -> RelationNode.Nod
     }[node_type]
 
 
-def sort_results_by_score(results: Union[list[ParagraphResult], list[DocumentResult]]):
+def sort_results_by_score(results: list[ParagraphResult] | list[DocumentResult]):
     results.sort(key=lambda x: (x.score.bm25, x.score.booster), reverse=True)
 
 
@@ -247,7 +248,7 @@ async def merge_vectors_results(
     resources: list[str],
     kbid: str,
     top_k: int,
-    min_score: Optional[float] = None,
+    min_score: float | None = None,
 ) -> Sentences:
     facets: dict[str, Any] = {}
     raw_vectors_list: list[DocumentScored] = []
@@ -333,7 +334,7 @@ async def merge_paragraph_results(
     facets: dict[str, Any] = {}
     query = None
     next_page = False
-    ematches: Optional[list[str]] = None
+    ematches: list[str] | None = None
     total = 0
     for paragraph_response in paragraph_responses:
         if ematches is None:
@@ -389,7 +390,7 @@ async def merge_paragraph_results(
 
 
 async def load_paragraph(
-    result: ParagraphResult, kbid: str, highlight: bool, ematches: Optional[list[str]]
+    result: ParagraphResult, kbid: str, highlight: bool, ematches: list[str] | None
 ) -> Paragraph:
     _, field_type, field = result.field.split("/")
     text = await get_paragraph_text(
@@ -606,7 +607,7 @@ async def merge_paragraphs_results(
 async def merge_suggest_entities_results(
     suggest_responses: list[SuggestResponse],
 ) -> RelatedEntities:
-    unique_entities: Set[RelatedEntity] = set()
+    unique_entities: set[RelatedEntity] = set()
     for response in suggest_responses:
         response_entities = (
             RelatedEntity(family=e.subtype, value=e.value) for e in response.entity_results.nodes

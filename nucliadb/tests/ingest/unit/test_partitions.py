@@ -19,7 +19,7 @@
 #
 import json
 import os
-from typing import Iterable
+from collections.abc import Iterable
 from unittest.mock import patch
 
 import pytest

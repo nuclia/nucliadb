@@ -19,7 +19,6 @@
 #
 
 from datetime import datetime
-from typing import Optional
 from uuid import uuid4
 
 from nucliadb_protos import resources_pb2 as rpb
@@ -40,9 +39,9 @@ class BrokerMessageBuilder:
         self,
         *,
         kbid: str,
-        rid: Optional[str] = None,
-        slug: Optional[str] = None,
-        source: Optional[wpb.BrokerMessage.MessageSource.ValueType] = None,
+        rid: str | None = None,
+        slug: str | None = None,
+        source: wpb.BrokerMessage.MessageSource.ValueType | None = None,
     ):
         self.bm = wpb.BrokerMessage()
         self.fields: dict[tuple[str, rpb.FieldType.ValueType], FieldBuilder] = {}

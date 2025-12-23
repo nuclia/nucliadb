@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 from nucliadb.backups.const import BackupsNatsConfig
 from nucliadb.backups.create import backup_kb_task

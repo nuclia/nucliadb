@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 import aiohttp
 
@@ -97,7 +96,7 @@ class UploadServicer:
             response.status = GetLabelsResponse.Status.NOTFOUND
             return response
         response.kb.uuid = kbid
-        labels: Optional[Labels] = await datamanagers.atomic.labelset.get_all(kbid=kbid)
+        labels: Labels | None = await datamanagers.atomic.labelset.get_all(kbid=kbid)
         if labels is not None:
             response.labels.CopyFrom(labels)
         return response

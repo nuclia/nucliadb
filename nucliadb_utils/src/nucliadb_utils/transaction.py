@@ -21,7 +21,7 @@ import asyncio
 import uuid
 from asyncio import Event
 from functools import partial
-from typing import Any, Optional, Union
+from typing import Any
 
 import nats
 import nats.errors
@@ -48,9 +48,9 @@ from nucliadb_utils.utilities import get_pubsub
 
 class WaitFor:
     uuid: str
-    seq: Optional[int] = None
+    seq: int | None = None
 
-    def __init__(self, uuid: str, seq: Optional[int] = None):
+    def __init__(self, uuid: str, seq: int | None = None):
         self.uuid = uuid
         self.seq = seq
 
@@ -77,7 +77,7 @@ class LocalTransactionUtility:
         writer: BrokerMessage,
         partition: int,
         wait: bool = False,
-        target_subject: Optional[str] = None,
+        target_subject: str | None = None,
     ) -> int:
         from nucliadb_utils.utilities import get_ingest
 
@@ -99,14 +99,14 @@ class LocalTransactionUtility:
 
 
 class TransactionUtility:
-    nc: Union[Client, NatsClientTelemetry]
-    js: Union[JetStreamContext, JetStreamContextTelemetry]
+    nc: Client | NatsClientTelemetry
+    js: JetStreamContext | JetStreamContextTelemetry
     pubsub: PubSubDriver
 
     def __init__(
         self,
         nats_servers: list[str],
-        nats_creds: Optional[str] = None,
+        nats_creds: str | None = None,
         commit_timeout: int = 60,
     ):
         self.nats_creds = nats_creds
@@ -118,11 +118,11 @@ class TransactionUtility:
 
     async def reconnected_cb(self):
         # See who we are connected to on reconnect.
-        logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
+        logger.info(f"Got reconnected to NATS {self.nc.connected_url}")
 
     async def error_cb(self, e):
         logger.error(
-            "There was an error connecting to NATS transaction: {}".format(e),
+            f"There was an error connecting to NATS transaction: {e}",
             exc_info=True,
         )
 
@@ -138,9 +138,7 @@ class TransactionUtility:
     def _get_notification_action_type(self):
         return Notification.Action.COMMIT  # currently do not handle ABORT!
 
-    async def wait_for_commited(
-        self, kbid: str, waiting_for: WaitFor, request_id: str
-    ) -> Optional[Event]:
+    async def wait_for_commited(self, kbid: str, waiting_for: WaitFor, request_id: str) -> Event | None:
         action_type = self._get_notification_action_type()
 
         def received(waiting_for: WaitFor, event: Event, msg: Any):
@@ -166,7 +164,7 @@ class TransactionUtility:
         )
         return waiting_event
 
-    async def initialize(self, service_name: Optional[str] = None):
+    async def initialize(self, service_name: str | None = None):
         self.pubsub = await get_pubsub()  # type: ignore
 
         options: dict[str, Any] = {
@@ -194,14 +192,14 @@ class TransactionUtility:
 
     async def commit(
         self,
-        writer: Union[BrokerMessage, BrokerMessageBlobReference],
+        writer: BrokerMessage | BrokerMessageBlobReference,
         partition: int,
         wait: bool = False,
-        target_subject: Optional[str] = None,  # allow customizing where to send the message
-        headers: Optional[dict[str, str]] = None,
+        target_subject: str | None = None,  # allow customizing where to send the message
+        headers: dict[str, str] | None = None,
     ) -> int:
         headers = headers or {}
-        waiting_event: Optional[Event] = None
+        waiting_event: Event | None = None
 
         waiting_for = WaitFor(uuid=writer.uuid)
         request_id = uuid.uuid4().hex

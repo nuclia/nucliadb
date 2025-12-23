@@ -17,8 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from collections.abc import Callable
 from inspect import iscoroutinefunction
-from typing import TYPE_CHECKING, Annotated, Callable, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Annotated
 
 import pydantic
 from fastapi import HTTPException, Query, Response
@@ -72,12 +73,7 @@ if TYPE_CHECKING:  # pragma: no cover
 else:
     FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: dict[models.FieldTypeName, int]
 
-FieldModelType = Union[
-    models.TextField,
-    models.LinkField,
-    models.InputConversationField,
-    models.FileField,
-]
+FieldModelType = models.TextField | models.LinkField | models.InputConversationField | models.FileField
 
 FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP = {
     models.FieldTypeName.FILE: resources_pb2.FieldType.FILE,
@@ -278,7 +274,7 @@ async def parse_file_field_adapter(
     )
 
 
-FIELD_PARSERS_MAP: dict[Type, Callable] = {
+FIELD_PARSERS_MAP: dict[type, Callable] = {
     models.TextField: parse_text_field_adapter,
     models.LinkField: parse_link_field_adapter,
     models.InputConversationField: parse_conversation_field_adapter,
@@ -463,7 +459,7 @@ async def append_messages_to_conversation_field_rslug_prefix(
     kbid: str,
     rslug: str,
     field_id: FieldIdString,
-    messages: List[models.InputMessage],
+    messages: list[models.InputMessage],
 ) -> ResourceFieldAdded:
     try:
         field = models.InputConversationField(messages=messages)
@@ -488,7 +484,7 @@ async def append_messages_to_conversation_field_rid_prefix(
     kbid: str,
     rid: str,
     field_id: FieldIdString,
-    messages: List[models.InputMessage],
+    messages: list[models.InputMessage],
 ) -> ResourceFieldAdded:
     try:
         field = models.InputConversationField(messages=messages)
@@ -550,7 +546,7 @@ async def reprocess_file_field(
     rid: str,
     field_id: FieldIdString,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
-    x_file_password: Annotated[Optional[str], X_FILE_PASSWORD] = None,
+    x_file_password: Annotated[str | None, X_FILE_PASSWORD] = None,
     reset_title: bool = Query(
         default=False,
         description="Reset the title of the resource so that the file or link computed titles are set after processing.",

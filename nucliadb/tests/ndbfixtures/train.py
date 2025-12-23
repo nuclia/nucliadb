@@ -19,10 +19,10 @@
 #
 import asyncio
 import uuid
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from time import time
-from typing import AsyncIterator
 from unittest.mock import patch
 
 import aiohttp

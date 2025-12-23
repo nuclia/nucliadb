@@ -21,8 +21,8 @@ import asyncio
 import contextvars
 import json
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Callable, List, Optional
 
 import backoff
 import mmh3
@@ -71,17 +71,17 @@ class RequestContext:
         self.path: str = ""
 
 
-request_context_var = contextvars.ContextVar[Optional[RequestContext]]("request_context", default=None)
+request_context_var = contextvars.ContextVar[RequestContext | None]("request_context", default=None)
 
 
-def get_trace_id() -> Optional[str]:
+def get_trace_id() -> str | None:
     span = get_current_span()
     if span is None:
         return None
     return format_trace_id(span.get_span_context().trace_id)
 
 
-def get_request_context() -> Optional[RequestContext]:
+def get_request_context() -> RequestContext | None:
     return request_context_var.get()
 
 
@@ -103,7 +103,7 @@ def fill_audit_search_request(audit: AuditSearchRequest, request: SearchRequest)
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app: ASGIApp, audit_utility_getter: Callable[[], Optional[AuditStorage]]) -> None:
+    def __init__(self, app: ASGIApp, audit_utility_getter: Callable[[], AuditStorage | None]) -> None:
         self.audit_utility_getter = audit_utility_getter
         super().__init__(app)
 
@@ -155,17 +155,17 @@ KB_USAGE_STREAM_SUBJECT = "kb-usage.nuclia_db"
 
 
 class StreamAuditStorage(AuditStorage):
-    task: Optional[asyncio.Task]
+    task: asyncio.Task | None
     initialized: bool
     queue: asyncio.Queue
 
     def __init__(
         self,
-        nats_servers: List[str],
+        nats_servers: list[str],
         nats_target: str,
         partitions: int,
         seed: int,
-        nats_creds: Optional[str] = None,
+        nats_creds: str | None = None,
         service: str = "nucliadb.audit",
     ):
         self.nats_servers = nats_servers
@@ -186,10 +186,10 @@ class StreamAuditStorage(AuditStorage):
 
     async def reconnected_cb(self):
         # See who we are connected to on reconnect.
-        logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
+        logger.info(f"Got reconnected to NATS {self.nc.connected_url}")
 
     async def error_cb(self, e):
-        logger.error("There was an error connecting to NATS audit: {}".format(e), exc_info=True)
+        logger.error(f"There was an error connecting to NATS audit: {e}", exc_info=True)
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
@@ -269,12 +269,12 @@ class StreamAuditStorage(AuditStorage):
         *,
         kbid: str,
         audit_type: AuditRequest.AuditType.Value,  # type: ignore
-        when: Optional[Timestamp] = None,
-        user: Optional[str] = None,
-        origin: Optional[str] = None,
-        rid: Optional[str] = None,
-        field_metadata: Optional[List[FieldID]] = None,
-        audit_fields: Optional[List[AuditField]] = None,
+        when: Timestamp | None = None,
+        user: str | None = None,
+        origin: str | None = None,
+        rid: str | None = None,
+        field_metadata: list[FieldID] | None = None,
+        audit_fields: list[AuditField] | None = None,
     ):
         auditrequest = AuditRequest()
 
@@ -369,7 +369,7 @@ class StreamAuditStorage(AuditStorage):
         search: SearchRequest,
         timeit: float,
         resources: int,
-        retrieval_rephrased_question: Optional[str] = None,
+        retrieval_rephrased_question: str | None = None,
     ):
         context = get_request_context()
         if context is None:
@@ -420,19 +420,19 @@ class StreamAuditStorage(AuditStorage):
         client_type: int,
         origin: str,
         question: str,
-        rephrased_question: Optional[str],
-        retrieval_rephrased_question: Optional[str],
-        chat_context: List[ChatContext],
-        retrieved_context: List[RetrievedContext],
-        answer: Optional[str],
-        reasoning: Optional[str],
-        learning_id: Optional[str],
+        rephrased_question: str | None,
+        retrieval_rephrased_question: str | None,
+        chat_context: list[ChatContext],
+        retrieved_context: list[RetrievedContext],
+        answer: str | None,
+        reasoning: str | None,
+        learning_id: str | None,
         status_code: int,
-        model: Optional[str],
-        rephrase_time: Optional[float] = None,
-        generative_answer_time: Optional[float] = None,
-        generative_answer_first_chunk_time: Optional[float] = None,
-        generative_reasoning_first_chunk_time: Optional[float] = None,
+        model: str | None,
+        rephrase_time: float | None = None,
+        generative_answer_time: float | None = None,
+        generative_answer_first_chunk_time: float | None = None,
+        generative_reasoning_first_chunk_time: float | None = None,
     ):
         rcontext = get_request_context()
         if rcontext is None:
@@ -482,8 +482,8 @@ class StreamAuditStorage(AuditStorage):
         learning_id: str,
         good: bool,
         task: int,
-        feedback: Optional[str],
-        text_block_id: Optional[str],
+        feedback: str | None,
+        text_block_id: str | None,
     ):
         rcontext = get_request_context()
         if rcontext is None:

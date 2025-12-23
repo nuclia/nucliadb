@@ -20,9 +20,9 @@
 import asyncio
 import base64
 import uuid
+from collections.abc import AsyncIterator
 from contextlib import contextmanager
 from io import BytesIO
-from typing import AsyncIterator
 from unittest import mock
 from unittest.mock import patch
 

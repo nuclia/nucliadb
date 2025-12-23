@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 
 from nucliadb.train.generators.utils import batchify
 from nucliadb_models.filters import FilterExpression
@@ -33,7 +33,7 @@ def image_classification_batch_generator(
     kbid: str,
     trainset: TrainSet,
     shard_replica_id: str,
-    filter_expression: Optional[FilterExpression],
+    filter_expression: FilterExpression | None,
 ) -> AsyncGenerator[ImageClassificationBatch, None]:
     generator = generate_image_classification_payloads(kbid, trainset, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, ImageClassificationBatch)

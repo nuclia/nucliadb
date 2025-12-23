@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Union
 
 from fastapi import Header, Request
 from fastapi_versioning import version
@@ -48,7 +47,7 @@ async def summarize_endpoint(
     kbid: str,
     item: SummarizeRequest,
     x_show_consumption: bool = Header(default=False),
-) -> Union[SummarizedResponse, HTTPClientError]:
+) -> SummarizedResponse | HTTPClientError:
     try:
         return await summarize(
             kbid=kbid,

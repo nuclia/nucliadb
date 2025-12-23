@@ -21,7 +21,6 @@ import asyncio
 import base64
 import time
 from contextlib import contextmanager
-from typing import Optional
 
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry import trace
@@ -95,7 +94,7 @@ class PullV2Worker:
         driver: Driver,
         storage: Storage,
         pull_time_error_backoff: int,
-        pubsub: Optional[PubSubDriver] = None,
+        pubsub: PubSubDriver | None = None,
         pull_time_empty_backoff: float = 5.0,
         pull_api_timeout: int = 60,
     ):

@@ -21,7 +21,6 @@ import contextlib
 import logging
 import threading
 from datetime import datetime, timezone
-from typing import Optional
 
 from cachetools import TTLCache
 
@@ -47,7 +46,7 @@ class BackPressureCache:
         self._cache = TTLCache(maxsize=1024, ttl=5 * 60)
         self._lock = threading.Lock()
 
-    def get(self, key: str) -> Optional[BackPressureData]:
+    def get(self, key: str) -> BackPressureData | None:
         with self._lock:
             data = self._cache.get(key, None)
             if data is None:
@@ -72,7 +71,7 @@ def cached_back_pressure(cache_key: str):
     Context manager that handles the caching of the try again in time so that
     we don't recompute try again times if we have already applied back pressure.
     """
-    data: Optional[BackPressureData] = _cache.get(cache_key)
+    data: BackPressureData | None = _cache.get(cache_key)
     if data is not None:
         back_pressure_type = data.type
         RATE_LIMITED_REQUESTS_COUNTER.inc({"type": back_pressure_type, "cached": "true"})

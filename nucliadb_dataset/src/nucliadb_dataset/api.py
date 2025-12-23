@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Iterator, List
+from collections.abc import Iterator
 
 from nucliadb_dataset import CLIENT_ID, NUCLIA_GLOBAL
 from nucliadb_dataset.nuclia import NucliaDriver
@@ -36,26 +36,22 @@ def get_nuclia_client() -> NucliaDriver:
 
 def iterate_sentences(kbid: str, labels: bool, entities: bool, text: bool) -> Iterator[TrainSentence]:
     client = get_nuclia_client()
-    for sentence in client.iterate_sentences(kbid, labels, entities, text):
-        yield sentence
+    yield from client.iterate_sentences(kbid, labels, entities, text)
 
 
 def iterate_paragraphs(kbid: str, labels: bool, entities: bool, text: bool) -> Iterator[TrainParagraph]:
     client = get_nuclia_client()
-    for sentence in client.iterate_paragraphs(kbid, labels, entities, text):
-        yield sentence
+    yield from client.iterate_paragraphs(kbid, labels, entities, text)
 
 
 def iterate_fields(kbid: str, labels: bool, entities: bool, text: bool) -> Iterator[TrainField]:
     client = get_nuclia_client()
-    for sentence in client.iterate_fields(kbid, labels, entities, text):
-        yield sentence
+    yield from client.iterate_fields(kbid, labels, entities, text)
 
 
 def iterate_resources(kbid: str, labels: bool, entities: bool, text: bool) -> Iterator[TrainResource]:
     client = get_nuclia_client()
-    for sentence in client.iterate_resources(kbid, labels, entities, text):
-        yield sentence
+    yield from client.iterate_resources(kbid, labels, entities, text)
 
 
 def get_labels(kbid: str) -> GetLabelsResponse:
@@ -76,7 +72,7 @@ def get_info(kbid: str) -> TrainInfo:
     return info
 
 
-def get_ontology_count(kbid: str, paragraph_labelsets: List[str], resource_labelset: List[str]):
+def get_ontology_count(kbid: str, paragraph_labelsets: list[str], resource_labelset: list[str]):
     client = get_nuclia_client()
     labels = client.get_ontology_count(kbid, paragraph_labelsets, resource_labelset)
     return labels

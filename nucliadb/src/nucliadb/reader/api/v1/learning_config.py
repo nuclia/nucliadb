@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Dict
 
 from fastapi import Header, Request
 from fastapi_versioning import version
@@ -173,7 +172,7 @@ async def get_schema_for_configuration_creation(
     status_code=200,
     summary="Learning extract strategies",
     description="Get available extract strategies ",
-    response_model=Dict[str, ExtractConfig],
+    response_model=dict[str, ExtractConfig],
     tags=["Extract Strategies"],
 )
 @requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
@@ -210,7 +209,7 @@ async def get_extract_strategy_from_id(
     status_code=200,
     summary="Learning split strategies",
     description="Get available split strategies ",
-    response_model=Dict[str, SplitConfiguration],
+    response_model=dict[str, SplitConfiguration],
     tags=["Split Strategies"],
 )
 @requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])

@@ -19,7 +19,6 @@
 #
 import re
 import string
-from typing import Optional, Union
 
 from nucliadb.search import logger
 from nucliadb.search.search.query_parser.fetcher import Fetcher
@@ -117,7 +116,7 @@ async def parse_keyword_query(
 
 
 async def parse_semantic_query(
-    item: Union[search_models.SearchRequest, search_models.FindRequest],
+    item: search_models.SearchRequest | search_models.FindRequest,
     *,
     fetcher: Fetcher,
 ) -> SemanticQuery:
@@ -130,7 +129,7 @@ async def parse_semantic_query(
 
 
 def parse_keyword_min_score(
-    min_score: Optional[Union[float, search_models.MinScore]],
+    min_score: float | search_models.MinScore | None,
 ) -> float:
     # Keep backward compatibility with the deprecated min_score payload
     # parameter being a float (specifying semantic)
@@ -141,7 +140,7 @@ def parse_keyword_min_score(
 
 
 async def parse_semantic_min_score(
-    min_score: Optional[Union[float, search_models.MinScore]],
+    min_score: float | search_models.MinScore | None,
     *,
     fetcher: Fetcher,
 ):
@@ -170,7 +169,7 @@ async def query_with_synonyms(
     query: str,
     *,
     fetcher: Fetcher,
-) -> Optional[str]:
+) -> str | None:
     """
     Replace the terms in the query with an expression that will make it match with the configured synonyms.
     We're using the Tantivy's query language here: https://docs.rs/tantivy/latest/tantivy/query/struct.QueryParser.html

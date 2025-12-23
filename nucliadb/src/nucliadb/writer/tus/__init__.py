@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from dataclasses import dataclass
-from typing import Optional
 
 from nucliadb.writer.settings import settings as writer_settings
 from nucliadb.writer.tus.dm import FileDataManager, RedisFileDataManagerFactory
@@ -37,8 +36,8 @@ class TusStorageDriver:
     manager: FileStorageManager
 
 
-DRIVER: Optional[TusStorageDriver] = None
-REDIS_FILE_DATA_MANAGER_FACTORY: Optional[RedisFileDataManagerFactory] = None
+DRIVER: TusStorageDriver | None = None
+REDIS_FILE_DATA_MANAGER_FACTORY: RedisFileDataManagerFactory | None = None
 
 
 async def initialize():

@@ -19,7 +19,8 @@
 #
 import asyncio
 from collections import deque
-from typing import AsyncIterator, Deque, Sequence, cast
+from collections.abc import AsyncIterator, Sequence
+from typing import Deque, cast
 
 from typing_extensions import assert_never
 

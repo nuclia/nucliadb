@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from os.path import dirname, getsize
-from typing import Optional
 from uuid import uuid4
 
 from nucliadb.ingest.fields.text import Text
@@ -45,11 +44,11 @@ async def test_create_resource_orm_extracted(
     ex1.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field="text1"))
     ex1.body.text = "My Text"
 
-    field_obj: Optional[Text] = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj: Text | None = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     assert field_obj is not None
     await field_obj.set_extracted_text(ex1)
 
-    ex2: Optional[ExtractedText] = await field_obj.get_extracted_text()
+    ex2: ExtractedText | None = await field_obj.get_extracted_text()
     assert ex2 is not None
     assert ex2.text == ex1.body.text
 
@@ -80,11 +79,11 @@ async def test_create_resource_orm_extracted_file(
     )
     ex1.file.CopyFrom(cf1)
 
-    field_obj: Optional[Text] = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj: Text | None = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     assert field_obj is not None
     await field_obj.set_extracted_text(ex1)
 
-    ex2: Optional[ExtractedText] = await field_obj.get_extracted_text()
+    ex2: ExtractedText | None = await field_obj.get_extracted_text()
     assert ex2 is not None
     ex3 = ExtractedText()
     with open(filename, "rb") as testfile:
@@ -108,7 +107,7 @@ async def test_create_resource_orm_extracted_delta(
     field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_extracted_text(ex1)
 
-    ex2: Optional[ExtractedText] = await field_obj.get_extracted_text()
+    ex2: ExtractedText | None = await field_obj.get_extracted_text()
     assert ex2 is not None
     assert ex2.text == ex1.body.text
 

@@ -23,10 +23,11 @@ import asyncio
 import base64
 import json
 import socket
+from collections.abc import AsyncGenerator, AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
-from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Optional, cast
+from typing import Any, cast
 from urllib.parse import quote_plus
 
 import aiohttp
@@ -153,7 +154,7 @@ class GCSStorageField(StorageField):
                 assert data["resource"]["name"] == destination_uri
 
     @storage_ops_observer.wrap({"type": "iter_data"})
-    async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
+    async def iter_data(self, range: Range | None = None) -> AsyncGenerator[bytes]:
         attempt = 1
         while True:
             try:
@@ -176,7 +177,7 @@ class GCSStorageField(StorageField):
                 attempt += 1
 
     @storage_ops_observer.wrap({"type": "inner_iter_data"})
-    async def _inner_iter_data(self, range: Optional[Range] = None):
+    async def _inner_iter_data(self, range: Range | None = None):
         """
         Iterate through object data.
         """
@@ -377,7 +378,7 @@ class GCSStorageField(StorageField):
         max_tries=MAX_TRIES,
     )
     @storage_ops_observer.wrap({"type": "exists"})
-    async def exists(self) -> Optional[ObjectMetadata]:
+    async def exists(self) -> ObjectMetadata | None:
         """
         Existence can be checked either with a CloudFile data in the field attribute
         or own StorageField key and bucket. Field takes precendece
@@ -425,23 +426,23 @@ class GCSStorageField(StorageField):
 
 class GCSStorage(Storage):
     field_klass = GCSStorageField
-    _session: Optional[aiohttp.ClientSession] = None
+    _session: aiohttp.ClientSession | None = None
     _credentials = None
     _json_credentials = None
     chunk_size = CHUNK_SIZE
 
     def __init__(
         self,
-        account_credentials: Optional[str] = None,
-        bucket: Optional[str] = None,
-        location: Optional[str] = None,
-        project: Optional[str] = None,
-        executor: Optional[ThreadPoolExecutor] = None,
-        deadletter_bucket: Optional[str] = None,
-        indexing_bucket: Optional[str] = None,
-        labels: Optional[Dict[str, str]] = None,
+        account_credentials: str | None = None,
+        bucket: str | None = None,
+        location: str | None = None,
+        project: str | None = None,
+        executor: ThreadPoolExecutor | None = None,
+        deadletter_bucket: str | None = None,
+        indexing_bucket: str | None = None,
+        labels: dict[str, str] | None = None,
         url: str = "https://www.googleapis.com",
-        scopes: Optional[List[str]] = None,
+        scopes: list[str] | None = None,
         anonymous: bool = False,
     ):
         if anonymous:
@@ -533,7 +534,7 @@ class GCSStorage(Storage):
     @storage_ops_observer.wrap({"type": "delete"})
     async def delete_upload(self, uri: str, bucket_name: str):
         if uri:
-            url = "{}/{}/o/{}".format(self.object_base_url, bucket_name, quote_plus(uri))
+            url = f"{self.object_base_url}/{bucket_name}/o/{quote_plus(uri)}"
             headers = await self.get_access_headers()
             async with self.session.delete(url, headers=headers) as resp:
                 if resp.status in (200, 204, 404):
@@ -569,7 +570,7 @@ class GCSStorage(Storage):
         max_tries=MAX_TRIES,
     )
     @storage_ops_observer.wrap({"type": "create_bucket"})
-    async def create_bucket(self, bucket_name: str, kbid: Optional[str] = None):
+    async def create_bucket(self, bucket_name: str, kbid: str | None = None):
         if await self.check_exists(bucket_name=bucket_name):
             return
 
@@ -671,9 +672,9 @@ class GCSStorage(Storage):
         return deleted, conflict
 
     async def iterate_objects(
-        self, bucket: str, prefix: str, start: Optional[str] = None
-    ) -> AsyncGenerator[ObjectInfo, None]:
-        url = "{}/{}/o".format(self.object_base_url, bucket)
+        self, bucket: str, prefix: str, start: str | None = None
+    ) -> AsyncGenerator[ObjectInfo]:
+        url = f"{self.object_base_url}/{bucket}/o"
         headers = await self.get_access_headers()
         params = {"prefix": prefix}
         if start:

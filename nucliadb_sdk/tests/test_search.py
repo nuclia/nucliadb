@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import os
-from typing import Any, Dict
+from typing import Any
 
 import nucliadb_sdk
 from nucliadb_models.resource import KnowledgeBoxObj
@@ -21,7 +21,7 @@ from nucliadb_models.search import SearchOptions
 
 TESTING_IN_CI = os.environ.get("CI") == "true"
 
-DATA: Dict[str, Any] = {
+DATA: dict[str, Any] = {
     "text": [
         "Sunday afternoon walking through Venice in the sun with @user ️ ️ ️ @ Abbot Kinney, Venice",
         "Time for some BBQ and whiskey libations. Chomp, belch, chomp! (@ Lucille's Smokehouse Bar-B-Que)",

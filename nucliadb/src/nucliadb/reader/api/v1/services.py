@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Optional, Union
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
@@ -69,7 +68,7 @@ from nucliadb_utils.utilities import get_ingest, get_storage
 @version(1)
 async def get_entities(
     request: Request, kbid: str, show_entities: bool = False
-) -> Union[KnowledgeBoxEntities, HTTPClientError]:
+) -> KnowledgeBoxEntities | HTTPClientError:
     if show_entities:
         return HTTPClientError(
             status_code=400,
@@ -186,7 +185,7 @@ async def get_labelset(kbid: str, labelset_id: str) -> LabelSet:
     kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
     if not kb_exists:
         raise KnowledgeBoxNotFound()
-    labelset: Optional[writer_pb2.LabelSet] = await datamanagers.atomic.labelset.get(
+    labelset: writer_pb2.LabelSet | None = await datamanagers.atomic.labelset.get(
         kbid=kbid, labelset_id=labelset_id
     )
     if labelset is None:
@@ -230,9 +229,7 @@ async def get_custom_synonyms(request: Request, kbid: str):
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def notifications_endpoint(
-    request: Request, kbid: str
-) -> Union[StreamingResponse, HTTPClientError]:
+async def notifications_endpoint(request: Request, kbid: str) -> StreamingResponse | HTTPClientError:
     if in_standalone_mode():
         return HTTPClientError(
             status_code=404,
@@ -274,10 +271,10 @@ async def exists_kb(kbid: str) -> bool:
 async def processing_status(
     request: Request,
     kbid: str,
-    cursor: Optional[str] = None,
-    scheduled: Optional[bool] = None,
+    cursor: str | None = None,
+    scheduled: bool | None = None,
     limit: int = 20,
-) -> Union[processing.RequestsResults, HTTPClientError]:
+) -> processing.RequestsResults | HTTPClientError:
     if not await exists_kb(kbid=kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
@@ -294,7 +291,7 @@ async def processing_status(
 
         async def _composition(
             result: processing.RequestsResult,
-        ) -> Optional[processing.RequestsResult]:
+        ) -> processing.RequestsResult | None:
             async with max_simultaneous:
                 resource = await kb.get(result.resource_id)
                 if resource is None:

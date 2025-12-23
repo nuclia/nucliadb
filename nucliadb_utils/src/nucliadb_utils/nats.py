@@ -21,8 +21,9 @@ import asyncio
 import logging
 import sys
 import time
+from collections.abc import Awaitable, Callable
 from functools import cached_property, partial
-from typing import Any, Awaitable, Callable, Optional, Union
+from typing import Any
 
 import nats
 import nats.errors
@@ -67,7 +68,7 @@ class NatsMessageProgressUpdater(MessageProgressUpdater):
 
 
 class NatsConnectionManager:
-    _nc: Union[NATSClient, NatsClientTelemetry]
+    _nc: NATSClient | NatsClientTelemetry
     _subscriptions: list[tuple[Subscription, Callable[[], Awaitable[None]]]]
     _pull_subscriptions: list[
         tuple[
@@ -81,8 +82,8 @@ class NatsConnectionManager:
         *,
         service_name: str,
         nats_servers: list[str],
-        nats_creds: Optional[str] = None,
-        pull_utilization_metrics: Optional[Counter] = None,
+        nats_creds: str | None = None,
+        pull_utilization_metrics: Counter | None = None,
     ):
         self._service_name = service_name
         self._nats_servers = nats_servers
@@ -91,9 +92,9 @@ class NatsConnectionManager:
         self._pull_subscriptions = []
         self._lock = asyncio.Lock()
         self._healthy = True
-        self._last_unhealthy: Optional[float] = None
+        self._last_unhealthy: float | None = None
         self._needs_reconnection = False
-        self._reconnect_task: Optional[asyncio.Task] = None
+        self._reconnect_task: asyncio.Task | None = None
         self._expected_subscriptions: set[str] = set()
         self._initialized = False
         self.pull_utilization_metrics = pull_utilization_metrics
@@ -274,11 +275,11 @@ class NatsConnectionManager:
         logger.info("Connection is closed on NATS")
 
     @property
-    def nc(self) -> Union[NATSClient, NatsClientTelemetry]:
+    def nc(self) -> NATSClient | NatsClientTelemetry:
         return self._nc
 
     @cached_property
-    def js(self) -> Union[JetStreamContext, JetStreamContextTelemetry]:
+    def js(self) -> JetStreamContext | JetStreamContextTelemetry:
         return get_traced_jetstream(self._nc, self._service_name)
 
     async def subscribe(
@@ -291,7 +292,7 @@ class NatsConnectionManager:
         subscription_lost_cb: Callable[[], Awaitable[None]],
         flow_control: bool = False,
         manual_ack: bool = True,
-        config: Optional[nats.js.api.ConsumerConfig] = None,
+        config: nats.js.api.ConsumerConfig | None = None,
     ) -> Subscription:
         sub = await self.js.subscribe(
             subject=subject,
@@ -314,8 +315,8 @@ class NatsConnectionManager:
         stream: str,
         cb: Callable[[Msg], Awaitable[None]],
         subscription_lost_cb: Callable[[], Awaitable[None]],
-        durable: Optional[str] = None,
-        config: Optional[nats.js.api.ConsumerConfig] = None,
+        durable: str | None = None,
+        config: nats.js.api.ConsumerConfig | None = None,
     ) -> JetStreamContext.PullSubscription:
         wrapped_cb: Callable[[Msg], Awaitable[None]]
         if isinstance(self.js, JetStreamContextTelemetry):
@@ -370,9 +371,7 @@ class NatsConnectionManager:
 
         return psub
 
-    async def _remove_subscription(
-        self, subscription: Union[Subscription, JetStreamContext.PullSubscription]
-    ):
+    async def _remove_subscription(self, subscription: Subscription | JetStreamContext.PullSubscription):
         async with self._lock:
             for index, (sub, _) in enumerate(self._subscriptions):
                 if sub is not subscription:
@@ -391,7 +390,7 @@ class NatsConnectionManager:
                     pass
                 return
 
-    async def unsubscribe(self, subscription: Union[Subscription, JetStreamContext.PullSubscription]):
+    async def unsubscribe(self, subscription: Subscription | JetStreamContext.PullSubscription):
         await subscription.unsubscribe()
         await self._remove_subscription(subscription)
 
@@ -403,7 +402,7 @@ class NatsConnectionManager:
         while True:
             await asyncio.sleep(30)
 
-            existing_subs = set(sub._consumer for sub, _, _, _ in self._pull_subscriptions)
+            existing_subs = {sub._consumer for sub, _, _, _ in self._pull_subscriptions}
             missing_subs = self._expected_subscriptions - existing_subs
             if missing_subs:
                 logger.warning(f"Some NATS subscriptions are missing {missing_subs}")

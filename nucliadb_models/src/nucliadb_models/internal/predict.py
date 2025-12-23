@@ -19,13 +19,11 @@ Models for Predict API v1.
 ATENTION! Keep these models in sync with models on Predict API
 """
 
-from typing import List, Optional
-
 from pydantic import BaseModel, Field
 
 
 class SentenceSearch(BaseModel):
-    vectors: dict[str, List[float]] = Field(
+    vectors: dict[str, list[float]] = Field(
         default_factory=dict,
         description="Sentence vectors for each semantic model",
         min_length=1,
@@ -45,14 +43,14 @@ class Ner(BaseModel):
 
 
 class TokenSearch(BaseModel):
-    tokens: List[Ner] = []
+    tokens: list[Ner] = []
     time: float
     input_tokens: int = 0
 
 
 class QueryInfo(BaseModel):
-    language: Optional[str]
-    stop_words: List[str] = Field(default_factory=list)
+    language: str | None
+    stop_words: list[str] = Field(default_factory=list)
     semantic_thresholds: dict[str, float] = Field(
         default_factory=dict,
         description="Semantic threshold for each semantic model",
@@ -60,10 +58,10 @@ class QueryInfo(BaseModel):
     )
     visual_llm: bool
     max_context: int
-    entities: Optional[TokenSearch]
-    sentence: Optional[SentenceSearch]
+    entities: TokenSearch | None
+    sentence: SentenceSearch | None
     query: str
-    rephrased_query: Optional[str] = None
+    rephrased_query: str | None = None
 
 
 class RerankModel(BaseModel):

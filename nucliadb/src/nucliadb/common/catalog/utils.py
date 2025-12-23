@@ -40,7 +40,7 @@ def build_catalog_resource_data(resource: Resource, index_message: IndexMessage)
     }
 
     # Labels from the resource and classification labels from each field
-    labels = set(label for label in index_message.labels)
+    labels = {label for label in index_message.labels}
     for classification in resource.basic.computedmetadata.field_classifications:
         for clf in classification.classifications:
             label = f"/l/{clf.labelset}/{clf.label}"

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Optional
+from typing import Any
 
 from nucliadb.ingest.fields.base import Field
 from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, FileExtractedData
@@ -30,22 +30,22 @@ class File(Field[FieldFile]):
     pbklass = FieldFile
     value: FieldFile
     type: str = "f"
-    file_extracted_data: Optional[FileExtractedData]
+    file_extracted_data: FileExtractedData | None
 
     def __init__(
         self,
         id: str,
         resource: Any,
-        pb: Optional[Any] = None,
-        value: Optional[str] = None,
+        pb: Any | None = None,
+        value: str | None = None,
     ):
-        super(File, self).__init__(id, resource, pb, value)
+        super().__init__(id, resource, pb, value)
         self.file_extracted_data = None
 
     async def set_value(self, payload: FieldFile):
         old_file = await self.get_value()
         if old_file is None:
-            old_cf: Optional[CloudFile] = None
+            old_cf: CloudFile | None = None
         else:
             old_cf = old_file.file
 
@@ -57,7 +57,7 @@ class File(Field[FieldFile]):
 
         await self.db_set_value(payload)
 
-    async def get_value(self) -> Optional[FieldFile]:
+    async def get_value(self) -> FieldFile | None:
         return await self.db_get_value()
 
     async def set_file_extracted_data(self, file_extracted_data: FileExtractedData):
@@ -101,7 +101,7 @@ class File(Field[FieldFile]):
         await self.storage.upload_pb(sf, file_extracted_data)
         self.file_extracted_data = file_extracted_data
 
-    async def get_file_extracted_data(self) -> Optional[FileExtractedData]:
+    async def get_file_extracted_data(self) -> FileExtractedData | None:
         if self.file_extracted_data is None:
             sf: StorageField = self.storage.file_extracted(
                 self.kbid, self.uuid, self.type, self.id, FILE_METADATA

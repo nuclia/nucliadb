@@ -14,18 +14,13 @@
 #
 import os
 import time
+from collections.abc import Callable
 from functools import wraps
 from inspect import isasyncgenfunction, iscoroutinefunction, isgeneratorfunction
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Type,
     TypeVar,
-    Union,
 )
 
 import prometheus_client
@@ -52,9 +47,9 @@ class Observer:
         self,
         name: str,
         *,
-        error_mappings: Optional[Dict[str, Union[Type[Exception], Type[BaseException]]]] = None,
-        labels: Optional[Dict[str, str]] = None,
-        buckets: Optional[List[float]] = None,
+        error_mappings: dict[str, type[Exception] | type[BaseException]] | None = None,
+        labels: dict[str, str] | None = None,
+        buckets: list[float] | None = None,
     ):
         self.error_mappings = error_mappings or {}
         self.labels = labels or {}
@@ -82,7 +77,7 @@ class Observer:
             **hist_kwargs,  # type: ignore
         )
 
-    def wrap(self, labels: Optional[Dict[str, str]] = None) -> Callable[[F], F]:
+    def wrap(self, labels: dict[str, str] | None = None) -> Callable[[F], F]:
         def decorator(func):
             if iscoroutinefunction(func):
 
@@ -104,8 +99,7 @@ class Observer:
                 @wraps(func)
                 def inner(*args, **kwargs):
                     with ObserverRecorder(self, labels or {}):
-                        for item in func(*args, **kwargs):
-                            yield item
+                        yield from func(*args, **kwargs)
 
             else:
 
@@ -118,12 +112,12 @@ class Observer:
 
         return decorator
 
-    def __call__(self, labels: Optional[Dict[str, str]] = None):
+    def __call__(self, labels: dict[str, str] | None = None):
         return ObserverRecorder(self, labels or {})
 
 
 class ObserverRecorder:
-    def __init__(self, observer: Observer, label_overrides: Dict[str, str]):
+    def __init__(self, observer: Observer, label_overrides: dict[str, str]):
         self.observer = observer
         if len(label_overrides) > 0:
             self.labels = observer.labels.copy()
@@ -154,9 +148,9 @@ class ObserverRecorder:
 
     def __exit__(
         self,
-        exc_type: Optional[Union[Type[Exception], Type[BaseException]]],
-        exc_value: Optional[Union[Exception, BaseException]],
-        traceback: Optional[StackSummary],
+        exc_type: type[Exception] | type[BaseException] | None,
+        exc_value: Exception | BaseException | None,
+        traceback: StackSummary | None,
     ):
         if exc_type is not None:
             status = ERROR
@@ -170,7 +164,7 @@ class ObserverRecorder:
 
 
 class Gauge:
-    def __init__(self, name: str, *, labels: Optional[Dict[str, str]] = None):
+    def __init__(self, name: str, *, labels: dict[str, str] | None = None):
         self.labels = labels or {}
         if _VERSION_ENV_VAR_NAME in os.environ:
             self.labels[_VERSION_METRIC] = os.environ[_VERSION_ENV_VAR_NAME]
@@ -179,7 +173,7 @@ class Gauge:
             name, f"Gauge for {name}.", labelnames=tuple(self.labels.keys())
         )
 
-    def set(self, value: Union[float, int], labels: Optional[Dict[str, str]] = None):
+    def set(self, value: float | int, labels: dict[str, str] | None = None):
         merged_labels = self.labels.copy()
         merged_labels.update(labels or {})
 
@@ -188,7 +182,7 @@ class Gauge:
         else:
             self.gauge.set(value)
 
-    def inc(self, value: Union[float, int], labels: Optional[Dict[str, str]] = None):
+    def inc(self, value: float | int, labels: dict[str, str] | None = None):
         merged_labels = self.labels.copy()
         merged_labels.update(labels or {})
 
@@ -197,7 +191,7 @@ class Gauge:
         else:
             self.gauge.inc(value)
 
-    def dec(self, value: Union[float, int], labels: Optional[Dict[str, str]] = None):
+    def dec(self, value: float | int, labels: dict[str, str] | None = None):
         merged_labels = self.labels.copy()
         merged_labels.update(labels or {})
 
@@ -206,12 +200,12 @@ class Gauge:
         else:
             self.gauge.dec(value)
 
-    def remove(self, labels: Dict[str, str]):
+    def remove(self, labels: dict[str, str]):
         self.gauge.remove(*[labels[k] for k in self.labels.keys()])
 
 
 class Counter:
-    def __init__(self, name: str, *, labels: Optional[Dict[str, str]] = None):
+    def __init__(self, name: str, *, labels: dict[str, str] | None = None):
         self.labels = labels or {}
         if _VERSION_ENV_VAR_NAME in os.environ:
             self.labels[_VERSION_METRIC] = os.environ[_VERSION_ENV_VAR_NAME]
@@ -220,7 +214,7 @@ class Counter:
             name, f"Counter for {name}.", labelnames=tuple(self.labels.keys())
         )
 
-    def inc(self, labels: Optional[Dict[str, str]] = None, value: Union[float, int] = 1):
+    def inc(self, labels: dict[str, str] | None = None, value: float | int = 1):
         merged_labels = self.labels.copy()
         merged_labels.update(labels or {})
 
@@ -235,8 +229,8 @@ class Histogram:
         self,
         name: str,
         *,
-        labels: Optional[Dict[str, str]] = None,
-        buckets: Optional[List[float]] = None,
+        labels: dict[str, str] | None = None,
+        buckets: list[float] | None = None,
     ):
         self.labels = labels or {}
         if _VERSION_ENV_VAR_NAME in os.environ:
@@ -252,7 +246,7 @@ class Histogram:
             **kwargs,  # type: ignore
         )
 
-    def observe(self, value: float, labels: Optional[Dict[str, str]] = None):
+    def observe(self, value: float, labels: dict[str, str] | None = None):
         merged_labels = self.labels.copy()
         merged_labels.update(labels or {})
         if len(merged_labels) > 0:

@@ -24,15 +24,10 @@ import asyncio
 import base64
 import hashlib
 import uuid
+from collections.abc import AsyncGenerator, AsyncIterator
 from io import BytesIO
 from typing import (
     Any,
-    AsyncGenerator,
-    AsyncIterator,
-    List,
-    Optional,
-    Type,
-    Union,
     cast,
 )
 
@@ -65,14 +60,14 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     storage: Storage
     bucket: str
     key: str
-    field: Optional[CloudFile] = None
+    field: CloudFile | None = None
 
     def __init__(
         self,
         storage: Storage,
         bucket: str,
         fullkey: str,
-        field: Optional[CloudFile] = None,
+        field: CloudFile | None = None,
     ):
         self.storage = storage
         self.bucket = bucket
@@ -83,7 +78,7 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile: ...
 
     @abc.abstractmethod
-    async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
+    async def iter_data(self, range: Range | None = None) -> AsyncGenerator[bytes]:
         raise NotImplementedError()
         yield b""
 
@@ -95,7 +90,7 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
         return deleted
 
     @abc.abstractmethod
-    async def exists(self) -> Optional[ObjectMetadata]: ...
+    async def exists(self) -> ObjectMetadata | None: ...
 
     @abc.abstractmethod
     async def copy(
@@ -130,10 +125,10 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
 
 class Storage(abc.ABC, metaclass=abc.ABCMeta):
     source: int
-    field_klass: Type
-    deadletter_bucket: Optional[str] = None
-    indexing_bucket: Optional[str] = None
-    cached_buckets: List[str] = []
+    field_klass: type
+    deadletter_bucket: str | None = None
+    indexing_bucket: str | None = None
+    cached_buckets: list[str] = []
     chunk_size = CHUNK_SIZE
 
     async def delete_resource(self, kbid: str, uuid: str):
@@ -166,7 +161,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         await self.upload_object(self.deadletter_bucket, key, message.SerializeToString())
 
     def get_indexing_storage_key(
-        self, *, kb: str, logical_shard: str, resource_uid: str, txid: Union[int, str]
+        self, *, kb: str, logical_shard: str, resource_uid: str, txid: int | str
     ):
         return INDEXING_KEY.format(kb=kb, shard=logical_shard, resource=resource_uid, txid=txid)
 
@@ -174,7 +169,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         self,
         message: BrainResource,
         txid: int,
-        partition: Optional[str],
+        partition: str | None,
         kb: str,
         logical_shard: str,
     ) -> str:
@@ -197,7 +192,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         self,
         message: BrainResource,
         reindex_id: str,
-        partition: Optional[str],
+        partition: str | None,
         kb: str,
         logical_shard: str,
     ) -> str:
@@ -328,7 +323,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         kbid: str,
         uuid: str,
         field: str,
-        old_field: Optional[CloudFile] = None,
+        old_field: CloudFile | None = None,
     ) -> StorageField:
         # Its a file field value
         bucket = self.get_bucket_name(kbid)
@@ -360,7 +355,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         payload: bytes,
         filename: str,
         content_type: str,
-        md5: Optional[str] = None,
+        md5: str | None = None,
     ):
         decoded_payload = base64.b64decode(payload)
         cf = CloudFile()
@@ -436,8 +431,8 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         self,
         bucket: str,
         key: str,
-        range: Optional[Range] = None,
-    ) -> AsyncGenerator[bytes, None]:
+        range: Range | None = None,
+    ) -> AsyncGenerator[bytes]:
         destination: StorageField = self.field_klass(storage=self, bucket=bucket, fullkey=key)
         try:
             async for data in destination.iter_data(range=range):
@@ -460,9 +455,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         result.seek(0)
         return result
 
-    async def downloadbytescf_iterator(
-        self, cf: CloudFile
-    ) -> AsyncGenerator[bytes, None]:  # pragma: no cover
+    async def downloadbytescf_iterator(self, cf: CloudFile) -> AsyncGenerator[bytes]:  # pragma: no cover
         # this is covered by other tests
         if cf.source == self.source:
             async for data in self.download(cf.bucket_name, cf.uri):
@@ -479,7 +472,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     async def upload_pb(self, sf: StorageField, payload: Any):
         await self.upload_object(sf.bucket, sf.key, payload.SerializeToString())
 
-    async def download_pb(self, sf: StorageField, PBKlass: Type):
+    async def download_pb(self, sf: StorageField, PBKlass: type):
         payload = await self.downloadbytes(sf.bucket, sf.key)
 
         if payload.getbuffer().nbytes == 0:
@@ -513,8 +506,8 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def iterate_objects(
-        self, bucket: str, prefix: str, start: Optional[str] = None
-    ) -> AsyncGenerator[ObjectInfo, None]:
+        self, bucket: str, prefix: str, start: str | None = None
+    ) -> AsyncGenerator[ObjectInfo]:
         raise NotImplementedError()
         yield ObjectInfo(name="")
 
@@ -573,9 +566,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         ...
 
 
-async def iter_and_add_size(
-    stream: AsyncGenerator[bytes, None], cf: CloudFile
-) -> AsyncGenerator[bytes, None]:
+async def iter_and_add_size(stream: AsyncGenerator[bytes], cf: CloudFile) -> AsyncGenerator[bytes]:
     # This is needed because some storage types like GCS or S3 require
     # the size of the file at least at the request done for the last chunk.
     total_size = 0
@@ -586,9 +577,7 @@ async def iter_and_add_size(
         yield chunk
 
 
-async def iter_in_chunk_size(
-    iterator: AsyncGenerator[bytes, None], chunk_size: int
-) -> AsyncGenerator[bytes, None]:
+async def iter_in_chunk_size(iterator: AsyncGenerator[bytes], chunk_size: int) -> AsyncGenerator[bytes]:
     # This is needed to make sure bytes uploaded to the blob storage complies with a particular chunk size.
     buffer = b""
     async for chunk in iterator:
@@ -602,8 +591,8 @@ async def iter_in_chunk_size(
 
 
 async def iterate_storage_compatible(
-    iterator: AsyncGenerator[bytes, None], storage: Storage, cf: CloudFile
-) -> AsyncGenerator[bytes, None]:
+    iterator: AsyncGenerator[bytes], storage: Storage, cf: CloudFile
+) -> AsyncGenerator[bytes]:
     """
     Makes sure to add the size to the cloudfile and split the data in
     chunks that are compatible with the storage type of choice

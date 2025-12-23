@@ -19,7 +19,6 @@
 #
 
 import logging
-from typing import Optional, Type, Union
 
 from pydantic import ValidationError
 
@@ -90,7 +89,7 @@ class RAOFindParser:
         self.fetcher = fetcher
 
         # cached data while parsing
-        self._query: Optional[retrieval_models.Query] = None
+        self._query: retrieval_models.Query | None = None
 
     async def parse(self) -> tuple[RetrievalRequest, Reranker]:
         self._validate_request()
@@ -397,7 +396,7 @@ async def parse_keyword_query(
 
 
 async def parse_semantic_query(
-    item: Union[search_models.SearchRequest, search_models.FindRequest],
+    item: search_models.SearchRequest | search_models.FindRequest,
     *,
     fetcher: RAOFetcher,
 ) -> retrieval_models.SemanticQuery:
@@ -410,7 +409,7 @@ async def parse_semantic_query(
 
 
 async def parse_semantic_min_score(
-    min_score: Optional[Union[float, search_models.MinScore]],
+    min_score: float | search_models.MinScore | None,
     *,
     fetcher: RAOFetcher,
 ) -> float:
@@ -435,7 +434,7 @@ async def parse_semantic_min_score(
 
 
 def convert_labels_to_filter_expressions(
-    label_filters: Union[list[str], list[Filter]], classification_labels: knowledgebox_pb2.Labels
+    label_filters: list[str] | list[Filter], classification_labels: knowledgebox_pb2.Labels
 ) -> tuple[list[FieldFilterExpression], ParagraphFilterExpression | None]:
     field_expressions: list[FieldFilterExpression] = []
     paragraph_expressions: list[ParagraphFilterExpression] = []
@@ -459,7 +458,7 @@ def convert_labels_to_filter_expressions(
                 field_expressions.append(facet_filter)  # type: ignore[arg-type]
 
         else:
-            combinator: Union[Type[And[FieldFilterExpression]], Type[Or[FieldFilterExpression]]]
+            combinator: type[And[FieldFilterExpression]] | type[Or[FieldFilterExpression]]
             if label_filter.all:
                 labels = label_filter.all
                 combinator, negate = And, False

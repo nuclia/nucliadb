@@ -19,7 +19,8 @@
 #
 
 from collections import OrderedDict
-from typing import AsyncGenerator, Optional, cast
+from collections.abc import AsyncGenerator
+from typing import cast
 
 from nidx_protos.nodereader_pb2 import StreamFilter, StreamRequest
 
@@ -43,7 +44,7 @@ def token_classification_batch_generator(
     kbid: str,
     trainset: TrainSet,
     shard_replica_id: str,
-    filter_expression: Optional[FilterExpression],
+    filter_expression: FilterExpression | None,
 ) -> AsyncGenerator[TokenClassificationBatch, None]:
     generator = generate_token_classification_payloads(kbid, trainset, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, TokenClassificationBatch)

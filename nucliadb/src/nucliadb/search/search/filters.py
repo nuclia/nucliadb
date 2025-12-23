@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from collections.abc import Iterator
-from typing import Any, Optional, Union
+from typing import Any
 
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb_models.labels import translate_alias_to_system_label
@@ -108,7 +108,7 @@ def split_labels_by_type(
 
 def is_paragraph_labelset_kind(labelset_id: str, classification_labels: knowledgebox_pb2.Labels) -> bool:
     try:
-        labelset: Optional[knowledgebox_pb2.LabelSet] = classification_labels.labelset.get(labelset_id)
+        labelset: knowledgebox_pb2.LabelSet | None = classification_labels.labelset.get(labelset_id)
         if labelset is None:
             return False
         return knowledgebox_pb2.LabelSet.LabelSetKind.PARAGRAPHS in labelset.kind
@@ -117,7 +117,7 @@ def is_paragraph_labelset_kind(labelset_id: str, classification_labels: knowledg
         return False
 
 
-def flatten_filter_literals(filters: Union[list[str], dict[str, Any]]) -> list[str]:
+def flatten_filter_literals(filters: list[str] | dict[str, Any]) -> list[str]:
     if isinstance(filters, list):
         return filters
     else:
@@ -130,20 +130,17 @@ def iter_filter_expression_literals(expression: dict[str, Any]) -> Iterator[str]
         return
 
     if "not" in expression:
-        for label in iter_filter_expression_literals(expression["not"]):
-            yield label
+        yield from iter_filter_expression_literals(expression["not"])
         return
 
     if "and" in expression:
         for and_term in expression["and"]:
-            for label in iter_filter_expression_literals(and_term):
-                yield label
+            yield from iter_filter_expression_literals(and_term)
         return
 
     if "or" in expression:
         for or_term in expression["or"]:
-            for label in iter_filter_expression_literals(or_term):
-                yield label
+            yield from iter_filter_expression_literals(or_term)
         return
 
 
@@ -151,7 +148,7 @@ def has_classification_label_filters(filters: list[str]) -> bool:
     return any(label.startswith(CLASSIFICATION_LABEL_PREFIX) for label in filters)
 
 
-def convert_to_node_filters(filters: Union[list[str], list[Filter]]) -> dict[str, Any]:
+def convert_to_node_filters(filters: list[str] | list[Filter]) -> dict[str, Any]:
     if len(filters) == 0:
         return {}
 
@@ -161,7 +158,7 @@ def convert_to_node_filters(filters: Union[list[str], list[Filter]]) -> dict[str
     return {"and": [convert_filter_to_node_schema(fltr) for fltr in filters]}
 
 
-def convert_filter_to_node_schema(fltr: Union[str, Filter]) -> dict[str, Any]:
+def convert_filter_to_node_schema(fltr: str | Filter) -> dict[str, Any]:
     if isinstance(fltr, str):
         return {"literal": fltr}
 

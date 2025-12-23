@@ -19,7 +19,6 @@
 
 import json
 import logging
-from typing import Optional
 
 from grpc import ChannelCredentials, aio
 
@@ -58,7 +57,7 @@ RETRY_OPTIONS = [
 def get_traced_grpc_channel(
     address: str,
     service_name: str,
-    credentials: Optional[ChannelCredentials] = None,
+    credentials: ChannelCredentials | None = None,
     variant: str = "",
     max_send_message: int = 100,
 ) -> aio.Channel:

@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Union
 
 from nidx_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
 from typing_extensions import assert_never
@@ -73,7 +72,7 @@ FacetFilter = (
 
 
 async def parse_expression(
-    expr: Union[FieldFilterExpression, ParagraphFilterExpression],
+    expr: FieldFilterExpression | ParagraphFilterExpression,
     kbid: str,
 ) -> PBFilterExpression:
     f = PBFilterExpression()

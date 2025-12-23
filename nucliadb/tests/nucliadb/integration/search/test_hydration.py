@@ -19,8 +19,8 @@
 #
 
 import base64
+from collections.abc import AsyncIterable
 from dataclasses import dataclass
-from typing import AsyncIterable
 
 import pytest
 from httpx import AsyncClient

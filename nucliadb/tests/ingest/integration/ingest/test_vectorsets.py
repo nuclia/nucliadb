@@ -20,7 +20,6 @@
 import random
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from nidx_protos import noderesources_pb2
 
@@ -138,7 +137,7 @@ def create_broker_message_with_vectorset(
     vectorset_id: str,
     *,
     vectorset_dimension: int,
-    default_vectorset_dimension: Optional[int] = None,
+    default_vectorset_dimension: int | None = None,
 ):
     bm = writer_pb2.BrokerMessage(kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT)
 

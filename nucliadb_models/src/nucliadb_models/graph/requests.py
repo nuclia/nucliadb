@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 from enum import Enum
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional
 
 from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
 from typing_extensions import Self
@@ -41,10 +41,10 @@ class NodeMatchKindName(str, Enum):
 
 
 class GraphNode(BaseModel, extra="forbid"):
-    value: Optional[str] = None
+    value: str | None = None
     match: NodeMatchKindName = NodeMatchKindName.EXACT
-    type: Optional[RelationNodeType] = RelationNodeType.ENTITY
-    group: Optional[str] = None
+    type: RelationNodeType | None = RelationNodeType.ENTITY
+    group: str | None = None
 
     @model_validator(mode="after")
     def validate_fuzzy_usage(self) -> Self:
@@ -60,8 +60,8 @@ class GraphNode(BaseModel, extra="forbid"):
 
 
 class GraphRelation(BaseModel, extra="forbid"):
-    label: Optional[str] = None
-    type: Optional[RelationType] = None
+    label: str | None = None
+    type: RelationType | None = None
 
 
 ## Models for query expressions
@@ -85,9 +85,9 @@ class Relation(GraphRelation, GraphProp):
 
 class GraphPath(GraphProp, extra="forbid"):
     prop: Literal["path"] = "path"
-    source: Optional[GraphNode] = None
-    relation: Optional[GraphRelation] = None
-    destination: Optional[GraphNode] = None
+    source: GraphNode | None = None
+    relation: GraphRelation | None = None
+    destination: GraphNode | None = None
     undirected: bool = False
 
 
@@ -129,7 +129,7 @@ class GraphFilterExpression(BaseModel, extra="forbid"):
 
 class BaseGraphSearchRequest(BaseModel):
     top_k: int = Field(default=50, le=500, title="Number of results to retrieve")
-    filter_expression: Optional[GraphFilterExpression] = Field(
+    filter_expression: GraphFilterExpression | None = Field(
         default=None,
         title="Filter resource by an expression",
         description=(
@@ -137,7 +137,7 @@ class BaseGraphSearchRequest(BaseModel):
             "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters "
         ),
     )
-    security: Optional[RequestSecurity] = Field(
+    security: RequestSecurity | None = Field(
         default=None,
         title="Security",
         description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",  # noqa: E501
@@ -155,22 +155,15 @@ graph_query_discriminator = filter_discriminator
 # Paths search
 
 GraphPathQuery = Annotated[
-    Union[
-        # bool expressions
-        Annotated[And["GraphPathQuery"], Tag("and")],
-        Annotated[Or["GraphPathQuery"], Tag("or")],
-        Annotated[Not["GraphPathQuery"], Tag("not")],
-        # paths
-        Annotated[GraphPath, Tag("path")],
-        # nodes
-        Annotated[SourceNode, Tag("source_node")],
-        Annotated[DestinationNode, Tag("destination_node")],
-        Annotated[AnyNode, Tag("node")],
-        # relations
-        Annotated[Relation, Tag("relation")],
-        # metadata
-        Annotated[Generated, Tag("generated")],
-    ],
+    Annotated[And["GraphPathQuery"], Tag("and")]
+    | Annotated[Or["GraphPathQuery"], Tag("or")]
+    | Annotated[Not["GraphPathQuery"], Tag("not")]
+    | Annotated[GraphPath, Tag("path")]
+    | Annotated[SourceNode, Tag("source_node")]
+    | Annotated[DestinationNode, Tag("destination_node")]
+    | Annotated[AnyNode, Tag("node")]
+    | Annotated[Relation, Tag("relation")]
+    | Annotated[Generated, Tag("generated")],
     Discriminator(graph_query_discriminator),
 ]
 
@@ -182,13 +175,11 @@ class GraphSearchRequest(BaseGraphSearchRequest):
 # Nodes search
 
 GraphNodesQuery = Annotated[
-    Union[
-        Annotated[And["GraphNodesQuery"], Tag("and")],
-        Annotated[Or["GraphNodesQuery"], Tag("or")],
-        Annotated[Not["GraphNodesQuery"], Tag("not")],
-        Annotated[AnyNode, Tag("node")],
-        Annotated[Generated, Tag("generated")],
-    ],
+    Annotated[And["GraphNodesQuery"], Tag("and")]
+    | Annotated[Or["GraphNodesQuery"], Tag("or")]
+    | Annotated[Not["GraphNodesQuery"], Tag("not")]
+    | Annotated[AnyNode, Tag("node")]
+    | Annotated[Generated, Tag("generated")],
     Discriminator(graph_query_discriminator),
 ]
 
@@ -200,13 +191,11 @@ class GraphNodesSearchRequest(BaseGraphSearchRequest):
 # Relations search
 
 GraphRelationsQuery = Annotated[
-    Union[
-        Annotated[And["GraphRelationsQuery"], Tag("and")],
-        Annotated[Or["GraphRelationsQuery"], Tag("or")],
-        Annotated[Not["GraphRelationsQuery"], Tag("not")],
-        Annotated[Relation, Tag("relation")],
-        Annotated[Generated, Tag("generated")],
-    ],
+    Annotated[And["GraphRelationsQuery"], Tag("and")]
+    | Annotated[Or["GraphRelationsQuery"], Tag("or")]
+    | Annotated[Not["GraphRelationsQuery"], Tag("not")]
+    | Annotated[Relation, Tag("relation")]
+    | Annotated[Generated, Tag("generated")],
     Discriminator(graph_query_discriminator),
 ]
 

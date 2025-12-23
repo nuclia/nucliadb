@@ -14,7 +14,6 @@
 #
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -37,10 +36,10 @@ class MessageFormat(Enum):
 
 
 class MessageContent(BaseModel):
-    text: Optional[str] = None
-    format: Optional[MessageFormat] = None
-    attachments: Optional[List[CloudLink]] = None
-    attachments_fields: List[FieldRef] = []
+    text: str | None = None
+    format: MessageFormat | None = None
+    attachments: list[CloudLink] | None = None
+    attachments_fields: list[FieldRef] = []
 
 
 class MessageType(Enum):
@@ -50,12 +49,12 @@ class MessageType(Enum):
 
 
 class Message(BaseModel):
-    timestamp: Optional[DateTime] = None
-    who: Optional[str] = None
-    to: Optional[List[str]] = []
+    timestamp: DateTime | None = None
+    who: str | None = None
+    to: list[str] | None = []
     content: MessageContent
-    ident: Optional[str] = None
-    type_: Optional[MessageType] = Field(None, alias="type")
+    ident: str | None = None
+    type_: MessageType | None = Field(None, alias="type")
 
 
 class Conversation(BaseModel):
@@ -64,7 +63,7 @@ class Conversation(BaseModel):
     a conversation in the field level.
     """
 
-    messages: Optional[List[Message]] = []
+    messages: list[Message] | None = []
 
 
 class FieldConversation(BaseModel):
@@ -75,11 +74,11 @@ class FieldConversation(BaseModel):
     This class is used mainly when exposing a conversation in the resource level
     """
 
-    pages: Optional[int] = None
-    size: Optional[int] = None
-    total: Optional[int] = None
-    extract_strategy: Optional[str] = None
-    split_strategy: Optional[str] = None
+    pages: int | None = None
+    size: int | None = None
+    total: int | None = None
+    extract_strategy: str | None = None
+    split_strategy: str | None = None
 
 
 # Creation and update classes (Those used on writer endpoints)
@@ -88,18 +87,18 @@ class FieldConversation(BaseModel):
 class InputMessageContent(BaseModel):
     text: str = Field()
     format: MessageFormat = MessageFormat.PLAIN
-    attachments: List[FileB64] = Field(default=[], max_length=50)
-    attachments_fields: List[FieldRef] = Field(default=[], max_length=50)
+    attachments: list[FileB64] = Field(default=[], max_length=50)
+    attachments_fields: list[FieldRef] = Field(default=[], max_length=50)
 
 
 class InputMessage(BaseModel):
-    timestamp: Optional[datetime] = Field(
+    timestamp: datetime | None = Field(
         default=None, description="Time at which the message was sent, in ISO 8601 format."
     )
-    who: Optional[str] = Field(
+    who: str | None = Field(
         default=None, description="Sender of the message, e.g. 'user' or 'assistant'"
     )
-    to: List[str] = Field(
+    to: list[str] = Field(
         default_factory=list,
         description="List of recipients of the message, e.g. ['assistant'] or ['user']",
         max_length=100,
@@ -109,7 +108,7 @@ class InputMessage(BaseModel):
         description="Unique identifier for the message. Must be unique within the conversation.",
         max_length=128,
     )
-    type_: Optional[MessageType] = Field(None, alias="type")
+    type_: MessageType | None = Field(None, alias="type")
 
     @field_validator("ident", mode="after")
     @classmethod
@@ -126,22 +125,22 @@ class InputMessage(BaseModel):
 
 
 class InputConversationField(BaseModel):
-    messages: List[InputMessage] = Field(
+    messages: list[InputMessage] = Field(
         default_factory=list,
         description="List of messages in the conversation field. Each message must have a unique ident. A single conversation can contain up to 51,200 messages. You can add up to 2,048 messages per request.",
     )
-    extract_strategy: Optional[str] = Field(
+    extract_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia extract strategy used at processing time. If not set, the default strategy was used. Extract strategies are defined at the learning configuration api.",
     )
-    split_strategy: Optional[str] = Field(
+    split_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia split strategy used at processing time. If not set, the default strategy was used. Split strategies are defined at the learning configuration api.",
     )
 
     @field_validator("messages", mode="after")
     @classmethod
-    def idents_are_unique(cls, value: List[InputMessage]) -> List[InputMessage]:
+    def idents_are_unique(cls, value: list[InputMessage]) -> list[InputMessage]:
         seen_idents = set()
         for message in value:
             if message.ident in seen_idents:

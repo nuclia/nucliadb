@@ -19,7 +19,6 @@
 #
 from datetime import datetime
 from os.path import dirname, getsize
-from typing import Optional
 from uuid import uuid4
 
 from nucliadb.ingest.fields.link import Link
@@ -58,7 +57,7 @@ async def test_create_resource_orm_link_extracted(
     field_obj: Link = await r.get_field(ex1.field, FieldType.LINK, load=False)
     await field_obj.set_link_extracted_data(ex1)
 
-    ex2: Optional[LinkExtractedData] = await field_obj.get_link_extracted_data()
+    ex2: LinkExtractedData | None = await field_obj.get_link_extracted_data()
     assert ex2 is not None
     assert ex2.title == ex1.title
     assert ex2.link_preview.source == storage.source

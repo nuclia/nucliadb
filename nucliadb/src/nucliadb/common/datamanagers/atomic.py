@@ -35,10 +35,11 @@ it's transaction
 
 """
 
+from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import Awaitable, Callable, TypeVar
+from typing import Concatenate, TypeVar
 
-from typing_extensions import Concatenate, ParamSpec
+from typing_extensions import ParamSpec
 
 from nucliadb.common.maindb.driver import Transaction
 

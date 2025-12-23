@@ -15,13 +15,13 @@
 
 from collections.abc import Sequence
 from enum import Enum
-from typing import Any, Generic, Literal, Optional, TypeVar, Union
+from typing import Annotated, Any, Generic, Literal, TypeVar
 from uuid import UUID
 
 import pydantic
 from pydantic import AliasChoices, BaseModel, Discriminator, Tag, field_validator, model_validator
 from pydantic.config import ConfigDict
-from typing_extensions import Annotated, Self
+from typing_extensions import Self
 
 from .common import FieldTypeName, Paragraph
 from .metadata import ResourceProcessingStatus
@@ -88,10 +88,8 @@ class Resource(FilterProp, extra="forbid"):
     model_config = ConfigDict(title="Resource Filter")
 
     prop: Literal["resource"] = "resource"
-    id: Optional[str] = pydantic.Field(default=None, description="UUID of the resource to match")
-    slug: Optional[SlugString] = pydantic.Field(
-        default=None, description="Slug of the resource to match"
-    )
+    id: str | None = pydantic.Field(default=None, description="UUID of the resource to match")
+    slug: SlugString | None = pydantic.Field(default=None, description="Slug of the resource to match")
 
     @field_validator("id", mode="after")
     def validate_id(cls, v: str) -> str:
@@ -116,7 +114,7 @@ class Field(FilterProp, extra="forbid"):
 
     prop: Literal["field"] = "field"
     type: FieldTypeName = pydantic.Field(description="Type of the field to match, ")
-    name: Optional[str] = pydantic.Field(
+    name: str | None = pydantic.Field(
         default=None,
         title="Field Filter",
         description="Name of the field to match. If blank, matches all fields of the given type",
@@ -134,10 +132,10 @@ class DateCreated(FilterProp, extra="forbid"):
     """Matches all fields created in a date range"""
 
     prop: Literal["created"] = "created"
-    since: Optional[DateTime] = pydantic.Field(
+    since: DateTime | None = pydantic.Field(
         default=None, description="Start of the date range. Leave blank for unbounded"
     )
-    until: Optional[DateTime] = pydantic.Field(
+    until: DateTime | None = pydantic.Field(
         default=None, description="End of the date range. Leave blank for unbounded"
     )
 
@@ -152,10 +150,10 @@ class DateModified(FilterProp, extra="forbid"):
     """Matches all fields modified in a date range"""
 
     prop: Literal["modified"] = "modified"
-    since: Optional[DateTime] = pydantic.Field(
+    since: DateTime | None = pydantic.Field(
         default=None, description="Start of the date range. Leave blank for unbounded"
     )
-    until: Optional[DateTime] = pydantic.Field(
+    until: DateTime | None = pydantic.Field(
         default=None, description="End of the date range. Leave blank for unbounded"
     )
 
@@ -171,7 +169,7 @@ class Label(FilterProp, extra="forbid"):
 
     prop: Literal["label"] = "label"
     labelset: str = pydantic.Field(description="The labelset to match")
-    label: Optional[str] = pydantic.Field(
+    label: str | None = pydantic.Field(
         default=None,
         description="The label to match. If blank, matches all labels in the given labelset",
     )
@@ -187,7 +185,7 @@ class ResourceMimetype(FilterProp, extra="forbid"):
     type: str = pydantic.Field(
         description="Type of the mimetype to match. e.g: In image/jpeg, type is image"
     )
-    subtype: Optional[str] = pydantic.Field(
+    subtype: str | None = pydantic.Field(
         default=None,
         description=(
             "Type of the mimetype to match. e.g: In image/jpeg, subtype is jpeg."
@@ -203,7 +201,7 @@ class FieldMimetype(FilterProp, extra="forbid"):
     type: str = pydantic.Field(
         description="Type of the mimetype to match. e.g: In image/jpeg, type is image"
     )
-    subtype: Optional[str] = pydantic.Field(
+    subtype: str | None = pydantic.Field(
         default=None,
         description=(
             "Type of the mimetype to match. e.g: In image/jpeg, subtype is jpeg."
@@ -217,7 +215,7 @@ class Entity(FilterProp, extra="forbid"):
 
     prop: Literal["entity"] = "entity"
     subtype: str = pydantic.Field(description="Type of the entity. e.g: PERSON")
-    value: Optional[str] = pydantic.Field(
+    value: str | None = pydantic.Field(
         default=None,
         description="Value of the entity. e.g: Anna. If blank, matches any entity of the given type",
     )
@@ -246,7 +244,7 @@ class OriginMetadata(FilterProp, extra="forbid"):
 
     prop: Literal["origin_metadata"] = "origin_metadata"
     field: str = pydantic.Field(title="Origin Metadata Field", description="Metadata field")
-    value: Optional[str] = pydantic.Field(
+    value: str | None = pydantic.Field(
         default=None,
         description="Value of the metadata field. If blank, matches any document with the given metadata field set (to any value)",
     )
@@ -256,7 +254,7 @@ class OriginPath(FilterProp, extra="forbid"):
     """Matches the origin path"""
 
     prop: Literal["origin_path"] = "origin_path"
-    prefix: Optional[str] = pydantic.Field(
+    prefix: str | None = pydantic.Field(
         default=None,
         description=(
             "Prefix of the path, matches all paths under this prefix"
@@ -269,7 +267,7 @@ class OriginSource(FilterProp, extra="forbid"):
     """Matches the origin source id"""
 
     prop: Literal["origin_source"] = "origin_source"
-    id: Optional[str] = pydantic.Field(default=None, description=("Source ID"))
+    id: str | None = pydantic.Field(default=None, description=("Source ID"))
 
 
 class OriginCollaborator(FilterProp, extra="forbid"):
@@ -286,7 +284,7 @@ class Generated(FilterProp, extra="forbid"):
     by: Literal["data-augmentation"] = pydantic.Field(
         description="Generator for this field. Currently, only data-augmentation is supported"
     )
-    da_task: Optional[str] = pydantic.Field(
+    da_task: str | None = pydantic.Field(
         default=None, description="Matches field generated by an specific DA task, given its prefix"
     )
 
@@ -307,7 +305,7 @@ class Status(FilterProp, extra="forbid"):
 
 # The discriminator function is optional, everything works without it.
 # We implement it because it makes pydantic produce more user-friendly errors
-def filter_discriminator(v: Any) -> Optional[str]:
+def filter_discriminator(v: Any) -> str | None:
     if isinstance(v, dict):
         if "and" in v:
             return "and"
@@ -329,59 +327,53 @@ def filter_discriminator(v: Any) -> Optional[str]:
 
 
 FieldFilterExpression = Annotated[
-    Union[
-        Annotated[And["FieldFilterExpression"], Tag("and")],
-        Annotated[Or["FieldFilterExpression"], Tag("or")],
-        Annotated[Not["FieldFilterExpression"], Tag("not")],
-        Annotated[Resource, Tag("resource")],
-        Annotated[Field, Tag("field")],
-        Annotated[Keyword, Tag("keyword")],
-        Annotated[DateCreated, Tag("created")],
-        Annotated[DateModified, Tag("modified")],
-        Annotated[Label, Tag("label")],
-        Annotated[ResourceMimetype, Tag("resource_mimetype")],
-        Annotated[FieldMimetype, Tag("field_mimetype")],
-        Annotated[Entity, Tag("entity")],
-        Annotated[Language, Tag("language")],
-        Annotated[OriginTag, Tag("origin_tag")],
-        Annotated[OriginMetadata, Tag("origin_metadata")],
-        Annotated[OriginPath, Tag("origin_path")],
-        Annotated[OriginSource, Tag("origin_source")],
-        Annotated[OriginCollaborator, Tag("origin_collaborator")],
-        Annotated[Generated, Tag("generated")],
-    ],
+    Annotated[And["FieldFilterExpression"], Tag("and")]
+    | Annotated[Or["FieldFilterExpression"], Tag("or")]
+    | Annotated[Not["FieldFilterExpression"], Tag("not")]
+    | Annotated[Resource, Tag("resource")]
+    | Annotated[Field, Tag("field")]
+    | Annotated[Keyword, Tag("keyword")]
+    | Annotated[DateCreated, Tag("created")]
+    | Annotated[DateModified, Tag("modified")]
+    | Annotated[Label, Tag("label")]
+    | Annotated[ResourceMimetype, Tag("resource_mimetype")]
+    | Annotated[FieldMimetype, Tag("field_mimetype")]
+    | Annotated[Entity, Tag("entity")]
+    | Annotated[Language, Tag("language")]
+    | Annotated[OriginTag, Tag("origin_tag")]
+    | Annotated[OriginMetadata, Tag("origin_metadata")]
+    | Annotated[OriginPath, Tag("origin_path")]
+    | Annotated[OriginSource, Tag("origin_source")]
+    | Annotated[OriginCollaborator, Tag("origin_collaborator")]
+    | Annotated[Generated, Tag("generated")],
     Discriminator(filter_discriminator),
 ]
 
 ParagraphFilterExpression = Annotated[
-    Union[
-        Annotated[And["ParagraphFilterExpression"], Tag("and")],
-        Annotated[Or["ParagraphFilterExpression"], Tag("or")],
-        Annotated[Not["ParagraphFilterExpression"], Tag("not")],
-        Annotated[Label, Tag("label")],
-        Annotated[Kind, Tag("kind")],
-    ],
+    Annotated[And["ParagraphFilterExpression"], Tag("and")]
+    | Annotated[Or["ParagraphFilterExpression"], Tag("or")]
+    | Annotated[Not["ParagraphFilterExpression"], Tag("not")]
+    | Annotated[Label, Tag("label")]
+    | Annotated[Kind, Tag("kind")],
     Discriminator(filter_discriminator),
 ]
 
 ResourceFilterExpression = Annotated[
-    Union[
-        Annotated[And["ResourceFilterExpression"], Tag("and")],
-        Annotated[Or["ResourceFilterExpression"], Tag("or")],
-        Annotated[Not["ResourceFilterExpression"], Tag("not")],
-        Annotated[Resource, Tag("resource")],
-        Annotated[DateCreated, Tag("created")],
-        Annotated[DateModified, Tag("modified")],
-        Annotated[Label, Tag("label")],
-        Annotated[ResourceMimetype, Tag("resource_mimetype")],
-        Annotated[Language, Tag("language")],
-        Annotated[OriginTag, Tag("origin_tag")],
-        Annotated[OriginMetadata, Tag("origin_metadata")],
-        Annotated[OriginPath, Tag("origin_path")],
-        Annotated[OriginSource, Tag("origin_source")],
-        Annotated[OriginCollaborator, Tag("origin_collaborator")],
-        Annotated[Status, Tag("status")],
-    ],
+    Annotated[And["ResourceFilterExpression"], Tag("and")]
+    | Annotated[Or["ResourceFilterExpression"], Tag("or")]
+    | Annotated[Not["ResourceFilterExpression"], Tag("not")]
+    | Annotated[Resource, Tag("resource")]
+    | Annotated[DateCreated, Tag("created")]
+    | Annotated[DateModified, Tag("modified")]
+    | Annotated[Label, Tag("label")]
+    | Annotated[ResourceMimetype, Tag("resource_mimetype")]
+    | Annotated[Language, Tag("language")]
+    | Annotated[OriginTag, Tag("origin_tag")]
+    | Annotated[OriginMetadata, Tag("origin_metadata")]
+    | Annotated[OriginPath, Tag("origin_path")]
+    | Annotated[OriginSource, Tag("origin_source")]
+    | Annotated[OriginCollaborator, Tag("origin_collaborator")]
+    | Annotated[Status, Tag("status")],
     Discriminator(filter_discriminator),
 ]
 
@@ -398,10 +390,10 @@ class FilterExpression(BaseModel, extra="forbid"):
         AND = "and"
         OR = "or"
 
-    field: Optional[FieldFilterExpression] = pydantic.Field(
+    field: FieldFilterExpression | None = pydantic.Field(
         default=None, title="Field Filters", description="Filter to apply to fields"
     )
-    paragraph: Optional[ParagraphFilterExpression] = pydantic.Field(
+    paragraph: ParagraphFilterExpression | None = pydantic.Field(
         default=None, description="Filter to apply to each text block"
     )
 

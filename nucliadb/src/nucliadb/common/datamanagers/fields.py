@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional
 
 from google.protobuf.message import Message
 
@@ -34,7 +33,7 @@ KB_RESOURCE_FIELD_STATUS = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/status"
 
 async def get_raw(
     txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str
-) -> Optional[bytes]:
+) -> bytes | None:
     key = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     return await txn.get(key)
 
@@ -62,7 +61,7 @@ async def delete(txn: Transaction, *, kbid: str, rid: str, field_type: str, fiel
 
 async def get_error(
     txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str
-) -> Optional[writer_pb2.Error]:
+) -> writer_pb2.Error | None:
     key = KB_RESOURCE_FIELD_ERROR.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     return await get_kv_pb(txn, key, writer_pb2.Error)
 
@@ -85,7 +84,7 @@ async def set_error(
 
 async def get_status(
     txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str
-) -> Optional[writer_pb2.FieldStatus]:
+) -> writer_pb2.FieldStatus | None:
     key = KB_RESOURCE_FIELD_STATUS.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     return await get_kv_pb(txn, key, writer_pb2.FieldStatus)
 

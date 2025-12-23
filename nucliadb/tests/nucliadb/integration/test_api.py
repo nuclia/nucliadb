@@ -19,7 +19,7 @@
 #
 import base64
 import json
-from typing import Optional, cast
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pydantic
@@ -1674,7 +1674,7 @@ async def test_deletions_on_text_index(
 ):
     kbid = standalone_knowledgebox
 
-    async def kb_search(query: str, filters: Optional[list[str]] = None):
+    async def kb_search(query: str, filters: list[str] | None = None):
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/search",
             json={

@@ -15,7 +15,6 @@
 
 import asyncio
 import time
-from typing import List, Optional
 
 from opentelemetry.context import (  # type: ignore
     _SUPPRESS_INSTRUMENTATION_KEY,
@@ -78,7 +77,7 @@ class BatchSpanProcessor(SpanProcessor):
             self.worker(), name="OtelBatchSpanProcessor"
         )
         self.condition = asyncio.Condition()
-        self._flush_request = None  # type: Optional[_FlushRequest]
+        self._flush_request: _FlushRequest | None = None
         self.schedule_delay_millis = schedule_delay_millis
         self.max_export_batch_size = max_export_batch_size
         self.max_queue_size = max_queue_size
@@ -87,9 +86,9 @@ class BatchSpanProcessor(SpanProcessor):
         # flag that indicates that spans are being dropped
         self._spans_dropped = False
         # precallocated list to send spans to exporter
-        self.spans_list: List[Optional[Span]] = [None] * self.max_export_batch_size
+        self.spans_list: list[Span | None] = [None] * self.max_export_batch_size
 
-    def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
+    def on_start(self, span: Span, parent_context: Context | None = None) -> None:
         pass
 
     def on_end(self, span: ReadableSpan) -> None:
@@ -135,7 +134,7 @@ class BatchSpanProcessor(SpanProcessor):
 
     async def _worker(self) -> None:
         timeout = self.schedule_delay_millis / 1e3
-        flush_request = None  # type: Optional[_FlushRequest]
+        flush_request: _FlushRequest | None = None
         while not self.done:
             logger.debug("Waiting condition")
             async with self.condition:
@@ -187,7 +186,7 @@ class BatchSpanProcessor(SpanProcessor):
 
     def _get_and_unset_flush_request(
         self,
-    ) -> Optional[_FlushRequest]:
+    ) -> _FlushRequest | None:
         """Returns the current flush request and makes it invisible to the
         worker thread for subsequent calls.
         """
@@ -199,7 +198,7 @@ class BatchSpanProcessor(SpanProcessor):
 
     @staticmethod
     def _notify_flush_request_finished(
-        flush_request: Optional[_FlushRequest],
+        flush_request: _FlushRequest | None,
     ):
         """Notifies the flush initiator(s) waiting on the given request/event
         that the flush operation was finished.
@@ -220,7 +219,7 @@ class BatchSpanProcessor(SpanProcessor):
             self._flush_request = _FlushRequest()
         return self._flush_request
 
-    async def _export(self, flush_request: Optional[_FlushRequest]):
+    async def _export(self, flush_request: _FlushRequest | None):
         """Exports spans considering the given flush_request.
         In case of a given flush_requests spans are exported in batches until
         the number of exported spans reached or exceeded the number of spans in
@@ -274,7 +273,7 @@ class BatchSpanProcessor(SpanProcessor):
         while self.queue.qsize():
             await self._export_batch()
 
-    async def async_force_flush(self, timeout_millis: Optional[int] = None) -> bool:
+    async def async_force_flush(self, timeout_millis: int | None = None) -> bool:
         if timeout_millis is None:
             timeout_millis = self.export_timeout_millis
 

@@ -19,8 +19,8 @@
 #
 
 import dataclasses
+from collections.abc import Iterator
 from datetime import datetime
-from typing import Iterator, Optional
 
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FieldId, ParagraphId
 from nucliadb_protos import resources_pb2 as rpb
@@ -36,19 +36,19 @@ from .helpers import labels_to_classifications
 
 @dataclasses.dataclass
 class FieldUser:
-    metadata: Optional[rpb.UserFieldMetadata] = None
+    metadata: rpb.UserFieldMetadata | None = None
 
 
 @dataclasses.dataclass
 class FieldExtracted:
-    metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
-    text: Optional[rpb.ExtractedTextWrapper] = None
-    vectors: Optional[list[rpb.ExtractedVectorsWrapper]] = None
-    question_answers: Optional[rpb.FieldQuestionAnswerWrapper] = None
+    metadata: rpb.FieldComputedMetadataWrapper | None = None
+    text: rpb.ExtractedTextWrapper | None = None
+    vectors: list[rpb.ExtractedVectorsWrapper] | None = None
+    question_answers: rpb.FieldQuestionAnswerWrapper | None = None
     # only applies to file fields
-    file: Optional[rpb.FileExtractedData] = None
+    file: rpb.FileExtractedData | None = None
     # only applies to file fields
-    link: Optional[rpb.LinkExtractedData] = None
+    link: rpb.LinkExtractedData | None = None
 
 
 @dataclasses.dataclass
@@ -63,13 +63,13 @@ class FieldBuilder:
         self._kbid = kbid
         self._rid = rid
         self._field_id = rpb.FieldID(field=field, field_type=field_type)
-        self.__extracted_metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
-        self.__extracted_text: Optional[rpb.ExtractedTextWrapper] = None
-        self.__extracted_vectors: Optional[dict[str, rpb.ExtractedVectorsWrapper]] = None
-        self.__user_metadata: Optional[rpb.UserFieldMetadata] = None
-        self.__question_answers: Optional[rpb.FieldQuestionAnswerWrapper] = None
-        self.__file: Optional[rpb.FileExtractedData] = None
-        self.__link: Optional[rpb.LinkExtractedData] = None
+        self.__extracted_metadata: rpb.FieldComputedMetadataWrapper | None = None
+        self.__extracted_text: rpb.ExtractedTextWrapper | None = None
+        self.__extracted_vectors: dict[str, rpb.ExtractedVectorsWrapper] | None = None
+        self.__user_metadata: rpb.UserFieldMetadata | None = None
+        self.__question_answers: rpb.FieldQuestionAnswerWrapper | None = None
+        self.__file: rpb.FileExtractedData | None = None
+        self.__link: rpb.LinkExtractedData | None = None
 
     @property
     def id(self) -> rpb.FieldID:
@@ -165,14 +165,14 @@ class FieldBuilder:
         classifications = labels_to_classifications(labelset, labels)
         self._extracted_metadata.metadata.metadata.classifications.extend(classifications)
 
-    def with_extracted_text(self, text: str, split: Optional[str] = None):
+    def with_extracted_text(self, text: str, split: str | None = None):
         if split is None:
             self._extracted_text.body.text = text
         else:
             self._extracted_text.body.split_text[split] = text
 
     def with_extracted_vectors(
-        self, vectors: list[utils_pb2.Vector], vectorset: str, split: Optional[str] = None
+        self, vectors: list[utils_pb2.Vector], vectorset: str, split: str | None = None
     ):
         if split is None:
             self._extracted_vectors(vectorset).vectors.vectors.vectors.extend(vectors)
@@ -180,7 +180,7 @@ class FieldBuilder:
             self._extracted_vectors(vectorset).vectors.split_vectors[split].vectors.extend(vectors)
 
     def with_extracted_paragraph_metadata(
-        self, paragraph: rpb.Paragraph, split: Optional[str] = None
+        self, paragraph: rpb.Paragraph, split: str | None = None
     ) -> rpb.Paragraph:
         if split is None:
             self._extracted_metadata.metadata.metadata.paragraphs.append(paragraph)
@@ -202,7 +202,7 @@ class FieldBuilder:
         )
 
     def with_user_paragraph_labels(
-        self, key: str, labelset: str, labels: list[str], split: Optional[str] = None
+        self, key: str, labelset: str, labels: list[str], split: str | None = None
     ):
         classifications = labels_to_classifications(labelset, labels, split)
         pa = rpb.ParagraphAnnotation()
@@ -213,11 +213,11 @@ class FieldBuilder:
     def add_paragraph(
         self,
         text: str,
-        split: Optional[str] = None,
+        split: str | None = None,
         kind: rpb.Paragraph.TypeParagraph.ValueType = rpb.Paragraph.TypeParagraph.TEXT,
-        labels: Optional[list[tuple[str, list[str]]]] = None,
-        user_labels: Optional[list[tuple[str, list[str]]]] = None,
-        vectors: Optional[dict[str, list[float]]] = None,
+        labels: list[tuple[str, list[str]]] | None = None,
+        user_labels: list[tuple[str, list[str]]] | None = None,
+        vectors: dict[str, list[float]] | None = None,
     ) -> tuple[ParagraphId, rpb.Paragraph]:
         """Add a single paragraph to the field.
 
@@ -304,9 +304,7 @@ class FieldBuilder:
         question_answer.answers.append(answer_pb)
         self._question_answers.question_answers.question_answers.question_answer.append(question_answer)
 
-    def iter_paragraphs(
-        self, split: Optional[str] = None
-    ) -> Iterator[tuple[ParagraphId, rpb.Paragraph]]:
+    def iter_paragraphs(self, split: str | None = None) -> Iterator[tuple[ParagraphId, rpb.Paragraph]]:
         if split is None:
             paragraphs = self._extracted_metadata.metadata.metadata.paragraphs
         else:

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import urllib.parse
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import HTTPException
 from fastapi.requests import Request
@@ -93,9 +93,9 @@ async def _download_extract_file(
     field_type: FieldTypeName,
     field_id: str,
     download_field: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
-    range_request: Optional[str] = None,
+    rid: str | None = None,
+    rslug: str | None = None,
+    range_request: str | None = None,
 ) -> Response:
     rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
 
@@ -150,9 +150,9 @@ async def download_field_file_rid_prefix(
 async def _download_field_file(
     kbid: str,
     field_id: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
-    range_request: Optional[str] = None,
+    rid: str | None = None,
+    rslug: str | None = None,
+    range_request: str | None = None,
     inline: bool = False,
 ) -> Response:
     rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
@@ -223,9 +223,9 @@ async def _download_field_conversation_attachment(
     field_id: str,
     message_id: str,
     file_num: int,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
-    range_request: Optional[str] = None,
+    rid: str | None = None,
+    rslug: str | None = None,
+    range_request: str | None = None,
 ) -> Response:
     rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
 
@@ -238,8 +238,8 @@ async def _download_field_conversation_attachment(
     return await download_api(sf, range_request)
 
 
-async def download_api(sf: StorageField, range_request: Optional[str] = None, inline: bool = False):
-    metadata: Optional[ObjectMetadata] = await sf.exists()
+async def download_api(sf: StorageField, range_request: str | None = None, inline: bool = False):
+    metadata: ObjectMetadata | None = await sf.exists()
     if metadata is None:
         raise HTTPException(status_code=404, detail="Specified file doesn't exist")
 
@@ -312,7 +312,7 @@ async def download_api(sf: StorageField, range_request: Optional[str] = None, in
     )
 
 
-async def _get_resource_uuid_from_params(kbid, rid: Optional[str], rslug: Optional[str]) -> str:
+async def _get_resource_uuid_from_params(kbid, rid: str | None, rslug: str | None) -> str:
     if not any([rid, rslug]):
         raise ValueError("Either rid or slug must be set")
 

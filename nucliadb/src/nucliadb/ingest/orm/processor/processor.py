@@ -19,7 +19,6 @@
 #
 import asyncio
 import logging
-from typing import Optional
 
 import aiohttp.client_exceptions
 import nats.errors
@@ -145,8 +144,8 @@ class Processor:
         self,
         driver: Driver,
         storage: Storage,
-        pubsub: Optional[PubSubDriver] = None,
-        partition: Optional[str] = None,
+        pubsub: PubSubDriver | None = None,
+        partition: str | None = None,
     ):
         self.driver = driver
         self.storage = storage
@@ -158,7 +157,7 @@ class Processor:
         self,
         message: writer_pb2.BrokerMessage,
         seqid: int,
-        partition: Optional[str] = None,
+        partition: str | None = None,
         transaction_check: bool = True,
     ) -> None:
         partition = partition if self.partition is None else self.partition
@@ -285,7 +284,7 @@ class Processor:
                 kb = KnowledgeBox(txn, self.storage, kbid)
                 uuid = await self.get_resource_uuid(kb, message)
 
-                resource: Optional[Resource] = None
+                resource: Resource | None = None
                 handled_exception = None
                 created = False
 
@@ -675,7 +674,7 @@ class Processor:
             await self.pubsub.publish(channel, payload)
 
     async def _mark_resource_error(
-        self, kb: KnowledgeBox, resource: Optional[Resource], partition: str, seqid: int
+        self, kb: KnowledgeBox, resource: Resource | None, partition: str, seqid: int
     ) -> None:
         """
         Unhandled error processing, try to mark resource as error
@@ -696,8 +695,8 @@ class Processor:
     # XXX: Why are these utility functions here?
     async def get_kb_obj(
         self, txn: Transaction, kbid: knowledgebox_pb2.KnowledgeBoxID
-    ) -> Optional[KnowledgeBox]:
-        uuid: Optional[str] = kbid.uuid
+    ) -> KnowledgeBox | None:
+        uuid: str | None = kbid.uuid
         if uuid == "":
             uuid = await datamanagers.kb.get_kb_uuid(txn, slug=kbid.slug)
 

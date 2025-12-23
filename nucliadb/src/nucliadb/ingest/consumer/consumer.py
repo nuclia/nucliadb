@@ -20,7 +20,6 @@
 import asyncio
 import logging
 import time
-from typing import Optional, Union
 
 import backoff
 import nats
@@ -73,8 +72,8 @@ class IngestConsumer:
         partition: str,
         storage: Storage,
         nats_connection_manager: NatsConnectionManager,
-        pubsub: Optional[PubSubDriver] = None,
-        lock: Optional[Union[asyncio.Lock, asyncio.Semaphore]] = None,
+        pubsub: PubSubDriver | None = None,
+        lock: asyncio.Lock | asyncio.Semaphore | None = None,
     ):
         self.driver = driver
         self.partition = partition
@@ -84,9 +83,9 @@ class IngestConsumer:
 
         self.lock = lock or asyncio.Lock()
         self.processor = Processor(driver, storage, pubsub, partition)
-        self.subscription: Optional[JetStreamContext.PullSubscription] = None
+        self.subscription: JetStreamContext.PullSubscription | None = None
 
-    async def ack_message(self, msg: Msg, kbid: Optional[str] = None):
+    async def ack_message(self, msg: Msg, kbid: str | None = None):
         await msg.ack()
 
     async def initialize(self):
@@ -161,7 +160,7 @@ class IngestConsumer:
     async def subscription_worker(self, msg: Msg):
         context.clear_context()
 
-        kbid: Optional[str] = None
+        kbid: str | None = None
         subject = msg.subject
         reply = msg.reply
         seqid = int(reply.split(".")[5])

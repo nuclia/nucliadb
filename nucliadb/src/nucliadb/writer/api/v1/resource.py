@@ -20,7 +20,7 @@
 import asyncio
 import contextlib
 from time import time
-from typing import Annotated, Optional
+from typing import Annotated
 from uuid import uuid4
 
 from fastapi import HTTPException, Query, Response
@@ -637,7 +637,7 @@ def needs_resource_reindex(item: UpdateResourcePayload) -> bool:
     )
 
 
-async def maybe_send_to_process(toprocess: PushPayload, partition) -> Optional[int]:
+async def maybe_send_to_process(toprocess: PushPayload, partition) -> int | None:
     if not needs_reprocess(toprocess):
         return None
 

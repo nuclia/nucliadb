@@ -50,7 +50,7 @@ def pdm_build_initialize(context):
             command.append(f"--mypy_grpc_out={build_dir}")
 
         if protoc.main(command) != 0:
-            raise Exception("error: {} failed".format(command))
+            raise Exception(f"error: {command} failed")
 
     # Create py.typed to enable type checking
     open(f"{build_dir}/nucliadb_protos/py.typed", "w")

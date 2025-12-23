@@ -18,22 +18,12 @@ import importlib.metadata
 import inspect
 import io
 import warnings
+from collections.abc import AsyncGenerator, AsyncIterable, Callable, Iterable, Iterator
 from dataclasses import dataclass
 from json import JSONDecodeError
 from typing import (
     Any,
-    AsyncGenerator,
-    AsyncIterable,
-    Callable,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Tuple,
-    Type,
     TypeVar,
-    Union,
 )
 
 import httpx
@@ -117,11 +107,11 @@ from nucliadb_models.writer import (
 from nucliadb_sdk.v2 import exceptions
 
 # Generics
-OUTPUT_TYPE = TypeVar("OUTPUT_TYPE", bound=Union[BaseModel, None])
+OUTPUT_TYPE = TypeVar("OUTPUT_TYPE", bound=BaseModel | None)
 
-RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes], dict[str, Any]]
+RawRequestContent = str | bytes | Iterable[bytes] | AsyncIterable[bytes] | dict[str, Any]
 
-INPUT_TYPE = TypeVar("INPUT_TYPE", BaseModel, List[InputMessage], RawRequestContent, object, None)
+INPUT_TYPE = TypeVar("INPUT_TYPE", BaseModel, list[InputMessage], RawRequestContent, object, None)
 USER_AGENT = f"nucliadb-sdk/{importlib.metadata.version('nucliadb_sdk')}"
 
 
@@ -138,7 +128,7 @@ ASK_STATUS_CODE_ERROR = "-1"
 class SdkEndpointDefinition:
     method: str
     path_template: str
-    path_params: Tuple[str, ...]
+    path_params: tuple[str, ...]
 
 
 SDK_DEFINITION = {
@@ -480,7 +470,7 @@ SDK_DEFINITION = {
 
 def _parse_ask_response_lines(lines_iter: Iterator[str], learning_id: str) -> SyncAskResponse:
     answer = ""
-    reasoning: Optional[str] = None
+    reasoning: str | None = None
     answer_json = None
     status = ""
     retrieval_results = None
@@ -489,9 +479,9 @@ def _parse_ask_response_lines(lines_iter: Iterator[str], learning_id: str) -> Sy
     citation_footnote_to_context: dict[str, str] = {}
     tokens = None
     timings = None
-    error: Optional[str] = None
+    error: str | None = None
     debug = None
-    augmented_context: Optional[AugmentedContext] = None
+    augmented_context: AugmentedContext | None = None
     for line in lines_iter:
         try:
             item = AskResponseItem.model_validate_json(line).item
@@ -584,7 +574,7 @@ async def ask_response_parser_async(response: httpx.Response) -> SyncAskResponse
 
 
 def _parse_list_of_pydantic(
-    data: List[Any],
+    data: list[Any],
 ) -> str:
     output = []
     for item in data:
@@ -608,8 +598,8 @@ def is_raw_request_content(content: Any) -> bool:
 
 def prepare_request_base(
     path_template: str,
-    path_params: Tuple[str, ...],
-    kwargs: Dict[str, Any],
+    path_params: tuple[str, ...],
+    kwargs: dict[str, Any],
 ):
     path_data = {}
     for param in path_params:
@@ -624,13 +614,13 @@ def prepare_request_base(
 
 def prepare_request(
     path_template: str,
-    path_params: Tuple[str, ...],
-    request_type: Optional[Type[INPUT_TYPE]],
-    content: Optional[INPUT_TYPE] = None,
+    path_params: tuple[str, ...],
+    request_type: type[INPUT_TYPE] | None,
+    content: INPUT_TYPE | None = None,
     **kwargs,
 ):
     path = prepare_request_base(path_template, path_params, kwargs)
-    data: Optional[RawRequestContent] = None
+    data: RawRequestContent | None = None
     if request_type is not None and request_type is not type(None):
         if content is not None:
             if isinstance(content, list):
@@ -643,7 +633,7 @@ def prepare_request(
                 raise TypeError(f"Unknown type {type(content)}")
         else:
             # pull properties out of kwargs now
-            content_data: Dict[str, str] = {}
+            content_data: dict[str, str] = {}
             if issubclass(request_type, BaseModel):
                 for key in list(kwargs.keys()):
                     if key in request_type.model_fields:
@@ -670,8 +660,8 @@ def prepare_request(
 
 def _request_sync_builder(
     name: str,
-    request_type: Type[INPUT_TYPE],
-    response_type: Type[OUTPUT_TYPE],
+    request_type: type[INPUT_TYPE],
+    response_type: type[OUTPUT_TYPE],
 ):
     """
     SYNC standard Pydantic response builder
@@ -683,8 +673,8 @@ def _request_sync_builder(
 
     def _func(
         self: NucliaDB,
-        content: Optional[INPUT_TYPE] = None,
-        headers: Optional[Dict[str, str]] = None,
+        content: INPUT_TYPE | None = None,
+        headers: dict[str, str] | None = None,
         **kwargs,
     ) -> OUTPUT_TYPE:
         path, data, query_params = prepare_request(
@@ -718,9 +708,7 @@ def _request_json_sync_builder(
     path_template = sdk_def.path_template
     path_params = sdk_def.path_params
 
-    def _func(
-        self: NucliaDB, content: Optional[Dict[str, Any]] = None, **kwargs
-    ) -> Optional[Dict[str, Any]]:
+    def _func(self: NucliaDB, content: dict[str, Any] | None = None, **kwargs) -> dict[str, Any] | None:
         path = prepare_request_base(
             path_template=path_template,
             path_params=path_params,
@@ -750,7 +738,7 @@ def _request_iterator_sync_builder(
     path_template = sdk_def.path_template
     path_params = sdk_def.path_params
 
-    def _func(self: NucliaDB, **kwargs) -> Callable[[Optional[int]], Iterator[bytes]]:
+    def _func(self: NucliaDB, **kwargs) -> Callable[[int | None], Iterator[bytes]]:
         path = prepare_request_base(
             path_template=path_template,
             path_params=path_params,
@@ -764,8 +752,8 @@ def _request_iterator_sync_builder(
 
 def _request_async_builder(
     name: str,
-    request_type: Type[INPUT_TYPE],
-    response_type: Type[OUTPUT_TYPE],
+    request_type: type[INPUT_TYPE],
+    response_type: type[OUTPUT_TYPE],
 ):
     """
     ASYNC standard Pydantic response builder
@@ -778,8 +766,8 @@ def _request_async_builder(
 
     async def _func(
         self: NucliaDBAsync,
-        content: Optional[INPUT_TYPE] = None,
-        headers: Optional[Dict[str, str]] = None,
+        content: INPUT_TYPE | None = None,
+        headers: dict[str, str] | None = None,
         **kwargs,
     ) -> OUTPUT_TYPE:
         path, data, query_params = prepare_request(
@@ -815,8 +803,8 @@ def _request_json_async_builder(
     path_params = sdk_def.path_params
 
     async def _func(
-        self: NucliaDBAsync, content: Optional[Dict[str, Any]] = None, **kwargs
-    ) -> Optional[Dict[str, Any]]:
+        self: NucliaDBAsync, content: dict[str, Any] | None = None, **kwargs
+    ) -> dict[str, Any] | None:
         path = prepare_request_base(
             path_template=path_template,
             path_params=path_params,
@@ -846,7 +834,7 @@ def _request_iterator_async_builder(
     path_template = sdk_def.path_template
     path_params = sdk_def.path_params
 
-    def _func(self: NucliaDBAsync, **kwargs) -> Callable[[Optional[int]], AsyncGenerator[bytes, None]]:
+    def _func(self: NucliaDBAsync, **kwargs) -> Callable[[int | None], AsyncGenerator[bytes]]:
         path = prepare_request_base(
             path_template=path_template,
             path_params=path_params,
@@ -864,11 +852,11 @@ class _NucliaDBBase:
     def __init__(
         self,
         *,
-        region: Union[str, Region] = "europe-1",
-        api_key: Optional[str] = None,
-        url: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
-        timeout: Optional[float] = None,
+        region: str | Region = "europe-1",
+        api_key: str | None = None,
+        url: str | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = None,
     ):
         if isinstance(region, Region):
             warnings.warn(f"Passing Region enum is deprecated. Use the string instead: {region.value}")
@@ -898,9 +886,9 @@ class _NucliaDBBase:
         self,
         path,
         method: str,
-        query_params: Optional[Dict[str, str]] = None,
-        content: Optional[RawRequestContent] = None,
-        extra_headers: Optional[Dict[str, str]] = None,
+        query_params: dict[str, str] | None = None,
+        content: RawRequestContent | None = None,
+        extra_headers: dict[str, str] | None = None,
     ):
         raise NotImplementedError
 
@@ -908,8 +896,8 @@ class _NucliaDBBase:
         self,
         path,
         method: str,
-        data: Optional[Union[str, bytes]] = None,
-        query_params: Optional[Dict[str, str]] = None,
+        data: str | bytes | None = None,
+        query_params: dict[str, str] | None = None,
     ):
         raise NotImplementedError
 
@@ -923,7 +911,7 @@ class _NucliaDBBase:
                 f"Account limits exceeded error {response.status_code}: {response.text}"
             )
         elif response.status_code == 429:
-            try_after: Optional[float] = None
+            try_after: float | None = None
             try:
                 body = response.json()
                 try_after = body.get("detail", {}).get("try_after")
@@ -955,12 +943,12 @@ class NucliaDB(_NucliaDBBase):
     def __init__(
         self,
         *,
-        region: Union[str, Region] = "europe-1",
-        api_key: Optional[str] = None,
-        url: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
-        timeout: Optional[float] = 60.0 * 5,
-        _httpx_transport: Optional[BaseTransport] = None,
+        region: str | Region = "europe-1",
+        api_key: str | None = None,
+        url: str | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = 60.0 * 5,
+        _httpx_transport: BaseTransport | None = None,
     ):
         """
         Create a new instance of the NucliaDB client
@@ -1000,12 +988,12 @@ class NucliaDB(_NucliaDBBase):
         self,
         path,
         method: str,
-        query_params: Optional[Dict[str, str]] = None,
-        content: Optional[RawRequestContent] = None,
-        extra_headers: Optional[Dict[str, str]] = None,
+        query_params: dict[str, str] | None = None,
+        content: RawRequestContent | None = None,
+        extra_headers: dict[str, str] | None = None,
     ):
         url = f"{self.base_url}{path}"
-        opts: Dict[str, Any] = {}
+        opts: dict[str, Any] = {}
         if content is not None:
             if isinstance(content, dict):
                 content = orjson.dumps(content)
@@ -1021,11 +1009,11 @@ class NucliaDB(_NucliaDBBase):
         self,
         path,
         method: str,
-        data: Optional[Union[str, bytes]] = None,
-        query_params: Optional[Dict[str, str]] = None,
-    ) -> Callable[[Optional[int]], Iterator[bytes]]:
+        data: str | bytes | None = None,
+        query_params: dict[str, str] | None = None,
+    ) -> Callable[[int | None], Iterator[bytes]]:
         url = f"{self.base_url}{path}"
-        opts: Dict[str, Any] = {}
+        opts: dict[str, Any] = {}
         if data is not None:
             opts["data"] = data
         if query_params is not None:
@@ -1034,8 +1022,7 @@ class NucliaDB(_NucliaDBBase):
         def iter_bytes(chunk_size=None) -> Iterator[bytes]:
             with self.session.stream(method.lower(), url=url, **opts, timeout=30.0) as response:
                 self._check_response(response)
-                for chunk in response.iter_raw(chunk_size=chunk_size):
-                    yield chunk
+                yield from response.iter_raw(chunk_size=chunk_size)
 
         return iter_bytes
 
@@ -1072,10 +1059,10 @@ class NucliaDB(_NucliaDBBase):
     delete_field_by_id = _request_sync_builder("delete_field_by_id", type(None), type(None))
     # Conversation endpoints
     add_conversation_message = _request_sync_builder(
-        "add_conversation_message", List[InputMessage], ResourceFieldAdded
+        "add_conversation_message", list[InputMessage], ResourceFieldAdded
     )
     add_conversation_message_by_slug = _request_sync_builder(
-        "add_conversation_message_by_slug", List[InputMessage], ResourceFieldAdded
+        "add_conversation_message_by_slug", list[InputMessage], ResourceFieldAdded
     )
     get_resource_field = _request_sync_builder("get_resource_field", type(None), ResourceField)
     get_resource_field_by_slug = _request_sync_builder(
@@ -1162,12 +1149,12 @@ class NucliaDBAsync(_NucliaDBBase):
     def __init__(
         self,
         *,
-        region: Union[str, Region] = "europe-1",
-        api_key: Optional[str] = None,
-        url: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
-        timeout: Optional[float] = 60.0,
-        _httpx_transport: Optional[AsyncBaseTransport] = None,
+        region: str | Region = "europe-1",
+        api_key: str | None = None,
+        url: str | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = 60.0,
+        _httpx_transport: AsyncBaseTransport | None = None,
     ):
         """
         Create a new instance of the NucliaDB client
@@ -1205,12 +1192,12 @@ class NucliaDBAsync(_NucliaDBBase):
         self,
         path,
         method: str,
-        query_params: Optional[Dict[str, str]] = None,
-        content: Optional[RawRequestContent] = None,
-        extra_headers: Optional[Dict[str, str]] = None,
+        query_params: dict[str, str] | None = None,
+        content: RawRequestContent | None = None,
+        extra_headers: dict[str, str] | None = None,
     ):
         url = f"{self.base_url}{path}"
-        opts: Dict[str, Any] = {}
+        opts: dict[str, Any] = {}
         if content is not None:
             if isinstance(content, dict):
                 content = orjson.dumps(content)
@@ -1226,17 +1213,17 @@ class NucliaDBAsync(_NucliaDBBase):
         self,
         path,
         method: str,
-        data: Optional[Union[str, bytes]] = None,
-        query_params: Optional[Dict[str, str]] = None,
-    ) -> Callable[[Optional[int]], AsyncGenerator[bytes, None]]:
+        data: str | bytes | None = None,
+        query_params: dict[str, str] | None = None,
+    ) -> Callable[[int | None], AsyncGenerator[bytes]]:
         url = f"{self.base_url}{path}"
-        opts: Dict[str, Any] = {}
+        opts: dict[str, Any] = {}
         if data is not None:
             opts["data"] = data
         if query_params is not None:
             opts["params"] = query_params
 
-        async def iter_bytes(chunk_size=None) -> AsyncGenerator[bytes, None]:
+        async def iter_bytes(chunk_size=None) -> AsyncGenerator[bytes]:
             async with self.session.stream(method.lower(), url=url, **opts) as response:
                 self._check_response(response)
                 async for chunk in response.aiter_raw(chunk_size=chunk_size):
@@ -1279,10 +1266,10 @@ class NucliaDBAsync(_NucliaDBBase):
     delete_field_by_id = _request_async_builder("delete_field_by_id", type(None), type(None))
     # Conversation endpoints
     add_conversation_message = _request_async_builder(
-        "add_conversation_message", List[InputMessage], ResourceFieldAdded
+        "add_conversation_message", list[InputMessage], ResourceFieldAdded
     )
     add_conversation_message_by_slug = _request_async_builder(
-        "add_conversation_message_by_slug", List[InputMessage], ResourceFieldAdded
+        "add_conversation_message_by_slug", list[InputMessage], ResourceFieldAdded
     )
     get_resource_field = _request_async_builder("get_resource_field", type(None), ResourceField)
     get_resource_field_by_slug = _request_async_builder(

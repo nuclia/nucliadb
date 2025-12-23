@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional, Union, cast
+from typing import cast
 
 from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
@@ -96,8 +96,8 @@ async def head_resource_by_slug(
 async def head_resource(
     *,
     kbid: str,
-    rslug: Optional[str] = None,
-    rid: Optional[str] = None,
+    rslug: str | None = None,
+    rid: str | None = None,
 ) -> None:
     if all([rslug, rid]) or not any([rslug, rid]):
         raise ValueError("Either rid or rslug must be provided, but not both")
@@ -263,8 +263,8 @@ async def get_resource_by_slug(
 
 async def _get_resource(
     *,
-    rslug: Optional[str] = None,
-    rid: Optional[str] = None,
+    rslug: str | None = None,
+    rid: str | None = None,
     kbid: str,
     show: list[ResourceProperties],
     field_type_filter: list[FieldTypeName],
@@ -321,7 +321,7 @@ async def get_resource_field_rslug_prefix(
     ),
     # not working with latest pydantic/fastapi
     # page: Union[Literal["last", "first"], int] = Query("last"),
-    page: Union[str, int] = Query("last"),
+    page: str | int = Query("last"),
 ) -> Response:
     return await _get_resource_field(
         kbid,
@@ -361,7 +361,7 @@ async def get_resource_field_rid_prefix(
     ),
     # not working with latest pydantic/fastapi
     # page: Union[Literal["last", "first"], int] = Query("last"),
-    page: Union[str, int] = Query("last"),
+    page: str | int = Query("last"),
 ) -> Response:
     return await _get_resource_field(
         kbid,
@@ -380,9 +380,9 @@ async def _get_resource_field(
     field_id: str,
     show: list[ResourceFieldProperties],
     extracted: list[ExtractedDataTypeName],
-    page: Union[str, int],
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
+    page: str | int,
+    rid: str | None = None,
+    rslug: str | None = None,
 ) -> Response:
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()

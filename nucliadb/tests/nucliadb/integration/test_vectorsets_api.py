@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 from unittest.mock import patch
 
 import pytest
@@ -500,7 +499,7 @@ async def _check_search(
     kbid: str,
     query: str,
     vector: list[float],
-    vectorset: Optional[str] = None,
+    vectorset: str | None = None,
 ):
     # check semantic search
     payload = {

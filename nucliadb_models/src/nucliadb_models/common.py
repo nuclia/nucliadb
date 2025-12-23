@@ -16,7 +16,7 @@ import base64
 import hashlib
 import re
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import (
     BaseModel,
@@ -50,9 +50,9 @@ class ParamDefault(BaseModel):
     default: Any = None
     title: str
     description: str
-    le: Optional[float] = None
-    gt: Optional[float] = None
-    max_items: Optional[int] = None
+    le: float | None = None
+    gt: float | None = None
+    max_items: int | None = None
     deprecated: bool = False
 
     def to_pydantic_field(self, default=_NOT_SET, **kw) -> Field:  # type: ignore
@@ -86,13 +86,13 @@ class FieldID(BaseModel):
 
 
 class File(BaseModel):
-    filename: Optional[str] = None
+    filename: str | None = None
     content_type: str = "application/octet-stream"
-    payload: Optional[str] = Field(default=None, description="Base64 encoded file content")
-    md5: Optional[str] = None
+    payload: str | None = Field(default=None, description="Base64 encoded file content")
+    md5: str | None = None
     # These are to be used for external files
-    uri: Optional[str] = None
-    extra_headers: Dict[str, str] = {}
+    uri: str | None = None
+    extra_headers: dict[str, str] = {}
 
     @model_validator(mode="after")
     def _check_internal_file_fields(self) -> Self:
@@ -134,10 +134,10 @@ class FileB64(BaseModel):
 
 
 class CloudFile(BaseModel):
-    uri: Optional[str] = None
-    size: Optional[int] = None
-    content_type: Optional[str] = None
-    bucket_name: Optional[str] = None
+    uri: str | None = None
+    size: int | None = None
+    content_type: str | None = None
+    bucket_name: str | None = None
 
     class Source(Enum):
         FLAPS = "FLAPS"
@@ -146,23 +146,23 @@ class CloudFile(BaseModel):
         LOCAL = "LOCAL"
         EXTERNAL = "EXTERNAL"
 
-    source: Optional[Source]
-    filename: Optional[str]
-    resumable_uri: Optional[str]
-    offset: Optional[int]
-    upload_uri: Optional[str]
-    parts: Optional[List[str]]
-    old_uri: Optional[str]
-    old_bucket: Optional[str]
-    md5: Optional[str]
+    source: Source | None
+    filename: str | None
+    resumable_uri: str | None
+    offset: int | None
+    upload_uri: str | None
+    parts: list[str] | None
+    old_uri: str | None
+    old_bucket: str | None
+    md5: str | None
 
 
 class CloudLink(BaseModel):
-    uri: Optional[str] = None
-    size: Optional[int] = None
-    content_type: Optional[str] = None
-    filename: Optional[str] = None
-    md5: Optional[str] = None
+    uri: str | None = None
+    size: int | None = None
+    content_type: str | None = None
+    filename: str | None = None
+    md5: str | None = None
 
     @staticmethod
     def format_reader_download_uri(uri: str) -> str:
@@ -216,7 +216,7 @@ class FieldTypeName(str, Enum):
 class FieldRef(BaseModel):
     field_type: FieldTypeName
     field_id: str
-    split: Optional[str] = None
+    split: str | None = None
 
 
 class Classification(BaseModel):
@@ -229,19 +229,19 @@ class UserClassification(Classification):
 
 
 class Sentence(BaseModel):
-    start: Optional[int] = None
-    end: Optional[int] = None
-    key: Optional[str] = None
+    start: int | None = None
+    end: int | None = None
+    key: str | None = None
 
 
 class PageInformation(BaseModel):
-    page: Optional[int] = Field(default=None, title="Page Information Page")
-    page_with_visual: Optional[bool] = None
+    page: int | None = Field(default=None, title="Page Information Page")
+    page_with_visual: bool | None = None
 
 
 class Representation(BaseModel):
-    is_a_table: Optional[bool] = None
-    reference_file: Optional[str] = None
+    is_a_table: bool | None = None
+    reference_file: str | None = None
 
 
 class ParagraphRelations(BaseModel):
@@ -251,10 +251,10 @@ class ParagraphRelations(BaseModel):
 
 
 class Paragraph(BaseModel):
-    start: Optional[int] = None
-    end: Optional[int] = None
-    start_seconds: Optional[List[int]] = None
-    end_seconds: Optional[List[int]] = None
+    start: int | None = None
+    end: int | None = None
+    start_seconds: list[int] | None = None
+    end_seconds: list[int] | None = None
 
     class TypeParagraph(str, Enum):
         TEXT = "TEXT"
@@ -265,35 +265,35 @@ class Paragraph(BaseModel):
         TITLE = "TITLE"
         TABLE = "TABLE"
 
-    kind: Optional[TypeParagraph] = None
-    classifications: Optional[List[Classification]] = None
-    sentences: Optional[List[Sentence]] = None
-    key: Optional[str] = None
-    page: Optional[PageInformation] = None
-    representation: Optional[Representation] = None
-    relations: Optional[ParagraphRelations] = None
+    kind: TypeParagraph | None = None
+    classifications: list[Classification] | None = None
+    sentences: list[Sentence] | None = None
+    key: str | None = None
+    page: PageInformation | None = None
+    representation: Representation | None = None
+    relations: ParagraphRelations | None = None
 
 
 class Shards(BaseModel):
-    shards: Optional[List[str]] = None
+    shards: list[str] | None = None
 
 
 class Question(BaseModel):
     text: str
-    language: Optional[str] = None
-    ids_paragraphs: List[str]
+    language: str | None = None
+    ids_paragraphs: list[str]
 
 
 class Answer(BaseModel):
     text: str
-    language: Optional[str] = None
-    ids_paragraphs: List[str]
+    language: str | None = None
+    ids_paragraphs: list[str]
 
 
 class QuestionAnswer(BaseModel):
     question: Question
-    answers: List[Answer]
+    answers: list[Answer]
 
 
 class QuestionAnswers(BaseModel):
-    question_answer: List[QuestionAnswer]
+    question_answer: list[QuestionAnswer]

@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -26,16 +25,16 @@ from nucliadb_models.common import CloudLink, File
 
 
 class FieldFile(BaseModel):
-    added: Optional[datetime] = None
-    file: Optional[CloudLink] = None
-    language: Optional[str] = None
-    password: Optional[str] = None
+    added: datetime | None = None
+    file: CloudLink | None = None
+    language: str | None = None
+    password: str | None = None
     external: bool = False
-    extract_strategy: Optional[str] = Field(
+    extract_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia extract strategy used at processing time. If not set, the default strategy was used. Extract strategies are defined at the learning configuration api.",
     )
-    split_strategy: Optional[str] = Field(
+    split_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia split strategy used at processing time. If not set, the default strategy was used. Split strategies are defined at the learning configuration api.",
     )
@@ -45,14 +44,14 @@ class FieldFile(BaseModel):
 
 
 class FileField(BaseModel):
-    language: Optional[str] = None
-    password: Optional[str] = None
+    language: str | None = None
+    password: str | None = None
     file: File
-    extract_strategy: Optional[str] = Field(
+    extract_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia extract strategy to use at processing time. If not set, the default strategy will be used. Extract strategies are defined at the learning configuration api.",
     )
-    split_strategy: Optional[str] = Field(
+    split_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia split strategy used at processing time. If not set, the default strategy was used. Split strategies are defined at the learning configuration api.",
     )

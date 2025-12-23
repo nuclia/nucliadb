@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from nidx_protos.nodereader_pb2 import GraphSearchResponse, SearchResponse
 
@@ -63,7 +63,7 @@ async def build_find_response(
     retrieval: UnitRetrieval,
     kbid: str,
     query: str,
-    rephrased_query: Optional[str],
+    rephrased_query: str | None,
     reranker: Reranker,
     resource_hydration_options: ResourceHydrationOptions,
     text_block_hydration_options: TextBlockHydrationOptions,
