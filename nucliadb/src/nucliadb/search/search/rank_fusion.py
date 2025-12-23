@@ -24,8 +24,8 @@ from typing import Optional, TypeVar
 
 from nucliadb.common.external_index_providers.base import ScoredTextBlock
 from nucliadb.common.ids import ParagraphId
-from nucliadb.models.internal.retrieval import RrfScore, Score, WeightedCombSumScore
 from nucliadb.search.search.query_parser import models as parser_models
+from nucliadb_models.retrieval import RrfScore, Score, WeightedCombSumScore
 from nucliadb_models.search import SCORE_TYPE
 from nucliadb_telemetry.metrics import Observer
 

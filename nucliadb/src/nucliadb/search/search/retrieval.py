@@ -31,13 +31,13 @@ from nidx_protos.nodereader_pb2 import (
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
-from nucliadb.models.internal.retrieval import GraphScore, KeywordScore, SemanticScore
 from nucliadb.search import logger
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.metrics import merge_observer, search_observer
 from nucliadb.search.search.query_parser.models import UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.search.rank_fusion import IndexSource, get_rank_fusion
+from nucliadb_models.retrieval import GraphScore, KeywordScore, SemanticScore
 from nucliadb_models.search import SCORE_TYPE, TextPosition
 
 # Constant score given to all graph results until we implement graph scoring

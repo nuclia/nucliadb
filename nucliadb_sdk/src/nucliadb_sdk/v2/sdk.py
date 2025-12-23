@@ -42,7 +42,6 @@ from httpx._transports.base import AsyncBaseTransport, BaseTransport
 from nuclia_models.predict.run_agents import RunTextAgentsRequest, RunTextAgentsResponse
 from pydantic import BaseModel, ValidationError
 
-from nucliadb.models.internal.retrieval import RetrievalRequest, RetrievalResponse
 from nucliadb_models.augment import AugmentRequest, AugmentResponse
 from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
@@ -74,6 +73,7 @@ from nucliadb_models.resource import (
     ResourceField,
     ResourceList,
 )
+from nucliadb_models.retrieval import RetrievalRequest, RetrievalResponse
 from nucliadb_models.search import (
     AnswerAskResponseItem,
     AskRequest,

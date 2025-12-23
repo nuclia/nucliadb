@@ -36,16 +36,16 @@ from pytest_mock import MockerFixture
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
-from nucliadb.models.internal.retrieval import (
-    KeywordScore,
-    ScoreSource,
-    ScoreType,
-)
 from nucliadb.search.predict import AnswerStatusCode, DummyPredictEngine
 from nucliadb.search.search.chat import ask
 from nucliadb.search.search.query_parser.models import UnitRetrieval
 from nucliadb.search.search.retrieval import text_block_search
 from nucliadb.search.utilities import get_predict
+from nucliadb_models.retrieval import (
+    KeywordScore,
+    ScoreSource,
+    ScoreType,
+)
 from nucliadb_models.search import (
     SCORE_TYPE,
     AskRequest,

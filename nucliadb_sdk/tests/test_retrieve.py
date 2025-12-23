@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import nucliadb_sdk
-from nucliadb.models.internal.retrieval import KeywordQuery, Query, RetrievalRequest, RetrievalResponse
+from nucliadb_models.retrieval import KeywordQuery, Query, RetrievalRequest, RetrievalResponse
 
 
 def test_retrieve(docs_dataset: str, sdk: nucliadb_sdk.NucliaDB):
