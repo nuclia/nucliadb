@@ -15,7 +15,6 @@
 import json
 from enum import Enum
 from typing import Any, Literal, Optional, Union
-from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.aliases import AliasChoices
@@ -930,13 +929,6 @@ Please return ONLY the question without any explanation. Just the rephrased ques
         if isinstance(values, dict):
             if "top_k" in values and values["top_k"] is None:
                 values["top_k"] = SearchParamDefaults.top_k.default
-        return values
-
-    @field_validator("resource_filters", mode="after")
-    def validate_resource_filters(cls, values: list[str]) -> list[str]:
-        if values is not None:
-            for v in values:
-                _validate_resource_filter(v)
         return values
 
 
@@ -1870,13 +1862,6 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
             self.context = None
         return self
 
-    @field_validator("resource_filters", mode="after")
-    def validate_resource_filters(cls, values: list[str]) -> list[str]:
-        if values is not None:
-            for v in values:
-                _validate_resource_filter(v)
-        return values
-
 
 # Alias (for backwards compatiblity with testbed)
 class ChatRequest(AskRequest):
@@ -2543,22 +2528,3 @@ class CatalogFacetsRequest(BaseModel):
 
 class CatalogFacetsResponse(BaseModel):
     facets: dict[str, int]
-
-
-def _validate_resource_filter(v: str):
-    parts = v.split("/")
-
-    rid = parts[0]
-    try:
-        UUID(rid)
-    except ValueError:
-        raise ValueError(f"resource id filter '{rid}' should be a valid UUID")
-
-    if len(parts) > 1:
-        field_type = parts[1]
-        try:
-            FieldTypeName.from_abbreviation(field_type)
-        except KeyError:  # pragma: no cover
-            raise ValueError(
-                f"resource filter {v} has an invalid field type: {field_type}",
-            )

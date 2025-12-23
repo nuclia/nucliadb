@@ -453,7 +453,7 @@ async def test_catalog_filter_expression(
         },
     )
     assert resp.status_code == 422
-    assert "resource id filter 'not-a-uuid' should be a valid UUID" in resp.json()["detail"][0]["msg"]
+    assert "Invalid UUID" in resp.json()["detail"][0]["msg"]
 
     # Invalid resource slug
     resp = await nucliadb_reader.post(
