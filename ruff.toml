@@ -13,16 +13,18 @@ select = [
     "W",   # pycodestyle warnings
     "F",   # pyflakes
     "I",   # isort
-    "UP007",
+    "UP007",  # pyupgrade: Union[A, B] -> A | B and Optional[A] -> A | None
+    "RUF",  # ruff
 ]
 
 ignore = [
-"E501",
+  "E501",
   "E203",
   "E252",
   "E701",
   "F541",
   "F901",
+  "RUF006", # dangling asyncio tasks, we sometimes create a task and exit the endpoint
 ]
 
 [lint.isort]
