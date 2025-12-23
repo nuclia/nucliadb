@@ -236,7 +236,7 @@ class IngestConsumer:
                 logger.info(
                     f"An error happend while processing a message from {message_source}. "
                     f"A copy of the message has been stored on {self.processor.storage.deadletter_bucket}. "
-                    f"Check sentry for more details: {str(e)}"
+                    f"Check sentry for more details: {e!s}"
                 )
                 await self.ack_message(msg, kbid)
                 logger.info("Message acked because of deadletter", extra={"seqid": seqid})
@@ -248,7 +248,7 @@ class IngestConsumer:
                 logger.info(
                     f"An error happend while processing a message from {message_source}. "
                     f"This message has been dropped and won't be retried again"
-                    f"Check sentry for more details: {str(e)}"
+                    f"Check sentry for more details: {e!s}"
                 )
                 await self.ack_message(msg, kbid)
                 logger.info("Message acked because of drop", extra={"seqid": seqid})
@@ -258,7 +258,7 @@ class IngestConsumer:
                 logger.exception(
                     f"An error happend while processing a message from {message_source}. "
                     "Message has not been ACKd and will be retried. "
-                    f"Check sentry for more details: {str(e)}"
+                    f"Check sentry for more details: {e!s}"
                 )
                 await msg.nak()
                 logger.info("Message nacked because of unhandled error", extra={"seqid": seqid})

@@ -186,23 +186,23 @@ class TestHistogram:
         histo = metrics.Histogram("my_histo")
         histo.observe(5)
 
-        assert [s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "5.0"][
-            0
-        ].value == 1.0
+        assert (
+            next(s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "5.0").value == 1.0
+        )
 
     def test_histo_with_labels(self):
         histo = metrics.Histogram("my_histo2", labels={"foo": "", "bar": ""}, buckets=[1, 2, 3])
         histo.observe(1, labels={"foo": "baz", "bar": "qux"})
 
-        assert [s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "1.0"][
-            0
-        ].value == 1.0
+        assert (
+            next(s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "1.0").value == 1.0
+        )
 
     def test_histo_with_env_label(self, monkeypatch):
         monkeypatch.setenv("VERSION", "1.0.0")
         histo = metrics.Histogram("my_histo3", buckets=[1, 2, 3])
         histo.observe(1)
 
-        assert [s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "1.0"][
-            0
-        ].value == 1.0
+        assert (
+            next(s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "1.0").value == 1.0
+        )

@@ -40,7 +40,7 @@ from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field:path}}",  # noqa
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field:path}}",
     tags=["Resource fields"],
     status_code=200,
     summary="Download extracted binary file (by slug)",
@@ -67,7 +67,7 @@ async def download_extract_file_rslug_prefix(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field:path}}",  # noqa
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field:path}}",
     tags=["Resource fields"],
     status_code=200,
     summary="Download extracted binary file (by id)",
@@ -165,7 +165,7 @@ async def _download_field_file(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}/download/field/{{message_id}}/{{file_num}}",  # noqa
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}/download/field/{{message_id}}/{{file_num}}",
     tags=["Resource fields"],
     status_code=200,
     summary="Download conversation binary field (by slug)",
@@ -192,7 +192,7 @@ async def download_field_conversation_rslug_prefix(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}/download/field/{{message_id}}/{{file_num}}",  # noqa
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}/download/field/{{message_id}}/{{file_num}}",
     tags=["Resource fields"],
     status_code=200,
     summary="Download conversation binary field (by id)",

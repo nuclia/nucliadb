@@ -290,7 +290,7 @@ async def full_resource_prompt_context(
         ordered_paragraphs: The results of the retrieval (find) operation.
         resource: The resource to be included in the context. This is used only when chatting with a specific resource with no retrieval.
         strategy: strategy instance containing, for example, the number of full resources to include in the context.
-    """  # noqa: E501
+    """
     if resource is not None:
         # The user has specified a resource to be included in the context.
         ordered_resources = [resource]

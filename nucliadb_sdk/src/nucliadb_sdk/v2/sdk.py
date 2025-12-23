@@ -978,7 +978,7 @@ class NucliaDB(_NucliaDBBase):
 
         >>> from nucliadb_sdk import NucliaDB, Region
         >>> sdk = NucliaDB(api_key="api-key", url=\"http://localhost:8080\")
-        """  # noqa
+        """
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
         self.session = httpx.Client(
             headers=self.headers, base_url=self.base_url, timeout=timeout, transport=_httpx_transport
@@ -1182,7 +1182,7 @@ class NucliaDBAsync(_NucliaDBBase):
         If you are connecting to a NucliaDB on-prem instance, you will need to specify the URL
 
         >>> sdk = NucliaDBAsync(api_key="api-key", url="https://mycompany.api.com/api/nucliadb")
-        """  # noqa
+        """
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
         self.session = httpx.AsyncClient(
             headers=self.headers, base_url=self.base_url, timeout=timeout, transport=_httpx_transport

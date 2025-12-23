@@ -221,9 +221,9 @@ async def get_custom_synonyms(request: Request, kbid: str):
     f"/{KB_PREFIX}/{{kbid}}/notifications",
     status_code=200,
     summary="Knowledge Box Notifications Stream",
-    description="Provides a stream of activity notifications for the given Knowledge Box. The stream will be automatically closed after 2 minutes.",  # noqa: E501
+    description="Provides a stream of activity notifications for the given Knowledge Box. The stream will be automatically closed after 2 minutes.",
     tags=["Knowledge Box Services"],
-    response_description="Each line of the response is a Base64-encoded JSON object representing a notification. Refer to [the internal documentation](https://github.com/nuclia/nucliadb/blob/main/docs/tutorials/KB_NOTIFICATIONS.md) for a more detailed explanation of each notification type.",  # noqa: E501
+    response_description="Each line of the response is a Base64-encoded JSON object representing a notification. Refer to [the internal documentation](https://github.com/nuclia/nucliadb/blob/main/docs/tutorials/KB_NOTIFICATIONS.md) for a more detailed explanation of each notification type.",
     response_model=None,
     responses={"404": {"description": "Knowledge Box not found"}},
 )

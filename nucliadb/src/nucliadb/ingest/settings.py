@@ -46,7 +46,7 @@ class DriverSettings(BaseSettings):
     )
     driver_pg_url: str | None = Field(
         default=None,
-        description="PostgreSQL DSN. The connection string to the PG server. Example: postgres://username:password@postgres:5432/nucliadb.",  # noqa
+        description="PostgreSQL DSN. The connection string to the PG server. Example: postgres://username:password@postgres:5432/nucliadb.",
     )
     driver_pg_connection_pool_min_size: int = Field(
         default=10,

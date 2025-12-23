@@ -28,7 +28,7 @@ from nucliadb_telemetry.tracerprovider import (
     AsyncTracerProvider,
 )
 
-from .context import set_info_on_span  # noqa: F401
+from .context import set_info_on_span
 
 set_info_on_span  # b/w compatible import
 

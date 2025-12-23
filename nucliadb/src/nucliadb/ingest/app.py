@@ -96,7 +96,7 @@ async def initialize_grpc():  # pragma: no cover
     finalizers = await initialize()
     grpc_finalizer = await start_grpc(SERVICE_NAME)
 
-    return [grpc_finalizer] + finalizers
+    return [grpc_finalizer, *finalizers]
 
 
 async def initialize_pull_workers() -> list[Callable[[], Awaitable[None]]]:
@@ -114,14 +114,14 @@ async def main_consumer():  # pragma: no cover
 
     ingest_consumers = await consumer_service.start_ingest_consumers(SERVICE_NAME)
 
-    await run_until_exit([grpc_health_finalizer, ingest_consumers, metrics_server.shutdown] + finalizers)
+    await run_until_exit([grpc_health_finalizer, ingest_consumers, metrics_server.shutdown, *finalizers])
 
 
 async def main_orm_grpc():  # pragma: no cover
     finalizers = await initialize()
     grpc_finalizer = await start_grpc(SERVICE_NAME)
     metrics_server = await serve_metrics()
-    await run_until_exit([grpc_finalizer, metrics_server.shutdown] + finalizers)
+    await run_until_exit([grpc_finalizer, metrics_server.shutdown, *finalizers])
 
 
 async def main_ingest_processed_consumer():  # pragma: no cover
@@ -134,7 +134,7 @@ async def main_ingest_processed_consumer():  # pragma: no cover
     consumer = await consumer_service.start_ingest_processed_consumer_v2(SERVICE_NAME)
 
     await run_until_exit(
-        [grpc_health_finalizer, consumer, metrics_server.shutdown, stop_processing_engine] + finalizers
+        [grpc_health_finalizer, consumer, metrics_server.shutdown, stop_processing_engine, *finalizers]
     )
 
 
@@ -158,19 +158,17 @@ async def main_subscriber_workers():  # pragma: no cover
     backup_consumers_finalizers = await initialize_backup_consumers(context)
 
     await run_until_exit(
-        backup_consumers_finalizers
-        + [
-            imports_consumer.finalize,
-            exports_consumer.finalize,
-            stop_ingest_utility,
-            materializer_closer,
-            shard_creator_closer,
-            auditor_closer,
-            grpc_health_finalizer,
-            metrics_server.shutdown,
-            context.finalize,
-        ]
-        + finalizers
+        *backup_consumers_finalizers,
+        imports_consumer.finalize,
+        exports_consumer.finalize,
+        stop_ingest_utility,
+        materializer_closer,
+        shard_creator_closer,
+        auditor_closer,
+        grpc_health_finalizer,
+        metrics_server.shutdown,
+        context.finalize,
+        *finalizers,
     )
 
 

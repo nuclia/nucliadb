@@ -275,7 +275,7 @@ class Extra(BaseModel):
     metadata: dict[Any, Any] = Field(
         ...,
         title="Metadata",
-        description="Arbitrary JSON metadata provided by the user that is not meant to be searchable, but can be serialized on results.",  # noqa
+        description="Arbitrary JSON metadata provided by the user that is not meant to be searchable, but can be serialized on results.",
     )
 
 

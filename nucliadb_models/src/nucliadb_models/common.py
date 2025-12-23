@@ -38,7 +38,7 @@ FIELD_TYPE_CHAR_MAP = {
 }
 
 STORAGE_FILE_MATCH = re.compile(
-    r"/?kbs/(?P<kbid>[^/]+)/r/(?P<rid>[^/]+)/(?P<download_type>[fe])/(?P<field_type>\w)/(?P<field_id>[^/]+)/?(?P<key>.*)?"  # noqa
+    r"/?kbs/(?P<kbid>[^/]+)/r/(?P<rid>[^/]+)/(?P<download_type>[fe])/(?P<field_type>\w)/(?P<field_id>[^/]+)/?(?P<key>.*)?"
 )
 DOWNLOAD_TYPE_MAP = {"f": "field", "e": "extracted"}
 DOWNLOAD_URI = "/kb/{kbid}/resource/{rid}/{field_type}/{field_id}/download/{download_type}/{key}"

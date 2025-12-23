@@ -79,7 +79,7 @@ class Streamer:
         header = self.resp.raw.read(4, decode_content=True)
         if header == b"":
             return None
-        payload_size = int.from_bytes(header, byteorder="big", signed=False)  # noqa
+        payload_size = int.from_bytes(header, byteorder="big", signed=False)
         data = self.resp.raw.read(payload_size)
         return data
 

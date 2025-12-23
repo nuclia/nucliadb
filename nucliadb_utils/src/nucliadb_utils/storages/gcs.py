@@ -171,7 +171,7 @@ class GCSStorageField(StorageField):
                     raise
                 wait_time = 2 ** (attempt - 1)
                 logger.warning(
-                    f"Error downloading from GCP. Retrying ({attempt} of {MAX_TRIES}) after {wait_time} seconds. Error: {ex}"  # noqa
+                    f"Error downloading from GCP. Retrying ({attempt} of {MAX_TRIES}) after {wait_time} seconds. Error: {ex}"
                 )
                 await asyncio.sleep(wait_time)
                 attempt += 1
@@ -323,7 +323,7 @@ class GCSStorageField(StorageField):
         async with self.storage.session.put(
             self.field.resumable_uri, headers=headers, data=data
         ) as call:
-            text = await call.text()  # noqa
+            text = await call.text()
             if call.status not in [200, 201, 308]:
                 if call.status == 410:
                     raise ResumableUploadGone(text)

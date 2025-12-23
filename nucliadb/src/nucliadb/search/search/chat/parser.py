@@ -121,7 +121,7 @@ class RAOFindParser:
         try:
             reranker = self._parse_reranker()
         except ValidationError as exc:
-            raise InternalParserError(f"Parsing error in reranker: {str(exc)}") from exc
+            raise InternalParserError(f"Parsing error in reranker: {exc!s}") from exc
 
         # As we'll call /retrieve, that has rank fusion integrated, we have to
         # make sure we ask for enough results to rerank.

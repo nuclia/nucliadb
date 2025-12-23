@@ -75,7 +75,7 @@ async def test_ingest_broker_message_with_vectorsets(
 
     def validate_index_message(resource: noderesources_pb2.Resource):
         assert len(resource.paragraphs) == 1
-        field_id = list(resource.paragraphs.keys())[0]
+        field_id = next(iter(resource.paragraphs.keys()))
         field_paragraphs = resource.paragraphs[field_id]
         for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
             assert len(paragraph.vectorsets_sentences) == 2

@@ -130,7 +130,7 @@ class GCloudBlobStore(BlobStore):
         self.project = project
         self.bucket_labels = bucket_labels
         self.object_base_url = object_base_url + "/storage/v1/b"
-        self.upload_url = object_base_url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"  # noqa
+        self.upload_url = object_base_url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"
         self.json_credentials = json_credentials
         self._credentials = None
 
@@ -310,7 +310,7 @@ class GCloudFileStorageManager(FileStorageManager):
             },
             data=data,
         ) as call:
-            text = await call.text()  # noqa
+            text = await call.text()
             if call.status not in [200, 201, 308]:
                 raise GoogleCloudException(f"{call.status}: {text}")
             return call

@@ -814,7 +814,7 @@ class ParagraphPages:
             return self._materialized[paragraph_start_index]
         except IndexError:
             logger.error(
-                f"Could not find a page for the given index: {paragraph_start_index}. Page positions: {self.positions}"  # noqa
+                f"Could not find a page for the given index: {paragraph_start_index}. Page positions: {self.positions}"
             )
             if len(self._materialized) > 0:
                 return self._materialized[-1]

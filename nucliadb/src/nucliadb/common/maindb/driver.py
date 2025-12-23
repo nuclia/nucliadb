@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import ClassVar
 
 DEFAULT_SCAN_LIMIT = -1
 DEFAULT_BATCH_SCAN_LIMIT = 500
@@ -66,7 +67,7 @@ class Transaction:
 
 class Driver:
     initialized = False
-    _abort_tasks: list[asyncio.Task] = []
+    _abort_tasks: ClassVar[list[asyncio.Task]] = []
 
     async def initialize(self):
         raise NotImplementedError()

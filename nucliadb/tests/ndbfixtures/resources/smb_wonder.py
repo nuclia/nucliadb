@@ -84,7 +84,7 @@ async def smb_wonder_resource(
     paragraphs = [
         (
             ParagraphId.from_string(f"{rid}/f/smb-wonder/0-99"),
-            "Super Mario Bros. Wonder (SMB Wonder) is a 2023 platform game developed and published by Nintendo.\n",  # noqa
+            "Super Mario Bros. Wonder (SMB Wonder) is a 2023 platform game developed and published by Nintendo.\n",
         ),
         (
             ParagraphId.from_string(f"{rid}/f/smb-wonder/99-145"),
@@ -92,7 +92,7 @@ async def smb_wonder_resource(
         ),
         (
             ParagraphId.from_string(f"{rid}/f/smb-wonder/145-234"),
-            "As one of eight player characters, the player completes levels across the Flower Kingdom.",  # noqa
+            "As one of eight player characters, the player completes levels across the Flower Kingdom.",
         ),
     ]
     for expected_paragraph_id, paragraph in paragraphs:

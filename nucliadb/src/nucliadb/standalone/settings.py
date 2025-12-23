@@ -45,7 +45,7 @@ class Settings(DriverSettings, StorageSettings, ExtendedStorageSettings):
     # use with standalone app vs cluster app.
     nua_api_key: str | None = pydantic.Field(
         default=None,
-        description="Nuclia Understanding API Key. Read how to generate a NUA Key here: https://docs.nuclia.dev/docs/rag/advanced/understanding/intro#get-a-nua-key",  # noqa
+        description="Nuclia Understanding API Key. Read how to generate a NUA Key here: https://docs.nuclia.dev/docs/rag/advanced/understanding/intro#get-a-nua-key",
     )
     zone: str | None = pydantic.Field(default=None, description="Nuclia Understanding API Zone ID")
     http_host: str = pydantic.Field(default="0.0.0.0", description="HTTP Port")

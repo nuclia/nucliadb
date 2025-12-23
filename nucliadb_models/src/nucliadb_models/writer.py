@@ -45,28 +45,28 @@ class FieldDefaults:
     icon = Field(
         None,
         title="Icon",
-        description="The icon should be a media type string: https://www.iana.org/assignments/media-types/media-types.xhtml",  # noqa
+        description="The icon should be a media type string: https://www.iana.org/assignments/media-types/media-types.xhtml",
     )
 
     files: dict[FieldIdString, FileField] = Field(
         {},
         title="Files",
-        description=f"Dictionary of file fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
+        description=f"Dictionary of file fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",
     )
     links: dict[FieldIdString, LinkField] = Field(
         {},
         title="Links",
-        description=f"Dictionary of link fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
+        description=f"Dictionary of link fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",
     )
     texts: dict[FieldIdString, TextField] = Field(
         {},
         title="Texts",
-        description=f"Dictionary of text fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
+        description=f"Dictionary of text fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",
     )
     conversations: dict[FieldIdString, InputConversationField] = Field(
         {},
         title="Conversations",
-        description=f"Dictionary of conversation fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
+        description=f"Dictionary of conversation fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",
     )
 
 
@@ -86,7 +86,7 @@ class CreateResourcePayload(BaseModel):
     origin: InputOrigin | None = Field(
         default=None,
         title="Origin",
-        description="Origin metadata for the resource. Used to store information about the resource on the origin system. Most of its fields can later be used to filter at search time.",  # noqa
+        description="Origin metadata for the resource. Used to store information about the resource on the origin system. Most of its fields can later be used to filter at search time.",
     )
     extra: Extra | None = Field(
         default=None,
@@ -110,12 +110,12 @@ class CreateResourcePayload(BaseModel):
     security: ResourceSecurity | None = Field(
         default=None,
         title="Security",
-        description="Security metadata for the resource. It can be used to have fine-grained control over who can access the resource.",  # noqa
+        description="Security metadata for the resource. It can be used to have fine-grained control over who can access the resource.",
     )
     wait_for_commit: SkipJsonSchema[bool] = Field(
         default=True,
         title="Wait for commit",
-        description="Wait until the new resource have been properly commited to the database (not processed). Setting this to false allow lower latency but new resources may not be accessible right away",  # noqa: E501
+        description="Wait until the new resource have been properly commited to the database (not processed). Setting this to false allow lower latency but new resources may not be accessible right away",
     )
 
     @field_validator("icon")
@@ -161,12 +161,12 @@ class UpdateResourcePayload(BaseModel):
     security: ResourceSecurity | None = Field(
         default=None,
         title="Security",
-        description="Security metadata for the resource. It can be used to have fine-grained control over who can access the resource.",  # noqa
+        description="Security metadata for the resource. It can be used to have fine-grained control over who can access the resource.",
     )
     hidden: bool | None = Field(
         default=None,
         title="Hidden",
-        description="Modify the hidden status of the resource. If not set, the hidden status will not be modified.",  # noqa
+        description="Modify the hidden status of the resource. If not set, the hidden status will not be modified.",
     )
 
 

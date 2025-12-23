@@ -67,7 +67,7 @@ from nucliadb_utils.utilities import get_audit
 SEARCH_EXAMPLES = {
     "filtering_by_icon": Example(
         summary="Search for pdf documents where the text 'Noam Chomsky' appears",
-        description="For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        description="For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",
         value={
             "query": "Noam Chomsky",
             "filters": ["/icon/application/pdf"],
@@ -76,7 +76,7 @@ SEARCH_EXAMPLES = {
     ),
     "get_language_counts": Example(
         summary="Get the number of documents for each language",
-        description="For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        description="For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",
         value={
             "page_size": 0,
             "faceted": ["/s/p"],
@@ -90,7 +90,7 @@ SEARCH_EXAMPLES = {
     f"/{KB_PREFIX}/{{kbid}}/search",
     status_code=200,
     summary="Search Knowledge Box",
-    description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",  # noqa: E501
+    description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",
     response_model=KnowledgeboxSearchResults,
     response_model_exclude_unset=True,
     tags=["Search"],
@@ -112,12 +112,12 @@ async def search_knowledgebox(
     offset: int = fastapi_query(SearchParamDefaults.offset),
     min_score: float | None = Query(
         default=None,
-        description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
+        description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",
         deprecated=True,
     ),
     min_score_semantic: float | None = Query(
         default=None,
-        description="Minimum semantic similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
+        description="Minimum semantic similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",
     ),
     min_score_bm25: float = Query(
         default=0,
@@ -196,7 +196,7 @@ async def search_knowledgebox(
     f"/{KB_PREFIX}/{{kbid}}/search",
     status_code=200,
     summary="Search Knowledge Box",
-    description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",  # noqa: E501
+    description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",
     response_model=KnowledgeboxSearchResults,
     response_model_exclude_unset=True,
     tags=["Search"],

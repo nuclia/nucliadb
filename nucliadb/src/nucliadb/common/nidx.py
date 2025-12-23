@@ -160,7 +160,7 @@ class NidxNatsIndexer:
     async def index(self, writer: IndexMessage) -> int:
         res = await self.nats_connection_manager.js.publish(self.subject, writer.SerializeToString())
         logger.info(
-            f" = Pushed message to nidx shard: {writer.shard}, txid: {writer.txid}  seqid: {res.seq}"  # noqa
+            f" = Pushed message to nidx shard: {writer.shard}, txid: {writer.txid}  seqid: {res.seq}"
         )
         return res.seq
 

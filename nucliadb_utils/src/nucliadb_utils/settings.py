@@ -71,7 +71,7 @@ class StorageSettings(BaseSettings):
 
     gcs_base64_creds: str | None = Field(
         default=None,
-        description="GCS JSON credentials of a service account encoded in Base64: https://cloud.google.com/iam/docs/service-account-overview",  # noqa
+        description="GCS JSON credentials of a service account encoded in Base64: https://cloud.google.com/iam/docs/service-account-overview",
     )
     gcs_bucket: str | None = Field(
         default=None,
@@ -83,11 +83,11 @@ class StorageSettings(BaseSettings):
     )
     gcs_project: str | None = Field(
         default=None,
-        description="Google Cloud Project ID: https://cloud.google.com/resource-manager/docs/creating-managing-projects",  # noqa
+        description="Google Cloud Project ID: https://cloud.google.com/resource-manager/docs/creating-managing-projects",
     )
     gcs_bucket_labels: dict[str, str] = Field(
         default={},
-        description="Map of labels with which GCS buckets will be labeled with: https://cloud.google.com/storage/docs/tags-and-labels",  # noqa
+        description="Map of labels with which GCS buckets will be labeled with: https://cloud.google.com/storage/docs/tags-and-labels",
     )
     gcs_endpoint_url: str = "https://www.googleapis.com"
 
@@ -102,7 +102,7 @@ class StorageSettings(BaseSettings):
     s3_bucket: str | None = Field(default=None, description="KnowledgeBox S3 bucket name template")
     s3_bucket_tags: dict[str, str] = Field(
         default={},
-        description="Map of tags with which S3 buckets will be tagged with: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketTagging.html",  # noqa
+        description="Map of tags with which S3 buckets will be tagged with: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketTagging.html",
     )
 
     local_files: str | None = Field(
@@ -120,13 +120,13 @@ class StorageSettings(BaseSettings):
 
     azure_account_url: str | None = Field(
         default=None,
-        description="Azure Account URL. The driver implementation uses Azure's default credential authentication method: https://learn.microsoft.com/en-us/python/api/azure-identity/azure.identity.defaultazurecredential?view=azure-python",  # noqa
+        description="Azure Account URL. The driver implementation uses Azure's default credential authentication method: https://learn.microsoft.com/en-us/python/api/azure-identity/azure.identity.defaultazurecredential?view=azure-python",
         examples=["https://<storageaccountname>.blob.core.windows.net"],
     )
 
     azure_kb_account_url: str | None = Field(
         default=None,
-        description="Azure Account URL for KB containers. If unspecified, uses `azure_account_url`",  # noqa
+        description="Azure Account URL for KB containers. If unspecified, uses `azure_account_url`",
         examples=["https://<storageaccountname>.blob.core.windows.net"],
     )
 

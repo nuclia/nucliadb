@@ -132,7 +132,7 @@ def tus_options(
 
 def _tus_options() -> Response:
     """
-    Gather information about the Server’s current configuration such as enabled extensions, version...
+    Gather information about the Server's current configuration such as enabled extensions, version...
     """
     resp = Response(headers=TUS_HEADERS, status_code=204)
     return resp
@@ -264,7 +264,7 @@ async def _tus_post(
         try:
             metadata = parse_tus_metadata(request.headers["upload-metadata"])
         except InvalidTUSMetadata as exc:
-            raise HTTPBadRequest(detail=f"Upload-Metadata header contains errors: {str(exc)}")
+            raise HTTPBadRequest(detail=f"Upload-Metadata header contains errors: {exc!s}")
     else:
         metadata = {}
 
@@ -338,7 +338,7 @@ async def _tus_post(
     return Response(
         status_code=201,
         headers={
-            "Location": location,  # noqa
+            "Location": location,
             "Tus-Resumable": "1.0.0",
             "Access-Control-Expose-Headers": "Location,Tus-Resumable",
         },

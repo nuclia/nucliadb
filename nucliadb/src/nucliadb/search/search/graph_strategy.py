@@ -114,11 +114,11 @@ SCHEMA = {
 }
 
 PROMPT = """\
-You are an advanced language model assisting in scoring relationships (edges) between two entities in a knowledge graph, given a user’s question.
+You are an advanced language model assisting in scoring relationships (edges) between two entities in a knowledge graph, given a user's question.
 
 For each provided **(head_entity, relationship, tail_entity)**, you must:
 1. Assign a **relevance score** between **0** and **10**.
-2. **0** means “this relationship can’t be relevant at all to the question.”
+2. **0** means “this relationship can't be relevant at all to the question.”
 3. **10** means “this relationship is extremely relevant to the question.”
 4. You may use **any integer** between 0 and 10 (e.g., 3, 7, etc.) based on how relevant you deem the relationship to be.
 5. **Language Agnosticism**: The question and the relationships may be in different languages. The relevance scoring should still work and be agnostic of the language.

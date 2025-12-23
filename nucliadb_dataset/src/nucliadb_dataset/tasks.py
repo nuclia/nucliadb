@@ -191,4 +191,4 @@ TASK_DEFINITIONS: dict[Task, TaskDefinition] = {
     ),
 }
 
-TASK_DEFINITIONS_REVERSE = {task.proto: task for task in TASK_DEFINITIONS.values()}  # noqa
+TASK_DEFINITIONS_REVERSE = {task.proto: task for task in TASK_DEFINITIONS.values()}

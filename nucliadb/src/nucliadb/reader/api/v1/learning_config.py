@@ -34,7 +34,7 @@ from nucliadb_utils.settings import is_onprem_nucliadb
     path=f"/{KB_PREFIX}/{{kbid}}/models/{{model_id}}/{{filename:path}}",
     status_code=200,
     summary="Download the Knowledege Box model",
-    description="Download the trained model or any other generated file as a result of a training task on a Knowledge Box.",  # noqa
+    description="Download the trained model or any other generated file as a result of a training task on a Knowledge Box.",
     response_model=None,
     tags=["Models"],
 )

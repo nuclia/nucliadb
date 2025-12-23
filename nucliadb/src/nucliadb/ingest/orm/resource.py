@@ -810,7 +810,7 @@ class Resource:
                 assert len(vectorsets) == 1, (
                     "Invalid broker message, can't ingest vectors from unknown vectorset to KB with multiple vectorsets"
                 )
-                vectorset = list(vectorsets.values())[0]
+                vectorset = next(iter(vectorsets.values()))
 
             else:
                 if field_vectors.vectorset_id not in vectorsets:

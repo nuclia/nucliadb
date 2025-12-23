@@ -74,7 +74,8 @@ def get_traced_grpc_channel(
         options = [
             ("grpc.max_receive_message_length", max_send_message * 1024 * 1024),
             ("grpc.max_send_message_length", max_send_message * 1024 * 1024),
-        ] + RETRY_OPTIONS
+            *RETRY_OPTIONS,
+        ]
         channel = aio.insecure_channel(address, options=options)
     return channel
 

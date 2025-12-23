@@ -34,7 +34,7 @@ class EntitiesGroupSummary(BaseModel):
     entities: dict[str, Entity] = Field(
         default={},
         title="[Deprecated] Entities in the group",
-        description="This field is deprecated and will be removed in future versions. It will always be empty. Use the /api/v1/kb/{kbid}/entitiesgroup/{group} endpoint to get the entities of a group.",  # noqa: E501
+        description="This field is deprecated and will be removed in future versions. It will always be empty. Use the /api/v1/kb/{kbid}/entitiesgroup/{group} endpoint to get the entities of a group.",
     )
 
 

@@ -49,7 +49,7 @@ class ResourceIndexed(BaseModel):
     seqid: int = Field(
         ...,
         title="Sequence ID",
-        description="Sequence ID of the resource operation. This can be used to track completion of specific operations.",  # noqa: E501
+        description="Sequence ID of the resource operation. This can be used to track completion of specific operations.",
     )
 
 
@@ -59,7 +59,7 @@ class ResourceWritten(BaseModel):
     seqid: int = Field(
         ...,
         title="Sequence ID",
-        description="Sequence ID of the resource operation. This can be used to track completion of specific operations.",  # noqa: E501
+        description="Sequence ID of the resource operation. This can be used to track completion of specific operations.",
     )
     operation: ResourceOperationType = Field(
         ..., title="Operation", description="Type of resource write operation."
@@ -77,7 +77,7 @@ class ResourceProcessed(BaseModel):
     seqid: int = Field(
         ...,
         title="Sequence ID",
-        description="Sequence ID of the resource operation. This can be used to track completion of specific operations.",  # noqa: E501
+        description="Sequence ID of the resource operation. This can be used to track completion of specific operations.",
     )
     ingestion_succeeded: bool = Field(
         default=True,

@@ -120,11 +120,11 @@ class _FindParser:
         try:
             rank_fusion = self._parse_rank_fusion()
         except ValidationError as exc:
-            raise InternalParserError(f"Parsing error in rank fusion: {str(exc)}") from exc
+            raise InternalParserError(f"Parsing error in rank fusion: {exc!s}") from exc
         try:
             reranker = self._parse_reranker()
         except ValidationError as exc:
-            raise InternalParserError(f"Parsing error in reranker: {str(exc)}") from exc
+            raise InternalParserError(f"Parsing error in reranker: {exc!s}") from exc
 
         # Adjust retrieval windows. Our current implementation assume:
         # `top_k <= reranker.window <= rank_fusion.window`

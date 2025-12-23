@@ -128,7 +128,6 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     field_klass: type
     deadletter_bucket: str | None = None
     indexing_bucket: str | None = None
-    cached_buckets: list[str] = []
     chunk_size = CHUNK_SIZE
 
     async def delete_resource(self, kbid: str, uuid: str):

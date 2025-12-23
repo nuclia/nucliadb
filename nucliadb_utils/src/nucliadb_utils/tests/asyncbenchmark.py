@@ -25,7 +25,7 @@ import sys
 import time
 from collections.abc import Awaitable, Callable, Coroutine
 from math import ceil
-from typing import Any, TypeVar
+from typing import Any, ClassVar, TypeVar
 
 import pytest
 from pytest_benchmark.session import BenchmarkSession  # type: ignore
@@ -36,11 +36,11 @@ from pytest_benchmark.utils import NameWrapper, format_time  # type: ignore
 T = TypeVar("T")
 
 
-class FixtureAlreadyUsed(Exception): ...  # noqa
+class FixtureAlreadyUsed(Exception): ...
 
 
 class AsyncBenchmarkFixture:  # pragma: no cover
-    _precisions: dict[Callable, float] = {}
+    _precisions: ClassVar[dict[Callable, float]] = {}
 
     def __init__(
         self,

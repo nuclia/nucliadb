@@ -19,7 +19,7 @@ from functools import wraps
 from asgiref.compatibility import guarantee_single_callable
 from fastapi import Request, Response
 from opentelemetry import context, trace
-from opentelemetry.instrumentation.asgi.version import __version__  # noqa
+from opentelemetry.instrumentation.asgi.version import __version__
 from opentelemetry.instrumentation.propagators import get_global_response_propagator
 from opentelemetry.instrumentation.utils import (
     _start_internal_or_server_span,

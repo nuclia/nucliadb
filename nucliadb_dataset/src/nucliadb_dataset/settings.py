@@ -40,7 +40,7 @@ class RunningSettings(BaseSettings):
 
     datasets_url: str = pydantic.Field(
         "https://europe-1.nuclia.cloud",
-        description="Base url for the Nuclia datasets component (excluding /api/v1)™",  # noqa
+        description="Base url for the Nuclia datasets component (excluding /api/v1)™",
     )
 
     apikey: str | None = pydantic.Field(None, description="API key to upload to Nuclia Datasets™")

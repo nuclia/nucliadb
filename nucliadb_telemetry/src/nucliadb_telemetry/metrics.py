@@ -65,7 +65,7 @@ class Observer:
         self.counter = prometheus_client.Counter(
             f"{name}_count",
             f"Number of times {name} was called.",
-            labelnames=tuple(self.labels.keys()) + (_STATUS_METRIC,),
+            labelnames=(*tuple(self.labels.keys()), _STATUS_METRIC),
         )
         hist_kwargs = {}
         if buckets is not None:
@@ -256,11 +256,11 @@ class Histogram:
 
 
 __all__ = (
-    "Observer",
-    "ObserverRecorder",
-    "OK",
     "ERROR",
+    "OK",
     "Counter",
     "Gauge",
     "Histogram",
+    "Observer",
+    "ObserverRecorder",
 )

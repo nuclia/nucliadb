@@ -85,7 +85,7 @@ class KnowledgeBoxConfig(BaseModel):
     learning_configuration: dict[str, Any] | None = Field(
         default=None,
         title="Learning Configuration",
-        description="Learning configuration for the Knowledge Box. If provided, NucliaDB will set the learning configuration for the Knowledge Box.",  # noqa: E501
+        description="Learning configuration for the Knowledge Box. If provided, NucliaDB will set the learning configuration for the Knowledge Box.",
     )
 
     external_index_provider: ExternalIndexProvider | None = Field(

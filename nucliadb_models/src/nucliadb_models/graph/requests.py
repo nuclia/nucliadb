@@ -140,7 +140,7 @@ class BaseGraphSearchRequest(BaseModel):
     security: RequestSecurity | None = Field(
         default=None,
         title="Security",
-        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",  # noqa: E501
+        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",
     )
     show_hidden: bool = Field(
         default=False,
