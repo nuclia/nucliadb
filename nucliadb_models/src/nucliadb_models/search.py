@@ -2546,6 +2546,8 @@ class CatalogFacetsResponse(BaseModel):
 
 
 def _validate_resource_filter(v: str):
+    # TODO: remove return once we can validate properly
+    return
     parts = v.split("/")
 
     rid = parts[0]
