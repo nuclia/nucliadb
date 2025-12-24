@@ -26,6 +26,7 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
+from nucliadb.middleware import ClientErrorPayloadLoggerMiddleware
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_v1
 from nucliadb.reader.lifecycle import lifespan
@@ -51,6 +52,8 @@ middleware.extend(
         Middleware(AuditMiddleware, audit_utility_getter=get_audit),
     ]
 )
+if running_settings.debug:
+    middleware.append(Middleware(ClientErrorPayloadLoggerMiddleware))
 
 errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 

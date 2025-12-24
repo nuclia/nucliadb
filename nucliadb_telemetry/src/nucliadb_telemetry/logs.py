@@ -176,6 +176,7 @@ _default_logger_levels = {
     # some are too chatty
     "uvicorn.error": LogLevel.WARNING,
     "nucliadb_utils.utilities": LogLevel.WARNING,
+    "nucliadb.middleware": LogLevel.INFO,
 }
 
 
