@@ -67,7 +67,9 @@ def app():
     def foo(request):
         raise HTTPException(status_code=412, detail="Precondition Failed")
 
-    return app_
+    yield app_
+
+    ClientErrorPayloadLoggerMiddleware.ip_counters.clear()
 
 
 def test_client_error_payload_is_logged(app, caplog):
