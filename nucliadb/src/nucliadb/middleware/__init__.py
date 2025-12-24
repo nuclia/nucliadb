@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 import time
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -25,6 +26,8 @@ from starlette.responses import Response
 
 PROCESS_TIME_HEADER = "X-PROCESS-TIME"
 ACCESS_CONTROL_EXPOSE_HEADER = "Access-Control-Expose-Headers"
+
+logger = logging.getLogger("nucliadb.middleware")
 
 
 class ProcessTimeHeaderMiddleware(BaseHTTPMiddleware):
@@ -50,3 +53,39 @@ class ProcessTimeHeaderMiddleware(BaseHTTPMiddleware):
                 duration = time.perf_counter() - start
                 self.capture_process_time(response, duration)
                 self.expose_process_time_header(response)
+
+
+class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware that logs the payload of client error responses (HTTP 412 and 422).
+    This helps supporting clients by providing more context about the errors they
+    encounter which otherwise we don't have much visibility on.
+    """
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        response = None
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            if response is not None and response.status_code in (412, 422):
+                chunks = []
+                async for chunk in response.body_iterator:  # type: ignore
+                    chunks.append(chunk)
+                response_body = b"".join(chunks)
+                logger.info(
+                    f"Client error. Response payload: {response_body.decode('utf-8')}",
+                    extra={
+                        "request_method": request.method,
+                        "request_path": request.url.path,
+                        "response_status_code": response.status_code,
+                    },
+                )
+                # Recreate the response body iterator since it has been consumed
+                return Response(
+                    content=response_body,
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    media_type=response.media_type,
+                    background=response.background,
+                )

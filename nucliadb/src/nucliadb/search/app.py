@@ -26,7 +26,7 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.middleware import ProcessTimeHeaderMiddleware
+from nucliadb.middleware import ClientErrorPayloadLoggerMiddleware, ProcessTimeHeaderMiddleware
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import lifespan
@@ -52,6 +52,7 @@ middleware.extend(
 
 if running_settings.debug:
     middleware.append(Middleware(ProcessTimeHeaderMiddleware))
+    middleware.append(Middleware(ClientErrorPayloadLoggerMiddleware))
 
 errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
