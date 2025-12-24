@@ -26,6 +26,7 @@ NUCLIA_CUSTOM_CONTENT_TYPES = {
 
 EXTRA_VALID_CONTENT_TYPES = {
     "application/font-woff",
+    "application/javascript",
     "application/mp4",
     "application/toml",
     "application/vnd.jgraph.mxfile",
