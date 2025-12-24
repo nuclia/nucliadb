@@ -48,7 +48,7 @@ def test_setup_logging_plain(monkeypatch):
         )
 
         logging.getLogger.assert_any_call("foo")
-        assert len(logging.getLogger().addHandler.mock_calls) == 5
+        assert len(logging.getLogger().addHandler.mock_calls) == 6
 
         logger = logging.getLogger()
         handler = logger.addHandler.mock_calls[0].args[0]
