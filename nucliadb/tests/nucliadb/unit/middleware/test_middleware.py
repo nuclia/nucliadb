@@ -79,15 +79,9 @@ def test_client_error_payload_is_logged(app, caplog):
         assert response.status_code == 412
         assert "Client error. Response payload: Precondition Failed" in caplog.text
 
-
-def test_client_error_payload_logging_is_limited_per_ip(app, caplog):
-    caplog.clear()
-    client = TestClient(app)
-    with caplog.at_level("INFO"):
         for _ in range(ClientErrorPayloadLoggerMiddleware.max_events_per_ip + 10):
             response = client.get("/foo/")
 
-        assert response.status_code == 412
         log_count = caplog.text.count("Client error. Response payload: Precondition Failed")
         assert log_count == ClientErrorPayloadLoggerMiddleware.max_events_per_ip
 
