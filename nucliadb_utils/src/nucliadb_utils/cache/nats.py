@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (C) 2021 Bosutech XXI S.L.
 #
 # nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -23,7 +22,6 @@ import functools
 import os
 import uuid
 from inspect import iscoroutinefunction
-from typing import Dict, List, Optional, Union
 
 import nats
 import nats.errors
@@ -54,16 +52,16 @@ async def wait_for_it(future: asyncio.Future, msg):
 class NatsPubsub(PubSubDriver[Msg]):
     _jetstream = None
     _jsm = None
-    _subscriptions: Dict[str, Subscription]
+    _subscriptions: dict[str, Subscription]
     async_callback = True
 
     def __init__(
         self,
         thread: bool = False,
-        name: Optional[str] = "natsutility",
+        name: str | None = "natsutility",
         timeout: float = 2.0,
-        hosts: Optional[List[str]] = None,
-        user_credentials_file: Optional[str] = None,
+        hosts: list[str] | None = None,
+        user_credentials_file: str | None = None,
     ):
         self._hosts = hosts or []
         self._timeout = timeout
@@ -73,11 +71,11 @@ class NatsPubsub(PubSubDriver[Msg]):
         self._uuid = os.environ.get("HOSTNAME", uuid.uuid4().hex)
         self.initialized = False
         self.lock = asyncio.Lock()
-        self.nc: Union[Client, NatsClientTelemetry, None] = None
+        self.nc: Client | NatsClientTelemetry | None = None
         self.user_credentials_file = user_credentials_file
 
     @property
-    def jetstream(self) -> Union[JetStreamContext, JetStreamContextTelemetry]:
+    def jetstream(self) -> JetStreamContext | JetStreamContextTelemetry:
         if self.nc is None:
             raise AttributeError("NC not initialized")
         if self._jetstream is None:
@@ -154,10 +152,10 @@ class NatsPubsub(PubSubDriver[Msg]):
 
     async def reconnected_cb(self):
         # See who we are connected to on reconnect.
-        logger.info("Got reconnected NATS to {url}".format(url=self.nc.connected_url.netloc))
+        logger.info(f"Got reconnected NATS to {self.nc.connected_url.netloc}")
 
     async def error_cb(self, e):
-        logger.info("There was an error connecting to NATS {}".format(e), exc_info=True)
+        logger.info(f"There was an error connecting to NATS {e}", exc_info=True)
 
     async def closed_cb(self):
         logger.info("Connection is closed to NATS")
@@ -173,7 +171,7 @@ class NatsPubsub(PubSubDriver[Msg]):
         else:
             raise ErrConnectionClosed("Could not subscribe")
 
-    async def subscribe(self, handler: Callback, key, group="", subscription_id: Optional[str] = None):
+    async def subscribe(self, handler: Callback, key, group="", subscription_id: str | None = None):
         if subscription_id is None:
             subscription_id = key
 
@@ -189,7 +187,7 @@ class NatsPubsub(PubSubDriver[Msg]):
         else:
             raise ErrConnectionClosed("Could not subscribe")
 
-    async def unsubscribe(self, key: str, subscription_id: Optional[str] = None):
+    async def unsubscribe(self, key: str, subscription_id: str | None = None):
         if subscription_id is None:
             subscription_id = key
 

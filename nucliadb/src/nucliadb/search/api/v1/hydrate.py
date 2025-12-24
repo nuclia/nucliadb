@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Awaitable, Optional, Union
+from collections.abc import Awaitable
 
 from async_lru import alru_cache
 from fastapi import Request, Response
@@ -81,13 +81,13 @@ class HydratedBuilder:
         self._resources: dict[str, HydratedResource] = {}
         self._fields: dict[
             str,
-            Union[
-                HydratedTextField,
-                HydratedFileField,
-                HydratedLinkField,
-                HydratedConversationField,
-                HydratedGenericField,
-            ],
+            (
+                HydratedTextField
+                | HydratedFileField
+                | HydratedLinkField
+                | HydratedConversationField
+                | HydratedGenericField
+            ),
         ] = {}
         self._paragraphs: dict[str, HydratedParagraph] = {}
 
@@ -100,13 +100,13 @@ class HydratedBuilder:
         self,
     ) -> dict[
         str,
-        Union[
-            HydratedTextField,
-            HydratedFileField,
-            HydratedLinkField,
-            HydratedConversationField,
-            HydratedGenericField,
-        ],
+        (
+            HydratedTextField
+            | HydratedFileField
+            | HydratedLinkField
+            | HydratedConversationField
+            | HydratedGenericField
+        ),
     ]:
         return self._fields
 
@@ -127,13 +127,13 @@ class HydratedBuilder:
     def add_field(
         self,
         field_id: FieldId,
-        field: Union[
-            HydratedTextField,
-            HydratedFileField,
-            HydratedLinkField,
-            HydratedConversationField,
-            HydratedGenericField,
-        ],
+        field: (
+            HydratedTextField
+            | HydratedFileField
+            | HydratedLinkField
+            | HydratedConversationField
+            | HydratedGenericField
+        ),
     ):
         self._fields[field_id.full()] = field
 
@@ -324,5 +324,5 @@ class Hydrator:
             return await aw
 
     @alru_cache(maxsize=50)
-    async def cached_download_page_preview(self, field: Field, page: int) -> Optional[Image]:
+    async def cached_download_page_preview(self, field: Field, page: int) -> Image | None:
         return await download_page_preview(field, page)

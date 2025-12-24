@@ -17,8 +17,8 @@ import subprocess
 import sys
 import time
 import uuid
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
-from typing import AsyncIterator, Iterator, Optional
 from uuid import uuid4
 
 import docker  # type: ignore[import-untyped]
@@ -80,7 +80,7 @@ class NucliaFixture:
     port: int
     grpc: int
     url: str
-    container: Optional[NucliaDB] = None
+    container: NucliaDB | None = None
 
 
 def get_docker_internal_host() -> str:

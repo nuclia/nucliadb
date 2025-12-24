@@ -33,7 +33,7 @@ async def test_get_ontology_count(
 
     with aioresponses() as m:
         m.get(
-            f"http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{knowledgebox}/search?faceted=/l/my-labelset",  # noqa
+            f"http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{knowledgebox}/search?faceted=/l/my-labelset",
             payload={
                 "resources": {},
                 "sentences": {"results": [], "facets": {}},

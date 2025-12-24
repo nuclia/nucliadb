@@ -19,7 +19,6 @@
 #
 import asyncio
 import logging
-from typing import Optional
 
 from nucliadb.common import locking
 from nucliadb.common.cluster.rollover import rollover_kb_index
@@ -233,7 +232,7 @@ async def run_pg_schema_migrations(driver: PGDriver):
                 await tx.commit()
 
 
-async def run(context: ExecutionContext, target_version: Optional[int] = None) -> None:
+async def run(context: ExecutionContext, target_version: int | None = None) -> None:
     # Run schema migrations first, since they create the `resources` table needed for the lock below
     # Schema migrations use their own locking system
     if isinstance(context.kv_driver, PGDriver):

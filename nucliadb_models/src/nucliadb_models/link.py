@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 from datetime import datetime
-from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -25,19 +24,19 @@ from pydantic import BaseModel, Field
 
 
 class FieldLink(BaseModel):
-    added: Optional[datetime] = None
-    headers: Optional[Dict[str, str]] = None
-    cookies: Optional[Dict[str, str]] = None
-    uri: Optional[str] = None
-    language: Optional[str] = None
-    localstorage: Optional[Dict[str, str]] = None
-    css_selector: Optional[str] = None
-    xpath: Optional[str] = None
-    extract_strategy: Optional[str] = Field(
+    added: datetime | None = None
+    headers: dict[str, str] | None = None
+    cookies: dict[str, str] | None = None
+    uri: str | None = None
+    language: str | None = None
+    localstorage: dict[str, str] | None = None
+    css_selector: str | None = None
+    xpath: str | None = None
+    extract_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia extract strategy used at processing time. If not set, the default strategy was used. Extract strategies are defined at the learning configuration api.",
     )
-    split_strategy: Optional[str] = Field(
+    split_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia split strategy used at processing time. If not set, the default strategy was used. Split strategies are defined at the learning configuration api.",
     )
@@ -47,18 +46,18 @@ class FieldLink(BaseModel):
 
 
 class LinkField(BaseModel):
-    headers: Optional[Dict[str, str]] = {}
-    cookies: Optional[Dict[str, str]] = {}
+    headers: dict[str, str] | None = {}
+    cookies: dict[str, str] | None = {}
     uri: str
-    language: Optional[str] = None
-    localstorage: Optional[Dict[str, str]] = {}
-    css_selector: Optional[str] = None
-    xpath: Optional[str] = None
-    extract_strategy: Optional[str] = Field(
+    language: str | None = None
+    localstorage: dict[str, str] | None = {}
+    css_selector: str | None = None
+    xpath: str | None = None
+    extract_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia extract strategy to use at processing time. If not set, the default strategy will be used. Extract strategies are defined at the learning configuration api.",
     )
-    split_strategy: Optional[str] = Field(
+    split_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia split strategy used at processing time. If not set, the default strategy was used. Split strategies are defined at the learning configuration api.",
     )

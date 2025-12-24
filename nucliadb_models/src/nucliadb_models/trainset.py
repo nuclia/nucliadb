@@ -15,7 +15,6 @@
 
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -40,7 +39,7 @@ class TrainSetType(int, Enum):
 
 class TrainSet(BaseModel):
     type: TrainSetType = Field(..., description="Streaming type")
-    filter_expression: Optional[FilterExpression] = Field(
+    filter_expression: FilterExpression | None = Field(
         default=None,
         title="Filter resource by an expression",
         description=(

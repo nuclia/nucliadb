@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
-from typing import Optional, Union, cast
+from typing import cast
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
@@ -62,25 +62,23 @@ async def resource_search(
     kbid: str,
     query: str,
     rid: str,
-    filter_expression: Optional[str] = fastapi_query(SearchParamDefaults.filter_expression),
+    filter_expression: str | None = fastapi_query(SearchParamDefaults.filter_expression),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
-    sort: Optional[SortField] = fastapi_query(SearchParamDefaults.sort_field, alias="sort_field"),
+    sort: SortField | None = fastapi_query(SearchParamDefaults.sort_field, alias="sort_field"),
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
-    top_k: Optional[int] = fastapi_query(SearchParamDefaults.top_k),
-    range_creation_start: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_start),
-    range_creation_end: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_end),
-    range_modification_start: Optional[DateTime] = fastapi_query(
+    top_k: int | None = fastapi_query(SearchParamDefaults.top_k),
+    range_creation_start: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_end),
+    range_modification_start: DateTime | None = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
-    range_modification_end: Optional[DateTime] = fastapi_query(
-        SearchParamDefaults.range_modification_end
-    ),
+    range_modification_end: DateTime | None = fastapi_query(SearchParamDefaults.range_modification_end),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
-) -> Union[ResourceSearchResults, HTTPClientError]:
+) -> ResourceSearchResults | HTTPClientError:
     top_k = top_k or SearchParamDefaults.top_k  # type: ignore
     top_k = cast(int, top_k)
 

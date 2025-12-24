@@ -24,7 +24,7 @@ import enum
 import logging
 from collections import defaultdict
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from google.protobuf.message import DecodeError, Message
 
@@ -75,27 +75,27 @@ PbType = TypeVar("PbType", bound=Message)
 
 
 class Field(Generic[PbType]):
-    pbklass: Type[PbType]
+    pbklass: type[PbType]
     type: str = "x"
-    value: Optional[Any]
-    extracted_text: Optional[ExtractedText]
-    extracted_vectors: dict[Optional[str], VectorObject]
-    computed_metadata: Optional[FieldComputedMetadata]
-    large_computed_metadata: Optional[LargeComputedMetadata]
-    question_answers: Optional[FieldQuestionAnswers]
+    value: Any | None
+    extracted_text: ExtractedText | None
+    extracted_vectors: dict[str | None, VectorObject]
+    computed_metadata: FieldComputedMetadata | None
+    large_computed_metadata: LargeComputedMetadata | None
+    question_answers: FieldQuestionAnswers | None
 
     def __init__(
         self,
         id: str,
         resource: Resource,
-        pb: Optional[Any] = None,
-        value: Optional[Any] = None,
+        pb: Any | None = None,
+        value: Any | None = None,
     ):
         if self.pbklass is None:
             raise InvalidFieldClass()
 
         self.value = None
-        self.extracted_text: Optional[ExtractedText] = None
+        self.extracted_text: ExtractedText | None = None
         self.extracted_vectors = {}
         self.computed_metadata = None
         self.large_computed_metadata = None
@@ -159,7 +159,7 @@ class Field(Generic[PbType]):
 
         return self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, key)
 
-    async def db_get_value(self) -> Optional[PbType]:
+    async def db_get_value(self) -> PbType | None:
         if self.value is None:
             payload = await datamanagers.fields.get_raw(
                 self.resource.txn,
@@ -234,7 +234,7 @@ class Field(Generic[PbType]):
         except KeyError:
             pass
 
-    async def get_error(self) -> Optional[Error]:
+    async def get_error(self) -> Error | None:
         return await datamanagers.fields.get_error(
             self.resource.txn,
             kbid=self.kbid,
@@ -253,7 +253,7 @@ class Field(Generic[PbType]):
             error=error,
         )
 
-    async def get_status(self) -> Optional[FieldStatus]:
+    async def get_status(self) -> FieldStatus | None:
         return await datamanagers.fields.get_status(
             self.resource.txn,
             kbid=self.kbid,
@@ -272,7 +272,7 @@ class Field(Generic[PbType]):
             status=status,
         )
 
-    async def get_question_answers(self, force=False) -> Optional[FieldQuestionAnswers]:
+    async def get_question_answers(self, force=False) -> FieldQuestionAnswers | None:
         if self.question_answers is None or force:
             sf = self.get_storage_field(FieldTypes.QUESTION_ANSWERS)
             try:
@@ -289,9 +289,7 @@ class Field(Generic[PbType]):
     async def set_question_answers(self, payload: FieldQuestionAnswerWrapper) -> None:
         if self.type in SUBFIELDFIELDS:
             try:
-                actual_payload: Optional[FieldQuestionAnswers] = await self.get_question_answers(
-                    force=True
-                )
+                actual_payload: FieldQuestionAnswers | None = await self.get_question_answers(force=True)
             except KeyError:
                 actual_payload = None
         else:
@@ -324,7 +322,7 @@ class Field(Generic[PbType]):
             self.question_answers = actual_payload
 
     async def set_extracted_text(self, payload: ExtractedTextWrapper) -> None:
-        actual_payload: Optional[ExtractedText] = None
+        actual_payload: ExtractedText | None = None
         if self.type in SUBFIELDFIELDS:
             # Try to get the previously extracted text protobuf if it exists so we can merge it with the new splits
             # coming from the processing payload.
@@ -375,7 +373,7 @@ class Field(Generic[PbType]):
             await self.storage.upload_pb(sf, actual_payload)
             self.extracted_text = actual_payload
 
-    async def get_extracted_text(self, force=False) -> Optional[ExtractedText]:
+    async def get_extracted_text(self, force=False) -> ExtractedText | None:
         if self.extracted_text is None or force:
             async with self.locks["extracted_text"]:
                 # Value could have been fetched while waiting for the lock
@@ -391,10 +389,10 @@ class Field(Generic[PbType]):
         payload: ExtractedVectorsWrapper,
         vectorset: str,
         storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
-    ) -> Optional[VectorObject]:
+    ) -> VectorObject | None:
         if self.type in SUBFIELDFIELDS:
             try:
-                actual_payload: Optional[VectorObject] = await self.get_vectors(
+                actual_payload: VectorObject | None = await self.get_vectors(
                     vectorset=vectorset,
                     storage_key_kind=storage_key_kind,
                     force=True,
@@ -405,7 +403,7 @@ class Field(Generic[PbType]):
             actual_payload = None
 
         sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
-        vo: Optional[VectorObject] = None
+        vo: VectorObject | None = None
         if actual_payload is None:
             # Its first extracted vectors
             if payload.HasField("file"):
@@ -457,7 +455,7 @@ class Field(Generic[PbType]):
         vectorset: str,
         storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
         force: bool = False,
-    ) -> Optional[VectorObject]:
+    ) -> VectorObject | None:
         if self.extracted_vectors.get(vectorset, None) is None or force:
             sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
             payload = await self.storage.download_pb(sf, VectorObject)
@@ -468,9 +466,7 @@ class Field(Generic[PbType]):
     async def set_field_metadata(self, payload: FieldComputedMetadataWrapper) -> FieldComputedMetadata:
         if self.type in SUBFIELDFIELDS:
             try:
-                actual_payload: Optional[FieldComputedMetadata] = await self.get_field_metadata(
-                    force=True
-                )
+                actual_payload: FieldComputedMetadata | None = await self.get_field_metadata(force=True)
             except KeyError:
                 actual_payload = None
         else:
@@ -513,7 +509,7 @@ class Field(Generic[PbType]):
 
         return self.computed_metadata
 
-    async def get_field_metadata(self, force: bool = False) -> Optional[FieldComputedMetadata]:
+    async def get_field_metadata(self, force: bool = False) -> FieldComputedMetadata | None:
         if self.computed_metadata is None or force:
             async with self.locks["field_metadata"]:
                 # Value could have been fetched while waiting for the lock
@@ -527,7 +523,7 @@ class Field(Generic[PbType]):
     async def set_large_field_metadata(self, payload: LargeComputedMetadataWrapper):
         if self.type in SUBFIELDFIELDS:
             try:
-                actual_payload: Optional[LargeComputedMetadata] = await self.get_large_field_metadata(
+                actual_payload: LargeComputedMetadata | None = await self.get_large_field_metadata(
                     force=True
                 )
             except KeyError:
@@ -537,7 +533,7 @@ class Field(Generic[PbType]):
 
         sf = self.get_storage_field(FieldTypes.FIELD_LARGE_METADATA)
 
-        new_payload: Optional[LargeComputedMetadata] = None
+        new_payload: LargeComputedMetadata | None = None
         if payload.HasField("file"):
             new_payload = LargeComputedMetadata()
             data = await self.storage.downloadbytescf(payload.file)
@@ -564,7 +560,7 @@ class Field(Generic[PbType]):
 
         return self.large_computed_metadata
 
-    async def get_large_field_metadata(self, force: bool = False) -> Optional[LargeComputedMetadata]:
+    async def get_large_field_metadata(self, force: bool = False) -> LargeComputedMetadata | None:
         if self.large_computed_metadata is None or force:
             sf = self.get_storage_field(FieldTypes.FIELD_LARGE_METADATA)
             payload = await self.storage.download_pb(

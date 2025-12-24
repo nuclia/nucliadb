@@ -20,7 +20,6 @@
 
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
 
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import ProcessingEngine
@@ -94,7 +93,7 @@ def _generate_processing_payload_for_fields(
     rid: str,
     fields: GeneratedFields,
     bm: writer_pb2.BrokerMessage,
-) -> Optional[PushPayload]:
+) -> PushPayload | None:
     partitioning = get_partitioning()
     partition = partitioning.generate_partition(kbid, rid)
 

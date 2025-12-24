@@ -18,8 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import copy
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence, Union, cast
+from typing import cast
 
 import yaml
 from pydantic import BaseModel
@@ -92,7 +93,7 @@ from nucliadb_utils.utilities import get_storage
 # The hope here is it will be enough to get the answer to the question.
 CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
 
-TextBlockId = Union[ParagraphId, FieldId]
+TextBlockId = ParagraphId | FieldId
 
 
 class CappedPromptContext:
@@ -101,7 +102,7 @@ class CappedPromptContext:
     and automatically trim data that exceeds the limit when it's being set on the dictionary.
     """
 
-    def __init__(self, max_size: Optional[int]):
+    def __init__(self, max_size: int | None):
         self.output: PromptContext = {}
         self.images: PromptContextImages = {}
         self.max_size = max_size
@@ -168,8 +169,8 @@ async def get_next_conversation_messages(
     page: int,
     start_idx: int,
     num_messages: int,
-    message_type: Optional[resources_pb2.Message.MessageType.ValueType] = None,
-    msg_to: Optional[str] = None,
+    message_type: resources_pb2.Message.MessageType.ValueType | None = None,
+    msg_to: str | None = None,
 ) -> list[resources_pb2.Message]:
     output = []
     cmetadata = await field_obj.get_metadata()
@@ -265,7 +266,7 @@ async def full_resource_prompt_context(
     context: CappedPromptContext,
     kbid: str,
     ordered_paragraphs: list[FindParagraph],
-    rid: Optional[str],
+    rid: str | None,
     strategy: FullResourceStrategy,
     metrics: Metrics,
     augmented_context: AugmentedContext,
@@ -280,7 +281,7 @@ async def full_resource_prompt_context(
         ordered_paragraphs: The results of the retrieval (find) operation.
         resource: The resource to be included in the context. This is used only when chatting with a specific resource with no retrieval.
         strategy: strategy instance containing, for example, the number of full resources to include in the context.
-    """  # noqa: E501
+    """
     if rid is not None:
         # The user has specified a resource to be included in the context.
         ordered_resources = [rid]
@@ -699,7 +700,7 @@ async def neighbouring_paragraphs_prompt_context(
 
 def get_text_position(
     paragraph_id: ParagraphId, index: int, field_metadata: FieldComputedMetadata
-) -> Optional[TextPosition]:
+) -> TextPosition | None:
     if paragraph_id.field_id.subfield_id:
         metadata = field_metadata.split_metadata[paragraph_id.field_id.subfield_id]
     else:
@@ -993,14 +994,14 @@ class PromptContextBuilder:
         self,
         kbid: str,
         ordered_paragraphs: list[FindParagraph],
-        resource: Optional[str] = None,
-        user_context: Optional[list[str]] = None,
-        user_image_context: Optional[list[Image]] = None,
-        strategies: Optional[Sequence[RagStrategy]] = None,
-        image_strategies: Optional[Sequence[ImageRagStrategy]] = None,
-        max_context_characters: Optional[int] = None,
+        resource: str | None = None,
+        user_context: list[str] | None = None,
+        user_image_context: list[Image] | None = None,
+        strategies: Sequence[RagStrategy] | None = None,
+        image_strategies: Sequence[ImageRagStrategy] | None = None,
+        max_context_characters: int | None = None,
         visual_llm: bool = False,
-        query_image: Optional[Image] = None,
+        query_image: Image | None = None,
         metrics: Metrics = Metrics("prompt_context_builder"),
     ):
         self.kbid = kbid
@@ -1046,10 +1047,10 @@ class PromptContextBuilder:
         if self.image_strategies is None or len(self.image_strategies) == 0:
             # Nothing to do
             return
-        page_image_strategy: Optional[PageImageStrategy] = None
+        page_image_strategy: PageImageStrategy | None = None
         max_page_images = 5
-        table_image_strategy: Optional[TableImageStrategy] = None
-        paragraph_image_strategy: Optional[ParagraphImageStrategy] = None
+        table_image_strategy: TableImageStrategy | None = None
+        paragraph_image_strategy: ParagraphImageStrategy | None = None
         for strategy in self.image_strategies:
             if strategy.name == ImageRagStrategyName.PAGE_IMAGE:
                 if page_image_strategy is None:
@@ -1136,12 +1137,12 @@ class PromptContextBuilder:
             RagStrategyName.GRAPH,
         ]
 
-        full_resource: Optional[FullResourceStrategy] = None
-        hierarchy: Optional[HierarchyResourceStrategy] = None
-        neighbouring_paragraphs: Optional[NeighbouringParagraphsStrategy] = None
-        field_extension: Optional[FieldExtensionStrategy] = None
-        metadata_extension: Optional[MetadataExtensionStrategy] = None
-        conversational_strategy: Optional[ConversationalStrategy] = None
+        full_resource: FullResourceStrategy | None = None
+        hierarchy: HierarchyResourceStrategy | None = None
+        neighbouring_paragraphs: NeighbouringParagraphsStrategy | None = None
+        field_extension: FieldExtensionStrategy | None = None
+        metadata_extension: MetadataExtensionStrategy | None = None
+        conversational_strategy: ConversationalStrategy | None = None
         for strategy in self.strategies:
             if strategy.name == RagStrategyName.FIELD_EXTENSION:
                 field_extension = cast(FieldExtensionStrategy, strategy)
@@ -1234,7 +1235,7 @@ class PromptContextBuilder:
             )
 
 
-def get_paragraph_page_number(paragraph: FindParagraph) -> Optional[int]:
+def get_paragraph_page_number(paragraph: FindParagraph) -> int | None:
     if not paragraph.page_with_visual:
         return None
     if paragraph.position is None:

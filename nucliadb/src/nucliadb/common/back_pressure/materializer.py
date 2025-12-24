@@ -20,7 +20,6 @@
 import asyncio
 import logging
 import threading
-from typing import Optional
 
 from cachetools import TTLCache
 from fastapi import HTTPException
@@ -213,7 +212,7 @@ class BackPressureMaterializer:
             raise BackPressureException(data)
 
 
-MATERIALIZER: Optional[BackPressureMaterializer] = None
+MATERIALIZER: BackPressureMaterializer | None = None
 materializer_lock = threading.Lock()
 
 
@@ -262,7 +261,7 @@ def get_materializer() -> BackPressureMaterializer:
     return MATERIALIZER
 
 
-async def maybe_back_pressure(kbid: str, resource_uuid: Optional[str] = None) -> None:
+async def maybe_back_pressure(kbid: str, resource_uuid: str | None = None) -> None:
     """
     This function does system checks to see if we need to put back pressure on writes.
     In that case, a HTTP 429 will be raised with the estimated time to try again.
@@ -272,7 +271,7 @@ async def maybe_back_pressure(kbid: str, resource_uuid: Optional[str] = None) ->
     await back_pressure_checks(kbid, resource_uuid)
 
 
-async def back_pressure_checks(kbid: str, resource_uuid: Optional[str] = None):
+async def back_pressure_checks(kbid: str, resource_uuid: str | None = None):
     """
     Will raise a 429 if back pressure is needed:
     - If the processing engine is behind.

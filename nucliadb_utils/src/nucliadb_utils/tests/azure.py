@@ -17,9 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from collections.abc import Generator, Iterator
 from contextlib import ExitStack
 from dataclasses import dataclass
-from typing import Any, Generator, Iterator
+from typing import Any
 from unittest.mock import patch
 
 import pytest

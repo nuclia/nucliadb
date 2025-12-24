@@ -247,7 +247,7 @@ async def test_update_all_fields_key(txn, storage, kb):
     await resource.update_all_field_ids(updated=[file_field])
 
     result = await resource.get_all_field_ids(for_update=False)
-    assert list(result.fields) == list(all_fields.fields) + [file_field]
+    assert list(result.fields) == [*list(all_fields.fields), file_field]
 
     # Check deletes
     await resource.update_all_field_ids(deleted=[file_field])

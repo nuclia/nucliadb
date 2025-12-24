@@ -21,7 +21,6 @@ import asyncio
 import logging
 import os
 import sys
-from typing import Optional
 
 import argdantic
 import uvicorn  # type: ignore
@@ -148,7 +147,7 @@ def run():
     server.run()
 
 
-def get_latest_nucliadb() -> Optional[str]:
+def get_latest_nucliadb() -> str | None:
     return asyncio.run(versions.latest_nucliadb())
 
 

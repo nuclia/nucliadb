@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 
 from fastapi import HTTPException
 from nidx_protos.nodereader_pb2 import StreamRequest
@@ -40,7 +40,7 @@ def sentence_classification_batch_generator(
     kbid: str,
     trainset: TrainSet,
     shard_replica_id: str,
-    filter_expression: Optional[FilterExpression],
+    filter_expression: FilterExpression | None,
 ) -> AsyncGenerator[SentenceClassificationBatch, None]:
     if len(trainset.filter.labels) == 0:
         raise HTTPException(

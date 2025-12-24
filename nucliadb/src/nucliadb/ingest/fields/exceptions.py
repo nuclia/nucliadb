@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Type
 
 
 class InvalidFieldClass(Exception):
@@ -25,7 +24,7 @@ class InvalidFieldClass(Exception):
 
 
 class InvalidPBClass(Exception):
-    def __init__(self, source: Type, destination: Type):
+    def __init__(self, source: type, destination: type):
         self.source = source
         self.destination = destination
         super().__init__(f"Source and destination does not match {self.source} - {self.destination}")

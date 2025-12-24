@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncIterator, Optional
+from collections.abc import AsyncIterator
 
 from nucliadb.common.datamanagers.utils import get_kv_pb
 from nucliadb.common.maindb.driver import Transaction
@@ -37,7 +37,7 @@ async def initialize(txn: Transaction, *, kbid: str):
 
 async def get(
     txn: Transaction, *, kbid: str, vectorset_id: str
-) -> Optional[knowledgebox_pb2.VectorSetConfig]:
+) -> knowledgebox_pb2.VectorSetConfig | None:
     kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=False)
     index = _find_vectorset(kb_vectorsets, vectorset_id)
     if index is None:
@@ -80,7 +80,7 @@ async def set(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.VectorSet
 
 async def delete(
     txn: Transaction, *, kbid: str, vectorset_id: str
-) -> Optional[knowledgebox_pb2.VectorSetConfig]:
+) -> knowledgebox_pb2.VectorSetConfig | None:
     kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=True)
     index = _find_vectorset(kb_vectorsets, vectorset_id)
     if index is None:
@@ -111,7 +111,7 @@ async def _get_or_default(
 
 def _find_vectorset(
     kb_vectorsets: knowledgebox_pb2.KnowledgeBoxVectorSetsConfig, vectorset_id: str
-) -> Optional[int]:
+) -> int | None:
     """Return the position of the vectorset in `vectorsets` or `None` if not found."""
     for idx, vectorset in enumerate(kb_vectorsets.vectorsets):
         if vectorset.vectorset_id == vectorset_id:

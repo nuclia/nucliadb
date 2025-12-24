@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional, Union
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
@@ -69,7 +68,7 @@ class MigrationsDataManager:
             await txn.delete(MIGRATIONS_KEY.format(kbid=kbid))
             await txn.commit()
 
-    async def get_kb_info(self, kbid: str) -> Optional[KnowledgeBoxInfo]:
+    async def get_kb_info(self, kbid: str) -> KnowledgeBoxInfo | None:
         async with self.driver.ro_transaction() as txn:
             kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
             if kb_config is None:
@@ -91,8 +90,8 @@ class MigrationsDataManager:
     async def update_global_info(
         self,
         *,
-        current_version: Union[int, _Unset] = _UNSET,
-        target_version: Union[int, None, _Unset] = _UNSET,
+        current_version: int | _Unset = _UNSET,
+        target_version: int | None | _Unset = _UNSET,
     ) -> None:
         async with self.driver.rw_transaction() as txn:
             raw_pb = await txn.get(MIGRATION_INFO_KEY, for_update=True)

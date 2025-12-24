@@ -19,7 +19,7 @@
 #
 import asyncio
 import logging
-from typing import Awaitable, Callable, Optional
+from collections.abc import Awaitable, Callable
 
 from grpc import aio
 from grpc_health.v1 import health, health_pb2, health_pb2_grpc
@@ -41,7 +41,7 @@ def nats_manager_healthy() -> bool:
 
 
 def pubsub_check() -> bool:
-    driver: Optional[PubSubDriver] = get_utility(Utility.PUBSUB)
+    driver: PubSubDriver | None = get_utility(Utility.PUBSUB)
     if driver is None:
         return True
     if isinstance(driver, NatsPubsub):

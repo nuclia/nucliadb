@@ -43,7 +43,7 @@ async def test_resource_download_extracted_file(
     download_field = "thumbnail"
 
     resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}/download/{download_type}/{download_field}",  # noqa
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}/download/{download_type}/{download_field}",
     )
     assert resp.status_code == 200
     filename = f"{INGEST_TESTS_DIR}{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"
@@ -90,7 +90,7 @@ async def test_resource_download_field_file(
     assert resp.status_code == 206
     assert resp.headers["Content-Disposition"]
 
-    filename = f"{INGEST_TESTS_DIR}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
+    filename = f"{INGEST_TESTS_DIR}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"
 
     open(filename, "rb").read() == resp.content
 
@@ -121,7 +121,7 @@ async def test_resource_download_field_conversation(
         f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/conversation/{field_id}/download/field/{msg_id}/{file_id}",
     )
     assert resp.status_code == 200
-    filename = f"{INGEST_TESTS_DIR}/{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"  # noqa
+    filename = f"{INGEST_TESTS_DIR}/{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"
     assert open(filename, "rb").read() == resp.content
 
 
@@ -131,7 +131,7 @@ async def test_resource_download_field_conversation(
         [
             "{field_type}/{field_id}/download/extracted/{download_field}",
             {"field_type": "text", "field_id": "text1", "download_field": "thumbnail"},
-        ],  # noqa
+        ],
         ["file/{field_id}/download/field", {"field_id": "file1"}],
         [
             "conversation/{field_id}/download/field/{message_id}/{file_num}",

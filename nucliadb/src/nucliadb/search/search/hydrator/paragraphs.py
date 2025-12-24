@@ -19,7 +19,6 @@
 #
 import asyncio
 from dataclasses import dataclass
-from typing import Optional, Union
 
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.ingest.fields.base import Field
@@ -112,19 +111,19 @@ class ParagraphIndex:
                 replacement for replacement in paragraph.relations.replacements
             ]
 
-    def get(self, paragraph_id: Union[str, ParagraphId]) -> Optional[resources_pb2.Paragraph]:
+    def get(self, paragraph_id: str | ParagraphId) -> resources_pb2.Paragraph | None:
         paragraph_id = str(paragraph_id)
         return self.paragraphs.get(paragraph_id)
 
-    def previous(self, paragraph_id: Union[str, ParagraphId]) -> Optional[str]:
+    def previous(self, paragraph_id: str | ParagraphId) -> str | None:
         paragraph_id = str(paragraph_id)
         return self.neighbours.get((paragraph_id, ParagraphIndex.PREVIOUS))
 
-    def next(self, paragraph_id: Union[str, ParagraphId]) -> Optional[str]:
+    def next(self, paragraph_id: str | ParagraphId) -> str | None:
         paragraph_id = str(paragraph_id)
         return self.neighbours.get((paragraph_id, ParagraphIndex.NEXT))
 
-    def n_previous(self, paragraph_id: Union[str, ParagraphId], count: int = 1) -> list[str]:
+    def n_previous(self, paragraph_id: str | ParagraphId, count: int = 1) -> list[str]:
         assert count >= 1, f"can't find negative previous {count}"
         paragraph_id = str(paragraph_id)
         previous: list[str] = []
@@ -138,7 +137,7 @@ class ParagraphIndex:
             current_id = previous_id
         return previous
 
-    def n_next(self, paragraph_id: Union[str, ParagraphId], count: int = 1) -> list[str]:
+    def n_next(self, paragraph_id: str | ParagraphId, count: int = 1) -> list[str]:
         assert count >= 1, f"can't find negative nexts {count}"
         paragraph_id = str(paragraph_id)
         nexts = []
@@ -152,23 +151,23 @@ class ParagraphIndex:
             nexts.append(next_id)
         return nexts
 
-    def parents(self, paragraph_id: Union[str, ParagraphId]) -> list[str]:
+    def parents(self, paragraph_id: str | ParagraphId) -> list[str]:
         paragraph_id = str(paragraph_id)
         return self.related.get((paragraph_id, ParagraphIndex.PARENTS), [])
 
-    def siblings(self, paragraph_id: Union[str, ParagraphId]) -> list[str]:
+    def siblings(self, paragraph_id: str | ParagraphId) -> list[str]:
         paragraph_id = str(paragraph_id)
         return self.related.get((paragraph_id, ParagraphIndex.SIBLINGS), [])
 
-    def replacements(self, paragraph_id: Union[str, ParagraphId]) -> list[str]:
+    def replacements(self, paragraph_id: str | ParagraphId) -> list[str]:
         paragraph_id = str(paragraph_id)
         return self.related.get((paragraph_id, ParagraphIndex.REPLACEMENTS), [])
 
 
 @dataclass
 class ExtraParagraphHydration:
-    field_page: Optional[int]
-    field_table_page: Optional[int]
+    field_page: int | None
+    field_table_page: int | None
     related_paragraph_ids: list[ParagraphId]
 
 
@@ -272,8 +271,8 @@ async def related_paragraphs_refs(
     paragraph_id: ParagraphId,
     index: ParagraphIndex,
     *,
-    neighbours_before: Optional[int] = None,
-    neighbours_after: Optional[int] = None,
+    neighbours_before: int | None = None,
+    neighbours_after: int | None = None,
     parents: bool = False,
     siblings: bool = False,
     replacements: bool = False,

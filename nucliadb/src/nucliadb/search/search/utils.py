@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -30,7 +29,7 @@ from nucliadb_utils.utilities import has_feature
 logger = logging.getLogger(__name__)
 
 
-async def filter_hidden_resources(kbid: str, show_hidden: bool) -> Optional[bool]:
+async def filter_hidden_resources(kbid: str, show_hidden: bool) -> bool | None:
     kb_config = await kb.get_config(kbid=kbid)
     hidden_enabled = kb_config and kb_config.hidden_resources_enabled
     if hidden_enabled and not show_hidden:
@@ -41,8 +40,8 @@ async def filter_hidden_resources(kbid: str, show_hidden: bool) -> Optional[bool
 
 def min_score_from_query_params(
     min_score_bm25: float,
-    min_score_semantic: Optional[float],
-    deprecated_min_score: Optional[float],
+    min_score_semantic: float | None,
+    deprecated_min_score: float | None,
 ) -> MinScore:
     # Keep backward compatibility with the deprecated min_score parameter
     semantic = deprecated_min_score if min_score_semantic is None else min_score_semantic

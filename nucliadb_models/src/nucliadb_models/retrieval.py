@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 from enum import Enum
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -40,17 +40,17 @@ class GraphQuery(BaseModel):
 
 
 class Query(BaseModel):
-    keyword: Optional[KeywordQuery] = None
-    semantic: Optional[SemanticQuery] = None
-    graph: Optional[GraphQuery] = None
+    keyword: KeywordQuery | None = None
+    semantic: SemanticQuery | None = None
+    graph: GraphQuery | None = None
 
 
 class Filters(BaseModel):
-    filter_expression: Optional[FilterExpression] = (
+    filter_expression: FilterExpression | None = (
         SearchParamDefaults.filter_expression.to_pydantic_field()
     )
     show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
-    security: Optional[RequestSecurity] = None
+    security: RequestSecurity | None = None
     with_duplicates: bool = False
 
 
@@ -58,7 +58,7 @@ class RetrievalRequest(BaseModel):
     query: Query
     top_k: int = Field(default=20, gt=0, le=500)
     filters: Filters = Field(default_factory=Filters)
-    rank_fusion: Union[RankFusionName, RankFusion] = Field(default=RankFusionName.RECIPROCAL_RANK_FUSION)
+    rank_fusion: RankFusionName | RankFusion = Field(default=RankFusionName.RECIPROCAL_RANK_FUSION)
 
 
 class ScoreSource(str, Enum):

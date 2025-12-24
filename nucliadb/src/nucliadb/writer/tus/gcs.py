@@ -28,7 +28,6 @@ import tempfile
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from typing import Optional
 from urllib.parse import quote_plus
 
 import aiohttp
@@ -74,11 +73,11 @@ RETRIABLE_EXCEPTIONS = (
 
 
 class GCloudBlobStore(BlobStore):
-    _session: Optional[aiohttp.ClientSession] = None
+    _session: aiohttp.ClientSession | None = None
     loop = None
     upload_url: str
     object_base_url: str
-    json_credentials: Optional[str]
+    json_credentials: str | None
     bucket: str
     location: str
     project: str
@@ -123,7 +122,7 @@ class GCloudBlobStore(BlobStore):
         project: str,
         bucket_labels,
         object_base_url: str,
-        json_credentials: Optional[str],
+        json_credentials: str | None,
     ):
         self.bucket = bucket
         self.source = CloudFile.Source.GCS
@@ -131,7 +130,7 @@ class GCloudBlobStore(BlobStore):
         self.project = project
         self.bucket_labels = bucket_labels
         self.object_base_url = object_base_url + "/storage/v1/b"
-        self.upload_url = object_base_url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"  # noqa
+        self.upload_url = object_base_url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"
         self.json_credentials = json_credentials
         self._credentials = None
 
@@ -311,7 +310,7 @@ class GCloudFileStorageManager(FileStorageManager):
             },
             data=data,
         ) as call:
-            text = await call.text()  # noqa
+            text = await call.text()
             if call.status not in [200, 201, 308]:
                 raise GoogleCloudException(f"{call.status}: {text}")
             return call

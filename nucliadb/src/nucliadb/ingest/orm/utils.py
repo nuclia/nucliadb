@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import urllib.parse
-from typing import Sequence
+from collections.abc import Sequence
 
 from nucliadb.models.internal.processing import PushPayload, PushTextFormat, Text
 from nucliadb_protos.resources_pb2 import (

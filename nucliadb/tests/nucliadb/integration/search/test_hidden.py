@@ -57,7 +57,7 @@ async def test_hidden_search(
 
     resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/suggest?query=title")
     assert resp.status_code == 200
-    assert set([r["rid"] for r in resp.json()["paragraphs"]["results"]]) == {r1, r2}
+    assert {r["rid"] for r in resp.json()["paragraphs"]["results"]} == {r1, r2}
 
     # Hide r1
     resp = await nucliadb_writer.patch(
@@ -73,7 +73,7 @@ async def test_hidden_search(
 
     resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/suggest?query=title")
     assert resp.status_code == 200
-    assert set([r["rid"] for r in resp.json()["paragraphs"]["results"]]) == {r2}
+    assert {r["rid"] for r in resp.json()["paragraphs"]["results"]} == {r2}
 
     # Unless show_hidden is passed, then both resources are returned
     resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/search?show_hidden=true")
@@ -84,7 +84,7 @@ async def test_hidden_search(
         f"/kb/{standalone_knowledgebox}/suggest?query=title&show_hidden=true"
     )
     assert resp.status_code == 200
-    assert set([r["rid"] for r in resp.json()["paragraphs"]["results"]]) == {r1, r2}
+    assert {r["rid"] for r in resp.json()["paragraphs"]["results"]} == {r1, r2}
 
     # Test catalog ternary filter
     resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/catalog")

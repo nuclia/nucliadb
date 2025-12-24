@@ -14,8 +14,9 @@
 
 import logging
 import os
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any
 
 import pyarrow as pa  # type: ignore
 
@@ -42,12 +43,12 @@ CHUNK_SIZE = 5 * 1024 * 1024
 @dataclass
 class LabelSetCount:
     count: int
-    labels: Dict[str, int] = field(default_factory=dict)
+    labels: dict[str, int] = field(default_factory=dict)
 
 
-class NucliaDataset(object):
-    labels: Optional[KnowledgeBoxLabels]
-    entities: Optional[KnowledgeBoxEntities]
+class NucliaDataset:
+    labels: KnowledgeBoxLabels | None
+    entities: KnowledgeBoxEntities | None
 
     def __new__(cls, *args, **kwargs):
         if cls is NucliaDataset:
@@ -56,18 +57,18 @@ class NucliaDataset(object):
 
     def __init__(
         self,
-        base_path: Optional[str] = None,
+        base_path: str | None = None,
     ):
         if base_path is None:
             base_path = os.getcwd()
         self.base_path = base_path
-        self.mappings: List[Callable] = []
+        self.mappings: list[Callable] = []
 
         self.labels = None
         self.entities = None
         self.folder = None
 
-    def iter_all_partitions(self, force=False) -> Iterator[Tuple[str, str]]:
+    def iter_all_partitions(self, force=False) -> Iterator[tuple[str, str]]:
         partitions = self.get_partitions()
         for index, partition in enumerate(partitions):
             logger.info(f"Reading partition {partition} {index}/{len(partitions)}")
@@ -75,7 +76,7 @@ class NucliaDataset(object):
             logger.info(f"Done reading partition {partition}")
             yield partition, filename
 
-    def read_all_partitions(self, force=False, path: Optional[str] = None) -> List[str]:
+    def read_all_partitions(self, force=False, path: str | None = None) -> list[str]:
         partitions = self.get_partitions()
         result = []
         for index, partition in enumerate(partitions):
@@ -91,9 +92,9 @@ class NucliaDataset(object):
     def read_partition(
         self,
         partition_id: str,
-        filename: Optional[str] = None,
+        filename: str | None = None,
         force: bool = False,
-        path: Optional[str] = None,
+        path: str | None = None,
     ):
         raise NotImplementedError()
 
@@ -103,12 +104,12 @@ class NucliaDBDataset(NucliaDataset):
         self,
         sdk: NucliaDB,
         kbid: str,
-        task: Optional[Task] = None,
-        labels: Optional[List[str]] = None,
-        trainset: Optional[Union[TrainSetPB, TrainSetModel]] = None,
-        base_path: Optional[str] = None,
-        search_sdk: Optional[NucliaDB] = None,
-        reader_sdk: Optional[NucliaDB] = None,
+        task: Task | None = None,
+        labels: list[str] | None = None,
+        trainset: TrainSetPB | TrainSetModel | None = None,
+        base_path: str | None = None,
+        search_sdk: NucliaDB | None = None,
+        reader_sdk: NucliaDB | None = None,
     ):
         super().__init__(base_path)
 
@@ -165,13 +166,13 @@ class NucliaDBDataset(NucliaDataset):
         streamer.initialize(partition_id)
         return streamer
 
-    def _set_mappings(self, funcs: List[Callable[[Any, Any], Tuple[Any, Any]]]):
+    def _set_mappings(self, funcs: list[Callable[[Any, Any], tuple[Any, Any]]]):
         self.mappings = funcs
 
     def _set_schema(self, schema: pa.Schema):
         self.schema = schema
 
-    def get_partitions(self) -> List[str]:
+    def get_partitions(self) -> list[str]:
         """
         Get expected number of partitions from a live NucliaDB
         """
@@ -183,9 +184,9 @@ class NucliaDBDataset(NucliaDataset):
     def read_partition(
         self,
         partition_id: str,
-        filename: Optional[str] = None,
+        filename: str | None = None,
         force: bool = False,
-        path: Optional[str] = None,
+        path: str | None = None,
     ):
         """
         Export an arrow partition from a live NucliaDB and store it locally
@@ -220,12 +221,12 @@ class NucliaDBDataset(NucliaDataset):
 
 def download_all_partitions(
     task: str,
-    slug: Optional[str] = None,
-    kbid: Optional[str] = None,
-    nucliadb_base_url: Optional[str] = "http://localhost:8080",
-    path: Optional[str] = None,
-    sdk: Optional[NucliaDB] = None,
-    labels: Optional[List[str]] = None,
+    slug: str | None = None,
+    kbid: str | None = None,
+    nucliadb_base_url: str | None = "http://localhost:8080",
+    path: str | None = None,
+    sdk: NucliaDB | None = None,
+    labels: list[str] | None = None,
 ):
     if sdk is None:
         sdk = NucliaDB(region="on-prem", url=nucliadb_base_url)

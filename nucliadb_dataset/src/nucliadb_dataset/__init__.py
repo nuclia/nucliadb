@@ -13,12 +13,11 @@
 # limitations under the License.
 
 from enum import Enum
-from typing import Dict
 
 from nucliadb_dataset.dataset import NucliaDBDataset, Task, download_all_partitions
 from nucliadb_dataset.nuclia import NucliaDriver
 
-NUCLIA_GLOBAL: Dict[str, NucliaDriver] = {}
+NUCLIA_GLOBAL: dict[str, NucliaDriver] = {}
 
 CLIENT_ID = "CLIENT"
 
@@ -29,10 +28,10 @@ class ExportType(str, Enum):
 
 
 __all__ = (
+    "CLIENT_ID",
+    "NUCLIA_GLOBAL",
+    "ExportType",
     "NucliaDBDataset",
     "Task",
     "download_all_partitions",
-    "NUCLIA_GLOBAL",
-    "CLIENT_ID",
-    "ExportType",
 )

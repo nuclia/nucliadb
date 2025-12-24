@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 from typing_extensions import assert_never
 
@@ -28,7 +27,7 @@ from nucliadb.search.search.query_parser.models import (
 from nucliadb_models.search import AskRequest, MaxTokens
 
 
-async def parse_ask(kbid: str, item: AskRequest, *, fetcher: Optional[Fetcher] = None) -> Generation:
+async def parse_ask(kbid: str, item: AskRequest, *, fetcher: Fetcher | None = None) -> Generation:
     fetcher = fetcher or fetcher_for_ask(kbid, item)
     parser = _AskParser(kbid, item, fetcher)
     return await parser.parse()

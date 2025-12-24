@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from typing import Annotated, Optional, Union
+from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
@@ -105,23 +105,23 @@ class GenericFieldHydration(BaseModel, extra="forbid"):
 
 
 class FieldHydration(BaseModel, extra="forbid"):
-    text: Optional[TextFieldHydration] = Field(
+    text: TextFieldHydration | None = Field(
         default_factory=TextFieldHydration,
         description="Text fields hydration options",
     )
-    file: Optional[FileFieldHydration] = Field(
+    file: FileFieldHydration | None = Field(
         default_factory=FileFieldHydration,
         description="File fields hydration options",
     )
-    link: Optional[LinkFieldHydration] = Field(
+    link: LinkFieldHydration | None = Field(
         default_factory=LinkFieldHydration,
         description="Link fields hydration options",
     )
-    conversation: Optional[ConversationFieldHydration] = Field(
+    conversation: ConversationFieldHydration | None = Field(
         default_factory=ConversationFieldHydration,
         description="Conversation fields hydration options",
     )
-    generic: Optional[GenericFieldHydration] = Field(
+    generic: GenericFieldHydration | None = Field(
         default_factory=GenericFieldHydration,
         description="Generic fields hydration options",
     )
@@ -141,7 +141,7 @@ class NeighbourParagraphHydration(BaseModel, extra="forbid"):
 
 
 class RelatedParagraphHydration(BaseModel, extra="forbid"):
-    neighbours: Optional[NeighbourParagraphHydration] = Field(
+    neighbours: NeighbourParagraphHydration | None = Field(
         default=None,
         description="Hydrate extra paragraphs that surround the original one",
     )
@@ -205,11 +205,11 @@ class ParagraphHydration(BaseModel, extra="forbid"):
         default=True,
         description="Hydrate paragraph text",
     )
-    image: Optional[ImageParagraphHydration] = Field(
+    image: ImageParagraphHydration | None = Field(
         default=None,
         description="Hydrate options for paragraphs extracted from images (using OCR, inception...)",
     )
-    table: Optional[TableParagraphHydration] = Field(
+    table: TableParagraphHydration | None = Field(
         default=None,
         description="Hydrate options for paragraphs extracted from tables",
     )
@@ -217,19 +217,19 @@ class ParagraphHydration(BaseModel, extra="forbid"):
     # TODO: at some point, we should add hydration options for paragraphs from
     # audio and video
 
-    page: Optional[ParagraphPageHydration] = Field(
+    page: ParagraphPageHydration | None = Field(
         default=None,
         description="Hydrte options for paragraphs within a page. This applies to paragraphs in fields with pages",
     )
 
-    related: Optional[RelatedParagraphHydration] = Field(
+    related: RelatedParagraphHydration | None = Field(
         default=None,
         description="Hydration options for related paragraphs. For example, neighbours or sibling paragraphs",
     )
 
 
 class Hydration(BaseModel, extra="forbid"):
-    resource: Optional[ResourceHydration] = Field(
+    resource: ResourceHydration | None = Field(
         default_factory=ResourceHydration,
         description="Resource hydration options",
     )
@@ -270,22 +270,22 @@ class HydratedResource(BaseModel, extra="forbid"):
     id: str = Field(description="Unique resource id")
     slug: str = Field(description="Resource slug")
 
-    title: Optional[str] = None
-    summary: Optional[str] = None
+    title: str | None = None
+    summary: str | None = None
 
-    origin: Optional[Origin] = None
+    origin: Origin | None = None
 
-    security: Optional[ResourceSecurity] = None
+    security: ResourceSecurity | None = None
 
     # TODO: add resource labels to hydrated resources
 
 
 class FieldExtractedData(BaseModel, extra="forbid"):
-    text: Optional[str] = None
+    text: str | None = None
 
 
 class SplitFieldExtractedData(BaseModel, extra="forbid"):
-    texts: Optional[dict[str, str]] = None
+    texts: dict[str, str] | None = None
 
 
 class HydratedTextField(BaseModel, extra="forbid"):
@@ -293,8 +293,8 @@ class HydratedTextField(BaseModel, extra="forbid"):
     resource: str = Field("Field resource id")
     field_type: FieldTypeName = FieldTypeName.TEXT
 
-    value: Optional[FieldText] = None
-    extracted: Optional[FieldExtractedData] = None
+    value: FieldText | None = None
+    extracted: FieldExtractedData | None = None
 
 
 class HydratedFileField(BaseModel, extra="forbid"):
@@ -302,10 +302,10 @@ class HydratedFileField(BaseModel, extra="forbid"):
     resource: str = Field("Field resource id")
     field_type: FieldTypeName = FieldTypeName.FILE
 
-    value: Optional[FieldFile] = None
-    extracted: Optional[FieldExtractedData] = None
+    value: FieldFile | None = None
+    extracted: FieldExtractedData | None = None
 
-    previews: Optional[dict[str, Image]] = Field(
+    previews: dict[str, Image] | None = Field(
         default=None,
         title="Previews of specific parts of the field",
         description=(
@@ -323,8 +323,8 @@ class HydratedLinkField(BaseModel, extra="forbid"):
     resource: str = Field("Field resource id")
     field_type: FieldTypeName = FieldTypeName.LINK
 
-    value: Optional[FieldLink] = None
-    extracted: Optional[FieldExtractedData] = None
+    value: FieldLink | None = None
+    extracted: FieldExtractedData | None = None
 
 
 class HydratedConversationField(BaseModel, extra="forbid"):
@@ -332,8 +332,8 @@ class HydratedConversationField(BaseModel, extra="forbid"):
     resource: str = Field("Field resource id")
     field_type: FieldTypeName = FieldTypeName.CONVERSATION
 
-    value: Optional[FieldConversation] = None
-    extracted: Optional[FieldExtractedData] = None
+    value: FieldConversation | None = None
+    extracted: FieldExtractedData | None = None
 
 
 class HydratedGenericField(BaseModel, extra="forbid"):
@@ -341,24 +341,24 @@ class HydratedGenericField(BaseModel, extra="forbid"):
     resource: str = Field("Field resource id")
     field_type: FieldTypeName = FieldTypeName.TEXT
 
-    value: Optional[str] = None
-    extracted: Optional[FieldExtractedData] = None
+    value: str | None = None
+    extracted: FieldExtractedData | None = None
 
 
 class RelatedNeighbourParagraphRefs(BaseModel, extra="forbid"):
-    before: Optional[list[str]] = None
-    after: Optional[list[str]] = None
+    before: list[str] | None = None
+    after: list[str] | None = None
 
 
 class RelatedParagraphRefs(BaseModel, extra="forbid"):
-    neighbours: Optional[RelatedNeighbourParagraphRefs] = None
-    parents: Optional[list[str]] = None
-    siblings: Optional[list[str]] = None
-    replacements: Optional[list[str]] = None
+    neighbours: RelatedNeighbourParagraphRefs | None = None
+    parents: list[str] | None = None
+    siblings: list[str] | None = None
+    replacements: list[str] | None = None
 
 
 class HydratedParagraphImage(BaseModel, extra="forbid"):
-    source_image: Optional[Image] = Field(
+    source_image: Image | None = Field(
         default=None,
         description=(
             "Source image for this paragraph. This only applies to paragraphs "
@@ -369,7 +369,7 @@ class HydratedParagraphImage(BaseModel, extra="forbid"):
 
 
 class HydratedParagraphTable(BaseModel, extra="forbid"):
-    page_preview_ref: Optional[str] = Field(
+    page_preview_ref: str | None = Field(
         default=None,
         description=(
             "Referento to the page preview for this paragraph. The actual "
@@ -381,7 +381,7 @@ class HydratedParagraphTable(BaseModel, extra="forbid"):
 
 
 class HydratedParagraphPage(BaseModel, extra="forbid"):
-    page_preview_ref: Optional[str] = Field(
+    page_preview_ref: str | None = Field(
         default=None,
         description=(
             "Reference to the page preview for this paragraph. The actual "
@@ -398,28 +398,26 @@ class HydratedParagraph(BaseModel, extra="forbid"):
     field: str = Field(description="Paragraph field id")
     resource: str = Field(description="Paragraph resource id")
 
-    text: Optional[str] = None
+    text: str | None = None
 
     # TODO: add labels to hydrated paragraphs
     # labels: Optional[list[str]] = None
 
-    related: Optional[RelatedParagraphRefs] = None
+    related: RelatedParagraphRefs | None = None
 
-    image: Optional[HydratedParagraphImage] = None
-    table: Optional[HydratedParagraphTable] = None
-    page: Optional[HydratedParagraphPage] = None
+    image: HydratedParagraphImage | None = None
+    table: HydratedParagraphTable | None = None
+    page: HydratedParagraphPage | None = None
 
 
 class Hydrated(BaseModel, extra="forbid"):
     resources: dict[str, HydratedResource]
     fields: dict[
         str,
-        Union[
-            HydratedTextField,
-            HydratedFileField,
-            HydratedLinkField,
-            HydratedConversationField,
-            HydratedGenericField,
-        ],
+        HydratedTextField
+        | HydratedFileField
+        | HydratedLinkField
+        | HydratedConversationField
+        | HydratedGenericField,
     ]
     paragraphs: dict[str, HydratedParagraph]

@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Optional
 
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.cluster.settings import in_standalone_mode
@@ -58,13 +57,13 @@ class ApplicationContext:
         self.service_name = service_name
         self._initialized: bool = False
         self._lock = asyncio.Lock()
-        self._kv_driver: Optional[Driver] = None
-        self._blob_storage: Optional[Storage] = None
-        self._shard_manager: Optional[KBShardManager] = None
-        self._partitioning: Optional[PartitionUtility] = None
-        self._nats_manager: Optional[NatsConnectionManager] = None
-        self._transaction: Optional[TransactionUtility] = None
-        self._nidx: Optional[NidxUtility] = None
+        self._kv_driver: Driver | None = None
+        self._blob_storage: Storage | None = None
+        self._shard_manager: KBShardManager | None = None
+        self._partitioning: PartitionUtility | None = None
+        self._nats_manager: NatsConnectionManager | None = None
+        self._transaction: TransactionUtility | None = None
+        self._nidx: NidxUtility | None = None
         self.enabled_kv_driver = kv_driver
         self.enabled_blob_storage = blob_storage
         self.enabled_shard_manager = shard_manager

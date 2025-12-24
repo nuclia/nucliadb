@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
-from typing import Optional, Union
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
@@ -67,7 +66,7 @@ async def ask_knowledgebox_endpoint(
         description="When set to true, outputs response as JSON in a non-streaming way. "
         "This is slower and requires waiting for entire answer to be ready.",
     ),
-) -> Union[StreamingResponse, HTTPClientError, Response]:
+) -> StreamingResponse | HTTPClientError | Response:
     current_user: NucliaUser = request.user
     # If present, security groups from AuthorizationBackend overrides any
     # security group of the payload
@@ -116,8 +115,8 @@ async def create_ask_response(
     client_type: NucliaDBClientType,
     origin: str,
     x_synchronous: bool,
-    resource: Optional[str] = None,
-    extra_predict_headers: Optional[dict[str, str]] = None,
+    resource: str | None = None,
+    extra_predict_headers: dict[str, str] | None = None,
 ) -> Response:
     maybe_log_request_payload(kbid, "/ask", ask_request)
     ask_request.max_tokens = parse_max_tokens(ask_request.max_tokens)

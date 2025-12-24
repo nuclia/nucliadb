@@ -18,23 +18,22 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from typing import Dict, Optional
 
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    gcs_deadletter_bucket: Optional[str] = None
-    gcs_indexing_bucket: Optional[str] = None
+    gcs_deadletter_bucket: str | None = None
+    gcs_indexing_bucket: str | None = None
 
     gcs_threads: int = 3
-    gcs_labels: Dict[str, str] = {}
+    gcs_labels: dict[str, str] = {}
 
-    s3_deadletter_bucket: Optional[str] = None
-    s3_indexing_bucket: Optional[str] = None
+    s3_deadletter_bucket: str | None = None
+    s3_indexing_bucket: str | None = None
 
-    azure_deadletter_bucket: Optional[str] = None
-    azure_indexing_bucket: Optional[str] = None
+    azure_deadletter_bucket: str | None = None
+    azure_indexing_bucket: str | None = None
 
     local_testing_files: str = os.path.dirname(__file__)
 

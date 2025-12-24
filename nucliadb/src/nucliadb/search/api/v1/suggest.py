@@ -19,7 +19,6 @@
 #
 import json
 from datetime import datetime
-from typing import Optional, Union
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
@@ -64,20 +63,18 @@ async def suggest_knowledgebox(
     response: Response,
     kbid: str,
     query: str = fastapi_query(SearchParamDefaults.suggest_query),
-    filter_expression: Optional[str] = fastapi_query(
+    filter_expression: str | None = fastapi_query(
         SearchParamDefaults.filter_expression, include_in_schema=False
     ),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
-    range_creation_start: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_start),
-    range_creation_end: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_end),
-    range_modification_start: Optional[DateTime] = fastapi_query(
+    range_creation_start: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_end),
+    range_modification_start: DateTime | None = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
-    range_modification_end: Optional[DateTime] = fastapi_query(
-        SearchParamDefaults.range_modification_end
-    ),
+    range_modification_end: DateTime | None = fastapi_query(SearchParamDefaults.range_modification_end),
     features: list[SuggestOptions] = fastapi_query(SearchParamDefaults.suggest_features),
     show: list[ResourceProperties] = fastapi_query(SearchParamDefaults.show),
     field_type_filter: list[FieldTypeName] = fastapi_query(
@@ -89,7 +86,7 @@ async def suggest_knowledgebox(
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
     show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
-) -> Union[KnowledgeboxSuggestResults, HTTPClientError]:
+) -> KnowledgeboxSuggestResults | HTTPClientError:
     try:
         expr = FilterExpression.model_validate_json(filter_expression) if filter_expression else None
 
@@ -126,14 +123,14 @@ async def suggest(
     response,
     kbid: str,
     query: str,
-    filter_expression: Optional[FilterExpression],
+    filter_expression: FilterExpression | None,
     fields: list[str],
     filters: list[str],
     faceted: list[str],
-    range_creation_start: Optional[datetime],
-    range_creation_end: Optional[datetime],
-    range_modification_start: Optional[datetime],
-    range_modification_end: Optional[datetime],
+    range_creation_start: datetime | None,
+    range_creation_end: datetime | None,
+    range_modification_start: datetime | None,
+    range_modification_end: datetime | None,
     features: list[SuggestOptions],
     show: list[ResourceProperties],
     field_type_filter: list[FieldTypeName],

@@ -17,17 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 from nucliadb.ingest.settings import DriverSettings
 
 
 class Settings(DriverSettings):
     grpc_port: int = 8031
-    train_grpc_address: Optional[str] = None
+    train_grpc_address: str | None = None
 
-    nuclia_learning_url: Optional[str] = "https://nuclia.cloud/api/v1/learning/"
-    nuclia_learning_apikey: Optional[str] = None
+    nuclia_learning_url: str | None = "https://nuclia.cloud/api/v1/learning/"
+    nuclia_learning_apikey: str | None = None
 
     internal_counter_api: str = "http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{kbid}/counters"
 

@@ -309,7 +309,7 @@ async def test_catalog_status_filters(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == 1
-    assert list(body["resources"].values())[0]["metadata"]["status"] == "PENDING"
+    assert next(iter(body["resources"].values()))["metadata"]["status"] == "PENDING"
 
     # AND filter
     resp = await nucliadb_reader.post(

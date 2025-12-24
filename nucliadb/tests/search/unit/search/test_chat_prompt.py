@@ -384,7 +384,7 @@ async def test_hierarchy_promp_context(kb):
         )
         assert (
             context.output[f"{rid}/f/f1/0-10"]
-            == "DOCUMENT: Title text \n SUMMARY: Summary text \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n First paragraph text \n\n \n EXTRACTED BLOCK: \n Second paragraph text"  # noqa
+            == "DOCUMENT: Title text \n SUMMARY: Summary text \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n First paragraph text \n\n \n EXTRACTED BLOCK: \n Second paragraph text"
         )
         # Chec that the original text of the paragraphs is preserved
         assert ordered_paragraphs[0].text == "First paragraph text"

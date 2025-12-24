@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Iterator, List
+from collections.abc import Iterator
 
 import grpc
 
@@ -54,8 +54,7 @@ class NucliaDriver:
         request.metadata.labels = labels
         request.metadata.entities = entities
         request.metadata.text = text
-        for sentence in self.stub.GetSentences(request):
-            yield sentence
+        yield from self.stub.GetSentences(request)
 
     def iterate_paragraphs(
         self, kbid: str, labels: bool, entities: bool, text: bool
@@ -65,8 +64,7 @@ class NucliaDriver:
         request.metadata.labels = labels
         request.metadata.entities = entities
         request.metadata.text = text
-        for paragraph in self.stub.GetParagraphs(request):
-            yield paragraph
+        yield from self.stub.GetParagraphs(request)
 
     def iterate_resources(
         self, kbid: str, labels: bool, entities: bool, text: bool
@@ -76,8 +74,7 @@ class NucliaDriver:
         request.metadata.labels = labels
         request.metadata.entities = entities
         request.metadata.text = text
-        for resource in self.stub.GetResources(request):
-            yield resource
+        yield from self.stub.GetResources(request)
 
     def iterate_fields(
         self, kbid: str, labels: bool, entities: bool, text: bool
@@ -87,8 +84,7 @@ class NucliaDriver:
         request.metadata.labels = labels
         request.metadata.entities = entities
         request.metadata.text = text
-        for field in self.stub.GetFields(request):
-            yield field
+        yield from self.stub.GetFields(request)
 
     def get_labels(self, kbid: str) -> GetLabelsResponse:
         request = GetLabelsRequest()
@@ -106,7 +102,7 @@ class NucliaDriver:
         return self.stub.GetInfo(request)
 
     def get_ontology_count(
-        self, kbid: str, paragraph_labelsets: List[str], resource_labelsets: List[str]
+        self, kbid: str, paragraph_labelsets: list[str], resource_labelsets: list[str]
     ) -> LabelsetsCount:
         request = GetLabelsetsCountRequest()
         request.kb.uuid = kbid

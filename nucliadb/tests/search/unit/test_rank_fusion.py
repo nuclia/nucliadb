@@ -25,7 +25,6 @@ This test suite validates different combinations of inputs
 """
 
 import random
-from typing import Optional, Type
 from unittest.mock import patch
 
 import pytest
@@ -64,7 +63,7 @@ def disable_hidden_resources_check():
     ],
 )
 async def test_get_rank_fusion(
-    maindb_driver: Driver, dummy_predict: PredictEngine, rank_fusion, expected_type: Type
+    maindb_driver: Driver, dummy_predict: PredictEngine, rank_fusion, expected_type: type
 ):
     item = FindRequest(rank_fusion=rank_fusion)
     parsed = await parse_find("kbid", item)
@@ -74,7 +73,7 @@ async def test_get_rank_fusion(
 
 
 def gen_keyword_result(
-    score: float, rid: Optional[str] = None, force_id: Optional[str] = None
+    score: float, rid: str | None = None, force_id: str | None = None
 ) -> TextBlockMatch:
     assert (rid is None and force_id is not None) or (rid is not None and force_id is None)
     if force_id is None:
@@ -94,7 +93,7 @@ def gen_keyword_result(
 
 
 def gen_semantic_result(
-    score: float, rid: Optional[str] = None, force_id: Optional[str] = None
+    score: float, rid: str | None = None, force_id: str | None = None
 ) -> TextBlockMatch:
     assert (rid is None and force_id is not None) or (rid is not None and force_id is None)
     if force_id is None:
@@ -113,7 +112,7 @@ def gen_semantic_result(
     return semantic_result_to_text_block_match(result)
 
 
-def gen_graph_result(rid: Optional[str] = None, force_id: Optional[str] = None) -> TextBlockMatch:
+def gen_graph_result(rid: str | None = None, force_id: str | None = None) -> TextBlockMatch:
     assert (rid is None and force_id is not None) or (rid is not None and force_id is None)
     if force_id is None:
         start = random.randint(0, 100)

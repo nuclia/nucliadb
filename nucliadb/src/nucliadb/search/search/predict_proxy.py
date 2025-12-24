@@ -19,7 +19,7 @@
 #
 import json
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any
 
 import aiohttp
 from fastapi.datastructures import QueryParams
@@ -78,9 +78,9 @@ async def predict_proxy(
     user_id: str,
     client_type: NucliaDBClientType,
     origin: str,
-    json: Optional[Any] = None,
+    json: Any | None = None,
     headers: dict[str, str] = {},
-) -> Union[Response, StreamingResponse]:
+) -> Response | StreamingResponse:
     if not await exists_kb(kbid=kbid):
         raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
@@ -100,7 +100,7 @@ async def predict_proxy(
 
     status_code = predict_response.status
     media_type = predict_response.headers.get("Content-Type")
-    response: Union[Response, StreamingResponse]
+    response: Response | StreamingResponse
     user_query = json.get("question") if json is not None else ""
     if predict_response.headers.get("Transfer-Encoding") == "chunked":
         if endpoint == PredictProxiedEndpoints.CHAT:
@@ -250,10 +250,10 @@ def audit_predict_proxy_endpoint(
     client_type: NucliaDBClientType,
     origin: str,
     text_answer: bytes,
-    text_reasoning: Optional[str],
+    text_reasoning: str | None,
     generative_answer_time: float,
-    generative_answer_first_chunk_time: Optional[float],
-    generative_reasoning_first_chunk_time: Optional[float],
+    generative_answer_first_chunk_time: float | None,
+    generative_reasoning_first_chunk_time: float | None,
     status_code: AnswerStatusCode,
 ):
     maybe_audit_chat(

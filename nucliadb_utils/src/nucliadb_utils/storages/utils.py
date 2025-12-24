@@ -19,7 +19,6 @@
 #
 
 from dataclasses import dataclass
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -41,8 +40,8 @@ class Range:
     The start and end values are 0-based.
     """
 
-    start: Optional[int] = None
-    end: Optional[int] = None
+    start: int | None = None
+    end: int | None = None
 
     def any(self) -> bool:
         return self.start is not None or self.end is not None

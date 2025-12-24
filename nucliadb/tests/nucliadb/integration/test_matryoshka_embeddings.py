@@ -136,6 +136,4 @@ async def test_matryoshka_embeddings(
     # As all vectors normalized are the same, an entire page is returned and all
     # vectors have the same score
     assert len(results["sentences"]["results"]) == 20
-    assert (
-        len(set((semantic_result["score"] for semantic_result in results["sentences"]["results"]))) == 1
-    )
+    assert len({semantic_result["score"] for semantic_result in results["sentences"]["results"]}) == 1

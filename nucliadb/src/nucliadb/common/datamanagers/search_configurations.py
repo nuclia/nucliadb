@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-from typing import Optional
 
 from pydantic import TypeAdapter
 
@@ -31,7 +30,7 @@ KB_SEARCH_CONFIGURATION_PREFIX = "/kbs/{kbid}/search_configuration"
 KB_SEARCH_CONFIGURATION = "/kbs/{kbid}/search_configuration/{name}"
 
 
-async def get(txn: Transaction, *, kbid: str, name: str) -> Optional[SearchConfiguration]:
+async def get(txn: Transaction, *, kbid: str, name: str) -> SearchConfiguration | None:
     key = KB_SEARCH_CONFIGURATION.format(kbid=kbid, name=name)
     data = await txn.get(key, for_update=True)
     if not data:

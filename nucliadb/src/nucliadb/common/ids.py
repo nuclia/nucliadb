@@ -24,7 +24,6 @@ paragraphs... Avoiding spread of id construction and parsing everywhere
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 from nucliadb_models.common import FieldTypeName
 from nucliadb_protos.resources_pb2 import FieldType
@@ -77,7 +76,7 @@ class FieldId:
     type: str
     key: str
     # also knwon as `split`, this indicates a part of a field in, for example, conversations
-    subfield_id: Optional[str] = None
+    subfield_id: str | None = None
 
     @classmethod
     def from_string(cls, value: str) -> "FieldId":
@@ -113,7 +112,7 @@ class FieldId:
 
     @classmethod
     def from_pb(
-        cls, rid: str, field_type: FieldType.ValueType, key: str, subfield_id: Optional[str] = None
+        cls, rid: str, field_type: FieldType.ValueType, key: str, subfield_id: str | None = None
     ) -> "FieldId":
         return cls(rid=rid, type=FIELD_TYPE_PB_TO_STR[field_type], key=key, subfield_id=subfield_id)
 
@@ -265,7 +264,7 @@ class VectorId:
         return hash(self.full())
 
 
-def extract_data_augmentation_id(generated_field_id: str) -> Optional[str]:
+def extract_data_augmentation_id(generated_field_id: str) -> str | None:
     """Data augmentation generated fields have a strict id with the following
     format:
     `da-{task_id}-{original:field_type}-{original:field_id}[-{original:split}]`

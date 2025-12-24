@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 
 import backoff
 
@@ -56,7 +56,7 @@ async def resource_exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
 # id and slug
 
 
-async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str) -> Optional[str]:
+async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str) -> str | None:
     encoded_uuid = await txn.get(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug, for_update=False))
     if not encoded_uuid:
         return None
@@ -65,7 +65,7 @@ async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str)
 
 async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
     key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug)
-    encoded_slug: Optional[bytes] = await txn.get(key)
+    encoded_slug: bytes | None = await txn.get(key)
     return encoded_slug not in (None, b"")
 
 
@@ -97,7 +97,7 @@ async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -
 @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
 async def get_resource_shard_id(
     txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
-) -> Optional[str]:
+) -> str | None:
     key = KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid)
     shard = await txn.get(key, for_update=for_update)
     if shard is not None:
@@ -113,7 +113,7 @@ async def set_resource_shard_id(txn: Transaction, *, kbid: str, rid: str, shard:
 # Basic
 
 
-async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> Optional[resources_pb2.Basic]:
+async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Basic | None:
     raw = await get_basic_raw(txn, kbid=kbid, rid=rid)
     if raw is None:
         return None
@@ -122,7 +122,7 @@ async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> Optional[resour
     return basic
 
 
-async def get_basic_raw(txn: Transaction, *, kbid: str, rid: str) -> Optional[bytes]:
+async def get_basic_raw(txn: Transaction, *, kbid: str, rid: str) -> bytes | None:
     if ingest_settings.driver == "local":
         raw_basic = await txn.get(KB_RESOURCE_BASIC_FS.format(kbid=kbid, uuid=rid))
     else:
@@ -146,7 +146,7 @@ async def set_basic(txn: Transaction, *, kbid: str, rid: str, basic: resources_p
 # Origin
 
 
-async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> Optional[resources_pb2.Origin]:
+async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Origin | None:
     key = KB_RESOURCE_ORIGIN.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Origin)
 
@@ -159,7 +159,7 @@ async def set_origin(txn: Transaction, *, kbid: str, rid: str, origin: resources
 # Extra
 
 
-async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> Optional[resources_pb2.Extra]:
+async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Extra | None:
     key = KB_RESOURCE_EXTRA.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Extra)
 
@@ -172,7 +172,7 @@ async def set_extra(txn: Transaction, *, kbid: str, rid: str, extra: resources_p
 # Security
 
 
-async def get_security(txn: Transaction, *, kbid: str, rid: str) -> Optional[resources_pb2.Security]:
+async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Security | None:
     key = KB_RESOURCE_SECURITY.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Security)
 
@@ -260,7 +260,7 @@ async def set_number_of_resources(txn: Transaction, kbid: str, value: int) -> No
 
 async def get_all_field_ids(
     txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
-) -> Optional[resources_pb2.AllFieldIDs]:
+) -> resources_pb2.AllFieldIDs | None:
     key = KB_RESOURCE_ALL_FIELDS.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.AllFieldIDs, for_update=for_update)
 

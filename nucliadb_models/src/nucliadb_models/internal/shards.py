@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 from enum import Enum
-from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -58,9 +57,9 @@ class ShardReplica(BaseModel):
 
 class ShardObject(BaseModel):
     shard: str
-    nidx_shard_id: Optional[str]
+    nidx_shard_id: str | None
 
 
 class KnowledgeboxShards(BaseModel):
     kbid: str
-    shards: List[ShardObject]
+    shards: list[ShardObject]

@@ -21,8 +21,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Optional
+from typing import Any
 
 import backoff
 import psycopg
@@ -72,7 +73,7 @@ class DataLayer:
         self.connection = connection
         self.log_on_select_for_update = settings.driver_pg_log_on_select_for_update
 
-    async def get(self, key: str, select_for_update: bool = False) -> Optional[bytes]:
+    async def get(self, key: str, select_for_update: bool = False) -> bytes | None:
         with pg_observer({"type": "get"}):
             statement = "SELECT value FROM resources WHERE key = %s"
             if select_for_update:
@@ -116,7 +117,7 @@ class DataLayer:
             async with self.connection.cursor() as cur:
                 await cur.execute("DELETE FROM resources WHERE key LIKE %s", (prefix + "%",))
 
-    async def batch_get(self, keys: list[str], select_for_update: bool = False) -> list[Optional[bytes]]:
+    async def batch_get(self, keys: list[str], select_for_update: bool = False) -> list[bytes | None]:
         with pg_observer({"type": "batch_get"}):
             async with self.connection.cursor() as cur:
                 statement = "SELECT key, value FROM resources WHERE key = ANY(%s)"
@@ -134,7 +135,7 @@ class DataLayer:
         prefix: str,
         limit: int = DEFAULT_SCAN_LIMIT,
         include_start: bool = True,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         query = "SELECT key FROM resources WHERE key LIKE %s ORDER BY key"
 
         args: list[Any] = [prefix + "%"]
@@ -190,7 +191,7 @@ class PGTransaction(Transaction):
     async def batch_get(self, keys: list[str], for_update: bool = True):
         return await self.data_layer.batch_get(keys, select_for_update=for_update)
 
-    async def get(self, key: str, for_update: bool = True) -> Optional[bytes]:
+    async def get(self, key: str, for_update: bool = True) -> bytes | None:
         return await self.data_layer.get(key, select_for_update=for_update)
 
     async def set(self, key: str, value: bytes):
@@ -243,7 +244,7 @@ class ReadOnlyPGTransaction(Transaction):
             return await DataLayer(conn).batch_get(keys, select_for_update=False)
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
-    async def get(self, key: str, for_update: bool = False) -> Optional[bytes]:
+    async def get(self, key: str, for_update: bool = False) -> bytes | None:
         async with self.driver._get_connection() as conn:
             return await DataLayer(conn).get(key, select_for_update=False)
 
@@ -330,7 +331,7 @@ class PGDriver(Driver):
             metric.set(value)
 
     @asynccontextmanager
-    async def _transaction(self, *, read_only: bool) -> AsyncGenerator[Transaction, None]:
+    async def _transaction(self, *, read_only: bool) -> AsyncGenerator[Transaction]:
         if read_only:
             yield ReadOnlyPGTransaction(self)
         else:
@@ -343,7 +344,7 @@ class PGDriver(Driver):
                         await txn.abort()
 
     @asynccontextmanager
-    async def _get_connection(self) -> AsyncGenerator[psycopg.AsyncConnection, None]:
+    async def _get_connection(self) -> AsyncGenerator[psycopg.AsyncConnection]:
         timeout = self.acquire_timeout_ms / 1000
         # Manual retry loop since backoff.on_exception does not play well with async context managers
         retries = 0

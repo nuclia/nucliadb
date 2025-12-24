@@ -17,14 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 import pydantic
 import pydantic_settings
 
 
 class Settings(pydantic_settings.BaseSettings):
-    redis_url: Optional[str] = None
+    redis_url: str | None = None
     max_concurrent_migrations: int = pydantic.Field(
         default=5,
         description="Maximum number of concurrent KB migrations allowed.",

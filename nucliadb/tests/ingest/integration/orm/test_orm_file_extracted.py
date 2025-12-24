@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from os.path import dirname, getsize
-from typing import Optional
 from uuid import uuid4
 
 from nucliadb.ingest.fields.file import File
@@ -65,7 +64,7 @@ async def test_create_resource_orm_file_extracted(
     field_obj: File = await r.get_field(ex1.field, FieldType.FILE, load=False)
     await field_obj.set_file_extracted_data(ex1)
 
-    ex2: Optional[FileExtractedData] = await field_obj.get_file_extracted_data()
+    ex2: FileExtractedData | None = await field_obj.get_file_extracted_data()
     assert ex2 is not None
     assert ex2.md5 == ex1.md5
     assert ex2.file_generated["asd"].source == storage.source

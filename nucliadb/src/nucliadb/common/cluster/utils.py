@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import backoff
 from nidx_protos import nodereader_pb2
@@ -46,13 +46,13 @@ logger = logging.getLogger(__name__)
 _lock = asyncio.Lock()
 
 
-async def setup_cluster() -> Union[KBShardManager, StandaloneKBShardManager]:
+async def setup_cluster() -> KBShardManager | StandaloneKBShardManager:
     async with _lock:
         if get_utility(Utility.SHARD_MANAGER) is not None:
             # already setup
             return get_utility(Utility.SHARD_MANAGER)
 
-        mng: Union[KBShardManager, StandaloneKBShardManager]
+        mng: KBShardManager | StandaloneKBShardManager
         if settings.standalone_mode:
             mng = StandaloneKBShardManager()
         else:
@@ -70,7 +70,7 @@ def get_shard_manager() -> KBShardManager:
     return get_utility(Utility.SHARD_MANAGER)  # type: ignore
 
 
-async def get_resource(kbid: str, resource_id: str) -> Optional[Resource]:
+async def get_resource(kbid: str, resource_id: str) -> Resource | None:
     async with datamanagers.with_ro_transaction() as txn:
         return await Resource.get(txn, kbid=kbid, rid=resource_id)
 
@@ -78,7 +78,7 @@ async def get_resource(kbid: str, resource_id: str) -> Optional[Resource]:
 @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8)
 async def get_rollover_resource_index_message(
     kbid: str, resource_id: str
-) -> Optional[nodereader_pb2.Resource]:
+) -> nodereader_pb2.Resource | None:
     async with datamanagers.with_ro_transaction() as txn:
         resource = await Resource.get(txn, kbid=kbid, rid=resource_id)
         if resource is None:
@@ -98,7 +98,7 @@ async def index_resource_to_shard(
     kbid: str,
     resource_id: str,
     shard: writer_pb2.ShardObject,
-    resource_index_message: Optional[nodereader_pb2.Resource] = None,
+    resource_index_message: nodereader_pb2.Resource | None = None,
 ) -> None:
     logger.info("Indexing resource", extra={"kbid": kbid, "resource_id": resource_id})
     sm = app_context.shard_manager

@@ -24,7 +24,7 @@ import inspect
 import logging
 from concurrent.futures.thread import ThreadPoolExecutor
 from enum import Enum
-from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_telemetry.metrics import Counter
@@ -87,23 +87,21 @@ class Utility(str, Enum):
     NIDX = "nidx"
 
 
-def get_utility(ident: Union[Utility, str]):
+def get_utility(ident: Utility | str):
     return MAIN.get(ident)
 
 
-def set_utility(ident: Union[Utility, str], util: Any):
+def set_utility(ident: Utility | str, util: Any):
     if ident in MAIN:
         logger.warning(f"Overwriting previously set utility {ident}: {MAIN[ident]} with {util}")
     MAIN[ident] = util
 
 
-def clean_utility(ident: Union[Utility, str]):
+def clean_utility(ident: Utility | str):
     MAIN.pop(ident, None)
 
 
-async def get_storage(
-    gcs_scopes: Optional[List[str]] = None, service_name: Optional[str] = None
-) -> Storage:
+async def get_storage(gcs_scopes: list[str] | None = None, service_name: str | None = None) -> Storage:
     if Utility.STORAGE in MAIN:
         return MAIN[Utility.STORAGE]
 
@@ -113,7 +111,7 @@ async def get_storage(
     return MAIN[Utility.STORAGE]
 
 
-async def _create_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
+async def _create_storage(gcs_scopes: list[str] | None = None) -> Storage:
     if storage_settings.file_backend == FileBackendConfig.AZURE:
         from nucliadb_utils.storages.azure import AzureStorage
 
@@ -192,7 +190,7 @@ async def _create_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
 
 
 async def teardown_storage() -> None:
-    storage: Optional[Storage] = get_utility(Utility.STORAGE)
+    storage: Storage | None = get_utility(Utility.STORAGE)
     if storage is None:
         return
     await storage.finalize()
@@ -224,8 +222,8 @@ async def get_nuclia_storage() -> NucliaStorage:
     return MAIN.get(Utility.NUCLIA_STORAGE, None)
 
 
-async def get_pubsub() -> Optional[PubSubDriver]:
-    driver: Optional[PubSubDriver] = get_utility(Utility.PUBSUB)
+async def get_pubsub() -> PubSubDriver | None:
+    driver: PubSubDriver | None = get_utility(Utility.PUBSUB)
     if driver is None:
         if cache_settings.cache_pubsub_nats_url:
             logger.info("Configuring nats pubsub")
@@ -283,7 +281,7 @@ async def finalize_utilities():
 
 
 async def start_transaction_utility(
-    service_name: Optional[str] = None,
+    service_name: str | None = None,
 ) -> TransactionUtility:
     from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
 
@@ -293,9 +291,7 @@ async def start_transaction_utility(
         return current
 
     if transaction_settings.transaction_local:
-        transaction_utility: Union[LocalTransactionUtility, TransactionUtility] = (
-            LocalTransactionUtility()
-        )
+        transaction_utility: LocalTransactionUtility | TransactionUtility = LocalTransactionUtility()
     elif transaction_settings.transaction_jetstream_servers is not None:
         transaction_utility = TransactionUtility(
             nats_creds=transaction_settings.transaction_jetstream_auth,
@@ -318,7 +314,7 @@ async def stop_transaction_utility() -> None:
         clean_utility(Utility.TRANSACTION)
 
 
-def get_audit() -> Optional[AuditStorage]:
+def get_audit() -> AuditStorage | None:
     return get_utility(Utility.AUDIT)
 
 
@@ -345,7 +341,7 @@ def register_audit_utility(service: str) -> AuditStorage:
 
 
 async def start_audit_utility(service: str):
-    audit_utility: Optional[AuditStorage] = get_utility(Utility.AUDIT)
+    audit_utility: AuditStorage | None = get_utility(Utility.AUDIT)
     if audit_utility is not None and audit_utility.initialized is True:
         return
 
@@ -363,7 +359,7 @@ async def stop_audit_utility():
 
 
 async def start_nats_manager(
-    service_name: str, nats_servers: list[str], nats_creds: Optional[str] = None
+    service_name: str, nats_servers: list[str], nats_creds: str | None = None
 ) -> NatsConnectionManager:
     util = get_utility(Utility.NATS_MANAGER)
     if util is not None:
@@ -413,8 +409,8 @@ X_ACCOUNT_TYPE_HEADER = "X-NUCLIADB-ACCOUNT-TYPE"
 def has_feature(
     name: str,
     default: bool = False,
-    context: Optional[dict[str, str]] = None,
-    headers: Optional[dict[str, str]] = None,
+    context: dict[str, str] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> bool:
     if context is None:
         context = {}

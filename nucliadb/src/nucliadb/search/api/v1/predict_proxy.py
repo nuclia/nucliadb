@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
-from typing import Union
 
 from fastapi import Header, Request
 from fastapi.responses import Response, StreamingResponse
@@ -68,7 +67,7 @@ async def predict_proxy_endpoint(
     x_nucliadb_user: str = Header(""),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_forwarded_for: str = Header(""),
-) -> Union[Response, StreamingResponse, HTTPClientError]:
+) -> Response | StreamingResponse | HTTPClientError:
     try:
         payload = await request.json()
     except json.JSONDecodeError:

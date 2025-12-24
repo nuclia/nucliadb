@@ -17,15 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     dm_enabled: bool = True
-    dm_redis_host: Optional[str] = None
-    dm_redis_port: Optional[int] = None
+    dm_redis_host: str | None = None
+    dm_redis_port: int | None = None
 
 
 settings = Settings()

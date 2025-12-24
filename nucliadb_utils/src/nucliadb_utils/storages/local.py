@@ -23,8 +23,8 @@ import glob
 import json
 import os
 import shutil
+from collections.abc import AsyncGenerator, AsyncIterator
 from datetime import datetime
-from typing import AsyncGenerator, AsyncIterator, Optional
 
 import aiofiles
 
@@ -38,7 +38,7 @@ class LocalStorageField(StorageField):
     storage: LocalStorage
     _handler = None
 
-    def metadata_key(self, uri: Optional[str] = None):
+    def metadata_key(self, uri: str | None = None):
         if uri is None and self.field is not None:
             return f"{self.field.uri}.metadata"
         elif uri is None and self.key is not None:
@@ -73,7 +73,7 @@ class LocalStorageField(StorageField):
         destination_path = f"{destination_bucket_path}/{destination_uri}"
         shutil.copy(origin_path, destination_path)
 
-    async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
+    async def iter_data(self, range: Range | None = None) -> AsyncGenerator[bytes]:
         range = range or Range()
         key = self.field.uri if self.field else self.key
         if self.field is None:
@@ -191,7 +191,7 @@ class LocalStorageField(StorageField):
         self.field.ClearField("offset")
         self.field.ClearField("upload_uri")
 
-    async def exists(self) -> Optional[ObjectMetadata]:
+    async def exists(self) -> ObjectMetadata | None:
         file_path = self.storage.get_file_path(self.bucket, self.key)
         metadata_path = self.metadata_key(file_path)
         if os.path.exists(metadata_path):
@@ -218,7 +218,7 @@ class LocalStorage(Storage):
     field_klass = LocalStorageField
     chunk_size = CHUNK_SIZE
 
-    def __init__(self, local_testing_files: str, indexing_bucket: Optional[str] = None):
+    def __init__(self, local_testing_files: str, indexing_bucket: str | None = None):
         self.local_testing_files = local_testing_files.rstrip("/")
         self.bucket_format = "ndb_{kbid}"
         self.source = CloudFile.LOCAL
@@ -281,8 +281,8 @@ class LocalStorage(Storage):
         return deleted
 
     async def iterate_objects(
-        self, bucket: str, prefix: str, start: Optional[str] = None
-    ) -> AsyncGenerator[ObjectInfo, None]:
+        self, bucket: str, prefix: str, start: str | None = None
+    ) -> AsyncGenerator[ObjectInfo]:
         bucket_path = self.get_bucket_path(bucket)
         pathname = f"{self.get_file_path(bucket, prefix)}**/*"
         for key in sorted(glob.glob(pathname, recursive=True)):
@@ -296,7 +296,7 @@ class LocalStorage(Storage):
                 continue
             yield ObjectInfo(name=name)
 
-    async def download(self, bucket: str, key: str, range: Optional[Range] = None):
+    async def download(self, bucket: str, key: str, range: Range | None = None):
         key_path = self.get_file_path(bucket, key)
         if not os.path.exists(key_path):
             return

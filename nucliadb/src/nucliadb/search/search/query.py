@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from nidx_protos import nodereader_pb2
 from nidx_protos.noderesources_pb2 import Resource
@@ -42,16 +42,16 @@ async def paragraph_query_to_pb(
     kbid: str,
     rid: str,
     query: str,
-    filter_expression: Optional[FilterExpression],
+    filter_expression: FilterExpression | None,
     fields: list[str],
     filters: list[str],
     faceted: list[str],
     top_k: int,
-    range_creation_start: Optional[datetime] = None,
-    range_creation_end: Optional[datetime] = None,
-    range_modification_start: Optional[datetime] = None,
-    range_modification_end: Optional[datetime] = None,
-    sort: Optional[str] = None,
+    range_creation_start: datetime | None = None,
+    range_creation_end: datetime | None = None,
+    range_modification_start: datetime | None = None,
+    range_modification_end: datetime | None = None,
+    sort: str | None = None,
     sort_ord: str = SortOrder.DESC.value,
     with_duplicates: bool = False,
 ) -> nodereader_pb2.SearchRequest:
@@ -118,15 +118,15 @@ async def suggest_query_to_pb(
     kbid: str,
     features: list[SuggestOptions],
     query: str,
-    filter_expression: Optional[FilterExpression],
+    filter_expression: FilterExpression | None,
     fields: list[str],
     filters: list[str],
     faceted: list[str],
-    range_creation_start: Optional[datetime] = None,
-    range_creation_end: Optional[datetime] = None,
-    range_modification_start: Optional[datetime] = None,
-    range_modification_end: Optional[datetime] = None,
-    hidden: Optional[bool] = None,
+    range_creation_start: datetime | None = None,
+    range_creation_end: datetime | None = None,
+    range_modification_start: datetime | None = None,
+    range_modification_end: datetime | None = None,
+    hidden: bool | None = None,
 ) -> nodereader_pb2.SuggestRequest:
     request = nodereader_pb2.SuggestRequest()
 
@@ -233,7 +233,7 @@ def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]
             )
 
 
-def get_sort_field_proto(obj: SortField) -> Optional[nodereader_pb2.OrderBy.OrderField.ValueType]:
+def get_sort_field_proto(obj: SortField) -> nodereader_pb2.OrderBy.OrderField.ValueType | None:
     return {
         SortField.SCORE: None,
         SortField.CREATED: nodereader_pb2.OrderBy.OrderField.CREATED,

@@ -18,8 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
+from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
-from typing import AsyncGenerator, Type, Union, cast
+from typing import Type, cast
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.export_import import logger
@@ -34,7 +35,7 @@ MAINDB_IMPORT_KEY = "/kbs/{kbid}/imports/{id}"
 STORAGE_EXPORT_KEY = "exports/{export_id}"
 STORAGE_IMPORT_KEY = "imports/{import_id}"
 
-Metadata = Union[ExportMetadata, ImportMetadata]
+Metadata = ExportMetadata | ImportMetadata
 
 
 class ExportImportDataManager:
@@ -59,7 +60,7 @@ class ExportImportDataManager:
         if data is None or data == b"":
             raise MetadataNotFound()
         decoded = data.decode("utf-8")
-        model_type: Union[Type[ExportMetadata], Type[ImportMetadata]]
+        model_type: Type[ExportMetadata] | Type[ImportMetadata]
         if type == "export":
             model_type = ExportMetadata
         elif type == "import":

@@ -19,7 +19,6 @@
 #
 import asyncio
 import json
-from typing import Optional
 
 import pytest
 from httpx import AsyncClient
@@ -57,7 +56,7 @@ async def test_resource_security_is_returned_serialization(
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{resource_id}", params={"show": ["security"]})
     assert resp.status_code == 200, resp.text
     resource = resp.json()
-    assert set(resource["security"]["access_groups"]) == set([PLATFORM_GROUP, DEVELOPERS_GROUP])
+    assert set(resource["security"]["access_groups"]) == {PLATFORM_GROUP, DEVELOPERS_GROUP}
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -181,7 +180,7 @@ async def _test_search_request_with_security(
     nucliadb_reader: AsyncClient,
     kbid: str,
     query: str,
-    security_groups: Optional[list[str]],
+    security_groups: list[str] | None,
     expected_resources: list[str],
 ):
     payload = {
@@ -323,7 +322,7 @@ async def _test_ask_request_with_security(
     nucliadb_reader,
     kbid: str,
     query: str,
-    security_groups: Optional[list[str]],
+    security_groups: list[str] | None,
     expected_resources: list[str],
 ):
     payload = {

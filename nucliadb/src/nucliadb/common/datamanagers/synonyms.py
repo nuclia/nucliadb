@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional
 
 from nucliadb.common.datamanagers.utils import get_kv_pb
 from nucliadb.common.maindb.driver import Transaction
@@ -27,7 +26,7 @@ from nucliadb_protos import knowledgebox_pb2
 KB_SYNONYMS = "/kbs/{kbid}/synonyms"
 
 
-async def get(txn: Transaction, *, kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
+async def get(txn: Transaction, *, kbid: str) -> knowledgebox_pb2.Synonyms | None:
     key = KB_SYNONYMS.format(kbid=kbid)
     return await get_kv_pb(txn, key, knowledgebox_pb2.Synonyms, for_update=False)
 

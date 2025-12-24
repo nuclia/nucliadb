@@ -141,7 +141,7 @@ async def cookie_tale_resource(
 
     # add paragraph relations
 
-    title_paragraph_id = list(title_field.iter_paragraphs())[0][0]
+    title_paragraph_id = next(iter(title_field.iter_paragraphs()))[0]
     paragraph_pbs[1].relations.parents.append(title_paragraph_id.full())
 
     paragraph_pbs[1].relations.siblings.append(paragraphs[0][0].full())

@@ -15,9 +15,10 @@
 
 import functools
 from collections import OrderedDict
+from collections.abc import Awaitable, Callable
 from concurrent import futures
 from contextlib import contextmanager
-from typing import Any, Awaitable, Callable, List, Optional, Tuple
+from typing import Any
 
 import grpc
 from grpc import ChannelCredentials, ClientCallDetails, aio
@@ -371,8 +372,8 @@ class GRPCTelemetry:
         self,
         server_addr: str,
         max_send_message: int = 100,
-        credentials: Optional[ChannelCredentials] = None,
-        options: Optional[List[Tuple[str, Any]]] = None,
+        credentials: ChannelCredentials | None = None,
+        options: list[tuple[str, Any]] | None = None,
     ):
         options = [
             ("grpc.max_receive_message_length", max_send_message * 1024 * 1024),
@@ -397,8 +398,8 @@ class GRPCTelemetry:
         self,
         concurrency: int = 4,
         max_receive_message: int = 100,
-        interceptors: Optional[List[aio.ServerInterceptor]] = None,
-        options: Optional[List[Tuple[str, Any]]] = None,
+        interceptors: list[aio.ServerInterceptor] | None = None,
+        options: list[tuple[str, Any]] | None = None,
     ):
         _interceptors = (
             get_server_interceptors(self.service_name, self.tracer_provider)

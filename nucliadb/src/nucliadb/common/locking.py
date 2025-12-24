@@ -22,7 +22,6 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 import orjson
 
@@ -99,7 +98,7 @@ class _Lock:
         self.task = asyncio.create_task(self._refresh_task())
         return self
 
-    async def get_lock_data(self, txn: Transaction) -> Optional[LockValue]:
+    async def get_lock_data(self, txn: Transaction) -> LockValue | None:
         existing_data = await txn.get(self.key, for_update=True)
         if existing_data is None:
             return None

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from nucliadb.ingest.fields.base import Field
 from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation, SplitsMetadata
@@ -42,7 +42,7 @@ class Conversation(Field[PBConversation]):
     pbklass = PBConversation
     type: str = "c"
     value: dict[int, PBConversation]
-    metadata: Optional[FieldConversation]
+    metadata: FieldConversation | None
 
     _created: bool = False
 
@@ -50,12 +50,12 @@ class Conversation(Field[PBConversation]):
         self,
         id: str,
         resource: Any,
-        pb: Optional[Any] = None,
-        value: Optional[dict[int, PBConversation]] = None,
+        pb: Any | None = None,
+        value: dict[int, PBConversation] | None = None,
     ):
-        super(Conversation, self).__init__(id, resource, pb, value)
+        super().__init__(id, resource, pb, value)
         self.value = {}
-        self._splits_metadata: Optional[SplitsMetadata] = None
+        self._splits_metadata: SplitsMetadata | None = None
         self.metadata = None
 
     async def delete_value(self):
@@ -76,7 +76,7 @@ class Conversation(Field[PBConversation]):
         metadata.split_strategy = payload.split_strategy
 
         # Get the last page if it exists
-        last_page: Optional[PBConversation] = None
+        last_page: PBConversation | None = None
         if self._created is False and metadata.pages > 0:
             try:
                 last_page = await self.db_get_value(page=metadata.pages)
@@ -138,7 +138,7 @@ class Conversation(Field[PBConversation]):
         await self.db_set_metadata(metadata)
         await self.set_splits_metadata(self._splits_metadata)
 
-    async def get_value(self, page: Optional[int] = None) -> Optional[PBConversation]:
+    async def get_value(self, page: int | None = None) -> PBConversation | None:
         # If no page was requested, force fetch of metadata
         # and set the page to the last page
         if page is None and self.metadata is None:
@@ -153,7 +153,7 @@ class Conversation(Field[PBConversation]):
         except PageNotFound:
             return None
 
-    async def get_full_conversation(self) -> Optional[PBConversation]:
+    async def get_full_conversation(self) -> PBConversation | None:
         """
         Messages of a conversations may be stored across several pages.
         This method fetches them all and returns a single complete conversation.

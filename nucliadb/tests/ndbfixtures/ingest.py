@@ -20,11 +20,11 @@
 import logging
 import os
 import uuid
+from collections.abc import AsyncIterator, Iterable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from os.path import dirname, getsize
-from typing import AsyncIterator, Iterable, Optional
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -412,9 +412,7 @@ async def test_resource(storage: Storage, maindb_driver: Driver, knowledgebox: s
     resource.clean()
 
 
-def broker_resource(
-    knowledgebox: str, rid: Optional[str] = None, slug: Optional[str] = None
-) -> BrokerMessage:
+def broker_resource(knowledgebox: str, rid: str | None = None, slug: str | None = None) -> BrokerMessage:
     if rid is None:
         rid = str(uuid.uuid4())
     if slug is None:
@@ -641,7 +639,7 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox: str) -
 
         # 2.4 CONVERSATION FIELD
 
-        def make_message(text: str, files: Optional[list[rpb.CloudFile]] = None) -> rpb.Message:
+        def make_message(text: str, files: list[rpb.CloudFile] | None = None) -> rpb.Message:
             msg = rpb.Message(
                 who="myself",
             )

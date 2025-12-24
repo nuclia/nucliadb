@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-from typing import Optional
 
 import orjson
 
@@ -50,7 +49,7 @@ async def get_labels(txn: Transaction, *, kbid: str) -> kb_pb2.Labels:
     return labels
 
 
-async def _get_labelset_ids(txn: Transaction, *, kbid: str) -> Optional[list[str]]:
+async def _get_labelset_ids(txn: Transaction, *, kbid: str) -> list[str] | None:
     key = KB_LABELSET_IDS.format(kbid=kbid)
     data = await txn.get(key, for_update=True)
     if not data:
@@ -84,7 +83,7 @@ async def _set_labelset_ids(txn: Transaction, *, kbid: str, labelsets: list[str]
     await txn.set(key, data)
 
 
-async def get_labelset(txn: Transaction, *, kbid: str, labelset_id: str) -> Optional[kb_pb2.LabelSet]:
+async def get_labelset(txn: Transaction, *, kbid: str, labelset_id: str) -> kb_pb2.LabelSet | None:
     labelset_key = KB_LABELSET.format(kbid=kbid, id=labelset_id)
     payload = await txn.get(labelset_key)
     if payload:

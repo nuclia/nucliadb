@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncIterator, Optional
+from collections.abc import AsyncIterator
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
@@ -62,7 +62,7 @@ class TrainShardManager(manager.KBShardManager):
 
         return shard_object.nidx_shard_id
 
-    async def get_kb_obj(self, txn: Transaction, kbid: str) -> Optional[KnowledgeBox]:
+    async def get_kb_obj(self, txn: Transaction, kbid: str) -> KnowledgeBox | None:
         if kbid is None:
             return None
 
@@ -72,7 +72,7 @@ class TrainShardManager(manager.KBShardManager):
         kbobj = KnowledgeBox(txn, self.storage, kbid)
         return kbobj
 
-    async def get_kb_entities_manager(self, txn: Transaction, kbid: str) -> Optional[EntitiesManager]:
+    async def get_kb_entities_manager(self, txn: Transaction, kbid: str) -> EntitiesManager | None:
         kbobj = await self.get_kb_obj(txn, kbid)
         if kbobj is None:
             return None

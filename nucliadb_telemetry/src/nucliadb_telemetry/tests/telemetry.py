@@ -15,7 +15,7 @@
 
 import asyncio
 import os
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import nats
 import pytest
@@ -62,7 +62,7 @@ class Jaeger(BaseImage):
         if os.environ.get("TESTING", "") == "jenkins" or "TRAVIS" in os.environ:
             return port if port else self.port
         network = self.container_obj.attrs["NetworkSettings"]
-        service_port = "{0}/udp".format(port if port else self.port)
+        service_port = f"{port if port else self.port}/udp"
         for netport in network["Ports"].keys():
             if netport == service_port:
                 return network["Ports"][service_port][0]["HostPort"]

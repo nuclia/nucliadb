@@ -55,7 +55,7 @@ __all__ = (
     "search_configurations",
     "synonyms",
     "vectorsets",
-    "with_transaction",
-    "with_rw_transaction",
     "with_ro_transaction",
+    "with_rw_transaction",
+    "with_transaction",
 )

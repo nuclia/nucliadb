@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import unittest
-from typing import Optional
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -124,10 +123,10 @@ class TestVectorSetAndMatryoshkaParsing:
     async def test_query_without_vectorset_nor_matryoshka(
         self,
         dummy_predict: PredictEngine,
-        vectorset: Optional[str],
-        matryoshka_dimension: Optional[int],
-        expected_vectorset: Optional[str],
-        expected_dimension: Optional[int],
+        vectorset: str | None,
+        matryoshka_dimension: int | None,
+        expected_vectorset: str | None,
+        expected_dimension: int | None,
     ):
         fetcher = Fetcher(
             "kbid",

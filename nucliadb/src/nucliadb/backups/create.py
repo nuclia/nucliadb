@@ -21,8 +21,8 @@ import asyncio
 import json
 import logging
 import tarfile
+from collections.abc import AsyncIterator
 from datetime import datetime, timezone
-from typing import AsyncIterator, Optional
 
 from nucliadb.backups.const import (
     BackupFinishedStream,
@@ -255,9 +255,7 @@ async def backup_search_configurations(context: ApplicationContext, kbid: str, b
     )
 
 
-async def get_metadata(
-    context: ApplicationContext, kbid: str, backup_id: str
-) -> Optional[BackupMetadata]:
+async def get_metadata(context: ApplicationContext, kbid: str, backup_id: str) -> BackupMetadata | None:
     async with context.kv_driver.ro_transaction() as txn:
         metadata_raw = await txn.get(MaindbKeys.METADATA.format(kbid=kbid, backup_id=backup_id))
         if metadata_raw is None:

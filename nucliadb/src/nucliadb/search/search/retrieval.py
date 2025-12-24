@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Iterable
+from collections.abc import Iterable
 
 from nidx_protos.nodereader_pb2 import (
     DocumentScored,

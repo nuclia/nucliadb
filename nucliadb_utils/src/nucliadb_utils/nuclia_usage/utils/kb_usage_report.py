@@ -22,7 +22,6 @@ import logging
 from collections.abc import Iterable
 from contextlib import suppress
 from datetime import datetime, timezone
-from typing import Optional
 
 from nats.js.client import JetStreamContext
 
@@ -90,14 +89,14 @@ class KbUsageReportUtility:
     def send_kb_usage(
         self,
         service: Service,
-        account_id: Optional[str],
-        kb_id: Optional[str],
+        account_id: str | None,
+        kb_id: str | None,
         kb_source: KBSource,
         processes: Iterable[Process] = (),
         predicts: Iterable[Predict] = (),
         searches: Iterable[Search] = (),
-        storage: Optional[Storage] = None,
-        activity_log_match: Optional[ActivityLogMatch] = None,
+        storage: Storage | None = None,
+        activity_log_match: ActivityLogMatch | None = None,
     ):
         usage = KbUsage()
         usage.service = service  # type: ignore

@@ -19,10 +19,10 @@
 #
 import asyncio
 import uuid
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from time import time
-from typing import AsyncIterator
 from unittest.mock import patch
 
 import aiohttp
@@ -166,7 +166,7 @@ def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:
     message1.basic.modified.FromDatetime(datetime.now(timezone.utc))
     message1.texts[
         "field1"
-    ].body = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."  # noqa
+    ].body = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."
     message1.source = BrokerMessage.MessageSource.WRITER
     return message1
 
@@ -192,7 +192,7 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
 
     etw = ExtractedTextWrapper()
     etw.field.CopyFrom(field1_if)
-    etw.body.text = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa. I miss Manresa!"  # noqa
+    etw.body.text = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa. I miss Manresa!"
     message2.extracted_text.append(etw)
 
     fcmw = FieldComputedMetadataWrapper()

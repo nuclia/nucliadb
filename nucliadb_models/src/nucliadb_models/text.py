@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
@@ -52,14 +51,14 @@ TEXT_FORMAT_TO_MIMETYPE = {
 
 
 class FieldText(BaseModel):
-    body: Optional[str] = None
-    format: Optional[TextFormat] = None
-    md5: Optional[str] = None
-    extract_strategy: Optional[str] = Field(
+    body: str | None = None
+    format: TextFormat | None = None
+    md5: str | None = None
+    extract_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia extract strategy used at processing time. If not set, the default strategy was used. Extract strategies are defined at the learning configuration api.",
     )
-    split_strategy: Optional[str] = Field(
+    split_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia split strategy used at processing time. If not set, the default strategy was used. Split strategies are defined at the learning configuration api.",
     )
@@ -80,11 +79,11 @@ If you need to store more text, consider using a file field instead or splitting
         default=TextFormat.PLAIN,
         description="The format of the text.",
     )
-    extract_strategy: Optional[str] = Field(
+    extract_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia extract strategy to use at processing time. If not set, the default strategy will be used. Extract strategies are defined at the learning configuration api.",
     )
-    split_strategy: Optional[str] = Field(
+    split_strategy: str | None = Field(
         default=None,
         description="Id of the Nuclia split strategy used at processing time. If not set, the default strategy was used. Split strategies are defined at the learning configuration api.",
     )

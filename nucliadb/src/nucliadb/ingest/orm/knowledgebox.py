@@ -17,9 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from collections.abc import AsyncGenerator, Callable, Coroutine, Sequence
 from datetime import datetime
 from functools import partial
-from typing import Any, AsyncGenerator, Callable, Coroutine, Optional, Sequence
+from typing import Any
 from uuid import uuid4
 
 from grpc import StatusCode
@@ -88,7 +89,7 @@ class KnowledgeBox:
         self.txn = txn
         self.storage = storage
         self.kbid = kbid
-        self._config: Optional[KnowledgeBoxConfig] = None
+        self._config: KnowledgeBoxConfig | None = None
 
     @staticmethod
     def new_unique_kbid() -> str:
@@ -248,14 +249,14 @@ class KnowledgeBox:
         driver: Driver,
         kbid: str,
         *,
-        slug: Optional[str] = None,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
-        migration_version: Optional[int] = None,
-        external_index_provider: Optional[StoredExternalIndexProviderMetadata] = None,
-        hidden_resources_enabled: Optional[bool] = None,
-        hidden_resources_hide_on_creation: Optional[bool] = None,
-        prewarm_enabled: Optional[bool] = None,
+        slug: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        migration_version: int | None = None,
+        external_index_provider: StoredExternalIndexProviderMetadata | None = None,
+        hidden_resources_enabled: bool | None = None,
+        hidden_resources_hide_on_creation: bool | None = None,
+        prewarm_enabled: bool | None = None,
     ) -> str:
         async with driver.rw_transaction() as txn:
             stored = await datamanagers.kb.get_config(txn, kbid=kbid, for_update=True)
@@ -428,7 +429,7 @@ class KnowledgeBox:
             await txn.delete_by_prefix(prefix)
             await txn.commit()
 
-    async def get_resource_shard(self, shard_id: str) -> Optional[writer_pb2.ShardObject]:
+    async def get_resource_shard(self, shard_id: str) -> writer_pb2.ShardObject | None:
         async with datamanagers.with_ro_transaction() as txn:
             pb = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
             if pb is None:
@@ -439,7 +440,7 @@ class KnowledgeBox:
                 return shard
         return None
 
-    async def get(self, uuid: str) -> Optional[Resource]:
+    async def get(self, uuid: str) -> Resource | None:
         return await Resource.get(self.txn, self.kbid, uuid)
 
     async def maindb_delete_resource(self, uuid: str):
@@ -469,7 +470,7 @@ class KnowledgeBox:
         with processor_observer({"type": "delete_resource_storage"}):
             await self.storage_delete_resource(uuid)
 
-    async def get_resource_uuid_by_slug(self, slug: str) -> Optional[str]:
+    async def get_resource_uuid_by_slug(self, slug: str) -> str | None:
         return await datamanagers.resources.get_resource_uuid_from_slug(
             self.txn, kbid=self.kbid, slug=slug
         )
@@ -486,7 +487,7 @@ class KnowledgeBox:
                 key_ok = True
         return slug
 
-    async def add_resource(self, uuid: str, slug: str, basic: Optional[Basic] = None) -> Resource:
+    async def add_resource(self, uuid: str, slug: str, basic: Basic | None = None) -> Resource:
         if basic is None:
             basic = Basic()
         if slug == "":

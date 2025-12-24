@@ -22,7 +22,7 @@ import dataclasses
 import logging
 import math
 import random
-from typing import Optional, cast
+from typing import cast
 
 from grpc import StatusCode
 from grpc.aio import AioRpcError
@@ -65,7 +65,7 @@ class Rebalancer:
     def __init__(self, context: ApplicationContext, kbid: str):
         self.context = context
         self.kbid = kbid
-        self.kb_shards: Optional[writer_pb2.Shards] = None
+        self.kb_shards: writer_pb2.Shards | None = None
 
     async def get_rebalance_shards(self, estimate: bool = False) -> list[RebalanceShard]:
         """
@@ -383,7 +383,7 @@ async def get_resource_paragraphs_count(resource_id: str, nidx_shard_id: str) ->
 
 def get_target_shard(
     shards: list[RebalanceShard], rebalanced_shard: RebalanceShard, skip_active: bool = True
-) -> tuple[Optional[RebalanceShard], int]:
+) -> tuple[RebalanceShard | None, int]:
     """
     Return the biggest shard with capacity (< 90% of the max paragraphs per shard).
     """

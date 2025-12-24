@@ -18,8 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from collections.abc import AsyncGenerator, Iterable
 from time import time
-from typing import AsyncGenerator, Iterable, Optional, Union
 
 from nidx_protos.nodereader_pb2 import GraphSearchResponse, SearchResponse
 from nuclia_models.predict.generative_responses import GenerativeChunk
@@ -94,8 +94,8 @@ async def rephrase_query(
     query: str,
     user_id: str,
     user_context: list[str],
-    generative_model: Optional[str] = None,
-    chat_history_relevance_threshold: Optional[float] = None,
+    generative_model: str | None = None,
+    chat_history_relevance_threshold: float | None = None,
 ) -> RephraseResponse:
     # NOTE: When moving /ask to RAO, this will need to change to whatever client/utility is used
     # to call NUA predict (internally or externally in the case of onprem).
@@ -120,8 +120,8 @@ async def get_find_results(
     user: str,
     origin: str,
     metrics: Metrics,
-    prequeries_strategy: Optional[PreQueriesStrategy] = None,
-) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], Fetcher, Reranker]:
+    prequeries_strategy: PreQueriesStrategy | None = None,
+) -> tuple[KnowledgeboxFindResults, list[PreQueryResult] | None, Fetcher, Reranker]:
     prequeries_results = None
     prefilter_queries_results = None
     queries_results = None
@@ -179,7 +179,7 @@ async def get_find_results(
     return main_results, prequeries_results, fetcher, reranker
 
 
-def add_resource_filter(request: Union[FindRequest, AskRequest], resources: list[str]):
+def add_resource_filter(request: FindRequest | AskRequest, resources: list[str]):
     if len(resources) == 0:
         return
 
@@ -271,7 +271,7 @@ async def get_relations_results(
     *,
     kbid: str,
     text_answer: str,
-    timeout: Optional[float] = None,
+    timeout: float | None = None,
 ) -> Relations:
     try:
         predict = get_predict()
@@ -292,7 +292,7 @@ async def get_relations_results_from_entities(
     *,
     kbid: str,
     entities: Iterable[RelationNode],
-    timeout: Optional[float] = None,
+    timeout: float | None = None,
     deleted_entities: set[str] = set(),
 ) -> Relations:
     entry_points = list(entities)
@@ -333,19 +333,19 @@ def maybe_audit_chat(
     origin: str,
     generative_answer_time: float,
     generative_answer_first_chunk_time: float,
-    generative_reasoning_first_chunk_time: Optional[float],
-    rephrase_time: Optional[float],
+    generative_reasoning_first_chunk_time: float | None,
+    rephrase_time: float | None,
     user_query: str,
-    rephrased_query: Optional[str],
-    retrieval_rephrase_query: Optional[str],
+    rephrased_query: str | None,
+    retrieval_rephrase_query: str | None,
     text_answer: bytes,
-    text_reasoning: Optional[str],
+    text_reasoning: str | None,
     status_code: AnswerStatusCode,
     chat_history: list[ChatContextMessage],
     query_context: PromptContext,
     query_context_order: PromptContextOrder,
-    learning_id: Optional[str],
-    model: Optional[str],
+    learning_id: str | None,
+    model: str | None,
 ):
     audit = get_audit()
     if audit is None:
@@ -385,7 +385,7 @@ def maybe_audit_chat(
     )
 
 
-def parse_audit_answer(raw_text_answer: bytes, status_code: AnswerStatusCode) -> Optional[str]:
+def parse_audit_answer(raw_text_answer: bytes, status_code: AnswerStatusCode) -> str | None:
     if status_code == AnswerStatusCode.NO_CONTEXT or status_code == AnswerStatusCode.NO_RETRIEVAL_DATA:
         # We don't want to audit "Not enough context to answer this." and instead set a None.
         return None
@@ -406,13 +406,13 @@ class ChatAuditor:
         client_type: NucliaDBClientType,
         origin: str,
         user_query: str,
-        rephrased_query: Optional[str],
-        retrieval_rephrased_query: Optional[str],
+        rephrased_query: str | None,
+        retrieval_rephrased_query: str | None,
         chat_history: list[ChatContextMessage],
-        learning_id: Optional[str],
+        learning_id: str | None,
         query_context: PromptContext,
         query_context_order: PromptContextOrder,
-        model: Optional[str],
+        model: str | None,
     ):
         self.kbid = kbid
         self.user_id = user_id
@@ -430,11 +430,11 @@ class ChatAuditor:
     def audit(
         self,
         text_answer: bytes,
-        text_reasoning: Optional[str],
+        text_reasoning: str | None,
         generative_answer_time: float,
         generative_answer_first_chunk_time: float,
-        generative_reasoning_first_chunk_time: Optional[float],
-        rephrase_time: Optional[float],
+        generative_reasoning_first_chunk_time: float | None,
+        rephrase_time: float | None,
         status_code: AnswerStatusCode,
     ):
         maybe_audit_chat(
@@ -512,7 +512,7 @@ async def run_prequeries(
 async def get_answer_stream(
     kbid: str,
     item: ChatModel,
-    extra_headers: Optional[dict[str, str]] = None,
+    extra_headers: dict[str, str] | None = None,
 ) -> tuple[str, str, AsyncGenerator[GenerativeChunk, None]]:
     # NOTE: When moving /ask to RAO, this will need to change to whatever client/utility is used
     # to call NUA predict (internally or externally in the case of onprem).

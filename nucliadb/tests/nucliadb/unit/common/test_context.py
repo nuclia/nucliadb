@@ -25,7 +25,7 @@ from nucliadb.common.context import ApplicationContext
 
 async def test_initialize_happens_only_once():
     context = ApplicationContext()
-    context._initialize = AsyncMock()  # noqa
+    context._initialize = AsyncMock()
 
     tasks = []
     for _ in range(10):

@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional, Union
 
 from nidx_protos import nodereader_pb2
 from typing_extensions import assert_never
@@ -57,11 +56,11 @@ async def parse_graph_relation_search(
     return pb
 
 
-AnyGraphRequest = Union[
-    graph_requests.GraphSearchRequest,
-    graph_requests.GraphNodesSearchRequest,
-    graph_requests.GraphRelationsSearchRequest,
-]
+AnyGraphRequest = (
+    graph_requests.GraphSearchRequest
+    | graph_requests.GraphNodesSearchRequest
+    | graph_requests.GraphRelationsSearchRequest
+)
 
 
 async def _parse_common(kbid: str, item: AnyGraphRequest) -> nodereader_pb2.GraphSearchRequest:
@@ -79,7 +78,7 @@ async def _parse_common(kbid: str, item: AnyGraphRequest) -> nodereader_pb2.Grap
     return pb
 
 
-async def _parse_filters(kbid: str, item: AnyGraphRequest) -> Optional[nodereader_pb2.FilterExpression]:
+async def _parse_filters(kbid: str, item: AnyGraphRequest) -> nodereader_pb2.FilterExpression | None:
     filter_expr = nodereader_pb2.FilterExpression()
     if item.filter_expression:
         if item.filter_expression.field:
@@ -101,7 +100,7 @@ async def _parse_filters(kbid: str, item: AnyGraphRequest) -> Optional[nodereade
         return None
 
 
-def _parse_security(kbid: str, item: AnyGraphRequest) -> Optional[utils_pb2.Security]:
+def _parse_security(kbid: str, item: AnyGraphRequest) -> utils_pb2.Security | None:
     if item.security is not None and len(item.security.groups) > 0:
         security_pb = utils_pb2.Security()
         for group_id in item.security.groups:

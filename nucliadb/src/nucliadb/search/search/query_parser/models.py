@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Optional, Union
 
 from nidx_protos import nodereader_pb2
 from pydantic import BaseModel, ConfigDict, Field
@@ -47,7 +46,7 @@ KeywordQuery = _TextQuery
 
 
 class SemanticQuery(BaseModel):
-    query: Optional[list[float]]
+    query: list[float] | None
     vectorset: str
     min_score: float
 
@@ -67,11 +66,11 @@ class GraphQuery(BaseModel):
 
 
 class Query(BaseModel):
-    fulltext: Optional[FulltextQuery] = None
-    keyword: Optional[KeywordQuery] = None
-    semantic: Optional[SemanticQuery] = None
-    relation: Optional[RelationQuery] = None
-    graph: Optional[GraphQuery] = None
+    fulltext: FulltextQuery | None = None
+    keyword: KeywordQuery | None = None
+    semantic: SemanticQuery | None = None
+    relation: RelationQuery | None = None
+    graph: GraphQuery | None = None
 
 
 # filters
@@ -80,21 +79,21 @@ class Query(BaseModel):
 class Filters(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    field_expression: Optional[nodereader_pb2.FilterExpression] = None
-    paragraph_expression: Optional[nodereader_pb2.FilterExpression] = None
+    field_expression: nodereader_pb2.FilterExpression | None = None
+    paragraph_expression: nodereader_pb2.FilterExpression | None = None
     filter_expression_operator: nodereader_pb2.FilterOperator.ValueType = (
         nodereader_pb2.FilterOperator.AND
     )
 
     facets: list[str] = Field(default_factory=list)
-    hidden: Optional[bool] = None
-    security: Optional[search_models.RequestSecurity] = None
+    hidden: bool | None = None
+    security: search_models.RequestSecurity | None = None
     with_duplicates: bool = False
 
 
 class DateTimeFilter(BaseModel):
-    after: Optional[datetime] = None  # aka, start
-    before: Optional[datetime] = None  # aka, end
+    after: datetime | None = None  # aka, start
+    before: datetime | None = None  # aka, end
 
 
 # rank fusion
@@ -122,7 +121,7 @@ class PredictReranker(BaseModel):
     window: int = Field(le=200)
 
 
-Reranker = Union[NoopReranker, PredictReranker]
+Reranker = NoopReranker | PredictReranker
 
 # retrieval and generation operations
 
@@ -131,8 +130,8 @@ class UnitRetrieval(BaseModel):
     query: Query
     top_k: int
     filters: Filters = Field(default_factory=Filters)
-    rank_fusion: Optional[RankFusion] = None
-    reranker: Optional[Reranker] = None
+    rank_fusion: RankFusion | None = None
+    reranker: Reranker | None = None
 
 
 # TODO: augmentation things: hydration...
@@ -141,7 +140,7 @@ class UnitRetrieval(BaseModel):
 class Generation(BaseModel):
     use_visual_llm: bool
     max_context_tokens: int
-    max_answer_tokens: Optional[int]
+    max_answer_tokens: int | None
 
 
 class ParsedQuery(BaseModel):
@@ -149,7 +148,7 @@ class ParsedQuery(BaseModel):
 
     fetcher: Fetcher
     retrieval: UnitRetrieval
-    generation: Optional[Generation] = None
+    generation: Generation | None = None
 
 
 ### Graph

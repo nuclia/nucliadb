@@ -19,7 +19,8 @@
 #
 import os
 import sys
-from typing import Any, Iterator, Type
+from collections.abc import Iterator
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -99,7 +100,7 @@ def storage_settings(request, storage) -> Iterator[dict[str, Any]]:
     if isinstance(storage, Mock):
         yield {}
     else:
-        storage_backend_map: dict[Type, str] = {
+        storage_backend_map: dict[type, str] = {
             AzureStorage: "azure",
             GCSStorage: "gcs",
             LocalStorage: "local",

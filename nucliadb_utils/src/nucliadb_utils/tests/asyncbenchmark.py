@@ -19,13 +19,13 @@
 
 # This code is derived from pytest-benchmark at https://github.com/ionelmc/pytest-benchmark
 
-from __future__ import division, print_function
 
 import gc
 import sys
 import time
+from collections.abc import Awaitable, Callable, Coroutine
 from math import ceil
-from typing import Any, Awaitable, Callable, Coroutine, Dict, TypeVar
+from typing import Any, ClassVar, TypeVar
 
 import pytest
 from pytest_benchmark.session import BenchmarkSession  # type: ignore
@@ -36,11 +36,11 @@ from pytest_benchmark.utils import NameWrapper, format_time  # type: ignore
 T = TypeVar("T")
 
 
-class FixtureAlreadyUsed(Exception): ...  # noqa
+class FixtureAlreadyUsed(Exception): ...
 
 
-class AsyncBenchmarkFixture(object):  # pragma: no cover
-    _precisions: Dict[Callable, float] = {}
+class AsyncBenchmarkFixture:  # pragma: no cover
+    _precisions: ClassVar[dict[Callable, float]] = {}
 
     def __init__(
         self,
@@ -189,16 +189,14 @@ class AsyncBenchmarkFixture(object):  # pragma: no cover
             stats = self._make_stats(iterations)
 
             self._logger.debug(
-                "  Running %s rounds x %s iterations ..." % (rounds, iterations),
+                f"  Running {rounds} rounds x {iterations} iterations ...",
                 yellow=True,
                 bold=True,
             )
             run_start = time.time()
             if self._warmup:
                 warmup_rounds = min(rounds, max(1, int(self._warmup / iterations)))
-                self._logger.debug(
-                    "  Warmup %s rounds x %s iterations ..." % (warmup_rounds, iterations)
-                )
+                self._logger.debug(f"  Warmup {warmup_rounds} rounds x {iterations} iterations ...")
                 for _ in range(warmup_rounds):
                     await runner(loops_range)
             for _ in range(rounds):
@@ -258,7 +256,7 @@ class AsyncBenchmarkFixture(object):  # pragma: no cover
                 )
 
             self._logger.debug(
-                "    Measured %s iterations: %ss." % (loops, format_time(duration)),
+                f"    Measured {loops} iterations: {format_time(duration)}s.",
                 yellow=True,
             )
             if duration >= min_time:

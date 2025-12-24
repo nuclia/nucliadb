@@ -19,7 +19,6 @@
 #
 import json
 from time import time
-from typing import Optional, Union
 
 from fastapi import Body, Header, Query, Request, Response
 from fastapi.openapi.models import Example
@@ -68,7 +67,7 @@ from nucliadb_utils.utilities import get_audit
 SEARCH_EXAMPLES = {
     "filtering_by_icon": Example(
         summary="Search for pdf documents where the text 'Noam Chomsky' appears",
-        description="For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        description="For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",
         value={
             "query": "Noam Chomsky",
             "filters": ["/icon/application/pdf"],
@@ -77,7 +76,7 @@ SEARCH_EXAMPLES = {
     ),
     "get_language_counts": Example(
         summary="Get the number of documents for each language",
-        description="For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        description="For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",
         value={
             "page_size": 0,
             "faceted": ["/s/p"],
@@ -91,7 +90,7 @@ SEARCH_EXAMPLES = {
     f"/{KB_PREFIX}/{{kbid}}/search",
     status_code=200,
     summary="Search Knowledge Box",
-    description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",  # noqa: E501
+    description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",
     response_model=KnowledgeboxSearchResults,
     response_model_exclude_unset=True,
     tags=["Search"],
@@ -103,7 +102,7 @@ async def search_knowledgebox(
     response: Response,
     kbid: str,
     query: str = fastapi_query(SearchParamDefaults.query),
-    filter_expression: Optional[str] = fastapi_query(SearchParamDefaults.filter_expression),
+    filter_expression: str | None = fastapi_query(SearchParamDefaults.filter_expression),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
@@ -111,29 +110,27 @@ async def search_knowledgebox(
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
     top_k: int = fastapi_query(SearchParamDefaults.top_k),
     offset: int = fastapi_query(SearchParamDefaults.offset),
-    min_score: Optional[float] = Query(
+    min_score: float | None = Query(
         default=None,
-        description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
+        description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",
         deprecated=True,
     ),
-    min_score_semantic: Optional[float] = Query(
+    min_score_semantic: float | None = Query(
         default=None,
-        description="Minimum semantic similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
+        description="Minimum semantic similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",
     ),
     min_score_bm25: float = Query(
         default=0,
         description="Minimum bm25 score to filter paragraph and document index results",
         ge=0,
     ),
-    vectorset: Optional[str] = fastapi_query(SearchParamDefaults.vectorset),
-    range_creation_start: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_start),
-    range_creation_end: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_end),
-    range_modification_start: Optional[DateTime] = fastapi_query(
+    vectorset: str | None = fastapi_query(SearchParamDefaults.vectorset),
+    range_creation_start: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_end),
+    range_modification_start: DateTime | None = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
-    range_modification_end: Optional[DateTime] = fastapi_query(
-        SearchParamDefaults.range_modification_end
-    ),
+    range_modification_end: DateTime | None = fastapi_query(SearchParamDefaults.range_modification_end),
     features: list[SearchOptions] = fastapi_query(
         SearchParamDefaults.search_features,
         default=[
@@ -156,7 +153,7 @@ async def search_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
+) -> KnowledgeboxSearchResults | HTTPClientError:
     try:
         expr = FilterExpression.model_validate_json(filter_expression) if filter_expression else None
 
@@ -199,7 +196,7 @@ async def search_knowledgebox(
     f"/{KB_PREFIX}/{{kbid}}/search",
     status_code=200,
     summary="Search Knowledge Box",
-    description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",  # noqa: E501
+    description="Search on a Knowledge Box and retrieve separate results for documents, paragraphs, and sentences. Usually, it is better to use `find`",
     response_model=KnowledgeboxSearchResults,
     response_model_exclude_unset=True,
     tags=["Search"],
@@ -214,7 +211,7 @@ async def search_post_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
+) -> KnowledgeboxSearchResults | HTTPClientError:
     return await _search_endpoint(response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
 
 
@@ -226,7 +223,7 @@ async def _search_endpoint(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     **kwargs,
-) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
+) -> KnowledgeboxSearchResults | HTTPClientError:
     try:
         with cache.request_caches():
             results, incomplete = await search(
@@ -254,7 +251,7 @@ async def search(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     do_audit: bool = True,
-    with_status: Optional[ResourceProcessingStatus] = None,
+    with_status: ResourceProcessingStatus | None = None,
 ) -> tuple[KnowledgeboxSearchResults, bool]:
     audit = get_audit()
     start_time = time()

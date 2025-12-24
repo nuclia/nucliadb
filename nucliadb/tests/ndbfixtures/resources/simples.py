@@ -19,7 +19,7 @@
 #
 import asyncio
 import time
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import pytest
 from httpx import AsyncClient

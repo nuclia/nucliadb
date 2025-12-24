@@ -16,7 +16,7 @@
 import string
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -73,34 +73,34 @@ class ExtractedDataTypeName(str, Enum):
 
 
 class KnowledgeBoxConfig(BaseModel):
-    slug: Optional[SlugString] = Field(
+    slug: SlugString | None = Field(
         default=None, title="Slug", description="Slug for the Knowledge Box."
     )
-    title: Optional[str] = Field(default=None, title="Title", description="Title for the Knowledge Box.")
-    description: Optional[str] = Field(
+    title: str | None = Field(default=None, title="Title", description="Title for the Knowledge Box.")
+    description: str | None = Field(
         default=None,
         title="Description",
         description="Description for the Knowledge Box.",
     )
-    learning_configuration: Optional[Dict[str, Any]] = Field(
+    learning_configuration: dict[str, Any] | None = Field(
         default=None,
         title="Learning Configuration",
-        description="Learning configuration for the Knowledge Box. If provided, NucliaDB will set the learning configuration for the Knowledge Box.",  # noqa: E501
+        description="Learning configuration for the Knowledge Box. If provided, NucliaDB will set the learning configuration for the Knowledge Box.",
     )
 
-    external_index_provider: Optional[ExternalIndexProvider] = Field(
+    external_index_provider: ExternalIndexProvider | None = Field(
         default=None,
         title="External Index Provider",
         description="External index provider for the Knowledge Box.",
     )
 
-    configured_external_index_provider: Optional[dict[str, Any]] = Field(
+    configured_external_index_provider: dict[str, Any] | None = Field(
         default=None,
         title="Configured External Index Provider",
         description="Metadata for the configured external index provider (if any)",
     )
 
-    similarity: Optional[VectorSimilarity] = Field(
+    similarity: VectorSimilarity | None = Field(
         default=None,
         description="This field is deprecated. Use 'learning_configuration' instead.",
     )
@@ -117,7 +117,7 @@ class KnowledgeBoxConfig(BaseModel):
 
     @field_validator("slug")
     @classmethod
-    def id_check(cls, v: Optional[str]) -> Optional[str]:
+    def id_check(cls, v: str | None) -> str | None:
         if v is None:
             return v
 
@@ -136,7 +136,7 @@ class KnowledgeBoxConfig(BaseModel):
 
 
 class KnowledgeBoxObjSummary(BaseModel):
-    slug: Optional[SlugString] = None
+    slug: SlugString | None = None
     uuid: str
 
 
@@ -149,25 +149,25 @@ class KnowledgeBoxObj(BaseModel):
     The API representation of a Knowledge Box object.
     """
 
-    slug: Optional[SlugString] = None
+    slug: SlugString | None = None
     uuid: str
-    config: Optional[KnowledgeBoxConfig] = None
-    model: Optional[SemanticModelMetadata] = None
+    config: KnowledgeBoxConfig | None = None
+    model: SemanticModelMetadata | None = None
 
 
 class KnowledgeBoxList(BaseModel):
-    kbs: List[KnowledgeBoxObjSummary] = []
+    kbs: list[KnowledgeBoxObjSummary] = []
 
 
 # Resources
 
 
 class ExtractedData(BaseModel):
-    text: Optional[ExtractedText] = None
-    metadata: Optional[FieldComputedMetadata] = None
-    large_metadata: Optional[LargeComputedMetadata] = None
-    vectors: Optional[VectorObject] = None
-    question_answers: Optional[FieldQuestionAnswers] = None
+    text: ExtractedText | None = None
+    metadata: FieldComputedMetadata | None = None
+    large_metadata: LargeComputedMetadata | None = None
+    vectors: VectorObject | None = None
+    question_answers: FieldQuestionAnswers | None = None
 
 
 class TextFieldExtractedData(ExtractedData):
@@ -175,32 +175,31 @@ class TextFieldExtractedData(ExtractedData):
 
 
 class FileFieldExtractedData(ExtractedData):
-    file: Optional[FileExtractedData] = None
+    file: FileExtractedData | None = None
 
 
 class LinkFieldExtractedData(ExtractedData):
-    link: Optional[LinkExtractedData] = None
+    link: LinkExtractedData | None = None
 
 
 class ConversationFieldExtractedData(ExtractedData):
     pass
 
 
-ExtractedDataType = Optional[
-    Union[
-        TextFieldExtractedData,
-        FileFieldExtractedData,
-        LinkFieldExtractedData,
-        ConversationFieldExtractedData,
-    ]
-]
+ExtractedDataType = (
+    TextFieldExtractedData
+    | FileFieldExtractedData
+    | LinkFieldExtractedData
+    | ConversationFieldExtractedData
+    | None
+)
 
 
 class Error(BaseModel):
     body: str
     code: int
     code_str: str
-    created: Optional[datetime]
+    created: datetime | None
     severity: str
 
 
@@ -208,51 +207,51 @@ class FieldData(BaseModel): ...
 
 
 class TextFieldData(BaseModel):
-    value: Optional[FieldText] = None
-    extracted: Optional[TextFieldExtractedData] = None
-    error: Optional[Error] = None
-    status: Optional[str] = None
-    errors: Optional[list[Error]] = None
+    value: FieldText | None = None
+    extracted: TextFieldExtractedData | None = None
+    error: Error | None = None
+    status: str | None = None
+    errors: list[Error] | None = None
 
 
 class FileFieldData(BaseModel):
-    value: Optional[FieldFile] = None
-    extracted: Optional[FileFieldExtractedData] = None
-    error: Optional[Error] = None
-    status: Optional[str] = None
-    errors: Optional[list[Error]] = None
+    value: FieldFile | None = None
+    extracted: FileFieldExtractedData | None = None
+    error: Error | None = None
+    status: str | None = None
+    errors: list[Error] | None = None
 
 
 class LinkFieldData(BaseModel):
-    value: Optional[FieldLink] = None
-    extracted: Optional[LinkFieldExtractedData] = None
-    error: Optional[Error] = None
-    status: Optional[str] = None
-    errors: Optional[list[Error]] = None
+    value: FieldLink | None = None
+    extracted: LinkFieldExtractedData | None = None
+    error: Error | None = None
+    status: str | None = None
+    errors: list[Error] | None = None
 
 
 class ConversationFieldData(BaseModel):
-    value: Optional[FieldConversation] = None
-    extracted: Optional[ConversationFieldExtractedData] = None
-    error: Optional[Error] = None
-    status: Optional[str] = None
-    errors: Optional[list[Error]] = None
+    value: FieldConversation | None = None
+    extracted: ConversationFieldExtractedData | None = None
+    error: Error | None = None
+    status: str | None = None
+    errors: list[Error] | None = None
 
 
 class GenericFieldData(BaseModel):
-    value: Optional[str] = None
-    extracted: Optional[TextFieldExtractedData] = None
-    error: Optional[Error] = None
-    status: Optional[str] = None
-    errors: Optional[list[Error]] = None
+    value: str | None = None
+    extracted: TextFieldExtractedData | None = None
+    error: Error | None = None
+    status: str | None = None
+    errors: list[Error] | None = None
 
 
 class ResourceData(BaseModel):
-    texts: Optional[Dict[str, TextFieldData]] = None
-    files: Optional[Dict[str, FileFieldData]] = None
-    links: Optional[Dict[str, LinkFieldData]] = None
-    conversations: Optional[Dict[str, ConversationFieldData]] = None
-    generics: Optional[Dict[str, GenericFieldData]] = None
+    texts: dict[str, TextFieldData] | None = None
+    files: dict[str, FileFieldData] | None = None
+    links: dict[str, LinkFieldData] | None = None
+    conversations: dict[str, ConversationFieldData] | None = None
+    generics: dict[str, GenericFieldData] | None = None
 
 
 class QueueType(str, Enum):
@@ -264,29 +263,29 @@ class Resource(BaseModel):
     id: str
 
     # This first block of attributes correspond to Basic fields
-    slug: Optional[str] = None
-    title: Optional[str] = None
-    summary: Optional[str] = None
-    icon: Optional[str] = None
-    thumbnail: Optional[str] = None
-    metadata: Optional[Metadata] = None
-    usermetadata: Optional[UserMetadata] = None
-    fieldmetadata: Optional[List[UserFieldMetadata]] = None
-    computedmetadata: Optional[ComputedMetadata] = None
-    created: Optional[datetime] = None
-    modified: Optional[datetime] = None
-    last_seqid: Optional[int] = None
-    last_account_seq: Optional[int] = None
-    queue: Optional[QueueType] = None
-    hidden: Optional[bool] = None
+    slug: str | None = None
+    title: str | None = None
+    summary: str | None = None
+    icon: str | None = None
+    thumbnail: str | None = None
+    metadata: Metadata | None = None
+    usermetadata: UserMetadata | None = None
+    fieldmetadata: list[UserFieldMetadata] | None = None
+    computedmetadata: ComputedMetadata | None = None
+    created: datetime | None = None
+    modified: datetime | None = None
+    last_seqid: int | None = None
+    last_account_seq: int | None = None
+    queue: QueueType | None = None
+    hidden: bool | None = None
 
-    origin: Optional[Origin] = None
-    extra: Optional[Extra] = None
-    relations: Optional[List[Relation]] = None
+    origin: Origin | None = None
+    extra: Extra | None = None
+    relations: list[Relation] | None = None
 
-    data: Optional[ResourceData] = None
+    data: ResourceData | None = None
 
-    security: Optional[ResourceSecurity] = Field(
+    security: ResourceSecurity | None = Field(
         default=None,
         title="Security",
         description="Resource security metadata",
@@ -300,19 +299,12 @@ class ResourcePagination(BaseModel):
 
 
 class ResourceList(BaseModel):
-    resources: List[Resource]
+    resources: list[Resource]
     pagination: ResourcePagination
 
 
 class ResourceField(BaseModel):
     field_type: FieldTypeName
     field_id: str
-    value: Optional[
-        Union[
-            FieldText,
-            FieldFile,
-            FieldLink,
-            Conversation,
-        ]
-    ] = None
+    value: FieldText | FieldFile | FieldLink | Conversation | None = None
     extracted: ExtractedDataType = None

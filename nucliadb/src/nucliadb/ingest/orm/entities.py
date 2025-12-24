@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 
 from nidx_protos.nodereader_pb2 import (
     Faceted,
@@ -59,7 +59,7 @@ class EntitiesManager:
         async for group, eg in self.iterate_entities_groups(exclude_deleted=True):
             entities.groups[group].CopyFrom(eg)
 
-    async def get_entities_group(self, group: str) -> Optional[EntitiesGroup]:
+    async def get_entities_group(self, group: str) -> EntitiesGroup | None:
         return await self.get_entities_group_inner(group)
 
     async def get_entities_groups(self) -> dict[str, EntitiesGroup]:
@@ -78,10 +78,10 @@ class EntitiesManager:
 
     # Private API
 
-    async def get_entities_group_inner(self, group: str) -> Optional[EntitiesGroup]:
+    async def get_entities_group_inner(self, group: str) -> EntitiesGroup | None:
         return await self.get_indexed_entities_group(group)
 
-    async def get_indexed_entities_group(self, group: str) -> Optional[EntitiesGroup]:
+    async def get_indexed_entities_group(self, group: str) -> EntitiesGroup | None:
         shard_manager = get_shard_manager()
 
         async def do_entities_search(shard_id: str) -> GraphSearchResponse:

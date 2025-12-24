@@ -250,7 +250,7 @@ async def test_suggest_related_entities(
     assert resp.status_code == 201
 
     def assert_expected_entities(body, expected):
-        assert set((e["value"] for e in body["entities"]["entities"])) == expected
+        assert {e["value"] for e in body["entities"]["entities"]} == expected
 
     # Test simple suggestions
     resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/suggest?query=Ann")
@@ -386,7 +386,7 @@ async def test_suggest_features(
     def assert_expected_entities(response):
         expected = {"Anna", "Anthony"}
         assert len(response["entities"]) == len(expected)
-        assert set((e["value"] for e in response["entities"]["entities"])) == expected
+        assert {e["value"] for e in response["entities"]["entities"]} == expected
 
     resp = await nucliadb_reader.get(
         f"/kb/{standalone_knowledgebox}/suggest",

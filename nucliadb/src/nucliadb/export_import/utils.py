@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import functools
-from typing import AsyncGenerator, AsyncIterator, Callable, Optional
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
 
 import backoff
 from google.protobuf.message import DecodeError as ProtobufDecodeError
@@ -200,7 +200,7 @@ async def iter_kb_resource_uuids(context: ApplicationContext, kbid: str) -> Asyn
 
 async def get_broker_message(
     context: ApplicationContext, kbid: str, rid: str
-) -> Optional[writer_pb2.BrokerMessage]:
+) -> writer_pb2.BrokerMessage | None:
     async with datamanagers.with_ro_transaction() as txn:
         resource = await Resource.get(txn, kbid=kbid, rid=rid)
         if resource is None:
@@ -422,7 +422,7 @@ class ExportStreamReader:
 
     async def maybe_read_learning_config(
         self,
-    ) -> tuple[Optional[learning_proxy.LearningConfiguration], bytes]:
+    ) -> tuple[learning_proxy.LearningConfiguration | None, bytes]:
         """
         Tries to read a learning config from the beginning of the stream.
         Returs the learning config if found. It also returns any leftover bytes that
@@ -521,7 +521,7 @@ class TaskRetryHandler:
 
 async def get_learning_config(
     kbid: str,
-) -> Optional[learning_proxy.LearningConfiguration]:
+) -> learning_proxy.LearningConfiguration | None:
     return await learning_proxy.get_configuration(kbid)
 
 

@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 import aiohttp
 
@@ -32,7 +31,7 @@ class NucliaStorage:
         self,
         nuclia_public_url: str,
         nuclia_zone: str,
-        service_account: Optional[str] = None,
+        service_account: str | None = None,
     ):
         self.service_account = service_account
         self.nuclia_public_url = nuclia_public_url.format(zone=nuclia_zone)

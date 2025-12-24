@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional
 
 from pydantic import Field
 
@@ -43,7 +42,7 @@ class Settings(DriverSettings):
         title="Prequeries max parallel",
         description="The maximum number of prequeries to run in parallel per /ask request",
     )
-    nidx_address: Optional[str] = Field(default=None)
+    nidx_address: str | None = Field(default=None)
 
 
 settings = Settings()

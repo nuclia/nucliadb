@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -22,7 +21,7 @@ class ResourceSecurity(BaseModel):
     Security metadata for the resource
     """
 
-    access_groups: List[str] = Field(
+    access_groups: list[str] = Field(
         default=[],
         title="Access groups",
         description="List of group ids that can access the resource.",
@@ -34,7 +33,7 @@ class RequestSecurity(BaseModel):
     Security metadata for the search request
     """
 
-    groups: List[str] = Field(
+    groups: list[str] = Field(
         default=[],
         title="Groups",
         description="List of group ids to do the request with. ",

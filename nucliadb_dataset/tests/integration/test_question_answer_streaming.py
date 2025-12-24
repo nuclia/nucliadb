@@ -171,9 +171,9 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     )
 
     paragraphs = [
-        "Super Mario Bros. Wonder (SMB Wonder) is a 2023 platform game developed and published by Nintendo.\n",  # noqa
+        "Super Mario Bros. Wonder (SMB Wonder) is a 2023 platform game developed and published by Nintendo.\n",
         "SMB Wonder is a side-scrolling plaftorm game.\n",
-        "As one of eight player characters, the player completes levels across the Flower Kingdom.",  # noqa
+        "As one of eight player characters, the player completes levels across the Flower Kingdom.",
     ]
 
     file_field_et = ExtractedTextWrapper(

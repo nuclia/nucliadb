@@ -104,10 +104,10 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
 
     assert msg_consume_time_histo.histo.collect()[0].samples  # type: ignore
 
-    sample = [
+    sample = next(
         sam.labels
         for sam in msg_consume_time_histo.histo.collect()[0].samples  # type: ignore
         if sam.labels.get("le") == "0.005"
-    ][0]
+    )
     sample.pop("consumer")
     assert sample == {"stream": "testing", "acked": "no", "le": "0.005"}

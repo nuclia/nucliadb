@@ -19,7 +19,8 @@
 #
 import logging
 import uuid
-from typing import AsyncIterator, cast
+from collections.abc import AsyncIterator
+from typing import cast
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.pg import PGTransaction

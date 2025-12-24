@@ -14,7 +14,6 @@
 #
 
 import enum
-from typing import Dict, Optional
 
 import pydantic
 from pydantic_settings import BaseSettings
@@ -53,7 +52,7 @@ class LogFormatType(enum.Enum):
 class LogSettings(BaseSettings):
     debug: bool = False
     log_level: LogLevel = LogLevel.WARNING
-    logger_levels: Optional[Dict[str, LogLevel]] = None
+    logger_levels: dict[str, LogLevel] | None = None
     log_output_type: LogOutputType = LogOutputType.STDOUT
     log_format_type: LogFormatType = LogFormatType.STRUCTURED
 

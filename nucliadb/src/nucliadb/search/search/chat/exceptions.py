@@ -19,17 +19,15 @@
 #
 
 
-from typing import Optional
-
 from nucliadb_models.search import KnowledgeboxFindResults, PreQueryResult
 
 
 class NoRetrievalResultsError(Exception):
     def __init__(
         self,
-        main: Optional[KnowledgeboxFindResults] = None,
-        prequeries: Optional[list[PreQueryResult]] = None,
-        prefilters: Optional[list[PreQueryResult]] = None,
+        main: KnowledgeboxFindResults | None = None,
+        prequeries: list[PreQueryResult] | None = None,
+        prefilters: list[PreQueryResult] | None = None,
     ):
         self.main_query = main
         self.prequeries = prequeries

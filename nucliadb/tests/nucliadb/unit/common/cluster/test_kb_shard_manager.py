@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 
@@ -87,7 +87,7 @@ def txn():
         def __init__(self):
             self.store = {}
 
-        async def get(self, key: str, for_update=False) -> Optional[Any]:
+        async def get(self, key: str, for_update=False) -> Any | None:
             return self.store.get(key, None)
 
         async def set(self, key: str, value: Any):

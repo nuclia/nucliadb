@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List
+from typing import TYPE_CHECKING, Any
 
 import pyarrow as pa  # type: ignore
 
@@ -64,10 +65,10 @@ class TaskDefinition:
     schema: pa.schema
     proto: Any
     labels: bool
-    mapping: List[Callable]
+    mapping: list[Callable]
 
 
-TASK_DEFINITIONS: Dict[Task, TaskDefinition] = {
+TASK_DEFINITIONS: dict[Task, TaskDefinition] = {
     Task.PARAGRAPH_CLASSIFICATION: TaskDefinition(
         schema=pa.schema(
             [
@@ -190,4 +191,4 @@ TASK_DEFINITIONS: Dict[Task, TaskDefinition] = {
     ),
 }
 
-TASK_DEFINITIONS_REVERSE = {task.proto: task for task in TASK_DEFINITIONS.values()}  # noqa
+TASK_DEFINITIONS_REVERSE = {task.proto: task for task in TASK_DEFINITIONS.values()}

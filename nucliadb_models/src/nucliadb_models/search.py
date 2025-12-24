@@ -14,19 +14,18 @@
 #
 import json
 from enum import Enum
-from typing import Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.aliases import AliasChoices
 from pydantic.json_schema import SkipJsonSchema
-from typing_extensions import Annotated, Self
+from typing_extensions import Self
 
 from nucliadb_models import RelationMetadata
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.graph.requests import GraphPathQuery
 
 # Bw/c import to avoid breaking users
-# noqa isort: skip
 from nucliadb_models.metadata import RelationNodeType, RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
@@ -152,12 +151,12 @@ FacetsResult = dict[str, Any]
 
 
 class TextPosition(BaseModel):
-    page_number: Optional[int] = None
+    page_number: int | None = None
     index: int
     start: int
     end: int
-    start_seconds: Optional[list[int]] = None
-    end_seconds: Optional[list[int]] = None
+    start_seconds: list[int] | None = None
+    end_seconds: list[int] | None = None
 
 
 class Sentence(BaseModel):
@@ -166,8 +165,8 @@ class Sentence(BaseModel):
     text: str
     field_type: str
     field: str
-    index: Optional[str] = None
-    position: Optional[TextPosition] = None
+    index: str | None = None
+    position: TextPosition | None = None
 
 
 class Sentences(BaseModel):
@@ -177,7 +176,7 @@ class Sentences(BaseModel):
     page_size: int = 20
     min_score: float = Field(
         title="Minimum score",
-        description="Minimum similarity score used to filter vector index search. Results with a lower score have been ignored.",  # noqa: E501
+        description="Minimum similarity score used to filter vector index search. Results with a lower score have been ignored.",
     )
 
 
@@ -188,45 +187,45 @@ class Paragraph(BaseModel):
     field: str
     text: str
     labels: list[str] = []
-    start_seconds: Optional[list[int]] = None
-    end_seconds: Optional[list[int]] = None
-    position: Optional[TextPosition] = None
+    start_seconds: list[int] | None = None
+    end_seconds: list[int] | None = None
+    position: TextPosition | None = None
     fuzzy_result: bool = False
 
 
 class Paragraphs(BaseModel):
     results: list[Paragraph] = []
-    facets: Optional[FacetsResult] = None
-    query: Optional[str] = Field(default=None, title="Paragraphs Query")
+    facets: FacetsResult | None = None
+    query: str | None = Field(default=None, title="Paragraphs Query")
     total: int = 0
     page_number: int = 0
     page_size: int = 20
     next_page: bool = False
     min_score: float = Field(
         title="Minimum score",
-        description="Minimum bm25 score used to filter bm25 index search. Results with a lower score have been ignored.",  # noqa: E501
+        description="Minimum bm25 score used to filter bm25 index search. Results with a lower score have been ignored.",
     )
 
 
 class ResourceResult(BaseModel):
-    score: Union[float, int]
+    score: float | int
     rid: str
     field_type: str
     field: str
-    labels: Optional[list[str]] = None
+    labels: list[str] | None = None
 
 
 class Resources(BaseModel):
     results: list[ResourceResult]
-    facets: Optional[FacetsResult] = None
-    query: Optional[str] = Field(default=None, title="Resources Query")
+    facets: FacetsResult | None = None
+    query: str | None = Field(default=None, title="Resources Query")
     total: int = 0
     page_number: int = 0
     page_size: int = 20
     next_page: bool = False
     min_score: float = Field(
         title="Minimum score",
-        description="Minimum bm25 score used to filter bm25 index search. Results with a lower score have been ignored.",  # noqa: E501
+        description="Minimum bm25 score used to filter bm25 index search. Results with a lower score have been ignored.",
     )
 
 
@@ -246,7 +245,7 @@ class DirectionalRelation(BaseModel):
     relation: RelationType
     relation_label: str
     direction: RelationDirection
-    metadata: Optional[RelationMetadata] = None
+    metadata: RelationMetadata | None = None
     resource_id: str
 
 
@@ -280,23 +279,23 @@ class RelatedEntities(BaseModel):
 class ResourceSearchResults(JsonBaseModel):
     """Search on resource results"""
 
-    sentences: Optional[Sentences] = None
-    paragraphs: Optional[Paragraphs] = None
-    relations: Optional[Relations] = None
-    nodes: Optional[list[dict[str, str]]] = None
-    shards: Optional[list[str]] = None
+    sentences: Sentences | None = None
+    paragraphs: Paragraphs | None = None
+    relations: Relations | None = None
+    nodes: list[dict[str, str]] | None = None
+    shards: list[str] | None = None
 
 
 class KnowledgeboxSearchResults(JsonBaseModel):
     """Search on knowledgebox results"""
 
     resources: dict[str, Resource] = {}
-    sentences: Optional[Sentences] = None
-    paragraphs: Optional[Paragraphs] = None
-    fulltext: Optional[Resources] = None
-    relations: Optional[Relations] = None
-    nodes: Optional[list[dict[str, str]]] = None
-    shards: Optional[list[str]] = None
+    sentences: Sentences | None = None
+    paragraphs: Paragraphs | None = None
+    fulltext: Resources | None = None
+    relations: Relations | None = None
+    nodes: list[dict[str, str]] | None = None
+    shards: list[str] | None = None
 
     # TODO: remove on a future major release
     autofilters: list[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
@@ -306,16 +305,16 @@ class CatalogResponse(BaseModel):
     """Catalog results"""
 
     resources: dict[str, Resource] = {}
-    fulltext: Optional[Resources] = None
-    shards: Optional[list[str]] = None
+    fulltext: Resources | None = None
+    shards: list[str] | None = None
 
 
 class KnowledgeboxSuggestResults(JsonBaseModel):
     """Suggest on resource results"""
 
-    paragraphs: Optional[Paragraphs] = None
-    entities: Optional[RelatedEntities] = None
-    shards: Optional[list[str]] = None
+    paragraphs: Paragraphs | None = None
+    entities: RelatedEntities | None = None
+    shards: list[str] | None = None
 
 
 class KnowledgeboxCounters(BaseModel):
@@ -323,7 +322,7 @@ class KnowledgeboxCounters(BaseModel):
     paragraphs: int
     fields: int
     sentences: int
-    shards: Optional[list[str]] = None
+    shards: list[str] | None = None
     index_size: float = Field(default=0.0, title="Index size (bytes)")
 
 
@@ -378,13 +377,13 @@ class ReciprocalRankFusion(_BaseRankFusion):
     k: float = Field(
         default=60.0,
         title="RRF k parameter",
-        description="k parameter changes the influence top-ranked and lower-ranked elements have. Research has shown that 60 is a performant value across datasets",  # noqa: E501
+        description="k parameter changes the influence top-ranked and lower-ranked elements have. Research has shown that 60 is a performant value across datasets",
     )
-    window: Optional[int] = Field(
+    window: int | None = Field(
         default=None,
         le=MAX_RANK_FUSION_WINDOW,
         title="RRF window",
-        description="Number of elements for retrieval to do RRF. Window must be greater or equal to top_k. Greater values will increase probability of multi match at cost of retrieval time",  # noqa: E501
+        description="Number of elements for retrieval to do RRF. Window must be greater or equal to top_k. Greater values will increase probability of multi match at cost of retrieval time",
     )
     boosting: ReciprocalRankFusionWeights = Field(
         default_factory=ReciprocalRankFusionWeights,
@@ -395,12 +394,12 @@ Define different weights for each retriever. This allows to assign different pri
 The default is 1 for each retriever, which means no extra boost for any of them. Weights below 0 can be used for negative boosting.
 
 This kind of boosting can be useful in multilingual search, for example, where keyword search may not give good results and can degrade the final search experience
-        """,  # noqa: E501
+        """,
     )
 
 
 RankFusion = Annotated[
-    Union[ReciprocalRankFusion],
+    ReciprocalRankFusion,
     Field(discriminator="name"),
 ]
 
@@ -435,15 +434,15 @@ class _BaseReranker(BaseModel):
 
 class PredictReranker(_BaseReranker):
     name: Literal[RerankerName.PREDICT_RERANKER] = RerankerName.PREDICT_RERANKER
-    window: Optional[int] = Field(
+    window: int | None = Field(
         default=None,
         le=200,
         title="Reranker window",
-        description="Number of elements reranker will use. Window must be greater or equal to top_k. Greater values will improve results at cost of retrieval and reranking time. By default, this reranker uses a default of 2 times top_k",  # noqa: E501
+        description="Number of elements reranker will use. Window must be greater or equal to top_k. Greater values will improve results at cost of retrieval and reranking time. By default, this reranker uses a default of 2 times top_k",
     )
 
 
-Reranker = Annotated[Union[PredictReranker], Field(discriminator="name")]
+Reranker = Annotated[PredictReranker, Field(discriminator="name")]
 
 
 class KnowledgeBoxCount(BaseModel):
@@ -473,17 +472,17 @@ class SearchParamDefaults:
     filters = ParamDefault(
         default=[],
         title="Search Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",
     )
     resource_filters = ParamDefault(
         default=[],
         title="Resources filter",
-        description="List of resource ids to filter search results for. Only paragraphs from the specified resources will be returned.",  # noqa: E501
+        description="List of resource ids to filter search results for. Only paragraphs from the specified resources will be returned.",
     )
     faceted = ParamDefault(
         default=[],
         title="Faceted",
-        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
+        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/rag/advanced/search-filters",
         max_items=50,
     )
     chat_query = ParamDefault(
@@ -520,12 +519,12 @@ class SearchParamDefaults:
     highlight = ParamDefault(
         default=False,
         title="Highlight",
-        description="If set to true, the query terms will be highlighted in the results between <mark>...</mark> tags",  # noqa: E501
+        description="If set to true, the query terms will be highlighted in the results between <mark>...</mark> tags",
     )
     with_duplicates = ParamDefault(
         default=False,
         title="With duplicate paragraphs",
-        description="Whether to return duplicate paragraphs on the same document",  # noqa: E501
+        description="Whether to return duplicate paragraphs on the same document",
     )
     with_status = ParamDefault(
         default=None,
@@ -535,7 +534,7 @@ class SearchParamDefaults:
     with_synonyms = ParamDefault(
         default=False,
         title="With custom synonyms",
-        description="Whether to return matches for custom knowledge box synonyms of the query terms. Note: only supported for `keyword` and `fulltext` search options.",  # noqa: E501
+        description="Whether to return matches for custom knowledge box synonyms of the query terms. Note: only supported for `keyword` and `fulltext` search options.",
     )
     sort_order = ParamDefault(
         default=SortOrder.DESC,
@@ -565,12 +564,12 @@ class SearchParamDefaults:
     reranker = ParamDefault(
         default=RerankerName.PREDICT_RERANKER,
         title="Reranker",
-        description="Reranker let you specify which method you want to use to rerank your results at the end of retrieval",  # noqa: E501
+        description="Reranker let you specify which method you want to use to rerank your results at the end of retrieval",
     )
     debug = ParamDefault(
         default=False,
         title="Debug mode",
-        description="If set, the response will include some extra metadata for debugging purposes, like the list of queried nodes.",  # noqa: E501
+        description="If set, the response will include some extra metadata for debugging purposes, like the list of queried nodes.",
     )
     show = ParamDefault(
         default=[ResourceProperties.BASIC],
@@ -591,27 +590,27 @@ class SearchParamDefaults:
     range_creation_start = ParamDefault(
         default=None,
         title="Resource creation range start",
-        description="Resources created before this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",  # noqa: E501
+        description="Resources created before this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",
     )
     range_creation_end = ParamDefault(
         default=None,
         title="Resource creation range end",
-        description="Resources created after this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",  # noqa: E501
+        description="Resources created after this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",
     )
     range_modification_start = ParamDefault(
         default=None,
         title="Resource modification range start",
-        description="Resources modified before this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",  # noqa: E501
+        description="Resources modified before this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",
     )
     range_modification_end = ParamDefault(
         default=None,
         title="Resource modification range end",
-        description="Resources modified after this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",  # noqa: E501
+        description="Resources modified after this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",
     )
     vector = ParamDefault(
         default=None,
         title="Search Vector",
-        description="The vector to perform the search with. If not provided, NucliaDB will use Nuclia Predict API to create the vector off from the query.",  # noqa: E501
+        description="The vector to perform the search with. If not provided, NucliaDB will use Nuclia Predict API to create the vector off from the query.",
     )
     vectorset = ParamDefault(
         default=None,
@@ -627,12 +626,12 @@ class SearchParamDefaults:
     chat_history = ParamDefault(
         default=None,
         title="Chat history",
-        description="Use to rephrase the new LLM query by taking into account the chat conversation history. This will be passed to the LLM so that it is aware of the previous conversation.",  # noqa: E501
+        description="Use to rephrase the new LLM query by taking into account the chat conversation history. This will be passed to the LLM so that it is aware of the previous conversation.",
     )
     chat_features = ParamDefault(
         default=[ChatOptions.SEMANTIC, ChatOptions.KEYWORD],
         title="Chat features",
-        description="Features enabled for the chat endpoint. Semantic search is done if `semantic` is included. If `keyword` is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned. `paragraphs` and `vectors` are deprecated, please use `keyword` and `semantic` instead",  # noqa: E501
+        description="Features enabled for the chat endpoint. Semantic search is done if `semantic` is included. If `keyword` is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned. `paragraphs` and `vectors` are deprecated, please use `keyword` and `semantic` instead",
     )
     suggest_features = ParamDefault(
         default=[
@@ -645,17 +644,17 @@ class SearchParamDefaults:
     security = ParamDefault(
         default=None,
         title="Security",
-        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",  # noqa: E501
+        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",
     )
     security_groups = ParamDefault(
         default=[],
         title="Security groups",
-        description="List of security groups to filter search results for. Only resources matching the query and containing the specified security groups will be returned. If empty, all resources will be considered for the search.",  # noqa: E501
+        description="List of security groups to filter search results for. Only resources matching the query and containing the specified security groups will be returned. If empty, all resources will be considered for the search.",
     )
     rephrase = ParamDefault(
         default=False,
         title="Rephrase query consuming LLMs",
-        description="Rephrase query consuming LLMs - it will make the query slower",  # noqa: E501
+        description="Rephrase query consuming LLMs - it will make the query slower",
     )
     prefer_markdown = ParamDefault(
         default=False,
@@ -695,10 +694,10 @@ class SearchParamDefaults:
 
 
 class Filter(BaseModel):
-    all: Optional[list[str]] = Field(default=None, min_length=1)
-    any: Optional[list[str]] = Field(default=None, min_length=1)
-    none: Optional[list[str]] = Field(default=None, min_length=1)
-    not_all: Optional[list[str]] = Field(default=None, min_length=1)
+    all: list[str] | None = Field(default=None, min_length=1)
+    any: list[str] | None = Field(default=None, min_length=1)
+    none: list[str] | None = Field(default=None, min_length=1)
+    not_all: list[str] | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def validate_filter(self) -> Self:
@@ -740,19 +739,19 @@ class CatalogQuery(BaseModel):
 
 
 class CatalogRequest(BaseModel):
-    query: Union[str, CatalogQuery] = ParamDefault(
+    query: str | CatalogQuery = ParamDefault(
         default="",
         title="Catalog Request Query",
         description="The query to search for",
     ).to_pydantic_field()
-    filter_expression: Optional[CatalogFilterExpression] = (
+    filter_expression: CatalogFilterExpression | None = (
         SearchParamDefaults.catalog_filter_expression.to_pydantic_field()
     )
     faceted: list[str] = SearchParamDefaults.faceted.to_pydantic_field()
-    sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
+    sort: SortOptions | None = SearchParamDefaults.sort.to_pydantic_field()
     page_number: int = SearchParamDefaults.catalog_page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.catalog_page_size.to_pydantic_field()
-    hidden: Optional[bool] = SearchParamDefaults.hidden.to_pydantic_field()
+    hidden: bool | None = SearchParamDefaults.hidden.to_pydantic_field()
     show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field(
         default=[ResourceProperties.BASIC, ResourceProperties.ERRORS]
     )
@@ -760,32 +759,30 @@ class CatalogRequest(BaseModel):
     debug: SkipJsonSchema[bool] = SearchParamDefaults.debug.to_pydantic_field()
 
     # Deprecated filter parameters
-    filters: Union[list[str], list[Filter]] = Field(
+    filters: list[str] | list[Filter] = Field(
         default=[],
         title="Catalog Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",
         deprecated="Use filter_expression instead",
     )
-    with_status: Optional[ResourceProcessingStatus] = Field(
+    with_status: ResourceProcessingStatus | None = Field(
         default=None,
         title="With processing status",
         description="Filter results by resource processing status",
         deprecated="Use filter_expression instead",
     )
-    range_creation_start: Optional[DateTime] = (
-        SearchParamDefaults.range_creation_start.to_pydantic_field(
-            deprecated="Use filter_expression instead",
-        )
-    )
-    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field(
+    range_creation_start: DateTime | None = SearchParamDefaults.range_creation_start.to_pydantic_field(
         deprecated="Use filter_expression instead",
     )
-    range_modification_start: Optional[DateTime] = (
+    range_creation_end: DateTime | None = SearchParamDefaults.range_creation_end.to_pydantic_field(
+        deprecated="Use filter_expression instead",
+    )
+    range_modification_start: DateTime | None = (
         SearchParamDefaults.range_modification_start.to_pydantic_field(
             deprecated="Use filter_expression instead",
         )
     )
-    range_modification_end: Optional[DateTime] = (
+    range_modification_end: DateTime | None = (
         SearchParamDefaults.range_modification_end.to_pydantic_field(
             deprecated="Use filter_expression instead",
         )
@@ -798,15 +795,15 @@ class CatalogRequest(BaseModel):
 
 
 class MinScore(BaseModel):
-    semantic: Optional[float] = Field(
+    semantic: float | None = Field(
         default=None,
         title="Minimum semantic score",
-        description="Minimum semantic similarity score used to filter vector index search. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
+        description="Minimum semantic similarity score used to filter vector index search. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",
     )
     bm25: float = Field(
         default=0,
         title="Minimum bm25 score",
-        description="Minimum score used to filter bm25 index search. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
+        description="Minimum score used to filter bm25 index search. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",
         ge=0,
     )
 
@@ -820,7 +817,7 @@ AUDIT_METADATA_MAX_BYTES = 1024 * 10  # 10KB
 
 
 class AuditMetadataBase(BaseModel):
-    audit_metadata: Optional[dict[str, str]] = Field(
+    audit_metadata: dict[str, str] | None = Field(
         default=None,
         title="Audit metadata",
         description=(
@@ -844,29 +841,27 @@ class AuditMetadataBase(BaseModel):
 
 class BaseSearchRequest(AuditMetadataBase):
     query: str = SearchParamDefaults.query.to_pydantic_field()
-    filter_expression: Optional[FilterExpression] = (
+    filter_expression: FilterExpression | None = (
         SearchParamDefaults.filter_expression.to_pydantic_field()
     )
     fields: list[str] = SearchParamDefaults.fields.to_pydantic_field()
-    filters: Union[list[str], list[Filter]] = Field(
+    filters: list[str] | list[Filter] = Field(
         default=[],
         title="Search Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",
     )
     top_k: int = SearchParamDefaults.top_k.to_pydantic_field()
-    min_score: Optional[Union[float, MinScore]] = Field(
+    min_score: float | MinScore | None = Field(
         default=None,
         title="Minimum score",
-        description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",  # noqa: E501
+        description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",
     )
-    range_creation_start: Optional[DateTime] = (
-        SearchParamDefaults.range_creation_start.to_pydantic_field()
-    )
-    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
-    range_modification_start: Optional[DateTime] = (
+    range_creation_start: DateTime | None = SearchParamDefaults.range_creation_start.to_pydantic_field()
+    range_creation_end: DateTime | None = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: DateTime | None = (
         SearchParamDefaults.range_modification_start.to_pydantic_field()
     )
-    range_modification_end: Optional[DateTime] = (
+    range_modification_end: DateTime | None = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
@@ -874,15 +869,15 @@ class BaseSearchRequest(AuditMetadataBase):
     show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
     field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
     extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
-    vector: Optional[list[float]] = SearchParamDefaults.vector.to_pydantic_field()
-    vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
+    vector: list[float] | None = SearchParamDefaults.vector.to_pydantic_field()
+    vectorset: str | None = SearchParamDefaults.vectorset.to_pydantic_field()
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
     with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
     # autofilter is deprecated and its logic was removed. We're just keeping it in the model definition to
     # avoid breaking changes in the python sdks. Please remove on a future major release.
     autofilter: SkipJsonSchema[bool] = False
     resource_filters: list[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
-    security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
+    security: RequestSecurity | None = SearchParamDefaults.security.to_pydantic_field()
     show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
 
     rephrase: bool = Field(
@@ -892,7 +887,7 @@ class BaseSearchRequest(AuditMetadataBase):
         ),
     )
 
-    rephrase_prompt: Optional[str] = Field(
+    rephrase_prompt: str | None = Field(
         default=None,
         title="Rephrase",
         description=(
@@ -911,7 +906,7 @@ Please return ONLY the question without any explanation. Just the rephrased ques
             Please return ONLY the question without any explanation.""",
         ],
     )
-    query_image: Optional[Image] = Field(
+    query_image: Image | None = Field(
         default=None,
         title="Query image",
         description="Image that will be used together with the query text for retrieval.",
@@ -941,7 +936,7 @@ class SearchRequest(BaseSearchRequest):
         ]
     )
     faceted: list[str] = SearchParamDefaults.faceted.to_pydantic_field()
-    sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
+    sort: SortOptions | None = SearchParamDefaults.sort.to_pydantic_field()
     offset: int = SearchParamDefaults.offset.to_pydantic_field()
 
     @field_validator("faceted")
@@ -962,7 +957,7 @@ class SearchRequest(BaseSearchRequest):
 
     @field_validator("sort", mode="after")
     @classmethod
-    def sorting_by_title_not_supported(cls, value: Optional[SortOptions]) -> Optional[SortOptions]:
+    def sorting_by_title_not_supported(cls, value: SortOptions | None) -> SortOptions | None:
         if value and value.field == SortField.TITLE:
             raise ValueError("sorting by title not supported in /search")
 
@@ -988,19 +983,19 @@ class UserPrompt(BaseModel):
 
 
 class MaxTokens(BaseModel):
-    context: Optional[int] = Field(
+    context: int | None = Field(
         default=None,
         title="Maximum context tokens",
         description="Use to limit the amount of tokens used in the LLM context",
     )
-    answer: Optional[int] = Field(
+    answer: int | None = Field(
         default=None,
         title="Maximum answer tokens",
         description="Use to limit the amount of tokens used in the LLM answer",
     )
 
 
-def parse_max_tokens(max_tokens: Optional[Union[int, MaxTokens]]) -> Optional[MaxTokens]:
+def parse_max_tokens(max_tokens: int | MaxTokens | None) -> MaxTokens | None:
     if isinstance(max_tokens, int):
         # If the max_tokens is an integer, it is interpreted as the max_tokens value for the generated answer.
         # The max tokens for the context is set to None to use the default value for the model (comes in the
@@ -1046,7 +1041,7 @@ class ChatModel(BaseModel):
     question: str = Field(description="Question to ask the generative model")
     user_id: str
     retrieval: bool = True
-    system: Optional[str] = Field(
+    system: str | None = Field(
         default=None,
         title="System prompt",
         description="Optional system prompt input by the user",
@@ -1055,9 +1050,9 @@ class ChatModel(BaseModel):
         default={},
         description="The information retrieval context for the current query",
     )
-    query_context_order: Optional[dict[str, int]] = Field(
+    query_context_order: dict[str, int] | None = Field(
         default=None,
-        description="The order of the query context elements. This is used to sort the context elements by relevance before sending them to the generative model",  # noqa: E501
+        description="The order of the query context elements. This is used to sort the context elements by relevance before sending them to the generative model",
     )
     chat_history: list[ChatContextMessage] = Field(
         default=[], description="The chat conversation history"
@@ -1066,29 +1061,29 @@ class ChatModel(BaseModel):
         default=True,
         description="Truncate the chat context in case it doesn't fit the generative input",
     )
-    user_prompt: Optional[UserPrompt] = Field(
+    user_prompt: UserPrompt | None = Field(
         default=None, description="Optional custom prompt input by the user"
     )
-    citations: Union[bool, None, CitationsType] = Field(
+    citations: bool | None | CitationsType = Field(
         default=None,
         description="Whether to include citations in the response. "
         "If set to None or False, no citations will be computed. "
         "If set to True or 'default', citations will be computed after answer generation and send as a separate `CitationsGenerativeResponse` chunk. "
         "If set to 'llm_footnotes', citations will be included in the LLM's response as markdown-styled footnotes. A `FootnoteCitationsGenerativeResponse` chunk will also be sent to map footnote ids to context keys in the `query_context`.",
     )
-    citation_threshold: Optional[float] = Field(
+    citation_threshold: float | None = Field(
         default=None,
         description="If citations is set to True or 'default', this will be the similarity threshold. Value between 0 and 1, lower values will produce more citations. If not set, it will be set to the optimized threshold found by Nuclia.",
         ge=0.0,
         le=1.0,
     )
-    generative_model: Optional[str] = Field(
+    generative_model: str | None = Field(
         default=None,
         title="Generative model",
-        description="The generative model to use for the predict chat endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
+        description="The generative model to use for the predict chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
     )
 
-    max_tokens: Optional[int] = Field(default=None, description="Maximum characters to generate")
+    max_tokens: int | None = Field(default=None, description="Maximum characters to generate")
 
     query_context_images: dict[str, Image] = Field(
         default={},
@@ -1099,7 +1094,7 @@ class ChatModel(BaseModel):
         default=False,
         description="If set to true, the response will be in markdown format",
     )
-    json_schema: Optional[dict[str, Any]] = Field(
+    json_schema: dict[str, Any] | None = Field(
         default=None,
         description="The JSON schema to use for the generative model answers",
     )
@@ -1107,17 +1102,17 @@ class ChatModel(BaseModel):
         default=False,
         description="Whether to reorder the query context based on a reranker",
     )
-    top_k: Optional[int] = Field(default=None, description="Number of best elements to get from")
+    top_k: int | None = Field(default=None, description="Number of best elements to get from")
 
     format_prompt: bool = Field(
         default=True,
-        description="If set to false, the prompt given as `user_prompt` will be used as is, without any formatting for question or context. If set to true, the prompt must contain the placeholders {question} and {context} to be replaced by the question and context respectively",  # noqa: E501
+        description="If set to false, the prompt given as `user_prompt` will be used as is, without any formatting for question or context. If set to true, the prompt must contain the placeholders {question} and {context} to be replaced by the question and context respectively",
     )
-    seed: Optional[int] = Field(
+    seed: int | None = Field(
         default=None,
         description="Seed use for the generative model for a deterministic output.",
     )
-    reasoning: Union[Reasoning, bool] = Field(
+    reasoning: Reasoning | bool = Field(
         title="Reasoning options",
         default=False,
         description=(
@@ -1132,26 +1127,25 @@ class RephraseModel(BaseModel):
     chat_history: list[ChatContextMessage] = []
     user_id: str
     user_context: list[str] = []
-    generative_model: Optional[str] = Field(
+    generative_model: str | None = Field(
         default=None,
         title="Generative model",
-        description="The generative model to use for the rephrase endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
+        description="The generative model to use for the rephrase endpoint. If not provided, the model configured for the Knowledge Box is used.",
     )
-    chat_history_relevance_threshold: Optional[
+    chat_history_relevance_threshold: (
         Annotated[
             float,
             Field(
                 ge=0.0,
                 le=1.0,
-                description=(
-                    "Threshold to determine if the past chat history is relevant to rephrase the user's question. "
-                    "0 - Always treat previous messages as relevant (always rephrase)."
-                    "1 – Always treat previous messages as irrelevant (never rephrase)."
-                    "Values in between adjust the sensitivity."
-                ),
+                description="Threshold to determine if the past chat history is relevant to rephrase the user's question. "
+                "0 - Always treat previous messages as relevant (always rephrase)."
+                "1 - Always treat previous messages as irrelevant (never rephrase)."
+                "Values in between adjust the sensitivity.",
             ),
         ]
-    ] = None
+        | None
+    ) = None
 
 
 class RagStrategyName:
@@ -1235,13 +1229,13 @@ class FullResourceApplyTo(BaseModel):
     exclude: list[str] = Field(
         default_factory=list,
         title="Labels to exclude from full resource expansion",
-        description="Resources from matches containing any of these labels won't expand to the full resource. This may be useful to exclude long and not interesting resources and expend less tokens",  # noqa: E501
+        description="Resources from matches containing any of these labels won't expand to the full resource. This may be useful to exclude long and not interesting resources and expend less tokens",
     )
 
 
 class FullResourceStrategy(RagStrategy):
     name: Literal["full_resource"] = "full_resource"
-    count: Optional[int] = Field(
+    count: int | None = Field(
         default=None,
         title="Count",
         description="Maximum number of full documents to retrieve. If not specified, all matching documents are retrieved.",
@@ -1252,7 +1246,7 @@ class FullResourceStrategy(RagStrategy):
         title="Include remaining text blocks",
         description="Whether to include the remaining text blocks after the maximum number of resources has been reached.",
     )
-    apply_to: Optional[FullResourceApplyTo] = Field(
+    apply_to: FullResourceApplyTo | None = Field(
         default=None,
         title="Apply to certain resources only",
         description="Define which resources to exclude from serialization",
@@ -1358,7 +1352,7 @@ class PreQuery(BaseModel):
         ),
         ge=0,
     )
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         title="Prequery id",
         min_length=1,
@@ -1492,7 +1486,7 @@ class TableImageStrategy(ImageRagStrategy):
 
 class PageImageStrategy(ImageRagStrategy):
     name: Literal["page_image"] = "page_image"
-    count: Optional[int] = Field(
+    count: int | None = Field(
         default=None,
         title="Count",
         description="Maximum number of page images to retrieve. By default, at most 5 images are retrieved.",
@@ -1504,20 +1498,18 @@ class ParagraphImageStrategy(ImageRagStrategy):
 
 
 RagStrategies = Annotated[
-    Union[
-        FieldExtensionStrategy,
-        FullResourceStrategy,
-        HierarchyResourceStrategy,
-        NeighbouringParagraphsStrategy,
-        MetadataExtensionStrategy,
-        ConversationalStrategy,
-        PreQueriesStrategy,
-        GraphStrategy,
-    ],
+    FieldExtensionStrategy
+    | FullResourceStrategy
+    | HierarchyResourceStrategy
+    | NeighbouringParagraphsStrategy
+    | MetadataExtensionStrategy
+    | ConversationalStrategy
+    | PreQueriesStrategy
+    | GraphStrategy,
     Field(discriminator="name"),
 ]
 RagImagesStrategies = Annotated[
-    Union[PageImageStrategy, ParagraphImageStrategy, TableImageStrategy],
+    PageImageStrategy | ParagraphImageStrategy | TableImageStrategy,
     Field(discriminator="name"),
 ]
 PromptContext = dict[str, str]
@@ -1526,10 +1518,10 @@ PromptContextImages = dict[str, Image]
 
 
 class CustomPrompt(BaseModel):
-    system: Optional[str] = Field(
+    system: str | None = Field(
         default=None,
         title="System prompt",
-        description="System prompt given to the generative model responsible of generating the answer. This can help customize the behavior of the model when generating the answer. If not specified, the default model provider's prompt is used.",  # noqa: E501
+        description="System prompt given to the generative model responsible of generating the answer. This can help customize the behavior of the model when generating the answer. If not specified, the default model provider's prompt is used.",
         min_length=1,
         examples=[
             "You are a medical assistant, use medical terminology",
@@ -1538,10 +1530,10 @@ class CustomPrompt(BaseModel):
             "You are a financial expert, use correct terms",
         ],
     )
-    user: Optional[str] = Field(
+    user: str | None = Field(
         default=None,
         title="User prompt",
-        description="User prompt given to the generative model responsible of generating the answer. Use the words {context} and {question} in brackets where you want those fields to be placed, in case you want them in your prompt. Context will be the data returned by the retrieval step and question will be the user's query.",  # noqa: E501
+        description="User prompt given to the generative model responsible of generating the answer. Use the words {context} and {question} in brackets where you want those fields to be placed, in case you want them in your prompt. Context will be the data returned by the retrieval step and question will be the user's query.",
         min_length=1,
         examples=[
             "Taking into account our previous conversation, and this context: {context} answer this {question}",
@@ -1550,7 +1542,7 @@ class CustomPrompt(BaseModel):
             "Given this context: {context}. Answer this {question} using the provided context. Please, answer always in French",
         ],
     )
-    rephrase: Optional[str] = Field(
+    rephrase: str | None = Field(
         default=None,
         title="Rephrase",
         description=(
@@ -1580,23 +1572,23 @@ class AskRequest(AuditMetadataBase):
         le=200,
         description="The top most relevant results to fetch at the retrieval step. The maximum number of results allowed is 200.",
     )
-    filter_expression: Optional[FilterExpression] = (
+    filter_expression: FilterExpression | None = (
         SearchParamDefaults.filter_expression.to_pydantic_field()
     )
     fields: list[str] = SearchParamDefaults.fields.to_pydantic_field()
-    filters: Union[list[str], list[Filter]] = Field(
+    filters: list[str] | list[Filter] = Field(
         default=[],
         title="Search Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",
     )
-    keyword_filters: Union[list[str], list[Filter]] = Field(
+    keyword_filters: list[str] | list[Filter] = Field(
         default=[],
         title="Keyword filters",
         description=(
             "List of keyword filter expressions to apply to the retrieval step. "
             "The text block search will only be performed on the documents that contain the specified keywords. "
             "The filters are case-insensitive, and only alphanumeric characters and spaces are allowed. "
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters"  # noqa: E501
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters"
         ),
         examples=[
             ["NLP", "BERT"],
@@ -1604,43 +1596,39 @@ class AskRequest(AuditMetadataBase):
             ["Friedrich Nietzsche", "Immanuel Kant"],
         ],
     )
-    vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
-    min_score: Optional[Union[float, MinScore]] = Field(
+    vectorset: str | None = SearchParamDefaults.vectorset.to_pydantic_field()
+    min_score: float | MinScore | None = Field(
         default=None,
         title="Minimum score",
-        description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",  # noqa: E501
+        description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",
     )
     features: list[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
-    range_creation_start: Optional[DateTime] = (
-        SearchParamDefaults.range_creation_start.to_pydantic_field()
-    )
-    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
-    range_modification_start: Optional[DateTime] = (
+    range_creation_start: DateTime | None = SearchParamDefaults.range_creation_start.to_pydantic_field()
+    range_creation_end: DateTime | None = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: DateTime | None = (
         SearchParamDefaults.range_modification_start.to_pydantic_field()
     )
-    range_modification_end: Optional[DateTime] = (
+    range_modification_end: DateTime | None = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
     show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
     field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
     extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
-    context: Optional[list[ChatContextMessage]] = SearchParamDefaults.chat_context.to_pydantic_field()
-    chat_history: Optional[list[ChatContextMessage]] = (
-        SearchParamDefaults.chat_history.to_pydantic_field()
-    )
-    extra_context: Optional[list[str]] = Field(
+    context: list[ChatContextMessage] | None = SearchParamDefaults.chat_context.to_pydantic_field()
+    chat_history: list[ChatContextMessage] | None = SearchParamDefaults.chat_history.to_pydantic_field()
+    extra_context: list[str] | None = Field(
         default=None,
         title="Extra query context",
         description="""Additional context that is added to the retrieval context sent to the LLM.
         It allows extending the chat feature with content that may not be in the Knowledge Box.""",
     )
-    extra_context_images: Optional[list[Image]] = Field(
+    extra_context_images: list[Image] | None = Field(
         default=None,
         title="Extra query context images",
         description="""Additional images added to the retrieval context sent to the LLM."
         It allows extending the chat feature with content that may not be in the Knowledge Box.""",
     )
-    query_image: Optional[Image] = Field(
+    query_image: Image | None = Field(
         default=None,
         title="Query image",
         description="Image that will be used together with the query text for retrieval and then sent to the LLM as part of the context. "
@@ -1653,27 +1641,27 @@ class AskRequest(AuditMetadataBase):
 
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     resource_filters: list[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
-    prompt: Optional[Union[str, CustomPrompt]] = Field(
+    prompt: str | CustomPrompt | None = Field(
         default=None,
         title="Prompts",
-        description="Use to customize the prompts given to the generative model. Both system and user prompts can be customized. If a string is provided, it is interpreted as the user prompt.",  # noqa: E501
+        description="Use to customize the prompts given to the generative model. Both system and user prompts can be customized. If a string is provided, it is interpreted as the user prompt.",
     )
-    rank_fusion: Union[RankFusionName, RankFusion] = SearchParamDefaults.rank_fusion.to_pydantic_field()
-    reranker: Union[RerankerName, Reranker] = SearchParamDefaults.reranker.to_pydantic_field()
-    citations: Union[bool, None, CitationsType] = Field(
+    rank_fusion: RankFusionName | RankFusion = SearchParamDefaults.rank_fusion.to_pydantic_field()
+    reranker: RerankerName | Reranker = SearchParamDefaults.reranker.to_pydantic_field()
+    citations: bool | None | CitationsType = Field(
         default=None,
         description="Whether to include citations in the response. "
         "If set to None or False, no citations will be computed. "
         "If set to True or 'default', citations will be computed after answer generation and send as a separate `CitationsGenerativeResponse` chunk. "
         "If set to 'llm_footnotes', citations will be included in the LLM's response as markdown-styled footnotes. A `FootnoteCitationsGenerativeResponse` chunk will also be sent to map footnote ids to context keys in the `query_context`.",
     )
-    citation_threshold: Optional[float] = Field(
+    citation_threshold: float | None = Field(
         default=None,
         description="If citations is set to True or 'default', this will be the similarity threshold. Value between 0 and 1, lower values will produce more citations. If not set, it will be set to the optimized threshold found by Nuclia.",
         ge=0.0,
         le=1.0,
     )
-    security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
+    security: RequestSecurity | None = SearchParamDefaults.security.to_pydantic_field()
     show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
     rag_strategies: list[RagStrategies] = Field(
         default=[],
@@ -1738,21 +1726,21 @@ If empty, the default strategy is used, which simply adds the text of the matchi
     )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
 
-    generative_model: Optional[str] = Field(
+    generative_model: str | None = Field(
         default=None,
         title="Generative model",
-        description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
+        description="The generative model to use for the chat endpoint. If not provided, the model configured for the Knowledge Box is used.",
     )
-    generative_model_seed: Optional[int] = Field(
+    generative_model_seed: int | None = Field(
         default=None,
         title="Seed for the generative model",
         description="The seed to use for the generative model for deterministic generation. Only supported by some models.",
     )
 
-    max_tokens: Optional[Union[int, MaxTokens]] = Field(
+    max_tokens: int | MaxTokens | None = Field(
         default=None,
         title="Maximum LLM tokens to use for the request",
-        description="Use to limit the amount of tokens used in the LLM context and/or for generating the answer. If not provided, the default maximum tokens of the generative model will be used. If an integer is provided, it is interpreted as the maximum tokens for the answer.",  # noqa: E501
+        description="Use to limit the amount of tokens used in the LLM context and/or for generating the answer. If not provided, the default maximum tokens of the generative model will be used. If an integer is provided, it is interpreted as the maximum tokens for the answer.",
     )
 
     rephrase: bool = Field(
@@ -1761,7 +1749,7 @@ If empty, the default strategy is used, which simply adds the text of the matchi
             "Rephrase the query for a more efficient retrieval. This will consume LLM tokens and make the request slower."
         ),
     )
-    chat_history_relevance_threshold: Optional[float] = Field(
+    chat_history_relevance_threshold: float | None = Field(
         default=None,
         ge=0.0,
         le=1.0,
@@ -1779,7 +1767,7 @@ If empty, the default strategy is used, which simply adds the text of the matchi
         description="If set to true, the response will be in markdown format",
     )
 
-    answer_json_schema: Optional[dict[str, Any]] = Field(
+    answer_json_schema: dict[str, Any] | None = Field(
         default=None,
         title="Answer JSON schema",
         description="""Desired JSON schema for the LLM answer.
@@ -1795,12 +1783,12 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
         description="Whether to generate an answer using the generative model. If set to false, the response will only contain the retrieval results.",
     )
 
-    search_configuration: Optional[str] = Field(
+    search_configuration: str | None = Field(
         default=None,
         description="Load ask parameters from this configuration. Parameters in the request override parameters from the configuration.",
     )
 
-    reasoning: Union[Reasoning, bool] = Field(
+    reasoning: Reasoning | bool = Field(
         default=False,
         title="Reasoning options",
         description=(
@@ -1883,8 +1871,8 @@ class SummarizeModel(BaseModel):
     """
 
     resources: dict[str, SummarizeResourceModel] = {}
-    generative_model: Optional[str] = None
-    user_prompt: Optional[str] = None
+    generative_model: str | None = None
+    user_prompt: str | None = None
     summary_kind: SummaryKind = SummaryKind.SIMPLE
 
 
@@ -1893,13 +1881,13 @@ class SummarizeRequest(BaseModel):
     Model for the request payload of the summarize endpoint
     """
 
-    generative_model: Optional[str] = Field(
+    generative_model: str | None = Field(
         default=None,
         title="Generative model",
-        description="The generative model to use for the summarization. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
+        description="The generative model to use for the summarization. If not provided, the model configured for the Knowledge Box is used.",
     )
 
-    user_prompt: Optional[str] = Field(
+    user_prompt: str | None = Field(
         default=None,
         title="User prompt",
         description="Optional custom prompt input by the user",
@@ -1910,7 +1898,7 @@ class SummarizeRequest(BaseModel):
         min_length=1,
         max_length=100,
         title="Resources",
-        description="Uids or slugs of the resources to summarize. If the resources are not found, they will be ignored.",  # noqa: E501
+        description="Uids or slugs of the resources to summarize. If the resources are not found, they will be ignored.",
     )
 
     summary_kind: SummaryKind = Field(
@@ -1936,20 +1924,20 @@ class SummarizedResponse(BaseModel):
         title="Summary",
         description="Global summary of all resources combined.",
     )
-    consumption: Optional[Consumption] = None
+    consumption: Consumption | None = None
 
 
 class KnowledgeGraphEntity(BaseModel):
     name: str
-    type: Optional[RelationNodeType] = None
-    subtype: Optional[str] = None
+    type: RelationNodeType | None = None
+    subtype: str | None = None
 
 
 class FindRequest(BaseSearchRequest):
-    query_entities: SkipJsonSchema[Optional[list[KnowledgeGraphEntity]]] = Field(
+    query_entities: SkipJsonSchema[list[KnowledgeGraphEntity] | None] = Field(
         default=None, title="Query entities", description="Entities to use in a knowledge graph search"
     )
-    graph_query: Optional[GraphPathQuery] = Field(
+    graph_query: GraphPathQuery | None = Field(
         default=None,
         title="Graph query",
         description="Query for the knowledge graph. Paths (node-relation-node) extracted from a paragraph_id will be used to extend the results",
@@ -1960,17 +1948,17 @@ class FindRequest(BaseSearchRequest):
             FindOptions.SEMANTIC,
         ]
     )
-    rank_fusion: Union[RankFusionName, RankFusion] = SearchParamDefaults.rank_fusion.to_pydantic_field()
-    reranker: Union[RerankerName, Reranker] = SearchParamDefaults.reranker.to_pydantic_field()
+    rank_fusion: RankFusionName | RankFusion = SearchParamDefaults.rank_fusion.to_pydantic_field()
+    reranker: RerankerName | Reranker = SearchParamDefaults.reranker.to_pydantic_field()
 
-    keyword_filters: Union[list[str], list[Filter]] = Field(
+    keyword_filters: list[str] | list[Filter] = Field(
         default=[],
         title="Keyword filters",
         description=(
             "List of keyword filter expressions to apply to the retrieval step. "
             "The text block search will only be performed on the documents that contain the specified keywords. "
             "The filters are case-insensitive, and only alphanumeric characters and spaces are allowed. "
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters"  # noqa: E501
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters"
         ),
         examples=[
             ["NLP", "BERT"],
@@ -1979,11 +1967,11 @@ class FindRequest(BaseSearchRequest):
         ],
     )
 
-    search_configuration: Optional[str] = Field(
+    search_configuration: str | None = Field(
         default=None,
         description="Load find parameters from this configuration. Parameters in the request override parameters from the configuration.",
     )
-    generative_model: Optional[str] = Field(
+    generative_model: str | None = Field(
         default=None,
         title="Generative model",
         description="The generative model used to rephrase the query. If not provided, the model configured for the Knowledge Box is used.",
@@ -2017,9 +2005,9 @@ class SCORE_TYPE(str, Enum):
 
 
 class FindTextPosition(BaseModel):
-    page_number: Optional[int] = None
-    start_seconds: Optional[list[int]] = None
-    end_seconds: Optional[list[int]] = None
+    page_number: int | None = None
+    start_seconds: list[int] | None = None
+    end_seconds: list[int] | None = None
     index: int
     start: int
     end: int
@@ -2031,15 +2019,15 @@ class FindParagraph(BaseModel):
     order: int = Field(default=0, ge=0)
     text: str
     id: str
-    labels: Optional[list[str]] = []
-    position: Optional[TextPosition] = None
+    labels: list[str] | None = []
+    position: TextPosition | None = None
     fuzzy_result: bool = False
     page_with_visual: bool = Field(
         default=False,
         title="Page where this paragraph belongs is a visual page",
         description="This flag informs if the page may have information that has not been extracted",
     )
-    reference: Optional[str] = Field(
+    reference: str | None = Field(
         default=None,
         title="Reference to the image that represents this text",
         description="Reference to the extracted image that represents this paragraph",
@@ -2049,7 +2037,7 @@ class FindParagraph(BaseModel):
         title="Is a table",
         description="The referenced image of the paragraph is a table",
     )
-    relevant_relations: Optional[Relations] = Field(
+    relevant_relations: Relations | None = Field(
         default=None,
         title="Relevant relations",
         description="Relevant relations from which the paragraph was found, will only be filled if using the Graph RAG Strategy",
@@ -2074,9 +2062,9 @@ class KnowledgeboxFindResults(JsonBaseModel):
     """Find on knowledgebox results"""
 
     resources: dict[str, FindResource]
-    relations: Optional[Relations] = None
-    query: Optional[str] = Field(default=None, title="Find Results Query")
-    rephrased_query: Optional[str] = None
+    relations: Relations | None = None
+    query: str | None = Field(default=None, title="Find Results Query")
+    rephrased_query: str | None = None
     total: int = 0
     page_number: int = Field(
         default=0,
@@ -2090,18 +2078,18 @@ class KnowledgeboxFindResults(JsonBaseModel):
         default=False,
         description="Pagination will be deprecated, please, refer to `top_k` in the request",
     )
-    nodes: Optional[list[dict[str, str]]] = Field(
+    nodes: list[dict[str, str]] | None = Field(
         default=None,
         title="Nodes",
         description="List of nodes queried in the search",
     )
-    shards: Optional[list[str]] = Field(
+    shards: list[str] | None = Field(
         default=None,
         title="Shards",
         description="The list of shard replica ids used for the search.",
     )
     autofilters: list[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
-    min_score: Optional[Union[float, MinScore]] = Field(
+    min_score: float | MinScore | None = Field(
         default=MinScore(),
         title="Minimum result score",
         description="The minimum scores that have been used for the search operation.",
@@ -2109,9 +2097,9 @@ class KnowledgeboxFindResults(JsonBaseModel):
     best_matches: list[str] = Field(
         default=[],
         title="Best matches",
-        description="List of ids of best matching paragraphs. The list is sorted by decreasing relevance (most relevant first).",  # noqa: E501
+        description="List of ids of best matching paragraphs. The list is sorted by decreasing relevance (most relevant first).",
     )
-    metrics: Optional[dict[str, Any]] = Field(
+    metrics: dict[str, Any] | None = Field(
         default=None,
         title="Metrics",
         description=(
@@ -2129,15 +2117,15 @@ class FeedbackTasks(str, Enum):
 class FeedbackRequest(BaseModel):
     ident: str = Field(
         title="Request identifier",
-        description="Id of the request to provide feedback for. This id is returned in the response header `Nuclia-Learning-Id` of the chat endpoint.",  # noqa: E501
+        description="Id of the request to provide feedback for. This id is returned in the response header `Nuclia-Learning-Id` of the chat endpoint.",
     )
     good: bool = Field(title="Good", description="Whether the result was good or not")
     task: FeedbackTasks = Field(
         title="Task",
         description="The task the feedback is for. For now, only `CHAT` task is available",
     )
-    feedback: Optional[str] = Field(None, title="Feedback", description="Feedback text")
-    text_block_id: Optional[str] = Field(None, title="Text block", description="Text block id")
+    feedback: str | None = Field(None, title="Feedback", description="Feedback text")
+    text_block_id: str | None = Field(None, title="Text block", description="Text block id")
 
 
 def validate_facets(facets):
@@ -2188,13 +2176,11 @@ class AugmentedTextBlock(BaseModel):
     text: str = Field(
         description="The text of the augmented text block. It may include additional metadata to enrich the context"
     )
-    position: Optional[TextPosition] = Field(
+    position: TextPosition | None = Field(
         default=None,
         description="Metadata about the position of the text block in the original document.",
     )
-    parent: Optional[str] = Field(
-        default=None, description="The parent text block that was augmented for."
-    )
+    parent: str | None = Field(default=None, description="The parent text block that was augmented for.")
     augmentation_type: TextBlockAugmentationType = Field(description="Type of augmentation.")
 
 
@@ -2218,12 +2204,12 @@ class AskTokens(BaseModel):
         title="Output tokens",
         description="Number of LLM tokens used for the answer",
     )
-    input_nuclia: Optional[float] = Field(
+    input_nuclia: float | None = Field(
         title="Input Nuclia tokens",
         description="Number of Nuclia LLM tokens used for the context in the query",
         default=None,
     )
-    output_nuclia: Optional[float] = Field(
+    output_nuclia: float | None = Field(
         title="Output Nuclia tokens",
         description="Number of Nuclia LLM tokens used for the answer",
         default=None,
@@ -2231,12 +2217,12 @@ class AskTokens(BaseModel):
 
 
 class AskTimings(BaseModel):
-    generative_first_chunk: Optional[float] = Field(
+    generative_first_chunk: float | None = Field(
         default=None,
         title="Generative first chunk",
         description="Time the LLM took to generate the first chunk of the answer",
     )
-    generative_total: Optional[float] = Field(
+    generative_total: float | None = Field(
         default=None,
         title="Generative total",
         description="Total time the LLM took to generate the answer",
@@ -2244,12 +2230,12 @@ class AskTimings(BaseModel):
 
 
 class SyncAskMetadata(BaseModel):
-    tokens: Optional[AskTokens] = Field(
+    tokens: AskTokens | None = Field(
         default=None,
         title="Tokens",
         description="Number of tokens used in the LLM context and answer",
     )
-    timings: Optional[AskTimings] = Field(
+    timings: AskTimings | None = Field(
         default=None,
         title="Timings",
         description="Timings of the generative model",
@@ -2268,19 +2254,19 @@ class SyncAskResponse(BaseModel):
         title="Answer",
         description="The generative answer to the query",
     )
-    reasoning: Optional[str] = Field(
+    reasoning: str | None = Field(
         default=None,
         title="Reasoning steps",
-        description="The reasoning steps followed by the LLM to generate the answer. This is returned only if the reasoning feature is enabled in the request.",  # noqa: E501
+        description="The reasoning steps followed by the LLM to generate the answer. This is returned only if the reasoning feature is enabled in the request.",
     )
-    answer_json: Optional[dict[str, Any]] = Field(
+    answer_json: dict[str, Any] | None = Field(
         default=None,
         title="Answer JSON",
-        description="The generative JSON answer to the query. This is returned only if the answer_json_schema parameter is provided in the request.",  # noqa: E501
+        description="The generative JSON answer to the query. This is returned only if the answer_json_schema parameter is provided in the request.",
     )
     status: str = Field(
         title="Status",
-        description="The status of the query execution. It can be 'success', 'error', 'no_context' or 'no_retrieval_data'",  # noqa: E501
+        description="The status of the query execution. It can be 'success', 'error', 'no_context' or 'no_retrieval_data'",
     )
     retrieval_results: KnowledgeboxFindResults = Field(
         title="Retrieval results",
@@ -2291,7 +2277,7 @@ class SyncAskResponse(BaseModel):
         title="Retrieval best matches",
         description="Sorted list of best matching text blocks in the retrieval step. This includes the main query and prequeries results, if any.",
     )
-    prequeries: Optional[dict[str, KnowledgeboxFindResults]] = Field(
+    prequeries: dict[str, KnowledgeboxFindResults] | None = Field(
         default=None,
         title="Prequeries",
         description="The retrieval results of the prequeries",
@@ -2299,9 +2285,9 @@ class SyncAskResponse(BaseModel):
     learning_id: str = Field(
         default="",
         title="Learning id",
-        description="The id of the learning request. This id can be used to provide feedback on the learning process.",  # noqa: E501
+        description="The id of the learning request. This id can be used to provide feedback on the learning process.",
     )
-    relations: Optional[Relations] = Field(
+    relations: Relations | None = Field(
         default=None,
         title="Relations",
         description="The detected relations of the answer",
@@ -2316,29 +2302,29 @@ class SyncAskResponse(BaseModel):
         title="Citation footnote to context",
         description="""Maps ids in the footnote citations to query_context keys (normally paragraph ids)""",
     )
-    augmented_context: Optional[AugmentedContext] = Field(
+    augmented_context: AugmentedContext | None = Field(
         default=None,
         description=(
             "Augmented text blocks that were sent to the LLM as part of the RAG strategies "
             "applied on the retrieval results in the request."
         ),
     )
-    prompt_context: Optional[list[str]] = Field(
+    prompt_context: list[str] | None = Field(
         default=None,
         title="Prompt context",
         description="The prompt context used to generate the answer. Returned only if the debug flag is set to true",
     )
-    predict_request: Optional[dict[str, Any]] = Field(
+    predict_request: dict[str, Any] | None = Field(
         default=None,
         title="Predict request",
         description="The internal predict request used to generate the answer. Returned only if the debug flag is set to true",
     )
-    metadata: Optional[SyncAskMetadata] = Field(
+    metadata: SyncAskMetadata | None = Field(
         default=None,
         title="Metadata",
-        description="Metadata of the query execution. This includes the number of tokens used in the LLM context and answer, and the timings of the generative model.",  # noqa: E501
+        description="Metadata of the query execution. This includes the number of tokens used in the LLM context and answer, and the timings of the generative model.",
     )
-    consumption: Optional[Consumption] = Field(
+    consumption: Consumption | None = Field(
         default=None,
         title="Consumption",
         description=(
@@ -2346,12 +2332,12 @@ class SyncAskResponse(BaseModel):
             " 'X-show-consumption' header is set to true in the request."
         ),
     )
-    error_details: Optional[str] = Field(
+    error_details: str | None = Field(
         default=None,
         title="Error details",
         description="Error details message in case there was an error",
     )
-    debug: Optional[dict[str, Any]] = Field(
+    debug: dict[str, Any] | None = Field(
         default=None,
         title="Debug information",
         description=(
@@ -2441,7 +2427,7 @@ class StatusAskResponseItem(BaseModel):
     type: Literal["status"] = "status"
     code: str
     status: str
-    details: Optional[str] = None
+    details: str | None = None
 
 
 class ErrorAskResponseItem(BaseModel):
@@ -2460,22 +2446,22 @@ class DebugAskResponseItem(BaseModel):
     metrics: dict[str, Any]
 
 
-AskResponseItemType = Union[
-    AnswerAskResponseItem,
-    ReasoningAskResponseItem,
-    JSONAskResponseItem,
-    MetadataAskResponseItem,
-    AugmentedContextResponseItem,
-    CitationsAskResponseItem,
-    FootnoteCitationsAskResponseItem,
-    StatusAskResponseItem,
-    ErrorAskResponseItem,
-    RetrievalAskResponseItem,
-    RelationsAskResponseItem,
-    DebugAskResponseItem,
-    PrequeriesAskResponseItem,
-    ConsumptionResponseItem,
-]
+AskResponseItemType = (
+    AnswerAskResponseItem
+    | ReasoningAskResponseItem
+    | JSONAskResponseItem
+    | MetadataAskResponseItem
+    | AugmentedContextResponseItem
+    | CitationsAskResponseItem
+    | FootnoteCitationsAskResponseItem
+    | StatusAskResponseItem
+    | ErrorAskResponseItem
+    | RetrievalAskResponseItem
+    | RelationsAskResponseItem
+    | DebugAskResponseItem
+    | PrequeriesAskResponseItem
+    | ConsumptionResponseItem
+)
 
 
 class AskResponseItem(BaseModel):
@@ -2495,7 +2481,7 @@ def parse_custom_prompt(item: AskRequest) -> CustomPrompt:
     return prompt
 
 
-def parse_rephrase_prompt(item: AskRequest) -> Optional[str]:
+def parse_rephrase_prompt(item: AskRequest) -> str | None:
     prompt = parse_custom_prompt(item)
     return prompt.rephrase
 
@@ -2506,7 +2492,7 @@ FindRequest.model_rebuild()
 
 class CatalogFacetsPrefix(BaseModel):
     prefix: str = Field(pattern="^((/[^/]+)*)$")
-    depth: Optional[int] = Field(
+    depth: int | None = Field(
         default=None,
         ge=0,
         description="Only include facets up to this depth from the prefix, leave empty to include all depths",

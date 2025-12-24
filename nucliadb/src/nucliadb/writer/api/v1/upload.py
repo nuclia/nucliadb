@@ -22,7 +22,7 @@ import uuid
 from datetime import datetime
 from hashlib import md5
 from io import BytesIO
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import HTTPException
 from fastapi.requests import Request
@@ -122,17 +122,17 @@ TUS_HEADERS = {
 def tus_options(
     request: Request,
     kbid: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
-    upload_id: Optional[str] = None,
-    field: Optional[str] = None,
+    rid: str | None = None,
+    rslug: str | None = None,
+    upload_id: str | None = None,
+    field: str | None = None,
 ) -> Response:
     return _tus_options()
 
 
 def _tus_options() -> Response:
     """
-    Gather information about the Server’s current configuration such as enabled extensions, version...
+    Gather information about the Server's current configuration such as enabled extensions, version...
     """
     resp = Response(headers=TUS_HEADERS, status_code=204)
     return resp
@@ -151,9 +151,9 @@ async def tus_post_rslug_prefix(
     kbid: str,
     rslug: str,
     field: FieldIdString,
-    item: Optional[CreateResourcePayload] = None,
-    x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
-    x_split_strategy: Annotated[Optional[str], X_SPLIT_STRATEGY] = None,
+    item: CreateResourcePayload | None = None,
+    x_extract_strategy: Annotated[str | None, X_EXTRACT_STRATEGY] = None,
+    x_split_strategy: Annotated[str | None, X_SPLIT_STRATEGY] = None,
 ) -> Response:
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _tus_post(
@@ -180,9 +180,9 @@ async def tus_post_rid_prefix(
     kbid: str,
     path_rid: str,
     field: FieldIdString,
-    item: Optional[CreateResourcePayload] = None,
-    x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
-    x_split_strategy: Annotated[Optional[str], X_SPLIT_STRATEGY] = None,
+    item: CreateResourcePayload | None = None,
+    x_extract_strategy: Annotated[str | None, X_EXTRACT_STRATEGY] = None,
+    x_split_strategy: Annotated[str | None, X_SPLIT_STRATEGY] = None,
 ) -> Response:
     return await _tus_post(
         request,
@@ -206,9 +206,9 @@ async def tus_post_rid_prefix(
 async def tus_post(
     request: Request,
     kbid: str,
-    item: Optional[CreateResourcePayload] = None,
-    x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
-    x_split_strategy: Annotated[Optional[str], X_SPLIT_STRATEGY] = None,
+    item: CreateResourcePayload | None = None,
+    x_extract_strategy: Annotated[str | None, X_EXTRACT_STRATEGY] = None,
+    x_split_strategy: Annotated[str | None, X_SPLIT_STRATEGY] = None,
 ) -> Response:
     return await _tus_post(
         request, kbid, item, extract_strategy=x_extract_strategy, split_strategy=x_split_strategy
@@ -219,11 +219,11 @@ async def tus_post(
 async def _tus_post(
     request: Request,
     kbid: str,
-    item: Optional[CreateResourcePayload] = None,
-    path_rid: Optional[str] = None,
-    field_id: Optional[str] = None,
-    extract_strategy: Optional[str] = None,
-    split_strategy: Optional[str] = None,
+    item: CreateResourcePayload | None = None,
+    path_rid: str | None = None,
+    field_id: str | None = None,
+    extract_strategy: str | None = None,
+    split_strategy: str | None = None,
 ) -> Response:
     """
     An empty POST request is used to create a new upload resource.
@@ -264,7 +264,7 @@ async def _tus_post(
         try:
             metadata = parse_tus_metadata(request.headers["upload-metadata"])
         except InvalidTUSMetadata as exc:
-            raise HTTPBadRequest(detail=f"Upload-Metadata header contains errors: {str(exc)}")
+            raise HTTPBadRequest(detail=f"Upload-Metadata header contains errors: {exc!s}")
     else:
         metadata = {}
 
@@ -338,7 +338,7 @@ async def _tus_post(
     return Response(
         status_code=201,
         headers={
-            "Location": location,  # noqa
+            "Location": location,
             "Tus-Resumable": "1.0.0",
             "Access-Control-Expose-Headers": "Location,Tus-Resumable",
         },
@@ -484,8 +484,8 @@ async def tus_patch(
     request: Request,
     kbid: str,
     upload_id: str,
-    rid: Optional[str] = None,
-    field: Optional[str] = None,
+    rid: str | None = None,
+    field: str | None = None,
 ):
     try:
         return await _tus_patch(
@@ -507,8 +507,8 @@ async def _tus_patch(
     request: Request,
     kbid: str,
     upload_id: str,
-    rid: Optional[str] = None,
-    field: Optional[str] = None,
+    rid: str | None = None,
+    field: str | None = None,
 ) -> Response:
     """
     Upload all bytes in the requests and append them in the specified offset
@@ -644,12 +644,12 @@ async def upload_rslug_prefix(
     kbid: str,
     rslug: str,
     field: FieldIdString,
-    x_filename: Annotated[Optional[str], X_FILENAME] = None,
-    x_password: Annotated[Optional[str], X_PASSWORD] = None,
-    x_language: Annotated[Optional[str], X_LANGUAGE] = None,
-    x_md5: Annotated[Optional[str], X_MD5] = None,
-    x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
-    x_split_strategy: Annotated[Optional[str], X_SPLIT_STRATEGY] = None,
+    x_filename: Annotated[str | None, X_FILENAME] = None,
+    x_password: Annotated[str | None, X_PASSWORD] = None,
+    x_language: Annotated[str | None, X_LANGUAGE] = None,
+    x_md5: Annotated[str | None, X_MD5] = None,
+    x_extract_strategy: Annotated[str | None, X_EXTRACT_STRATEGY] = None,
+    x_split_strategy: Annotated[str | None, X_SPLIT_STRATEGY] = None,
 ) -> ResourceFileUploaded:
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _upload(
@@ -680,12 +680,12 @@ async def upload_rid_prefix(
     kbid: str,
     path_rid: str,
     field: FieldIdString,
-    x_filename: Annotated[Optional[str], X_FILENAME] = None,
-    x_password: Annotated[Optional[str], X_PASSWORD] = None,
-    x_language: Annotated[Optional[str], X_LANGUAGE] = None,
-    x_md5: Annotated[Optional[str], X_MD5] = None,
-    x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
-    x_split_strategy: Annotated[Optional[str], X_SPLIT_STRATEGY] = None,
+    x_filename: Annotated[str | None, X_FILENAME] = None,
+    x_password: Annotated[str | None, X_PASSWORD] = None,
+    x_language: Annotated[str | None, X_LANGUAGE] = None,
+    x_md5: Annotated[str | None, X_MD5] = None,
+    x_extract_strategy: Annotated[str | None, X_EXTRACT_STRATEGY] = None,
+    x_split_strategy: Annotated[str | None, X_SPLIT_STRATEGY] = None,
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -713,12 +713,12 @@ async def upload_rid_prefix(
 async def upload(
     request: StarletteRequest,
     kbid: str,
-    x_filename: Annotated[Optional[str], X_FILENAME] = None,
-    x_password: Annotated[Optional[str], X_PASSWORD] = None,
-    x_language: Annotated[Optional[str], X_LANGUAGE] = None,
-    x_md5: Annotated[Optional[str], X_MD5] = None,
-    x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
-    x_split_strategy: Annotated[Optional[str], X_SPLIT_STRATEGY] = None,
+    x_filename: Annotated[str | None, X_FILENAME] = None,
+    x_password: Annotated[str | None, X_PASSWORD] = None,
+    x_language: Annotated[str | None, X_LANGUAGE] = None,
+    x_md5: Annotated[str | None, X_MD5] = None,
+    x_extract_strategy: Annotated[str | None, X_EXTRACT_STRATEGY] = None,
+    x_split_strategy: Annotated[str | None, X_SPLIT_STRATEGY] = None,
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -736,14 +736,14 @@ async def upload(
 async def _upload(
     request: StarletteRequest,
     kbid: str,
-    path_rid: Optional[str] = None,
-    field: Optional[str] = None,
-    x_filename: Optional[str] = None,
-    x_password: Optional[str] = None,
-    x_language: Optional[str] = None,
-    x_md5: Optional[str] = None,
-    x_extract_strategy: Optional[str] = None,
-    x_split_strategy: Optional[str] = None,
+    path_rid: str | None = None,
+    field: str | None = None,
+    x_filename: str | None = None,
+    x_password: str | None = None,
+    x_language: str | None = None,
+    x_md5: str | None = None,
+    x_extract_strategy: str | None = None,
+    x_split_strategy: str | None = None,
 ) -> ResourceFileUploaded:
     if path_rid is not None:
         await validate_rid_exists_or_raise_error(kbid, path_rid)
@@ -848,9 +848,9 @@ async def _upload(
 
 async def validate_field_upload(
     kbid: str,
-    rid: Optional[str] = None,
-    field: Optional[str] = None,
-    md5: Optional[str] = None,
+    rid: str | None = None,
+    field: str | None = None,
+    md5: str | None = None,
 ):
     """Validate field upload and return blob storage path, rid and field id.
 
@@ -893,14 +893,14 @@ async def store_file_on_nuclia_db(
     field: str,
     content_type: str = "application/octet-stream",
     override_resource_title: bool = False,
-    filename: Optional[str] = None,
-    password: Optional[str] = None,
-    language: Optional[str] = None,
-    md5: Optional[str] = None,
-    item: Optional[CreateResourcePayload] = None,
-    extract_strategy: Optional[str] = None,
-    split_strategy: Optional[str] = None,
-) -> Optional[int]:
+    filename: str | None = None,
+    password: str | None = None,
+    language: str | None = None,
+    md5: str | None = None,
+    item: CreateResourcePayload | None = None,
+    extract_strategy: str | None = None,
+    split_strategy: str | None = None,
+) -> int | None:
     # File is on NucliaDB Storage at path
     partitioning = get_partitioning()
     processing = get_processing()

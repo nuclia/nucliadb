@@ -21,7 +21,7 @@
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Literal, Union, cast
+from typing import Any, Literal, cast
 
 from psycopg import AsyncCursor, sql
 from psycopg.rows import DictRow, dict_row
@@ -275,7 +275,7 @@ async def _faceted_search_unfiltered(
         for status in ["PENDING", "PROCESSED", "ERROR", "EMPTY"]:
             sqls.append(
                 sql.SQL(
-                    "SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s AND facet = '/n/s/{0}' GROUP BY facet".format(
+                    "SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s AND facet = '/n/s/{}' GROUP BY facet".format(
                         status
                     )
                 )
@@ -294,7 +294,7 @@ async def _faceted_search_unfiltered(
                 facet_params[f"facet_{cnt}"] = f"{prefix}/%"
                 facet_params[f"facet_len_{cnt}"] = -(len(prefix) + 1)
             facet_sql = sql.SQL("AND {}").format(sql.SQL(" OR ").join(prefixes_sql))
-        elif all((facet.startswith("/l") or facet.startswith("/n/i") for facet in tmp_facets.keys())):
+        elif all(facet.startswith("/l") or facet.startswith("/n/i") for facet in tmp_facets.keys()):
             # Special case for the catalog query, which can have many facets asked for
             # Filter for the categories (icon and labels) in the query, filter the rest in the code below
             facet_sql = sql.SQL("AND (facet LIKE '/l/%%' OR facet like '/n/i/%%')")
@@ -421,7 +421,7 @@ def _convert_filter(expr: CatalogExpression, filter_params: dict[str, Any]) -> s
 
 def _convert_boolean_op(
     operands: list[CatalogExpression],
-    op: Union[Literal["and"], Literal["or"]],
+    op: Literal["and"] | Literal["or"],
     filter_params: dict[str, Any],
 ) -> sql.Composable:
     array_op = sql.SQL("@>" if op == "and" else "&&")

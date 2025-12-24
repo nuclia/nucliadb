@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional
 
 import pytest
 
@@ -135,7 +134,7 @@ def test_valid_data_augmentation_id_extraction(
     task_id: str,
     field_type: str,
     field_id: str,
-    split: Optional[str],
+    split: str | None,
 ):
     if split is not None:
         gen_field_id = f"da-{task_id}-{field_type}-{field_id}-{split}"
@@ -156,7 +155,7 @@ def test_invalid_data_augmentation_id_extraction(
     task_id: str,
     field_type: str,
     field_id: str,
-    split: Optional[str],
+    split: str | None,
 ):
     if split is not None:
         gen_field_id = f"da-{task_id}-{field_type}-{field_id}-{split}"

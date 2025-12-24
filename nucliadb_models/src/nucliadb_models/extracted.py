@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -27,27 +26,27 @@ from .metadata import Relation
 
 
 class ExtractedText(BaseModel):
-    text: Optional[str] = None
-    split_text: Optional[Dict[str, str]] = None
-    deleted_splits: Optional[List[str]] = None
+    text: str | None = None
+    split_text: dict[str, str] | None = None
+    deleted_splits: list[str] | None = None
 
 
 class Vector(BaseModel):
-    start: Optional[int] = None
-    end: Optional[int] = None
-    start_paragraph: Optional[int] = None
-    end_paragraph: Optional[int] = None
-    vector: Optional[List[float]] = None
+    start: int | None = None
+    end: int | None = None
+    start_paragraph: int | None = None
+    end_paragraph: int | None = None
+    vector: list[float] | None = None
 
 
 class Vectors(BaseModel):
-    vectors: Optional[List[Vector]] = None
+    vectors: list[Vector] | None = None
 
 
 class VectorObject(BaseModel):
-    vectors: Optional[Vectors] = None
-    split_vectors: Optional[Dict[str, Vectors]] = None
-    deleted_splits: Optional[List[str]] = None
+    vectors: Vectors | None = None
+    split_vectors: dict[str, Vectors] | None = None
+    deleted_splits: list[str] | None = None
 
 
 class Position(BaseModel):
@@ -56,14 +55,14 @@ class Position(BaseModel):
 
 
 class Positions(BaseModel):
-    position: List[Position]
+    position: list[Position]
     entity: str
 
 
 class FieldEntity(BaseModel):
     text: str
     label: str
-    positions: List[Position]
+    positions: list[Position]
 
 
 class FieldEntities(BaseModel):
@@ -71,91 +70,91 @@ class FieldEntities(BaseModel):
     Wrapper for the entities extracted from a field (required because protobuf doesn't support lists of lists)
     """
 
-    entities: List[FieldEntity]
+    entities: list[FieldEntity]
 
 
 class FieldMetadata(BaseModel):
-    links: List[str]
-    paragraphs: List[Paragraph]
-    ner: Dict[str, str]  # TODO: Remove once processor doesn't use this anymore
-    entities: Dict[str, FieldEntities]
-    classifications: List[Classification]
-    last_index: Optional[datetime] = None
-    last_understanding: Optional[datetime] = None
-    last_extract: Optional[datetime] = None
-    last_summary: Optional[datetime] = None
-    last_processing_start: Optional[datetime] = None
-    thumbnail: Optional[CloudLink] = None
-    language: Optional[str] = None
-    summary: Optional[str] = None
-    positions: Dict[str, Positions]  # TODO: Remove once processor doesn't use this anymore
-    relations: Optional[List[Relation]] = None
-    mime_type: Optional[str] = None
+    links: list[str]
+    paragraphs: list[Paragraph]
+    ner: dict[str, str]  # TODO: Remove once processor doesn't use this anymore
+    entities: dict[str, FieldEntities]
+    classifications: list[Classification]
+    last_index: datetime | None = None
+    last_understanding: datetime | None = None
+    last_extract: datetime | None = None
+    last_summary: datetime | None = None
+    last_processing_start: datetime | None = None
+    thumbnail: CloudLink | None = None
+    language: str | None = None
+    summary: str | None = None
+    positions: dict[str, Positions]  # TODO: Remove once processor doesn't use this anymore
+    relations: list[Relation] | None = None
+    mime_type: str | None = None
 
 
 class FieldComputedMetadata(BaseModel):
     metadata: FieldMetadata
-    split_metadata: Optional[Dict[str, FieldMetadata]] = None
-    deleted_splits: Optional[List[str]] = None
+    split_metadata: dict[str, FieldMetadata] | None = None
+    deleted_splits: list[str] | None = None
 
 
 class Entity(BaseModel):
-    token: Optional[str] = None
-    root: Optional[str] = None
-    type: Optional[str] = None
+    token: str | None = None
+    root: str | None = None
+    type: str | None = None
 
 
 class FieldLargeMetadata(BaseModel):
-    entities: Optional[List[Entity]] = None
-    tokens: Optional[Dict[str, int]] = None
+    entities: list[Entity] | None = None
+    tokens: dict[str, int] | None = None
 
 
 class LargeComputedMetadata(BaseModel):
-    metadata: Optional[FieldLargeMetadata] = None
-    split_metadata: Optional[Dict[str, FieldLargeMetadata]] = None
-    deleted_splits: Optional[List[str]] = None
+    metadata: FieldLargeMetadata | None = None
+    split_metadata: dict[str, FieldLargeMetadata] | None = None
+    deleted_splits: list[str] | None = None
 
 
 class LinkExtractedData(BaseModel):
-    date: Optional[datetime] = None
-    language: Optional[str] = None
-    title: Optional[str] = None
-    metadata: Optional[Dict[str, str]] = None
-    link_thumbnail: Optional[CloudLink] = None
-    link_preview: Optional[CloudLink] = None
-    field: Optional[str] = Field(default=None, title="Link Extracted Data Field")
-    link_image: Optional[CloudLink] = None
-    description: Optional[str] = None
-    type: Optional[str] = None
-    embed: Optional[str] = None
-    file_generated: Optional[Dict[str, CloudLink]] = None
+    date: datetime | None = None
+    language: str | None = None
+    title: str | None = None
+    metadata: dict[str, str] | None = None
+    link_thumbnail: CloudLink | None = None
+    link_preview: CloudLink | None = None
+    field: str | None = Field(default=None, title="Link Extracted Data Field")
+    link_image: CloudLink | None = None
+    description: str | None = None
+    type: str | None = None
+    embed: str | None = None
+    file_generated: dict[str, CloudLink] | None = None
 
 
 class NestedPosition(BaseModel):
-    start: Optional[int] = None
-    end: Optional[int] = None
-    page: Optional[int] = Field(default=None, title="Position Page")
+    start: int | None = None
+    end: int | None = None
+    page: int | None = Field(default=None, title="Position Page")
 
 
 class NestedListPosition(BaseModel):
-    positions: List[NestedPosition]
+    positions: list[NestedPosition]
 
 
 class Row(BaseModel):
-    cell: Optional[List[str]] = None
+    cell: list[str] | None = None
 
 
 class Sheet(BaseModel):
-    rows: Optional[List[Row]] = None
+    rows: list[Row] | None = None
 
 
 class RowsPreview(BaseModel):
-    sheets: Optional[Dict[str, Sheet]] = None
+    sheets: dict[str, Sheet] | None = None
 
 
 class PagePositions(BaseModel):
-    start: Optional[int] = None
-    end: Optional[int] = None
+    start: int | None = None
+    end: int | None = None
 
 
 class PageStructurePage(BaseModel):
@@ -174,32 +173,32 @@ class PageStructureToken(BaseModel):
 
 class PageStructure(BaseModel):
     page: PageStructurePage
-    tokens: List[PageStructureToken]
+    tokens: list[PageStructureToken]
 
 
 class FilePages(BaseModel):
-    pages: Optional[List[CloudLink]] = None
-    positions: Optional[List[PagePositions]] = None
-    structures: Optional[List[PageStructure]] = None
+    pages: list[CloudLink] | None = None
+    positions: list[PagePositions] | None = None
+    structures: list[PageStructure] | None = None
 
 
 class FileExtractedData(BaseModel):
-    language: Optional[str] = None
-    md5: Optional[str] = None
-    metadata: Optional[Dict[str, str]] = None
-    nested: Optional[Dict[str, str]] = None
-    file_generated: Optional[Dict[str, CloudLink]] = None
-    file_rows_previews: Optional[Dict[str, RowsPreview]] = None
-    file_preview: Optional[CloudLink] = None
-    file_pages_previews: Optional[FilePages] = None
-    file_thumbnail: Optional[CloudLink] = None
-    field: Optional[str] = None
-    icon: Optional[str] = None
-    nested_position: Optional[Dict[str, NestedPosition]] = None
-    nested_list_position: Optional[Dict[str, NestedListPosition]] = None
+    language: str | None = None
+    md5: str | None = None
+    metadata: dict[str, str] | None = None
+    nested: dict[str, str] | None = None
+    file_generated: dict[str, CloudLink] | None = None
+    file_rows_previews: dict[str, RowsPreview] | None = None
+    file_preview: CloudLink | None = None
+    file_pages_previews: FilePages | None = None
+    file_thumbnail: CloudLink | None = None
+    field: str | None = None
+    icon: str | None = None
+    nested_position: dict[str, NestedPosition] | None = None
+    nested_list_position: dict[str, NestedListPosition] | None = None
 
 
 class FieldQuestionAnswers(BaseModel):
     question_answers: QuestionAnswers
-    split_question_answers: Optional[Dict[str, QuestionAnswers]] = None
-    deleted_splits: Optional[List[str]] = None
+    split_question_answers: dict[str, QuestionAnswers] | None = None
+    deleted_splits: list[str] | None = None

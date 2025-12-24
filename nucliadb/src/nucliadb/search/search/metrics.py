@@ -19,7 +19,7 @@
 #
 import contextlib
 import time
-from typing import Any, Optional, Union
+from typing import Any
 
 from nucliadb_telemetry import metrics
 
@@ -63,7 +63,7 @@ rag_histogram = metrics.Histogram(
     buckets=buckets,
 )
 
-MetricsData = dict[str, Union[int, float]]
+MetricsData = dict[str, int | float]
 
 
 class Metrics:
@@ -87,10 +87,10 @@ class Metrics:
         self.child_spans.append(child_span)
         return child_span
 
-    def set(self, key: str, value: Union[int, float]):
+    def set(self, key: str, value: int | float):
         self._metrics[key] = value
 
-    def get(self, key: str) -> Optional[Union[int, float]]:
+    def get(self, key: str) -> int | float | None:
         return self._metrics.get(key)
 
     def to_dict(self) -> MetricsData:
@@ -103,7 +103,7 @@ class Metrics:
         result[self.id] = self.to_dict()
         return result
 
-    def __getitem__(self, key: str) -> Union[int, float]:
+    def __getitem__(self, key: str) -> int | float:
         return self._metrics[key]
 
 
@@ -111,8 +111,8 @@ class AskMetrics(Metrics):
     def __init__(self: "AskMetrics"):
         super().__init__(id="ask")
         self.global_start = time.monotonic()
-        self.first_chunk_yielded_at: Optional[float] = None
-        self.first_reasoning_chunk_yielded_at: Optional[float] = None
+        self.first_chunk_yielded_at: float | None = None
+        self.first_reasoning_chunk_yielded_at: float | None = None
 
     def record_first_chunk_yielded(self):
         self.first_chunk_yielded_at = time.monotonic()
@@ -124,12 +124,12 @@ class AskMetrics(Metrics):
             self.first_reasoning_chunk_yielded_at - self.global_start
         )
 
-    def get_first_chunk_time(self) -> Optional[float]:
+    def get_first_chunk_time(self) -> float | None:
         if self.first_chunk_yielded_at is None:
             return None
         return self.first_chunk_yielded_at - self.global_start
 
-    def get_first_reasoning_chunk_time(self) -> Optional[float]:
+    def get_first_reasoning_chunk_time(self) -> float | None:
         if self.first_reasoning_chunk_yielded_at is None:
             return None
         return self.first_reasoning_chunk_yielded_at - self.global_start

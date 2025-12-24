@@ -19,7 +19,6 @@
 #
 
 from contextlib import asynccontextmanager
-from typing import Optional
 
 from fastapi import FastAPI
 from starlette.routing import Mount
@@ -28,7 +27,7 @@ from nucliadb.common.context import ApplicationContext
 
 
 @asynccontextmanager
-async def inject_app_context(app: FastAPI, context: Optional[ApplicationContext] = None):
+async def inject_app_context(app: FastAPI, context: ApplicationContext | None = None):
     if context is None:
         context = ApplicationContext()
 

@@ -18,8 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from collections.abc import Awaitable
 from contextlib import AsyncExitStack
-from typing import Awaitable, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 

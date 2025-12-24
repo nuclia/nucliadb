@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 import mrflagly
 import pydantic_settings
@@ -28,7 +28,7 @@ from nucliadb_utils.settings import nuclia_settings, running_settings
 
 
 class Settings(pydantic_settings.BaseSettings):
-    flag_settings_url: Optional[str] = None
+    flag_settings_url: str | None = None
 
     # temporary flag to test this FF enabled/disabled easily
     disable_ask_decoupled_ff: bool = False
@@ -63,7 +63,7 @@ class FlagService:
         else:
             self.flag_service = mrflagly.FlagService(url=settings.flag_settings_url)
 
-    def enabled(self, flag_key: str, default: bool = False, context: Optional[dict] = None) -> bool:
+    def enabled(self, flag_key: str, default: bool = False, context: dict | None = None) -> bool:
         if context is None:
             context = {}
         context["environment"] = running_settings.running_environment

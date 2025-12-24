@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Optional
 
 from fastapi import HTTPException, Request
 from fastapi_versioning import version
@@ -178,7 +177,7 @@ async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
         )
 
     try:
-        results: Optional[list[Shard]] = await asyncio.wait_for(
+        results: list[Shard] | None = await asyncio.wait_for(
             asyncio.gather(*ops, return_exceptions=True),  # type: ignore
             timeout=settings.search_timeout,
         )

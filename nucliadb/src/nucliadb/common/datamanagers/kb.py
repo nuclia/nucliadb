@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-from typing import AsyncIterator, Optional
+from collections.abc import AsyncIterator
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.maindb.driver import Transaction
@@ -47,7 +47,7 @@ async def exists_kb(txn: Transaction, *, kbid: str) -> bool:
     return await get_config(txn, kbid=kbid, for_update=False) is not None
 
 
-async def get_kb_uuid(txn: Transaction, *, slug: str) -> Optional[str]:
+async def get_kb_uuid(txn: Transaction, *, slug: str) -> str | None:
     uuid = await txn.get(KB_SLUGS.format(slug=slug), for_update=False)
     if uuid is not None:
         return uuid.decode()
@@ -67,7 +67,7 @@ async def delete_kb_slug(txn: Transaction, *, slug: str):
 
 async def get_config(
     txn: Transaction, *, kbid: str, for_update: bool = False
-) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:
+) -> knowledgebox_pb2.KnowledgeBoxConfig | None:
     key = KB_UUID.format(kbid=kbid)
     payload = await txn.get(key, for_update=for_update)
     if payload is None:
@@ -105,8 +105,8 @@ async def get_matryoshka_vector_dimension(
     txn: Transaction,
     *,
     kbid: str,
-    vectorset_id: Optional[str] = None,
-) -> Optional[int]:
+    vectorset_id: str | None = None,
+) -> int | None:
     """Return vector dimension for matryoshka models"""
     from . import vectorsets
 
@@ -145,7 +145,7 @@ async def get_matryoshka_vector_dimension(
 
 async def get_external_index_provider_metadata(
     txn: Transaction, *, kbid: str
-) -> Optional[knowledgebox_pb2.StoredExternalIndexProviderMetadata]:
+) -> knowledgebox_pb2.StoredExternalIndexProviderMetadata | None:
     kb_config = await get_config(txn, kbid=kbid)
     if kb_config is None:
         return None

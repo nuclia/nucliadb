@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import Optional
 
 import pydantic
 
@@ -44,11 +43,11 @@ class Settings(DriverSettings, StorageSettings, ExtendedStorageSettings):
     # all settings here are mapped in to other env var settings used
     # in the app. These are helper settings to make things easier to
     # use with standalone app vs cluster app.
-    nua_api_key: Optional[str] = pydantic.Field(
+    nua_api_key: str | None = pydantic.Field(
         default=None,
-        description="Nuclia Understanding API Key. Read how to generate a NUA Key here: https://docs.nuclia.dev/docs/rag/advanced/understanding/intro#get-a-nua-key",  # noqa
+        description="Nuclia Understanding API Key. Read how to generate a NUA Key here: https://docs.nuclia.dev/docs/rag/advanced/understanding/intro#get-a-nua-key",
     )
-    zone: Optional[str] = pydantic.Field(default=None, description="Nuclia Understanding API Zone ID")
+    zone: str | None = pydantic.Field(default=None, description="Nuclia Understanding API Zone ID")
     http_host: str = pydantic.Field(default="0.0.0.0", description="HTTP Port")
     http_port: int = pydantic.Field(default=8080, description="HTTP Port")
     ingest_grpc_port: int = pydantic.Field(default=8030, description="Ingest GRPC Port")
@@ -83,7 +82,7 @@ class Settings(DriverSettings, StorageSettings, ExtendedStorageSettings):
         description="Default role to assign to user that is authenticated \
                     upstream. Not used with `upstream_naive` auth policy.",
     )
-    auth_policy_role_mapping: Optional[dict[str, dict[str, list[NucliaDBRoles]]]] = pydantic.Field(
+    auth_policy_role_mapping: dict[str, dict[str, list[NucliaDBRoles]]] | None = pydantic.Field(
         default=None,
         description="""
 Role mapping for `upstream_auth_header`, `upstream_oauth2` and `upstream_basicauth` auth policies.
@@ -97,7 +96,7 @@ Examples:
 """,
     )
 
-    jwk_key: Optional[str] = pydantic.Field(
+    jwk_key: str | None = pydantic.Field(
         default=None,
         description="JWK key used for temporary token generation and validation.",
     )

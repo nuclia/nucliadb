@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import time
-from typing import Any, Optional
+from typing import Any
 
 import backoff
 import orjson
@@ -43,7 +43,7 @@ DATA: dict[str, Any] = {}
 
 
 class FileDataManager:
-    _data: Optional[dict[str, Any]] = None
+    _data: dict[str, Any] | None = None
     _loaded = False
     key = None
     _ttl = 60 * 50 * 5  # 5 minutes should be plenty of time between activity
@@ -63,7 +63,7 @@ class FileDataManager:
         if self._data and "last_activity" in self._data:
             # check for another active upload, fail if we're screwing with
             # someone else
-            last_activity: Optional[int] = self._data.get("last_activity")
+            last_activity: int | None = self._data.get("last_activity")
             if last_activity and (time.time() - last_activity) < self._ttl:
                 if request.headers and request.headers.get("tus-override-upload", "0") != "1":
                     raise HTTPPreconditionFailed(

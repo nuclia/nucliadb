@@ -20,9 +20,9 @@
 from __future__ import annotations
 
 import base64
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import AsyncExitStack
 from datetime import datetime
-from typing import AsyncGenerator, AsyncIterator, Optional
 
 import aiobotocore  # type: ignore
 import aiohttp
@@ -86,7 +86,7 @@ class S3StorageField(StorageField):
         self,
         uri,
         bucket,
-        range: Optional[Range] = None,
+        range: Range | None = None,
     ):
         range = range or Range()
         if range.any():
@@ -103,7 +103,7 @@ class S3StorageField(StorageField):
                 raise
 
     @s3_ops_observer.wrap({"type": "iter_data"})
-    async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
+    async def iter_data(self, range: Range | None = None) -> AsyncGenerator[bytes]:
         # Suports field and key based iter
         uri = self.field.uri if self.field else self.key
         if self.field is None:
@@ -277,7 +277,7 @@ class S3StorageField(StorageField):
         )
 
     @s3_ops_observer.wrap({"type": "exists"})
-    async def exists(self) -> Optional[ObjectMetadata]:
+    async def exists(self) -> ObjectMetadata | None:
         """
         Existence can be checked either with a CloudFile data in the field attribute
         or own StorageField key and bucket. Field takes precendece
@@ -348,18 +348,18 @@ class S3Storage(Storage):
 
     def __init__(
         self,
-        aws_client_id: Optional[str] = None,
-        aws_client_secret: Optional[str] = None,
-        deadletter_bucket: Optional[str] = None,
-        indexing_bucket: Optional[str] = None,
-        endpoint_url: Optional[str] = None,
+        aws_client_id: str | None = None,
+        aws_client_secret: str | None = None,
+        deadletter_bucket: str | None = None,
+        indexing_bucket: str | None = None,
+        endpoint_url: str | None = None,
         verify_ssl: bool = True,
         use_ssl: bool = True,
-        region_name: Optional[str] = None,
-        kms_key_id: Optional[str] = None,
+        region_name: str | None = None,
+        kms_key_id: str | None = None,
         max_pool_connections: int = 30,
-        bucket: Optional[str] = None,
-        bucket_tags: Optional[dict[str, str]] = None,
+        bucket: str | None = None,
+        bucket_tags: dict[str, str] | None = None,
     ):
         self.source = CloudFile.S3
         self.deadletter_bucket = deadletter_bucket
@@ -394,7 +394,7 @@ class S3Storage(Storage):
             self._session = get_session()
         return self._session
 
-    async def initialize(self: "S3Storage") -> None:
+    async def initialize(self: S3Storage) -> None:
         session = AioSession()
         self._s3aioclient: AioBaseClient = await self._exit_stack.enter_async_context(
             session.create_client("s3", **self.opts)
@@ -425,8 +425,8 @@ class S3Storage(Storage):
             raise AttributeError("No valid uri")
 
     async def iterate_objects(
-        self, bucket: str, prefix: str = "/", start: Optional[str] = None
-    ) -> AsyncGenerator[ObjectInfo, None]:
+        self, bucket: str, prefix: str = "/", start: str | None = None
+    ) -> AsyncGenerator[ObjectInfo]:
         paginator = self._s3aioclient.get_paginator("list_objects")
         async for result in paginator.paginate(
             Bucket=bucket, Prefix=prefix, PaginationConfig={"StartingToken": start}
@@ -531,9 +531,9 @@ async def bucket_exists(client: AioSession, bucket_name: str) -> bool:
 async def create_bucket(
     client: AioSession,
     bucket_name: str,
-    bucket_tags: Optional[dict[str, str]] = None,
-    region_name: Optional[str] = None,
-    kms_key_id: Optional[str] = None,
+    bucket_tags: dict[str, str] | None = None,
+    region_name: str | None = None,
+    kms_key_id: str | None = None,
 ):
     bucket_creation_options = {}
     if region_name is not None:

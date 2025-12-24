@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Optional
+from typing import Any
 
 from nucliadb.ingest.fields.base import Field
 from nucliadb_protos.resources_pb2 import CloudFile, FieldLink, LinkExtractedData
@@ -30,22 +30,22 @@ class Link(Field[FieldLink]):
     pbklass = FieldLink
     value: FieldLink
     type: str = "u"
-    link_extracted_data: Optional[LinkExtractedData]
+    link_extracted_data: LinkExtractedData | None
 
     def __init__(
         self,
         id: str,
         resource: Any,
-        pb: Optional[Any] = None,
-        value: Optional[str] = None,
+        pb: Any | None = None,
+        value: str | None = None,
     ):
-        super(Link, self).__init__(id, resource, pb, value)
+        super().__init__(id, resource, pb, value)
         self.link_extracted_data = None
 
     async def set_value(self, payload: FieldLink):
         await self.db_set_value(payload)
 
-    async def get_value(self) -> Optional[FieldLink]:
+    async def get_value(self) -> FieldLink | None:
         return await self.db_get_value()
 
     async def set_link_extracted_data(self, link_extracted_data: LinkExtractedData):
@@ -88,7 +88,7 @@ class Link(Field[FieldLink]):
         await self.storage.upload_pb(sf, link_extracted_data)
         self.link_extracted_data = link_extracted_data
 
-    async def get_link_extracted_data(self) -> Optional[LinkExtractedData]:
+    async def get_link_extracted_data(self) -> LinkExtractedData | None:
         if self.link_extracted_data is None:
             sf: StorageField = self.storage.file_extracted(
                 self.kbid, self.uuid, self.type, self.id, LINK_METADATA

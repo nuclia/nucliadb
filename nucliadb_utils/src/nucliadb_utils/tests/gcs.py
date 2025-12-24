@@ -18,9 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import re
+from collections.abc import Iterator
 from concurrent.futures.thread import ThreadPoolExecutor
 from contextlib import ExitStack
-from typing import Any, Iterator, Optional
+from typing import Any
 from unittest.mock import patch
 
 import docker  # type: ignore  # type: ignore
@@ -37,7 +38,7 @@ from nucliadb_utils.tests import free_port
 # IMPORTANT!
 # Without this, tests running in a remote docker host won't work
 DOCKER_ENV_GROUPS = re.search(r"//([^:]+)", docker.from_env().api.base_url)
-DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None
+DOCKER_HOST: str | None = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None
 
 # This images has the XML API in this PR https://github.com/fsouza/fake-gcs-server/pull/1164
 # which is needed because the Rust crate object_store uses it

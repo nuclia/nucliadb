@@ -14,7 +14,8 @@
 #
 
 import functools
-from typing import Any, Awaitable, Callable, Union
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 import grpc
 from grpc import ClientCallDetails, aio
@@ -79,7 +80,7 @@ def finish_metric_grpc(metric: metrics.ObserverRecorder, result):
     metric.end()
 
 
-def _to_str(v: Union[str, bytes]) -> str:
+def _to_str(v: str | bytes) -> str:
     if isinstance(v, str):
         return v
     return v.decode("utf-8")

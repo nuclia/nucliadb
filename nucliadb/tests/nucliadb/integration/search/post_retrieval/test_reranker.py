@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Union
 from unittest.mock import patch
 
 import pytest
@@ -95,7 +94,7 @@ async def test_predict_reranker_requests_more_results(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb: str,
     mocker: MockerFixture,
-    reranker: Union[RerankerName, PredictReranker],
+    reranker: RerankerName | PredictReranker,
     extra: int,
 ):
     """Validate predict reranker asks for more results than the user and we send

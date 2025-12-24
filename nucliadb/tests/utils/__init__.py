@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
-from typing import Optional
 
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
@@ -29,8 +28,8 @@ from tests.utils.dirty_index import mark_dirty
 
 def broker_resource(
     kbid: str,
-    rid: Optional[str] = None,
-    slug: Optional[str] = None,
+    rid: str | None = None,
+    slug: str | None = None,
     source: BrokerMessage.MessageSource.ValueType = BrokerMessage.MessageSource.WRITER,
 ) -> BrokerMessage:
     """
@@ -48,8 +47,8 @@ def broker_resource(
 
 def broker_resource_with_title_paragraph(
     kbid: str,
-    rid: Optional[str] = None,
-    slug: Optional[str] = None,
+    rid: str | None = None,
+    slug: str | None = None,
 ) -> BrokerMessage:
     """
     Returns a broker resource with barebones metadata.
@@ -71,8 +70,8 @@ def broker_resource_with_title_paragraph(
 async def inject_message(
     writer: WriterStub,
     message: BrokerMessage,
-    timeout: Optional[float] = None,
-    wait_for_ready: Optional[bool] = None,
+    timeout: float | None = None,
+    wait_for_ready: bool | None = None,
 ):
     # We should be able to enable this once all tests have been migrated
     # for ev in message.field_vectors:

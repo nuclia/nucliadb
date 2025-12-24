@@ -17,8 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Callable
 from unittest.mock import patch
 
 from nucliadb_models.internal.predict import (

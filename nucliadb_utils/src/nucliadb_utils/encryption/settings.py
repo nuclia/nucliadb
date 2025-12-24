@@ -16,14 +16,13 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class EncryptionSettings(BaseSettings):
-    encryption_secret_key: Optional[str] = Field(
+    encryption_secret_key: str | None = Field(
         default=None,
         title="Encryption Secret Key",
         description="""Secret key used for encryption and decryption of sensitive data in the database.

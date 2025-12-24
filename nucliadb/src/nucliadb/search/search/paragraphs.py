@@ -20,7 +20,6 @@
 import logging
 import re
 import string
-from typing import Optional
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.ingest.fields.base import Field
@@ -58,7 +57,7 @@ async def get_paragraph_from_full_text(
     field: Field,
     start: int,
     end: int,
-    split: Optional[str] = None,
+    split: str | None = None,
     log_on_missing_field: bool = True,
 ) -> str:
     """
@@ -90,11 +89,10 @@ async def get_paragraph_text(
     kbid: str,
     paragraph_id: ParagraphId,
     highlight: bool = False,
-    ematches: Optional[list[str]] = None,
-    matches: Optional[list[str]] = None,
-    orm_resource: Optional[
-        ResourceORM
-    ] = None,  # allow passing in orm_resource to avoid extra DB calls or txn issues
+    ematches: list[str] | None = None,
+    matches: list[str] | None = None,
+    orm_resource: None
+    | (ResourceORM) = None,  # allow passing in orm_resource to avoid extra DB calls or txn issues
     log_on_missing_field: bool = True,
 ) -> str:
     rid = paragraph_id.rid
@@ -139,7 +137,7 @@ async def get_text_sentence(
     index: int,
     start: int,
     end: int,
-    split: Optional[str] = None,
+    split: str | None = None,
 ) -> str:
     """
     Leave separated from get paragraph for now until we understand the differences
@@ -169,7 +167,7 @@ async def get_text_sentence(
 
 
 def highlight_paragraph(
-    text: str, words: Optional[list[str]] = None, ematches: Optional[list[str]] = None
+    text: str, words: list[str] | None = None, ematches: list[str] | None = None
 ) -> str:
     """
     Highlight `text` with <mark></mark> tags around the words in `words` and `ematches`.

@@ -21,7 +21,6 @@ import functools
 import inspect
 import typing
 from enum import Enum
-from typing import Optional, Tuple
 
 from starlette.authentication import AuthCredentials, AuthenticationBackend, BaseUser
 from starlette.exceptions import HTTPException
@@ -31,7 +30,7 @@ from starlette.websockets import WebSocket
 
 
 class NucliaUser(BaseUser):
-    def __init__(self, username: str, security_groups: Optional[list[str]] = None) -> None:
+    def __init__(self, username: str, security_groups: list[str] | None = None) -> None:
         self.username = username
         self._security_groups = security_groups
 
@@ -44,7 +43,7 @@ class NucliaUser(BaseUser):
         return self.username
 
     @property
-    def security_groups(self) -> Optional[list[str]]:
+    def security_groups(self) -> list[str] | None:
         return self._security_groups
 
 
@@ -62,7 +61,7 @@ class NucliaCloudAuthenticationBackend(AuthenticationBackend):
         self.user_header = user_header
         self.security_groups_header = security_groups_header
 
-    async def authenticate(self, request: HTTPConnection) -> Optional[Tuple[AuthCredentials, BaseUser]]:
+    async def authenticate(self, request: HTTPConnection) -> tuple[AuthCredentials, BaseUser] | None:
         if self.roles_header not in request.headers:
             return None
         else:
@@ -73,9 +72,9 @@ class NucliaCloudAuthenticationBackend(AuthenticationBackend):
         if self.user_header in request.headers:
             user = request.headers[self.user_header]
 
-            raw_security_groups: Optional[str] = request.headers.get(self.security_groups_header)
+            raw_security_groups: str | None = request.headers.get(self.security_groups_header)
 
-            security_groups: Optional[list[str]] = None
+            security_groups: list[str] | None = None
             if raw_security_groups is not None:
                 security_groups = raw_security_groups.split(";")
 
@@ -98,9 +97,9 @@ def has_required_scope(conn: HTTPConnection, scopes: typing.Sequence[str]) -> bo
 
 
 def requires(
-    scopes: typing.Union[str, typing.Sequence[str]],
+    scopes: str | typing.Sequence[str],
     status_code: int = 403,
-    redirect: Optional[str] = None,
+    redirect: str | None = None,
 ) -> typing.Callable:
     # As a fastapi requirement, custom Enum classes have to inherit also from
     # string, so we MUST check for Enum before str

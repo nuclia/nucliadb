@@ -57,7 +57,7 @@ async def api_config_check(request: Request):
                     valid_nua_key = True
             except Exception as exc:
                 logger.warning(f"Error validating nua key", exc_info=exc)
-                nua_key_check_error = f"Error checking NUA key: {str(exc)}"
+                nua_key_check_error = f"Error checking NUA key: {exc!s}"
     return JSONResponse(
         {
             "nua_api_key": {

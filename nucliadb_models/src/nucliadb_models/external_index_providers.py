@@ -14,7 +14,6 @@
 #
 
 from enum import Enum
-from typing import Union
 
 from pydantic import BaseModel
 
@@ -36,4 +35,4 @@ class DummyIndexProvider(ExternalIndexProviderBase):
     type: ExternalIndexProviderType = ExternalIndexProviderType.UNSET
 
 
-ExternalIndexProvider = Union[DummyIndexProvider,]
+ExternalIndexProvider = DummyIndexProvider

@@ -20,7 +20,7 @@
 import logging
 import os
 import random
-from typing import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator
 from unittest.mock import patch
 from urllib.parse import urlparse, urlunparse
 

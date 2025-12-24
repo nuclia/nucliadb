@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-from typing import Optional, cast
+from typing import cast
 
 from typing_extensions import assert_never
 
@@ -34,7 +34,7 @@ from nucliadb_utils.utilities import get_storage
 
 async def paragraph_source_image(
     kbid: str, paragraph_id: ParagraphId, paragraph: resources_pb2.Paragraph
-) -> Optional[Image]:
+) -> Image | None:
     """Certain paragraphs are extracted from images using techniques like OCR or
     inception. If that's the case, return the original image for this paragraph.
 
@@ -68,7 +68,7 @@ async def paragraph_source_image(
 
 async def download_image(
     kbid: str, field_id: FieldId, image_path: str, *, mime_type: str
-) -> Optional[Image]:
+) -> Image | None:
     storage = await get_storage(service_name=SERVICE_NAME)
     sf = storage.file_extracted(
         kbid,
@@ -83,7 +83,7 @@ async def download_image(
     return Image(content_type=mime_type, b64encoded=base64.b64encode(raw_image).decode())
 
 
-async def download_page_preview(field: Field, page: int) -> Optional[Image]:
+async def download_page_preview(field: Field, page: int) -> Image | None:
     """Download a specific page preview for a field and return it as an Image.
     As not all fields have previews, this function can return None.
 

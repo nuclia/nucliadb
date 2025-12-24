@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -26,7 +25,7 @@ from nucliadb_utils.settings import nucliadb_settings
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 
-async def start_ingest(service_name: Optional[str] = None):
+async def start_ingest(service_name: str | None = None):
     await setup_driver()
 
     actual_service = get_utility(Utility.INGEST)

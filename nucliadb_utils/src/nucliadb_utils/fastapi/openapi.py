@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
 
 from fastapi.applications import FastAPI
 from starlette.routing import Mount
@@ -34,7 +33,7 @@ def format_scopes(scope_list):
     return "\n".join(f"- `{scope}`" for scope in scope_list)
 
 
-def extend_openapi(app: Union[FastAPI, Mount]):  # pragma: no cover
+def extend_openapi(app: FastAPI | Mount):  # pragma: no cover
     for route in app.routes:
         # mypy complains about BaseRoute not having endpoint and
         # description attributes, but routes passed here always have

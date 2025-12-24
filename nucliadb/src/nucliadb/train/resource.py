@@ -19,7 +19,7 @@
 #
 from __future__ import annotations
 
-from typing import AsyncIterator, MutableMapping, Optional
+from collections.abc import AsyncIterator, MutableMapping
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.resource import Resource
@@ -79,7 +79,7 @@ async def iterate_sentences(
         if fm is None:
             continue
 
-        field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [(None, fm.metadata)]
+        field_metadatas: list[tuple[str | None, FieldMetadata]] = [(None, fm.metadata)]
         for subfield_metadata, splitted_metadata in fm.split_metadata.items():
             field_metadatas.append((subfield_metadata, splitted_metadata))
 
@@ -186,7 +186,7 @@ async def iterate_paragraphs(
         if fm is None:
             continue
 
-        field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [(None, fm.metadata)]
+        field_metadatas: list[tuple[str | None, FieldMetadata]] = [(None, fm.metadata)]
         for subfield_metadata, splitted_metadata in fm.split_metadata.items():
             field_metadatas.append((subfield_metadata, splitted_metadata))
 
@@ -262,7 +262,7 @@ async def iterate_fields(
         if fm is None:
             continue
 
-        field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [(None, fm.metadata)]
+        field_metadatas: list[tuple[str | None, FieldMetadata]] = [(None, fm.metadata)]
         for subfield_metadata, splitted_metadata in fm.split_metadata.items():
             field_metadatas.append((subfield_metadata, splitted_metadata))
 
@@ -317,7 +317,7 @@ async def generate_train_resource(
         if fm is None:
             continue
 
-        field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [(None, fm.metadata)]
+        field_metadatas: list[tuple[str | None, FieldMetadata]] = [(None, fm.metadata)]
         for subfield_metadata, splitted_metadata in fm.split_metadata.items():
             field_metadatas.append((subfield_metadata, splitted_metadata))
 

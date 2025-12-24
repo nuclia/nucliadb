@@ -19,7 +19,6 @@
 
 import contextlib
 import logging
-from typing import Optional
 
 from nucliadb.common.cache import (
     extracted_text_cache,
@@ -39,7 +38,7 @@ from nucliadb_utils.utilities import get_storage
 logger = logging.getLogger(__name__)
 
 
-async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
+async def get_resource(kbid: str, uuid: str) -> ResourceORM | None:
     """
     Will try to get the resource from the cache, if it's not there it will fetch it from the ORM and cache it.
     """
@@ -54,7 +53,7 @@ async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
     return await resource_cache.get(kbid, uuid)
 
 
-async def get_field(kbid: str, field_id: FieldId) -> Optional[Field]:
+async def get_field(kbid: str, field_id: FieldId) -> Field | None:
     rid = field_id.rid
     orm_resource = await get_resource(kbid, rid)
     if orm_resource is None:
@@ -67,7 +66,7 @@ async def get_field(kbid: str, field_id: FieldId) -> Optional[Field]:
     return field_obj
 
 
-async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
+async def get_field_extracted_text(field: Field) -> ExtractedText | None:
     if field.extracted_text is not None:
         return field.extracted_text
 

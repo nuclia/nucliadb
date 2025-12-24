@@ -19,12 +19,10 @@
 #
 
 
-from typing import Optional
-
 from nucliadb.train.utils import get_shard_manager
 
 
-async def get_kb_partitions(kbid: str, prefix: Optional[str] = None) -> list[str]:
+async def get_kb_partitions(kbid: str, prefix: str | None = None) -> list[str]:
     shard_manager = get_shard_manager()
     shards = await shard_manager.get_shards_by_kbid_inner(kbid=kbid)
     valid_shards = []

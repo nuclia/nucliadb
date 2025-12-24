@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Optional
 
 from google.protobuf.timestamp_pb2 import Timestamp
 from nidx_protos.nodereader_pb2 import SearchRequest
@@ -34,19 +33,19 @@ class BasicAuditStorage(AuditStorage):
         self.initialized = True
 
     def message_to_str(self, message: BrokerMessage) -> str:
-        return f"{message.type}+{message.multiid}+{message.audit.user}+{message.kbid}+{message.uuid}+{message.audit.when.ToJsonString()}+{message.audit.origin}+{message.audit.source}"  # noqa
+        return f"{message.type}+{message.multiid}+{message.audit.user}+{message.kbid}+{message.uuid}+{message.audit.when.ToJsonString()}+{message.audit.origin}+{message.audit.source}"
 
     async def report_and_send(
         self,
         *,
         kbid: str,
         audit_type: AuditRequest.AuditType.Value,  # type: ignore
-        when: Optional[Timestamp] = None,
-        user: Optional[str] = None,
-        origin: Optional[str] = None,
-        rid: Optional[str] = None,
-        field_metadata: Optional[List[FieldID]] = None,
-        audit_fields: Optional[List[AuditField]] = None,
+        when: Timestamp | None = None,
+        user: str | None = None,
+        origin: str | None = None,
+        rid: str | None = None,
+        field_metadata: list[FieldID] | None = None,
+        audit_fields: list[AuditField] | None = None,
     ):
         logger.debug(f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields}")
 
@@ -71,7 +70,7 @@ class BasicAuditStorage(AuditStorage):
         search: SearchRequest,
         timeit: float,
         resources: int,
-        retrieval_rephrased_question: Optional[str] = None,
+        retrieval_rephrased_question: str | None = None,
     ):
         logger.debug(f"SEARCH {kbid} {user} {origin} ''{search}'' {timeit} {resources}")
 
@@ -82,19 +81,19 @@ class BasicAuditStorage(AuditStorage):
         client_type: int,
         origin: str,
         question: str,
-        rephrased_question: Optional[str],
-        retrieval_rephrased_question: Optional[str],
-        chat_context: List[ChatContext],
-        retrieved_context: List[RetrievedContext],
-        answer: Optional[str],
-        reasoning: Optional[str],
-        learning_id: Optional[str],
+        rephrased_question: str | None,
+        retrieval_rephrased_question: str | None,
+        chat_context: list[ChatContext],
+        retrieved_context: list[RetrievedContext],
+        answer: str | None,
+        reasoning: str | None,
+        learning_id: str | None,
         status_code: int,
-        model: Optional[str],
-        rephrase_time: Optional[float] = None,
-        generative_answer_time: Optional[float] = None,
-        generative_answer_first_chunk_time: Optional[float] = None,
-        generative_reasoning_first_chunk_time: Optional[float] = None,
+        model: str | None,
+        rephrase_time: float | None = None,
+        generative_answer_time: float | None = None,
+        generative_answer_first_chunk_time: float | None = None,
+        generative_reasoning_first_chunk_time: float | None = None,
     ):
         logger.debug(f"CHAT {kbid} {user} {origin}")
 
@@ -121,7 +120,7 @@ class BasicAuditStorage(AuditStorage):
         learning_id: str,
         good: bool,
         task: int,
-        feedback: Optional[str],
-        text_block_id: Optional[str],
+        feedback: str | None,
+        text_block_id: str | None,
     ):
         logger.debug(f"FEEDBACK {kbid} {user} {client_type} {origin}")

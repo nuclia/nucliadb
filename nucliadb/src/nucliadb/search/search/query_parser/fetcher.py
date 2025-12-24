@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Optional, TypeVar, Union
+from typing import TypeVar
 
 from async_lru import alru_cache
 from typing_extensions import TypeIs
@@ -48,22 +48,22 @@ not_cached = NotCached()
 T = TypeVar("T")
 
 
-def is_cached(field: Union[T, NotCached]) -> TypeIs[T]:
+def is_cached(field: T | NotCached) -> TypeIs[T]:
     return not isinstance(field, NotCached)
 
 
 class FetcherCache:
-    predict_query_info: Union[Optional[QueryInfo], NotCached] = not_cached
+    predict_query_info: QueryInfo | None | NotCached = not_cached
 
     # semantic search
-    vectorset: Union[str, NotCached] = not_cached
+    vectorset: str | NotCached = not_cached
 
-    labels: Union[knowledgebox_pb2.Labels, NotCached] = not_cached
+    labels: knowledgebox_pb2.Labels | NotCached = not_cached
 
-    synonyms: Union[Optional[knowledgebox_pb2.Synonyms], NotCached] = not_cached
+    synonyms: knowledgebox_pb2.Synonyms | None | NotCached = not_cached
 
-    deleted_entity_groups: Union[list[str], NotCached] = not_cached
-    detected_entities: Union[list[utils_pb2.RelationNode], NotCached] = not_cached
+    deleted_entity_groups: list[str] | NotCached = not_cached
+    detected_entities: list[utils_pb2.RelationNode] | NotCached = not_cached
 
 
 class Fetcher:
@@ -84,12 +84,12 @@ class Fetcher:
         kbid: str,
         *,
         query: str,
-        user_vector: Optional[list[float]],
-        vectorset: Optional[str],
+        user_vector: list[float] | None,
+        vectorset: str | None,
         rephrase: bool,
-        rephrase_prompt: Optional[str],
-        generative_model: Optional[str],
-        query_image: Optional[Image],
+        rephrase_prompt: str | None,
+        generative_model: str | None,
+        query_image: Image | None,
     ):
         self.kbid = kbid
         self.query = query
@@ -106,11 +106,11 @@ class Fetcher:
 
     # Semantic search
 
-    async def get_matryoshka_dimension(self) -> Optional[int]:
+    async def get_matryoshka_dimension(self) -> int | None:
         vectorset = await self.get_vectorset()
         return await self.get_matryoshka_dimension_cached(self.kbid, vectorset)
 
-    async def get_user_vectorset(self) -> Optional[str]:
+    async def get_user_vectorset(self) -> str | None:
         """Returns the user's requested vectorset and validates if it does exist
         in the KB.
 
@@ -164,7 +164,7 @@ class Fetcher:
             self.cache.vectorset = vectorset
             return vectorset
 
-    async def get_query_vector(self) -> Optional[list[float]]:
+    async def get_query_vector(self) -> list[float] | None:
         if self.user_vector is not None:
             query_vector = self.user_vector
         else:
@@ -200,20 +200,20 @@ class Fetcher:
 
         return query_vector
 
-    async def get_rephrased_query(self) -> Optional[str]:
+    async def get_rephrased_query(self) -> str | None:
         query_info = await self._predict_query_endpoint()
         if query_info is None:
             return None
         return query_info.rephrased_query
 
-    def get_cached_rephrased_query(self) -> Optional[str]:
+    def get_cached_rephrased_query(self) -> str | None:
         if not is_cached(self.cache.predict_query_info):
             return None
         if self.cache.predict_query_info is None:
             return None
         return self.cache.predict_query_info.rephrased_query
 
-    async def get_semantic_min_score(self) -> Optional[float]:
+    async def get_semantic_min_score(self) -> float | None:
         query_info = await self._predict_query_endpoint()
         if query_info is None:
             return None
@@ -258,7 +258,7 @@ class Fetcher:
 
     # Synonyms
 
-    async def get_synonyms(self) -> Optional[knowledgebox_pb2.Synonyms]:
+    async def get_synonyms(self) -> knowledgebox_pb2.Synonyms | None:
         async with self.locks.setdefault("synonyms", asyncio.Lock()):
             if is_cached(self.cache.synonyms):
                 return self.cache.synonyms
@@ -276,7 +276,7 @@ class Fetcher:
 
         return query_info.visual_llm
 
-    async def get_max_context_tokens(self, max_tokens: Optional[MaxTokens]) -> int:
+    async def get_max_context_tokens(self, max_tokens: MaxTokens | None) -> int:
         query_info = await self._predict_query_endpoint()
         if query_info is None:
             raise SendToPredictError("Error while using predict's query endpoint")
@@ -291,14 +291,14 @@ class Fetcher:
             return max_tokens.context
         return model_max
 
-    def get_max_answer_tokens(self, max_tokens: Optional[MaxTokens]) -> Optional[int]:
+    def get_max_answer_tokens(self, max_tokens: MaxTokens | None) -> int | None:
         if max_tokens is not None and max_tokens.answer is not None:
             return max_tokens.answer
         return None
 
     # Predict API
 
-    async def _predict_query_endpoint(self) -> Optional[QueryInfo]:
+    async def _predict_query_endpoint(self) -> QueryInfo | None:
         async with self.locks.setdefault("predict_query_endpoint", asyncio.Lock()):
             if is_cached(self.cache.predict_query_info):
                 return self.cache.predict_query_info
@@ -339,7 +339,7 @@ class Fetcher:
                 )
 
     @alru_cache(maxsize=10)
-    async def get_matryoshka_dimension_cached(self, kbid: str, vectorset: str) -> Optional[int]:
+    async def get_matryoshka_dimension_cached(self, kbid: str, vectorset: str) -> int | None:
         # This can be safely cached as the matryoshka dimension is not expected to change
         return await get_matryoshka_dimension(kbid, vectorset)
 
@@ -348,11 +348,11 @@ class Fetcher:
 async def query_information(
     kbid: str,
     query: str,
-    semantic_model: Optional[str],
-    generative_model: Optional[str] = None,
+    semantic_model: str | None,
+    generative_model: str | None = None,
     rephrase: bool = False,
-    rephrase_prompt: Optional[str] = None,
-    query_image: Optional[Image] = None,
+    rephrase_prompt: str | None = None,
+    query_image: Image | None = None,
 ) -> QueryInfo:
     predict = get_predict()
     item = QueryModel(
@@ -373,7 +373,7 @@ async def detect_entities(kbid: str, query: str) -> list[utils_pb2.RelationNode]
 
 
 @query_parse_dependency_observer.wrap({"type": "matryoshka_dimension"})
-async def get_matryoshka_dimension(kbid: str, vectorset: Optional[str]) -> Optional[int]:
+async def get_matryoshka_dimension(kbid: str, vectorset: str | None) -> int | None:
     async with get_driver().ro_transaction() as txn:
         matryoshka_dimension = None
         if not vectorset:
@@ -395,6 +395,6 @@ async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
 
 
 @query_parse_dependency_observer.wrap({"type": "synonyms"})
-async def get_kb_synonyms(kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
+async def get_kb_synonyms(kbid: str) -> knowledgebox_pb2.Synonyms | None:
     async with get_driver().ro_transaction() as txn:
         return await datamanagers.synonyms.get(txn, kbid=kbid)

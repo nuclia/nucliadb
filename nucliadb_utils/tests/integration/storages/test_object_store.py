@@ -21,8 +21,8 @@
 
 import asyncio
 import uuid
+from collections.abc import AsyncGenerator
 from io import BytesIO
-from typing import AsyncGenerator
 
 import pytest
 

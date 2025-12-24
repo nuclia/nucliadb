@@ -79,7 +79,7 @@ HOMEPAGE_HTML = """
     </ul>
 </body>
 </html>
-"""  # noqa: E501
+"""
 
 
 def application_factory(settings: Settings) -> FastAPI:

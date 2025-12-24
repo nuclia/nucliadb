@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 from nidx_protos import nodereader_pb2
 
@@ -59,9 +58,7 @@ INDEX_SORTABLE_FIELDS = [
 
 
 @query_parser_observer.wrap({"type": "parse_search"})
-async def parse_search(
-    kbid: str, item: SearchRequest, *, fetcher: Optional[Fetcher] = None
-) -> ParsedQuery:
+async def parse_search(kbid: str, item: SearchRequest, *, fetcher: Fetcher | None = None) -> ParsedQuery:
     fetcher = fetcher or fetcher_for_search(kbid, item)
     parser = _SearchParser(kbid, item, fetcher)
     retrieval = await parser.parse()
@@ -88,8 +85,8 @@ class _SearchParser:
         self.fetcher = fetcher
 
         # cached data while parsing
-        self._query: Optional[Query] = None
-        self._top_k: Optional[int] = None
+        self._query: Query | None = None
+        self._top_k: int | None = None
 
     async def parse(self) -> UnitRetrieval:
         self._validate_request()

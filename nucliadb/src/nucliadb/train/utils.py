@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 from grpc import aio
 from grpc_health.v1 import health, health_pb2_grpc
@@ -37,7 +36,7 @@ from nucliadb_utils.utilities import (
 )
 
 
-async def start_train_grpc(service_name: Optional[str] = None):
+async def start_train_grpc(service_name: str | None = None):
     actual_service = get_utility(Utility.TRAIN)
     if actual_service is not None:
         return

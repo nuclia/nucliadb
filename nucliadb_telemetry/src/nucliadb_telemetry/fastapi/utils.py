@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from typing import List, NamedTuple, Optional, Tuple
+from typing import NamedTuple
 
 from fastapi.responses import JSONResponse
 from starlette.applications import Starlette
@@ -26,7 +26,7 @@ from nucliadb_telemetry import errors
 
 class FoundPathTemplate(NamedTuple):
     path: str
-    scope: Optional[Scope]
+    scope: Scope | None
     match: bool
 
 
@@ -42,7 +42,7 @@ def get_path_template(scope: Scope) -> FoundPathTemplate:
     return path_template
 
 
-def find_route(scope: Scope, routes: List[Route]) -> Tuple[Optional[str], Optional[Scope]]:
+def find_route(scope: Scope, routes: list[Route]) -> tuple[str | None, Scope | None]:
     # we mutate scope, so we need a copy
     scope = scope.copy()  # type:ignore
     for route in routes:

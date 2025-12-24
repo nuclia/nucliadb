@@ -17,14 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Optional
 
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    cache_pubsub_nats_url: List[str] = []
-    cache_pubsub_nats_auth: Optional[str] = None
+    cache_pubsub_nats_url: list[str] = []
+    cache_pubsub_nats_auth: str | None = None
 
 
 settings = Settings()

@@ -20,7 +20,6 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Union
 
 from nidx_protos.nodereader_pb2 import FilterExpression
 
@@ -36,19 +35,19 @@ from .fetcher import Fetcher
 
 @dataclass
 class OldFilterParams:
-    label_filters: Union[list[str], list[Filter]]
-    keyword_filters: Union[list[str], list[Filter]]
-    range_creation_start: Optional[datetime] = None
-    range_creation_end: Optional[datetime] = None
-    range_modification_start: Optional[datetime] = None
-    range_modification_end: Optional[datetime] = None
-    fields: Optional[list[str]] = None
-    key_filters: Optional[list[str]] = None
+    label_filters: list[str] | list[Filter]
+    keyword_filters: list[str] | list[Filter]
+    range_creation_start: datetime | None = None
+    range_creation_end: datetime | None = None
+    range_modification_start: datetime | None = None
+    range_modification_end: datetime | None = None
+    fields: list[str] | None = None
+    key_filters: list[str] | None = None
 
 
 async def parse_old_filters(
     old: OldFilterParams, fetcher: Fetcher
-) -> tuple[Optional[FilterExpression], Optional[FilterExpression]]:
+) -> tuple[FilterExpression | None, FilterExpression | None]:
     filters = []
     paragraph_filter_expression = None
 
@@ -150,8 +149,8 @@ async def parse_old_filters(
 
 
 def convert_label_filter_to_expressions(
-    fltr: Union[str, Filter], classification_labels: knowledgebox_pb2.Labels
-) -> tuple[Optional[FilterExpression], Optional[FilterExpression]]:
+    fltr: str | Filter, classification_labels: knowledgebox_pb2.Labels
+) -> tuple[FilterExpression | None, FilterExpression | None]:
     if isinstance(fltr, str):
         fltr = translate_label(fltr)
         f = FilterExpression()
@@ -175,7 +174,7 @@ def convert_label_filter_to_expressions(
 
 def split_labels(
     labels: list[str], classification_labels: knowledgebox_pb2.Labels, combinator: str, negate: bool
-) -> tuple[Optional[FilterExpression], Optional[FilterExpression]]:
+) -> tuple[FilterExpression | None, FilterExpression | None]:
     field = []
     paragraph = []
     for label in labels:
@@ -231,7 +230,7 @@ def is_paragraph_label(label: str, classification_labels: knowledgebox_pb2.Label
     labelset_id = parts[2]
 
     try:
-        labelset: Optional[knowledgebox_pb2.LabelSet] = classification_labels.labelset.get(labelset_id)
+        labelset: knowledgebox_pb2.LabelSet | None = classification_labels.labelset.get(labelset_id)
         if labelset is None:
             return False
         return knowledgebox_pb2.LabelSet.LabelSetKind.PARAGRAPHS in labelset.kind
@@ -240,19 +239,19 @@ def is_paragraph_label(label: str, classification_labels: knowledgebox_pb2.Label
         return False
 
 
-def convert_keyword_filter_to_expression(fltr: Union[str, Filter]) -> FilterExpression:
+def convert_keyword_filter_to_expression(fltr: str | Filter) -> FilterExpression:
     if isinstance(fltr, str):
         return convert_keyword_to_expression(fltr)
 
     f = FilterExpression()
     if fltr.all:
-        f.bool_and.operands.extend((convert_keyword_to_expression(f) for f in fltr.all))
+        f.bool_and.operands.extend(convert_keyword_to_expression(f) for f in fltr.all)
     if fltr.any:
-        f.bool_or.operands.extend((convert_keyword_to_expression(f) for f in fltr.any))
+        f.bool_or.operands.extend(convert_keyword_to_expression(f) for f in fltr.any)
     if fltr.none:
-        f.bool_not.bool_or.operands.extend((convert_keyword_to_expression(f) for f in fltr.none))
+        f.bool_not.bool_or.operands.extend(convert_keyword_to_expression(f) for f in fltr.none)
     if fltr.not_all:
-        f.bool_not.bool_and.operands.extend((convert_keyword_to_expression(f) for f in fltr.not_all))
+        f.bool_not.bool_and.operands.extend(convert_keyword_to_expression(f) for f in fltr.not_all)
 
     return f
 

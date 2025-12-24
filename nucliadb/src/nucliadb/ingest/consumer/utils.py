@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Callable, Coroutine
+from collections.abc import Callable, Coroutine
 
 
 class DelayedTaskHandler:

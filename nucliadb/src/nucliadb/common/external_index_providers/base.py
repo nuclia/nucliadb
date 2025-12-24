@@ -19,8 +19,9 @@
 #
 import abc
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Iterator, Optional
+from typing import Any
 
 from nidx_protos.nodereader_pb2 import SearchRequest
 from nidx_protos.noderesources_pb2 import Resource
@@ -94,11 +95,11 @@ class TextBlockMatch(ScoredTextBlock):
     page_with_visual: bool = False
     fuzzy_search: bool
     is_a_table: bool = False
-    representation_file: Optional[str] = None
+    representation_file: str | None = None
     paragraph_labels: list[str] = []
     field_labels: list[str] = []
-    text: Optional[str] = None
-    relevant_relations: Optional[Relations] = None
+    text: str | None = None
+    relevant_relations: Relations | None = None
 
     @property
     def is_an_image(self) -> bool:

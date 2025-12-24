@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Union
 from uuid import UUID
 
 from fastapi import Header, Request, Response
@@ -59,7 +58,7 @@ async def resource_ask_endpoint_by_uuid(
         description="When set to true, outputs response as JSON in a non-streaming way. "
         "This is slower and requires waiting for entire answer to be ready.",
     ),
-) -> Union[StreamingResponse, HTTPClientError, Response]:
+) -> StreamingResponse | HTTPClientError | Response:
     current_user: NucliaUser = request.user
     # If present, security groups from AuthorizationBackend overrides any
     # security group of the payload
@@ -105,7 +104,7 @@ async def resource_ask_endpoint_by_slug(
         description="When set to true, outputs response as JSON in a non-streaming way. "
         "This is slower and requires waiting for entire answer to be ready.",
     ),
-) -> Union[StreamingResponse, HTTPClientError, Response]:
+) -> StreamingResponse | HTTPClientError | Response:
     resource_id = await datamanagers.atomic.resources.get_resource_uuid_from_slug(kbid=kbid, slug=slug)
     if resource_id is None:
         return HTTPClientError(status_code=404, detail="Resource not found")

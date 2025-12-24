@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Union
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
@@ -58,7 +57,7 @@ async def run_agents_by_uuid(
     rid: str,
     item: ResourceAgentsRequest,
     x_nucliadb_user: str = Header(""),
-) -> Union[ResourceAgentsResponse, HTTPClientError]:
+) -> ResourceAgentsResponse | HTTPClientError:
     return await _run_agents_endpoint(kbid, rid, x_nucliadb_user, item)
 
 
@@ -80,7 +79,7 @@ async def run_agents_by_slug(
     slug: str,
     item: ResourceAgentsRequest,
     x_nucliadb_user: str = Header(""),
-) -> Union[ResourceAgentsResponse, HTTPClientError]:
+) -> ResourceAgentsResponse | HTTPClientError:
     resource_id = await datamanagers.atomic.resources.get_resource_uuid_from_slug(kbid=kbid, slug=slug)
     if resource_id is None:
         return HTTPClientError(status_code=404, detail="Resource not found")
@@ -89,7 +88,7 @@ async def run_agents_by_slug(
 
 async def _run_agents_endpoint(
     kbid: str, resource_id: str, user_id: str, item: ResourceAgentsRequest
-) -> Union[ResourceAgentsResponse, HTTPClientError]:
+) -> ResourceAgentsResponse | HTTPClientError:
     try:
         run_agents_response: RunAgentsResponse = await run_agents(
             kbid,

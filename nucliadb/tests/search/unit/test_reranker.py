@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -48,7 +47,7 @@ class DummyReranker(Reranker):
         self._window = window
 
     @property
-    def window(self) -> Optional[int]:
+    def window(self) -> int | None:
         return self._window
 
     async def _rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:

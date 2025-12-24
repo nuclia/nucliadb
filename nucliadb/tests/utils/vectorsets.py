@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from copy import deepcopy
-from typing import Optional
 from unittest.mock import patch
 
 from httpx import AsyncClient
@@ -40,7 +39,7 @@ async def add_vectorset(
     similarity: SimilarityFunction = SimilarityFunction.COSINE,
     vector_dimension: int = 768,
     threshold: float = 0.4,
-    matryoshka_dims: Optional[list[int]] = None,
+    matryoshka_dims: list[int] | None = None,
 ):
     # This function is tightly coupled with the vectorset API implementation. It
     # mocks the interactions with learning config to get, update and get again

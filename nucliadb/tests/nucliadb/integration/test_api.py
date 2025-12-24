@@ -19,7 +19,7 @@
 #
 import base64
 import json
-from typing import Optional, cast
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pydantic
@@ -954,7 +954,7 @@ async def test_dates_are_properly_validated(
             },
         },
     )
-    assert resp.status_code == 422, print(resp.text)
+    assert resp.status_code == 422, f"{resp.text}"
     detail = resp.json()["detail"][0]
     assert detail["loc"] == ["body", "origin", "created"]
 
@@ -967,7 +967,7 @@ async def test_dates_are_properly_validated(
             },
         },
     )
-    assert resp.status_code == 201, print(resp.text)
+    assert resp.status_code == 201, f"{resp.text}"
     rid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=origin")
@@ -1674,7 +1674,7 @@ async def test_deletions_on_text_index(
 ):
     kbid = standalone_knowledgebox
 
-    async def kb_search(query: str, filters: Optional[list[str]] = None):
+    async def kb_search(query: str, filters: list[str] | None = None):
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/search",
             json={

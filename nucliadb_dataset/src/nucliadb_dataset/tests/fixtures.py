@@ -14,7 +14,8 @@
 
 import re
 import tempfile
-from typing import TYPE_CHECKING, AsyncIterator, Iterator, Optional
+from collections.abc import AsyncIterator, Iterator
+from typing import TYPE_CHECKING
 
 import docker  # type: ignore
 import grpc
@@ -32,7 +33,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_sdk.v2.sdk import NucliaDB
 
 DOCKER_ENV_GROUPS = re.search(r"//([^:]+)", docker.from_env().api.base_url)
-DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None
+DOCKER_HOST: str | None = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None
 
 if TYPE_CHECKING:
     from nucliadb_protos.writer_pb2_grpc import WriterAsyncStub

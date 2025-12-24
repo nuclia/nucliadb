@@ -19,7 +19,6 @@
 #
 
 import hashlib
-from typing import Optional
 
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
@@ -42,5 +41,5 @@ class Text(Field[FieldText]):
             payload.md5 = hashlib.md5(payload.body.encode(), usedforsecurity=False).hexdigest()
         await self.db_set_value(payload)
 
-    async def get_value(self) -> Optional[FieldText]:
+    async def get_value(self) -> FieldText | None:
         return await self.db_get_value()

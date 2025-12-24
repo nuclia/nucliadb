@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Optional, Union
 
 from fastapi import HTTPException
 
@@ -178,7 +177,7 @@ def parse_basic_creation(
     bm: BrokerMessage,
     item: CreateResourcePayload,
     toprocess: PushPayload,
-    kb_config: Optional[KnowledgeBoxConfig],
+    kb_config: KnowledgeBoxConfig | None,
 ):
     bm.basic.created.FromDatetime(datetime.now())
 
@@ -261,7 +260,7 @@ def build_question_answer_annotation_pb(
 
 
 def parse_user_classifications(
-    item: Union[CreateResourcePayload, UpdateResourcePayload],
+    item: CreateResourcePayload | UpdateResourcePayload,
 ) -> list[ClassificationLabel]:
     return (
         [
