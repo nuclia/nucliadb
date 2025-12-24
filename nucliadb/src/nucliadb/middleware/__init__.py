@@ -60,8 +60,6 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
     Middleware that logs the payload of client error responses (HTTP 412 and 422).
     This helps supporting clients by providing more context about the errors they
     encounter which otherwise we don't have much visibility on.
-
-    Enable it by setting the environment variable LOG_CLIENT_ERROR_PAYLOADS=true
     """
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
