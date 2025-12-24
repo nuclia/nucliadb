@@ -45,10 +45,9 @@ middleware = []
 middleware.extend(
     [
         Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
+        Middleware(ClientErrorPayloadLoggerMiddleware),
     ]
 )
-if running_settings.debug:
-    middleware.append(Middleware(ClientErrorPayloadLoggerMiddleware))
 
 
 errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)

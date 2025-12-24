@@ -19,6 +19,7 @@
 
 import logging
 import time
+from collections import deque
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -60,7 +61,13 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
     Middleware that logs the payload of client error responses (HTTP 412 and 422).
     This helps supporting clients by providing more context about the errors they
     encounter which otherwise we don't have much visibility on.
+
+    There is a limit of logs per IP to avoid flooding the logs in case of
+    misbehaving clients.
     """
+
+    ip_counters: dict[str, "EventCounter"] = {}
+    max_events_per_ip = 100
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = None
@@ -68,7 +75,15 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             return response
         finally:
-            if response is not None and response.status_code in (412, 422):
+            client_ip = request.client.host if request.client else "unknown"
+            ip_counter = self.ip_counters.setdefault(client_ip, EventCounter())
+            if (
+                ip_counter.get_count() <= self.max_events_per_ip  # limit logs per IP
+                and response is not None
+                and response.status_code in (412, 422)
+            ):
+                ip_counter.log_event()
+
                 chunks = []
                 async for chunk in response.body_iterator:  # type: ignore
                     chunks.append(chunk)
@@ -89,3 +104,24 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
                     media_type=response.media_type,
                     background=response.background,
                 )
+
+
+class EventCounter:
+    def __init__(self, window_seconds: int = 3600):
+        self.window_seconds = window_seconds
+        self.events: deque[float] = deque()
+
+    def log_event(self):
+        current_time = time.time()
+        # Remove events older than the window
+        while self.events and self.events[0] < current_time - self.window_seconds:
+            self.events.popleft()
+        # Add current event
+        self.events.append(current_time)
+
+    def get_count(self) -> int:
+        current_time = time.time()
+        # Remove old events and return count
+        while self.events and self.events[0] < current_time - self.window_seconds:
+            self.events.popleft()
+        return len(self.events)

@@ -95,10 +95,10 @@ def application_factory(settings: Settings) -> FastAPI:
             backend=get_auth_backend(settings),
         ),
         Middleware(AuditMiddleware, audit_utility_getter=get_audit),
+        Middleware(ClientErrorPayloadLoggerMiddleware),
     ]
     if running_settings.debug:
         middleware.append(Middleware(ProcessTimeHeaderMiddleware))
-        middleware.append(Middleware(ClientErrorPayloadLoggerMiddleware))
 
     fastapi_settings = dict(
         debug=running_settings.debug,
