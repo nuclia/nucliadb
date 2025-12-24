@@ -18,13 +18,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import time
+
 import pytest
 from fastapi import HTTPException
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
 from starlette.testclient import TestClient
 
-from nucliadb.middleware import ClientErrorPayloadLoggerMiddleware, ProcessTimeHeaderMiddleware
+from nucliadb.middleware import (
+    ClientErrorPayloadLoggerMiddleware,
+    EventCounter,
+    ProcessTimeHeaderMiddleware,
+)
 
 
 class TestCaseProcessTimeHeaderMiddleware:
@@ -81,3 +87,14 @@ class TestCaseClientErrorPayloadLoggerMiddleware:
             assert response.status_code == 412
             log_count = caplog.text.count("Client error. Response payload: Precondition Failed")
             assert log_count == ClientErrorPayloadLoggerMiddleware.max_events_per_ip
+
+
+def test_event_counter():
+    counter = EventCounter(window_seconds=2)
+
+    for _ in range(200):
+        counter.log_event()
+
+    assert counter.get_count() == 200
+    time.sleep(2.1)
+    assert counter.get_count() == 0
