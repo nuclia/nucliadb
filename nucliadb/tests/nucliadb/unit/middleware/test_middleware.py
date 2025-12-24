@@ -58,6 +58,8 @@ class TestCaseProcessTimeHeaderMiddleware:
 
 @pytest.fixture(scope="function")
 def app():
+    ClientErrorPayloadLoggerMiddleware.ip_counters.clear()
+
     app_ = Starlette()
     app_.add_middleware(ClientErrorPayloadLoggerMiddleware)
 

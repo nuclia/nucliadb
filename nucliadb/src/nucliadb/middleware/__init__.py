@@ -66,11 +66,8 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
     misbehaving clients.
     """
 
+    ip_counters: dict[str, "EventCounter"] = {}
     max_events_per_ip = 100
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.ip_counters: dict[str, "EventCounter"] = {}
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = None
