@@ -81,7 +81,7 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
             client_ip = request.client.host if request.client else "unknown"
             ip_counter = self.ip_counters.setdefault(client_ip, EventCounter())
             if (
-                ip_counter.get_count() <= self.max_events_per_ip  # limit logs per IP
+                ip_counter.get_count() < self.max_events_per_ip  # limit logs per IP
                 and response is not None
                 and response.status_code in (412, 422)
             ):
