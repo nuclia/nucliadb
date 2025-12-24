@@ -70,40 +70,37 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
     max_events_per_ip = 100
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        response = None
-        try:
-            response = await call_next(request)
-            return response
-        finally:
-            client_ip = request.client.host if request.client else "unknown"
-            ip_counter = self.ip_counters.setdefault(client_ip, EventCounter())
-            if (
-                ip_counter.get_count() < self.max_events_per_ip  # limit logs per IP
-                and response is not None
-                and response.status_code in (412, 422)
-            ):
-                ip_counter.log_event()
+        response = await call_next(request)
 
-                chunks = []
-                async for chunk in response.body_iterator:  # type: ignore
-                    chunks.append(chunk)
-                response_body = b"".join(chunks)
-                logger.info(
-                    f"Client error. Response payload: {response_body.decode('utf-8')}",
-                    extra={
-                        "request_method": request.method,
-                        "request_path": request.url.path,
-                        "response_status_code": response.status_code,
-                    },
-                )
-                # Recreate the response body iterator since it has been consumed
-                return Response(
-                    content=response_body,
-                    status_code=response.status_code,
-                    headers=dict(response.headers),
-                    media_type=response.media_type,
-                    background=response.background,
-                )
+        client_ip = request.client.host if request.client else "unknown"
+        counter = self.ip_counters.setdefault(client_ip, EventCounter())
+        if (
+            response.status_code in (412, 422)
+            and counter.get_count() < self.max_events_per_ip  # limit logs per IP
+        ):
+            counter.log_event()
+
+            chunks = []
+            async for chunk in response.body_iterator:  # type: ignore
+                chunks.append(chunk)
+            response_body = b"".join(chunks)
+            logger.info(
+                f"Client error. Response payload: {response_body.decode('utf-8')}",
+                extra={
+                    "request_method": request.method,
+                    "request_path": request.url.path,
+                    "response_status_code": response.status_code,
+                },
+            )
+            # Recreate the response body iterator since it has been consumed
+            response = Response(
+                content=response_body,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                media_type=response.media_type,
+                background=response.background,
+            )
+        return response
 
 
 class EventCounter:
