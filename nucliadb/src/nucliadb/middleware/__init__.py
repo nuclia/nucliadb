@@ -20,7 +20,6 @@
 import logging
 import time
 from collections import deque
-from typing import Optional
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -67,14 +66,11 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
     misbehaving clients.
     """
 
-    _ip_counters: Optional[dict[str, "EventCounter"]] = None
     max_events_per_ip = 100
 
-    @property
-    def ip_counters(self):
-        if self._ip_counters is None:
-            self._ip_counters = {}
-        return self._ip_counters
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ip_counters: dict[str, "EventCounter"] = {}
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = None
