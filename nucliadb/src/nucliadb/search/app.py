@@ -21,7 +21,6 @@ import importlib.metadata
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
@@ -45,28 +44,35 @@ from nucliadb_utils.utilities import get_audit
 middleware = []
 middleware.extend(
     [
+<<<<<<< Updated upstream
         Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
         Middleware(AuditMiddleware, audit_utility_getter=get_audit),
+=======
+        (AuthenticationMiddleware, dict(backend=NucliaCloudAuthenticationBackend())),
+        (AuditMiddleware, dict(audit_utility_getter=get_audit)),
+        (ClientErrorPayloadLoggerMiddleware, dict()),
+>>>>>>> Stashed changes
     ]
 )
 
 if running_settings.debug:
+<<<<<<< Updated upstream
     middleware.append(Middleware(ProcessTimeHeaderMiddleware))
     middleware.append(Middleware(ClientErrorPayloadLoggerMiddleware))
+=======
+    middleware.append((ProcessTimeHeaderMiddleware, dict()))
+>>>>>>> Stashed changes
 
 errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
-
 fastapi_settings = dict(
     debug=running_settings.debug,
-    middleware=middleware,
     lifespan=lifespan,
     exception_handlers={
         Exception: global_exception_handler,
         ClientDisconnect: client_disconnect_handler,
     },
 )
-
 
 base_app = FastAPI(title="NucliaDB Search API", **fastapi_settings)  # type: ignore
 base_app.include_router(api_v1)
@@ -81,6 +87,10 @@ application = VersionedFastAPI(
     enable_latest=False,
     kwargs=fastapi_settings,
 )
+
+# Add middlewares to the final application, after the VersionedFastAPI wrapper
+for cls, kwargs in middleware:
+    application.add_middleware(cls, **kwargs)  # type: ignore
 
 
 async def homepage(request: Request) -> HTMLResponse:

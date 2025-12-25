@@ -23,7 +23,6 @@ import os
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect
@@ -83,26 +82,37 @@ HOMEPAGE_HTML = """
 
 
 def application_factory(settings: Settings) -> FastAPI:
-    middleware = [
-        Middleware(
+    middlewares = [
+        (
             CORSMiddleware,
-            allow_origins=http_settings.cors_origins,
-            allow_methods=["*"],
-            allow_headers=["*"],
+            dict(
+                allow_origins=http_settings.cors_origins,
+                allow_methods=["*"],
+                allow_headers=["*"],
+            ),
         ),
-        Middleware(
+        (
             AuthenticationMiddleware,
-            backend=get_auth_backend(settings),
+            dict(
+                backend=get_auth_backend(settings),
+            ),
         ),
+<<<<<<< Updated upstream
         Middleware(AuditMiddleware, audit_utility_getter=get_audit),
     ]
     if running_settings.debug:
         middleware.append(Middleware(ProcessTimeHeaderMiddleware))
         middleware.append(Middleware(ClientErrorPayloadLoggerMiddleware))
+=======
+        (AuditMiddleware, dict(audit_utility_getter=get_audit)),
+        (ClientErrorPayloadLoggerMiddleware, {}),
+    ]
+    if running_settings.debug:
+        middlewares.append((ProcessTimeHeaderMiddleware, {}))
+>>>>>>> Stashed changes
 
     fastapi_settings = dict(
         debug=running_settings.debug,
-        middleware=middleware,
         lifespan=lifespan,
         exception_handlers={
             Exception: global_exception_handler,
@@ -125,6 +135,10 @@ def application_factory(settings: Settings) -> FastAPI:
         enable_latest=False,
         kwargs=fastapi_settings,
     )
+
+    # Add middlewares to the final application, after the VersionedFastAPI wrapper
+    for cls, kwargs in middlewares:
+        application.add_middleware(cls, **kwargs)  # type: ignore
 
     for route in application.routes:
         if isinstance(route, Mount):

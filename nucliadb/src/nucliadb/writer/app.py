@@ -21,7 +21,6 @@
 import importlib.metadata
 
 from fastapi import FastAPI
-from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import ClientDisconnect
 from starlette.responses import HTMLResponse
@@ -44,7 +43,12 @@ middleware = []
 
 middleware.extend(
     [
+<<<<<<< Updated upstream
         Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
+=======
+        (AuthenticationMiddleware, dict(backend=NucliaCloudAuthenticationBackend())),
+        (ClientErrorPayloadLoggerMiddleware, dict()),
+>>>>>>> Stashed changes
     ]
 )
 if running_settings.debug:
@@ -55,7 +59,6 @@ errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
 fastapi_settings = dict(
     debug=running_settings.debug,
-    middleware=middleware,
     lifespan=lifespan,
     exception_handlers={
         Exception: global_exception_handler,
@@ -79,6 +82,10 @@ def create_application() -> FastAPI:
         enable_latest=False,
         kwargs=fastapi_settings,
     )
+
+    # Add middlewares to the final application, after the VersionedFastAPI wrapper
+    for cls, kwargs in middleware:
+        application.add_middleware(cls, **kwargs)  # type: ignore
 
     async def homepage(request):
         return HTMLResponse("NucliaDB Writer Service")
