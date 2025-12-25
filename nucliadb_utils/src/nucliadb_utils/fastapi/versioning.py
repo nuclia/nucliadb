@@ -20,9 +20,10 @@
 # This code is inspired by fastapi_versioning 1/3/2022 with MIT licence
 
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, cast
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TypeVar, cast
 
 from fastapi import FastAPI
+from fastapi.middleware import Middleware
 from fastapi.routing import APIRoute
 from starlette.routing import BaseRoute
 
@@ -52,12 +53,14 @@ def VersionedFastAPI(
     prefix_format: str = "/v{major}_{minor}",
     default_version: Tuple[int, int] = (1, 0),
     enable_latest: bool = False,
+    middleware: Sequence[Middleware] | None = None,
     kwargs: Optional[Dict[str, object]] = None,
 ) -> FastAPI:  # pragma: no cover
     kwargs = kwargs or {}
 
     parent_app = FastAPI(
         title=app.title,
+        middleware=middleware,
         **kwargs,  # type: ignore
     )
     version_route_mapping: Dict[Tuple[int, int], List[APIRoute]] = defaultdict(list)

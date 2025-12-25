@@ -54,7 +54,6 @@ errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
 fastapi_settings = dict(
     debug=running_settings.debug,
-    middleware=middleware,
     lifespan=lifespan,
     exception_handlers={
         Exception: global_exception_handler,
@@ -76,6 +75,7 @@ def create_application() -> FastAPI:
         prefix_format=f"/{API_PREFIX}/v{{major}}",
         default_version=(1, 0),
         enable_latest=False,
+        middleware=middleware,
         kwargs=fastapi_settings,
     )
 

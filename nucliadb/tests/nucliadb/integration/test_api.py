@@ -1922,7 +1922,7 @@ async def test_client_errors_can_be_logged_on_server_side(
         resp_bytes = resp.content.decode()
 
         # Check that the error was logged on server side
-        middleware_logger.info.assert_called_with(
+        middleware_logger.info.assert_called_once_with(
             f"Client error. Response payload: {resp_bytes}",
             extra={
                 "request_method": "POST",
