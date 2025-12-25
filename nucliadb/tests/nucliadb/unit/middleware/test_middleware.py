@@ -27,7 +27,6 @@ from starlette.responses import PlainTextResponse
 from starlette.testclient import TestClient
 
 from nucliadb.middleware import (
-    IP_LOG_COUNTS,
     ClientErrorPayloadLoggerMiddleware,
     EventCounter,
     ProcessTimeHeaderMiddleware,
@@ -59,7 +58,7 @@ class TestCaseProcessTimeHeaderMiddleware:
 
 @pytest.fixture(scope="function")
 def app():
-    IP_LOG_COUNTS.clear()
+    ClientErrorPayloadLoggerMiddleware.ip_log_counts.clear()
 
     app_ = Starlette()
     app_.add_middleware(ClientErrorPayloadLoggerMiddleware)
@@ -70,7 +69,7 @@ def app():
 
     yield app_
 
-    IP_LOG_COUNTS.clear()
+    ClientErrorPayloadLoggerMiddleware.ip_log_counts.clear()
 
 
 def test_client_error_payload_is_logged(app, caplog):

@@ -27,7 +27,6 @@ from starlette.responses import Response
 
 PROCESS_TIME_HEADER = "X-PROCESS-TIME"
 ACCESS_CONTROL_EXPOSE_HEADER = "Access-Control-Expose-Headers"
-IP_LOG_COUNTS: dict[str, "EventCounter"] = {}
 
 
 logger = logging.getLogger("nucliadb.middleware")
@@ -68,13 +67,14 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
     misbehaving clients.
     """
 
+    ip_log_counts: dict[str, "EventCounter"] = {}
     max_ip_logs_per_hour: int = 100
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = await call_next(request)
 
         client_ip = request.client.host if request.client else "unknown"
-        hourly_counter = IP_LOG_COUNTS.setdefault(client_ip, EventCounter(window_seconds=3600))
+        hourly_counter = self.ip_log_counts.setdefault(client_ip, EventCounter(window_seconds=3600))
         if response.status_code in (412, 422) and hourly_counter.get_count() < self.max_ip_logs_per_hour:
             hourly_counter.log_event()
 
