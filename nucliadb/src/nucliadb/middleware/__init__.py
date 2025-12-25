@@ -68,18 +68,15 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
     misbehaving clients.
     """
 
-    max_events_per_ip: int = 100
+    max_ip_logs_per_hour: int = 100
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = await call_next(request)
 
         client_ip = request.client.host if request.client else "unknown"
-        counter = IP_LOG_COUNTS.setdefault(client_ip, EventCounter())
-        if (
-            response.status_code in (412, 422)
-            and counter.get_count() < self.max_events_per_ip  # limit logs per IP
-        ):
-            counter.log_event()
+        hourly_counter = IP_LOG_COUNTS.setdefault(client_ip, EventCounter(window_seconds=3600))
+        if response.status_code in (412, 422) and hourly_counter.get_count() < self.max_ip_logs_per_hour:
+            hourly_counter.log_event()
 
             chunks = []
             async for chunk in response.body_iterator:  # type: ignore

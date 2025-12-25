@@ -82,13 +82,13 @@ def test_client_error_payload_is_logged(app, caplog):
         assert response.status_code == 412
         assert "Client error. Response payload: Precondition Failed" in caplog.text
 
-        prev = ClientErrorPayloadLoggerMiddleware.max_events_per_ip
-        ClientErrorPayloadLoggerMiddleware.max_events_per_ip = 5
-        for _ in range(ClientErrorPayloadLoggerMiddleware.max_events_per_ip + 2):
+        prev = ClientErrorPayloadLoggerMiddleware.max_ip_logs_per_hour
+        ClientErrorPayloadLoggerMiddleware.max_ip_logs_per_hour = 5
+        for _ in range(ClientErrorPayloadLoggerMiddleware.max_ip_logs_per_hour + 2):
             response = client.get("/foo/")
         log_count = caplog.text.count("Client error. Response payload: Precondition Failed")
-        assert log_count == ClientErrorPayloadLoggerMiddleware.max_events_per_ip
-        ClientErrorPayloadLoggerMiddleware.max_events_per_ip = prev
+        assert log_count == ClientErrorPayloadLoggerMiddleware.max_ip_logs_per_hour
+        ClientErrorPayloadLoggerMiddleware.max_ip_logs_per_hour = prev
 
 
 def test_event_counter():
