@@ -32,6 +32,7 @@ from nucliadb.learning_proxy import (
     SemanticConfig,
     SimilarityFunction,
 )
+from nucliadb.middleware import ClientErrorPayloadLoggerMiddleware
 from nucliadb.models.internal.processing import ClassificationLabel
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models import common, metadata
@@ -1911,6 +1912,9 @@ async def test_client_errors_can_be_logged_on_server_side(
     nucliadb_reader: AsyncClient,
     standalone_knowledgebox,
 ):
+    # Clear the previous counters just in case other tests have filled them
+    ClientErrorPayloadLoggerMiddleware.log_counters.clear()
+
     with patch("nucliadb.middleware.logger") as middleware_logger:
         kbid = standalone_knowledgebox
 

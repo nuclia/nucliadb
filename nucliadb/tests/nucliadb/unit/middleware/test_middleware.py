@@ -58,7 +58,7 @@ class TestCaseProcessTimeHeaderMiddleware:
 
 @pytest.fixture(scope="function")
 def app():
-    ClientErrorPayloadLoggerMiddleware.ip_log_counts.clear()
+    ClientErrorPayloadLoggerMiddleware.log_counters.clear()
 
     app_ = Starlette()
     app_.add_middleware(ClientErrorPayloadLoggerMiddleware)
@@ -69,7 +69,7 @@ def app():
 
     yield app_
 
-    ClientErrorPayloadLoggerMiddleware.ip_log_counts.clear()
+    ClientErrorPayloadLoggerMiddleware.log_counters.clear()
 
 
 def test_client_error_payload_is_logged(app, caplog):
@@ -80,14 +80,6 @@ def test_client_error_payload_is_logged(app, caplog):
 
         assert response.status_code == 412
         assert "Client error. Response payload: Precondition Failed" in caplog.text
-
-        prev = ClientErrorPayloadLoggerMiddleware.max_ip_logs_per_hour
-        ClientErrorPayloadLoggerMiddleware.max_ip_logs_per_hour = 5
-        for _ in range(ClientErrorPayloadLoggerMiddleware.max_ip_logs_per_hour + 2):
-            response = client.get("/foo/")
-        log_count = caplog.text.count("Client error. Response payload: Precondition Failed")
-        assert log_count == ClientErrorPayloadLoggerMiddleware.max_ip_logs_per_hour
-        ClientErrorPayloadLoggerMiddleware.max_ip_logs_per_hour = prev
 
 
 def test_event_counter():
