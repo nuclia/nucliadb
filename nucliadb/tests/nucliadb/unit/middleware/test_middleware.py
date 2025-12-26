@@ -73,7 +73,6 @@ def app():
 
 
 def test_client_error_payload_is_logged(app, caplog):
-    caplog.clear()
     client = TestClient(app)
     with caplog.at_level("INFO"):
         response = client.get("/foo/")
