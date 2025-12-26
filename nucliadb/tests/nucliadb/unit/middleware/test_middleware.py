@@ -21,13 +21,11 @@
 import time
 
 import pytest
-from fastapi import HTTPException
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
 from starlette.testclient import TestClient
 
 from nucliadb.middleware import (
-    ClientErrorPayloadLoggerMiddleware,
     EventCounter,
     ProcessTimeHeaderMiddleware,
 )
@@ -54,31 +52,6 @@ class TestCaseProcessTimeHeaderMiddleware:
 
         assert response.headers["access-control-expose-headers"] == "X-PROCESS-TIME"
         assert float(response.headers["x-process-time"]) > 0
-
-
-@pytest.fixture(scope="function")
-def app():
-    ClientErrorPayloadLoggerMiddleware.log_counters.clear()
-
-    app_ = Starlette()
-    app_.add_middleware(ClientErrorPayloadLoggerMiddleware)
-
-    @app_.route("/foo/")
-    def foo(request):
-        raise HTTPException(status_code=412, detail="Precondition Failed")
-
-    yield app_
-
-    ClientErrorPayloadLoggerMiddleware.log_counters.clear()
-
-
-def test_client_error_payload_is_logged(app, caplog):
-    client = TestClient(app)
-    with caplog.at_level("INFO"):
-        response = client.get("/foo/")
-
-        assert response.status_code == 412
-        assert "Client error. Response payload: Precondition Failed" in caplog.text
 
 
 def test_event_counter():
