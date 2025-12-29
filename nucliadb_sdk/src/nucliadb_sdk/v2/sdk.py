@@ -39,7 +39,7 @@ from typing import (
 import httpx
 import orjson
 from httpx._transports.base import AsyncBaseTransport, BaseTransport
-from nuclia_models.common.consumption import Consumption
+from nuclia_models.common.consumption import Consumption, TokensDetail
 from nuclia_models.predict.run_agents import RunTextAgentsRequest, RunTextAgentsResponse
 from pydantic import BaseModel, ValidationError
 
@@ -530,8 +530,16 @@ def _parse_ask_response_lines(lines_iter: Iterator[str], learning_id: str) -> Sy
                 augmented_context = item.augmented
             elif isinstance(item, ConsumptionResponseItem):
                 consumption = Consumption(
-                    normalized_tokens=item.normalized_tokens,
-                    customer_key_tokens=item.customer_key_tokens,
+                    normalized_tokens=TokensDetail(
+                        input=item.normalized_tokens.input,
+                        output=item.normalized_tokens.output,
+                        image=item.normalized_tokens.image,
+                    ),
+                    customer_key_tokens=TokensDetail(
+                        input=item.customer_key_tokens.input,
+                        output=item.customer_key_tokens.output,
+                        image=item.customer_key_tokens.image,
+                    ),
                 )
             else:
                 warnings.warn(f"Unknown item in ask endpoint response: {item}")
