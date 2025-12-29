@@ -1918,10 +1918,11 @@ async def test_client_errors_can_be_logged_on_server_side(
 
         # Check that the error was logged on server side
         middleware_logger.info.assert_called_once_with(
-            f"Client error. Response payload: {resp_bytes}",
+            f"Client payload validation error",
             extra={
                 "request_method": "POST",
                 "request_path": f"/api/v1/kb/{kbid}/resources",
                 "response_status_code": 422,
+                "response_payload": resp_bytes,
             },
         )
