@@ -21,19 +21,21 @@
 #[cfg(test)]
 mod tests;
 
-use crate::config::{VectorConfig, flags};
+use crate::config::{IndexEntity, VectorConfig, flags};
 use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, ParagraphRef, VectorRef};
+use crate::field_list_metadata::{paragraph_alive_fields, paragraph_is_deleted};
 use crate::formula::Formula;
 use crate::hnsw::{self, *};
-use crate::inverted_index;
-use crate::inverted_index::{FilterBitSet, InvertedIndexes, build_indexes};
+use crate::inverted_index::{self, InvertedIndexes};
+use crate::inverted_index::{FilterBitSet, build_indexes};
+use crate::utils::FieldKey;
 use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use core::f32;
 use rayon::prelude::*;
 
 use std::cmp::Reverse;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::iter::empty;
 use std::path::Path;
 use std::time::Instant;
@@ -49,30 +51,27 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
         if !InvertedIndexes::exists(path) {
-            build_indexes(path, &data_store)?;
+            build_indexes(path, &config.entity, &data_store)?;
         }
         Box::new(data_store)
     } else {
         let data_store = DataStoreV2::open(path, &config.vector_type, OpenReason::Search { prewarm })?;
         // Build the index at runtime if they do not exist. This can
         // be removed once we have migrated all existing indexes
-        if !InvertedIndexes::exists(path) && !config.disable_indexes {
-            build_indexes(path, &data_store)?;
+        if !InvertedIndexes::exists(path) {
+            build_indexes(path, &config.entity, &data_store)?;
         }
         Box::new(data_store)
     };
 
     let index = open_disk_hnsw(path, prewarm)?;
 
-    let inverted_indexes = if !config.disable_indexes {
-        Some(InvertedIndexes::open(
-            path,
-            metadata.records,
-            inverted_index::OpenOptions { prewarm },
-        )?)
-    } else {
-        None
-    };
+    let inverted_indexes = InvertedIndexes::open(
+        &config.entity,
+        path,
+        metadata.records,
+        inverted_index::OpenOptions { prewarm },
+    )?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
@@ -84,27 +83,33 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
     })
 }
 
-pub fn merge(segment_path: &Path, operants: &[&OpenSegment], config: &VectorConfig) -> VectorR<OpenSegment> {
+pub fn merge(
+    segment_path: &Path,
+    mut operants: Vec<(&OpenSegment, &HashSet<FieldKey>)>,
+    config: &VectorConfig,
+) -> VectorR<OpenSegment> {
     // Sort largest operant first so we reuse as much of the HNSW as possible
-    let mut operants = operants.to_vec();
-    operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.metadata.records));
+    operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.0.metadata.records));
 
     // Tags for all segments are the same (this should not happen, prepare_merge ensures it)
-    let tags = &operants[0].metadata.index_metadata.tags;
-    for dp in &operants {
-        if &dp.metadata.index_metadata.tags != tags {
+    let tags = &operants[0].0.metadata.index_metadata.tags;
+    for (segment, _) in &operants {
+        if &segment.metadata.index_metadata.tags != tags {
             return Err(crate::VectorErr::InconsistentMergeSegmentTags);
         }
     }
+
+    let segments = operants.iter().map(|(s, _)| *s).collect();
 
     // Creating the node store
     if config.flags.contains(&flags::FORCE_DATA_STORE_V1.to_string()) {
         // V1 can only merge from V1
         let mut node_producers = Vec::new();
-        for dp in &operants {
+        for (segment, _) in &operants {
             node_producers.push((
-                dp.alive_paragraphs(),
-                dp.data_store
+                segment.alive_paragraphs(),
+                segment
+                    .data_store
                     .as_any()
                     .downcast_ref::<DataStoreV1>()
                     .ok_or(VectorErr::InconsistentMergeDataStore)?,
@@ -113,15 +118,42 @@ pub fn merge(segment_path: &Path, operants: &[&OpenSegment], config: &VectorConf
 
         DataStoreV1::merge(segment_path, node_producers.as_mut_slice(), config)?;
         let data_store = DataStoreV1::open(segment_path, &config.vector_type, OpenReason::Create)?;
-        merge_indexes(segment_path, data_store, operants, config)
+        merge_indexes(segment_path, data_store, segments, config)
     } else {
         let node_producers = operants
             .iter()
-            .map(|dp| (dp.alive_paragraphs(), dp.data_store.as_ref()))
+            .map(|(s, _)| (s.alive_paragraphs(), s.data_store.as_ref()))
             .collect();
-        DataStoreV2::merge(segment_path, node_producers, config)?;
+
+        // If the metadata represents the list of fields the paragraph appears in, we need to get the new list as the
+        // union of the fields in all segments, taking deletions into account
+        let paragraph_deduplicator = if matches!(config.entity, IndexEntity::Relation) {
+            let mut per_paragraph_alive_fields: HashMap<String, Vec<FieldKey>> = HashMap::new();
+            for (segment, deletions) in &operants {
+                for paragraph_id in segment.alive_paragraphs() {
+                    let paragraph = segment.data_store.get_paragraph(paragraph_id);
+                    for f in paragraph_alive_fields(&paragraph, deletions) {
+                        per_paragraph_alive_fields
+                            .entry(paragraph.id().to_string())
+                            .or_default()
+                            .push(f.to_owned());
+                    }
+                }
+            }
+
+            Some(
+                per_paragraph_alive_fields
+                    .into_iter()
+                    .map(|(k, v)| (k, bincode::encode_to_vec(v, bincode::config::standard()).unwrap()))
+                    .collect(),
+            )
+        } else {
+            None
+        };
+        DataStoreV2::merge(segment_path, node_producers, config, paragraph_deduplicator)?;
+
         let data_store = DataStoreV2::open(segment_path, &config.vector_type, OpenReason::Create)?;
-        merge_indexes(segment_path, data_store, operants, config)
+        merge_indexes(segment_path, data_store, segments, config)
     }
 }
 
@@ -168,16 +200,14 @@ fn merge_indexes<DS: DataStore + 'static>(
         },
     };
 
-    let inverted_indexes = if !config.disable_indexes {
-        build_indexes(segment_path, &data_store)?;
-        Some(InvertedIndexes::open(
-            segment_path,
-            merged_vectors_count as usize,
-            inverted_index::OpenOptions { prewarm: false },
-        )?)
-    } else {
-        None
-    };
+    build_indexes(segment_path, &config.entity, &data_store)?;
+    let inverted_indexes = InvertedIndexes::open(
+        &config.entity,
+        segment_path,
+        merged_vectors_count as usize,
+        inverted_index::OpenOptions { prewarm: false },
+    )?;
+
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
@@ -254,23 +284,19 @@ fn create_indexes<DS: DataStore + 'static>(
 
     let index = open_disk_hnsw(path, false)?;
 
-    build_indexes(path, &data_store)?;
-
     let metadata = VectorSegmentMetadata {
         path: path.to_path_buf(),
         records: data_store.stored_paragraph_count() as usize,
         index_metadata: VectorSegmentMeta { tags },
     };
 
-    let inverted_indexes = if !config.disable_indexes {
-        Some(InvertedIndexes::open(
-            path,
-            vector_count as usize,
-            inverted_index::OpenOptions { prewarm: false },
-        )?)
-    } else {
-        None
-    };
+    build_indexes(path, &config.entity, &data_store)?;
+    let inverted_indexes = InvertedIndexes::open(
+        &config.entity,
+        path,
+        vector_count as usize,
+        inverted_index::OpenOptions { prewarm: false },
+    )?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
@@ -411,7 +437,7 @@ pub struct OpenSegment {
     metadata: VectorSegmentMetadata,
     data_store: Box<dyn DataStore>,
     index: Box<dyn DiskHnsw>,
-    inverted_indexes: Option<InvertedIndexes>,
+    inverted_indexes: InvertedIndexes,
     alive_bitset: FilterBitSet,
 }
 
@@ -422,13 +448,23 @@ impl AsRef<OpenSegment> for OpenSegment {
 }
 
 impl OpenSegment {
-    pub fn apply_deletion(&mut self, key: &str) {
-        let Some(inverted_indexes) = &self.inverted_indexes else {
-            return;
-        };
-        if let Some(deleted_ids) = inverted_indexes.ids_for_deletion_key(key) {
-            for id in deleted_ids {
-                self.alive_bitset.remove(id);
+    pub fn apply_deletions(&mut self, keys: &HashSet<FieldKey>) {
+        match &self.inverted_indexes {
+            InvertedIndexes::Paragraph(indexes) => {
+                for key in keys {
+                    for id in indexes.ids_for_deletion_key(key) {
+                        self.alive_bitset.remove(id);
+                    }
+                }
+            }
+            InvertedIndexes::Relation(indexes) => {
+                let affected_paragraphs = keys.iter().flat_map(|k| indexes.ids_for_field_key(k));
+                for paragraph_id in affected_paragraphs {
+                    let paragraph = self.data_store.get_paragraph(paragraph_id);
+                    if paragraph_is_deleted(&paragraph, keys) {
+                        self.alive_bitset.remove(paragraph_id);
+                    }
+                }
             }
         }
     }
@@ -446,9 +482,7 @@ impl OpenSegment {
     }
 
     pub fn space_usage(&self) -> usize {
-        self.data_store.size_bytes()
-            + self.index.size()
-            + self.inverted_indexes.as_ref().map_or(0, InvertedIndexes::space_usage)
+        self.data_store.size_bytes() + self.index.size() + self.inverted_indexes.space_usage()
     }
 
     pub fn get_paragraph(&self, id: ParagraphAddr) -> ParagraphRef<'_> {
@@ -498,10 +532,18 @@ impl OpenSegment {
         };
         let retriever = Retriever::new(data_store, config, min_score);
 
-        let mut filter_bitset = self.inverted_indexes.as_ref().and_then(|ii| ii.filter(filter));
-        if let Some(ref mut bitset) = filter_bitset {
-            bitset.intersect_with(&self.alive_bitset);
-        }
+        let filter_bitset = if filter.non_empty() {
+            let InvertedIndexes::Paragraph(inverted_indexes) = &self.inverted_indexes else {
+                unreachable!("Cannot filter without paragraph indexes");
+            };
+            let mut filter_bitset = inverted_indexes.filter(filter);
+            if let Some(ref mut bitset) = filter_bitset {
+                bitset.intersect_with(&self.alive_bitset);
+            }
+            filter_bitset
+        } else {
+            None
+        };
         // If we have no filters, just the deletions
         let bitset = filter_bitset.as_ref().unwrap_or(&self.alive_bitset);
 
@@ -645,7 +687,7 @@ mod test {
 
     use crate::{
         ParagraphAddr, VectorAddr,
-        config::{Similarity, VectorCardinality, VectorConfig},
+        config::VectorConfig,
         formula::Formula,
         vector_types::dense_f32::{dot_similarity, encode_vector},
     };
@@ -724,14 +766,7 @@ mod test {
 
     #[test]
     fn test_save_recall_aligned_data() -> anyhow::Result<()> {
-        let config = VectorConfig {
-            similarity: Similarity::Dot,
-            vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
-            normalize_vectors: false,
-            flags: vec![],
-            vector_cardinality: VectorCardinality::Single,
-            disable_indexes: false,
-        };
+        let config = VectorConfig::for_paragraphs(crate::config::VectorType::DenseF32 { dimension: DIMENSION });
         let mut rng = SmallRng::seed_from_u64(1234567890);
         let temp_dir = tempdir()?;
 
@@ -771,14 +806,7 @@ mod test {
 
     #[test]
     fn test_save_recall_aligned_data_after_merge() -> anyhow::Result<()> {
-        let config = VectorConfig {
-            similarity: Similarity::Dot,
-            vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
-            normalize_vectors: false,
-            flags: vec![],
-            vector_cardinality: VectorCardinality::Single,
-            disable_indexes: false,
-        };
+        let config = VectorConfig::for_paragraphs(crate::config::VectorType::DenseF32 { dimension: DIMENSION });
         let mut rng = SmallRng::seed_from_u64(1234567890);
 
         // Create two segments with random data of different length
@@ -800,8 +828,10 @@ mod test {
             HashSet::new(),
         )?;
 
+        let no_dels = HashSet::new();
+        let work = vec![(&dp1, &no_dels), (&dp2, &no_dels)];
         let path_merged = tempdir()?;
-        let merged_dp = merge(path_merged.path(), &[&dp1, &dp2], &config)?;
+        let merged_dp = merge(path_merged.path(), work, &config)?;
 
         for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2.into_iter()).enumerate() {
             let vector = merged_dp.data_store.get_vector(VectorAddr(i as u32));
@@ -850,14 +880,7 @@ mod test {
             center = random_nearby_vector(&mut rng, &center, 0.1);
         }
 
-        let config = VectorConfig {
-            similarity: Similarity::Dot,
-            vector_type: crate::config::VectorType::DenseF32 { dimension: DIMENSION },
-            normalize_vectors: false,
-            flags: vec![],
-            vector_cardinality: VectorCardinality::Single,
-            disable_indexes: false,
-        };
+        let config = VectorConfig::for_paragraphs(crate::config::VectorType::DenseF32 { dimension: DIMENSION });
 
         // Create a segment
         let temp_dir = tempdir()?;

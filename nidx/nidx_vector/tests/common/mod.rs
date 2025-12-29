@@ -39,11 +39,11 @@ impl TestOpener {
 }
 
 impl OpenIndexMetadata<VectorSegmentMeta> for TestOpener {
-    fn segments(&self) -> impl Iterator<Item = (SegmentMetadata<VectorSegmentMeta>, nidx_types::Seq)> {
+    fn segments(&self) -> impl DoubleEndedIterator<Item = (SegmentMetadata<VectorSegmentMeta>, nidx_types::Seq)> {
         self.segments.iter().cloned()
     }
 
-    fn deletions(&self) -> impl Iterator<Item = (&String, nidx_types::Seq)> {
+    fn deletions(&self) -> impl DoubleEndedIterator<Item = (&String, nidx_types::Seq)> {
         self.deletions.iter().map(|(key, seq)| (key, *seq))
     }
 }

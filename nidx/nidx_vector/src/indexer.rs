@@ -18,13 +18,15 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::config::{VectorCardinality, VectorConfig};
+use crate::field_list_metadata::encode_field_list_metadata;
 use crate::multivector::extract_multi_vectors;
 use crate::segment::{self, Elem};
+use crate::utils::FieldKey;
 use crate::{VectorSegmentMetadata, utils};
-use nidx_protos::{noderesources, prost::*};
-use std::collections::HashMap;
+use anyhow::anyhow;
+use nidx_protos::{Resource, noderesources, prost::*};
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::time::Instant;
 use tracing::*;
 
 pub const SEGMENT_TAGS: &[&str] = &["/q/h"];
@@ -102,11 +104,7 @@ pub fn index_resource(
     output_path: &Path,
     config: &VectorConfig,
 ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
-    let time = Instant::now();
-
-    debug!("Updating main index");
-    let v = time.elapsed().as_millis();
-    debug!("Creating elements for the main index: starts {v} ms");
+    debug!("Creating elements for the main index");
 
     let mut elems = Vec::new();
     let normalize_vectors = config.normalize_vectors;
@@ -136,11 +134,6 @@ pub fn index_resource(
             }
         }
     }
-    let v = time.elapsed().as_millis();
-    debug!("Creating elements for the main index: ends {v} ms");
-
-    let v = time.elapsed().as_millis();
-    debug!("Main index set resource: starts {v} ms");
 
     if elems.is_empty() {
         return Ok(None);
@@ -152,10 +145,82 @@ pub fn index_resource(
         .filter(|t| SEGMENT_TAGS.contains(&t.as_str()))
         .cloned()
         .collect();
+
+    debug!("Creating the segment");
     let segment = segment::create(output_path, elems, config, tags)?;
 
-    let v = time.elapsed().as_millis();
-    debug!("Main index set resource: ends {v} ms");
+    Ok(Some(segment.into_metadata()))
+}
+
+fn encode_metadata_field(rid: &str, fields: &HashSet<&String>) -> Vec<u8> {
+    let encoded_fields: Vec<_> = fields
+        .iter()
+        .map(|f| format!("{rid}/{f}"))
+        .filter_map(|f| FieldKey::from_field_id(&f))
+        .collect();
+    encode_field_list_metadata(&encoded_fields)
+}
+
+pub fn index_relations(
+    resource: &Resource,
+    output_path: &Path,
+    config: &VectorConfig,
+) -> anyhow::Result<Option<VectorSegmentMetadata>> {
+    debug!("Creating elements for the main index");
+
+    let mut entity_fields = HashMap::new();
+    let Some(resource_id) = &resource.resource else {
+        return Err(anyhow!("resource_id required"));
+    };
+    let rid = &resource_id.uuid;
+
+    for (field, relations) in &resource.field_relations {
+        for relation in &relations.relations {
+            let Some(relation) = &relation.relation else {
+                return Err(anyhow!("relation required"));
+            };
+            let Some(source) = &relation.source else {
+                return Err(anyhow!("relation source node required"));
+            };
+            entity_fields
+                .entry(source.value.clone())
+                .or_insert_with(HashSet::new)
+                .insert(field);
+
+            let Some(to) = &relation.to else {
+                return Err(anyhow!("relation to node required"));
+            };
+            entity_fields
+                .entry(to.value.clone())
+                .or_insert_with(HashSet::new)
+                .insert(field);
+        }
+    }
+
+    let mut elems = Vec::new();
+    for node_vector in &resource.relation_node_vectors {
+        let vector = node_vector.vector.clone();
+        let Some(node) = &node_vector.node else {
+            return Err(anyhow!("relation node required"));
+        };
+        let fields = entity_fields.get(&node.value);
+        let Some(fields) = fields else {
+            continue;
+        };
+        elems.push(Elem::new(
+            node.value.clone(),
+            vector,
+            vec![],
+            Some(encode_metadata_field(rid, fields)),
+        ));
+    }
+
+    if elems.is_empty() {
+        return Ok(None);
+    }
+
+    debug!("Creating the segment");
+    let segment = segment::create(output_path, elems, config, HashSet::new())?;
 
     Ok(Some(segment.into_metadata()))
 }

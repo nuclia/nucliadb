@@ -32,6 +32,7 @@ from nucliadb.learning_proxy import (
     SemanticConfig,
     SimilarityFunction,
 )
+from nucliadb.middleware import ClientErrorPayloadLoggerMiddleware
 from nucliadb.models.internal.processing import ClassificationLabel
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models import common, metadata
@@ -1895,3 +1896,33 @@ async def test_get_kb_by_slug_on_cloud(
     resp = await nucliadb_reader.get(f"/kb/s/{account_id}:{user_slug}")
     assert resp.status_code == 200
     assert resp.json()["uuid"] == kbid
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_client_errors_can_be_logged_on_server_side(
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox,
+):
+    # Clear the previous counters just in case other tests have filled them
+    ClientErrorPayloadLoggerMiddleware.log_counters.clear()
+
+    with patch("nucliadb.middleware.logger") as middleware_logger:
+        kbid = standalone_knowledgebox
+
+        # Make a request that triggers a 422 error
+        resp = await nucliadb_writer.post(f"/kb/{kbid}/resources", json={"title": 456})
+        assert resp.status_code == 422
+        assert resp.json()["detail"][0]["msg"] == "Input should be a valid string"
+        assert resp.json()["detail"][0]["input"] == 456
+        resp_bytes = resp.content.decode()
+
+        # Check that the error was logged on server side
+        middleware_logger.info.assert_called_once_with(
+            f"Client payload validation error",
+            extra={
+                "request_method": "POST",
+                "request_path": f"/api/v1/kb/{kbid}/resources",
+                "response_status_code": 422,
+                "response_payload": resp_bytes,
+            },
+        )

@@ -26,6 +26,7 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import ClientDisconnect
 from starlette.responses import HTMLResponse
 
+from nucliadb.middleware import ClientErrorPayloadLoggerMiddleware
 from nucliadb.writer import API_PREFIX
 from nucliadb.writer.api.v1.router import api as api_v1
 from nucliadb.writer.lifecycle import lifespan
@@ -41,14 +42,18 @@ from nucliadb_utils.settings import running_settings
 
 middleware = []
 
-middleware.extend([Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend())])
+middleware.extend(
+    [
+        Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
+        Middleware(ClientErrorPayloadLoggerMiddleware),
+    ]
+)
 
 
 errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
 fastapi_settings = dict(
     debug=running_settings.debug,
-    middleware=middleware,
     lifespan=lifespan,
     exception_handlers={
         Exception: global_exception_handler,
@@ -70,6 +75,7 @@ def create_application() -> FastAPI:
         prefix_format=f"/{API_PREFIX}/v{{major}}",
         default_version=(1, 0),
         enable_latest=False,
+        middleware=middleware,
         kwargs=fastapi_settings,
     )
 

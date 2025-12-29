@@ -29,6 +29,7 @@ from typing import (
 import httpx
 import orjson
 from httpx._transports.base import AsyncBaseTransport, BaseTransport
+from nuclia_models.common.consumption import Consumption, TokensDetail
 from nuclia_models.predict.run_agents import RunTextAgentsRequest, RunTextAgentsResponse
 from pydantic import BaseModel, ValidationError
 
@@ -75,6 +76,7 @@ from nucliadb_models.search import (
     CatalogRequest,
     CatalogResponse,
     CitationsAskResponseItem,
+    ConsumptionResponseItem,
     DebugAskResponseItem,
     ErrorAskResponseItem,
     FeedbackRequest,
@@ -482,6 +484,7 @@ def _parse_ask_response_lines(lines_iter: Iterator[str], learning_id: str) -> Sy
     error: str | None = None
     debug = None
     augmented_context: AugmentedContext | None = None
+    consumption: Consumption | None = None
     for line in lines_iter:
         try:
             item = AskResponseItem.model_validate_json(line).item
@@ -515,6 +518,19 @@ def _parse_ask_response_lines(lines_iter: Iterator[str], learning_id: str) -> Sy
                 debug = item.metadata
             elif isinstance(item, AugmentedContextResponseItem):
                 augmented_context = item.augmented
+            elif isinstance(item, ConsumptionResponseItem):
+                consumption = Consumption(
+                    normalized_tokens=TokensDetail(
+                        input=item.normalized_tokens.input,
+                        output=item.normalized_tokens.output,
+                        image=item.normalized_tokens.image,
+                    ),
+                    customer_key_tokens=TokensDetail(
+                        input=item.customer_key_tokens.input,
+                        output=item.customer_key_tokens.output,
+                        image=item.customer_key_tokens.image,
+                    ),
+                )
             else:
                 warnings.warn(f"Unknown item in ask endpoint response: {item}")
         except ValidationError:
@@ -542,6 +558,7 @@ def _parse_ask_response_lines(lines_iter: Iterator[str], learning_id: str) -> Sy
             "debug": debug,
             "metadata": SyncAskMetadata(tokens=tokens, timings=timings),
             "augmented_context": augmented_context,
+            "consumption": consumption,
         }
     )
 

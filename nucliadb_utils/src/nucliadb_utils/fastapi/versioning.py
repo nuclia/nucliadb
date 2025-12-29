@@ -21,9 +21,10 @@
 
 from collections import defaultdict
 from collections.abc import Callable
-from typing import Any, TypeVar, cast
+from typing import Any, Sequence, TypeVar, cast
 
 from fastapi import FastAPI
+from fastapi.middleware import Middleware
 from fastapi.routing import APIRoute
 from starlette.routing import BaseRoute
 
@@ -53,12 +54,14 @@ def VersionedFastAPI(
     prefix_format: str = "/v{major}_{minor}",
     default_version: tuple[int, int] = (1, 0),
     enable_latest: bool = False,
+    middleware: Sequence[Middleware] | None = None,
     kwargs: dict[str, object] | None = None,
 ) -> FastAPI:  # pragma: no cover
     kwargs = kwargs or {}
 
     parent_app = FastAPI(
         title=app.title,
+        middleware=middleware,
         **kwargs,  # type: ignore
     )
     version_route_mapping: dict[tuple[int, int], list[APIRoute]] = defaultdict(list)

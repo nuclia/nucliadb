@@ -22,7 +22,7 @@ mod common;
 
 use std::collections::HashSet;
 
-use nidx_protos::VectorSentence;
+use nidx_protos::{Position, Representation, SentenceMetadata, VectorSentence};
 use nidx_types::{
     prefilter::FieldId,
     query_language::{BooleanExpression, BooleanOperation, Operator},
@@ -56,14 +56,9 @@ fn test_basic_search(
         vec![flags::FORCE_DATA_STORE_V1.to_string()]
     };
 
-    let config = VectorConfig {
-        similarity,
-        vector_type,
-        normalize_vectors: false,
-        flags,
-        vector_cardinality: VectorCardinality::Single,
-        disable_indexes: false,
-    };
+    let mut config = VectorConfig::for_paragraphs(vector_type);
+    config.similarity = similarity;
+    config.flags = flags;
 
     // Creates a resource with some orthogonal vectors, to test search
     let mut resource = resource(vec![], vec![]);
@@ -158,14 +153,7 @@ fn test_deletions() -> anyhow::Result<()> {
     use nidx_types::prefilter::PrefilterResult;
     use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher};
 
-    let config = VectorConfig {
-        similarity: Similarity::Dot,
-        vector_type: VectorType::DenseF32 { dimension: 4 },
-        normalize_vectors: false,
-        flags: vec![],
-        vector_cardinality: VectorCardinality::Single,
-        disable_indexes: false,
-    };
+    let config = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 4 });
 
     // Creates a couple of resources
     let resource1 = resource(vec![], vec![]);
@@ -236,14 +224,7 @@ fn test_filtered_search() -> anyhow::Result<()> {
     use nidx_types::prefilter::PrefilterResult;
     use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher};
 
-    let config = VectorConfig {
-        similarity: Similarity::Dot,
-        vector_type: VectorType::DenseF32 { dimension: 4 },
-        normalize_vectors: false,
-        flags: vec![],
-        vector_cardinality: VectorCardinality::Single,
-        disable_indexes: false,
-    };
+    let config = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 4 });
 
     // Create 4 resources
     // 0 has label 0, 8
@@ -417,6 +398,76 @@ fn test_filtered_search() -> anyhow::Result<()> {
         ),
         [1, 3].into()
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_metadata_retrieved() -> anyhow::Result<()> {
+    use common::{TestOpener, resource};
+    use nidx_types::prefilter::PrefilterResult;
+    use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher};
+
+    let config = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 4 });
+
+    // Create a resource with metadata
+    let mut resource = resource(vec![], vec![]);
+    let sentences = &mut resource
+        .paragraphs
+        .values_mut()
+        .next()
+        .unwrap()
+        .paragraphs
+        .values_mut()
+        .next()
+        .unwrap()
+        .sentences;
+    sentences.clear();
+    let metadata = SentenceMetadata {
+        position: Some(Position {
+            index: 55,
+            start: 0,
+            end: 100,
+            page_number: 1,
+            in_page: false,
+            start_seconds: vec![4, 7],
+            end_seconds: vec![33, 66],
+        }),
+        page_with_visual: true,
+        representation: Some(Representation {
+            is_a_table: false,
+            file: "my_representative_file".to_string(),
+        }),
+    };
+    sentences.insert(
+        format!("{}/a/title/0-100", resource.resource.as_ref().unwrap().uuid),
+        VectorSentence {
+            vector: vec![1.0, 0.0, 0.0, 0.0],
+            metadata: Some(metadata.clone()),
+        },
+    );
+
+    let segment_dir = tempdir()?;
+    let meta = VectorIndexer
+        .index_resource(segment_dir.path(), &config, &resource, "default", true)?
+        .unwrap();
+    let open_config = TestOpener::new(vec![(meta, 1u64.into())], vec![]);
+    let searcher = VectorSearcher::open(config, open_config)?;
+
+    let results = searcher
+        .search(
+            &VectorSearchRequest {
+                vector: vec![0.7, 0.7, 0.0, 0.0],
+                result_per_page: 10,
+                ..Default::default()
+            },
+            &PrefilterResult::All,
+        )
+        .unwrap();
+
+    // All results
+    assert_eq!(results.documents.len(), 1);
+    assert_eq!(results.documents[0].metadata, Some(metadata));
 
     Ok(())
 }

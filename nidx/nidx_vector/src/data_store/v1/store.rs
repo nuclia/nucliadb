@@ -211,16 +211,9 @@ pub fn merge(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::VectorCardinality, segment::Elem};
+    use crate::segment::Elem;
 
-    const VECTOR_CONFIG: VectorConfig = VectorConfig {
-        vector_type: VectorType::DenseF32 { dimension: 3 },
-        similarity: crate::config::Similarity::Dot,
-        normalize_vectors: false,
-        flags: vec![],
-        vector_cardinality: VectorCardinality::Single,
-        disable_indexes: false,
-    };
+    const VECTOR_CONFIG: VectorConfig = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 3 });
 
     #[test]
     fn store_test() {

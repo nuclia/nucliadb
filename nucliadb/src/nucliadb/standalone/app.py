@@ -31,7 +31,7 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
 import nucliadb_admin_assets  # type: ignore
-from nucliadb.middleware import ProcessTimeHeaderMiddleware
+from nucliadb.middleware import ClientErrorPayloadLoggerMiddleware, ProcessTimeHeaderMiddleware
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
@@ -95,13 +95,13 @@ def application_factory(settings: Settings) -> FastAPI:
             backend=get_auth_backend(settings),
         ),
         Middleware(AuditMiddleware, audit_utility_getter=get_audit),
+        Middleware(ClientErrorPayloadLoggerMiddleware),
     ]
     if running_settings.debug:
         middleware.append(Middleware(ProcessTimeHeaderMiddleware))
 
     fastapi_settings = dict(
         debug=running_settings.debug,
-        middleware=middleware,
         lifespan=lifespan,
         exception_handlers={
             Exception: global_exception_handler,
@@ -122,6 +122,7 @@ def application_factory(settings: Settings) -> FastAPI:
         prefix_format=f"/{API_PREFIX}/v{{major}}",
         default_version=(1, 0),
         enable_latest=False,
+        middleware=middleware,
         kwargs=fastapi_settings,
     )
 
