@@ -17,80 +17,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, path::Path, sync::Arc};
+use std::{collections::BTreeMap, path::Path};
 
-use bit_set::BitSet;
-use bit_vec::BitVec;
-use fst_index::{FstIndexReader, FstIndexWriter};
-use map::{InvertedMapReader, InvertedMapWriter};
-use tracing::warn;
+use fst_index::FstIndexWriter;
 
-use crate::{
-    ParagraphAddr, VectorR,
-    data_store::{DataStore, iter_paragraphs},
-    formula::{BooleanOperator, Clause, Formula},
-};
+use crate::{ParagraphAddr, VectorR, config::IndexEntity, data_store::DataStore};
+use paragraph::ParagraphInvertedIndexes;
+use relation::RelationInvertedIndexes;
+
+pub use paragraph::FilterBitSet;
 
 mod fst_index;
 mod map;
+mod paragraph;
+mod relation;
 
 mod file {
     pub const INDEX_MAP: &str = "index.map";
     pub const FIELD_INDEX: &str = "field.fst";
     pub const LABEL_INDEX: &str = "label.fst";
-}
-
-pub struct FilterBitSet(BitSet);
-
-impl FilterBitSet {
-    pub fn new(len: usize, value: bool) -> Self {
-        Self(BitSet::from_bit_vec(BitVec::from_elem(len, value)))
-    }
-
-    pub fn remove(&mut self, id: ParagraphAddr) {
-        self.0.remove(id.0 as usize);
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = ParagraphAddr> {
-        self.0.iter().map(|v| ParagraphAddr(v as u32))
-    }
-
-    pub fn intersect_with(&mut self, other: &FilterBitSet) {
-        self.0.intersect_with(&other.0);
-    }
-
-    pub fn contains(&self, ParagraphAddr(id): ParagraphAddr) -> bool {
-        self.0.contains(id as usize)
-    }
-}
-
-/// The key for the field index. [uuid_as_bytes, field_type/field_name]
-fn field_id_key(paragraph_key: &str) -> Option<Vec<u8>> {
-    let mut parts = paragraph_key.split('/');
-    if let Some(uuid) = parts.next() {
-        if let Some(field_type) = parts.next() {
-            if let Some(field_name) = parts.next() {
-                return Some(
-                    [
-                        uuid::Uuid::parse_str(uuid).unwrap().as_bytes(),
-                        field_type.as_bytes(),
-                        "/".as_bytes(),
-                        field_name.as_bytes(),
-                    ]
-                    .concat(),
-                );
-            }
-        } else {
-            return Some(uuid::Uuid::parse_str(uuid).unwrap().as_bytes().to_vec());
-        }
-    }
-    warn!(?paragraph_key, "Unable to parse field id from key");
-    None
-}
-
-/// The key for the labels, ending with a separator to allow for easy prefix search
-fn labels_key(label: &str) -> Vec<u8> {
-    [&label.as_bytes()[1..], "/".as_bytes()].concat()
 }
 
 /// Helper to build indexes when the input is not sorted by key
@@ -119,135 +64,43 @@ impl IndexBuilder {
     }
 }
 
-/// Build indexes from a nodes.kv file.
-pub fn build_indexes(work_path: &Path, data_store: &impl DataStore) -> VectorR<()> {
-    let mut field_builder = IndexBuilder::new();
-    let mut label_builder = IndexBuilder::new();
-
-    for paragraph_addr in iter_paragraphs(data_store) {
-        let paragraph = data_store.get_paragraph(paragraph_addr);
-        let key = paragraph.id();
-        let labels = paragraph.labels();
-
-        if let Some(key) = field_id_key(key) {
-            field_builder.insert(key, paragraph_addr);
-        }
-        for l in labels {
-            label_builder.insert(labels_key(&l), paragraph_addr);
-        }
+/// Build indexes from a DataStore.
+pub fn build_indexes(work_path: &Path, indexes: &IndexEntity, data_store: &impl DataStore) -> VectorR<()> {
+    match indexes {
+        IndexEntity::Paragraph => ParagraphInvertedIndexes::build(work_path, data_store),
+        IndexEntity::Relation => RelationInvertedIndexes::build(work_path, data_store),
     }
-
-    let mut map = InvertedMapWriter::new(&work_path.join(file::INDEX_MAP))?;
-    let mut field_index = FstIndexWriter::new(&work_path.join(file::FIELD_INDEX), &mut map)?;
-    field_builder.write(&mut field_index)?;
-    field_index.finish()?;
-
-    let mut label_index = FstIndexWriter::new(&work_path.join(file::LABEL_INDEX), &mut map)?;
-    label_builder.write(&mut label_index)?;
-    label_index.finish()?;
-
-    map.finish()?;
-
-    Ok(())
 }
 
 pub struct OpenOptions {
     pub prewarm: bool,
 }
 
-pub struct InvertedIndexes {
-    field_index: FstIndexReader,
-    label_index: FstIndexReader,
-    records: usize,
+pub enum InvertedIndexes {
+    Paragraph(ParagraphInvertedIndexes),
+    Relation(RelationInvertedIndexes),
 }
 
 impl InvertedIndexes {
+    pub fn open(index_type: &IndexEntity, work_path: &Path, records: usize, options: OpenOptions) -> VectorR<Self> {
+        match index_type {
+            IndexEntity::Paragraph => Ok(InvertedIndexes::Paragraph(ParagraphInvertedIndexes::open(
+                work_path, records, options,
+            )?)),
+            IndexEntity::Relation => Ok(InvertedIndexes::Relation(RelationInvertedIndexes::open(
+                work_path, options,
+            )?)),
+        }
+    }
+
     pub fn space_usage(&self) -> usize {
-        self.field_index.space_usage() + self.label_index.space_usage()
+        match self {
+            InvertedIndexes::Paragraph(indexes) => indexes.space_usage(),
+            InvertedIndexes::Relation(indexes) => indexes.space_usage(),
+        }
     }
 
     pub fn exists(path: &Path) -> bool {
         path.join(file::INDEX_MAP).exists()
-    }
-
-    pub fn open(work_path: &Path, records: usize, options: OpenOptions) -> VectorR<Self> {
-        let map = Arc::new(InvertedMapReader::open(
-            &work_path.join(file::INDEX_MAP),
-            options.prewarm,
-        )?);
-        let field_index = FstIndexReader::open(&work_path.join(file::FIELD_INDEX), map.clone(), options.prewarm)?;
-        let label_index = FstIndexReader::open(&work_path.join(file::LABEL_INDEX), map, options.prewarm)?;
-
-        Ok(Self {
-            field_index,
-            label_index,
-            records,
-        })
-    }
-
-    pub fn ids_for_deletion_key(&self, key: &str) -> Option<impl Iterator<Item = ParagraphAddr>> {
-        field_id_key(key).map(|key| self.field_index.get_prefix(&key).into_iter().map(ParagraphAddr))
-    }
-
-    pub fn filter(&self, formula: &Formula) -> Option<FilterBitSet> {
-        formula
-            .clauses
-            .iter()
-            .map(|f| self.filter_clause(f))
-            .reduce(|mut a, b| {
-                if formula.operator == BooleanOperator::And {
-                    a.intersect_with(&b)
-                } else {
-                    a.union_with(&b)
-                }
-                a
-            })
-            .map(FilterBitSet)
-    }
-
-    fn filter_clause(&self, clause: &Clause) -> BitSet {
-        match clause {
-            Clause::Atom(atom_clause) => {
-                let ids: &mut dyn Iterator<Item = u32> = match atom_clause {
-                    crate::formula::AtomClause::Label(label) => {
-                        &mut self.label_index.get_prefix(&labels_key(label)).into_iter()
-                    }
-                    crate::formula::AtomClause::KeyPrefixSet(field_ids) => &mut field_ids
-                        .iter()
-                        .filter_map(|id| field_id_key(id).map(|k| self.field_index.get(&k)))
-                        .flatten()
-                        .flatten(),
-                };
-                let mut bitset = BitSet::from_bit_vec(BitVec::from_elem(self.records, false));
-                ids.for_each(|id| {
-                    bitset.insert(id as usize);
-                });
-                bitset
-            }
-            Clause::Compound(expression) => {
-                let func: &dyn Fn(BitSet, BitSet) -> BitSet = match expression.operator {
-                    crate::formula::BooleanOperator::Not | crate::formula::BooleanOperator::And => &|mut a, b| {
-                        a.intersect_with(&b);
-                        a
-                    },
-                    crate::formula::BooleanOperator::Or => &|mut a, b| {
-                        a.union_with(&b);
-                        a
-                    },
-                };
-                let mut bitset = expression
-                    .operands
-                    .iter()
-                    .map(|f| self.filter_clause(f))
-                    .reduce(func)
-                    .unwrap();
-                if matches!(expression.operator, crate::formula::BooleanOperator::Not) {
-                    bitset.get_mut().iter_mut().for_each(|mut f| *f = !*f);
-                    bitset
-                } else {
-                    bitset
-                }
-            }
-        }
     }
 }

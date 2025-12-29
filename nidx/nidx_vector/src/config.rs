@@ -95,6 +95,13 @@ pub enum VectorCardinality {
     Multi,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+pub enum IndexEntity {
+    #[default]
+    Paragraph,
+    Relation,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VectorConfig {
     #[serde(default)]
@@ -107,10 +114,32 @@ pub struct VectorConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub flags: Vec<String>,
     #[serde(default)]
-    pub disable_indexes: bool,
+    pub entity: IndexEntity,
 }
 
 impl VectorConfig {
+    pub const fn for_paragraphs(vector_type: VectorType) -> Self {
+        Self {
+            vector_type,
+            similarity: Similarity::Dot,
+            normalize_vectors: false,
+            vector_cardinality: VectorCardinality::Single,
+            flags: vec![],
+            entity: IndexEntity::Paragraph,
+        }
+    }
+
+    pub const fn for_relations(vector_type: VectorType) -> Self {
+        Self {
+            vector_type,
+            similarity: Similarity::Dot,
+            normalize_vectors: false,
+            vector_cardinality: VectorCardinality::Single,
+            flags: vec![],
+            entity: IndexEntity::Relation,
+        }
+    }
+
     pub fn similarity_function(&self) -> fn(&[u8], &[u8]) -> f32 {
         match (&self.similarity, &self.vector_type) {
             (Similarity::Dot, VectorType::DenseF32 { .. }) => dense_f32::dot_similarity,
@@ -146,7 +175,7 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
             vector_type,
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
-            disable_indexes: false,
+            entity: IndexEntity::Paragraph,
         })
     }
 }

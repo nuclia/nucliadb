@@ -421,7 +421,7 @@ mod tests {
     use std::io::{Seek, Write};
 
     use nidx_protos::StringList;
-    use nidx_vector::config::{Similarity, VectorCardinality, VectorConfig, VectorType};
+    use nidx_vector::config::{VectorConfig, VectorType};
     use tempfile::tempfile;
     use uuid::Uuid;
 
@@ -429,14 +429,7 @@ mod tests {
     use crate::metadata::NidxMetadata;
     use nidx_tests::*;
 
-    const VECTOR_CONFIG: VectorConfig = VectorConfig {
-        similarity: Similarity::Cosine,
-        normalize_vectors: false,
-        vector_type: VectorType::DenseF32 { dimension: 3 },
-        flags: vec![],
-        vector_cardinality: VectorCardinality::Single,
-        disable_indexes: false,
-    };
+    const VECTOR_CONFIG: VectorConfig = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 3 });
 
     #[sqlx::test]
     async fn test_index_resource(pool: sqlx::PgPool) {

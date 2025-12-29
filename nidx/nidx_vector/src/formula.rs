@@ -95,6 +95,9 @@ impl Formula {
     {
         self.clauses.push(clause.into())
     }
+    pub fn non_empty(&self) -> bool {
+        !self.clauses.is_empty()
+    }
 }
 
 impl Default for Formula {
