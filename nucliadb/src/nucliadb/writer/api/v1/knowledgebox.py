@@ -17,10 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 from functools import partial
 
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 from fastapi_versioning import version
 from starlette.requests import Request
 
@@ -184,7 +183,7 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> Kn
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
-async def delete_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
+async def delete_kb(request: Request, kbid: str, background: BackgroundTasks) -> KnowledgeBoxObj:
     driver = get_driver()
     try:
         await KnowledgeBox.delete(driver, kbid=kbid)
@@ -208,6 +207,6 @@ async def delete_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
     # be nice and notify processing this KB is being deleted so we waste
     # resources
     processing = get_processing()
-    asyncio.create_task(processing.delete_from_processing(kbid=kbid))
+    background.add_task(processing.delete_from_processing, kbid=kbid)
 
     return KnowledgeBoxObj(uuid=kbid)

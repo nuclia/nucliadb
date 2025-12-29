@@ -24,7 +24,6 @@ ignore = [
   "E701",
   "F541",
   "F901",
-  "RUF006", # dangling asyncio tasks, we sometimes create a task and exit the endpoint
 ]
 
 [lint.isort]

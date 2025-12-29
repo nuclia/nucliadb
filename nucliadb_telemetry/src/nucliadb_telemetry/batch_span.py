@@ -87,6 +87,7 @@ class BatchSpanProcessor(SpanProcessor):
         self._spans_dropped = False
         # precallocated list to send spans to exporter
         self.spans_list: list[Span | None] = [None] * self.max_export_batch_size
+        self.notify_tasks: set[asyncio.Task[None]] = set()
 
     def on_start(self, span: Span, parent_context: Context | None = None) -> None:
         pass
@@ -114,7 +115,9 @@ class BatchSpanProcessor(SpanProcessor):
             logger.exception(e)
 
         if self.queue.qsize() >= self.max_export_batch_size:
-            asyncio.create_task(self.notify())
+            task = asyncio.create_task(self.notify())
+            self.notify_tasks.add(task)
+            task.add_done_callback(self.notify_tasks.discard)
 
     async def notify(self):
         async with self.condition:
