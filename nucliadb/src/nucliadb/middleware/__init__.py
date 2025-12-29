@@ -81,16 +81,18 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
         if response.status_code in (412, 422) and counter.get_count() < self.max_logs:
             counter.log_event()
 
-            chunks = []
+            response_body = b""
+            chunk: bytes
             async for chunk in response.body_iterator:  # type: ignore
-                chunks.append(chunk)
-            response_body = b"".join(chunks)
+                response_body += chunk
+
             logger.info(
-                f"Client error. Response payload: {response_body.decode('utf-8')}",
+                f"Client payload validation error",
                 extra={
                     "request_method": request.method,
                     "request_path": request.url.path,
                     "response_status_code": response.status_code,
+                    "response_payload": response_body.decode("utf-8", errors="replace"),
                 },
             )
             # Recreate the response body iterator since it has been consumed
