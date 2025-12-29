@@ -39,6 +39,7 @@ from typing import (
 import httpx
 import orjson
 from httpx._transports.base import AsyncBaseTransport, BaseTransport
+from nuclia_models.common.consumption import Consumption
 from nuclia_models.predict.run_agents import RunTextAgentsRequest, RunTextAgentsResponse
 from pydantic import BaseModel, ValidationError
 
@@ -85,6 +86,7 @@ from nucliadb_models.search import (
     CatalogRequest,
     CatalogResponse,
     CitationsAskResponseItem,
+    ConsumptionResponseItem,
     DebugAskResponseItem,
     ErrorAskResponseItem,
     FeedbackRequest,
@@ -492,6 +494,7 @@ def _parse_ask_response_lines(lines_iter: Iterator[str], learning_id: str) -> Sy
     error: Optional[str] = None
     debug = None
     augmented_context: Optional[AugmentedContext] = None
+    consumption: Optional[Consumption] = None
     for line in lines_iter:
         try:
             item = AskResponseItem.model_validate_json(line).item
@@ -525,6 +528,11 @@ def _parse_ask_response_lines(lines_iter: Iterator[str], learning_id: str) -> Sy
                 debug = item.metadata
             elif isinstance(item, AugmentedContextResponseItem):
                 augmented_context = item.augmented
+            elif isinstance(item, ConsumptionResponseItem):
+                consumption = Consumption(
+                    normalized_tokens=item.normalized_tokens,
+                    customer_key_tokens=item.customer_key_tokens,
+                )
             else:
                 warnings.warn(f"Unknown item in ask endpoint response: {item}")
         except ValidationError:
@@ -552,6 +560,7 @@ def _parse_ask_response_lines(lines_iter: Iterator[str], learning_id: str) -> Sy
             "debug": debug,
             "metadata": SyncAskMetadata(tokens=tokens, timings=timings),
             "augmented_context": augmented_context,
+            "consumption": consumption,
         }
     )
 
