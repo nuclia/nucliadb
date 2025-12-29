@@ -25,6 +25,7 @@ from nucliadb_models.search import (
     AskTimings,
     AskTokens,
     CitationsAskResponseItem,
+    ConsumptionResponseItem,
     DirectionalRelation,
     EntitySubgraph,
     EntityType,
@@ -133,6 +134,12 @@ def test_ask_response_parser_stream():
             timings=AskTimings(generative_first_chunk=0.1, generative_total=0.2),
         ),
         CitationsAskResponseItem(citations={"some/paragraph/id": "This is a citation"}),
+        ConsumptionResponseItem.model_validate(
+            {
+                "normalized_tokens": {"input": 1, "output": 2, "image": 3},
+                "customer_key_tokens": {"input": 4, "output": 5, "image": 6},
+            }
+        ),
     ]
     raw_lines = [AskResponseItem(item=item).model_dump_json() for item in items]
     response = unittest.mock.Mock()
@@ -158,6 +165,12 @@ def test_ask_response_parser_stream():
     assert ask_response.metadata.tokens.output_nuclia == 0.005
     assert ask_response.metadata.timings.generative_first_chunk == 0.1
     assert ask_response.metadata.timings.generative_total == 0.2
+    assert ask_response.consumption.normalized_tokens.input == 1
+    assert ask_response.consumption.normalized_tokens.output == 2
+    assert ask_response.consumption.normalized_tokens.image == 3
+    assert ask_response.consumption.customer_key_tokens.input == 4
+    assert ask_response.consumption.customer_key_tokens.output == 5
+    assert ask_response.consumption.customer_key_tokens.image == 6
 
 
 async def test_ask_response_parser_async_stream():
