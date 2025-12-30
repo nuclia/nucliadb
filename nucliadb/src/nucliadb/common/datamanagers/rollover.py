@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 
 import orjson
 from pydantic import BaseModel
@@ -56,7 +56,7 @@ class RolloverStateNotFoundError(Exception):
     ...
 
 
-async def get_kb_rollover_shards(txn: Transaction, *, kbid: str) -> Optional[writer_pb2.Shards]:
+async def get_kb_rollover_shards(txn: Transaction, *, kbid: str) -> writer_pb2.Shards | None:
     key = KB_ROLLOVER_SHARDS.format(kbid=kbid)
     return await get_kv_pb(txn, key, writer_pb2.Shards)
 
@@ -90,7 +90,7 @@ async def add_batch_to_index(txn: Transaction, *, kbid: str, batch: list[str]) -
         await txn.set(key, b"")
 
 
-async def get_to_index(txn: Transaction, *, kbid: str, count: int) -> Optional[list[str]]:
+async def get_to_index(txn: Transaction, *, kbid: str, count: int) -> list[str] | None:
     key = KB_ROLLOVER_RESOURCES_TO_INDEX.format(kbid=kbid, resource="")
     found = [key async for key in txn.keys(key, count=count)]
     if found:
@@ -118,9 +118,7 @@ async def add_indexed(
     await txn.set(indexed, orjson.dumps(data))
 
 
-async def get_indexed_data(
-    txn: Transaction, *, kbid: str, resource_id: str
-) -> Optional[tuple[str, int]]:
+async def get_indexed_data(txn: Transaction, *, kbid: str, resource_id: str) -> tuple[str, int] | None:
     key = KB_ROLLOVER_RESOURCES_INDEXED.format(kbid=kbid, resource=resource_id)
     val = await txn.get(key)
     if val is not None:
@@ -213,7 +211,7 @@ async def update_kb_rollover_external_index_metadata(
 
 async def get_kb_rollover_external_index_metadata(
     txn: Transaction, *, kbid: str
-) -> Optional[kb_pb2.StoredExternalIndexProviderMetadata]:
+) -> kb_pb2.StoredExternalIndexProviderMetadata | None:
     key = KB_ROLLOVER_EXTERNAL_INDEX_METADATA.format(kbid=kbid)
     val = await txn.get(key)
     if not val:

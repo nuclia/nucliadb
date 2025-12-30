@@ -20,6 +20,7 @@
 import logging
 import time
 from collections import deque
+from typing import ClassVar
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -67,7 +68,7 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
     misbehaving clients.
     """
 
-    log_counters: dict[str, "HourlyLogCounter"] = {}
+    log_counters: ClassVar[dict[str, "HourlyLogCounter"]] = {}
     max_logs: int = 200
 
     def get_request_host(self, request: Request) -> str:

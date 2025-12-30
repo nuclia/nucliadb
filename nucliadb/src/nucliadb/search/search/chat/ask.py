@@ -20,7 +20,8 @@
 import dataclasses
 import functools
 import json
-from typing import AsyncGenerator, Optional, Union, cast
+from collections.abc import AsyncGenerator
+from typing import cast
 
 from nuclia_models.common.consumption import Consumption
 from nuclia_models.predict.generative_responses import (
@@ -141,7 +142,7 @@ class RetrievalResults:
     main_query: KnowledgeboxFindResults
     fetcher: Fetcher
     main_query_weight: float
-    prequeries: Optional[list[PreQueryResult]] = None
+    prequeries: list[PreQueryResult] | None = None
     best_matches: list[RetrievalMatch] = dataclasses.field(default_factory=list)
 
 
@@ -152,15 +153,15 @@ class AskResult:
         kbid: str,
         ask_request: AskRequest,
         main_results: KnowledgeboxFindResults,
-        prequeries_results: Optional[list[PreQueryResult]],
-        nuclia_learning_id: Optional[str],
-        predict_answer_stream: Optional[AsyncGenerator[GenerativeChunk, None]],
+        prequeries_results: list[PreQueryResult] | None,
+        nuclia_learning_id: str | None,
+        predict_answer_stream: AsyncGenerator[GenerativeChunk, None] | None,
         prompt_context: PromptContext,
         prompt_context_order: PromptContextOrder,
         auditor: ChatAuditor,
         metrics: AskMetrics,
         best_matches: list[RetrievalMatch],
-        debug_chat_model: Optional[ChatModel],
+        debug_chat_model: ChatModel | None,
         augmented_context: AugmentedContext,
     ):
         # Initial attributes
@@ -180,14 +181,14 @@ class AskResult:
 
         # Computed from the predict chat answer stream
         self._answer_text = ""
-        self._reasoning_text: Optional[str] = None
-        self._object: Optional[JSONGenerativeResponse] = None
-        self._status: Optional[StatusGenerativeResponse] = None
-        self._citations: Optional[CitationsGenerativeResponse] = None
-        self._footnote_citations: Optional[FootnoteCitationsGenerativeResponse] = None
-        self._metadata: Optional[MetaGenerativeResponse] = None
-        self._relations: Optional[Relations] = None
-        self._consumption: Optional[Consumption] = None
+        self._reasoning_text: str | None = None
+        self._object: JSONGenerativeResponse | None = None
+        self._status: StatusGenerativeResponse | None = None
+        self._citations: CitationsGenerativeResponse | None = None
+        self._footnote_citations: FootnoteCitationsGenerativeResponse | None = None
+        self._metadata: MetaGenerativeResponse | None = None
+        self._relations: Relations | None = None
+        self._consumption: Consumption | None = None
 
     @property
     def status_code(self) -> AnswerStatusCode:
@@ -196,7 +197,7 @@ class AskResult:
         return AnswerStatusCode(self._status.code)
 
     @property
-    def status_error_details(self) -> Optional[str]:
+    def status_error_details(self) -> str | None:
         if self._status is None:  # pragma: no cover
             return None
         return self._status.details
@@ -403,7 +404,7 @@ class AskResult:
         if self._object is not None:
             answer_json = self._object.object
 
-        prequeries_results: Optional[dict[str, KnowledgeboxFindResults]] = None
+        prequeries_results: dict[str, KnowledgeboxFindResults] | None = None
         if self.prequeries_results:
             prequeries_results = {}
             for index, (prequery, result) in enumerate(self.prequeries_results):
@@ -459,7 +460,7 @@ class AskResult:
 
     async def _stream_predict_answer_text(
         self,
-    ) -> AsyncGenerator[Union[TextGenerativeResponse, ReasoningGenerativeResponse], None]:
+    ) -> AsyncGenerator[TextGenerativeResponse | ReasoningGenerativeResponse, None]:
         """
         Reads the stream of the generative model, yielding the answer text but also parsing
         other items like status codes, citations and miscellaneous metadata.
@@ -503,8 +504,8 @@ class AskResult:
 class NotEnoughContextAskResult(AskResult):
     def __init__(
         self,
-        main_results: Optional[KnowledgeboxFindResults] = None,
-        prequeries_results: Optional[list[PreQueryResult]] = None,
+        main_results: KnowledgeboxFindResults | None = None,
+        prequeries_results: list[PreQueryResult] | None = None,
     ):
         self.main_results = main_results or KnowledgeboxFindResults(resources={}, min_score=None)
         self.prequeries_results = prequeries_results or []
@@ -554,8 +555,8 @@ async def ask(
     user_id: str,
     client_type: NucliaDBClientType,
     origin: str,
-    resource: Optional[str] = None,
-    extra_predict_headers: Optional[dict[str, str]] = None,
+    resource: str | None = None,
+    extra_predict_headers: dict[str, str] | None = None,
 ) -> AskResult:
     metrics = AskMetrics()
     chat_history = ask_request.chat_history or []
@@ -778,7 +779,7 @@ def handled_ask_exceptions(func):
     return wrapper
 
 
-def parse_prequeries(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:
+def parse_prequeries(ask_request: AskRequest) -> PreQueriesStrategy | None:
     query_ids = []
     for rag_strategy in ask_request.rag_strategies:
         if rag_strategy.name == RagStrategyName.PREQUERIES:
@@ -797,7 +798,7 @@ def parse_prequeries(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:
     return None
 
 
-def parse_graph_strategy(ask_request: AskRequest) -> Optional[GraphStrategy]:
+def parse_graph_strategy(ask_request: AskRequest) -> GraphStrategy | None:
     for rag_strategy in ask_request.rag_strategies:
         if rag_strategy.name == RagStrategyName.GRAPH:
             return cast(GraphStrategy, rag_strategy)
@@ -812,7 +813,7 @@ async def retrieval_step(
     user_id: str,
     origin: str,
     metrics: Metrics,
-    resource: Optional[str] = None,
+    resource: str | None = None,
 ) -> RetrievalResults:
     """
     This function encapsulates all the logic related to retrieval in the ask endpoint.
@@ -970,7 +971,7 @@ class _FindParagraph(ScoredTextBlock):
 
 def compute_best_matches(
     main_results: KnowledgeboxFindResults,
-    prequeries_results: Optional[list[PreQueryResult]] = None,
+    prequeries_results: list[PreQueryResult] | None = None,
     main_query_weight: float = 1.0,
 ) -> list[RetrievalMatch]:
     """
@@ -1041,7 +1042,7 @@ def compute_best_matches(
 
 def calculate_prequeries_for_json_schema(
     ask_request: AskRequest,
-) -> Optional[PreQueriesStrategy]:
+) -> PreQueriesStrategy | None:
     """
     This function generates a PreQueriesStrategy with a query for each property in the JSON schema
     found in ask_request.answer_json_schema.

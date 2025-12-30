@@ -33,11 +33,11 @@ def is_versioned_route(route):
 
 
 def extract_openapi(application, version, commit_id, app_name):
-    app = [
+    app = next(
         route.app
         for route in application.routes
         if is_versioned_route(route) and route.app.version == version
-    ][0]
+    )
     document = get_openapi(
         title=app.title,
         version=app.version,

@@ -22,7 +22,7 @@ import logging
 import os
 import platform
 import sys
-from typing import Iterator
+from collections.abc import Iterator
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -70,7 +70,7 @@ def get_platform():
         # If we are on Linux, we can return the architecture directly
         return "linux/amd64"
     else:
-        raise ValueError("Unsupported platform: {}".format(sys.platform))
+        raise ValueError(f"Unsupported platform: {sys.platform}")
 
 
 images.settings["nidx"] = {

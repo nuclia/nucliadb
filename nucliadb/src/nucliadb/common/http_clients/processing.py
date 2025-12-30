@@ -19,7 +19,6 @@
 #
 import logging
 from datetime import datetime
-from typing import Optional
 
 import aiohttp
 import pydantic
@@ -54,10 +53,10 @@ def get_processing_api_v2_url() -> str:
 
 class PullResponse(pydantic.BaseModel):
     status: str
-    payload: Optional[str] = None
+    payload: str | None = None
     payloads: list[bytes] = []
-    msgid: Optional[str] = None
-    cursor: Optional[int] = None
+    msgid: str | None = None
+    cursor: int | None = None
 
 
 class PullPosition(pydantic.BaseModel):
@@ -76,7 +75,7 @@ class RequestsResult(pydantic.BaseModel):
         description="Resource ID.",
     )
     kbid: str = pydantic.Field(..., title="KnowledgeBox ID")
-    title: Optional[str] = pydantic.Field(
+    title: str | None = pydantic.Field(
         None,
         title="Title",
         description="Title of the resource.",
@@ -101,12 +100,12 @@ class RequestsResult(pydantic.BaseModel):
         title="Timestamp",
         description="Timestamp of when the resource was first scheduled.",
     )
-    completed_at: Optional[datetime] = pydantic.Field(
+    completed_at: datetime | None = pydantic.Field(
         None,
         title="Completed At",
         description="Timestamp of when the resource was completed",
     )
-    scheduled_at: Optional[datetime] = pydantic.Field(
+    scheduled_at: datetime | None = pydantic.Field(
         None,
         title="Scheduled At",
         description="Timestamp of when the resource was first scheduled.",
@@ -139,7 +138,7 @@ class RequestsResults(pydantic.BaseModel):
         title="Results",
         description="List of results.",
     )
-    cursor: Optional[str] = pydantic.Field(
+    cursor: str | None = pydantic.Field(
         None,
         title="Cursor",
         description="Cursor to use for the next page of results.",
@@ -214,7 +213,7 @@ class ProcessingHTTPClient:
 
     async def pull_v2(
         self, ack_tokens: list[str], limit: int = 1, timeout: float = 5
-    ) -> Optional[PullResponseV2]:
+    ) -> PullResponseV2 | None:
         url = self.base_url_v2 + "/pull"
         request = PullRequestV2(limit=limit, timeout=timeout, ack=ack_tokens)
         async with self.session.post(
@@ -238,9 +237,9 @@ class ProcessingHTTPClient:
 
     async def requests(
         self,
-        cursor: Optional[str] = None,
-        scheduled: Optional[bool] = None,
-        kbid: Optional[str] = None,
+        cursor: str | None = None,
+        scheduled: bool | None = None,
+        kbid: str | None = None,
         limit: int = 20,
     ) -> RequestsResults:
         url = self.base_url + "/requests"
@@ -257,7 +256,7 @@ class ProcessingHTTPClient:
             check_status(resp, resp_text)
             return RequestsResults.model_validate_json(resp_text)
 
-    async def stats(self, kbid: str, timeout: Optional[float] = 1.0) -> StatsResponse:
+    async def stats(self, kbid: str, timeout: float | None = 1.0) -> StatsResponse:
         url = self.base_url + "/stats"
         async with self.session.get(
             url,

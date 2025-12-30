@@ -24,7 +24,6 @@ Backfill field status (from error)
 """
 
 import logging
-from typing import Optional
 
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb_protos import resources_pb2, writer_pb2
@@ -33,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 async def migrate(context: ExecutionContext) -> None:
-    start: Optional[str] = ""
+    start: str | None = ""
     while True:
         if start is None:
             break
@@ -43,7 +42,7 @@ async def migrate(context: ExecutionContext) -> None:
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None: ...
 
 
-async def do_batch(context: ExecutionContext, start: str) -> Optional[str]:
+async def do_batch(context: ExecutionContext, start: str) -> str | None:
     logger.info(f"Running batch from {start}")
     async with context.kv_driver.rw_transaction() as txn:
         async with txn.connection.cursor() as cur:  # type: ignore
@@ -64,7 +63,7 @@ async def do_batch(context: ExecutionContext, start: str) -> Optional[str]:
             field_keys = [r[0] for r in records]
 
             # Retrieve resources basic (to check status)
-            resource_keys = set(["/".join(f.split("/")[:5]) for f in field_keys])
+            resource_keys = {"/".join(f.split("/")[:5]) for f in field_keys}
             await cur.execute(
                 """
                 SELECT key, value FROM resources

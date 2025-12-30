@@ -19,7 +19,6 @@
 #
 import types
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -36,4 +35,4 @@ class KnowledgeBoxInfo:
 @dataclass
 class GlobalInfo:
     current_version: int
-    target_version: Optional[int] = None
+    target_version: int | None = None

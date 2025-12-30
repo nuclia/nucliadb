@@ -87,7 +87,7 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
 
     file_field = bmb.field_builder("file", rpb.FieldType.FILE)
     file_field.with_extracted_text(
-        "My own text Ramon. This is great to be here. \n Where is my beer? Do you want to go shooping? This is a test!"  # noqa
+        "My own text Ramon. This is great to be here. \n Where is my beer? Do you want to go shooping? This is a test!"
     )
 
     labelset = "labelset_paragraphs"

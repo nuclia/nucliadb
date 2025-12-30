@@ -47,7 +47,7 @@ async def test_get_resource_field_default_options(
     data = resp.json()
 
     # DEBUG
-    # import json  # noqa
+    # import json
     # print(json.dumps(data, indent=4))
 
     expected_root_fields = set(BASE + VALUE)
@@ -87,7 +87,7 @@ async def test_get_resource_field_all(nucliadb_reader: AsyncClient, test_resourc
     data = resp.json()
 
     # DEBUG
-    # import json  # noqa
+    # import json
     # print(json.dumps(data, indent=4))
 
     expected_root_fields = set(BASE + VALUE + EXTRACTED)
@@ -165,7 +165,7 @@ async def test_get_resource_field_conversation(
     data = resp.json()
 
     # DEBUG
-    # import json  # noqa
+    # import json
     # print(json.dumps(data, indent=4))
 
     expected_root_fields = set(BASE + VALUE)

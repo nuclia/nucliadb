@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from enum import Enum
-from typing import Dict, List, Optional
 
 from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings
@@ -26,7 +25,7 @@ from pydantic_settings import BaseSettings
 
 class RunningSettings(BaseSettings):
     debug: bool = False
-    sentry_url: Optional[str] = None
+    sentry_url: str | None = None
     running_environment: str = Field(
         default="local",
         validation_alias=AliasChoices("environment", "running_environment"),
@@ -42,7 +41,7 @@ running_settings = RunningSettings()
 
 
 class HTTPSettings(BaseSettings):
-    cors_origins: List[str] = ["*"]
+    cors_origins: list[str] = ["*"]
 
 
 http_settings = HTTPSettings()
@@ -70,47 +69,47 @@ class StorageSettings(BaseSettings):
         default=FileBackendConfig.NOT_SET, description="File backend storage type"
     )
 
-    gcs_base64_creds: Optional[str] = Field(
+    gcs_base64_creds: str | None = Field(
         default=None,
-        description="GCS JSON credentials of a service account encoded in Base64: https://cloud.google.com/iam/docs/service-account-overview",  # noqa
+        description="GCS JSON credentials of a service account encoded in Base64: https://cloud.google.com/iam/docs/service-account-overview",
     )
-    gcs_bucket: Optional[str] = Field(
+    gcs_bucket: str | None = Field(
         default=None,
         description="GCS Bucket name where files are stored: https://cloud.google.com/storage/docs/buckets",
     )
-    gcs_location: Optional[str] = Field(
+    gcs_location: str | None = Field(
         default=None,
         description="GCS Bucket location: https://cloud.google.com/storage/docs/locations",
     )
-    gcs_project: Optional[str] = Field(
+    gcs_project: str | None = Field(
         default=None,
-        description="Google Cloud Project ID: https://cloud.google.com/resource-manager/docs/creating-managing-projects",  # noqa
+        description="Google Cloud Project ID: https://cloud.google.com/resource-manager/docs/creating-managing-projects",
     )
-    gcs_bucket_labels: Dict[str, str] = Field(
+    gcs_bucket_labels: dict[str, str] = Field(
         default={},
-        description="Map of labels with which GCS buckets will be labeled with: https://cloud.google.com/storage/docs/tags-and-labels",  # noqa
+        description="Map of labels with which GCS buckets will be labeled with: https://cloud.google.com/storage/docs/tags-and-labels",
     )
     gcs_endpoint_url: str = "https://www.googleapis.com"
 
-    s3_client_id: Optional[str] = None
-    s3_client_secret: Optional[str] = None
+    s3_client_id: str | None = None
+    s3_client_secret: str | None = None
     s3_ssl: bool = True
     s3_verify_ssl: bool = True
     s3_max_pool_connections: int = 30
-    s3_endpoint: Optional[str] = None
-    s3_region_name: Optional[str] = None
-    s3_kms_key_id: Optional[str] = None
-    s3_bucket: Optional[str] = Field(default=None, description="KnowledgeBox S3 bucket name template")
-    s3_bucket_tags: Dict[str, str] = Field(
+    s3_endpoint: str | None = None
+    s3_region_name: str | None = None
+    s3_kms_key_id: str | None = None
+    s3_bucket: str | None = Field(default=None, description="KnowledgeBox S3 bucket name template")
+    s3_bucket_tags: dict[str, str] = Field(
         default={},
-        description="Map of tags with which S3 buckets will be tagged with: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketTagging.html",  # noqa
+        description="Map of tags with which S3 buckets will be tagged with: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketTagging.html",
     )
 
-    local_files: Optional[str] = Field(
+    local_files: str | None = Field(
         default=None,
         description="If using LOCAL `file_backend` storage, directory where files should be stored",
     )
-    local_indexing_bucket: Optional[str] = Field(
+    local_indexing_bucket: str | None = Field(
         default="indexer",
         description="If using LOCAL `file_backend` storage, subdirectory where indexing data is stored",
     )
@@ -119,28 +118,28 @@ class StorageSettings(BaseSettings):
         description="Number of days that uploaded files are kept in Nulia's processing engine",
     )
 
-    azure_account_url: Optional[str] = Field(
+    azure_account_url: str | None = Field(
         default=None,
-        description="Azure Account URL. The driver implementation uses Azure's default credential authentication method: https://learn.microsoft.com/en-us/python/api/azure-identity/azure.identity.defaultazurecredential?view=azure-python",  # noqa
+        description="Azure Account URL. The driver implementation uses Azure's default credential authentication method: https://learn.microsoft.com/en-us/python/api/azure-identity/azure.identity.defaultazurecredential?view=azure-python",
         examples=["https://<storageaccountname>.blob.core.windows.net"],
     )
 
-    azure_kb_account_url: Optional[str] = Field(
+    azure_kb_account_url: str | None = Field(
         default=None,
-        description="Azure Account URL for KB containers. If unspecified, uses `azure_account_url`",  # noqa
+        description="Azure Account URL for KB containers. If unspecified, uses `azure_account_url`",
         examples=["https://<storageaccountname>.blob.core.windows.net"],
     )
 
     # For testing purposes: Azurite docker image requires a connection string as it
     # doesn't support Azure's default credential authentication method
-    azure_connection_string: Optional[str] = None
+    azure_connection_string: str | None = None
 
 
 storage_settings = StorageSettings()
 
 
 class NucliaSettings(BaseSettings):
-    nuclia_service_account: Optional[str] = None
+    nuclia_service_account: str | None = None
     nuclia_public_url: str = "https://{zone}.nuclia.cloud"
     nuclia_processing_cluster_url: str = "http://processing-api.processing.svc.cluster.local:8080"
     nuclia_inner_predict_url: str = "http://predict.learning.svc.cluster.local:8080"
@@ -149,7 +148,7 @@ class NucliaSettings(BaseSettings):
     nuclia_zone: str = "europe-1"
     onprem: bool = True
 
-    nuclia_jwt_key: Optional[str] = None
+    nuclia_jwt_key: str | None = None
     nuclia_hash_seed: int = 42
     nuclia_partitions: int = 1
 
@@ -157,7 +156,7 @@ class NucliaSettings(BaseSettings):
     dummy_predict: bool = False
     dummy_learning_services: bool = False
     local_predict: bool = False
-    local_predict_headers: Dict[str, str] = {}
+    local_predict_headers: dict[str, str] = {}
 
     @model_validator(mode="before")
     @classmethod
@@ -171,15 +170,15 @@ nuclia_settings = NucliaSettings()
 
 
 class NucliaDBSettings(BaseSettings):
-    nucliadb_ingest: Optional[str] = "ingest-orm-grpc.nucliadb.svc.cluster.local:8030"
+    nucliadb_ingest: str | None = "ingest-orm-grpc.nucliadb.svc.cluster.local:8030"
 
 
 nucliadb_settings = NucliaDBSettings()
 
 
 class TransactionSettings(BaseSettings):
-    transaction_jetstream_auth: Optional[str] = None
-    transaction_jetstream_servers: List[str] = ["nats://localhost:4222"]
+    transaction_jetstream_auth: str | None = None
+    transaction_jetstream_servers: list[str] = ["nats://localhost:4222"]
     transaction_local: bool = False
     transaction_commit_timeout: int = Field(
         default=60, description="Transaction commit timeout in seconds"
@@ -190,10 +189,10 @@ transaction_settings = TransactionSettings()
 
 
 class IndexingSettings(BaseSettings):
-    index_jetstream_servers: List[str] = []
-    index_jetstream_auth: Optional[str] = None
+    index_jetstream_servers: list[str] = []
+    index_jetstream_auth: str | None = None
     index_local: bool = False
-    index_nidx_subject: Optional[str] = None
+    index_nidx_subject: str | None = None
     index_searcher_refresh_interval: float = 1.0
 
 
@@ -202,9 +201,9 @@ indexing_settings = IndexingSettings()
 
 class AuditSettings(BaseSettings):
     audit_driver: str = "basic"
-    audit_jetstream_target: Optional[str] = "audit.{partition}.{type}"
-    audit_jetstream_servers: List[str] = []
-    audit_jetstream_auth: Optional[str] = None
+    audit_jetstream_target: str | None = "audit.{partition}.{type}"
+    audit_jetstream_servers: list[str] = []
+    audit_jetstream_auth: str | None = None
     audit_partitions: int = 3
     audit_stream: str = "audit"
     audit_hash_seed: int = 1234
@@ -214,9 +213,9 @@ audit_settings = AuditSettings()
 
 
 class UsageSettings(BaseSettings):
-    usage_jetstream_subject: Optional[str] = "kb-usage.nuclia_db"
-    usage_jetstream_servers: List[str] = []
-    usage_jetstream_auth: Optional[str] = None
+    usage_jetstream_subject: str | None = "kb-usage.nuclia_db"
+    usage_jetstream_servers: list[str] = []
+    usage_jetstream_auth: str | None = None
     usage_stream: str = "kb-usage"
 
 

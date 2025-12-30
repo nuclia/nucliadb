@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import AsyncGenerator, Type
+from collections.abc import AsyncGenerator
 
 import aiohttp
 
@@ -26,7 +26,7 @@ from nucliadb.train.types import T
 
 async def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
-    pb_klass: Type[T],
+    pb_klass: type[T],
 ) -> AsyncGenerator[T, None]:
     while True:
         header = await response.content.read(4)

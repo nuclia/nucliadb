@@ -20,7 +20,7 @@
 
 
 import asyncio
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from nidx_protos.noderesources_pb2 import Resource as IndexMessage
 
@@ -70,8 +70,8 @@ class IndexMessageBuilder:
         vectors: bool = True,
         relations: bool = True,
         replace: bool = True,
-        vectorset_configs: Optional[list[VectorSetConfig]] = None,
-        append_splits: Optional[set[str]] = None,
+        vectorset_configs: list[VectorSetConfig] | None = None,
+        append_splits: set[str] | None = None,
     ):
         field = await self.resource.get_field(fieldid.field, fieldid.field_type)
         extracted_text = await field.get_extracted_text()

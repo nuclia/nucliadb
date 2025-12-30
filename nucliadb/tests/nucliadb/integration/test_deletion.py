@@ -223,7 +223,7 @@ async def test_paragraph_index_deletions(
     fields = resp_json["resources"][rid]["fields"]
     assert len(fields) == 1
     assert len(fields["/t/text"]["paragraphs"]) == 1
-    paragraph_id = list(fields["/t/text"]["paragraphs"].keys())[0]
+    paragraph_id = next(iter(fields["/t/text"]["paragraphs"].keys()))
     assert paragraph_id == f"{rid}/t/text/0-{len(text_field.extracted_text)}"
     fields["/t/text"]["paragraphs"][paragraph_id]["text"] == text_field.extracted_text
 

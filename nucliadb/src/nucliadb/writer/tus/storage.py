@@ -19,7 +19,7 @@
 #
 from __future__ import annotations
 
-from typing import AsyncIterator, Optional
+from collections.abc import AsyncIterator
 
 from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -47,13 +47,13 @@ class BlobStore:
 
 class FileStorageManager:
     chunk_size: int
-    min_upload_size: Optional[int] = None
+    min_upload_size: int | None = None
 
     def __init__(self, storage: BlobStore):
         self.storage = storage
 
     def iter_data(
-        self, uri: str, kbid: str, headers: Optional[dict[str, str]] = None
+        self, uri: str, kbid: str, headers: dict[str, str] | None = None
     ) -> AsyncIterator[bytes]:
         raise NotImplementedError()
 

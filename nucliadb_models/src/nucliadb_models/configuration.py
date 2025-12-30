@@ -14,7 +14,7 @@
 #
 
 import warnings
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, create_model
 
@@ -28,11 +28,11 @@ class KBConfiguration(BaseModel):
         super().__init__(**data)
 
     # Do not touch this model synced on Processing side
-    semantic_model: Optional[str] = None
-    generative_model: Optional[str] = None
-    ner_model: Optional[str] = None
-    anonymization_model: Optional[str] = None
-    visual_labeling: Optional[str] = None
+    semantic_model: str | None = None
+    generative_model: str | None = None
+    ner_model: str | None = None
+    anonymization_model: str | None = None
+    visual_labeling: str | None = None
 
 
 #
@@ -57,7 +57,7 @@ class FindSearchConfiguration(BaseModel):
 AskConfig = create_model(
     "AskConfig",
     **_model_fields(AskRequest, skip=["query", "search_configuration"]),
-    query=(Optional[str], None),
+    query=(str | None, None),
 )
 
 
@@ -67,7 +67,7 @@ class AskSearchConfiguration(BaseModel):
 
 
 SearchConfiguration = Annotated[
-    Union[FindSearchConfiguration, AskSearchConfiguration], Field(discriminator="kind")
+    FindSearchConfiguration | AskSearchConfiguration, Field(discriminator="kind")
 ]
 
 # We need this to avoid issues with pydantic and generic types defined in another module

@@ -54,7 +54,7 @@ def display_top(snapshot, key_type="lineno", limit=10):  # pragma: no cover
     print(f"Top {limit} lines")
     for index, stat in enumerate(top_stats[:limit], 1):
         frame = stat.traceback[0]
-        print("#%s: %s:%s: %.1f KiB" % (index, frame.filename, frame.lineno, stat.size / 1024))
+        print(f"#{index}: {frame.filename}:{frame.lineno}: {stat.size / 1024:.1f} KiB")
         line = linecache.getline(frame.filename, frame.lineno).strip()
         if line:
             print("    %s" % line)
@@ -62,6 +62,6 @@ def display_top(snapshot, key_type="lineno", limit=10):  # pragma: no cover
     other = top_stats[limit:]
     if other:
         size = sum(stat.size for stat in other)
-        print("%s other: %.1f KiB" % (len(other), size / 1024))
+        print(f"{len(other)} other: {size / 1024:.1f} KiB")
     total = sum(stat.size for stat in top_stats)
     print("Total allocated size: %.1f KiB" % (total / 1024))

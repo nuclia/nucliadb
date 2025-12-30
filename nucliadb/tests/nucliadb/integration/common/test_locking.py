@@ -75,4 +75,4 @@ async def test_distributed_lock_in_parallel(maindb_driver):
 
     # Check that 4 out of 5 tasks returned ResourceLocked error
     locked_count = sum([1 if isinstance(r, locking.ResourceLocked) else 0 for r in results])
-    assert locked_count == 4, print(results)
+    assert locked_count == 4, f"{results}"

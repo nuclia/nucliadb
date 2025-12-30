@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
 
 from pydantic import BaseModel
 
 
 class PushProcessingOptions(BaseModel):
-    ml_text: Optional[bool] = True
+    ml_text: bool | None = True

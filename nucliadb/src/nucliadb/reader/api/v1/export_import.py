@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncGenerator, AsyncIterable, Union
+from collections.abc import AsyncGenerator, AsyncIterable
 
 from fastapi.responses import StreamingResponse
 from fastapi_versioning import version
@@ -108,7 +108,7 @@ async def download_export_and_delete(
 @version(1)
 async def get_export_status_endpoint(
     request: Request, kbid: str, export_id: str
-) -> Union[StatusResponse, HTTPClientError]:
+) -> StatusResponse | HTTPClientError:
     context = get_app_context(request.app)
     if not await exists_kb(kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
@@ -127,7 +127,7 @@ async def get_export_status_endpoint(
 @version(1)
 async def get_import_status_endpoint(
     request: Request, kbid: str, import_id: str
-) -> Union[StatusResponse, HTTPClientError]:
+) -> StatusResponse | HTTPClientError:
     context = get_app_context(request.app)
     if not await exists_kb(kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
@@ -137,7 +137,7 @@ async def get_import_status_endpoint(
 
 async def _get_status(
     context: ApplicationContext, type: str, kbid: str, id: str
-) -> Union[StatusResponse, HTTPClientError]:
+) -> StatusResponse | HTTPClientError:
     if type not in ("export", "import"):
         raise ValueError(f"Incorrect type: {type}")
 

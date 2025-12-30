@@ -204,7 +204,7 @@ async def test_field_with_many_entities(
     body = resp.json()
 
     assert len(body["resources"]) == 1
-    text = list(body["resources"].values())[0]["data"]["texts"]["text1"]
+    text = next(iter(body["resources"].values()))["data"]["texts"]["text1"]
     assert text["status"] == "PROCESSED"
     assert len(text["errors"]) == 1
     assert "Too many detected entities" in text["errors"][0]["body"]
@@ -223,7 +223,7 @@ async def test_field_with_many_entities(
     body = resp.json()
 
     assert len(body["resources"]) == 1
-    text = list(body["resources"].values())[0]["data"]["texts"]["text1"]
+    text = next(iter(body["resources"].values()))["data"]["texts"]["text1"]
     assert text["status"] == "PROCESSED"
     assert "errors" not in text
 
@@ -283,7 +283,7 @@ async def test_field_with_many_paragraphs(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == 1
-    resource = list(body["resources"].values())[0]
+    resource = next(iter(body["resources"].values()))
     assert resource["metadata"]["status"] == "ERROR"
     text = resource["data"]["texts"]["text1"]
     assert text["status"] == "ERROR"
@@ -312,7 +312,7 @@ async def test_field_with_many_paragraphs(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == 1
-    resource = list(body["resources"].values())[0]
+    resource = next(iter(body["resources"].values()))
     assert resource["metadata"]["status"] == "PROCESSED"
     text = resource["data"]["texts"]["text1"]
     assert text["status"] == "PROCESSED"

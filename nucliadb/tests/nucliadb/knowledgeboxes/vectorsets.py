@@ -19,8 +19,8 @@
 #
 
 import uuid
+from collections.abc import AsyncIterable
 from dataclasses import dataclass
-from typing import AsyncIterable, Optional
 
 import pytest
 from httpx import AsyncClient
@@ -33,7 +33,7 @@ from tests.utils import inject_message
 @dataclass
 class KbSpecs:
     kbid: str
-    default_vector_dimension: Optional[int]
+    default_vector_dimension: int | None
     vectorset_id: str
     vectorset_dimension: int
 
@@ -68,7 +68,7 @@ async def inject_broker_message_with_vectorset_data(
     kbid: str,
     vectorset_id: str,
     *,
-    default_vector_dimension: Optional[int] = None,
+    default_vector_dimension: int | None = None,
     vectorset_dimension: int,
 ):
     from tests.ingest.integration.ingest.test_vectorsets import (

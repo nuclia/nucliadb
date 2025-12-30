@@ -27,7 +27,7 @@ async def test_run_until_exit():
     loop = MagicMock()
     with patch("nucliadb_utils.run.asyncio.get_running_loop", return_value=loop):
         finalizer = AsyncMock()
-        asyncio.create_task(run.run_until_exit([finalizer], sleep=0.01))
+        task = asyncio.create_task(run.run_until_exit([finalizer], sleep=0.01))
 
         await asyncio.sleep(0.05)
 
@@ -38,6 +38,8 @@ async def test_run_until_exit():
         await asyncio.sleep(0.05)
 
         finalizer.assert_called_once()
+
+        task.cancel()
 
 
 async def test_run_until_exit_handles_hard_exit():

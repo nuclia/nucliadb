@@ -18,7 +18,6 @@ import math
 import socket
 from asyncio import Future
 from functools import partial
-from typing import List
 
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 from opentelemetry.exporter.jaeger.thrift.gen.agent import Agent
@@ -37,14 +36,14 @@ UDP_PACKET_MAX_LENGTH = 65000
 
 class JaegerExporterAsync(JaegerExporter):
     def __init__(self, **kwags):
-        super(JaegerExporterAsync, self).__init__(**kwags)
+        super().__init__(**kwags)
         self._agent_client = AgentClientUDPAsync(
             host_name=self.agent_host_name,
             port=self.agent_port,
             split_oversized_batches=self.udp_split_oversized_batches,
         )
 
-    async def async_export(self, spans: List[Span]) -> SpanExportResult:
+    async def async_export(self, spans: list[Span]) -> SpanExportResult:
         # Populate service_name from first span
         # We restrict any SpanProcessor to be only associated with a single
         # TracerProvider, so it is safe to assume that all Spans in a single

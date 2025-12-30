@@ -14,7 +14,6 @@
 #
 
 from pathlib import Path
-from typing import Optional
 
 import pydantic
 from pydantic_settings import BaseSettings
@@ -35,20 +34,20 @@ class RunningSettings(BaseSettings):
     download_path: str = pydantic.Field(f"{Path.home()}/.nuclia/download", description="Download path")
     url: str = pydantic.Field(description="KnowledgeBox URL")
     type: Task = pydantic.Field(description="Dataset Type")
-    labelset: Optional[str] = pydantic.Field(
+    labelset: str | None = pydantic.Field(
         None, description="For classification which labelset or families"
     )
 
     datasets_url: str = pydantic.Field(
         "https://europe-1.nuclia.cloud",
-        description="Base url for the Nuclia datasets component (excluding /api/v1)™",  # noqa
+        description="Base url for the Nuclia datasets component (excluding /api/v1)™",
     )
 
-    apikey: Optional[str] = pydantic.Field(None, description="API key to upload to Nuclia Datasets™")
+    apikey: str | None = pydantic.Field(None, description="API key to upload to Nuclia Datasets™")
 
     environment: str = pydantic.Field("on-prem", description="region or on-prem")
 
-    service_token: Optional[str] = pydantic.Field(
+    service_token: str | None = pydantic.Field(
         None, description="Service account key to access Nuclia Cloud"
     )
 

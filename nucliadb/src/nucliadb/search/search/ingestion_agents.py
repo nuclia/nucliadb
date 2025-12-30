@@ -19,7 +19,6 @@
 #
 import asyncio
 from base64 import b64encode
-from typing import Optional
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.base import Field
@@ -41,8 +40,8 @@ async def run_agents(
     kbid: str,
     rid: str,
     user_id: str,
-    filters: Optional[list[AgentsFilter]] = None,
-    agent_ids: Optional[list[str]] = None,
+    filters: list[AgentsFilter] | None = None,
+    agent_ids: list[str] | None = None,
 ) -> RunAgentsResponse:
     fields = await fetch_resource_fields(kbid, rid)
 
@@ -57,7 +56,7 @@ async def run_agents(
     return await predict.run_agents(kbid, item)
 
 
-def _parse_filters(filters: Optional[list[AgentsFilter]]) -> Optional[list[NameOperationFilter]]:
+def _parse_filters(filters: list[AgentsFilter] | None) -> list[NameOperationFilter] | None:
     if filters is None:
         return None
     return [

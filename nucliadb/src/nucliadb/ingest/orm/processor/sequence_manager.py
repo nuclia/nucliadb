@@ -17,14 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 from nucliadb.common.maindb.driver import Driver, Transaction
 
 TXNID = "/internal/worker/{worker}"
 
 
-async def get_last_seqid(driver: Driver, worker: str) -> Optional[int]:
+async def get_last_seqid(driver: Driver, worker: str) -> int | None:
     """
     Get last stored sequence id for a worker.
 

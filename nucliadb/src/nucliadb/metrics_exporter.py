@@ -20,7 +20,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncGenerator, Callable, Tuple, cast
+from collections.abc import AsyncGenerator, Callable
+from typing import cast
 
 from nucliadb import logger
 from nucliadb.common import datamanagers
@@ -41,7 +42,7 @@ KBS_COUNT = metrics.Gauge("nucliadb_kbs_count")
 RESOURCES_COUNT = metrics.Gauge("nucliadb_resources_count")
 
 
-async def iter_kbids(context: ApplicationContext) -> AsyncGenerator[str, None]:
+async def iter_kbids(context: ApplicationContext) -> AsyncGenerator[str]:
     """
     Return a list of all KB ids.
     """
@@ -94,11 +95,11 @@ async def update_resource_metrics(context: ApplicationContext):
             "WHERE labels @> '{/n/s/PENDING}' "
             "AND COALESCE(modified_at, created_at) BETWEEN NOW() - INTERVAL '1 month' AND NOW() - INTERVAL '6 hours'"
         )
-        count = cast(Tuple[int], await cur.fetchone())[0]
+        count = cast(tuple[int], await cur.fetchone())[0]
         PENDING_RESOURCE_COUNT.set(count)
 
         await cur.execute("SELECT COUNT(*) FROM catalog")
-        count = cast(Tuple[int], await cur.fetchone())[0]
+        count = cast(tuple[int], await cur.fetchone())[0]
         RESOURCES_COUNT.set(count)
 
 

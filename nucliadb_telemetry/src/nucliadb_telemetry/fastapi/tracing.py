@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import typing
 import urllib
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable, Optional, Tuple
 
 from asgiref.compatibility import guarantee_single_callable
 from fastapi import Request, Response
 from opentelemetry import context, trace
-from opentelemetry.instrumentation.asgi.version import __version__  # noqa
+from opentelemetry.instrumentation.asgi.version import __version__
 from opentelemetry.instrumentation.propagators import get_global_response_propagator
 from opentelemetry.instrumentation.utils import (
     _start_internal_or_server_span,
@@ -42,7 +41,7 @@ from opentelemetry.util.http import (
 )
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
-ServerRequestHookT = Optional[Callable[[Span, dict], None]]
+ServerRequestHookT = Callable[[Span, dict], None] | None
 
 
 NUCLIA_TRACE_ID_HEADER = "X-NUCLIA-TRACE-ID"
@@ -60,7 +59,7 @@ ACCESS_CONTROL_EXPOSE_HEADER = "Access-Control-Expose-Headers"
 
 
 class ASGIGetter(Getter[dict]):
-    def get(self, carrier: dict, key: str) -> typing.Optional[typing.List[str]]:
+    def get(self, carrier: dict, key: str) -> list[str] | None:
         """Getter implementation to retrieve a HTTP header value from the ASGI
         scope.
 
@@ -86,7 +85,7 @@ class ASGIGetter(Getter[dict]):
             return None
         return decoded
 
-    def keys(self, carrier: dict) -> typing.List[str]:
+    def keys(self, carrier: dict) -> list[str]:
         headers = carrier.get("headers") or []
         return [_key.decode("utf8", errors="replace") for (_key, _) in headers]
 
@@ -227,7 +226,7 @@ def set_status_code(span, status_code):
         span.set_status(Status(http_status_to_status_code(status_code, server_span=True)))
 
 
-def get_default_span_details(scope: dict) -> Tuple[str, dict]:
+def get_default_span_details(scope: dict) -> tuple[str, dict]:
     """
     Default span name is the HTTP method and URL path, or just the method.
     https://github.com/open-telemetry/opentelemetry-specification/pull/3165

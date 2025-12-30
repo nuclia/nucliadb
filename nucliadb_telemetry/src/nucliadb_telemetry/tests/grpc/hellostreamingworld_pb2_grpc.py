@@ -7,7 +7,7 @@ from nucliadb_telemetry.tests.grpc import (
 )
 
 
-class MultiGreeterStub(object):
+class MultiGreeterStub:
     """The greeting service definition."""
 
     def __init__(self, channel):
@@ -23,7 +23,7 @@ class MultiGreeterStub(object):
         )
 
 
-class MultiGreeterServicer(object):
+class MultiGreeterServicer:
     """The greeting service definition."""
 
     def sayHello(self, request, context):
@@ -48,7 +48,7 @@ def add_MultiGreeterServicer_to_server(servicer, server):
 
 
 # This class is part of an EXPERIMENTAL API.
-class MultiGreeter(object):
+class MultiGreeter:
     """The greeting service definition."""
 
     @staticmethod

@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 from nidx_protos import nodereader_pb2
 from nidx_protos.nodereader_pb2 import SearchRequest
@@ -258,6 +257,6 @@ def is_incomplete(retrieval: UnitRetrieval) -> bool:
     return incomplete
 
 
-def get_rephrased_query(parsed: ParsedQuery) -> Optional[str]:
+def get_rephrased_query(parsed: ParsedQuery) -> str | None:
     """Given a parsed query, return the rephrased query used, if any."""
     return parsed.fetcher.get_cached_rephrased_query()

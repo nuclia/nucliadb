@@ -22,8 +22,8 @@ from __future__ import annotations
 
 import base64
 import logging
+from collections.abc import AsyncGenerator, AsyncIterator
 from datetime import datetime
-from typing import AsyncGenerator, AsyncIterator, Optional, Union
 
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.identity import DefaultAzureCredential
@@ -66,7 +66,7 @@ class AzureStorageField(StorageField):
             origin_bucket_name, origin_uri, destination_bucket_name, destination_uri
         )
 
-    async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
+    async def iter_data(self, range: Range | None = None) -> AsyncGenerator[bytes]:
         if self.field is not None:
             bucket = self.field.bucket_name
             key = self.field.uri
@@ -133,7 +133,7 @@ class AzureStorageField(StorageField):
         self.field.ClearField("upload_uri")
         self.field.ClearField("parts")
 
-    async def exists(self) -> Optional[ObjectMetadata]:
+    async def exists(self) -> ObjectMetadata | None:
         key = None
         bucket = None
         if self.field is not None and self.field.uri != "":
@@ -171,9 +171,9 @@ class AzureStorage(Storage):
         self,
         account_url: str,
         kb_account_url: str,
-        deadletter_bucket: Optional[str] = "deadletter",
-        indexing_bucket: Optional[str] = "indexing",
-        connection_string: Optional[str] = None,
+        deadletter_bucket: str | None = "deadletter",
+        indexing_bucket: str | None = "indexing",
+        connection_string: str | None = None,
     ):
         self.object_store = AzureObjectStore(account_url, connection_string=connection_string)
         self.kb_object_store = AzureObjectStore(kb_account_url, connection_string=connection_string)
@@ -186,7 +186,7 @@ class AzureStorage(Storage):
         else:
             return self.kb_object_store
 
-    async def initialize(self, service_name: Optional[str] = None):
+    async def initialize(self, service_name: str | None = None):
         await self.object_store.initialize()
         await self.kb_object_store.initialize()
         for bucket in [
@@ -209,7 +209,7 @@ class AzureStorage(Storage):
         except KeyError:
             pass
 
-    async def create_bucket(self, bucket_name: str, kbid: Optional[str] = None):
+    async def create_bucket(self, bucket_name: str, kbid: str | None = None):
         if await self.object_store_for_bucket(bucket_name).bucket_exists(bucket_name):
             return
         await self.object_store_for_bucket(bucket_name).bucket_create(bucket_name)
@@ -231,8 +231,8 @@ class AzureStorage(Storage):
         return await self.kb_object_store.bucket_delete(bucket_name)
 
     async def iterate_objects(
-        self, bucket: str, prefix: str, start: Optional[str] = None
-    ) -> AsyncGenerator[ObjectInfo, None]:
+        self, bucket: str, prefix: str, start: str | None = None
+    ) -> AsyncGenerator[ObjectInfo]:
         async for obj in self.object_store_for_bucket(bucket).iterate(bucket, prefix, start):
             yield obj
 
@@ -241,10 +241,10 @@ class AzureStorage(Storage):
 
 
 class AzureObjectStore(ObjectStore):
-    def __init__(self, account_url: str, connection_string: Optional[str] = None):
+    def __init__(self, account_url: str, connection_string: str | None = None):
         self.account_url = account_url
         self.connection_string = connection_string
-        self._service_client: Optional[BlobServiceClient] = None
+        self._service_client: BlobServiceClient | None = None
 
     @property
     def service_client(self) -> BlobServiceClient:
@@ -345,11 +345,11 @@ class AzureObjectStore(ObjectStore):
         self,
         bucket: str,
         key: str,
-        data: Union[bytes, AsyncGenerator[bytes, None]],
+        data: bytes | AsyncGenerator[bytes],
         metadata: ObjectMetadata,
     ) -> None:
         container_client = self.service_client.get_container_client(bucket)
-        length: Optional[int] = None
+        length: int | None = None
         if isinstance(data, bytes):
             length = len(data)
             metadata.size = length
@@ -385,8 +385,8 @@ class AzureObjectStore(ObjectStore):
         return await downloader.readall()
 
     async def download_stream(
-        self, bucket: str, key: str, range: Optional[Range] = None
-    ) -> AsyncGenerator[bytes, None]:
+        self, bucket: str, key: str, range: Range | None = None
+    ) -> AsyncGenerator[bytes]:
         range = range or Range()
         container_client = self.service_client.get_container_client(bucket)
         blob_client = container_client.get_blob_client(key)
@@ -406,8 +406,8 @@ class AzureObjectStore(ObjectStore):
             yield chunk
 
     async def iterate(
-        self, bucket: str, prefix: str, start: Optional[str] = None
-    ) -> AsyncGenerator[ObjectInfo, None]:
+        self, bucket: str, prefix: str, start: str | None = None
+    ) -> AsyncGenerator[ObjectInfo]:
         container_client = self.service_client.get_container_client(bucket)
         async for blob in container_client.list_blobs(name_starts_with=prefix):
             if start and blob.name <= start:

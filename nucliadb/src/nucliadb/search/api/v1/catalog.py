@@ -19,7 +19,6 @@
 #
 import json
 from time import time
-from typing import Optional, Union
 
 from fastapi import Request, Response
 from fastapi_versioning import version
@@ -75,30 +74,28 @@ async def catalog_get(
     response: Response,
     kbid: str,
     query: str = fastapi_query(SearchParamDefaults.query),
-    filter_expression: Optional[str] = fastapi_query(SearchParamDefaults.catalog_filter_expression),
+    filter_expression: str | None = fastapi_query(SearchParamDefaults.catalog_filter_expression),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
     sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
     page_number: int = fastapi_query(SearchParamDefaults.catalog_page_number),
     page_size: int = fastapi_query(SearchParamDefaults.catalog_page_size),
-    with_status: Optional[ResourceProcessingStatus] = fastapi_query(
+    with_status: ResourceProcessingStatus | None = fastapi_query(
         SearchParamDefaults.with_status, deprecated="Use filters instead"
     ),
     debug: bool = fastapi_query(SearchParamDefaults.debug, include_in_schema=False),
-    range_creation_start: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_start),
-    range_creation_end: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_end),
-    range_modification_start: Optional[DateTime] = fastapi_query(
+    range_creation_start: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_end),
+    range_modification_start: DateTime | None = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
-    range_modification_end: Optional[DateTime] = fastapi_query(
-        SearchParamDefaults.range_modification_end
-    ),
-    hidden: Optional[bool] = fastapi_query(SearchParamDefaults.hidden),
+    range_modification_end: DateTime | None = fastapi_query(SearchParamDefaults.range_modification_end),
+    hidden: bool | None = fastapi_query(SearchParamDefaults.hidden),
     show: list[ResourceProperties] = fastapi_query(
         SearchParamDefaults.show, default=[ResourceProperties.BASIC, ResourceProperties.ERRORS]
     ),
-) -> Union[CatalogResponse, HTTPClientError]:
+) -> CatalogResponse | HTTPClientError:
     try:
         expr = (
             CatalogFilterExpression.model_validate_json(filter_expression) if filter_expression else None
@@ -143,14 +140,14 @@ async def catalog_post(
     request: Request,
     kbid: str,
     item: CatalogRequest,
-) -> Union[CatalogResponse, HTTPClientError]:
+) -> CatalogResponse | HTTPClientError:
     return await catalog(kbid, item)
 
 
 async def catalog(
     kbid: str,
     item: CatalogRequest,
-) -> Union[HTTPClientError, CatalogResponse]:
+) -> HTTPClientError | CatalogResponse:
     """
     Catalog endpoint is a simplified version of the search endpoint, it only
     returns bm25 results on titles and it does not support vector search.

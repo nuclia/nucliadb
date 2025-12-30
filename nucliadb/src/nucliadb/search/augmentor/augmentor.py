@@ -96,12 +96,10 @@ async def augment(
                         continue
 
                     unfiltered_field_ids.extend(
-                        (
-                            FieldId.from_pb(
-                                rid=rid, field_type=field_id_pb.field_type, key=field_id_pb.field
-                            )
-                            for field_id_pb in all_field_ids.fields
+                        FieldId.from_pb(
+                            rid=rid, field_type=field_id_pb.field_type, key=field_id_pb.field
                         )
+                        for field_id_pb in all_field_ids.fields
                     )
 
                 elif isinstance(id, FieldId):

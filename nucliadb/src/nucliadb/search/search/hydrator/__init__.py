@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
-
 from pydantic import BaseModel
 
 from nucliadb_models.common import FieldTypeName
@@ -45,7 +43,7 @@ class TextBlockHydrationOptions(BaseModel):
     highlight: bool = False
 
     # list of exact matches to highlight
-    ematches: Optional[list[str]] = None
+    ematches: list[str] | None = None
 
     # If true, only hydrate the text block if its text is not already populated
     only_hydrate_empty: bool = False

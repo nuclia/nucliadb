@@ -22,7 +22,7 @@ from __future__ import annotations
 import abc
 import datetime
 from dataclasses import dataclass
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -49,22 +49,22 @@ class CatalogResourceData(BaseModel):
 class CatalogExpression:
     @dataclass
     class Date:
-        field: Union[Literal["created_at"], Literal["modified_at"]]
-        since: Optional[datetime.datetime]
-        until: Optional[datetime.datetime]
+        field: Literal["created_at"] | Literal["modified_at"]
+        since: datetime.datetime | None
+        until: datetime.datetime | None
 
-    bool_and: Optional[list["CatalogExpression"]] = None
-    bool_or: Optional[list["CatalogExpression"]] = None
-    bool_not: Optional["CatalogExpression"] = None
-    date: Optional[Date] = None
-    facet: Optional[str] = None
-    resource_id: Optional[str] = None
+    bool_and: list[CatalogExpression] | None = None
+    bool_or: list[CatalogExpression] | None = None
+    bool_not: CatalogExpression | None = None
+    date: Date | None = None
+    facet: str | None = None
+    resource_id: str | None = None
 
 
 class CatalogQuery(BaseModel):
     kbid: str
-    query: Optional[search_models.CatalogQuery] = Field(description="Full-text search query")
-    filters: Optional[CatalogExpression] = Field(description="Filters to apply to the search")
+    query: search_models.CatalogQuery | None = Field(description="Full-text search query")
+    filters: CatalogExpression | None = Field(description="Filters to apply to the search")
     sort: search_models.SortOptions = Field(description="Sorting option")
     faceted: list[str] = Field(description="List of facets to compute during the search")
     page_size: int = Field(description="Used for pagination. Maximum page size is 100")

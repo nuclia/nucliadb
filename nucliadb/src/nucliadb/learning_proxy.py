@@ -24,7 +24,7 @@ import os
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from enum import Enum, IntEnum
-from typing import Any, Optional, Union
+from typing import Any
 
 import backoff
 import httpx
@@ -89,12 +89,12 @@ class LearningConfiguration(BaseModel):
     # aka similarity function
     semantic_vector_similarity: str
     # aka vector_dimension
-    semantic_vector_size: Optional[int] = None
+    semantic_vector_size: int | None = None
     # aka min_score
-    semantic_threshold: Optional[float] = None
+    semantic_threshold: float | None = None
     # List of possible subdivisions of the matryoshka embeddings (if the model
     # supports it)
-    semantic_matryoshka_dimensions: Optional[list[int]] = Field(
+    semantic_matryoshka_dimensions: list[int] | None = Field(
         default=None, alias="semantic_matryoshka_dims"
     )
 
@@ -154,7 +154,7 @@ class LearningConfiguration(BaseModel):
 
 
 class ProxiedLearningConfigError(Exception):
-    def __init__(self, status_code: int, content: Union[str, dict[str, Any]]):
+    def __init__(self, status_code: int, content: str | dict[str, Any]):
         self.status_code = status_code
         self.content = content
 
@@ -176,7 +176,7 @@ def raise_for_status(response: httpx.Response) -> None:
 
 async def get_configuration(
     kbid: str,
-) -> Optional[LearningConfiguration]:
+) -> LearningConfiguration | None:
     return await learning_config_service().get_configuration(kbid)
 
 
@@ -205,7 +205,7 @@ async def learning_config_proxy(
     method: str,
     url: str,
     headers: dict[str, str] = {},
-) -> Union[Response, StreamingResponse]:
+) -> Response | StreamingResponse:
     return await proxy(
         service=LearningService.CONFIG,
         request=request,
@@ -245,7 +245,7 @@ async def proxy(
     method: str,
     url: str,
     headers: dict[str, str] = {},
-) -> Union[Response, StreamingResponse]:
+) -> Response | StreamingResponse:
     """
     Proxy the request to a learning API.
 
@@ -426,7 +426,7 @@ class DummyClient(httpx.AsyncClient):
 
 class LearningConfigService(ABC):
     @abstractmethod
-    async def get_configuration(self, kbid: str) -> Optional[LearningConfiguration]: ...
+    async def get_configuration(self, kbid: str) -> LearningConfiguration | None: ...
 
     @abstractmethod
     async def set_configuration(self, kbid: str, config: dict[str, Any]) -> LearningConfiguration: ...
@@ -439,7 +439,7 @@ class LearningConfigService(ABC):
 
 
 class ProxiedLearningConfig(LearningConfigService):
-    async def get_configuration(self, kbid: str) -> Optional[LearningConfiguration]:
+    async def get_configuration(self, kbid: str) -> LearningConfiguration | None:
         async with self._client() as client:
             resp = await client.get(f"config/{kbid}")
             try:
@@ -483,7 +483,7 @@ class InMemoryLearningConfig(LearningConfigService):
     def __init__(self):
         self.in_memory_configs = {}
 
-    async def get_configuration(self, kbid: str) -> Optional[LearningConfiguration]:
+    async def get_configuration(self, kbid: str) -> LearningConfiguration | None:
         return _IN_MEMORY_CONFIGS.get(kbid, None)
 
     async def set_configuration(self, kbid: str, config: dict[str, Any]) -> LearningConfiguration:

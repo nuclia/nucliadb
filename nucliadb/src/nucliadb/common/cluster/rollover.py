@@ -21,7 +21,6 @@ import argparse
 import asyncio
 import logging
 from datetime import datetime
-from typing import Optional
 
 from nidx_protos.nodewriter_pb2 import (
     NewShardRequest,
@@ -62,7 +61,7 @@ class UnexpectedRolloverError(Exception):
 async def create_rollover_index(
     app_context: ApplicationContext,
     kbid: str,
-    external: Optional[ExternalIndexManager] = None,
+    external: ExternalIndexManager | None = None,
 ) -> None:
     """
     Creates a new index for a knowledgebox in the index node cluster (and to the external index provider if configured).
@@ -174,7 +173,7 @@ async def create_rollover_shards(
         return kb_shards
 
 
-def _get_shard(shards: writer_pb2.Shards, shard_id: str) -> Optional[writer_pb2.ShardObject]:
+def _get_shard(shards: writer_pb2.Shards, shard_id: str) -> writer_pb2.ShardObject | None:
     for shard in shards.shards:
         if shard_id == shard.shard:
             return shard
@@ -222,7 +221,7 @@ def _to_ts(dt: datetime) -> int:
 
 
 async def index_to_rollover_index(
-    app_context: ApplicationContext, kbid: str, external: Optional[ExternalIndexManager] = None
+    app_context: ApplicationContext, kbid: str, external: ExternalIndexManager | None = None
 ) -> None:
     """
     Indexes all data in a kb in rollover indexes. This happens before the cutover.
@@ -286,7 +285,7 @@ async def _index_resource_to_rollover_index(
     rollover_shards: writer_pb2.Shards,
     kbid: str,
     resource_id: str,
-    external: Optional[ExternalIndexManager] = None,
+    external: ExternalIndexManager | None = None,
 ) -> None:
     async with resource_index_semaphore:
         async with datamanagers.with_transaction() as txn:
@@ -340,7 +339,7 @@ async def _index_resource_to_rollover_index(
 
 
 async def cutover_index(
-    app_context: ApplicationContext, kbid: str, external: Optional[ExternalIndexManager] = None
+    app_context: ApplicationContext, kbid: str, external: ExternalIndexManager | None = None
 ) -> None:
     """
     Swaps our the current active index for a knowledgebox.
@@ -445,7 +444,7 @@ async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
 
 
 async def validate_indexed_data(
-    app_context: ApplicationContext, kbid: str, external: Optional[ExternalIndexManager] = None
+    app_context: ApplicationContext, kbid: str, external: ExternalIndexManager | None = None
 ) -> list[str]:
     """
     Goes through all the resources in a knowledgebox and validates it

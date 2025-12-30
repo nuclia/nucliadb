@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncIterator, Callable, Optional
+from collections.abc import AsyncIterator, Callable
 
 from fastapi import HTTPException
 from grpc import StatusCode
@@ -53,11 +53,11 @@ from nucliadb.train.utils import get_shard_manager
 from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
-BatchGenerator = Callable[[str, TrainSet, str, Optional[FilterExpression]], AsyncIterator[TrainBatch]]
+BatchGenerator = Callable[[str, TrainSet, str, FilterExpression | None], AsyncIterator[TrainBatch]]
 
 
 async def generate_train_data(
-    kbid: str, shard: str, trainset: TrainSet, filter_expression: Optional[FilterExpression] = None
+    kbid: str, shard: str, trainset: TrainSet, filter_expression: FilterExpression | None = None
 ):
     # Get the data structure to generate data
     shard_manager = get_shard_manager()
@@ -66,7 +66,7 @@ async def generate_train_data(
     if trainset.batch_size == 0:
         trainset.batch_size = 50
 
-    batch_generator: Optional[BatchGenerator] = None
+    batch_generator: BatchGenerator | None = None
 
     if trainset.type == TaskType.FIELD_CLASSIFICATION:
         batch_generator = field_classification_batch_generator

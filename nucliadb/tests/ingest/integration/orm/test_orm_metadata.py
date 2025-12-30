@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Optional
 from uuid import uuid4
 
 from nucliadb.ingest.fields.text import Text
@@ -74,7 +73,7 @@ async def test_create_resource_orm_metadata(
     field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_field_metadata(ex1)
 
-    ex2: Optional[FieldComputedMetadata] = await field_obj.get_field_metadata()
+    ex2: FieldComputedMetadata | None = await field_obj.get_field_metadata()
     assert ex2 is not None
     assert ex2.metadata.links[0] == ex1.metadata.metadata.links[0]
     assert ex2.metadata.mime_type == ex1.metadata.metadata.mime_type
@@ -133,7 +132,7 @@ async def test_create_resource_orm_metadata_split(
     field_obj = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_field_metadata(ex2)
 
-    ex3: Optional[FieldComputedMetadata] = await field_obj.get_field_metadata()
+    ex3: FieldComputedMetadata | None = await field_obj.get_field_metadata()
     assert ex3 is not None
     assert ex1.metadata.split_metadata["ff1"].links[0] == ex3.split_metadata["ff1"].links[0]
     assert len(ex3.split_metadata) == 2

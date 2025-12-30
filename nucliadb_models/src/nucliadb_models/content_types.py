@@ -14,7 +14,6 @@
 
 
 import mimetypes
-from typing import Optional
 
 GENERIC_MIME_TYPE = "application/generic"
 
@@ -80,7 +79,7 @@ EXTRA_VALID_CONTENT_TYPES = {
 } | NUCLIA_CUSTOM_CONTENT_TYPES
 
 
-def guess(filename: str) -> Optional[str]:
+def guess(filename: str) -> str | None:
     """
     Guess the content type of a file based on its filename.
     Returns None if the content type could not be guessed.

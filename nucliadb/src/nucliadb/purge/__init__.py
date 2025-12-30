@@ -19,8 +19,8 @@
 #
 import asyncio
 import importlib.metadata
+from collections.abc import AsyncGenerator
 from itertools import batched  # type: ignore
-from typing import AsyncGenerator
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound

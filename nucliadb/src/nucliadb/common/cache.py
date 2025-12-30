@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 import backoff
 from async_lru import _LRUCacheWrapper, alru_cache
@@ -66,9 +66,9 @@ class Cache(Generic[K, T], ABC):
 
     """
 
-    cache: _LRUCacheWrapper[Optional[T]]
+    cache: _LRUCacheWrapper[T | None]
 
-    async def get(self, *args: K.args, **kwargs: K.kwargs) -> Optional[T]:
+    async def get(self, *args: K.args, **kwargs: K.kwargs) -> T | None:
         result = await self.cache(*args)
         # Do not cache None
         if result is None:
@@ -88,7 +88,7 @@ class Cache(Generic[K, T], ABC):
 class ResourceCache(Cache[[str, str], ResourceORM]):
     def __init__(self, cache_size: int) -> None:
         @alru_cache(maxsize=cache_size)
-        async def _get_resource(kbid: str, rid: str) -> Optional[ResourceORM]:
+        async def _get_resource(kbid: str, rid: str) -> ResourceORM | None:
             storage = await get_storage()
             async with get_driver().ro_transaction() as txn:
                 kb = KnowledgeBoxORM(txn, storage, kbid)
@@ -115,7 +115,7 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
     def __init__(self, cache_size: int) -> None:
         @alru_cache(maxsize=cache_size)
         @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
-        async def _get_extracted_text(kbid: str, field_id: FieldId) -> Optional[ExtractedText]:
+        async def _get_extracted_text(kbid: str, field_id: FieldId) -> ExtractedText | None:
             storage = await get_storage()
             try:
                 sf = storage.file_extracted(
@@ -144,18 +144,18 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
 
 # Global caches (per asyncio task)
 
-rcache: ContextVar[Optional[ResourceCache]] = ContextVar("rcache", default=None)
-etcache: ContextVar[Optional[ExtractedTextCache]] = ContextVar("etcache", default=None)
+rcache: ContextVar[ResourceCache | None] = ContextVar("rcache", default=None)
+etcache: ContextVar[ExtractedTextCache | None] = ContextVar("etcache", default=None)
 
 
 # Cache management
 
 
-def get_resource_cache() -> Optional[ResourceCache]:
+def get_resource_cache() -> ResourceCache | None:
     return rcache.get()
 
 
-def get_extracted_text_cache() -> Optional[ExtractedTextCache]:
+def get_extracted_text_cache() -> ExtractedTextCache | None:
     return etcache.get()
 
 

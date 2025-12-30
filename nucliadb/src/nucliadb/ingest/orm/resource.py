@@ -22,8 +22,9 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import defaultdict
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Optional, Sequence, Type
+from typing import Any
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
@@ -72,7 +73,7 @@ from nucliadb_utils.utilities import get_storage
 
 logger = logging.getLogger(__name__)
 
-KB_FIELDS: dict[int, Type] = {
+KB_FIELDS: dict[int, type] = {
     FieldType.TEXT: Text,
     FieldType.FILE: File,
     FieldType.LINK: Link,
@@ -104,16 +105,16 @@ class Resource:
         storage: Storage,
         kbid: str,
         uuid: str,
-        basic: Optional[PBBasic] = None,
+        basic: PBBasic | None = None,
         disable_vectors: bool = True,
     ):
         self.fields: dict[tuple[FieldType.ValueType, str], Field] = {}
         self.conversations: dict[int, PBConversation] = {}
-        self.relations: Optional[PBRelations] = None
-        self.all_fields_keys: Optional[list[tuple[FieldType.ValueType, str]]] = None
-        self.origin: Optional[PBOrigin] = None
-        self.extra: Optional[PBExtra] = None
-        self.security: Optional[utils_pb2.Security] = None
+        self.relations: PBRelations | None = None
+        self.all_fields_keys: list[tuple[FieldType.ValueType, str]] | None = None
+        self.origin: PBOrigin | None = None
+        self.extra: PBExtra | None = None
+        self.security: utils_pb2.Security | None = None
         self.modified: bool = False
         self._modified_extracted_text: list[FieldID] = []
 
@@ -123,12 +124,12 @@ class Resource:
         self.uuid = uuid
         self.basic = basic
         self.disable_vectors = disable_vectors
-        self._previous_status: Optional[Metadata.Status.ValueType] = None
-        self.user_relations: Optional[PBRelations] = None
+        self._previous_status: Metadata.Status.ValueType | None = None
+        self.user_relations: PBRelations | None = None
         self.locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     @classmethod
-    async def get(cls, txn: Transaction, kbid: str, rid: str) -> Optional["Resource"]:
+    async def get(cls, txn: Transaction, kbid: str, rid: str) -> Resource | None:
         basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
         if basic is None:
             return None
@@ -172,7 +173,7 @@ class Resource:
     async def set_basic(
         self,
         payload: PBBasic,
-        deleted_fields: Optional[list[FieldID]] = None,
+        deleted_fields: list[FieldID] | None = None,
     ):
         await self.get_basic()
 
@@ -229,7 +230,7 @@ class Resource:
         self.modified = True
 
     # Origin
-    async def get_origin(self) -> Optional[PBOrigin]:
+    async def get_origin(self) -> PBOrigin | None:
         if self.origin is None:
             origin = await datamanagers.resources.get_origin(self.txn, kbid=self.kbid, rid=self.uuid)
             self.origin = origin
@@ -241,7 +242,7 @@ class Resource:
         self.origin = payload
 
     # Extra
-    async def get_extra(self) -> Optional[PBExtra]:
+    async def get_extra(self) -> PBExtra | None:
         if self.extra is None:
             extra = await datamanagers.resources.get_extra(self.txn, kbid=self.kbid, rid=self.uuid)
             self.extra = extra
@@ -253,7 +254,7 @@ class Resource:
         self.extra = payload
 
     # Security
-    async def get_security(self) -> Optional[utils_pb2.Security]:
+    async def get_security(self) -> utils_pb2.Security | None:
         if self.security is None:
             security = await datamanagers.resources.get_security(self.txn, kbid=self.kbid, rid=self.uuid)
             self.security = security
@@ -373,7 +374,7 @@ class Resource:
         # REVIEW: are we sure we don't want to actually check this?
         return (type, field) in self.fields
 
-    async def get_all_field_ids(self, *, for_update: bool) -> Optional[PBAllFieldIDs]:
+    async def get_all_field_ids(self, *, for_update: bool) -> PBAllFieldIDs | None:
         return await datamanagers.resources.get_all_field_ids(
             self.txn, kbid=self.kbid, rid=self.uuid, for_update=for_update
         )
@@ -386,9 +387,9 @@ class Resource:
     async def update_all_field_ids(
         self,
         *,
-        updated: Optional[list[FieldID]] = None,
-        deleted: Optional[list[FieldID]] = None,
-        errors: Optional[list[writer_pb2.Error]] = None,
+        updated: list[FieldID] | None = None,
+        deleted: list[FieldID] | None = None,
+        errors: list[writer_pb2.Error] | None = None,
     ):
         needs_update = False
         all_fields = await self.get_all_field_ids(for_update=True)
@@ -467,7 +468,7 @@ class Resource:
 
         # If this message comes from the processor (not a DA worker), we clear all previous errors
         # TODO: When generated_by is populated with DA tasks by processor, remove only related errors
-        from_processor = any((x.WhichOneof("generator") == "processor" for x in message.generated_by))
+        from_processor = any(x.WhichOneof("generator") == "processor" for x in message.generated_by)
 
         for (field_type, field), errors in errors_by_field.items():
             field_obj = await self.get_field(field, field_type, load=False)
@@ -487,7 +488,7 @@ class Resource:
             # We infer the status for processor messages
             if message.source == BrokerMessage.MessageSource.PROCESSOR:
                 if any(
-                    (e.source_error.severity == writer_pb2.Error.Severity.ERROR for e in status.errors)
+                    e.source_error.severity == writer_pb2.Error.Severity.ERROR for e in status.errors
                 ):
                     status.status = writer_pb2.FieldStatus.Status.ERROR
                 else:
@@ -521,21 +522,17 @@ class Resource:
         )
 
         # If any field is processing -> PENDING
-        if any((f.status == writer_pb2.FieldStatus.Status.PENDING for f in field_statuses)):
+        if any(f.status == writer_pb2.FieldStatus.Status.PENDING for f in field_statuses):
             self.basic.metadata.status = PBMetadata.Status.PENDING
         # If we have any non-DA error -> ERROR
         elif any(
-            (
-                f.status == writer_pb2.FieldStatus.Status.ERROR
-                and any(
-                    (
-                        e.source_error.severity == writer_pb2.Error.Severity.ERROR
-                        and e.source_error.code != writer_pb2.Error.ErrorCode.DATAAUGMENTATION
-                        for e in f.errors
-                    )
-                )
-                for f in field_statuses
+            f.status == writer_pb2.FieldStatus.Status.ERROR
+            and any(
+                e.source_error.severity == writer_pb2.Error.Severity.ERROR
+                and e.source_error.code != writer_pb2.Error.ErrorCode.DATAAUGMENTATION
+                for e in f.errors
             )
+            for f in field_statuses
         ):
             self.basic.metadata.status = PBMetadata.Status.ERROR
         # Otherwise (everything processed or we only have DA errors) -> PROCESSED
@@ -749,7 +746,7 @@ class Resource:
         filenames = set()
         for (field_type, _), field_obj in fields.items():
             if field_type == FieldType.FILE:
-                field_value: Optional[FieldFile] = await field_obj.get_value()
+                field_value: FieldFile | None = await field_obj.get_value()
                 if field_value is not None:
                     if field_value.file.filename not in ("", None):
                         filenames.add(field_value.file.filename)
@@ -813,7 +810,7 @@ class Resource:
                 assert len(vectorsets) == 1, (
                     "Invalid broker message, can't ingest vectors from unknown vectorset to KB with multiple vectorsets"
                 )
-                vectorset = list(vectorsets.values())[0]
+                vectorset = next(iter(vectorsets.values()))
 
             else:
                 if field_vectors.vectorset_id not in vectorsets:
@@ -930,7 +927,7 @@ def maybe_update_basic_summary(basic: PBBasic, summary_text: str) -> bool:
     return True
 
 
-def maybe_update_basic_icon(basic: PBBasic, mimetype: Optional[str]) -> bool:
+def maybe_update_basic_icon(basic: PBBasic, mimetype: str | None) -> bool:
     if basic.icon not in (None, "", "application/octet-stream", GENERIC_MIME_TYPE):
         # Icon already set or detected
         return False
@@ -949,7 +946,7 @@ def maybe_update_basic_icon(basic: PBBasic, mimetype: Optional[str]) -> bool:
     return True
 
 
-def maybe_update_basic_thumbnail(basic: PBBasic, thumbnail: Optional[CloudFile], kbid: str) -> bool:
+def maybe_update_basic_thumbnail(basic: PBBasic, thumbnail: CloudFile | None, kbid: str) -> bool:
     if basic.thumbnail or thumbnail is None:
         return False
     basic.thumbnail = CloudLink.format_reader_download_uri(thumbnail.uri)
@@ -986,7 +983,7 @@ def update_basic_languages(basic: Basic, languages: list[str]) -> bool:
     return updated
 
 
-def get_text_field_mimetype(bm: BrokerMessage) -> Optional[str]:
+def get_text_field_mimetype(bm: BrokerMessage) -> str | None:
     if len(bm.texts) == 0:
         return None
     text_format = next(iter(bm.texts.values())).format

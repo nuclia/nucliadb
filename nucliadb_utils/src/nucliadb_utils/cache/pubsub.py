@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Awaitable, Callable, Generic, Optional, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -37,15 +38,15 @@ class PubSubDriver(Generic[T]):
     async def publish(self, channel_name: str, data: bytes):
         raise NotImplementedError()
 
-    async def unsubscribe(self, key: str, subscription_id: Optional[str] = None):
+    async def unsubscribe(self, key: str, subscription_id: str | None = None):
         raise NotImplementedError()
 
     async def subscribe(
         self,
         handler: Callback,
         key: str,
-        group: Optional[str] = None,
-        subscription_id: Optional[str] = None,
+        group: str | None = None,
+        subscription_id: str | None = None,
     ):
         raise NotImplementedError()
 

@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncGenerator, Callable, Optional, cast
+from collections.abc import AsyncGenerator, Callable
+from typing import cast
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import import logger
@@ -46,7 +47,7 @@ async def import_kb(
     context: ApplicationContext,
     kbid: str,
     stream: AsyncGenerator[bytes, None],
-    metadata: Optional[ImportMetadata] = None,
+    metadata: ImportMetadata | None = None,
 ) -> None:
     """
     Imports exported data from a stream into a knowledgebox.

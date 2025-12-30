@@ -22,16 +22,16 @@
 # This allows us to leverage context data for both tracing and logs.
 #
 import contextvars
-from typing import Dict, Optional, Sequence, Union
+from collections.abc import Sequence
 
 from opentelemetry.trace import get_current_span
 
 from nucliadb_telemetry.settings import telemetry_settings
 
-context_data = contextvars.ContextVar[Optional[Dict[str, str]]]("data", default=None)
+context_data = contextvars.ContextVar[dict[str, str] | None]("data", default=None)
 
 
-def add_context(new_data: Dict[str, str]):
+def add_context(new_data: dict[str, str]):
     """
     This implementation always merges and sets the context, even if is was already set.
 
@@ -55,23 +55,14 @@ def clear_context():
     context_data.set({})
 
 
-def get_context() -> Dict[str, str]:
+def get_context() -> dict[str, str]:
     return context_data.get() or {}
 
 
 def set_info_on_span(
-    headers: Dict[
+    headers: dict[
         str,
-        Union[
-            str,
-            bool,
-            int,
-            float,
-            Sequence[str],
-            Sequence[bool],
-            Sequence[int],
-            Sequence[float],
-        ],
+        (str | bool | int | float | Sequence[str] | Sequence[bool] | Sequence[int] | Sequence[float]),
     ],
 ):
     if telemetry_settings.jaeger_enabled:

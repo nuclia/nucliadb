@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -27,11 +26,11 @@ class InvalidTUSMetadata(Exception):
 
 
 class HTTPException(StarletteHTTPException):
-    _status_code: Optional[int] = None
+    _status_code: int | None = None
 
-    def __init__(self, detail: Optional[str] = None):
+    def __init__(self, detail: str | None = None):
         if self._status_code:
-            super(HTTPException, self).__init__(status_code=self._status_code, detail=detail)
+            super().__init__(status_code=self._status_code, detail=detail)
         else:
             raise AttributeError("Status code not defined")
 

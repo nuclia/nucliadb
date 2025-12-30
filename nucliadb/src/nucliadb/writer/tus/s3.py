@@ -22,7 +22,6 @@ from __future__ import annotations
 import base64
 import uuid
 from contextlib import AsyncExitStack
-from typing import Optional
 
 import aiobotocore  # type: ignore
 import aiohttp
@@ -195,8 +194,8 @@ class S3BlobStore(BlobStore):
         endpoint_url,
         region_name,
         bucket,
-        bucket_tags: Optional[dict[str, str]] = None,
-        kms_key_id: Optional[str] = None,
+        bucket_tags: dict[str, str] | None = None,
+        kms_key_id: str | None = None,
     ):
         self.bucket = bucket
         self.bucket_tags = bucket_tags

@@ -20,7 +20,6 @@
 import enum
 import importlib.metadata
 import logging
-from typing import Optional
 
 from cachetools import TTLCache
 
@@ -45,11 +44,11 @@ def installed_nucliadb() -> str:
     return get_installed_version(StandalonePackages.NUCLIADB.value)
 
 
-async def latest_nucliadb() -> Optional[str]:
+async def latest_nucliadb() -> str | None:
     return await get_latest_version(StandalonePackages.NUCLIADB.value)
 
 
-def nucliadb_updates_available(installed: str, latest: Optional[str]) -> bool:
+def nucliadb_updates_available(installed: str, latest: str | None) -> bool:
     if latest is None:
         return False
     return is_newer_release(installed, latest)
@@ -96,7 +95,7 @@ def get_installed_version(package_name: str) -> str:
     return importlib.metadata.distribution(package_name).version
 
 
-async def get_latest_version(package: str) -> Optional[str]:
+async def get_latest_version(package: str) -> str | None:
     result = CACHE.get(package, None)
     if result is None:
         try:

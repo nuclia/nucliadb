@@ -25,7 +25,7 @@ import uuid
 from collections import defaultdict
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 import backoff
@@ -132,19 +132,19 @@ def to_processing_driver_type(file_backend_driver: FileBackendConfig) -> Process
 class ProcessingEngine:
     def __init__(
         self,
-        nuclia_service_account: Optional[str] = None,
-        nuclia_zone: Optional[str] = None,
-        nuclia_public_url: Optional[str] = None,
-        nuclia_processing_cluster_url: Optional[str] = None,
-        onprem: Optional[bool] = False,
-        nuclia_jwt_key: Optional[str] = None,
+        nuclia_service_account: str | None = None,
+        nuclia_zone: str | None = None,
+        nuclia_public_url: str | None = None,
+        nuclia_processing_cluster_url: str | None = None,
+        onprem: bool | None = False,
+        nuclia_jwt_key: str | None = None,
         days_to_keep: int = 3,
         driver: FileBackendConfig = FileBackendConfig.GCS,
     ):
         self.nuclia_service_account = nuclia_service_account
         self.nuclia_zone = nuclia_zone
         if nuclia_public_url is not None:
-            self.nuclia_public_url: Optional[str] = nuclia_public_url.format(zone=nuclia_zone)
+            self.nuclia_public_url: str | None = nuclia_public_url.format(zone=nuclia_zone)
         else:
             self.nuclia_public_url = None
 
@@ -196,7 +196,7 @@ class ProcessingEngine:
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
     def generate_file_token_from_fieldfile(
-        self, file: FieldFilePB, classif_labels: Optional[list[ClassificationLabel]] = None
+        self, file: FieldFilePB, classif_labels: list[ClassificationLabel] | None = None
     ) -> str:
         if self.nuclia_jwt_key is None:
             raise AttributeError("Nuclia JWT key not set")
@@ -235,7 +235,7 @@ class ProcessingEngine:
     )
     @processing_observer.wrap({"type": "file_field_upload"})
     async def convert_filefield_to_str(
-        self, file: models.FileField, classif_labels: Optional[list[ClassificationLabel]] = None
+        self, file: models.FileField, classif_labels: list[ClassificationLabel] | None = None
     ) -> str:
         # Upload file without storing on Nuclia DB
         headers = {}
@@ -273,7 +273,7 @@ class ProcessingEngine:
         ).decode()
 
     def convert_external_filefield_to_str(
-        self, file_field: models.FileField, classif_labels: Optional[list[ClassificationLabel]] = None
+        self, file_field: models.FileField, classif_labels: list[ClassificationLabel] | None = None
     ) -> str:
         if self.nuclia_jwt_key is None:
             raise AttributeError("Nuclia JWT key not set")
@@ -313,7 +313,7 @@ class ProcessingEngine:
         self,
         file: FieldFilePB,
         storage: Storage,
-        classif_labels: Optional[list[ClassificationLabel]] = None,
+        classif_labels: list[ClassificationLabel] | None = None,
     ) -> str:
         """It's already an internal file that needs to be uploaded"""
         if self.onprem is False:
@@ -438,7 +438,7 @@ class ProcessingEngine:
             queue=QueueType(queue_type) if queue_type is not None else None,
         )
 
-    async def delete_from_processing(self, *, kbid: str, resource_id: Optional[str] = None) -> None:
+    async def delete_from_processing(self, *, kbid: str, resource_id: str | None = None) -> None:
         """
         Delete a resource from processing. This prevents inflight resources from being processed
         and wasting resources.
@@ -479,7 +479,7 @@ class DummyProcessingEngine(ProcessingEngine):
         pass
 
     async def convert_filefield_to_str(
-        self, file: models.FileField, classif_labels: Optional[list[ClassificationLabel]] = None
+        self, file: models.FileField, classif_labels: list[ClassificationLabel] | None = None
     ) -> str:
         self.calls.append([file])
         index = len(self.values["convert_filefield_to_str"])
@@ -487,7 +487,7 @@ class DummyProcessingEngine(ProcessingEngine):
         return f"convert_filefield_to_str,{index}"
 
     def convert_external_filefield_to_str(
-        self, file_field: models.FileField, classif_labels: Optional[list[ClassificationLabel]] = None
+        self, file_field: models.FileField, classif_labels: list[ClassificationLabel] | None = None
     ) -> str:
         self.calls.append([file_field])
         index = len(self.values["convert_external_filefield_to_str"])
@@ -498,7 +498,7 @@ class DummyProcessingEngine(ProcessingEngine):
         self,
         file: FieldFilePB,
         storage: Storage,
-        classif_labels: Optional[list[ClassificationLabel]] = None,
+        classif_labels: list[ClassificationLabel] | None = None,
     ) -> str:
         self.calls.append([file, storage])
         index = len(self.values["convert_internal_filefield_to_str"])
@@ -516,5 +516,5 @@ class DummyProcessingEngine(ProcessingEngine):
         self.values["send_to_process"].append([item, partition])
         return ProcessingInfo(seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED)
 
-    async def delete_from_processing(self, *, kbid: str, resource_id: Optional[str] = None) -> None:
+    async def delete_from_processing(self, *, kbid: str, resource_id: str | None = None) -> None:
         self.calls.append([kbid, resource_id])

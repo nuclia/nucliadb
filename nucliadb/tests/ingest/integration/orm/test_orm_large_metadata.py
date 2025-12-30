@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from os.path import dirname, getsize
-from typing import Optional
 from uuid import uuid4
 
 from nucliadb.ingest.fields.text import Text
@@ -53,7 +52,7 @@ async def test_create_resource_orm_large_metadata(
     field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_large_field_metadata(ex1)
 
-    ex2: Optional[LargeComputedMetadata] = await field_obj.get_large_field_metadata()
+    ex2: LargeComputedMetadata | None = await field_obj.get_large_field_metadata()
     assert ex2 is not None
     assert ex2.metadata.tokens["tok"] == ex1.real.metadata.tokens["tok"]
 
@@ -93,7 +92,7 @@ async def test_create_resource_orm_large_metadata_file(
     field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_large_field_metadata(ex1)
 
-    ex2: Optional[LargeComputedMetadata] = await field_obj.get_large_field_metadata()
+    ex2: LargeComputedMetadata | None = await field_obj.get_large_field_metadata()
     assert ex2 is not None
     ex3 = LargeComputedMetadata()
     with open(filename, "rb") as testfile:

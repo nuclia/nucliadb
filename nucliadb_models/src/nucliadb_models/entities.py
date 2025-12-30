@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -21,50 +20,50 @@ from pydantic import BaseModel, Field
 class Entity(BaseModel):
     value: str
     merged: bool = False
-    represents: List[str] = []
+    represents: list[str] = []
 
 
 class EntitiesGroupSummary(BaseModel):
-    title: Optional[str] = Field(default=None, description="Title of the entities group")
-    color: Optional[str] = Field(
+    title: str | None = Field(default=None, description="Title of the entities group")
+    color: str | None = Field(
         default=None,
         description="Color of the entities group. This is for display purposes only.",
     )
     custom: bool = Field(default=False, description="Denotes if it has been created by the user")
 
-    entities: Dict[str, Entity] = Field(
+    entities: dict[str, Entity] = Field(
         default={},
         title="[Deprecated] Entities in the group",
-        description="This field is deprecated and will be removed in future versions. It will always be empty. Use the /api/v1/kb/{kbid}/entitiesgroup/{group} endpoint to get the entities of a group.",  # noqa: E501
+        description="This field is deprecated and will be removed in future versions. It will always be empty. Use the /api/v1/kb/{kbid}/entitiesgroup/{group} endpoint to get the entities of a group.",
     )
 
 
 class EntitiesGroup(BaseModel):
-    title: Optional[str] = Field(default=None, description="Title of the entities group")
-    color: Optional[str] = Field(
+    title: str | None = Field(default=None, description="Title of the entities group")
+    color: str | None = Field(
         default=None,
         description="Color of the entities group. This is for display purposes only.",
     )
     custom: bool = Field(default=False, description="Denotes if it has been created by the user")
-    entities: Dict[str, Entity] = {}
+    entities: dict[str, Entity] = {}
 
 
 class KnowledgeBoxEntities(BaseModel):
     uuid: str
-    groups: Dict[str, EntitiesGroupSummary] = {}
+    groups: dict[str, EntitiesGroupSummary] = {}
 
 
 class CreateEntitiesGroupPayload(BaseModel):
     group: str
-    entities: Dict[str, Entity] = {}
-    title: Optional[str] = None
-    color: Optional[str] = None
+    entities: dict[str, Entity] = {}
+    title: str | None = None
+    color: str | None = None
 
 
 class UpdateEntitiesGroupPayload(BaseModel):
-    title: Optional[str] = None
-    color: Optional[str] = None
+    title: str | None = None
+    color: str | None = None
 
-    add: Dict[str, Entity] = {}
-    update: Dict[str, Entity] = {}
-    delete: List[str] = []
+    add: dict[str, Entity] = {}
+    update: dict[str, Entity] = {}
+    delete: list[str] = []

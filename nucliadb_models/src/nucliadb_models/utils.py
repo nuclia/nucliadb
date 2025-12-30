@@ -14,11 +14,10 @@
 
 import json
 from datetime import datetime
-from typing import Union
+from typing import Annotated
 
 import pydantic
 from pydantic import BeforeValidator
-from typing_extensions import Annotated
 
 
 def validate_field_id(value, handler, info):
@@ -75,7 +74,7 @@ def validate_json(value: str):
         raise ValueError("Invalid JSON") from exc
 
 
-def check_valid_datetime(v: Union[str, datetime]) -> datetime:
+def check_valid_datetime(v: str | datetime) -> datetime:
     if isinstance(v, datetime):
         return v
     try:

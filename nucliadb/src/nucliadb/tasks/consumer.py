@@ -19,7 +19,7 @@
 #
 
 import asyncio
-from typing import Generic, Optional, Type
+from typing import Generic
 
 import nats
 import nats.js.api
@@ -44,9 +44,9 @@ class NatsTaskConsumer(Generic[MsgType]):
         stream: NatsStream,
         consumer: NatsConsumer,
         callback: Callback,
-        msg_type: Type[MsgType],
-        max_concurrent_messages: Optional[int] = None,
-        max_deliver: Optional[int] = None,
+        msg_type: type[MsgType],
+        max_concurrent_messages: int | None = None,
+        max_deliver: int | None = None,
     ):
         self.name = name
         self.stream = stream
@@ -180,8 +180,8 @@ def create_consumer(
     stream: NatsStream,
     consumer: NatsConsumer,
     callback: Callback,
-    msg_type: Type[MsgType],
-    max_concurrent_messages: Optional[int] = None,
+    msg_type: type[MsgType],
+    max_concurrent_messages: int | None = None,
     max_retries: int = 100,
 ) -> NatsTaskConsumer[MsgType]:
     """

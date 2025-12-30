@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from os.path import dirname, getsize
-from typing import Optional
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
@@ -65,7 +64,7 @@ async def test_create_resource_orm_vector(
     field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_vectors(ex1, vectorset_id, storage_key_kind)
 
-    ex2: Optional[VectorObject] = await field_obj.get_vectors(vectorset_id, storage_key_kind)
+    ex2: VectorObject | None = await field_obj.get_vectors(vectorset_id, storage_key_kind)
     assert ex2 is not None
     assert ex2.vectors.vectors[0].vector == ex1.vectors.vectors.vectors[0].vector
 
@@ -98,7 +97,7 @@ async def test_create_resource_orm_vector_file(
     field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_vectors(ex1, vectorset_id, storage_key_kind)
 
-    ex2: Optional[VectorObject] = await field_obj.get_vectors(vectorset_id, storage_key_kind)
+    ex2: VectorObject | None = await field_obj.get_vectors(vectorset_id, storage_key_kind)
     ex3 = VectorObject()
     with open(filename, "rb") as testfile:
         data2 = testfile.read()
@@ -142,7 +141,7 @@ async def test_create_resource_orm_vector_split(
     field_obj2: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj2.set_vectors(ex1, vectorset_id, storage_key_kind)
 
-    ex2: Optional[VectorObject] = await field_obj2.get_vectors(vectorset_id, storage_key_kind)
+    ex2: VectorObject | None = await field_obj2.get_vectors(vectorset_id, storage_key_kind)
     assert ex2 is not None
     assert len(ex2.split_vectors) == 3
 

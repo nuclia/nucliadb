@@ -19,8 +19,8 @@
 #
 import asyncio
 import sys
+from collections.abc import Awaitable, Callable
 from functools import partial
-from typing import Awaitable, Callable, Optional
 
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
@@ -55,7 +55,7 @@ async def _exit_tasks(tasks: list[asyncio.Task]) -> None:
 
 
 async def start_ingest_consumers(
-    service_name: Optional[str] = None,
+    service_name: str | None = None,
 ) -> Callable[[], Awaitable[None]]:
     if transaction_settings.transaction_local:
         raise ConfigurationError("Can not start ingest consumers in local mode")
@@ -91,7 +91,7 @@ async def start_ingest_consumers(
 
 
 async def start_ingest_processed_consumer_v2(
-    service_name: Optional[str] = None,
+    service_name: str | None = None,
 ) -> Callable[[], Awaitable[None]]:
     """
     This is not meant to be deployed with a stateful set like the other consumers.

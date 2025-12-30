@@ -19,9 +19,10 @@
 #
 
 import logging
+from collections.abc import Callable
 from contextlib import contextmanager
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 from unittest.mock import patch
 
 from fastapi import FastAPI
@@ -35,11 +36,11 @@ logger = logging.getLogger("fixtures.utils")
 
 def create_api_client_factory(application: FastAPI) -> Callable[..., AsyncClient]:
     def _make_client_fixture(
-        roles: Optional[list[Enum]] = None,
+        roles: list[Enum] | None = None,
         user: str = "",
         version: str = "1",
         root: bool = False,
-        extra_headers: Optional[dict[str, str]] = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> AsyncClient:
         roles = roles or []
         client_base_url = "http://test"

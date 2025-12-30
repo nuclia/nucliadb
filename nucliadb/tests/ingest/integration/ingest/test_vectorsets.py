@@ -20,7 +20,6 @@
 import random
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from nidx_protos import noderesources_pb2
 
@@ -76,7 +75,7 @@ async def test_ingest_broker_message_with_vectorsets(
 
     def validate_index_message(resource: noderesources_pb2.Resource):
         assert len(resource.paragraphs) == 1
-        field_id = list(resource.paragraphs.keys())[0]
+        field_id = next(iter(resource.paragraphs.keys()))
         field_paragraphs = resource.paragraphs[field_id]
         for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
             assert len(paragraph.vectorsets_sentences) == 2
@@ -138,7 +137,7 @@ def create_broker_message_with_vectorset(
     vectorset_id: str,
     *,
     vectorset_dimension: int,
-    default_vectorset_dimension: Optional[int] = None,
+    default_vectorset_dimension: int | None = None,
 ):
     bm = writer_pb2.BrokerMessage(kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT)
 

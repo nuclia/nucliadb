@@ -19,9 +19,10 @@
 #
 import functools
 import logging
+from collections.abc import Callable
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Callable, Optional, cast
+from typing import cast
 
 from pydantic import BaseModel
 
@@ -44,7 +45,7 @@ class TaskMetadata(BaseModel):
     status: Status
     retries: int = 0
     error_messages: list[str] = []
-    last_modified: Optional[datetime] = None
+    last_modified: datetime | None = None
 
 
 class TaskRetryHandler:
@@ -87,7 +88,7 @@ class TaskRetryHandler:
             kbid=self.kbid, task_type=self.task_type, task_id=self.task_id
         )
 
-    async def get_metadata(self) -> Optional[TaskMetadata]:
+    async def get_metadata(self) -> TaskMetadata | None:
         return await _get_metadata(self.context.kv_driver, self.metadata_key)
 
     async def set_metadata(self, metadata: TaskMetadata) -> None:
@@ -150,7 +151,7 @@ class TaskRetryHandler:
         return wrapper
 
 
-async def _get_metadata(kv_driver: Driver, metadata_key: str) -> Optional[TaskMetadata]:
+async def _get_metadata(kv_driver: Driver, metadata_key: str) -> TaskMetadata | None:
     async with kv_driver.ro_transaction() as txn:
         metadata = await txn.get(metadata_key)
         if metadata is None:
@@ -173,7 +174,7 @@ async def purge_metadata(kv_driver: Driver) -> int:
         return 0
 
     total_purged = 0
-    start: Optional[str] = ""
+    start: str | None = ""
     while True:
         start, purged = await purge_batch(kv_driver, start)
         total_purged += purged
@@ -183,8 +184,8 @@ async def purge_metadata(kv_driver: Driver) -> int:
 
 
 async def purge_batch(
-    kv_driver: PGDriver, start: Optional[str] = None, batch_size: int = 200
-) -> tuple[Optional[str], int]:
+    kv_driver: PGDriver, start: str | None = None, batch_size: int = 200
+) -> tuple[str | None, int]:
     """
     Returns the next start key and the number of purged records. If start is None, it means there are no more records to purge.
     """

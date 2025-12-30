@@ -20,7 +20,8 @@
 # This code is inspired by fastapi_versioning 1/3/2022 with MIT licence
 
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TypeVar, cast
+from collections.abc import Callable
+from typing import Any, Sequence, TypeVar, cast
 
 from fastapi import FastAPI
 from fastapi.middleware import Middleware
@@ -40,8 +41,8 @@ def version(major: int, minor: int = 0) -> Callable[[CallableT], CallableT]:  # 
 
 def version_to_route(
     route: BaseRoute,
-    default_version: Tuple[int, int],
-) -> Tuple[Tuple[int, int], APIRoute]:  # pragma: no cover
+    default_version: tuple[int, int],
+) -> tuple[tuple[int, int], APIRoute]:  # pragma: no cover
     api_route = cast(APIRoute, route)
     version = getattr(api_route.endpoint, "_api_version", default_version)
     return version, api_route
@@ -51,10 +52,10 @@ def VersionedFastAPI(
     app: FastAPI,
     version_format: str = "{major}.{minor}",
     prefix_format: str = "/v{major}_{minor}",
-    default_version: Tuple[int, int] = (1, 0),
+    default_version: tuple[int, int] = (1, 0),
     enable_latest: bool = False,
     middleware: Sequence[Middleware] | None = None,
-    kwargs: Optional[Dict[str, object]] = None,
+    kwargs: dict[str, object] | None = None,
 ) -> FastAPI:  # pragma: no cover
     kwargs = kwargs or {}
 
@@ -63,7 +64,7 @@ def VersionedFastAPI(
         middleware=middleware,
         **kwargs,  # type: ignore
     )
-    version_route_mapping: Dict[Tuple[int, int], List[APIRoute]] = defaultdict(list)
+    version_route_mapping: dict[tuple[int, int], list[APIRoute]] = defaultdict(list)
     version_routes = [version_to_route(route, default_version) for route in app.routes]
 
     for version, route in version_routes:

@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import Union
 from unittest.mock import patch
 
 import pytest
@@ -73,7 +72,7 @@ async def test_find_query_parsing__top_k(
     ],
 )
 async def test_find_query_parsing__rank_fusion(
-    rank_fusion: Union[search_models.RankFusionName, search_models.RankFusion],
+    rank_fusion: search_models.RankFusionName | search_models.RankFusion,
     expected: parser_models.RankFusion,
     maindb_driver: Driver,
     dummy_predict: PredictEngine,
@@ -133,7 +132,7 @@ async def test_find_query_parsing__rank_fusion_limits(
 async def test_find_query_parsing__reranker(
     maindb_driver: Driver,
     dummy_predict: PredictEngine,
-    reranker: Union[search_models.RerankerName, search_models.Reranker],
+    reranker: search_models.RerankerName | search_models.Reranker,
     expected: parser_models.Reranker,
 ):
     find = FindRequest(

@@ -19,7 +19,6 @@
 #
 import random
 from datetime import datetime
-from typing import Optional
 from unittest.mock import patch
 
 import pytest
@@ -382,10 +381,10 @@ async def test_conversation_field_indexing(
         return bm
 
     async def search_message(
-        query: Optional[str] = None,
-        vector: Optional[list[float]] = None,
+        query: str | None = None,
+        vector: list[float] | None = None,
         top_k: int = 5,
-        min_score: Optional[float] = None,
+        min_score: float | None = None,
     ) -> KnowledgeboxFindResults:
         payload = {"top_k": top_k, "reranker": "noop"}
         features = []

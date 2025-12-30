@@ -19,7 +19,7 @@
 #
 
 import abc
-from typing import AsyncGenerator, AsyncIterator, Optional, Union
+from collections.abc import AsyncGenerator, AsyncIterator
 
 from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
 
@@ -37,7 +37,7 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
     async def finalize(self) -> None: ...
 
     @abc.abstractmethod
-    async def bucket_create(self, bucket: str, labels: Optional[dict[str, str]] = None) -> bool:
+    async def bucket_create(self, bucket: str, labels: dict[str, str] | None = None) -> bool:
         """
         Create a new bucket in the object storage. Labels the bucket with the given labels if provided.
         Returns True if the bucket was created, False if it already existed.
@@ -93,7 +93,7 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
         self,
         bucket: str,
         key: str,
-        data: Union[bytes, AsyncGenerator[bytes, None]],
+        data: bytes | AsyncGenerator[bytes, None],
         metadata: ObjectMetadata,
     ) -> None: ...
 
@@ -114,14 +114,14 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def download_stream(
-        self, bucket: str, key: str, range: Optional[Range] = None
+        self, bucket: str, key: str, range: Range | None = None
     ) -> AsyncGenerator[bytes, None]:
         raise NotImplementedError()
         yield b""
 
     @abc.abstractmethod
     async def iterate(
-        self, bucket: str, prefix: str, start: Optional[str] = None
+        self, bucket: str, prefix: str, start: str | None = None
     ) -> AsyncGenerator[ObjectInfo, None]:
         raise NotImplementedError()
         yield ObjectInfo(name="")
@@ -132,7 +132,7 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def upload_multipart_start(
         self, bucket: str, key: str, metadata: ObjectMetadata
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Start a multipart upload. May return the url for the resumable upload.
         """

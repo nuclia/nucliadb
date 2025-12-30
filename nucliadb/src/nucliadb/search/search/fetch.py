@@ -19,7 +19,6 @@
 #
 import asyncio
 from contextvars import ContextVar
-from typing import Optional
 
 from nidx_protos.nodereader_pb2 import DocumentResult, ParagraphResult
 
@@ -36,7 +35,7 @@ from nucliadb_protos.resources_pb2 import Paragraph
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
-rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar("rcache", default=None)
+rcache: ContextVar[dict[str, ResourceORM] | None] = ContextVar("rcache", default=None)
 
 
 async def fetch_resources(
@@ -79,7 +78,7 @@ async def fetch_resources(
 
 async def get_paragraph_from_resource(
     orm_resource: ResourceORM, result: ParagraphResult
-) -> Optional[Paragraph]:
+) -> Paragraph | None:
     _, field_type, field = result.field.split("/")
     field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
@@ -144,7 +143,7 @@ async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> list[str]:
 
 async def get_seconds_paragraph(
     result: ParagraphResult, kbid: str
-) -> Optional[tuple[list[int], list[int]]]:
+) -> tuple[list[int], list[int]] | None:
     orm_resource = await cache.get_resource(kbid, result.uuid)
 
     if orm_resource is None:

@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Optional
 from uuid import uuid4
 
 from nidx_protos.noderesources_pb2 import Resource
@@ -75,11 +74,11 @@ async def test_create_resource_orm_with_basic(
     r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
     assert r is not None
 
-    b2: Optional[PBBasic] = await r.get_basic()
+    b2: PBBasic | None = await r.get_basic()
     assert b2 is not None
     assert b2.icon == "text/plain"
 
-    o2: Optional[PBOrigin] = await r.get_origin()
+    o2: PBOrigin | None = await r.get_origin()
     assert o2 is None
 
     o2 = PBOrigin()
@@ -321,11 +320,11 @@ async def test_generate_broker_message(
     assert led.HasField("link_thumbnail")
 
     # Link extracted text
-    letxt = [et for et in bm.extracted_text if et.field.field == "link1"][0]
+    letxt = next(et for et in bm.extracted_text if et.field.field == "link1")
     assert letxt.body.text == "MyText"
 
     # Link field computed metadata
-    lfcm = [fcm for fcm in bm.field_metadata if fcm.field.field == "link1"][0]
+    lfcm = next(fcm for fcm in bm.field_metadata if fcm.field.field == "link1")
     assert lfcm.metadata.metadata.links[0] == "https://nuclia.com"
     assert len(lfcm.metadata.metadata.paragraphs) == 1
     assert len(lfcm.metadata.metadata.entities["processor"].entities) == 1
@@ -338,16 +337,16 @@ async def test_generate_broker_message(
     assert lfcm.metadata.metadata.HasField("thumbnail")
 
     # Large field metadata
-    llfm = [lfm for lfm in bm.field_large_metadata if lfm.field.field == "link1"][0]
+    llfm = next(lfm for lfm in bm.field_large_metadata if lfm.field.field == "link1")
     assert len(llfm.real.metadata.entities) == 2
     assert llfm.real.metadata.tokens["tok"] == 3
 
     # Field vectors
     idx = 0
     async for vectorset_id, vs in datamanagers.vectorsets.iter(txn, kbid=kb_obj.kbid):
-        lfv = [
+        lfv = next(
             v for v in bm.field_vectors if v.field.field == "link1" and v.vectorset_id == vectorset_id
-        ][0]
+        )
         assert len(lfv.vectors.vectors.vectors) == 1
         assert lfv.vectors.vectors.vectors[0].start == 0
         assert lfv.vectors.vectors.vectors[0].end == 20
@@ -369,7 +368,7 @@ async def test_generate_broker_message(
             assert len(msg.content.attachments) == 2
 
     # Extracted text
-    cfet = [et for et in bm.extracted_text if et.field.field == "conv1"][0]
+    cfet = next(et for et in bm.extracted_text if et.field.field == "conv1")
     assert cfet.body.text == "MyText"
 
     # TODO: Add checks for remaining field types and

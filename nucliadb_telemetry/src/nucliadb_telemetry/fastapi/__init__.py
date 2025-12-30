@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 
-from typing import Iterable, List
+from collections.abc import Iterable
 from urllib.parse import urlparse
 
 import prometheus_client
@@ -60,7 +60,7 @@ class ExcludeList:
 
 def instrument_app(
     app: FastAPI,
-    excluded_urls: List[str],
+    excluded_urls: list[str],
     server_request_hook: ServerRequestHookT = None,
     tracer_provider=None,
     metrics=False,

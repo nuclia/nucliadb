@@ -24,7 +24,8 @@ import functools
 import json
 import logging
 import tarfile
-from typing import Any, AsyncIterator, Callable, Optional, Union
+from collections.abc import AsyncIterator, Callable
+from typing import Any
 
 from pydantic import TypeAdapter
 
@@ -99,7 +100,7 @@ async def restore_resources(context: ApplicationContext, kbid: str, backup_id: s
         await set_last_restored(context, kbid, backup_id, key)
 
 
-async def get_last_restored(context: ApplicationContext, kbid: str, backup_id: str) -> Optional[str]:
+async def get_last_restored(context: ApplicationContext, kbid: str, backup_id: str) -> str | None:
     key = MaindbKeys.LAST_RESTORED.format(kbid=kbid, backup_id=backup_id)
     async with context.kv_driver.ro_transaction() as txn:
         raw = await txn.get(key)
@@ -189,7 +190,7 @@ class ResourceBackupReader:
         data = await self.read(tarinfo_size + padding_bytes)
         return data[:tarinfo_size]
 
-    async def read_item(self) -> Union[BrokerMessage, CloudFile, CloudFileBinary]:
+    async def read_item(self) -> BrokerMessage | CloudFile | CloudFileBinary:
         tarinfo = await self.read_tarinfo()
         if tarinfo.name.startswith("broker-message"):
             raw_bm = await self.read_data(tarinfo)

@@ -75,7 +75,7 @@ class _RetrievalParser:
         try:
             rank_fusion = self._parse_rank_fusion()
         except ValidationError as exc:
-            raise InternalParserError(f"Parsing error in rank fusion: {str(exc)}") from exc
+            raise InternalParserError(f"Parsing error in rank fusion: {exc!s}") from exc
 
         # ensure top_k and rank_fusion are coherent
         if top_k > rank_fusion.window:

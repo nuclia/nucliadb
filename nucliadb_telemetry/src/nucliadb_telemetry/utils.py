@@ -15,7 +15,6 @@
 
 import asyncio
 import os
-from typing import Dict, Optional
 
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
@@ -29,14 +28,14 @@ from nucliadb_telemetry.tracerprovider import (
     AsyncTracerProvider,
 )
 
-from .context import set_info_on_span  # noqa: F401
+from .context import set_info_on_span
 
 set_info_on_span  # b/w compatible import
 
-GLOBAL_PROVIDER: Dict[str, AsyncTracerProvider] = {}
+GLOBAL_PROVIDER: dict[str, AsyncTracerProvider] = {}
 
 
-def get_telemetry(service_name: Optional[str] = None) -> Optional[AsyncTracerProvider]:
+def get_telemetry(service_name: str | None = None) -> AsyncTracerProvider | None:
     if service_name is None:
         return None
     if service_name not in GLOBAL_PROVIDER and service_name is not None:
@@ -47,7 +46,7 @@ def get_telemetry(service_name: Optional[str] = None) -> Optional[AsyncTracerPro
     return GLOBAL_PROVIDER.get(service_name)
 
 
-def create_telemetry(service_name: str) -> Optional[AsyncTracerProvider]:
+def create_telemetry(service_name: str) -> AsyncTracerProvider | None:
     if telemetry_settings.jaeger_enabled is False:
         return None
 
@@ -69,7 +68,7 @@ async def clean_telemetry(service_name: str):
         del GLOBAL_PROVIDER[service_name]
 
 
-async def init_telemetry(tracer_provider: Optional[AsyncTracerProvider] = None):
+async def init_telemetry(tracer_provider: AsyncTracerProvider | None = None):
     if tracer_provider is None:
         return
 
@@ -107,7 +106,7 @@ async def init_telemetry(tracer_provider: Optional[AsyncTracerProvider] = None):
     tracer_provider.initialized = True
 
 
-async def setup_telemetry(service_name: str) -> Optional[AsyncTracerProvider]:
+async def setup_telemetry(service_name: str) -> AsyncTracerProvider | None:
     """
     Setup telemetry for a service if it is enabled
     """

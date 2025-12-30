@@ -20,7 +20,6 @@
 import asyncio
 from collections.abc import AsyncGenerator
 from datetime import datetime
-from typing import Union
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -105,9 +104,9 @@ async def test_activity(kb_notifications, nucliadb_reader: AsyncClient, knowledg
                 "resource_processed",
             ]
 
-            notif: Union[
-                ResourceIndexedNotification, ResourceWrittenNotification, ResourceProcessedNotification
-            ]
+            notif: (
+                ResourceIndexedNotification | ResourceWrittenNotification | ResourceProcessedNotification
+            )
 
             if notification_type == "resource_indexed":
                 notif = ResourceIndexedNotification.model_validate_json(line)  # type: ignore

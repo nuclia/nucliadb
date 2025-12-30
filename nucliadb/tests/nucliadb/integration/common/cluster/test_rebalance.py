@@ -232,7 +232,7 @@ async def test_build_shard_resources_index(
     assert set(shards_to_resources.values()) == {30}
 
     resources_batch = await get_resources_from_shard(
-        app_context.kv_driver, kbid, list(shards_to_resources.keys())[0], n=1000
+        app_context.kv_driver, kbid, next(iter(shards_to_resources.keys())), n=1000
     )
     assert set(resources_batch) == set(rids)
 

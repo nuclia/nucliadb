@@ -18,9 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
+from collections.abc import Iterator
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Iterator, Optional
 
 from nidx_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nidx_protos.noderesources_pb2 import (
@@ -81,9 +81,9 @@ class ResourceBrain:
         self,
         basic: Basic,
         user_relations: Relations,
-        origin: Optional[Origin],
-        previous_processing_status: Optional[Metadata.Status.ValueType],
-        security: Optional[utils_pb2.Security],
+        origin: Origin | None,
+        previous_processing_status: Metadata.Status.ValueType | None,
+        security: utils_pb2.Security | None,
     ) -> None:
         self._set_resource_status(basic, previous_processing_status)
         self._set_resource_dates(basic, origin)
@@ -97,9 +97,9 @@ class ResourceBrain:
         self,
         field_key: str,
         extracted_text: ExtractedText,
-        field_computed_metadata: Optional[FieldComputedMetadata],
-        basic_user_metadata: Optional[UserMetadata],
-        field_author: Optional[FieldAuthor],
+        field_computed_metadata: FieldComputedMetadata | None,
+        basic_user_metadata: UserMetadata | None,
+        field_author: FieldAuthor | None,
         replace_field: bool,
         skip_index: bool,
     ) -> None:
@@ -122,7 +122,7 @@ class ResourceBrain:
         field_key: str,
         extracted_text: ExtractedText,
         replace_field: bool,
-        skip_texts: Optional[bool],
+        skip_texts: bool | None,
     ):
         if skip_texts is not None:
             self.brain.skip_texts = skip_texts
@@ -144,18 +144,16 @@ class ResourceBrain:
     def apply_field_labels(
         self,
         field_key: str,
-        field_computed_metadata: Optional[FieldComputedMetadata],
-        field_author: Optional[FieldAuthor],
-        basic_user_metadata: Optional[UserMetadata] = None,
+        field_computed_metadata: FieldComputedMetadata | None,
+        field_author: FieldAuthor | None,
+        basic_user_metadata: UserMetadata | None = None,
     ):
         user_cancelled_labels: set[str] = (
-            set(
-                [
-                    f"{classification.labelset}/{classification.label}"
-                    for classification in basic_user_metadata.classifications
-                    if classification.cancelled_by_user
-                ]
-            )
+            {
+                f"{classification.labelset}/{classification.label}"
+                for classification in basic_user_metadata.classifications
+                if classification.cancelled_by_user
+            }
             if basic_user_metadata
             else set()
         )
@@ -216,12 +214,12 @@ class ResourceBrain:
         field_key: str,
         field_computed_metadata: FieldComputedMetadata,
         extracted_text: ExtractedText,
-        page_positions: Optional[FilePagePositions],
-        user_field_metadata: Optional[UserFieldMetadata],
+        page_positions: FilePagePositions | None,
+        user_field_metadata: UserFieldMetadata | None,
         replace_field: bool,
-        skip_paragraphs_index: Optional[bool],
-        skip_texts_index: Optional[bool],
-        append_splits: Optional[set[str]] = None,
+        skip_paragraphs_index: bool | None,
+        skip_texts_index: bool | None,
+        append_splits: set[str] | None = None,
     ) -> None:
         """
         append_splits: when provided, only the splits in this set will be indexed. This is used for conversation appends, to
@@ -247,8 +245,7 @@ class ResourceBrain:
         )
 
     def sorted_splits(self, extracted_text: ExtractedText) -> Iterator[str]:
-        for split in sorted(extracted_text.split_text.keys()):
-            yield split
+        yield from sorted(extracted_text.split_text.keys())
 
     @observer.wrap({"type": "apply_field_paragraphs"})
     def apply_field_paragraphs(
@@ -256,11 +253,11 @@ class ResourceBrain:
         field_key: str,
         field_computed_metadata: FieldComputedMetadata,
         extracted_text: ExtractedText,
-        page_positions: Optional[FilePagePositions],
-        user_field_metadata: Optional[UserFieldMetadata],
+        page_positions: FilePagePositions | None,
+        user_field_metadata: UserFieldMetadata | None,
         replace_field: bool,
-        skip_paragraphs: Optional[bool],
-        append_splits: Optional[set[str]] = None,
+        skip_paragraphs: bool | None,
+        append_splits: set[str] | None = None,
     ) -> None:
         if skip_paragraphs is not None:
             self.brain.skip_paragraphs = skip_paragraphs
@@ -393,7 +390,7 @@ class ResourceBrain:
             self.brain.paragraphs_to_delete.append(full_field_id)
 
     def _get_paragraph_user_classifications(
-        self, basic_user_field_metadata: Optional[UserFieldMetadata]
+        self, basic_user_field_metadata: UserFieldMetadata | None
     ) -> ParagraphClassifications:
         pc = ParagraphClassifications(valid={}, denied={})
         if basic_user_field_metadata is None:
@@ -412,18 +409,16 @@ class ResourceBrain:
     def generate_relations(
         self,
         field_key: str,
-        field_computed_metadata: Optional[FieldComputedMetadata],
-        basic_user_metadata: Optional[UserMetadata],
+        field_computed_metadata: FieldComputedMetadata | None,
+        basic_user_metadata: UserMetadata | None,
         replace_field: bool,
     ) -> None:
         user_cancelled_labels: set[str] = (
-            set(
-                [
-                    f"{classification.labelset}/{classification.label}"
-                    for classification in basic_user_metadata.classifications
-                    if classification.cancelled_by_user
-                ]
-            )
+            {
+                f"{classification.labelset}/{classification.label}"
+                for classification in basic_user_metadata.classifications
+                if classification.cancelled_by_user
+            }
             if basic_user_metadata
             else set()
         )
@@ -524,8 +519,8 @@ class ResourceBrain:
         vectorset: str,
         replace_field: bool = False,
         # cut to specific dimension if specified
-        vector_dimension: Optional[int] = None,
-        append_splits: Optional[set[str]] = None,
+        vector_dimension: int | None = None,
+        append_splits: set[str] | None = None,
     ):
         fid = ids.FieldId.from_string(f"{self.rid}/{field_id}")
         for subfield, vectors in vo.split_vectors.items():
@@ -599,7 +594,7 @@ class ResourceBrain:
         *,
         vectorset: str,
         # cut vectors if a specific dimension is specified
-        vector_dimension: Optional[int] = None,
+        vector_dimension: int | None = None,
     ):
         paragraph_pb = self.brain.paragraphs[field_id].paragraphs[paragraph_key.full()]
         sentence_pb = paragraph_pb.vectorsets_sentences[vectorset].sentences[sentence_key.full()]
@@ -624,7 +619,7 @@ class ResourceBrain:
 
         sentence_pb.metadata.position.index = paragraph_pb.metadata.position.index
 
-    def _set_resource_status(self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]):
+    def _set_resource_status(self, basic: Basic, previous_status: Metadata.Status.ValueType | None):
         """
         We purposefully overwrite what we index as a status and DO NOT reflect
         actual status with what we index.
@@ -654,7 +649,7 @@ class ResourceBrain:
             return "EMPTY"
         return METADATA_STATUS_PB_TYPE_TO_NAME_MAP[metadata.status]
 
-    def _set_resource_dates(self, basic: Basic, origin: Optional[Origin]):
+    def _set_resource_dates(self, basic: Basic, origin: Origin | None):
         """
         Adds the user-defined dates to the brain object. This is at resource level and applies to
         all fields of the resource.
@@ -679,7 +674,7 @@ class ResourceBrain:
             if origin.HasField("modified") and origin.modified.seconds != 0:
                 self.brain.metadata.modified.CopyFrom(origin.modified)
 
-    def _set_resource_relations(self, basic: Basic, origin: Optional[Origin], user_relations: Relations):
+    def _set_resource_relations(self, basic: Basic, origin: Origin | None, user_relations: Relations):
         """
         Adds the relations to the brain object corresponding to the user-defined metadata at the resource level:
         - Contributors of the document
@@ -723,7 +718,7 @@ class ResourceBrain:
 
         self.brain.relation_fields_to_delete.append("a/metadata")
 
-    def _set_resource_labels(self, basic: Basic, origin: Optional[Origin]):
+    def _set_resource_labels(self, basic: Basic, origin: Origin | None):
         """
         Adds the resource-level labels to the brain object.
         These levels are user-defined in basic or origin metadata.
@@ -780,7 +775,7 @@ class ResourceBrain:
 
 def is_paragraph_repeated_in_field(
     paragraph: Paragraph,
-    extracted_text: Optional[str],
+    extracted_text: str | None,
     unique_paragraphs: set[str],
 ) -> bool:
     if extracted_text is None:
@@ -819,15 +814,13 @@ class ParagraphPages:
             return self._materialized[paragraph_start_index]
         except IndexError:
             logger.error(
-                f"Could not find a page for the given index: {paragraph_start_index}. Page positions: {self.positions}"  # noqa
+                f"Could not find a page for the given index: {paragraph_start_index}. Page positions: {self.positions}"
             )
             if len(self._materialized) > 0:
                 return self._materialized[-1]
             return 0
 
 
-def should_skip_split_indexing(
-    split: str, replace_field: bool, append_splits: Optional[set[str]]
-) -> bool:
+def should_skip_split_indexing(split: str, replace_field: bool, append_splits: set[str] | None) -> bool:
     # When replacing the whole field, reindex all splits. Otherwise, we're only indexing the splits that are appended
     return not replace_field and append_splits is not None and split not in append_splits

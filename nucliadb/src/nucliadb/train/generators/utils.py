@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Any, AsyncGenerator, AsyncIterator, Optional, Type
+from collections.abc import AsyncGenerator, AsyncIterator
+from typing import Any
 
 from nucliadb.common.cache import get_resource_cache
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
@@ -30,7 +31,7 @@ from nucliadb.train.types import T
 from nucliadb_utils.utilities import get_storage
 
 
-async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[ResourceORM]:
+async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> ResourceORM | None:
     resource_cache = get_resource_cache()
     if resource_cache is None:
         logger.warning("Resource cache is not set")
@@ -39,7 +40,7 @@ async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[Resour
     return await resource_cache.get(kbid, uuid)
 
 
-async def _get_resource_from_db(kbid: str, uuid: str) -> Optional[ResourceORM]:
+async def _get_resource_from_db(kbid: str, uuid: str) -> ResourceORM | None:
     storage = await get_storage(service_name=SERVICE_NAME)
     async with get_driver().ro_transaction() as transaction:
         kb = KnowledgeBoxORM(transaction, storage, kbid)
@@ -81,7 +82,7 @@ async def get_paragraph(kbid: str, paragraph_id: str) -> str:
 
 
 async def batchify(
-    producer: AsyncIterator[Any], size: int, batch_klass: Type[T]
+    producer: AsyncIterator[Any], size: int, batch_klass: type[T]
 ) -> AsyncGenerator[T, None]:
     # NOTE: we are supposing all protobuffers have a data field
     batch = []

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -330,7 +330,7 @@ async def test_resource_endpoints_by_slug(
     knowledgebox: str,
     method: str,
     endpoint: str,
-    payload: Optional[dict[Any, Any]],
+    payload: dict[Any, Any] | None,
 ):
     kbid = knowledgebox
     slug = "my-resource"

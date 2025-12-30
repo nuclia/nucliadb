@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional
 
 
 class ClientError(Exception):
@@ -31,7 +30,7 @@ class AccountLimitError(ClientError):
 
 
 class RateLimitError(ClientError):
-    def __init__(self, message, try_after: Optional[float] = None):
+    def __init__(self, message, try_after: float | None = None):
         super().__init__(message)
         self.try_after = try_after
 

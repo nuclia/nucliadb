@@ -19,7 +19,6 @@
 #
 import dataclasses
 from datetime import datetime
-from typing import Optional, Union
 
 from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
@@ -88,7 +87,7 @@ async def extract_file_field(
     resource: ORMResource,
     toprocess: PushPayload,
     resource_classifications: ResourceClassifications,
-    password: Optional[str] = None,
+    password: str | None = None,
 ):
     field_type = resources_pb2.FieldType.FILE
     field = await resource.get_field(field_id, field_type)
@@ -183,7 +182,7 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
 async def parse_fields(
     writer: BrokerMessage,
     toprocess: PushPayload,
-    item: Union[CreateResourcePayload, UpdateResourcePayload],
+    item: CreateResourcePayload | UpdateResourcePayload,
     kbid: str,
     uuid: str,
     x_skip_store: bool,

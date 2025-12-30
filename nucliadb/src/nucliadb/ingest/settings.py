@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -41,13 +40,13 @@ class DriverConfig(Enum):
 
 class DriverSettings(BaseSettings):
     driver: DriverConfig = Field(default=DriverConfig.PG, description="K/V storage driver")
-    driver_local_url: Optional[str] = Field(
+    driver_local_url: str | None = Field(
         default=None,
         description="Local path to store data on file system. Example: /nucliadb/data/main",
     )
-    driver_pg_url: Optional[str] = Field(
+    driver_pg_url: str | None = Field(
         default=None,
-        description="PostgreSQL DSN. The connection string to the PG server. Example: postgres://username:password@postgres:5432/nucliadb.",  # noqa
+        description="PostgreSQL DSN. The connection string to the PG server. Example: postgres://username:password@postgres:5432/nucliadb.",
     )
     driver_pg_connection_pool_min_size: int = Field(
         default=10,

@@ -21,8 +21,8 @@ import asyncio
 import base64
 import time
 import uuid
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import AsyncIterator, Optional
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -142,7 +142,7 @@ async def pull_v2_worker(maindb_driver, pull_processor_api: PullProcessorAPI, st
 @pytest.fixture(scope="function")
 async def back_pressure(
     nats_manager: NatsConnectionManager,
-) -> AsyncIterator[Optional[BackPressureMaterializer]]:
+) -> AsyncIterator[BackPressureMaterializer | None]:
     settings = BackPressureSettings()
     settings.enabled = False
     back_pressure = BackPressureMaterializer(

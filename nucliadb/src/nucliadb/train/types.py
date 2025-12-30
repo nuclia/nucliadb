@@ -17,20 +17,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import TypeVar, Union
+from typing import TypeVar
 
 from nucliadb_protos import dataset_pb2 as dpb
 
-TrainBatch = Union[
-    dpb.FieldClassificationBatch,
-    dpb.ImageClassificationBatch,
-    dpb.ParagraphClassificationBatch,
-    dpb.ParagraphStreamingBatch,
-    dpb.QuestionAnswerStreamingBatch,
-    dpb.SentenceClassificationBatch,
-    dpb.TokenClassificationBatch,
-    dpb.FieldStreamingBatch,
-]
+TrainBatch = (
+    dpb.FieldClassificationBatch
+    | dpb.ImageClassificationBatch
+    | dpb.ParagraphClassificationBatch
+    | dpb.ParagraphStreamingBatch
+    | dpb.QuestionAnswerStreamingBatch
+    | dpb.SentenceClassificationBatch
+    | dpb.TokenClassificationBatch
+    | dpb.FieldStreamingBatch
+)
 
 T = TypeVar(
     "T",

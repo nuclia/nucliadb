@@ -20,7 +20,7 @@
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import Optional, TypeVar
+from typing import TypeVar
 
 from nucliadb.common.external_index_providers.base import ScoredTextBlock
 from nucliadb.common.ids import ParagraphId
@@ -128,7 +128,7 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         k: float = 60.0,
         *,
         window: int,
-        weights: Optional[dict[str, float]] = None,
+        weights: dict[str, float] | None = None,
         default_weight: float = 1.0,
     ):
         super().__init__(window)
@@ -210,7 +210,7 @@ class WeightedCombSum(RankFusionAlgorithm):
         self,
         *,
         window: int,
-        weights: Optional[dict[str, float]] = None,
+        weights: dict[str, float] | None = None,
         default_weight: float = 1.0,
     ):
         super().__init__(window)

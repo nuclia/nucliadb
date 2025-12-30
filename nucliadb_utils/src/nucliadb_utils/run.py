@@ -21,7 +21,7 @@ import asyncio
 import inspect
 import logging
 import signal
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 

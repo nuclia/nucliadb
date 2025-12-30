@@ -1,4 +1,4 @@
-target-version = "py39"
+target-version = "py310"
 line-length = 105
 
 exclude = [
@@ -13,10 +13,12 @@ select = [
     "W",   # pycodestyle warnings
     "F",   # pyflakes
     "I",   # isort
+    "UP007",  # pyupgrade: Union[A, B] -> A | B and Optional[A] -> A | None
+    "RUF",  # ruff
 ]
 
 ignore = [
-"E501",
+  "E501",
   "E203",
   "E252",
   "E701",

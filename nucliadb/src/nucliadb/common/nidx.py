@@ -19,7 +19,6 @@
 #
 
 import os
-from typing import Optional, Union
 
 from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxIndexerStub, NidxSearcherStub
 from nidx_protos.nodewriter_pb2 import (
@@ -54,7 +53,7 @@ class NidxUtility:
         pass
 
 
-def _storage_config(prefix: str, bucket: Optional[str]) -> dict[str, str]:
+def _storage_config(prefix: str, bucket: str | None) -> dict[str, str]:
     config = {}
     if storage_settings.file_backend == FileBackendConfig.LOCAL:
         local_bucket = bucket or storage_settings.local_indexing_bucket
@@ -161,7 +160,7 @@ class NidxNatsIndexer:
     async def index(self, writer: IndexMessage) -> int:
         res = await self.nats_connection_manager.js.publish(self.subject, writer.SerializeToString())
         logger.info(
-            f" = Pushed message to nidx shard: {writer.shard}, txid: {writer.txid}  seqid: {res.seq}"  # noqa
+            f" = Pushed message to nidx shard: {writer.shard}, txid: {writer.txid}  seqid: {res.seq}"
         )
         return res.seq
 
@@ -185,7 +184,7 @@ class NidxGrpcIndexer:
 class NidxServiceUtility(NidxUtility):
     """Implements Nidx utility connecting to the network service"""
 
-    indexer: Union[NidxNatsIndexer, NidxGrpcIndexer]
+    indexer: NidxNatsIndexer | NidxGrpcIndexer
 
     def __init__(self, service_name: str):
         self.service_name = service_name

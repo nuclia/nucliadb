@@ -188,7 +188,7 @@ async def _external_index_find(
     search_request = convert_retrieval_to_proto(parsed.retrieval)
 
     # Query index
-    query_results = await external_index_manager.query(search_request)  # noqa
+    query_results = await external_index_manager.query(search_request)
 
     # Hydrate and rerank results
     text_blocks, resources, best_matches = await hydrate_and_rerank(

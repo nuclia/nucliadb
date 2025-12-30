@@ -17,13 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import contextlib
 from time import time
-from typing import Annotated, Optional
+from typing import Annotated
 from uuid import uuid4
 
-from fastapi import HTTPException, Query, Response
+from fastapi import BackgroundTasks, HTTPException, Query, Response
 from fastapi_versioning import version
 from starlette.requests import Request
 
@@ -498,12 +497,10 @@ async def _reprocess_resource(
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def delete_resource_rslug_prefix(
-    request: Request,
-    kbid: str,
-    rslug: str,
+    request: Request, kbid: str, rslug: str, background: BackgroundTasks
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
-    return await _delete_resource(request, kbid, rid)
+    return await _delete_resource(request, kbid, rid, background)
 
 
 @api.delete(
@@ -514,19 +511,11 @@ async def delete_resource_rslug_prefix(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def delete_resource_rid_prefix(
-    request: Request,
-    kbid: str,
-    rid: str,
-):
-    return await _delete_resource(request, kbid, rid)
+async def delete_resource_rid_prefix(request: Request, kbid: str, rid: str, background: BackgroundTasks):
+    return await _delete_resource(request, kbid, rid, background)
 
 
-async def _delete_resource(
-    request: Request,
-    kbid: str,
-    rid: str,
-):
+async def _delete_resource(request: Request, kbid: str, rid: str, background: BackgroundTasks):
     await validate_rid_exists_or_raise_error(kbid, rid)
 
     partitioning = get_partitioning()
@@ -541,7 +530,7 @@ async def _delete_resource(
     parse_audit(writer.audit, request)
     await transaction.commit(writer, partition)
     processing = get_processing()
-    asyncio.create_task(processing.delete_from_processing(kbid=kbid, resource_id=rid))
+    background.add_task(processing.delete_from_processing, kbid=kbid, resource_id=rid)
 
     return Response(status_code=204)
 
@@ -637,7 +626,7 @@ def needs_resource_reindex(item: UpdateResourcePayload) -> bool:
     )
 
 
-async def maybe_send_to_process(toprocess: PushPayload, partition) -> Optional[int]:
+async def maybe_send_to_process(toprocess: PushPayload, partition) -> int | None:
     if not needs_reprocess(toprocess):
         return None
 

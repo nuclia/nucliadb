@@ -20,7 +20,8 @@
 import asyncio
 import logging
 import uuid
-from typing import Any, Awaitable, Callable, Optional
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from nidx_protos import noderesources_pb2, nodewriter_pb2
 from nidx_protos.nodewriter_pb2 import (
@@ -96,7 +97,7 @@ class KBShardManager:
     # TODO: move to data manager
     async def get_current_active_shard(
         self, txn: Transaction, kbid: str
-    ) -> Optional[writer_pb2.ShardObject]:
+    ) -> writer_pb2.ShardObject | None:
         kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=False)
         if kb_shards is None:
             return None
@@ -196,7 +197,7 @@ class KBShardManager:
         txid: int,
         partition: str,
         kb: str,
-        reindex_id: Optional[str] = None,
+        reindex_id: str | None = None,
         source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
     ) -> None:
         """
@@ -306,7 +307,7 @@ class StandaloneKBShardManager(KBShardManager):
         txid: int,
         partition: str,
         kb: str,
-        reindex_id: Optional[str] = None,
+        reindex_id: str | None = None,
         source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
     ) -> None:
         """

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Optional, Union
 
 import requests
 
@@ -26,12 +25,12 @@ SIZE_BYTES = 4
 
 
 class Streamer:
-    resp: Optional[requests.Response]
+    resp: requests.Response | None
 
     def __init__(
         self,
-        trainset: Union[TrainSetPB, TrainSetModel],
-        reader_headers: Dict[str, str],
+        trainset: TrainSetPB | TrainSetModel,
+        reader_headers: dict[str, str],
         base_url: str,
         kbid: str,
     ):
@@ -75,16 +74,16 @@ class Streamer:
     def __iter__(self):
         return self
 
-    def read(self) -> Optional[bytes]:
+    def read(self) -> bytes | None:
         assert self.resp is not None, "Streamer not initialized"
         header = self.resp.raw.read(4, decode_content=True)
         if header == b"":
             return None
-        payload_size = int.from_bytes(header, byteorder="big", signed=False)  # noqa
+        payload_size = int.from_bytes(header, byteorder="big", signed=False)
         data = self.resp.raw.read(payload_size)
         return data
 
-    def __next__(self) -> Optional[bytes]:
+    def __next__(self) -> bytes | None:
         payload = self.read()
         if payload in [None, b""]:
             logger.info("Streamer finished reading")

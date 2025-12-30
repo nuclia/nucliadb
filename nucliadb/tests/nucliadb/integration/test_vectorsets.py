@@ -21,7 +21,7 @@
 import functools
 import random
 import uuid
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -118,7 +118,7 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
 async def test_vectorset_parameter_without_default_vectorset(
     nucliadb_reader: AsyncClient,
     standalone_knowledgebox: str,
-    vectorset: Optional[str],
+    vectorset: str | None,
     expected: str,
 ):
     kbid = standalone_knowledgebox
@@ -238,7 +238,7 @@ async def test_querying_kb_with_vectorsets(
     result, but checking the index response.
 
     """
-    query: tuple[Any, Optional[nodereader_pb2.SearchResponse], Optional[Exception]] = (None, None, None)
+    query: tuple[Any, nodereader_pb2.SearchResponse | None, Exception | None] = (None, None, None)
 
     async def query_shard_wrapper(shard: str, pb_query: nodereader_pb2.SearchRequest):
         nonlocal query

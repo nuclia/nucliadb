@@ -19,7 +19,7 @@ import os
 from copy import copy
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
-from typing import Any, Dict, Optional
+from typing import Any
 
 import orjson
 import pydantic
@@ -41,40 +41,38 @@ try:
 except ImportError:  # pragma: no cover
     AccessFormatter = logging.Formatter  # type: ignore
 
-_BUILTIN_ATTRS = set(
-    [
-        # list of all possible args
-        "args",
-        "asctime",
-        "created",
-        "exc_info",
-        "exc_text",
-        "filename",
-        "funcName",
-        "levelname",
-        "levelno",
-        "lineno",
-        "module",
-        "msecs",
-        "message",
-        "msg",
-        "name",
-        "pathname",
-        "process",
-        "processName",
-        "relativeCreated",
-        "stack_info",
-        "thread",
-        "threadName",
-    ]
-)
+_BUILTIN_ATTRS = {
+    # list of all possible args
+    "args",
+    "asctime",
+    "created",
+    "exc_info",
+    "exc_text",
+    "filename",
+    "funcName",
+    "levelname",
+    "levelno",
+    "lineno",
+    "module",
+    "msecs",
+    "message",
+    "msg",
+    "name",
+    "pathname",
+    "process",
+    "processName",
+    "relativeCreated",
+    "stack_info",
+    "thread",
+    "threadName",
+}
 
 
 ACCESS_LOG_FMT = "%(asctime)s.%(msecs)03d - %(client_addr)s - %(request_line)s %(status_code)s"
 ACCESS_LOG_DATEFMT = "%Y-%m-%d,%H:%M:%S"
 
 
-def extra_from_record(record) -> Dict[str, Any]:
+def extra_from_record(record) -> dict[str, Any]:
     return {attr_name: record.__dict__[attr_name] for attr_name in set(record.__dict__) - _BUILTIN_ATTRS}
 
 
@@ -84,7 +82,7 @@ class JSONFormatter(logging.Formatter):
     """
 
     def format(self, record: logging.LogRecord) -> str:
-        extra: Dict[str, Any]
+        extra: dict[str, Any]
         if isinstance(record.msg, dict):
             extra = record.msg
         elif isinstance(record.msg, pydantic.BaseModel):
@@ -97,7 +95,7 @@ class JSONFormatter(logging.Formatter):
 
         return orjson.dumps(extra, default=repr).decode("utf-8", errors="ignore")
 
-    def fill_log_data(self, data: Dict[str, Any], record: logging.LogRecord) -> None:
+    def fill_log_data(self, data: dict[str, Any], record: logging.LogRecord) -> None:
         if "time" not in data:
             data["time"] = datetime.now(timezone.utc)
 
@@ -153,7 +151,7 @@ class UvicornAccessFormatter(JSONFormatter):
             http_version,
             status_code,
         ) = recordcopy.args  # type: ignore[misc]
-        request_line = "%s %s HTTP/%s" % (method, full_path, http_version)
+        request_line = f"{method} {full_path} HTTP/{http_version}"
         recordcopy.__dict__.update(
             {
                 "httpRequest": {
@@ -219,7 +217,7 @@ def setup_access_logging(settings: LogSettings) -> None:
         )
 
 
-def setup_logging(*, settings: Optional[LogSettings] = None) -> None:
+def setup_logging(*, settings: LogSettings | None = None) -> None:
     if settings is None:
         settings = LogSettings()
 

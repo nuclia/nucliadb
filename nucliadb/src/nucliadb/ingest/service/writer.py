@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 from nucliadb.backups import tasks as backup_tasks
 from nucliadb.backups import utils as backup_utils

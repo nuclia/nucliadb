@@ -19,7 +19,7 @@
 #
 import hashlib
 import uuid
-from typing import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Iterable
 from unittest.mock import patch
 
 import pytest
@@ -134,7 +134,7 @@ async def test_send_to_process_generated_fields(
     bm.source = BrokerMessage.MessageSource.PROCESSOR
     da_field = "da-author-f-0-0"
     bm.texts[da_field].body = "Text author"
-    bm.texts[da_field].md5 = hashlib.md5("Text author".encode()).hexdigest()
+    bm.texts[da_field].md5 = hashlib.md5(b"Text author").hexdigest()
     bm.texts[da_field].generated_by.data_augmentation.SetInParent()
 
     await processor.process(bm, 3)
@@ -240,7 +240,7 @@ async def test_data_augmentation_field_generation_and_search(
     bm.source = BrokerMessage.MessageSource.PROCESSOR
     da_field_id = "da-author-f-0-0"
     bm.texts[da_field_id].body = "Text author"
-    bm.texts[da_field_id].md5 = hashlib.md5("Text author".encode()).hexdigest()
+    bm.texts[da_field_id].md5 = hashlib.md5(b"Text author").hexdigest()
     bm.texts[da_field_id].generated_by.data_augmentation.SetInParent()
     await inject_message(nucliadb_ingest_grpc, bm)
 

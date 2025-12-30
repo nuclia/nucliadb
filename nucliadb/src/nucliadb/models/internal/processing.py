@@ -24,7 +24,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
@@ -65,8 +65,8 @@ class PushTextFormat(int, Enum):
 class Text(BaseModel):
     body: str
     format: PushTextFormat
-    extract_strategy: Optional[str] = None
-    split_strategy: Optional[str] = None
+    extract_strategy: str | None = None
+    split_strategy: str | None = None
     classification_labels: list[ClassificationLabel] = []
 
 
@@ -75,18 +75,18 @@ class LinkUpload(BaseModel):
     headers: dict[str, str] = {}
     cookies: dict[str, str] = {}
     localstorage: dict[str, str] = {}
-    css_selector: Optional[str] = Field(
+    css_selector: str | None = Field(
         None,
         title="Css selector",
         description="Css selector to parse the link",
     )
-    xpath: Optional[str] = Field(
+    xpath: str | None = Field(
         None,
         title="Xpath",
         description="Xpath to parse the link",
     )
-    extract_strategy: Optional[str] = None
-    split_strategy: Optional[str] = None
+    extract_strategy: str | None = None
+    split_strategy: str | None = None
     classification_labels: list[ClassificationLabel] = []
 
 
@@ -99,14 +99,14 @@ class PushMessageFormat(int, Enum):
 
 
 class PushMessageContent(BaseModel):
-    text: Optional[str] = None
+    text: str | None = None
     format: PushMessageFormat
     attachments: list[str] = []
 
 
 class PushMessage(BaseModel):
-    timestamp: Optional[datetime] = None
-    who: Optional[str] = None
+    timestamp: datetime | None = None
+    who: str | None = None
     to: list[str] = []
     content: PushMessageContent
     ident: str
@@ -114,8 +114,8 @@ class PushMessage(BaseModel):
 
 class PushConversation(BaseModel):
     messages: list[PushMessage] = []
-    extract_strategy: Optional[str] = None
-    split_strategy: Optional[str] = None
+    extract_strategy: str | None = None
+    split_strategy: str | None = None
     classification_labels: list[ClassificationLabel] = []
 
 
@@ -125,19 +125,19 @@ class Source(SourceValue, Enum):  # type: ignore
 
 
 class ProcessingInfo(BaseModel):
-    seqid: Optional[int] = None
-    account_seq: Optional[int] = None
-    queue: Optional[QueueType] = None
+    seqid: int | None = None
+    account_seq: int | None = None
+    queue: QueueType | None = None
 
 
 class PushPayload(BaseModel):
     uuid: str
-    slug: Optional[str] = None
+    slug: str | None = None
     kbid: str
-    source: Optional[Source] = None
+    source: Source | None = None
     userid: str
 
-    title: Optional[str] = None
+    title: str | None = None
 
     genericfield: dict[str, Text] = {}
 
@@ -160,4 +160,4 @@ class PushPayload(BaseModel):
     partition: int
 
     # List of available processing options (with default values)
-    processing_options: Optional[PushProcessingOptions] = Field(default_factory=PushProcessingOptions)
+    processing_options: PushProcessingOptions | None = Field(default_factory=PushProcessingOptions)

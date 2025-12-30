@@ -19,8 +19,6 @@
 #
 from __future__ import annotations
 
-from typing import Optional
-
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
@@ -40,7 +38,7 @@ class AzureBlobStore(BlobStore):
             logger.exception("Error closing AzureBlobStore")
         self._object_store = None
 
-    async def initialize(self, account_url: str, connection_string: Optional[str] = None):
+    async def initialize(self, account_url: str, connection_string: str | None = None):
         self.bucket = "nucliadb-{kbid}"
         self.source = CloudFile.Source.AZURE
         self._object_store = AzureObjectStore(account_url, connection_string=connection_string)

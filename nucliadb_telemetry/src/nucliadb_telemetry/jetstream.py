@@ -13,9 +13,10 @@
 # limitations under the License.
 #
 
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from functools import partial
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
+from typing import Any
 from urllib.parse import ParseResult
 
 import nats
@@ -61,7 +62,7 @@ msg_sent_counter = metrics.Counter("nuclia_nats_msg_sent", labels={"subject": ""
 
 
 def start_span_message_receiver(tracer: Tracer, msg: Msg):
-    attributes: dict[str, Union[str, int]] = {
+    attributes: dict[str, str | int] = {
         SpanAttributes.MESSAGING_DESTINATION_KIND: "nats",
         SpanAttributes.MESSAGING_MESSAGE_PAYLOAD_SIZE_BYTES: len(msg.data),
         SpanAttributes.MESSAGING_MESSAGE_ID: msg.reply,
@@ -121,18 +122,18 @@ class JetStreamContextTelemetry:
     async def stream_info(self, name: str):
         return await self.js.stream_info(name)
 
-    async def add_stream(self, name: str, subjects: List[str]):
+    async def add_stream(self, name: str, subjects: list[str]):
         return await self.js.add_stream(name=name, subjects=subjects)
 
     async def subscribe(
         self,
         subject: str,
-        queue: Optional[str] = None,
-        cb: Optional[Callable[[Msg], Awaitable[None]]] = None,
+        queue: str | None = None,
+        cb: Callable[[Msg], Awaitable[None]] | None = None,
         **kwargs,
     ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_subscriber")
-        wrapped_cb: Optional[Callable[[Msg], Awaitable[None]]]
+        wrapped_cb: Callable[[Msg], Awaitable[None]] | None
         if cb is not None:
             wrapped_cb = partial(_traced_callback, cb, tracer)
         else:
@@ -143,7 +144,7 @@ class JetStreamContextTelemetry:
         self,
         subject: str,
         body: bytes,
-        headers: Optional[Dict[str, str]] = None,
+        headers: dict[str, str] | None = None,
         **kwargs,
     ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_publisher")
@@ -170,9 +171,9 @@ class JetStreamContextTelemetry:
     async def pull_subscribe(
         self,
         subject: str,
-        durable: Optional[str] = None,
-        stream: Optional[str] = None,
-        config: Optional[nats.js.api.ConsumerConfig] = None,
+        durable: str | None = None,
+        stream: str | None = None,
+        config: nats.js.api.ConsumerConfig | None = None,
     ) -> JetStreamContext.PullSubscription:
         return await self.js.pull_subscribe(subject, durable=durable, stream=stream, config=config)  # type: ignore
 
@@ -212,7 +213,7 @@ class JetStreamContextTelemetry:
                     },
                 )
 
-    async def consumer_info(self, stream: str, consumer: str, timeout: Optional[float] = None):
+    async def consumer_info(self, stream: str, consumer: str, timeout: float | None = None):
         return await self.js.consumer_info(stream, consumer, timeout)
 
 
@@ -226,7 +227,7 @@ class NatsClientTelemetry:
         self,
         subject: str,
         queue: str = "",
-        cb: Optional[Callable[[Msg], Awaitable[None]]] = None,
+        cb: Callable[[Msg], Awaitable[None]] | None = None,
         **kwargs,
     ) -> Subscription:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_subscriber")
@@ -253,7 +254,7 @@ class NatsClientTelemetry:
         subject: str,
         body: bytes = b"",
         reply: str = "",
-        headers: Optional[Dict[str, str]] = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_publisher")
         headers = {} if headers is None else headers
@@ -274,7 +275,7 @@ class NatsClientTelemetry:
         payload: bytes = b"",
         timeout: float = 0.5,
         old_style: bool = False,
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ) -> Msg:
         headers = {} if headers is None else headers
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_request")
@@ -295,7 +296,7 @@ class NatsClientTelemetry:
         return self.nc.is_connected
 
     @property
-    def connected_url(self) -> Optional[ParseResult]:
+    def connected_url(self) -> ParseResult | None:
         return self.nc.connected_url
 
     def jetstream(self, **opts) -> nats.js.JetStreamContext:
@@ -314,7 +315,7 @@ class NatsClientTelemetry:
         return await self.nc.close()
 
 
-def get_traced_nats_client(nc: Client, service_name: str) -> Union[Client, NatsClientTelemetry]:
+def get_traced_nats_client(nc: Client, service_name: str) -> Client | NatsClientTelemetry:
     tracer_provider = get_telemetry(service_name)
     if tracer_provider is not None:
         return NatsClientTelemetry(nc, service_name, tracer_provider)
@@ -323,8 +324,8 @@ def get_traced_nats_client(nc: Client, service_name: str) -> Union[Client, NatsC
 
 
 def get_traced_jetstream(
-    nc: Union[Client, NatsClientTelemetry], service_name: str
-) -> Union[JetStreamContext, JetStreamContextTelemetry]:
+    nc: Client | NatsClientTelemetry, service_name: str
+) -> JetStreamContext | JetStreamContextTelemetry:
     jetstream = nc.jetstream()
     tracer_provider = get_telemetry(service_name)
 

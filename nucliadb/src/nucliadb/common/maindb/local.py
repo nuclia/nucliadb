@@ -19,8 +19,8 @@
 #
 import glob
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional
 
 from nucliadb.common.maindb.driver import (
     DEFAULT_BATCH_SCAN_LIMIT,
@@ -78,7 +78,7 @@ class LocalTransaction(Transaction):
             # Deleting a key that does not exist
             pass
 
-    async def read(self, key: str) -> Optional[bytes]:
+    async def read(self, key: str) -> bytes | None:
         try:
             async with aiofiles.open(self.compute_path(key), "rb") as resp:
                 return await resp.read()
@@ -106,8 +106,8 @@ class LocalTransaction(Transaction):
         self.clean()
         self.open = False
 
-    async def batch_get(self, keys: list[str], for_update: bool = False) -> list[Optional[bytes]]:
-        results: list[Optional[bytes]] = []
+    async def batch_get(self, keys: list[str], for_update: bool = False) -> list[bytes | None]:
+        results: list[bytes | None] = []
         for key in keys:
             obj = await self.get(key)
             if obj:
@@ -125,7 +125,7 @@ class LocalTransaction(Transaction):
 
         return results
 
-    async def get(self, key: str, for_update: bool = False) -> Optional[bytes]:
+    async def get(self, key: str, for_update: bool = False) -> bytes | None:
         if key in self.deleted_keys:
             raise KeyError(f"Not found {key}")
 

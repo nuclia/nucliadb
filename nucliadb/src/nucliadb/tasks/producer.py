@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Generic, Type
+from typing import Generic
 
 from nucliadb.tasks.logger import logger
 from nucliadb.tasks.models import MsgType
@@ -32,7 +32,7 @@ class NatsTaskProducer(Generic[MsgType]):
         name: str,
         stream: NatsStream,
         producer_subject: str,
-        msg_type: Type[MsgType],
+        msg_type: type[MsgType],
     ):
         self.name = name
         self.stream = stream
@@ -69,7 +69,7 @@ def create_producer(
     name: str,
     stream: NatsStream,
     producer_subject: str,
-    msg_type: Type[MsgType],
+    msg_type: type[MsgType],
 ) -> NatsTaskProducer[MsgType]:
     """
     Returns a non-initialized producer.

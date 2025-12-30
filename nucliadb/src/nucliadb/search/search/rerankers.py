@@ -21,7 +21,6 @@
 import logging
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
-from typing import Optional
 
 from typing_extensions import assert_never
 
@@ -65,7 +64,7 @@ class RerankingOptions:
 
 class Reranker(ABC):
     @abstractproperty
-    def window(self) -> Optional[int]:
+    def window(self) -> int | None:
         """Number of elements the reranker requests. `None` means no specific
         window is enforced."""
         ...
@@ -104,7 +103,7 @@ class NoopReranker(Reranker):
     """
 
     @property
-    def window(self) -> Optional[int]:
+    def window(self) -> int | None:
         return None
 
     @reranker_observer.wrap({"type": "noop"})

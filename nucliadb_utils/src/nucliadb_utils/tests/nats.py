@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import socket
-from typing import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator
 
 import nats
 import pytest

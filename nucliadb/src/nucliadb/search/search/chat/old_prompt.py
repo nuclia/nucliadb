@@ -20,8 +20,9 @@
 import asyncio
 import copy
 from collections import deque
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Deque, Dict, List, Optional, Sequence, Tuple, Union, cast
+from typing import Deque, cast
 
 import yaml
 from pydantic import BaseModel
@@ -85,7 +86,7 @@ MAX_RESOURCE_FIELD_TASKS = 4
 # The hope here is it will be enough to get the answer to the question.
 CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
 
-TextBlockId = Union[ParagraphId, FieldId]
+TextBlockId = ParagraphId | FieldId
 
 
 class ParagraphIdNotFoundInExtractedMetadata(Exception):
@@ -98,7 +99,7 @@ class CappedPromptContext:
     and automatically trim data that exceeds the limit when it's being set on the dictionary.
     """
 
-    def __init__(self, max_size: Optional[int]):
+    def __init__(self, max_size: int | None):
         self.output: PromptContext = {}
         self.images: PromptContextImages = {}
         self.max_size = max_size
@@ -165,9 +166,9 @@ async def get_next_conversation_messages(
     page: int,
     start_idx: int,
     num_messages: int,
-    message_type: Optional[resources_pb2.Message.MessageType.ValueType] = None,
-    msg_to: Optional[str] = None,
-) -> List[resources_pb2.Message]:
+    message_type: resources_pb2.Message.MessageType.ValueType | None = None,
+    msg_to: str | None = None,
+) -> list[resources_pb2.Message]:
     output = []
     cmetadata = await field_obj.get_metadata()
     for current_page in range(page, cmetadata.pages + 1):
@@ -187,7 +188,7 @@ async def get_next_conversation_messages(
 
 async def find_conversation_message(
     field_obj: Conversation, mident: str
-) -> tuple[Optional[resources_pb2.Message], int, int]:
+) -> tuple[resources_pb2.Message | None, int, int]:
     cmetadata = await field_obj.get_metadata()
     for page in range(1, cmetadata.pages + 1):
         conv = await field_obj.db_get_value(page)
@@ -274,7 +275,7 @@ async def full_resource_prompt_context(
     context: CappedPromptContext,
     kbid: str,
     ordered_paragraphs: list[FindParagraph],
-    resource: Optional[str],
+    resource: str | None,
     strategy: FullResourceStrategy,
     metrics: Metrics,
     augmented_context: AugmentedContext,
@@ -289,7 +290,7 @@ async def full_resource_prompt_context(
         ordered_paragraphs: The results of the retrieval (find) operation.
         resource: The resource to be included in the context. This is used only when chatting with a specific resource with no retrieval.
         strategy: strategy instance containing, for example, the number of full resources to include in the context.
-    """  # noqa: E501
+    """
     if resource is not None:
         # The user has specified a resource to be included in the context.
         ordered_resources = [resource]
@@ -405,7 +406,7 @@ async def extend_prompt_context_with_origin_metadata(
     text_block_ids: list[TextBlockId],
     augmented_context: AugmentedContext,
 ):
-    async def _get_origin(kbid: str, rid: str) -> tuple[str, Optional[Origin]]:
+    async def _get_origin(kbid: str, rid: str) -> tuple[str, Origin | None]:
         origin = None
         resource = await cache.get_resource(kbid, rid)
         if resource is not None:
@@ -534,7 +535,7 @@ async def extend_prompt_context_with_extra_metadata(
     text_block_ids: list[TextBlockId],
     augmented_context: AugmentedContext,
 ):
-    async def _get_extra(kbid: str, rid: str) -> tuple[str, Optional[Extra]]:
+    async def _get_extra(kbid: str, rid: str) -> tuple[str, Extra | None]:
         extra = None
         resource = await cache.get_resource(kbid, rid)
         if resource is not None:
@@ -657,7 +658,7 @@ async def get_matching_field_ids(
     return extend_field_ids
 
 
-async def get_orm_field(kbid: str, field_id: FieldId) -> Optional[Field]:
+async def get_orm_field(kbid: str, field_id: FieldId) -> Field | None:
     resource = await cache.get_resource(kbid, field_id.rid)
     if resource is None:  # pragma: no cover
         return None
@@ -765,7 +766,7 @@ async def neighbouring_paragraphs_prompt_context(
 
 def get_text_position(
     paragraph_id: ParagraphId, index: int, field_metadata: FieldComputedMetadata
-) -> Optional[TextPosition]:
+) -> TextPosition | None:
     if paragraph_id.field_id.subfield_id:
         metadata = field_metadata.split_metadata[paragraph_id.field_id.subfield_id]
     else:
@@ -804,7 +805,7 @@ async def conversation_prompt_context(
     metrics: Metrics,
     augmented_context: AugmentedContext,
 ):
-    analyzed_fields: List[str] = []
+    analyzed_fields: list[str] = []
     ops = 0
     async with get_driver().ro_transaction() as txn:
         storage = await get_storage()
@@ -834,7 +835,7 @@ async def conversation_prompt_context(
                 )  # type: ignore
                 cmetadata = await field_obj.get_metadata()
 
-                attachments: List[resources_pb2.FieldRef] = []
+                attachments: list[resources_pb2.FieldRef] = []
                 if strategy.full:
                     ops += 5
                     extracted_text = await field_obj.get_extracted_text()
@@ -967,7 +968,7 @@ async def hierarchy_prompt_context(
     # Make a copy of the ordered paragraphs to avoid modifying the original list, which is returned
     # in the response to the user
     ordered_paragraphs_copy = copy.deepcopy(ordered_paragraphs)
-    resources: Dict[str, ExtraCharsParagraph] = {}
+    resources: dict[str, ExtraCharsParagraph] = {}
 
     # Iterate paragraphs to get extended text
     for paragraph in ordered_paragraphs_copy:
@@ -1068,14 +1069,14 @@ class PromptContextBuilder:
         self,
         kbid: str,
         ordered_paragraphs: list[FindParagraph],
-        resource: Optional[str] = None,
-        user_context: Optional[list[str]] = None,
-        user_image_context: Optional[list[Image]] = None,
-        strategies: Optional[Sequence[RagStrategy]] = None,
-        image_strategies: Optional[Sequence[ImageRagStrategy]] = None,
-        max_context_characters: Optional[int] = None,
+        resource: str | None = None,
+        user_context: list[str] | None = None,
+        user_image_context: list[Image] | None = None,
+        strategies: Sequence[RagStrategy] | None = None,
+        image_strategies: Sequence[ImageRagStrategy] | None = None,
+        max_context_characters: int | None = None,
         visual_llm: bool = False,
-        query_image: Optional[Image] = None,
+        query_image: Image | None = None,
         metrics: Metrics = Metrics("prompt_context_builder"),
     ):
         self.kbid = kbid
@@ -1121,10 +1122,10 @@ class PromptContextBuilder:
         if self.image_strategies is None or len(self.image_strategies) == 0:
             # Nothing to do
             return
-        page_image_strategy: Optional[PageImageStrategy] = None
+        page_image_strategy: PageImageStrategy | None = None
         max_page_images = 5
-        table_image_strategy: Optional[TableImageStrategy] = None
-        paragraph_image_strategy: Optional[ParagraphImageStrategy] = None
+        table_image_strategy: TableImageStrategy | None = None
+        paragraph_image_strategy: ParagraphImageStrategy | None = None
         for strategy in self.image_strategies:
             if strategy.name == ImageRagStrategyName.PAGE_IMAGE:
                 if page_image_strategy is None:
@@ -1204,12 +1205,12 @@ class PromptContextBuilder:
             RagStrategyName.GRAPH,
         ]
 
-        full_resource: Optional[FullResourceStrategy] = None
-        hierarchy: Optional[HierarchyResourceStrategy] = None
-        neighbouring_paragraphs: Optional[NeighbouringParagraphsStrategy] = None
-        field_extension: Optional[FieldExtensionStrategy] = None
-        metadata_extension: Optional[MetadataExtensionStrategy] = None
-        conversational_strategy: Optional[ConversationalStrategy] = None
+        full_resource: FullResourceStrategy | None = None
+        hierarchy: HierarchyResourceStrategy | None = None
+        neighbouring_paragraphs: NeighbouringParagraphsStrategy | None = None
+        field_extension: FieldExtensionStrategy | None = None
+        metadata_extension: MetadataExtensionStrategy | None = None
+        conversational_strategy: ConversationalStrategy | None = None
         for strategy in self.strategies:
             if strategy.name == RagStrategyName.FIELD_EXTENSION:
                 field_extension = cast(FieldExtensionStrategy, strategy)
@@ -1302,7 +1303,7 @@ class PromptContextBuilder:
             )
 
 
-def get_paragraph_page_number(paragraph: FindParagraph) -> Optional[int]:
+def get_paragraph_page_number(paragraph: FindParagraph) -> int | None:
     if not paragraph.page_with_visual:
         return None
     if paragraph.position is None:
@@ -1314,7 +1315,7 @@ def get_paragraph_page_number(paragraph: FindParagraph) -> Optional[int]:
 class ExtraCharsParagraph:
     title: str
     summary: str
-    paragraphs: List[Tuple[FindParagraph, str]]
+    paragraphs: list[tuple[FindParagraph, str]]
 
 
 def _clean_paragraph_text(paragraph: FindParagraph) -> str:
@@ -1359,7 +1360,7 @@ async def hydrate_resource_text(
 async def hydrate_field_text(
     kbid: str,
     field_id: FieldId,
-) -> Optional[tuple[FieldId, str]]:
+) -> tuple[FieldId, str] | None:
     field = await cache.get_field(kbid, field_id)
     if field is None:  # pragma: no cover
         return None

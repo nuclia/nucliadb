@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
@@ -33,14 +33,7 @@ from nucliadb_models.resource import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    ValueType = Optional[
-        Union[
-            models.FieldText,
-            models.FieldFile,
-            models.FieldLink,
-            models.Conversation,
-        ]
-    ]
+    ValueType = models.FieldText | models.FieldFile | models.FieldLink | models.Conversation | None
 else:
     # without Any, pydantic fails to anything as validate() fails using the Union
     ValueType = Any
@@ -50,10 +43,10 @@ class ResourceField(BaseModel):
     field_type: FieldTypeName
     field_id: str
     value: ValueType = None
-    extracted: Optional[ExtractedDataType] = None
-    error: Optional[Error] = None
-    status: Optional[str] = None
-    errors: Optional[list[Error]] = None
+    extracted: ExtractedDataType | None = None
+    error: Error | None = None
+    status: str | None = None
+    errors: list[Error] | None = None
 
 
 FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP: dict[FieldTypeName, Any] = {

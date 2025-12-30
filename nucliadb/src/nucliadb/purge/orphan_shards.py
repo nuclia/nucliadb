@@ -20,7 +20,6 @@
 import argparse
 import asyncio
 import importlib.metadata
-from typing import Optional
 
 from grpc.aio import AioRpcError
 from nidx_protos import nodereader_pb2, noderesources_pb2
@@ -113,7 +112,7 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardKb]:
     return stored_shards
 
 
-async def _get_kbid(shard_id: str) -> Optional[str]:
+async def _get_kbid(shard_id: str) -> str | None:
     kbid = None
     try:
         req = nodereader_pb2.GetShardRequest()
