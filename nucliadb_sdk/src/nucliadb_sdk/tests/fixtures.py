@@ -150,9 +150,11 @@ def nucliadb(pg) -> Iterator[NucliaFixture]:
             child.kill()
     else:
         # We need to replace the localhost with the internal docker host to allow container-to-container communication
-        images.settings["nucliadb"]["env"]["DRIVER_PG_URL"] = images.settings["nucliadb"]["env"][
-            "DRIVER_PG_URL"
-        ].replace("localhost", get_docker_internal_host())
+        images.settings["nucliadb"]["env"]["DRIVER_PG_URL"] = (
+            images.settings["nucliadb"]["env"]["DRIVER_PG_URL"]
+            .replace("localhost", get_docker_internal_host())
+            .replace("127.0.0.1", get_docker_internal_host())
+        )
         container = NucliaDB()
         host, port = container.run()
         network = container.container_obj.attrs["NetworkSettings"]
