@@ -158,17 +158,19 @@ async def main_subscriber_workers():  # pragma: no cover
     backup_consumers_finalizers = await initialize_backup_consumers(context)
 
     await run_until_exit(
-        *backup_consumers_finalizers,
-        imports_consumer.finalize,
-        exports_consumer.finalize,
-        stop_ingest_utility,
-        materializer_closer,
-        shard_creator_closer,
-        auditor_closer,
-        grpc_health_finalizer,
-        metrics_server.shutdown,
-        context.finalize,
-        *finalizers,
+        [
+            *backup_consumers_finalizers,
+            imports_consumer.finalize,
+            exports_consumer.finalize,
+            stop_ingest_utility,
+            materializer_closer,
+            shard_creator_closer,
+            auditor_closer,
+            grpc_health_finalizer,
+            metrics_server.shutdown,
+            context.finalize,
+            *finalizers,
+        ]
     )
 
 
