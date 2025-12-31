@@ -138,8 +138,9 @@ impl RelationsReaderService {
         let mut nodes = Vec::new();
         let mut relations = Vec::new();
         let mut graph = Vec::new();
+        let mut scores = Vec::new();
 
-        for (_score, doc_address) in matching_docs {
+        for (score, doc_address) in matching_docs {
             let doc = searcher.doc(doc_address)?;
 
             let source = io_maps::source_to_relation_node(&self.schema, &doc);
@@ -160,13 +161,16 @@ impl RelationsReaderService {
                 metadata: io_maps::decode_metadata(&self.schema, &doc),
                 resource_field_id: io_maps::doc_to_resource_field_id(&self.schema, &doc),
                 facets: io_maps::doc_to_facets(&self.schema, &doc),
-            })
+            });
+
+            scores.push(score);
         }
 
         let response = nidx_protos::GraphSearchResponse {
             nodes,
             relations,
             graph,
+            scores,
         };
         Ok(response)
     }
@@ -195,11 +199,13 @@ impl RelationsReaderService {
         let destination_nodes = searcher.search(&destination_query, &collector)?;
         unique_nodes.merge(destination_nodes);
 
+        let mut scores = vec![];
         let nodes = unique_nodes
             .into_sorted_vec()
             .into_iter()
-            .map(|(encoded_node, _score)| {
+            .map(|(encoded_node, score)| {
                 let (value, node_type, node_subtype) = decode_node(&encoded_node);
+                scores.push(score);
                 RelationNode {
                     value,
                     ntype: io_maps::u64_to_node_type(node_type),
@@ -210,6 +216,7 @@ impl RelationsReaderService {
 
         let response = nidx_protos::GraphSearchResponse {
             nodes,
+            scores,
             ..Default::default()
         };
         Ok(response)
@@ -231,11 +238,13 @@ impl RelationsReaderService {
         let collector = TopUniqueCollector::new(Selector::Relations, top_k);
         let top_relations = searcher.search(&index_query, &collector)?;
 
+        let mut scores = vec![];
         let relations = top_relations
             .into_sorted_vec()
             .into_iter()
-            .map(|(encoded_relation, _score)| {
+            .map(|(encoded_relation, score)| {
                 let (relation_type, relation_label) = decode_relation(&encoded_relation);
+                scores.push(score);
                 nidx_protos::graph_search_response::Relation {
                     relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),
                     label: relation_label,
@@ -245,6 +254,7 @@ impl RelationsReaderService {
 
         let response = nidx_protos::GraphSearchResponse {
             relations,
+            scores,
             ..Default::default()
         };
         Ok(response)

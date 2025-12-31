@@ -50,6 +50,12 @@ pub enum Term {
     FromContext(String),
 }
 
+#[derive(Clone)]
+pub enum RelationTerm {
+    Exact(String),
+    FromContext(String),
+}
+
 #[derive(Default, Clone)]
 pub struct Node {
     pub value: Option<Term>,
@@ -59,7 +65,7 @@ pub struct Node {
 
 #[derive(Default, Clone)]
 pub struct Relation {
-    pub value: Option<String>,
+    pub label: Option<RelationTerm>,
     pub relation_type: Option<RelationType>,
 }
 
@@ -434,11 +440,12 @@ impl<'a> GraphQueryParser<'a> {
         let mut subqueries = vec![];
 
         match expression {
-            Expression::Value(Relation { value, relation_type }) => {
-                if let Some(value) = value
-                    && !value.is_empty()
-                {
-                    subqueries.push((Occur::Must, self.has_relation_label(value)));
+            Expression::Value(Relation {
+                label: term,
+                relation_type,
+            }) => {
+                if let Some(term) = term {
+                    subqueries.push((Occur::Must, self.has_relation_label(term)));
                 };
 
                 relation_type.map(|relation_type| {
@@ -446,11 +453,12 @@ impl<'a> GraphQueryParser<'a> {
                 });
             }
 
-            Expression::Not(Relation { value, relation_type }) => {
-                if let Some(value) = value
-                    && !value.is_empty()
-                {
-                    subqueries.push((Occur::MustNot, self.has_relation_label(value)));
+            Expression::Not(Relation {
+                label: term,
+                relation_type,
+            }) => {
+                if let Some(term) = term {
+                    subqueries.push((Occur::MustNot, self.has_relation_label(term)));
                 };
 
                 relation_type.map(|relation_type| {
@@ -460,15 +468,10 @@ impl<'a> GraphQueryParser<'a> {
 
             Expression::Or(relations) => {
                 subqueries.extend(relations.iter().flat_map(|relation| {
-                    if let Some(label) = &relation.value {
-                        if label.is_empty() {
-                            None
-                        } else {
-                            Some((Occur::Should, self.has_relation_label(label)))
-                        }
-                    } else {
-                        None
-                    }
+                    relation
+                        .label
+                        .as_ref()
+                        .map(|term| (Occur::Should, self.has_relation_label(term)))
                 }));
             }
         };
@@ -568,11 +571,33 @@ impl<'a> GraphQueryParser<'a> {
         ))
     }
 
-    fn has_relation_label(&self, label: &str) -> Box<dyn Query> {
-        Box::new(TermQuery::new(
-            tantivy::Term::from_field_text(self.schema.label, label),
-            IndexRecordOption::Basic,
-        ))
+    fn has_relation_label(&self, term: &RelationTerm) -> Box<dyn Query> {
+        match term {
+            RelationTerm::Exact(label) => Box::new(TermQuery::new(
+                tantivy::Term::from_field_text(self.schema.label, label),
+                IndexRecordOption::Basic,
+            )),
+            RelationTerm::FromContext(key) => {
+                let Some(keys) = self.context.edge_vector_results.get(key) else {
+                    return Box::new(EmptyQuery);
+                };
+
+                Box::new(BooleanQuery::union(
+                    keys.iter()
+                        .map(|(value, score)| {
+                            let q: Box<dyn Query> = Box::new(BoostQuery::new(
+                                Box::new(TermQuery::new(
+                                    tantivy::Term::from_field_text(self.schema.label, &self.schema.normalize(value)),
+                                    IndexRecordOption::Basic,
+                                )),
+                                *score,
+                            ));
+                            q
+                        })
+                        .collect(),
+                ))
+            }
+        }
     }
 
     fn has_relation_type(&self, relation_type: RelationType) -> Box<dyn Query> {
@@ -801,8 +826,22 @@ impl TryFrom<&nidx_protos::graph_query::Relation> for Relation {
 
     fn try_from(relation_pb: &nidx_protos::graph_query::Relation) -> Result<Self, Self::Error> {
         let value = relation_pb.value.clone();
+        let term = value.map(|value| {
+            match relation_pb
+                .match_kind
+                .as_ref()
+                .unwrap_or(&nidx_protos::graph_query::relation::MatchKind::Exact(
+                    nidx_protos::graph_query::relation::ExactMatch {},
+                )) {
+                nidx_protos::graph_query::relation::MatchKind::Exact(_) => RelationTerm::Exact(value),
+                nidx_protos::graph_query::relation::MatchKind::Vector(_) => RelationTerm::FromContext(value),
+            }
+        });
         let relation_type = relation_pb.relation_type.map(RelationType::try_from).transpose()?;
 
-        Ok(Relation { value, relation_type })
+        Ok(Relation {
+            label: term,
+            relation_type,
+        })
     }
 }

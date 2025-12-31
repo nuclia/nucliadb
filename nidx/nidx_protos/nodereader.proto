@@ -276,6 +276,7 @@ message GraphSearchResponse {
     repeated utils.RelationNode nodes = 1;
     repeated Relation relations = 2;
     repeated Path graph = 3;
+    repeated float scores = 4;
 }
 
 message FilterExpression {

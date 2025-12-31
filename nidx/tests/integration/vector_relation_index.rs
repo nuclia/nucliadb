@@ -95,7 +95,7 @@ fn resource() -> Resource {
             node_vector("dog", vec![0.7, 0.7, 0.0, 0.0]),
             node_vector("fish", vec![0.0, 0.0, 0.7, 0.7]),
             node_vector("snail", vec![0.0, 0.7, 0.7, 0.0]),
-            node_vector("lion", vec![0.7, 0.7, 0.0, 0.7]),
+            node_vector("lion", vec![0.58, 0.58, 0.0, 0.58]),
         ],
         relation_edge_vectors: vec![
             relation_vector("bigger than", vec![0.6, 0.6, 0.2, 0.0]),
@@ -106,8 +106,7 @@ fn resource() -> Resource {
     }
 }
 
-#[sqlx::test]
-async fn test_relation_node_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
+async fn shard_with_resource(pool: sqlx::PgPool) -> anyhow::Result<(NidxFixture, String)> {
     let meta = NidxMetadata::new_with_pool(pool.clone()).await?;
 
     let kbid = Uuid::new_v4();
@@ -132,6 +131,13 @@ async fn test_relation_node_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
     fixture.index_resource(&shard.id.to_string(), resource.clone()).await?;
     fixture.wait_sync().await;
 
+    Ok((fixture, shard.id.to_string()))
+}
+
+#[sqlx::test]
+async fn test_relation_node_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let (mut fixture, shard_id) = shard_with_resource(pool).await?;
+
     let graph_query = nidx_protos::GraphQuery {
         path: Some(nidx_protos::graph_query::PathQuery {
             query: Some(nidx_protos::graph_query::path_query::Query::Path(Path {
@@ -139,7 +145,7 @@ async fn test_relation_node_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
                     value: Some("dog".to_string()),
                     match_kind: Some(nidx_protos::graph_query::node::MatchKind::Vector(
                         nidx_protos::graph_query::node::VectorMatch {
-                            vector: vec![0.7, 0.7, 0.0, 0.0],
+                            vector: vec![0.6, 0.8, 0.0, 0.0],
                         },
                     )),
                     ..Default::default()
@@ -153,7 +159,7 @@ async fn test_relation_node_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let results = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard.id.to_string(),
+            shard: shard_id,
             query: Some(graph_query.clone()),
             kind: QueryKind::Nodes as i32,
             top_k: 100,
@@ -168,13 +174,79 @@ async fn test_relation_node_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
     assert_eq!(results.nodes[0].value, "dog");
     assert_eq!(results.nodes[1].value, "lion");
 
-    // TODO: Return score and check it here
+    assert_eq!(results.scores.len(), 2);
+    assert!(results.scores[0] > results.scores[1]);
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn test_relation_path_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let (mut fixture, shard_id) = shard_with_resource(pool).await?;
+
+    let graph_query = nidx_protos::GraphQuery {
+        path: Some(nidx_protos::graph_query::PathQuery {
+            query: Some(nidx_protos::graph_query::path_query::Query::Path(Path {
+                source: Some(Node {
+                    value: Some("dog".to_string()),
+                    match_kind: Some(nidx_protos::graph_query::node::MatchKind::Vector(
+                        nidx_protos::graph_query::node::VectorMatch {
+                            vector: vec![0.6, 0.8, 0.0, 0.0],
+                        },
+                    )),
+                    ..Default::default()
+                }),
+                undirected: true,
+                ..Default::default()
+            })),
+        }),
+    };
+
+    // Use graph path search
+    let results = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(graph_query.clone()),
+            kind: QueryKind::Path as i32,
+            top_k: 100,
+            graph_vectorset: "minivectors".to_string(),
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+
+    assert_eq!(results.graph.len(), 3);
+    let relations: Vec<_> = results
+        .graph
+        .iter()
+        .map(|p| {
+            (
+                results.nodes[p.source as usize].value.as_str(),
+                results.relations[p.relation as usize].label.as_str(),
+                results.nodes[p.destination as usize].value.as_str(),
+            )
+        })
+        .collect();
+
+    assert_eq!(
+        relations,
+        vec![
+            ("lion", "bigger than", "dog"),
+            ("dog", "bigger than", "fish"),
+            ("lion", "eats", "fish")
+        ]
+    );
+
+    assert!(results.scores[0] > 1.5); // Matches both sides, big score
+    assert!(results.scores[0] > results.scores[1]);
+    assert!(results.scores[1] > results.scores[2]);
 
     // Check paragraph search with graph results
     let results = fixture
         .searcher_client
         .search(SearchRequest {
-            shard: shard.id.to_string(),
+            shard: shard_id,
             graph_search: Some(nidx_protos::search_request::GraphSearch {
                 query: Some(graph_query),
             }),
@@ -208,7 +280,55 @@ async fn test_relation_node_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
         ]
     );
 
-    // TODO: Return score and check it here
+    assert!(graph_results.scores[0] > 1.5); // Matches both sides, big score
+    assert!(graph_results.scores[0] > graph_results.scores[1]);
+    assert!(graph_results.scores[1] > graph_results.scores[2]);
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn test_relation_edge_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let (mut fixture, shard_id) = shard_with_resource(pool).await?;
+
+    let graph_query = nidx_protos::GraphQuery {
+        path: Some(nidx_protos::graph_query::PathQuery {
+            query: Some(nidx_protos::graph_query::path_query::Query::Path(Path {
+                relation: Some(nidx_protos::graph_query::Relation {
+                    value: Some("comparison".to_string()),
+                    match_kind: Some(nidx_protos::graph_query::relation::MatchKind::Vector(
+                        nidx_protos::graph_query::relation::VectorMatch {
+                            vector: vec![0.6, 0.8, 0.0, 0.0],
+                        },
+                    )),
+                    ..Default::default()
+                }),
+                undirected: true,
+                ..Default::default()
+            })),
+        }),
+    };
+
+    let results = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id,
+            query: Some(graph_query.clone()),
+            kind: QueryKind::Relations as i32,
+            top_k: 100,
+            graph_vectorset: "minivectors".to_string(),
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+
+    // Expect bigger than & faster than
+    assert_eq!(results.relations.len(), 2);
+    assert_eq!(results.relations[0].label, "faster than");
+    assert_eq!(results.relations[1].label, "bigger than");
+
+    assert_eq!(results.scores.len(), 2);
+    assert!(results.scores[0] > results.scores[1]);
 
     Ok(())
 }
