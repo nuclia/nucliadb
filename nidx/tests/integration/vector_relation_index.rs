@@ -18,15 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashMap;
-
 use nidx_protos::graph_query::{Node, Path};
 use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::{
     GraphSearchRequest, IndexRelation, IndexRelations, Relation, RelationEdgeVector, RelationNode, RelationNodeVector,
-    Resource,
+    Resource, SearchRequest,
 };
 
 use uuid::Uuid;
@@ -113,16 +111,16 @@ async fn test_relation_node_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let meta = NidxMetadata::new_with_pool(pool.clone()).await?;
 
     let kbid = Uuid::new_v4();
-    let vector_configs = HashMap::from([
+    let vector_configs = vec![
         (
-            "relation_node".to_string(),
+            "minivectors".to_string(),
             VectorConfig::for_relation_nodes(VectorType::DenseF32 { dimension: 4 }),
         ),
         (
-            "relation_edge".to_string(),
+            "minivectors".to_string(),
             VectorConfig::for_relation_edges(VectorType::DenseF32 { dimension: 4 }),
         ),
-    ]);
+    ];
 
     // TODO: Skipping the fixture because it cannot create relation node indexes yet
     let shard = shards::create_shard(&meta, kbid, vector_configs).await?;
@@ -134,29 +132,32 @@ async fn test_relation_node_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
     fixture.index_resource(&shard.id.to_string(), resource.clone()).await?;
     fixture.wait_sync().await;
 
+    let graph_query = nidx_protos::GraphQuery {
+        path: Some(nidx_protos::graph_query::PathQuery {
+            query: Some(nidx_protos::graph_query::path_query::Query::Path(Path {
+                source: Some(Node {
+                    value: Some("dog".to_string()),
+                    match_kind: Some(nidx_protos::graph_query::node::MatchKind::Vector(
+                        nidx_protos::graph_query::node::VectorMatch {
+                            vector: vec![0.7, 0.7, 0.0, 0.0],
+                        },
+                    )),
+                    ..Default::default()
+                }),
+                undirected: true,
+                ..Default::default()
+            })),
+        }),
+    };
+
     let results = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
             shard: shard.id.to_string(),
-            query: Some(nidx_protos::GraphQuery {
-                path: Some(nidx_protos::graph_query::PathQuery {
-                    query: Some(nidx_protos::graph_query::path_query::Query::Path(Path {
-                        source: Some(Node {
-                            value: Some("dog".to_string()),
-                            match_kind: Some(nidx_protos::graph_query::node::MatchKind::Vector(
-                                nidx_protos::graph_query::node::VectorMatch {
-                                    vector: vec![0.7, 0.7, 0.0, 0.0],
-                                },
-                            )),
-                            ..Default::default()
-                        }),
-                        undirected: true,
-                        ..Default::default()
-                    })),
-                }),
-            }),
+            query: Some(graph_query.clone()),
             kind: QueryKind::Nodes as i32,
             top_k: 100,
+            graph_vectorset: "minivectors".to_string(),
             ..Default::default()
         })
         .await?
@@ -166,6 +167,46 @@ async fn test_relation_node_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
     assert_eq!(results.nodes.len(), 2);
     assert_eq!(results.nodes[0].value, "dog");
     assert_eq!(results.nodes[1].value, "lion");
+
+    // TODO: Return score and check it here
+
+    // Check paragraph search with graph results
+    let results = fixture
+        .searcher_client
+        .search(SearchRequest {
+            shard: shard.id.to_string(),
+            graph_search: Some(nidx_protos::search_request::GraphSearch {
+                query: Some(graph_query),
+            }),
+            graph_vectorset: "minivectors".to_string(),
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+
+    // Expect dog & lion
+    let graph_results = results.graph.unwrap();
+    assert_eq!(graph_results.graph.len(), 3);
+    let relations: Vec<_> = graph_results
+        .graph
+        .iter()
+        .map(|p| {
+            (
+                graph_results.nodes[p.source as usize].value.as_str(),
+                graph_results.relations[p.relation as usize].label.as_str(),
+                graph_results.nodes[p.destination as usize].value.as_str(),
+            )
+        })
+        .collect();
+
+    assert_eq!(
+        relations,
+        vec![
+            ("lion", "bigger than", "dog"),
+            ("dog", "bigger than", "fish"),
+            ("lion", "eats", "fish")
+        ]
+    );
 
     // TODO: Return score and check it here
 

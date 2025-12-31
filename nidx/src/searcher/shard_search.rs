@@ -88,6 +88,34 @@ pub async fn search(index_cache: Arc<IndexCache>, search_request: SearchRequest)
         None
     };
 
+    let (node_semantic_index, edge_semantic_index) = if let Some(relations_plan) =
+        &query_plan.index_queries.relations_request
+    {
+        let node_semantic_index = if !relations_plan.vector_node_requests.is_empty() {
+            let Some(index_id) = indexes.vector_relation_node_index(&relations_plan.relations_request.graph_vectorset)
+            else {
+                return Err(NidxError::NotFound);
+            };
+            Some(index_cache.get(&index_id).await?)
+        } else {
+            None
+        };
+
+        let edge_semantic_index = if !relations_plan.vector_edge_requests.is_empty() {
+            let Some(index_id) = indexes.vector_relation_edge_index(&relations_plan.relations_request.graph_vectorset)
+            else {
+                return Err(NidxError::NotFound);
+            };
+            Some(index_cache.get(&index_id).await?)
+        } else {
+            None
+        };
+
+        (node_semantic_index, edge_semantic_index)
+    } else {
+        (None, None)
+    };
+
     let current = Span::current();
     let search_results = tokio::task::spawn_blocking(move || {
         current.in_scope(|| {
@@ -97,6 +125,8 @@ pub async fn search(index_cache: Arc<IndexCache>, search_request: SearchRequest)
                 relation_search.as_ref().map(|v| v.as_ref().into()),
                 text_search.as_ref().map(|v| v.as_ref().into()),
                 vector_seach.as_ref().map(|v| v.as_ref().into()),
+                node_semantic_index.as_ref().map(|v| v.as_ref().into()),
+                edge_semantic_index.as_ref().map(|v| v.as_ref().into()),
             )
         })
     })
@@ -110,6 +140,8 @@ fn blocking_search(
     relation_searcher: Option<&RelationSearcher>,
     text_searcher: Option<&TextSearcher>,
     vector_searcher: Option<&VectorSearcher>,
+    node_semantic_index: Option<&VectorSearcher>,
+    edge_semantic_index: Option<&VectorSearcher>,
 ) -> anyhow::Result<SearchResponse> {
     let mut index_queries = query_plan.index_queries;
 
@@ -131,9 +163,12 @@ fn blocking_search(
 
     let relation_task = index_queries.relations_request.map(|request| {
         move || {
+            let graph_context =
+                run_semantic_graph_queries(&request, node_semantic_index, edge_semantic_index, prefilter)?;
+
             relation_searcher
                 .unwrap()
-                .graph_search(&request.relations_request, prefilter, GraphQueryContext::default())
+                .graph_search(&request.relations_request, prefilter, graph_context)
         }
     });
 
@@ -217,30 +252,87 @@ pub async fn graph_search(
         PrefilterResult::All
     };
 
-    let mut context = GraphQueryContext::default();
+    if matches!(prefilter, PrefilterResult::None) {
+        return Ok(GraphSearchResponse::default());
+    }
+
     let graph_queries = GraphIndexQueries::build(graph_request);
-    if !graph_queries.vector_node_requests.is_empty() {
-        // TODO: Use correct index
-        // TODO: Extract and reuse with paragraph search
-        let Some(vector_node_index_id) = indexes.vector_relation_node_index("relation_node") else {
+    let node_semantic_index = if !graph_queries.vector_node_requests.is_empty() {
+        let Some(index_id) = indexes.vector_relation_node_index(&graph_queries.relations_request.graph_vectorset)
+        else {
             return Err(NidxError::NotFound);
         };
-        let vector_node_searcher = index_cache.get(&vector_node_index_id).await?;
-        let mut tasks = tokio::task::JoinSet::new();
-        for (key, request) in graph_queries.vector_node_requests {
-            let prefilter = prefilter.clone();
-            let vector_node_searcher = vector_node_searcher.clone();
-            let current = Span::current();
-            tasks.spawn(async move {
-                current.in_scope(|| {
-                    let searcher: &VectorSearcher = vector_node_searcher.as_ref().into();
-                    (key, searcher.search(&request, &prefilter))
-                })
-            });
-        }
+        Some(index_cache.get(&index_id).await?)
+    } else {
+        None
+    };
+    let edge_semantic_index = if !graph_queries.vector_edge_requests.is_empty() {
+        let Some(index_id) = indexes.vector_relation_edge_index(&graph_queries.relations_request.graph_vectorset)
+        else {
+            return Err(NidxError::NotFound);
+        };
+        Some(index_cache.get(&index_id).await?)
+    } else {
+        None
+    };
 
-        while let Some(task) = tasks.join_next().await {
-            let (key, results) = task?;
+    let relation_searcher = index_cache.get(&relation_index_id).await?;
+    let current = Span::current();
+    let results = tokio::task::spawn_blocking(move || {
+        current.in_scope(|| {
+            let context = run_semantic_graph_queries(
+                &graph_queries,
+                node_semantic_index.as_ref().map(|i| i.as_ref().into()),
+                edge_semantic_index.as_ref().map(|i| i.as_ref().into()),
+                &prefilter,
+            );
+            let context = match context {
+                Ok(c) => c,
+                Err(e) => return Err(e),
+            };
+            let searcher: &RelationSearcher = relation_searcher.as_ref().into();
+            searcher.graph_search(&graph_queries.relations_request, &prefilter, context)
+        })
+    })
+    .await??;
+    Ok(results)
+}
+
+fn run_semantic_graph_queries(
+    graph_queries: &GraphIndexQueries,
+    node_index: Option<&VectorSearcher>,
+    relation_index: Option<&VectorSearcher>,
+    prefilter: &PrefilterResult,
+) -> anyhow::Result<GraphQueryContext> {
+    std::thread::scope(|scope| {
+        let mut node_threads: Vec<_> = graph_queries
+            .vector_node_requests
+            .iter()
+            .map(|(key, request)| {
+                let prefilter = prefilter.clone();
+                let vector_node_searcher = node_index.unwrap();
+                let current = Span::current();
+                scope
+                    .spawn(move || current.in_scope(|| (key.clone(), vector_node_searcher.search(request, &prefilter))))
+            })
+            .collect();
+
+        let mut edge_threads: Vec<_> = graph_queries
+            .vector_edge_requests
+            .iter()
+            .map(|(key, request)| {
+                let prefilter = prefilter.clone();
+                let vector_relation_searcher = relation_index.unwrap();
+                let current = Span::current();
+                scope.spawn(move || {
+                    current.in_scope(|| (key.clone(), vector_relation_searcher.search(request, &prefilter)))
+                })
+            })
+            .collect();
+
+        let mut context = GraphQueryContext::default();
+        while let Some(node_thread) = node_threads.pop() {
+            let (key, results) = node_thread.join().unwrap();
             context.node_vector_results.insert(
                 key,
                 results?
@@ -250,20 +342,18 @@ pub async fn graph_search(
                     .collect(),
             );
         }
-    }
+        while let Some(edge_thread) = edge_threads.pop() {
+            let (key, results) = edge_thread.join().unwrap();
+            context.edge_vector_results.insert(
+                key,
+                results?
+                    .documents
+                    .iter()
+                    .map(|d| (d.doc_id.clone().unwrap().id, d.score))
+                    .collect(),
+            );
+        }
 
-    if matches!(prefilter, PrefilterResult::None) {
-        return Ok(GraphSearchResponse::default());
-    }
-
-    let relation_searcher = index_cache.get(&relation_index_id).await?;
-    let current = Span::current();
-    let results = tokio::task::spawn_blocking(move || {
-        current.in_scope(|| {
-            let searcher: &RelationSearcher = relation_searcher.as_ref().into();
-            searcher.graph_search(&graph_queries.relations_request, &prefilter, context)
-        })
+        Ok(context)
     })
-    .await??;
-    Ok(results)
 }
