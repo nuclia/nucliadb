@@ -213,6 +213,9 @@ class Basic(BaseModel):
 
 class SyncMetadata(BaseModel):
     file_id: str = Field(description="Identifier of the file in the origin cloud storage system")
+    auth_provider: str = Field(
+        description="Authentication provider used to access the origin cloud storage system"
+    )
 
 
 class InputOrigin(BaseModel):

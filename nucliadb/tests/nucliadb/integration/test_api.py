@@ -992,6 +992,7 @@ async def test_origin_sync_metadata(
             "origin": {
                 "sync_metadata": {
                     "file_id": "1234",
+                    "auth_provider": "google_oauth",
                 },
             },
         },
@@ -1001,6 +1002,7 @@ async def test_origin_sync_metadata(
     resp = await nucliadb_reader.get(f"/kb/{kbid}/slug/myresource", params={"show": ["origin"]})
     assert resp.status_code == 200, resp.text
     assert resp.json()["origin"]["sync_metadata"]["file_id"] == "1234"
+    assert resp.json()["origin"]["sync_metadata"]["auth_provider"] == "google_oauth"
 
 
 @pytest.mark.deploy_modes("standalone")
