@@ -211,6 +211,13 @@ class Basic(BaseModel):
     last_account_seq: int | None = None
 
 
+class SyncMetadata(BaseModel):
+    file_id: str = Field(description="Identifier of the file in the origin cloud storage system")
+    auth_provider: str = Field(
+        description="Authentication provider used to access the origin cloud storage system"
+    )
+
+
 class InputOrigin(BaseModel):
     source_id: str | None = None
     url: str | None = None
@@ -240,6 +247,11 @@ class InputOrigin(BaseModel):
         default=None,
         description="Path of the original resource. Typically used to store folder structure information of the resource at the origin system. It can be later used for filtering on search endpoints with '/origin.path/{path}'",
         max_length=2048,
+    )
+    sync_metadata: SyncMetadata | None = Field(
+        default=None,
+        title="Sync Metadata",
+        description="Metadata related to the resource from the origin system fetched by the Progress Agentic RAG's Cloud Storage Sync service.",
     )
 
     @field_validator("tags")

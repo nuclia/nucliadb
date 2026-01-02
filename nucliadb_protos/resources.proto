@@ -85,6 +85,10 @@ message Basic {
     bool reset_title = 38;
 }
 
+message SyncMetadata {
+    string file_id = 1;
+    string auth_provider = 2;
+}
 
 // Block behaviors
 message Origin {
@@ -104,6 +108,7 @@ message Origin {
     string filename = 9;
     repeated string related = 10;
     string path = 11;
+    SyncMetadata sync_metadata = 12;
 }
 
 message Extra {

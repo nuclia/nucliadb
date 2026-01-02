@@ -42,6 +42,13 @@ def parse_origin(origin: Origin, origin_payload: InputOrigin):
         origin.metadata.update(origin_payload.metadata)
     if origin_payload.path:
         origin.path = origin_payload.path
+    if origin_payload.sync_metadata is not None:
+        origin.sync_metadata.CopyFrom(
+            resources_pb2.SyncMetadata(
+                file_id=origin_payload.sync_metadata.file_id,
+                auth_provider=origin_payload.sync_metadata.auth_provider,
+            )
+        )
     origin.source = Origin.Source.API
 
 
