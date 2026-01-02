@@ -998,11 +998,31 @@ async def test_origin_sync_metadata(
         },
     )
     assert resp.status_code == 201, f"{resp.text}"
+    rid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/slug/myresource", params={"show": ["origin"]})
     assert resp.status_code == 200, resp.text
     assert resp.json()["origin"]["sync_metadata"]["file_id"] == "1234"
     assert resp.json()["origin"]["sync_metadata"]["auth_provider"] == "google_oauth"
+
+    # Test patching sync_metadata
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{rid}",
+        json={
+            "origin": {
+                "sync_metadata": {
+                    "file_id": "5678",
+                    "auth_provider": "dropbox_oauth",
+                },
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/slug/myresource", params={"show": ["origin"]})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["origin"]["sync_metadata"]["file_id"] == "5678"
+    assert resp.json()["origin"]["sync_metadata"]["auth_provider"] == "dropbox_oauth"
 
 
 @pytest.mark.deploy_modes("standalone")
