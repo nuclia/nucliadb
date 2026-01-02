@@ -978,6 +978,32 @@ async def test_dates_are_properly_validated(
 
 
 @pytest.mark.deploy_modes("standalone")
+async def test_origin_sync_metadata(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox,
+):
+    kbid = standalone_knowledgebox
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "My title",
+            "slug": "myresource",
+            "origin": {
+                "sync_metadata": {
+                    "file_id": "1234",
+                },
+            },
+        },
+    )
+    assert resp.status_code == 201, f"{resp.text}"
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/slug/myresource", params={"show": ["origin"]})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["origin"]["sync_metadata"]["file_id"] == "1234"
+
+
+@pytest.mark.deploy_modes("standalone")
 async def test_file_computed_titles_are_set_on_resource_title(
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
