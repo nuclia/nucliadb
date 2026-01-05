@@ -146,6 +146,8 @@ class ObserverRecorder:
         self,
         exc_type: type[Exception] | type[BaseException] | None,
         exc_value: Exception | BaseException | None,
+        # this optional can't be removed as Python <3.14 doesn't accept a union
+        # of two NoneType
         traceback: Optional[StackSummary],  # noqa
     ):
         if exc_type is not None:
