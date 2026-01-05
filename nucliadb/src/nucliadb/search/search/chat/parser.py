@@ -302,7 +302,21 @@ class RAOFindParser:
                 for key in self.item.resource_filters:
                     parts = key.split("/")
                     if len(parts) == 1:
-                        operands.append(Resource(id=parts[0]))
+                        # HACK: some customers are wrongly using resource
+                        # filters without UUIDs. To avoid breaking them, we log
+                        # and ignore the validation error as nidx would do
+                        # anyway
+                        try:
+                            operands.append(Resource(id=parts[0]))
+                        except ValidationError:
+                            logger.warning(
+                                "Non-UUID resource filter",
+                                extra={
+                                    "kbid": self.kbid,
+                                    "filter": key,
+                                    "wrong_rid": parts[0],
+                                },
+                            )
                     else:
                         rid = parts[0]
                         try:
@@ -313,9 +327,23 @@ class RAOFindParser:
                                 f"resource filter {key} has an invalid field type: {parts[1]}",
                             )
                         field_id = parts[2] if len(parts) > 2 else None
-                        operands.append(
-                            And(operands=[Resource(id=rid), Field(type=field_type, name=field_id)])
-                        )
+                        # HACK: some customers are wrongly using resource
+                        # filters without UUIDs. To avoid breaking them, we log
+                        # and ignore the validation error as nidx would do
+                        # anyway
+                        try:
+                            operands.append(
+                                And(operands=[Resource(id=rid), Field(type=field_type, name=field_id)])
+                            )
+                        except ValidationError:
+                            logger.warning(
+                                "Non-UUID resource filter",
+                                extra={
+                                    "kbid": self.kbid,
+                                    "filter": key,
+                                    "wrong_rid": parts[0],
+                                },
+                            )
 
                 if len(operands) == 1:
                     field_expression.append(operands[0])
