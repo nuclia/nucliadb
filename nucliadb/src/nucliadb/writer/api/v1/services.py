@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from fastapi import HTTPException, Response
+from fastapi import Body, HTTPException, Path, Response
 from fastapi_versioning import version
 from starlette.requests import Request
 
@@ -44,7 +44,15 @@ from nucliadb_utils.authentication import requires
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def set_labelset_endpoint(request: Request, kbid: str, labelset: str, item: LabelSet):
+async def set_labelset_endpoint(
+    request: Request,
+    kbid: str,
+    labelset: str = Path(
+        title="The ID of the labelset to create or update. This is a unique identifier that should be used at search time.",
+        examples=["categories", "movie-genres", "document-types"],
+    ),
+    item: LabelSet = Body(...),
+):
     if item.title is None:
         item.title = labelset
 
