@@ -1,3 +1,5 @@
+include ../nucliadb.mk
+
 subpackages := nucliadb standalone reader search train writer ingest
 
 test_target_prefix := test-
@@ -5,12 +7,6 @@ test_cov_target_prefix := test-cov-
 
 test_subpackages_targets = $(addprefix $(test_target_prefix),$(subpackages))
 test_cov_subpackages_targets = $(addprefix $(test_cov_target_prefix),$(subpackages))
-
-pytest_flags := -s -rfE -v --tb=native
-pytest_extra_flags :=
-
-PYTEST := pytest $(pytest_flags) $(pytest_extra_flags)
-
 
 .PHONY: check-system
 check-system:
@@ -48,12 +44,11 @@ test-%:
 
 test-cov-%:
 	$(PYTEST) \
+		$(pytest_cov_report_flags) \
 		--cov=nucliadb \
 		--cov=nucliadb_models \
 		--cov=nucliadb_telemetry \
 		--cov=nucliadb_utils \
 		--cov-config=../.coveragerc \
-		--cov-report xml \
-		--cov-report term-missing:skip-covered \
 		--cov-append \
 		tests/$*

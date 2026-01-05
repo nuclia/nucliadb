@@ -1,3 +1,5 @@
+include ../nucliadb.mk
+
 .PHONY: format
 format:
 	ruff check --fix --config=../ruff.toml .
@@ -11,9 +13,9 @@ lint:
 
 .PHONY: test
 test:
-	pytest -sv --tb=native tests
+	$(PYTEST) tests
 
 
 .PHONY: test-cov
 test-cov:
-	pytest -rfE -sxv --cov=nucliadb_models --cov-config=../.coveragerc --tb=native --cov-report term-missing:skip-covered --cov-report xml tests
+	$(PYTEST) $(pytest_cov_report_flags) --cov=nucliadb_models --cov-config=../.coveragerc tests

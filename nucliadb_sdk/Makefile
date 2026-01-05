@@ -1,3 +1,5 @@
+include ../nucliadb.mk
+
 .PHONY: format
 format:
 	ruff check --fix --config=../ruff.toml .
@@ -11,16 +13,13 @@ lint:
 
 .PHONY: test
 test:
-	TEST_LOCAL_NUCLIADB=START pytest -rfE -sv --tb=native tests
+	TEST_LOCAL_NUCLIADB=START $(PYTEST) tests/
 
 .PHONY: test-cov
 test-cov:
-	TEST_LOCAL_NUCLIADB=START pytest \
-		-rfE -sxv \
+	TEST_LOCAL_NUCLIADB=START $(PYTEST) \
+		$(pytest_cov_report_flags) \
 		--cov=nucliadb_sdk \
 		--cov=nucliadb_models \
 		--cov-config=../.coveragerc \
-		--cov-report term-missing:skip-covered \
-		--cov-report xml \
-		--tb=native \
 		tests

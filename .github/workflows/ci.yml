@@ -104,6 +104,14 @@ jobs:
               make -C $package lint || ERROR=1
           done
           exit $ERROR
+      - name: Validate Python
+        run: |
+          source .venv/bin/activate
+          for package in nucliadb nucliadb_utils nucliadb_telemetry nucliadb_sdk nucliadb_dataset nucliadb_models
+          do
+              make -C $package tests pytest_extra_flags="--collect-only"
+          done
+          exit $ERROR
 
   lint-helm:
     name: Lint all helm charts

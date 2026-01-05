@@ -1,3 +1,4 @@
+include ../nucliadb.mk
 
 protos:
 	python -m grpc_tools.protoc ./nucliadb_telemetry/tests/grpc/helloworld.proto           -I ./ --python_out=./ --mypy_out=./ --grpc_python_out=./ --mypy_grpc_out=./
@@ -16,8 +17,8 @@ lint:
 
 .PHONY: test
 test:
-	pytest -sv --tb=native tests
+	$(PYTEST) tests/
 
 .PHONY: test-cov
 test-cov:
-	pytest -rfE -sxv --cov=nucliadb_telemetry --cov-config=../.coveragerc --tb=native --cov-report term-missing:skip-covered --cov-report xml tests
+	$(PYTEST) $(pytest_cov_report_flags) --cov=nucliadb_telemetry --cov-config=../.coveragerc tests/
