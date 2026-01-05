@@ -34,7 +34,6 @@ from nucliadb.common.ids import (
 )
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
-from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.search import logger
 from nucliadb.search.augmentor.fields import (
@@ -43,13 +42,11 @@ from nucliadb.search.augmentor.fields import (
     find_conversation_message,
 )
 from nucliadb.search.search.chat import rpc
-from nucliadb.search.search.chat.images import (
-    get_file_thumbnail_image,
-)
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.augment import (
     AugmentedConversationField,
     AugmentedField,
+    AugmentedFileField,
     AugmentFields,
     AugmentParagraph,
     AugmentParagraphs,
@@ -844,11 +841,37 @@ async def conversation_prompt_context(
                 # TODO(decoupled-ask): call /augment with conversation_image_attachments=True
                 if strategy.attachments_images and visual_llm:
                     ops += len(attachments)
+
+                    augmented = await rpc.augment(
+                        kbid,
+                        AugmentRequest(
+                            fields=AugmentFields(
+                                given=[id.full() for id in attachments],
+                                file_thumbnail=True,
+                            )
+                        ),
+                    )
+
                     for attachment in attachments:
-                        file_field: File = await resource.get_field(
-                            attachment.key, attachment.pb_type, load=True
+                        attachment_id_str = attachment.full()
+                        if attachment_id_str not in augmented.fields:
+                            continue
+
+                        attachment_field = augmented.fields[attachment_id_str]
+                        if not isinstance(attachment_field, AugmentedFileField):
+                            continue
+
+                        thumbnail_image_path = attachment_field.thumbnail_image
+                        if not thumbnail_image_path:
+                            continue
+
+                        image = await rpc.download_image(
+                            kbid,
+                            attachment,
+                            thumbnail_image_path,
+                            # We assume the thumbnail is always generated as JPEG by Nuclia processing
+                            mime_type="image/jpeg",
                         )
-                        image = await get_file_thumbnail_image(file_field)
                         if image is not None:
                             pid = f"{rid}/f/{attachment.key}/0-0"
                             context.images[pid] = image
