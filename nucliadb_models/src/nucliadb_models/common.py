@@ -220,8 +220,8 @@ class FieldRef(BaseModel):
 
 
 class Classification(BaseModel):
-    labelset: str
-    label: str
+    labelset: str = Field(title="The ID of the labelset")
+    label: str = Field(title="The label assigned from the labelset")
 
 
 class UserClassification(Classification):

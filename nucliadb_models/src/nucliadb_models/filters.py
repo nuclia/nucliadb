@@ -168,7 +168,7 @@ class Label(FilterProp, extra="forbid"):
     """Matches fields/paragraphs with a label (or labelset)"""
 
     prop: Literal["label"] = "label"
-    labelset: str = pydantic.Field(description="The labelset to match")
+    labelset: str = pydantic.Field(description="The ID of the labelset to match")
     label: str | None = pydantic.Field(
         default=None,
         description="The label to match. If blank, matches all labels in the given labelset",

@@ -19,7 +19,7 @@
 #
 import asyncio
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Path
 from fastapi.responses import StreamingResponse
 from fastapi_versioning import version
 from google.protobuf.json_format import MessageToDict
@@ -168,7 +168,14 @@ async def get_labelsets(kbid: str) -> KnowledgeBoxLabels:
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_labelset_endpoint(request: Request, kbid: str, labelset: str) -> LabelSet:
+async def get_labelset_endpoint(
+    request: Request,
+    kbid: str,
+    labelset: str = Path(
+        title="The ID of the labelset to create or update. This is a unique identifier that should be used at search time.",
+        examples=["categories", "movie-genres", "document-types"],
+    ),
+) -> LabelSet:
     try:
         return await get_labelset(kbid, labelset)
     except KnowledgeBoxNotFound:
