@@ -172,7 +172,7 @@ async def get_labelset_endpoint(
     request: Request,
     kbid: str,
     labelset: str = Path(
-        title="The ID of the labelset to create or update. This is a unique identifier that should be used at search time.",
+        title="The ID of the labelset to get. This is a unique identifier that should be used at search time.",
         examples=["categories", "movie-genres", "document-types"],
     ),
 ) -> LabelSet:
