@@ -22,7 +22,7 @@ from typing_extensions import Self
 from nucliadb_models import filters
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
-from nucliadb_models.search import ResourceProperties
+from nucliadb_models.search import ResourceProperties, TextPosition
 
 ResourceIdPattern = r"^([0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
 ResourceId = Annotated[
@@ -267,6 +267,7 @@ class AugmentRequest(BaseModel):
 
 class AugmentedParagraph(BaseModel):
     text: str | None = None
+    position: TextPosition | None = None
 
     neighbours_before: list[ParagraphId] | None = None
     neighbours_after: list[ParagraphId] | None = None

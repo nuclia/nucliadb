@@ -51,6 +51,7 @@ from nucliadb.models.internal.augment import (
     ParagraphAugment,
     ParagraphImage,
     ParagraphPage,
+    ParagraphPosition,
     ParagraphProp,
     ParagraphTable,
     ParagraphText,
@@ -500,7 +501,10 @@ def parse_second_augments(item: AugmentRequest, augmented: Augmented) -> list[Au
             augmentations.append(
                 ParagraphAugment(
                     given=neighbours,
-                    select=[ParagraphText()],
+                    select=[
+                        ParagraphText(),
+                        ParagraphPosition(),
+                    ],
                 )
             )
 
@@ -526,10 +530,12 @@ def merge_second_augment(item: AugmentRequest, response: AugmentResponse, augmen
                 neighbour = augmented.paragraphs[before_id]
 
                 if before_id_str not in response.paragraphs:
-                    if not neighbour.text:
+                    if not neighbour.text and not neighbour.position:
                         continue
                     # create a new paragraph for the neighbour
-                    new_paragraphs[before_id_str] = AugmentedParagraph(text=neighbour.text)
+                    new_paragraphs[before_id_str] = AugmentedParagraph(
+                        text=neighbour.text, position=neighbour.position
+                    )
 
                 else:
                     # merge neighbour with existing paragraph
@@ -547,10 +553,12 @@ def merge_second_augment(item: AugmentRequest, response: AugmentResponse, augmen
                 neighbour = augmented.paragraphs[after_id]
 
                 if after_id_str not in response.paragraphs:
-                    if not neighbour.text:
+                    if not neighbour.text and not neighbour.position:
                         continue
                     # create a new paragraph for the neighbour
-                    new_paragraphs[after_id_str] = AugmentedParagraph(text=neighbour.text)
+                    new_paragraphs[after_id_str] = AugmentedParagraph(
+                        text=neighbour.text, position=neighbour.position
+                    )
 
                 else:
                     # merge neighbour with existing paragraph

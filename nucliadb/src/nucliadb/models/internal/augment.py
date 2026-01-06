@@ -35,7 +35,11 @@ from nucliadb_models.file import FieldFile
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
-from nucliadb_models.search import ResourceProperties, SearchParamDefaults
+from nucliadb_models.search import (
+    ResourceProperties,
+    SearchParamDefaults,
+    TextPosition,
+)
 from nucliadb_protos import resources_pb2
 
 
@@ -146,6 +150,10 @@ class ParagraphText(SelectProp):
     prop: Literal["text"] = "text"
 
 
+class ParagraphPosition(SelectProp):
+    prop: Literal["position"] = "position"
+
+
 class ParagraphImage(SelectProp):
     prop: Literal["image"] = "image"
 
@@ -173,6 +181,7 @@ class RelatedParagraphs(SelectProp):
 ParagraphProp = Annotated[
     (
         Annotated[ParagraphText, Tag("text")]
+        | Annotated[ParagraphPosition, Tag("position")]
         | Annotated[ParagraphImage, Tag("image")]
         | Annotated[ParagraphTable, Tag("table")]
         | Annotated[ParagraphPage, Tag("page")]
@@ -490,6 +499,8 @@ class AugmentedParagraph:
 
     # textual representation of the paragraph
     text: str | None
+
+    position: TextPosition | None
 
     # original image for the paragraph when it has been extracted from an image
     # or a table. This value is the path to be used in the download endpoint

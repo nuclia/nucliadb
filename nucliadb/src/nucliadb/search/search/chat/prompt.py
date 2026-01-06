@@ -686,8 +686,7 @@ async def neighbouring_paragraphs_prompt_context(
             augmented_context.paragraphs[npid] = AugmentedTextBlock(
                 id=npid,
                 text=ntext,
-                # TODO(decoupled-ask): implement neighbour positions
-                position=None,
+                position=neighbour.position,
                 parent=pid.full(),
                 augmentation_type=TextBlockAugmentationType.NEIGHBOURING_PARAGRAPHS,
             )

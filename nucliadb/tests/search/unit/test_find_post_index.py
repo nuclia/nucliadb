@@ -132,6 +132,7 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
         return AugmentedParagraph(
             id=paragraph_id,
             text="extracted text",
+            position=None,
             source_image_path=None,
             page_preview_path=None,
             related=None,

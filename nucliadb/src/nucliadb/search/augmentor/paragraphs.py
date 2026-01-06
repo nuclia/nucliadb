@@ -20,6 +20,8 @@
 import asyncio
 from collections.abc import Sequence
 
+from typing_extensions import assert_never
+
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import Resource
@@ -30,16 +32,17 @@ from nucliadb.models.internal.augment import (
     Paragraph,
     ParagraphImage,
     ParagraphPage,
+    ParagraphPosition,
     ParagraphProp,
     ParagraphTable,
     ParagraphText,
     RelatedParagraphs,
 )
-from nucliadb.search import logger
 from nucliadb.search.augmentor.metrics import augmentor_observer
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 from nucliadb.search.search.paragraphs import get_paragraph_from_full_text
+from nucliadb_models.search import TextPosition
 from nucliadb_protos import resources_pb2
 
 
@@ -120,12 +123,16 @@ async def db_augment_paragraph(
         return _metadata
 
     text = None
+    position = None
     image_path = None
     page_preview_path = None
     related = None
     for prop in select:
         if isinstance(prop, ParagraphText):
             text = await get_paragraph_text(field, paragraph_id)
+
+        elif isinstance(prop, ParagraphPosition):
+            position = await get_paragraph_position(field, paragraph_id)
 
         elif isinstance(prop, ParagraphImage):
             metadata = await access_metadata()
@@ -161,11 +168,12 @@ async def db_augment_paragraph(
             )
 
         else:  # pragma: no cover
-            logger.warning(f"Unexpected paragraph prop: {prop}")
+            assert_never(prop)
 
     return AugmentedParagraph(
         id=paragraph_id,
         text=text,
+        position=position,
         source_image_path=image_path,
         page_preview_path=page_preview_path,
         related=related,
@@ -218,6 +226,29 @@ async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | N
     # we want to be explicit with not having the paragraph text but the function
     # above returns an empty string if it can't find it
     return text or None
+
+
+async def get_paragraph_position(field: Field, paragraph_id: ParagraphId) -> TextPosition | None:
+    field_paragraphs = await get_field_paragraphs(field)
+    if field_paragraphs is None:
+        return None
+
+    idx: int | None
+    for idx, paragraph in enumerate(field_paragraphs):
+        field_paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end)
+        if field_paragraph_id == paragraph_id:
+            break
+    else:
+        # we haven't found the paragraph, we can't provide a position
+        return None
+
+    return TextPosition(
+        index=idx,
+        start=paragraph.start,
+        end=paragraph.end,
+        start_seconds=list(paragraph.start_seconds),
+        end_seconds=list(paragraph.end_seconds),
+    )
 
 
 async def related_paragraphs(
