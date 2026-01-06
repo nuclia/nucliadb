@@ -54,7 +54,6 @@ from nucliadb_models.augment import (
     AugmentRequest,
     AugmentResources,
     ParagraphMetadata,
-    ResourceProp,
 )
 from nucliadb_models.retrieval import RerankerScore, RetrievalMatch, ScoreType
 from nucliadb_models.search import (
@@ -764,17 +763,18 @@ async def hydrate_and_rerank(
         else:
             text_block_id_to_hydrate.add(paragraph_id)
 
-    resource_select = ResourceProp.from_show_and_extracted(
-        resource_hydration_options.show, resource_hydration_options.extracted
+    resource_augment = AugmentResources(
+        given=list(resources_to_hydrate),
+        field_type_filter=resource_hydration_options.field_type_filter,
+    )
+    resource_augment.apply_show_and_extracted(
+        resource_hydration_options.show,
+        resource_hydration_options.extracted,
     )
 
     # hydrate only the strictly needed before rerank
     augment_request = AugmentRequest(
-        resources=AugmentResources(
-            given=list(resources_to_hydrate),
-            select=resource_select,
-            field_type_filter=resource_hydration_options.field_type_filter,
-        ),
+        resources=resource_augment,
         paragraphs=AugmentParagraphs(
             given=[
                 AugmentParagraph(
@@ -854,15 +854,10 @@ async def hydrate_and_rerank(
 
     # Finally, fetch resource metadata if we haven't already done it
     if reranker.needs_extra_results:
+        resource_augment.given = list(resources_to_hydrate)
         augmented = await rpc.augment(
             kbid,
-            AugmentRequest(
-                resources=AugmentResources(
-                    given=list(resources_to_hydrate),
-                    select=resource_select,
-                    field_type_filter=resource_hydration_options.field_type_filter,
-                ),
-            ),
+            AugmentRequest(resources=resource_augment),
         )
         augmented_resources = augmented.resources
 

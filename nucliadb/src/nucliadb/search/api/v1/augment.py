@@ -24,7 +24,6 @@ from typing import cast
 from fastapi import Header, Request
 from fastapi_versioning import version
 
-import nucliadb_models
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.models.internal import augment as internal_augment
 from nucliadb.models.internal.augment import (
@@ -263,45 +262,49 @@ def parse_deep_resource_augment(
     item: AugmentResources,
 ) -> tuple[list[ResourceProperties], list[ExtractedDataTypeName], list[ResourceProp]]:
     show = []
-    show_extracted = False
+    if item.basic:
+        show.append(ResourceProperties.BASIC)
+    if item.origin:
+        show.append(ResourceProperties.ORIGIN)
+    if item.extra:
+        show.append(ResourceProperties.EXTRA)
+    if item.relations:
+        show.append(ResourceProperties.RELATIONS)
+    if item.values:
+        show.append(ResourceProperties.VALUES)
+    if item.errors:
+        show.append(ResourceProperties.ERRORS)
+    if item.security:
+        show.append(ResourceProperties.SECURITY)
+
     extracted = []
-    select: list[ResourceProp] = []
+    if item.extracted_text:
+        extracted.append(ExtractedDataTypeName.TEXT)
+    if item.extracted_metadata:
+        extracted.append(ExtractedDataTypeName.METADATA)
+    if item.extracted_shortened_metadata:
+        extracted.append(ExtractedDataTypeName.SHORTENED_METADATA)
+    if item.extracted_large_metadata:
+        extracted.append(ExtractedDataTypeName.LARGE_METADATA)
+    if item.extracted_vector:
+        extracted.append(ExtractedDataTypeName.VECTOR)
+    if item.extracted_link:
+        extracted.append(ExtractedDataTypeName.LINK)
+    if item.extracted_file:
+        extracted.append(ExtractedDataTypeName.FILE)
+    if item.extracted_qa:
+        extracted.append(ExtractedDataTypeName.QA)
 
-    _resource_prop_to_show = {
-        nucliadb_models.augment.ResourceProp.BASIC: ResourceProperties.BASIC,
-        nucliadb_models.augment.ResourceProp.ORIGIN: ResourceProperties.ORIGIN,
-        nucliadb_models.augment.ResourceProp.EXTRA: ResourceProperties.EXTRA,
-        nucliadb_models.augment.ResourceProp.RELATIONS: ResourceProperties.RELATIONS,
-        nucliadb_models.augment.ResourceProp.VALUES: ResourceProperties.VALUES,
-        nucliadb_models.augment.ResourceProp.ERRORS: ResourceProperties.ERRORS,
-        nucliadb_models.augment.ResourceProp.SECURITY: ResourceProperties.SECURITY,
-    }
-    _resource_prop_to_extracted = {
-        nucliadb_models.augment.ResourceProp.EXTRACTED_TEXT: ExtractedDataTypeName.TEXT,
-        nucliadb_models.augment.ResourceProp.EXTRACTED_METADATA: ExtractedDataTypeName.METADATA,
-        nucliadb_models.augment.ResourceProp.EXTRACTED_SHORTENED_METADATA: ExtractedDataTypeName.SHORTENED_METADATA,
-        nucliadb_models.augment.ResourceProp.EXTRACTED_LARGE_METADATA: ExtractedDataTypeName.LARGE_METADATA,
-        nucliadb_models.augment.ResourceProp.EXTRACTED_VECTOR: ExtractedDataTypeName.VECTOR,
-        nucliadb_models.augment.ResourceProp.EXTRACTED_LINK: ExtractedDataTypeName.LINK,
-        nucliadb_models.augment.ResourceProp.EXTRACTED_FILE: ExtractedDataTypeName.FILE,
-        nucliadb_models.augment.ResourceProp.EXTRACTED_QA: ExtractedDataTypeName.QA,
-    }
-    _resource_prop_to_prop: dict[nucliadb_models.augment.ResourceProp, ResourceProp] = {
-        nucliadb_models.augment.ResourceProp.TITLE: ResourceTitle(),
-        nucliadb_models.augment.ResourceProp.SUMMARY: ResourceSummary(),
-        nucliadb_models.augment.ResourceProp.CLASSIFICATION_LABELS: ResourceClassificationLabels(),
-    }
-    for prop in item.select:
-        if prop in _resource_prop_to_show:
-            show.append(_resource_prop_to_show[prop])
-        elif prop in _resource_prop_to_extracted:
-            show_extracted = True
-            extracted.append(_resource_prop_to_extracted[prop])
-        elif prop in _resource_prop_to_prop:
-            select.append(_resource_prop_to_prop[prop])
-
-    if show_extracted:
+    if len(extracted) > 0:
         show.append(ResourceProperties.EXTRACTED)
+
+    select: list[ResourceProp] = []
+    if item.title:
+        select.append(ResourceTitle())
+    if item.summary:
+        select.append(ResourceSummary())
+    if item.classification_labels:
+        select.append(ResourceClassificationLabels())
 
     return (
         show,

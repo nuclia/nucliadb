@@ -53,7 +53,6 @@ from nucliadb_models.augment import (
     AugmentRequest,
     AugmentResourceFields,
     AugmentResources,
-    ResourceProp,
 )
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.search import (
@@ -311,10 +310,8 @@ async def full_resource_prompt_context(
         AugmentRequest(
             resources=AugmentResources(
                 given=ordered_resources,
-                select=[
-                    ResourceProp.TITLE,
-                    ResourceProp.SUMMARY,
-                ],
+                title=True,
+                summary=True,
                 fields=AugmentResourceFields(
                     text=True,
                     filters=[],
@@ -390,19 +387,19 @@ async def extend_prompt_context_with_metadata(
     if len(text_block_ids) == 0:  # pragma: no cover
         return
 
-    resource_select = []
-    field_classification_labels = False
+    resource_origin = False
+    resource_extra = False
+    classification_labels = False
     field_entities = False
 
     ops = 0
     if MetadataExtensionType.ORIGIN in strategy.types:
         ops += 1
-        resource_select.append(ResourceProp.ORIGIN)
+        resource_origin = True
 
     if MetadataExtensionType.CLASSIFICATION_LABELS in strategy.types:
         ops += 1
-        resource_select.append(ResourceProp.CLASSIFICATION_LABELS)
-        field_classification_labels = True
+        classification_labels = True
 
     if MetadataExtensionType.NERS in strategy.types:
         ops += 1
@@ -410,20 +407,22 @@ async def extend_prompt_context_with_metadata(
 
     if MetadataExtensionType.EXTRA_METADATA in strategy.types:
         ops += 1
-        resource_select.append(ResourceProp.EXTRA)
+        resource_extra = True
 
     metrics.set("metadata_extension_ops", ops * len(text_block_ids))
 
     augment_req = AugmentRequest()
-    if resource_select:
+    if resource_origin or resource_extra or classification_labels:
         augment_req.resources = AugmentResources(
             given=rids,
-            select=resource_select,
+            origin=resource_origin,
+            extra=resource_extra,
+            classification_labels=classification_labels,
         )
-    if field_classification_labels or field_entities:
+    if classification_labels or field_entities:
         augment_req.fields = AugmentFields(
             given=field_ids,
-            classification_labels=field_classification_labels,
+            classification_labels=classification_labels,
             entities=field_entities,
         )
 
@@ -554,16 +553,17 @@ async def field_extension_prompt_context(
         if resource_uuid not in ordered_resources:
             ordered_resources.append(resource_uuid)
 
-    select = []
+    resource_title = False
+    resource_summary = False
     filters: list[nucliadb_models.filters.Field | nucliadb_models.filters.Generated] = []
     # this strategy exposes a way to access resource title and summary using a
     # field id. However, as they are resource properties, we must request it as
     # that
     for name in strategy.fields:
         if name == "a/title":
-            select.append(ResourceProp.TITLE)
+            resource_title = True
         elif name == "a/summary":
-            select.append(ResourceProp.SUMMARY)
+            resource_summary = True
         else:
             # model already enforces type/name format
             field_type, field_name = name.split("/")
@@ -581,7 +581,8 @@ async def field_extension_prompt_context(
         AugmentRequest(
             resources=AugmentResources(
                 given=ordered_resources,
-                select=select,
+                title=resource_title,
+                summary=resource_summary,
                 fields=AugmentResourceFields(
                     text=True,
                     filters=filters,
