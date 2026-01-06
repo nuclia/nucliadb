@@ -82,8 +82,6 @@ async def augment_resource(
     rid: str,
     select: list[ResourceProp],
 ) -> AugmentedResource | None:
-    # TODO(decoupled-ask): make sure we don't repeat any select clause
-
     resource = await cache.get_resource(kbid, rid)
     if resource is None:
         # skip resources that aren't in the DB
@@ -97,6 +95,8 @@ async def db_augment_resource(
     resource: Resource,
     select: list[ResourceProp],
 ) -> AugmentedResource:
+    select = dedup_resource_select(select)
+
     title = None
     summary = None
     origin = None
@@ -144,6 +144,15 @@ async def db_augment_resource(
         classification_labels=labels,
     )
     return augmented
+
+
+def dedup_resource_select(select: list[ResourceProp]) -> list[ResourceProp]:
+    # there's no resource prop with fields that need special treatement to
+    # merge, just get by unique prop id
+    merged: dict[str, ResourceProp] = {}
+    for prop in select:
+        merged.setdefault(prop.prop, prop)
+    return list(merged.values())
 
 
 async def get_basic(resource: Resource) -> resources_pb2.Basic | None:
