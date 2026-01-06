@@ -208,11 +208,7 @@ class AugmentFields(BaseModel):
         return self
 
 
-# TODO(decoupled-ask): remove unused metadata
 class ParagraphMetadata(BaseModel):
-    field_labels: list[str]
-    paragraph_labels: list[str]
-
     is_an_image: bool
     is_a_table: bool
 

@@ -780,8 +780,6 @@ async def hydrate_and_rerank(
                 AugmentParagraph(
                     id=paragraph_id,
                     metadata=ParagraphMetadata(
-                        field_labels=text_blocks_by_id[paragraph_id].field_labels,
-                        paragraph_labels=text_blocks_by_id[paragraph_id].paragraph_labels,
                         is_an_image=text_blocks_by_id[paragraph_id].is_an_image,
                         is_a_table=text_blocks_by_id[paragraph_id].is_a_table,
                         source_file=text_blocks_by_id[paragraph_id].representation_file,

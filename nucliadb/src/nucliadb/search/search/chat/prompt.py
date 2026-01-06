@@ -837,7 +837,6 @@ async def conversation_prompt_context(
                             augmentation_type=TextBlockAugmentationType.CONVERSATION,
                         )
 
-                # TODO(decoupled-ask): call /augment with conversation_image_attachments=True
                 if strategy.attachments_images and visual_llm:
                     ops += len(attachments)
 
