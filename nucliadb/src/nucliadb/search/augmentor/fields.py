@@ -164,10 +164,33 @@ def dedup_field_select(
     select: Sequence[FieldProp | FileProp | ConversationProp],
 ) -> Sequence[FieldProp | FileProp | ConversationProp]:
     """Merge any duplicated property taking the broader augmentation possible."""
+    merged = {}
+
     # TODO(decoupled-ask): only conversation properties can be deduplicated
     # (none of the others has any field). However, deduplicating the selector is
     # not possible in many cases, so we do nothing
-    return select
+    unmergeable = []
+
+    for prop in select:
+        if prop.prop not in merged:
+            merged[prop.prop] = prop
+
+        else:
+            if isinstance(prop, ConversationText) or isinstance(prop, ConversationAttachments):
+                unmergeable.append(prop)
+            elif (
+                isinstance(prop, FieldText)
+                or isinstance(prop, FieldValue)
+                or isinstance(prop, FieldClassificationLabels)
+                or isinstance(prop, FieldEntities)
+                or isinstance(prop, FileThumbnail)
+            ):
+                # properties without parameters
+                pass
+            else:  # pragma: no cover
+                assert_never(prop)
+
+    return [*merged.values(), *unmergeable]
 
 
 @augmentor_observer.wrap({"type": "db_text_field"})
