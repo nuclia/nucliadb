@@ -121,10 +121,19 @@ def test_metadata_extension_strategy():
                     "given": paragraph_ids,
                     "select": [
                         {"prop": "origin"},
-                        # TODO(decoupled-ask): props for classification_labels, ner...
+                        {"prop": "extra"},
+                        {"prop": "classification_labels"},
                     ],
                     "from": "resources",
-                }
+                },
+                {
+                    "given": paragraph_ids,
+                    "select": [
+                        {"prop": "classification_labels"},
+                        {"prop": "entities"},
+                    ],
+                    "from": "fields",
+                },
             ]
         }
     )
