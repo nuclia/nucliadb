@@ -101,8 +101,6 @@ async def augment_field(
     field_id: FieldId,
     select: Sequence[FieldProp | ConversationProp],
 ) -> AugmentedField | None:
-    # TODO(decoupled-ask): make sure we don't repeat any select clause
-
     rid = field_id.rid
     resource = await cache.get_resource(kbid, rid)
     if resource is None:
@@ -125,6 +123,8 @@ async def db_augment_field(
     field_id: FieldId,
     select: Sequence[FieldProp | FileProp | ConversationProp],
 ) -> AugmentedField:
+    select = dedup_field_select(select)
+
     field_type = field_id.type
 
     # Note we cast `select` to the specific Union type required by the
@@ -158,6 +158,16 @@ async def db_augment_field(
 
     else:  # pragma: no cover
         assert False, f"unknown field type: {field_type}"
+
+
+def dedup_field_select(
+    select: Sequence[FieldProp | FileProp | ConversationProp],
+) -> Sequence[FieldProp | FileProp | ConversationProp]:
+    """Merge any duplicated property taking the broader augmentation possible."""
+    # TODO(decoupled-ask): only conversation properties can be deduplicated
+    # (none of the others has any field). However, deduplicating the selector is
+    # not possible in many cases, so we do nothing
+    return select
 
 
 @augmentor_observer.wrap({"type": "db_text_field"})

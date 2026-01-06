@@ -19,6 +19,7 @@
 #
 import asyncio
 from collections.abc import Sequence
+from typing import cast
 
 from typing_extensions import assert_never
 
@@ -94,8 +95,6 @@ async def augment_paragraph(
         return None
     field = await resource.get_field(field_id.key, field_id.pb_type)
 
-    # TODO(decoupled-ask): make sure we don't repeat any select clause
-
     return await db_augment_paragraph(resource, field, paragraph_id, select, metadata)
 
 
@@ -106,6 +105,8 @@ async def db_augment_paragraph(
     select: list[ParagraphProp],
     metadata: Metadata | None,
 ) -> AugmentedParagraph:
+    select = dedup_paragraph_select(select)
+
     # we use an accessor to get the metadata to avoid unnecessary DB round
     # trips. With this, we'll only fetch it one and only if we need it
     _metadata = metadata
@@ -178,6 +179,46 @@ async def db_augment_paragraph(
         page_preview_path=page_preview_path,
         related=related,
     )
+
+
+def dedup_paragraph_select(select: list[ParagraphProp]) -> list[ParagraphProp]:
+    """Merge any duplicated property taking the broader augmentation possible."""
+    merged = {}
+    for prop in select:
+        if prop.prop not in merged:
+            merged[prop.prop] = prop
+
+        else:
+            m = merged[prop.prop]
+
+            if (
+                isinstance(prop, ParagraphText)
+                or isinstance(prop, ParagraphPosition)
+                or isinstance(prop, ParagraphImage)
+            ):
+                # properties without parameters
+                pass
+
+            elif isinstance(prop, ParagraphTable):
+                prop = cast(ParagraphTable, prop)
+                m = cast(ParagraphTable, m)
+                m.prefer_page_preview = m.prefer_page_preview or prop.prefer_page_preview
+
+            elif isinstance(prop, ParagraphPage):
+                prop = cast(ParagraphPage, prop)
+                m = cast(ParagraphPage, m)
+                m.preview = m.preview or prop.preview
+
+            elif isinstance(prop, RelatedParagraphs):
+                prop = cast(RelatedParagraphs, prop)
+                m = cast(RelatedParagraphs, m)
+                m.neighbours_before = max(m.neighbours_before, prop.neighbours_before)
+                m.neighbours_after = max(m.neighbours_after, prop.neighbours_after)
+
+            else:  # pragma: no cover
+                assert_never(prop)
+
+    return list(merged.values())
 
 
 async def db_paragraph_metadata(field: Field, paragraph_id: ParagraphId) -> Metadata | None:
