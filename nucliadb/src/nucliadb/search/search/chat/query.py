@@ -531,7 +531,6 @@ async def find_retrieval(
     x_forwarded_for: str,
     metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, bool, Fetcher, Reranker]:
-    # TODO(decoupled-ask): Remove once the feature has been fully rolled out
     if not has_feature(const.Features.ASK_DECOUPLED, context={"kbid": kbid}):
         results, incomplete, parsed = await find(
             kbid,

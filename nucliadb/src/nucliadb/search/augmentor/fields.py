@@ -166,9 +166,11 @@ def dedup_field_select(
     """Merge any duplicated property taking the broader augmentation possible."""
     merged = {}
 
-    # TODO(decoupled-ask): only conversation properties can be deduplicated
-    # (none of the others has any field). However, deduplicating the selector is
-    # not possible in many cases, so we do nothing
+    # TODO(decoupled-ask): deduplicate conversation props.
+    #
+    # Note that only conversation properties can be deduplicated (none of the
+    # others have any field). However, deduplicating the selector is not
+    # possible in many cases, so we do nothing
     unmergeable = []
 
     for prop in select:
