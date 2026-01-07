@@ -506,6 +506,10 @@ class AugmentedParagraph:
     # or a table. This value is the path to be used in the download endpoint
     source_image_path: str | None
 
+    # image extracted from the table. It can be just from the table or the page,
+    # depending on the augment parameters
+    table_image_path: str | None
+
     # if the paragraph comes from a page, this is the path for the download
     # endpoint to get the page preview image
     page_preview_path: str | None

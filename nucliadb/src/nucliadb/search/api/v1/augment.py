@@ -144,116 +144,125 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
     augmentations: list[Augment] = []
 
     if item.resources is not None:
-        show, extracted, resource_select = parse_deep_resource_augment(item.resources)
-        if item.resources.field_type_filter is None:
-            field_type_filter = list(FieldTypeName)
-        else:
-            field_type_filter = item.resources.field_type_filter
+        for resource_augment in item.resources:
+            show, extracted, resource_select = parse_deep_resource_augment(resource_augment)
+            if resource_augment.field_type_filter is None:
+                field_type_filter = list(FieldTypeName)
+            else:
+                field_type_filter = resource_augment.field_type_filter
 
-        if show:
-            augmentations.append(
-                DeepResourceAugment(
-                    given=item.resources.given,
-                    show=show,
-                    extracted=extracted,
-                    field_type_filter=field_type_filter,
+            if show:
+                augmentations.append(
+                    DeepResourceAugment(
+                        given=resource_augment.given,
+                        show=show,
+                        extracted=extracted,
+                        field_type_filter=field_type_filter,
+                    )
                 )
-            )
-        if resource_select:
-            augmentations.append(
-                ResourceAugment(
-                    given=item.resources.given,  # type: ignore[arg-type]
-                    select=resource_select,
+            if resource_select:
+                augmentations.append(
+                    ResourceAugment(
+                        given=resource_augment.given,  # type: ignore[arg-type]
+                        select=resource_select,
+                    )
                 )
-            )
 
-        if item.resources.fields is not None:
-            # Augment resource fields with an optional field filter
-            field_select: list[FieldProp] = []
-            if item.resources.fields.text:
-                field_select.append(FieldText())
-            if item.resources.fields.classification_labels:
-                field_select.append(FieldClassificationLabels())
+            if resource_augment.fields is not None:
+                # Augment resource fields with an optional field filter
+                field_select: list[FieldProp] = []
+                if resource_augment.fields.text:
+                    field_select.append(FieldText())
+                if resource_augment.fields.classification_labels:
+                    field_select.append(FieldClassificationLabels())
 
-            augmentations.append(
-                FieldAugment(
-                    given=item.resources.given,  # type: ignore[arg-type]
-                    select=field_select,  # type: ignore[arg-type]
-                    filter=item.resources.fields.filters,
+                augmentations.append(
+                    FieldAugment(
+                        given=resource_augment.given,  # type: ignore[arg-type]
+                        select=field_select,  # type: ignore[arg-type]
+                        filter=resource_augment.fields.filters,
+                    )
                 )
-            )
 
     if item.fields is not None:
-        given = [FieldId.from_string(id) for id in item.fields.given]
-        select: list[FieldProp] = []
-        if item.fields.text:
-            select.append(FieldText())
-        if item.fields.entities:
-            select.append(FieldEntities())
-        if item.fields.classification_labels:
-            select.append(FieldClassificationLabels())
+        for field_augment in item.fields:
+            given = [FieldId.from_string(id) for id in field_augment.given]
+            select: list[FieldProp] = []
+            if field_augment.text:
+                select.append(FieldText())
+            if field_augment.entities:
+                select.append(FieldEntities())
+            if field_augment.classification_labels:
+                select.append(FieldClassificationLabels())
 
-        if len(select) > 0:
-            augmentations.append(
-                FieldAugment(
-                    given=given,
-                    select=select,
+            if len(select) > 0:
+                augmentations.append(
+                    FieldAugment(
+                        given=given,
+                        select=select,
+                    )
                 )
-            )
 
-        file_select: list[FileProp] = []
-        if item.fields.file_thumbnail:
-            file_select.append(FileThumbnail())
+            file_select: list[FileProp] = []
+            if field_augment.file_thumbnail:
+                file_select.append(FileThumbnail())
 
-        if len(file_select) > 0:
-            augmentations.append(
-                FileAugment(
-                    given=given,  # type: ignore
-                    select=file_select,
+            if len(file_select) > 0:
+                augmentations.append(
+                    FileAugment(
+                        given=given,  # type: ignore
+                        select=file_select,
+                    )
                 )
-            )
 
-        conversation_select: list[ConversationProp] = []
-        selector: ConversationSelector
+            conversation_select: list[ConversationProp] = []
+            selector: ConversationSelector
 
-        if item.fields.full_conversation:
-            selector = FullSelector()
-            conversation_select.append(ConversationText(selector=selector))
-            if item.fields.conversation_text_attachments or item.fields.conversation_image_attachments:
-                conversation_select.append(ConversationAttachments(selector=selector))
+            if field_augment.full_conversation:
+                selector = FullSelector()
+                conversation_select.append(ConversationText(selector=selector))
+                if (
+                    field_augment.conversation_text_attachments
+                    or field_augment.conversation_image_attachments
+                ):
+                    conversation_select.append(ConversationAttachments(selector=selector))
 
-        elif item.fields.max_conversation_messages is not None:
-            # we want to always get the first conversation and the window
-            # requested by the user
-            first_selector = MessageSelector(index="first")
-            window_selector = WindowSelector(size=item.fields.max_conversation_messages)
-            conversation_select.append(ConversationText(selector=first_selector))
-            conversation_select.append(ConversationText(selector=window_selector))
-            if item.fields.conversation_text_attachments or item.fields.conversation_image_attachments:
-                conversation_select.append(ConversationAttachments(selector=first_selector))
-                conversation_select.append(ConversationAttachments(selector=window_selector))
+            elif field_augment.max_conversation_messages is not None:
+                # we want to always get the first conversation and the window
+                # requested by the user
+                first_selector = MessageSelector(index="first")
+                window_selector = WindowSelector(size=field_augment.max_conversation_messages)
+                conversation_select.append(ConversationText(selector=first_selector))
+                conversation_select.append(ConversationText(selector=window_selector))
+                if (
+                    field_augment.conversation_text_attachments
+                    or field_augment.conversation_image_attachments
+                ):
+                    conversation_select.append(ConversationAttachments(selector=first_selector))
+                    conversation_select.append(ConversationAttachments(selector=window_selector))
 
-        if item.fields.conversation_answer_or_messages_after:
-            # TODO: how should we implement this OR? Maybe search for the answer
-            # in a first iteration and the window in the second
-            pass
+            if field_augment.conversation_answer_or_messages_after:
+                # TODO: how should we implement this OR? Maybe search for the answer
+                # in a first iteration and the window in the second
+                pass
 
-        if len(conversation_select) > 0:
-            augmentations.append(
-                ConversationAugment(
-                    given=given,  # type: ignore
-                    select=conversation_select,
+            if len(conversation_select) > 0:
+                augmentations.append(
+                    ConversationAugment(
+                        given=given,  # type: ignore
+                        select=conversation_select,
+                    )
                 )
-            )
 
     if item.paragraphs is not None:
-        paragraphs_to_augment, paragraph_selector = parse_paragraph_augment(item.paragraphs)
-        augmentations.append(
-            ParagraphAugment(
-                given=paragraphs_to_augment,
-                select=paragraph_selector,
+        for paragraph_augment in item.paragraphs:
+            paragraphs_to_augment, paragraph_selector = parse_paragraph_augment(paragraph_augment)
+            augmentations.append(
+                ParagraphAugment(
+                    given=paragraphs_to_augment,
+                    select=paragraph_selector,
+                )
             )
-        )
 
     return augmentations
 
@@ -472,10 +481,7 @@ def build_augment_response(item: AugmentRequest, augmented: Augmented) -> Augmen
                 map(lambda x: x.full(), paragraph.related.neighbours_after)
             )
         augmented_paragraph.source_image = paragraph.source_image_path
-        if item.paragraphs is not None and item.paragraphs.table_prefers_page_preview:
-            augmented_paragraph.table_image = paragraph.page_preview_path
-        else:
-            augmented_paragraph.table_image = paragraph.source_image_path
+        augmented_paragraph.table_image = paragraph.table_image_path
         augmented_paragraph.page_preview_image = paragraph.page_preview_path
         response.paragraphs[paragraph_id.full()] = augmented_paragraph
 
@@ -489,27 +495,26 @@ def parse_second_augments(item: AugmentRequest, augmented: Augmented) -> list[Au
     """
     augmentations: list[Augment] = []
 
-    if item.paragraphs is not None and (
-        item.paragraphs.neighbours_before or item.paragraphs.neighbours_after
-    ):
-        neighbours = []
-        for paragraph_id, paragraph in augmented.paragraphs.items():
-            if paragraph.related is not None:
-                for neighbour_before in paragraph.related.neighbours_before:
-                    neighbours.append(Paragraph(id=neighbour_before, metadata=None))
-                for neighbour_after in paragraph.related.neighbours_after:
-                    neighbours.append(Paragraph(id=neighbour_after, metadata=None))
+    for paragraph_augment in item.paragraphs or []:
+        if paragraph_augment.neighbours_before or paragraph_augment.neighbours_after:
+            neighbours = []
+            for paragraph_id, paragraph in augmented.paragraphs.items():
+                if paragraph.related is not None:
+                    for neighbour_before in paragraph.related.neighbours_before:
+                        neighbours.append(Paragraph(id=neighbour_before, metadata=None))
+                    for neighbour_after in paragraph.related.neighbours_after:
+                        neighbours.append(Paragraph(id=neighbour_after, metadata=None))
 
-        if neighbours:
-            augmentations.append(
-                ParagraphAugment(
-                    given=neighbours,
-                    select=[
-                        ParagraphText(),
-                        ParagraphPosition(),
-                    ],
+            if neighbours:
+                augmentations.append(
+                    ParagraphAugment(
+                        given=neighbours,
+                        select=[
+                            ParagraphText(),
+                            ParagraphPosition(),
+                        ],
+                    )
                 )
-            )
 
     return augmentations
 
@@ -517,8 +522,11 @@ def parse_second_augments(item: AugmentRequest, augmented: Augmented) -> list[Au
 def merge_second_augment(item: AugmentRequest, response: AugmentResponse, augmented: Augmented):
     """Merge in-place augmented data with an existing augment response."""
 
-    if item.paragraphs is not None and (
-        item.paragraphs.neighbours_before or item.paragraphs.neighbours_after
+    if any(
+        (
+            paragraph_augment.neighbours_before or paragraph_augment.neighbours_after
+            for paragraph_augment in item.paragraphs or []
+        )
     ):
         # neighbour paragraphs
 

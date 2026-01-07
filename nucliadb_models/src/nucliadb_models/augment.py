@@ -253,9 +253,9 @@ class AugmentParagraphs(BaseModel):
 
 
 class AugmentRequest(BaseModel):
-    resources: AugmentResources | None = None
-    fields: AugmentFields | None = None
-    paragraphs: AugmentParagraphs | None = None
+    resources: list[AugmentResources] | None = None
+    fields: list[AugmentFields] | None = None
+    paragraphs: list[AugmentParagraphs] | None = None
 
 
 # Response

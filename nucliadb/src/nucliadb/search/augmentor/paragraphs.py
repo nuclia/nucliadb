@@ -126,6 +126,7 @@ async def db_augment_paragraph(
     text = None
     position = None
     image_path = None
+    table_path = None
     page_preview_path = None
     related = None
     for prop in select:
@@ -149,8 +150,10 @@ async def db_augment_paragraph(
             if metadata.is_a_table:
                 if prop.prefer_page_preview and metadata.page and metadata.in_page_with_visual:
                     page_preview_path = f"generated/extracted_images_{metadata.page}.png"
+                    table_path = page_preview_path
                 elif metadata.source_file:
                     image_path = f"generated/{metadata.source_file}"
+                    table_path = image_path
 
         elif isinstance(prop, ParagraphPage):
             if prop.preview:
@@ -176,6 +179,7 @@ async def db_augment_paragraph(
         text=text,
         position=position,
         source_image_path=image_path,
+        table_image_path=table_path,
         page_preview_path=page_preview_path,
         related=related,
     )

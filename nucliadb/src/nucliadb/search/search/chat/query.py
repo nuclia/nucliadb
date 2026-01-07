@@ -773,23 +773,25 @@ async def hydrate_and_rerank(
 
     # hydrate only the strictly needed before rerank
     augment_request = AugmentRequest(
-        resources=resource_augment,
-        paragraphs=AugmentParagraphs(
-            given=[
-                AugmentParagraph(
-                    id=paragraph_id,
-                    metadata=ParagraphMetadata(
-                        is_an_image=text_blocks_by_id[paragraph_id].is_an_image,
-                        is_a_table=text_blocks_by_id[paragraph_id].is_a_table,
-                        source_file=text_blocks_by_id[paragraph_id].representation_file,
-                        page=text_blocks_by_id[paragraph_id].position.page_number,
-                        in_page_with_visual=text_blocks_by_id[paragraph_id].page_with_visual,
-                    ),
-                )
-                for paragraph_id in text_block_id_to_hydrate
-            ],
-            text=True,
-        ),
+        resources=[resource_augment],
+        paragraphs=[
+            AugmentParagraphs(
+                given=[
+                    AugmentParagraph(
+                        id=paragraph_id,
+                        metadata=ParagraphMetadata(
+                            is_an_image=text_blocks_by_id[paragraph_id].is_an_image,
+                            is_a_table=text_blocks_by_id[paragraph_id].is_a_table,
+                            source_file=text_blocks_by_id[paragraph_id].representation_file,
+                            page=text_blocks_by_id[paragraph_id].position.page_number,
+                            in_page_with_visual=text_blocks_by_id[paragraph_id].page_with_visual,
+                        ),
+                    )
+                    for paragraph_id in text_block_id_to_hydrate
+                ],
+                text=True,
+            )
+        ],
     )
     augment_response = await rpc.augment(kbid, augment_request)
     augmented_paragraphs = augment_response.paragraphs
@@ -856,7 +858,7 @@ async def hydrate_and_rerank(
         resource_augment.given = list(resources_to_hydrate)
         augmented = await rpc.augment(
             kbid,
-            AugmentRequest(resources=resource_augment),
+            AugmentRequest(resources=[resource_augment]),
         )
         augmented_resources = augmented.resources
 

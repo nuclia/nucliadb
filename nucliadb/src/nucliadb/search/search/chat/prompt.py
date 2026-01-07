@@ -311,15 +311,17 @@ async def full_resource_prompt_context(
     augmented = await rpc.augment(
         kbid,
         AugmentRequest(
-            resources=AugmentResources(
-                given=ordered_resources,
-                title=True,
-                summary=True,
-                fields=AugmentResourceFields(
-                    text=True,
-                    filters=[],
-                ),
-            )
+            resources=[
+                AugmentResources(
+                    given=ordered_resources,
+                    title=True,
+                    summary=True,
+                    fields=AugmentResourceFields(
+                        text=True,
+                        filters=[],
+                    ),
+                )
+            ]
         ),
     )
 
@@ -416,18 +418,22 @@ async def extend_prompt_context_with_metadata(
 
     augment_req = AugmentRequest()
     if resource_origin or resource_extra or classification_labels:
-        augment_req.resources = AugmentResources(
-            given=rids,
-            origin=resource_origin,
-            extra=resource_extra,
-            classification_labels=classification_labels,
-        )
+        augment_req.resources = [
+            AugmentResources(
+                given=rids,
+                origin=resource_origin,
+                extra=resource_extra,
+                classification_labels=classification_labels,
+            )
+        ]
     if classification_labels or field_entities:
-        augment_req.fields = AugmentFields(
-            given=field_ids,
-            classification_labels=classification_labels,
-            entities=field_entities,
-        )
+        augment_req.fields = [
+            AugmentFields(
+                given=field_ids,
+                classification_labels=classification_labels,
+                entities=field_entities,
+            )
+        ]
 
     if augment_req.resources is None and augment_req.fields is None:
         # nothing to augment
@@ -582,15 +588,17 @@ async def field_extension_prompt_context(
     augmented = await rpc.augment(
         kbid,
         AugmentRequest(
-            resources=AugmentResources(
-                given=ordered_resources,
-                title=resource_title,
-                summary=resource_summary,
-                fields=AugmentResourceFields(
-                    text=True,
-                    filters=filters,
-                ),
-            )
+            resources=[
+                AugmentResources(
+                    given=ordered_resources,
+                    title=resource_title,
+                    summary=resource_summary,
+                    fields=AugmentResourceFields(
+                        text=True,
+                        filters=filters,
+                    ),
+                )
+            ]
         ),
     )
 
@@ -651,12 +659,14 @@ async def neighbouring_paragraphs_prompt_context(
     augmented = await rpc.augment(
         kbid,
         AugmentRequest(
-            paragraphs=AugmentParagraphs(
-                given=[AugmentParagraph(id=pid.full()) for pid in retrieved_paragraphs_ids],
-                text=True,
-                neighbours_before=strategy.before,
-                neighbours_after=strategy.after,
-            )
+            paragraphs=[
+                AugmentParagraphs(
+                    given=[AugmentParagraph(id=pid.full()) for pid in retrieved_paragraphs_ids],
+                    text=True,
+                    neighbours_before=strategy.before,
+                    neighbours_after=strategy.after,
+                )
+            ]
         ),
     )
 
@@ -769,13 +779,15 @@ async def conversation_prompt_context(
         max_conversation_messages = strategy.max_messages
 
     augment = AugmentRequest(
-        fields=AugmentFields(
-            given=[paragraph_id.field_id.full() for paragraph_id, _ in conversation_paragraphs],
-            full_conversation=full_conversation,
-            max_conversation_messages=max_conversation_messages,
-            conversation_text_attachments=strategy.attachments_text,
-            conversation_image_attachments=strategy.attachments_images,
-        )
+        fields=[
+            AugmentFields(
+                given=[paragraph_id.field_id.full() for paragraph_id, _ in conversation_paragraphs],
+                full_conversation=full_conversation,
+                max_conversation_messages=max_conversation_messages,
+                conversation_text_attachments=strategy.attachments_text,
+                conversation_image_attachments=strategy.attachments_images,
+            )
+        ]
     )
     augmented = await rpc.augment(kbid, augment)
 
@@ -821,15 +833,17 @@ async def conversation_prompt_context(
         (strategy.attachments_images and visual_llm) and len(attachments) > 0
     ):
         augment = AugmentRequest(
-            fields=AugmentFields(
-                given=[
-                    id.full()
-                    for paragraph_attachments in attachments.values()
-                    for id in paragraph_attachments
-                ],
-                text=strategy.attachments_text,
-                file_thumbnail=(strategy.attachments_images and visual_llm),
-            )
+            fields=[
+                AugmentFields(
+                    given=[
+                        id.full()
+                        for paragraph_attachments in attachments.values()
+                        for id in paragraph_attachments
+                    ],
+                    text=strategy.attachments_text,
+                    file_thumbnail=(strategy.attachments_images and visual_llm),
+                )
+            ]
         )
         augmented = await rpc.augment(kbid, augment)
 
@@ -942,12 +956,15 @@ async def hierarchy_prompt_context(
     augmented = await rpc.augment(
         kbid,
         AugmentRequest(
-            paragraphs=AugmentParagraphs(
-                given=[
-                    AugmentParagraph(id=paragraph_id.full()) for paragraph_id in paragraphs_to_augment
-                ],
-                text=True,
-            )
+            paragraphs=[
+                AugmentParagraphs(
+                    given=[
+                        AugmentParagraph(id=paragraph_id.full())
+                        for paragraph_id in paragraphs_to_augment
+                    ],
+                    text=True,
+                )
+            ]
         ),
     )
 
