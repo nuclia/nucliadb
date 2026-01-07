@@ -21,7 +21,7 @@ import asyncio
 import json
 from collections.abc import Sequence
 from enum import Enum, auto
-from typing import Any, TypeVar, overload
+from typing import TypeVar, overload
 
 from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
@@ -160,13 +160,13 @@ async def nidx_query(
     return results, queried_shards
 
 
-def validate_nidx_query_results(results: list[Any]) -> HTTPException | None:
+def validate_nidx_query_results(results: list[T | BaseException]) -> HTTPException | None:
     """
     Validate the results of a nidx query and return an exception if any error is found
 
     Handling of exception is responsibility of caller.
     """
-    if results is None or len(results) == 0:
+    if len(results) == 0:
         return HTTPException(status_code=500, detail=f"Error while executing shard queries. No results.")
 
     for result in results:
