@@ -290,7 +290,6 @@ class AugmentedFileField(BaseModel):
     # former ners
     entities: dict[str, list[str]] | None = None
 
-    # TODO(decoupled-ask): implement image strategy
     page_preview_image: str | None = None
 
     # Path for the download API to retrieve the file thumbnail image
