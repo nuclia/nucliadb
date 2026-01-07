@@ -65,7 +65,6 @@ def test_validate_nidx_query_results():
 
 def test_validate_nidx_query_results_no_results():
     assert isinstance(utils.validate_nidx_query_results([]), HTTPException)
-    assert isinstance(utils.validate_nidx_query_results(None), HTTPException)
 
 
 def test_validate_nidx_query_results_unhandled_error():

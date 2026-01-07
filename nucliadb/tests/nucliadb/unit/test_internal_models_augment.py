@@ -29,12 +29,10 @@ def test_augment():
             "augmentations": [
                 {
                     "given": [uuid4().hex],
-                    "select": [
-                        {"prop": "title"},
-                        {"prop": "summary"},
-                        {"prop": "origin"},
-                        {"prop": "security"},
-                    ],
+                    "title": True,
+                    "summary": True,
+                    "origin": True,
+                    "security": True,
                     "from": "resources",
                 },
                 {
@@ -119,11 +117,9 @@ def test_metadata_extension_strategy():
             "augmentations": [
                 {
                     "given": paragraph_ids,
-                    "select": [
-                        {"prop": "origin"},
-                        {"prop": "extra"},
-                        {"prop": "classification_labels"},
-                    ],
+                    "origin": True,
+                    "extra": True,
+                    "classification_labels": True,
                     "from": "resources",
                 },
                 {
@@ -176,10 +172,8 @@ def test_hierarchy_strategy():
             "augmentations": [
                 {
                     "given": rids,
-                    "select": [
-                        {"prop": "title"},
-                        {"prop": "summary"},
-                    ],
+                    "title": True,
+                    "summary": True,
                     "from": "resources",
                 },
                 {
