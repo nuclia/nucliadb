@@ -35,7 +35,7 @@ from nuclia_models.predict.generative_responses import (
 from pytest_mock import MockerFixture
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
-from nucliadb.common.ids import ParagraphId
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.search.predict import AnswerStatusCode, DummyPredictEngine
 from nucliadb.search.search.chat import ask
 from nucliadb.search.search.query_parser.models import UnitRetrieval
@@ -2193,10 +2193,17 @@ async def test_ask_conversational_strategy(
 
         # TEST: text and image attachments
 
-        image = Image(b64encoded="my image", content_type="image/png")
+        async def get_file_thumbnail_path(_, field_id: FieldId) -> str | None:
+            return f"path/to/{field_id.key}"
+
+        image = Image(b64encoded="my image", content_type="image/jpeg")
         with (
             patch("nucliadb.search.search.chat.old_prompt.get_file_thumbnail_image", return_value=image),
-            patch("nucliadb.search.search.chat.prompt.get_file_thumbnail_image", return_value=image),
+            patch(
+                "nucliadb.search.augmentor.fields.get_file_thumbnail_path",
+                side_effect=get_file_thumbnail_path,
+            ),
+            patch("nucliadb.search.search.chat.prompt.rpc.download_image", return_value=image),
         ):
             spy = mocker.spy(ask, "get_answer_stream")
 
