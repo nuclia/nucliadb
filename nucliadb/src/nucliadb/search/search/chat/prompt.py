@@ -246,6 +246,8 @@ async def default_prompt_context(
             # have matched with the question, therefore try to include the answer to the
             # context by pulling the next few messages of the conversation field
             rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
+            # FIXME: a semantic paragraph can have reranker score. Once we
+            # refactor and have access to the score history, we can fix this
             if field_type == "c" and paragraph.score_type in (
                 SCORE_TYPE.VECTOR,
                 SCORE_TYPE.BOTH,
@@ -745,17 +747,17 @@ async def conversation_prompt_context(
         if paragraph.id not in context:
             context[paragraph.id] = _clean_paragraph_text(paragraph)
 
-        paragraph_id = ParagraphId.from_string(paragraph.id)
+        parent_paragraph_id = ParagraphId.from_string(paragraph.id)
 
-        if paragraph_id.field_id.type != FieldTypeName.CONVERSATION.abbreviation():
+        if parent_paragraph_id.field_id.type != FieldTypeName.CONVERSATION.abbreviation():
             # conversational strategy only applies to conversation fields
             continue
 
-        field_unique_id = paragraph_id.field_id.full_without_subfield()
+        field_unique_id = parent_paragraph_id.field_id.full_without_subfield()
         if field_unique_id in analyzed_fields:
             continue
 
-        conversation_paragraphs.append((paragraph_id, paragraph))
+        conversation_paragraphs.append((parent_paragraph_id, paragraph))
 
     # augment conversation paragraphs
 
@@ -777,11 +779,9 @@ async def conversation_prompt_context(
     )
     augmented = await rpc.augment(kbid, augment)
 
-    for paragraph_id, paragraph in conversation_paragraphs:
-        fid = paragraph_id.field_id
-
-        attachments: list[FieldId] = []
-
+    attachments: dict[ParagraphId, list[FieldId]] = {}
+    for parent_paragraph_id, paragraph in conversation_paragraphs:
+        fid = parent_paragraph_id.field_id
         field = augmented.fields.get(fid.full_without_subfield())
         if field is not None:
             field = cast(AugmentedConversationField, field)
@@ -805,7 +805,7 @@ async def conversation_prompt_context(
                     continue
                 context[pid] = text
 
-                attachments.extend(
+                attachments.setdefault(parent_paragraph_id, []).extend(
                     [FieldId.from_string(attachment_id) for attachment_id in field.attachments or []]
                 )
                 augmented_context.paragraphs[pid] = AugmentedTextBlock(
@@ -815,71 +815,62 @@ async def conversation_prompt_context(
                     augmentation_type=TextBlockAugmentationType.CONVERSATION,
                 )
 
-        if strategy.attachments_text:
-            ops += len(attachments)
+    # augment attachments
 
-            augmented = await rpc.augment(
-                kbid,
-                AugmentRequest(
-                    fields=AugmentFields(
-                        given=[id.full() for id in attachments],
-                        text=True,
-                    )
-                ),
+    if strategy.attachments_text or (
+        (strategy.attachments_images and visual_llm) and len(attachments) > 0
+    ):
+        augment = AugmentRequest(
+            fields=AugmentFields(
+                given=[
+                    id.full()
+                    for paragraph_attachments in attachments.values()
+                    for id in paragraph_attachments
+                ],
+                text=strategy.attachments_text,
+                file_thumbnail=(strategy.attachments_images and visual_llm),
             )
-            for attachment_id_str, field in augmented.fields.items():
-                if not field.text:
+        )
+        augmented = await rpc.augment(kbid, augment)
+
+        for parent_paragraph_id, paragraph_attachments in attachments.items():
+            for attachment_id in paragraph_attachments:
+                attachment_field = augmented.fields.get(attachment_id.full())
+
+                if attachment_field is None:
                     continue
 
-                attachment_id = FieldId.from_string(attachment_id_str)
-                pid = f"{attachment_id.full_without_subfield()}/0-{len(field.text)}"
-                if pid in context:
-                    continue
-                text = f"Attachment {attachment_id.key}: {field.text}\n\n"
-                context[pid] = text
-                augmented_context.paragraphs[pid] = AugmentedTextBlock(
-                    id=pid,
-                    text=text,
-                    parent=paragraph.id,
-                    augmentation_type=TextBlockAugmentationType.CONVERSATION,
-                )
+                if strategy.attachments_text and attachment_field.text:
+                    ops += 1
 
-        if strategy.attachments_images and visual_llm:
-            ops += len(attachments)
+                    pid = f"{attachment_id.full_without_subfield()}/0-{len(attachment_field.text)}"
+                    if pid not in context:
+                        text = f"Attachment {attachment_id.key}: {attachment_field.text}\n\n"
+                        context[pid] = text
+                        augmented_context.paragraphs[pid] = AugmentedTextBlock(
+                            id=pid,
+                            text=text,
+                            parent=parent_paragraph_id.full(),
+                            augmentation_type=TextBlockAugmentationType.CONVERSATION,
+                        )
 
-            augmented = await rpc.augment(
-                kbid,
-                AugmentRequest(
-                    fields=AugmentFields(
-                        given=[id.full() for id in attachments],
-                        file_thumbnail=True,
+                if (
+                    (strategy.attachments_images and visual_llm)
+                    and isinstance(attachment_field, AugmentedFileField)
+                    and attachment_field.thumbnail_image
+                ):
+                    ops += 1
+
+                    image = await rpc.download_image(
+                        kbid,
+                        attachment_id,
+                        attachment_field.thumbnail_image,
+                        # We assume the thumbnail is always generated as JPEG by Nuclia processing
+                        mime_type="image/jpeg",
                     )
-                ),
-            )
-
-            for attachment in attachments:
-                attachment_id_str = attachment.full()
-                if attachment_id_str not in augmented.fields:
-                    continue
-
-                attachment_field = augmented.fields[attachment_id_str]
-                if not isinstance(attachment_field, AugmentedFileField):
-                    continue
-
-                thumbnail_image_path = attachment_field.thumbnail_image
-                if not thumbnail_image_path:
-                    continue
-
-                image = await rpc.download_image(
-                    kbid,
-                    attachment,
-                    thumbnail_image_path,
-                    # We assume the thumbnail is always generated as JPEG by Nuclia processing
-                    mime_type="image/jpeg",
-                )
-                if image is not None:
-                    pid = f"{fid.rid}/f/{attachment.key}/0-0"
-                    context.images[pid] = image
+                    if image is not None:
+                        pid = f"{attachment_id.rid}/f/{attachment_id.key}/0-0"
+                        context.images[pid] = image
 
         analyzed_fields.append(field_unique_id)
     metrics.set("conversation_ops", ops)
