@@ -19,12 +19,14 @@
 #
 
 import nats
+import pytest
 from httpx import AsyncClient
 from nats.aio.client import Client
 from nats.js import JetStreamContext
 
 from nucliadb_protos.audit_pb2 import AuditRequest
 from nucliadb_utils.settings import audit_settings
+from nucliadb_utils.utilities import Utility, clean_utility, set_utility
 
 
 async def get_audit_messages(sub):
@@ -34,8 +36,9 @@ async def get_audit_messages(sub):
     return auditreq
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_ask_sends_only_one_audit(
-    cluster_nucliadb_search: AsyncClient, test_search_resource: str, stream_audit
+    nucliadb_search: AsyncClient, test_search_resource: str, stream_audit
 ) -> None:
     kbid = test_search_resource
 
@@ -47,6 +50,8 @@ async def test_ask_sends_only_one_audit(
         assert False, "Missing jetstream target in audit settings"
     subject = audit_settings.audit_jetstream_target.format(partition=partition, type="*")
 
+    set_utility(Utility.AUDIT, stream_audit)
+
     try:
         await jetstream.delete_stream(name=audit_settings.audit_stream)
         await jetstream.delete_stream(name="test_usage")
@@ -57,7 +62,7 @@ async def test_ask_sends_only_one_audit(
 
     psub = await jetstream.pull_subscribe(subject, "psub")
 
-    resp = await cluster_nucliadb_search.post(
+    resp = await nucliadb_search.post(
         f"/kb/{kbid}/ask",
         json={"query": "title"},
     )
@@ -88,3 +93,5 @@ async def test_ask_sends_only_one_audit(
     await psub.unsubscribe()
     await nats_client.flush()
     await nats_client.close()
+
+    clean_utility(Utility.AUDIT)

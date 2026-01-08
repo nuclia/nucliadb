@@ -43,11 +43,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.exceptions import LimitsExceededError
-from nucliadb_utils.utilities import (
-    Utility,
-    clean_utility,
-    set_utility,
-)
+from nucliadb_utils.utilities import Utility, clean_utility, set_utility
 from tests.utils import broker_resource, inject_message
 
 
