@@ -17,7 +17,7 @@ import time
 from collections.abc import Callable
 from functools import wraps
 from inspect import isasyncgenfunction, iscoroutinefunction, isgeneratorfunction
-from typing import TYPE_CHECKING, Any, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import prometheus_client
 
@@ -146,9 +146,7 @@ class ObserverRecorder:
         self,
         exc_type: type[Exception] | type[BaseException] | None,
         exc_value: Exception | BaseException | None,
-        # this optional can't be removed as Python <3.14 doesn't accept a union
-        # of two NoneType
-        traceback: Optional[StackSummary],  # noqa
+        traceback: "StackSummary | None",
     ):
         if exc_type is not None:
             status = ERROR
