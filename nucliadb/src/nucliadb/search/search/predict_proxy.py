@@ -103,7 +103,7 @@ async def predict_proxy(
     response: Response | StreamingResponse
     user_query = json.get("question") if json is not None else ""
     if predict_response.headers.get("Transfer-Encoding") == "chunked":
-        if endpoint == PredictProxiedEndpoints.CHAT:
+        if endpoint == PredictProxiedEndpoints.CHAT and status_code in range(200, 300):
             streaming_generator = chat_streaming_generator(
                 predict_response=predict_response,
                 kbid=kbid,
@@ -126,7 +126,7 @@ async def predict_proxy(
         with metrics.time(PREDICT_ANSWER_METRIC):
             content = await predict_response.read()
 
-        if endpoint == PredictProxiedEndpoints.CHAT:
+        if endpoint == PredictProxiedEndpoints.CHAT and status_code in range(200, 300):
             try:
                 llm_status_code = int(content[-1:].decode())  # Decode just the last char
                 if llm_status_code != 0:
