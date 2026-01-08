@@ -23,7 +23,6 @@ from httpx import AsyncClient
 from nats.aio.client import Client
 from nats.js import JetStreamContext
 
-from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_protos.audit_pb2 import AuditRequest
 from nucliadb_utils.settings import audit_settings
 
@@ -59,7 +58,7 @@ async def test_ask_sends_only_one_audit(
     psub = await jetstream.pull_subscribe(subject, "psub")
 
     resp = await cluster_nucliadb_search.post(
-        f"/{KB_PREFIX}/{kbid}/ask",
+        f"/kb/{kbid}/ask",
         json={"query": "title"},
     )
     assert resp.status_code == 200
