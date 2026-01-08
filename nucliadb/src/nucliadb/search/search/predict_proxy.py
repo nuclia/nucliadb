@@ -101,7 +101,7 @@ async def predict_proxy(
     status_code = predict_response.status
 
     # Only audit /predict/chat successful responses
-    should_audit = endpoint == PredictProxiedEndpoints.CHAT and status_code in range(200, 300)
+    should_audit = endpoint == PredictProxiedEndpoints.CHAT and 200 <= status_code < 300
 
     media_type = predict_response.headers.get("Content-Type")
     response: Response | StreamingResponse
