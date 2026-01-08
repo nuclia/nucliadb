@@ -75,9 +75,6 @@ from nucliadb_models.search import (
 )
 from nucliadb_protos.resources_pb2 import FieldComputedMetadata
 
-# TODO(decoupled-ask): remove this bw/c imports (used for tests)
-from .old_prompt import get_expanded_conversation_messages, get_next_conversation_messages  # noqa
-
 TextBlockId = ParagraphId | FieldId
 
 
