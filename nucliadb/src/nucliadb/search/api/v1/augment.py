@@ -29,6 +29,7 @@ from nucliadb.models.internal import augment as internal_augment
 from nucliadb.models.internal.augment import (
     Augment,
     Augmented,
+    ConversationAnswerOrAfter,
     ConversationAttachments,
     ConversationAugment,
     ConversationProp,
@@ -242,9 +243,7 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
                     conversation_select.append(ConversationAttachments(selector=window_selector))
 
             if field_augment.conversation_answer_or_messages_after:
-                # TODO: how should we implement this OR? Maybe search for the answer
-                # in a first iteration and the window in the second
-                pass
+                conversation_select.append(ConversationAnswerOrAfter())
 
             if len(conversation_select) > 0:
                 augmentations.append(

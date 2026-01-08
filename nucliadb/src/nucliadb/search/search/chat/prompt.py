@@ -28,19 +28,10 @@ from pydantic import BaseModel
 import nucliadb_models
 from nucliadb.common.ids import (
     FIELD_TYPE_STR_TO_NAME,
-    FIELD_TYPE_STR_TO_PB,
     FieldId,
     ParagraphId,
 )
-from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.fields.conversation import Conversation
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.search import logger
-from nucliadb.search.augmentor.fields import (
-    conversation_answer,
-    conversation_messages_after,
-    find_conversation_message,
-)
 from nucliadb.search.search.chat import rpc
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.augment import (
@@ -82,13 +73,10 @@ from nucliadb_models.search import (
     TextBlockAugmentationType,
     TextPosition,
 )
-from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import FieldComputedMetadata
-from nucliadb_utils.utilities import get_storage
 
-# Number of messages to pull after a match in a message
-# The hope here is it will be enough to get the answer to the question.
-CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
+# TODO(decoupled-ask): remove this bw/c imports (used for tests)
+from .old_prompt import get_expanded_conversation_messages, get_next_conversation_messages  # noqa
 
 TextBlockId = ParagraphId | FieldId
 
@@ -160,67 +148,6 @@ class CappedPromptContext:
         return self.output
 
 
-async def get_next_conversation_messages(
-    *,
-    field_obj: Conversation,
-    page: int,
-    start_idx: int,
-    num_messages: int,
-    message_type: resources_pb2.Message.MessageType.ValueType | None = None,
-    msg_to: str | None = None,
-) -> list[resources_pb2.Message]:
-    output = []
-    cmetadata = await field_obj.get_metadata()
-    for current_page in range(page, cmetadata.pages + 1):
-        conv = await field_obj.db_get_value(current_page)
-        for message in conv.messages[start_idx:]:
-            if message_type is not None and message.type != message_type:  # pragma: no cover
-                continue
-            if msg_to is not None and msg_to not in message.to:  # pragma: no cover
-                continue
-            output.append(message)
-            if len(output) >= num_messages:
-                return output
-        start_idx = 0
-
-    return output
-
-
-async def get_expanded_conversation_messages(
-    *,
-    kb: KnowledgeBoxORM,
-    rid: str,
-    field_id: str,
-    mident: str,
-    max_messages: int = CONVERSATION_MESSAGE_CONTEXT_EXPANSION,
-) -> list[resources_pb2.Message]:
-    resource = await kb.get(rid)
-    if resource is None:  # pragma: no cover
-        return []
-    field_obj: Conversation = await resource.get_field(field_id, FIELD_TYPE_STR_TO_PB["c"], load=True)  # type: ignore
-    found_message = await find_conversation_message(field_obj, mident)
-    if found_message is None:  # pragma: no cover
-        return []
-    page, index, message = found_message
-
-    if message.type == resources_pb2.Message.MessageType.QUESTION:
-        # only try to get answer if it was a question
-        found = await conversation_answer(field_obj, start_from=(page, index + 1))
-        if found is None:
-            return []
-        else:
-            _, _, answer = found
-            return [answer]
-
-    else:
-        messages_after = []
-        async for _, _, message in conversation_messages_after(
-            field_obj, start_from=(page, index + 1), limit=max_messages
-        ):
-            messages_after.append(message)
-        return messages_after
-
-
 async def default_prompt_context(
     context: CappedPromptContext,
     kbid: str,
@@ -235,30 +162,52 @@ async def default_prompt_context(
     - User context is inserted first, in order of appearance.
     - Using an dict prevents from duplicates pulled in through conversation expansion.
     """
-    # Sort retrieved paragraphs by decreasing order (most relevant first)
-    async with get_driver().ro_transaction() as txn:
-        storage = await get_storage()
-        kb = KnowledgeBoxORM(txn, storage, kbid)
-        for paragraph in ordered_paragraphs:
-            context[paragraph.id] = _clean_paragraph_text(paragraph)
 
-            # If the paragraph is a conversation and it matches semantically, we assume we
-            # have matched with the question, therefore try to include the answer to the
-            # context by pulling the next few messages of the conversation field
-            rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
-            # FIXME: a semantic paragraph can have reranker score. Once we
-            # refactor and have access to the score history, we can fix this
-            if field_type == "c" and paragraph.score_type in (
-                SCORE_TYPE.VECTOR,
-                SCORE_TYPE.BOTH,
-            ):
-                expanded_msgs = await get_expanded_conversation_messages(
-                    kb=kb, rid=rid, field_id=field_id, mident=mident
-                )
-                for msg in expanded_msgs:
-                    text = msg.content.text.strip()
-                    pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text)}"
-                    context[pid] = text
+    conversations = []
+
+    for paragraph in ordered_paragraphs:
+        context[paragraph.id] = _clean_paragraph_text(paragraph)
+
+        # If the paragraph is a conversation and it matches semantically, we
+        # assume we have matched with the question, therefore try to include the
+        # answer to the context by pulling the next few messages of the
+        # conversation field
+        rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
+        # FIXME: a semantic paragraph can have reranker score. Once we
+        # refactor and have access to the score history, we can fix this
+        if field_type == "c" and paragraph.score_type in (
+            SCORE_TYPE.VECTOR,
+            SCORE_TYPE.BOTH,
+        ):
+            conversations.append(f"{rid}/{field_type}/{field_id}/{mident}")
+
+    augment = AugmentRequest(
+        fields=[
+            AugmentFields(
+                given=[id for id in conversations],
+                conversation_answer_or_messages_after=True,
+            ),
+        ]
+    )
+    augmented = await rpc.augment(kbid, augment)
+
+    for id in conversations:
+        conversation_id = FieldId.from_string(id)
+
+        augmented_field = augmented.fields.get(conversation_id.full_without_subfield())
+        if augmented_field is None or not isinstance(augmented_field, AugmentedConversationField):
+            continue
+
+        for message in augmented_field.messages or []:
+            if message.text is None:
+                continue
+
+            message_id = copy.copy(conversation_id)
+            message_id.subfield_id = message.ident
+            pid = ParagraphId(
+                field_id=message_id, paragraph_start=0, paragraph_end=len(message.text)
+            ).full()
+            context[pid] = message.text
 
 
 async def full_resource_prompt_context(

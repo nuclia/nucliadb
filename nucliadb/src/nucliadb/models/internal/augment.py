@@ -332,6 +332,21 @@ class ConversationAttachments(SelectProp):
     selector: ConversationSelector = Field(default_factory=FullSelector)
 
 
+class ConversationAnswerOrAfter(SelectProp):
+    """Hacky conversation prop that given a conversation message (paragraph or
+    split), if it's type QUESTION, searches an answer and otherwise provides a
+    fixed window of messages after.
+
+    This was originally used in the /ask endpoint for conversation matches if no
+    strategy was selected, however, many bugs around it made it not really used.
+    Thus, the value provided by this is not clear and further evaluation should
+    be performed.
+
+    """
+
+    prop: Literal["answer_or_after"] = "answer_or_after"
+
+
 ConversationProp = Annotated[
     (
         Annotated[ConversationText, Tag("text")]
@@ -340,6 +355,7 @@ ConversationProp = Annotated[
         | Annotated[FieldClassificationLabels, Tag("classification_labels")]
         | Annotated[FieldEntities, Tag("entities")]
         | Annotated[ConversationAttachments, Tag("attachments")]
+        | Annotated[ConversationAnswerOrAfter, Tag("answer_or_after")]
     ),
     Discriminator(prop_discriminator),
 ]
