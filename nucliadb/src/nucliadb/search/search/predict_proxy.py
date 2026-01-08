@@ -99,11 +99,15 @@ async def predict_proxy(
     )
 
     status_code = predict_response.status
+
+    # Only audit /predict/chat successful responses
+    should_audit = endpoint == PredictProxiedEndpoints.CHAT and status_code in range(200, 300)
+
     media_type = predict_response.headers.get("Content-Type")
     response: Response | StreamingResponse
     user_query = json.get("question") if json is not None else ""
     if predict_response.headers.get("Transfer-Encoding") == "chunked":
-        if endpoint == PredictProxiedEndpoints.CHAT and status_code in range(200, 300):
+        if should_audit:
             streaming_generator = chat_streaming_generator(
                 predict_response=predict_response,
                 kbid=kbid,
@@ -126,7 +130,7 @@ async def predict_proxy(
         with metrics.time(PREDICT_ANSWER_METRIC):
             content = await predict_response.read()
 
-        if endpoint == PredictProxiedEndpoints.CHAT and status_code in range(200, 300):
+        if should_audit:
             try:
                 llm_status_code = int(content[-1:].decode())  # Decode just the last char
                 if llm_status_code != 0:
