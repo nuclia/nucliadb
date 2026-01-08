@@ -80,7 +80,11 @@ async def test_field_update_deletes_old_vectors(
     # should get 1 result
     resp = await nucliadb_reader.post(
         f"/kb/{standalone_knowledgebox}/find",
-        json={"query": "Hello", "features": ["semantic"], "min_score": -1},
+        json={
+            "query": "Hello",
+            "features": ["semantic"],
+            "min_score": -1,
+        },
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -106,19 +110,18 @@ async def test_field_update_deletes_old_vectors(
 
     # should get no results with semantic search
     resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "zxcvb",
             "features": ["semantic"],
             "min_score": -1,
-            "rag_strategies": [{"name": "neighbouring_paragraphs"}],
         },
         headers={"X-Synchronous": "True"},
     )
     assert resp.status_code == 200
     print(resp.text)
     body = resp.json()
-    assert len(body["retrieval_results"]["resources"]) == 0
+    assert len(body["resources"]) == 0
 
 
 @pytest.mark.deploy_modes("standalone")
