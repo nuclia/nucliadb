@@ -119,7 +119,6 @@ async def db_augment_resource(
                 summary = basic.summary
 
         elif isinstance(prop, ResourceOrigin):
-            # REVIEW(decoupled-ask): we may want a better hydration than proto to JSON
             origin = await serialize_origin(resource)
 
         elif isinstance(prop, ResourceExtra):

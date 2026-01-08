@@ -68,6 +68,7 @@ async def get_paragraph_image(kbid: str, paragraph_id: ParagraphId, reference: s
     return image
 
 
+# DEPRECATED(decoupled-ask): remove once old_prompt.py is removed
 async def get_file_thumbnail_image(file: File) -> Image | None:
     fed = await file.get_file_extracted_data()
     if fed is None or not fed.HasField("file_thumbnail"):
