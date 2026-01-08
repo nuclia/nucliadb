@@ -31,7 +31,7 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 nidx_protos = { version = "0.1.0", path = "nidx_protos" }
 tonic = "0.12.3"
-lru = "0.12.5"
+lru = "0.16"
 nidx_text = { version = "0.1.0", path = "nidx_text" }
 nidx_paragraph = { version = "0.1.0", path = "nidx_paragraph" }
 nidx_relation = { version = "0.1.0", path = "nidx_relation" }
