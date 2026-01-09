@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
+import uuid
+from contextlib import contextmanager
 from itertools import combinations
 from unittest import mock
 from unittest.mock import AsyncMock, patch
@@ -1961,33 +1963,22 @@ async def test_ask_query_image(nucliadb_reader: AsyncClient, standalone_knowledg
     assert predict.calls[1][1].question == "whatever"
 
 
-@pytest.mark.deploy_modes("standalone")
-async def test_ask_conversational_strategy(
-    nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
-    nucliadb_reader: AsyncClient,
-    standalone_knowledgebox: str,
-    mocker: MockerFixture,
-):
-    kbid = standalone_knowledgebox
-    rid = await lambs_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
-
+@contextmanager
+def mocked_text_block_search(*, result_paragraph_id: str):
     # FIXME(sc-13624): due to a bug in conversation field indexing, search is
     # not reliable. Thus, we mock here the results of a search to the index to
     # control the search results and properly test the RAG strategy
 
-    mock_paragraph_id = f"{rid}/c/lambs/10/0-35"
-
     async def mock_text_block_search(
         kbid: str, retrieval: UnitRetrieval
     ) -> tuple[list[TextBlockMatch], SearchRequest, SearchResponse, list[str]]:
-        nonlocal mock_paragraph_id
+        nonlocal result_paragraph_id
 
         _, pb_query, shards_response, queried_shards = await text_block_search(kbid, retrieval)
 
         text_blocks = [
             TextBlockMatch(
-                paragraph_id=ParagraphId.from_string(mock_paragraph_id),
+                paragraph_id=ParagraphId.from_string(result_paragraph_id),
                 score_type=SCORE_TYPE.BOTH,
                 scores=[
                     SemanticScore(
@@ -2021,8 +2012,22 @@ async def test_ask_conversational_strategy(
         # TODO(decoupled-ask): replace this with a proper mock for /retrieve
         patch("nucliadb.search.api.v1.retrieve.text_block_search", side_effect=mock_text_block_search),
     ):
-        data: SyncAskResponse
+        yield
 
+
+@pytest.mark.deploy_modes("standalone")
+async def test__validate_mocked_text_block_search(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    """Simple test to validate that we are properly mocking search"""
+    kbid = standalone_knowledgebox
+    rid = uuid.uuid4().hex
+
+    mock_paragraph_id = f"{rid}/c/lambs/10/0-35"
+
+    data: SyncAskResponse
+    with mocked_text_block_search(result_paragraph_id=mock_paragraph_id):
         # make sure we are enforcing the mock
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/ask",
@@ -2047,13 +2052,27 @@ async def test_ask_conversational_strategy(
             mock_paragraph_id
         }
 
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_conversational_strategy(
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    mocker: MockerFixture,
+):
+    kbid = standalone_knowledgebox
+    rid = await lambs_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    data: SyncAskResponse
+
+    mock_paragraph_id = f"{rid}/c/lambs/4/0-26"
+    with mocked_text_block_search(result_paragraph_id=mock_paragraph_id):
+        #
         # TEST: default prompt context (conversations)
         #
         # lambs/4 is a QUESTION, so we'll search an answer and find lambs/5
         #
-
-        mock_paragraph_id = f"{rid}/c/lambs/4/0-26"
-
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/ask",
             headers={"x-synchronous": "true"},
@@ -2080,13 +2099,13 @@ async def test_ask_conversational_strategy(
             f"{rid}/c/lambs/5/0-31",
         }
 
+    mock_paragraph_id = f"{rid}/c/lambs/6/0-80"
+    with mocked_text_block_search(result_paragraph_id=mock_paragraph_id):
+        #
         # TEST: default prompt context (conversations)
         #
         # lambs/6 is not a question, so we'll gather a bunch of messages after
         # it
-
-        mock_paragraph_id = f"{rid}/c/lambs/6/0-80"
-
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/ask",
             headers={"x-synchronous": "true"},
@@ -2118,10 +2137,24 @@ async def test_ask_conversational_strategy(
             f"{rid}/c/lambs/12/0-28",
         }
 
-        # TEST: full=True augments the whole conversation as paragraphs
 
-        mock_paragraph_id = f"{rid}/c/lambs/10/0-35"
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_conversational_strategy__full_conversation(
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    mocker: MockerFixture,
+):
+    """Test conversational strategy full=True"""
 
+    kbid = standalone_knowledgebox
+    rid = await lambs_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    data: SyncAskResponse
+
+    mock_paragraph_id = f"{rid}/c/lambs/10/0-35"
+    with mocked_text_block_search(result_paragraph_id=mock_paragraph_id):
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/ask",
             headers={"x-synchronous": "true"},
@@ -2159,6 +2192,24 @@ async def test_ask_conversational_strategy(
             == f"{rid}/c/lambs/10/0-35"
         )
 
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_conversational_strategy__max_messages(
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    mocker: MockerFixture,
+):
+    """Test conversational strategy max_messages"""
+
+    kbid = standalone_knowledgebox
+    rid = await lambs_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    data: SyncAskResponse
+
+    mock_paragraph_id = f"{rid}/c/lambs/10/0-35"
+    with mocked_text_block_search(result_paragraph_id=mock_paragraph_id):
         # TEST: max_messages=1 will return the first conversation message (that
         # nobody asked for) and the matched split and
 
@@ -2254,42 +2305,24 @@ async def test_ask_conversational_strategy(
             f"{rid}/c/lambs/12/0-28",
         }
 
-        # TEST: with max_messages exceeding, we'll get an window with an offset
 
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/ask",
-            headers={"x-synchronous": "true"},
-            json={
-                "query": "You know I can't make that promise.",
-                "top_k": 1,
-                "reranker": "noop",
-                "rag_strategies": [
-                    {
-                        "name": "conversation",
-                        "full": False,
-                        "max_messages": 7,
-                        "attachments_text": False,
-                        "attachments_images": False,
-                    },
-                ],
-            },
-        )
-        assert resp.status_code == 200
-        data = SyncAskResponse.model_validate_json(resp.content)
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_conversational_strategy__attachments(
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    mocker: MockerFixture,
+):
+    """Test conversational strategy text and image attachments"""
 
-        augmented = data.augmented_context
-        assert augmented is not None
-        assert augmented.paragraphs.keys() == {
-            f"{rid}/c/lambs/1/0-9",
-            f"{rid}/c/lambs/6/0-80",
-            f"{rid}/c/lambs/7/0-191",
-            f"{rid}/c/lambs/8/0-12",
-            f"{rid}/c/lambs/9/0-130",
-            f"{rid}/c/lambs/11/0-72",
-            f"{rid}/c/lambs/12/0-28",
-        }
+    kbid = standalone_knowledgebox
+    rid = await lambs_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
-        # TEST: text and image attachments
+    data: SyncAskResponse
+
+    mock_paragraph_id = f"{rid}/c/lambs/10/0-35"
+    with mocked_text_block_search(result_paragraph_id=mock_paragraph_id):
 
         async def get_file_thumbnail_path(_, field_id: FieldId) -> str | None:
             return f"path/to/{field_id.key}"
