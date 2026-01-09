@@ -200,19 +200,16 @@ impl RelationsReaderService {
         unique_nodes.merge(destination_nodes);
 
         let mut scores = vec![];
-        let nodes = unique_nodes
-            .into_sorted_vec()
-            .into_iter()
-            .map(|(encoded_node, score)| {
-                let (value, node_type, node_subtype) = decode_node(&encoded_node);
-                scores.push(score);
-                RelationNode {
-                    value,
-                    ntype: io_maps::u64_to_node_type(node_type),
-                    subtype: node_subtype,
-                }
-            })
-            .collect();
+        let mut nodes = vec![];
+        for (encoded_node, score) in unique_nodes.into_sorted_vec() {
+            let (value, node_type, node_subtype) = decode_node(&encoded_node);
+            scores.push(score);
+            nodes.push(RelationNode {
+                value,
+                ntype: io_maps::u64_to_node_type(node_type),
+                subtype: node_subtype,
+            });
+        }
 
         let response = nidx_protos::GraphSearchResponse {
             nodes,
@@ -239,18 +236,16 @@ impl RelationsReaderService {
         let top_relations = searcher.search(&index_query, &collector)?;
 
         let mut scores = vec![];
-        let relations = top_relations
-            .into_sorted_vec()
-            .into_iter()
-            .map(|(encoded_relation, score)| {
-                let (relation_type, relation_label) = decode_relation(&encoded_relation);
-                scores.push(score);
-                nidx_protos::graph_search_response::Relation {
-                    relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),
-                    label: relation_label,
-                }
-            })
-            .collect();
+        let mut relations = vec![];
+
+        for (encoded_relation, score) in top_relations.into_sorted_vec() {
+            let (relation_type, relation_label) = decode_relation(&encoded_relation);
+            scores.push(score);
+            relations.push(nidx_protos::graph_search_response::Relation {
+                relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),
+                label: relation_label,
+            });
+        }
 
         let response = nidx_protos::GraphSearchResponse {
             relations,
