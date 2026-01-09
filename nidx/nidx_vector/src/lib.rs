@@ -52,7 +52,7 @@ pub use indexer::SEGMENT_TAGS;
 pub use request_types::VectorSearchRequest;
 
 use crate::config::IndexEntity;
-use crate::indexer::index_relations;
+use crate::indexer::{index_relation_edges, index_relation_nodes};
 use crate::utils::FieldKey;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
@@ -79,12 +79,14 @@ impl VectorIndexer {
         index_name: &str,
         use_default_vectorset: bool,
     ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
-        if matches!(config.entity, IndexEntity::Paragraph) {
-            let vectorset_resource =
-                ResourceWrapper::new_vectorset_resource(resource, index_name, use_default_vectorset);
-            index_resource(vectorset_resource, output_dir, config)
-        } else {
-            index_relations(resource, output_dir, config)
+        match config.entity {
+            IndexEntity::Paragraph => {
+                let vectorset_resource =
+                    ResourceWrapper::new_vectorset_resource(resource, index_name, use_default_vectorset);
+                index_resource(vectorset_resource, output_dir, config)
+            }
+            IndexEntity::RelationNode => index_relation_nodes(resource, output_dir, config),
+            IndexEntity::RelationEdge => index_relation_edges(resource, output_dir, config),
         }
     }
 

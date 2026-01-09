@@ -369,7 +369,7 @@ impl ShardIndex {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct ShardIndexes(Vec<ShardIndex>);
 
 impl ShardIndexes {
@@ -418,6 +418,22 @@ impl ShardIndexes {
         self.0
             .iter()
             .filter(|i| i.kind == IndexKind::Vector && i.name == name)
+            .map(|i| i.id)
+            .next()
+    }
+
+    pub fn vector_relation_node_index(&self, name: &str) -> Option<IndexId> {
+        self.0
+            .iter()
+            .filter(|i| i.kind == IndexKind::VectorRelationNode && i.name == name)
+            .map(|i| i.id)
+            .next()
+    }
+
+    pub fn vector_relation_edge_index(&self, name: &str) -> Option<IndexId> {
+        self.0
+            .iter()
+            .filter(|i| i.kind == IndexKind::VectorRelationEdge && i.name == name)
             .map(|i| i.id)
             .next()
     }

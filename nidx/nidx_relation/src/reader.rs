@@ -30,7 +30,7 @@ use tantivy::{Index, IndexReader};
 use uuid::Uuid;
 
 use crate::graph_collector::{Selector, TopUniqueCollector};
-use crate::graph_query_parser::{BoolGraphQuery, BoolNodeQuery, GraphQueryParser};
+use crate::graph_query_parser::{BoolGraphQuery, BoolNodeQuery, GraphQueryParser, VectorQueryResults};
 use crate::schema::{Schema, decode_node, decode_relation, encode_field_id};
 use crate::top_unique_n::TopUniqueN;
 use crate::{RelationConfig, io_maps};
@@ -99,6 +99,7 @@ impl RelationsReaderService {
         &self,
         request: &GraphSearchRequest,
         prefilter: &PrefilterResult,
+        context: VectorQueryResults,
     ) -> anyhow::Result<GraphSearchResponse> {
         // No query? Empty graph
         let Some(query) = &request.query else {
@@ -110,21 +111,23 @@ impl RelationsReaderService {
 
         let top_k = request.top_k as usize;
 
+        let parser = GraphQueryParser::new(&self.schema, context);
+
         match request.kind() {
-            QueryKind::Path => self.paths_graph_search(query, prefilter, top_k),
-            QueryKind::Nodes => self.nodes_graph_search(query, prefilter, top_k),
-            QueryKind::Relations => self.relations_graph_search(query, prefilter, top_k),
+            QueryKind::Path => self.paths_graph_search(parser, query, prefilter, top_k),
+            QueryKind::Nodes => self.nodes_graph_search(parser, query, prefilter, top_k),
+            QueryKind::Relations => self.relations_graph_search(parser, query, prefilter, top_k),
         }
     }
 
     fn paths_graph_search(
         &self,
+        parser: GraphQueryParser,
         query: &nidx_protos::graph_query::PathQuery,
         prefilter: &PrefilterResult,
         top_k: usize,
     ) -> anyhow::Result<GraphSearchResponse> {
         let query = BoolGraphQuery::try_from(query)?;
-        let parser = GraphQueryParser::new(&self.schema);
         let index_query = parser.parse_bool(query);
         let index_query = self.apply_prefilter(index_query, prefilter);
 
@@ -135,8 +138,9 @@ impl RelationsReaderService {
         let mut nodes = Vec::new();
         let mut relations = Vec::new();
         let mut graph = Vec::new();
+        let mut scores = Vec::new();
 
-        for (_score, doc_address) in matching_docs {
+        for (score, doc_address) in matching_docs {
             let doc = searcher.doc(doc_address)?;
 
             let source = io_maps::source_to_relation_node(&self.schema, &doc);
@@ -157,25 +161,28 @@ impl RelationsReaderService {
                 metadata: io_maps::decode_metadata(&self.schema, &doc),
                 resource_field_id: io_maps::doc_to_resource_field_id(&self.schema, &doc),
                 facets: io_maps::doc_to_facets(&self.schema, &doc),
-            })
+            });
+
+            scores.push(score);
         }
 
         let response = nidx_protos::GraphSearchResponse {
             nodes,
             relations,
             graph,
+            scores,
         };
         Ok(response)
     }
 
     fn nodes_graph_search(
         &self,
+        parser: GraphQueryParser,
         query: &nidx_protos::graph_query::PathQuery,
         prefilter: &PrefilterResult,
         top_k: usize,
     ) -> anyhow::Result<GraphSearchResponse> {
         let query = BoolNodeQuery::try_from(query)?;
-        let parser = GraphQueryParser::new(&self.schema);
         let (source_query, destination_query) = parser.parse_bool_node(query);
         let source_query = self.apply_prefilter(source_query, prefilter);
         let destination_query = self.apply_prefilter(destination_query, prefilter);
@@ -192,21 +199,21 @@ impl RelationsReaderService {
         let destination_nodes = searcher.search(&destination_query, &collector)?;
         unique_nodes.merge(destination_nodes);
 
-        let nodes = unique_nodes
-            .into_sorted_vec()
-            .into_iter()
-            .map(|(encoded_node, _score)| {
-                let (value, node_type, node_subtype) = decode_node(&encoded_node);
-                RelationNode {
-                    value,
-                    ntype: io_maps::u64_to_node_type(node_type),
-                    subtype: node_subtype,
-                }
-            })
-            .collect();
+        let mut scores = vec![];
+        let mut nodes = vec![];
+        for (encoded_node, score) in unique_nodes.into_sorted_vec() {
+            let (value, node_type, node_subtype) = decode_node(&encoded_node);
+            scores.push(score);
+            nodes.push(RelationNode {
+                value,
+                ntype: io_maps::u64_to_node_type(node_type),
+                subtype: node_subtype,
+            });
+        }
 
         let response = nidx_protos::GraphSearchResponse {
             nodes,
+            scores,
             ..Default::default()
         };
         Ok(response)
@@ -214,12 +221,12 @@ impl RelationsReaderService {
 
     fn relations_graph_search(
         &self,
+        parser: GraphQueryParser,
         query: &nidx_protos::graph_query::PathQuery,
         prefilter: &PrefilterResult,
         top_k: usize,
     ) -> anyhow::Result<GraphSearchResponse> {
         let query = BoolGraphQuery::try_from(query)?;
-        let parser = GraphQueryParser::new(&self.schema);
         let index_query = parser.parse_bool(query);
         let index_query = self.apply_prefilter(index_query, prefilter);
 
@@ -228,20 +235,21 @@ impl RelationsReaderService {
         let collector = TopUniqueCollector::new(Selector::Relations, top_k);
         let top_relations = searcher.search(&index_query, &collector)?;
 
-        let relations = top_relations
-            .into_sorted_vec()
-            .into_iter()
-            .map(|(encoded_relation, _score)| {
-                let (relation_type, relation_label) = decode_relation(&encoded_relation);
-                nidx_protos::graph_search_response::Relation {
-                    relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),
-                    label: relation_label,
-                }
-            })
-            .collect();
+        let mut scores = vec![];
+        let mut relations = vec![];
+
+        for (encoded_relation, score) in top_relations.into_sorted_vec() {
+            let (relation_type, relation_label) = decode_relation(&encoded_relation);
+            scores.push(score);
+            relations.push(nidx_protos::graph_search_response::Relation {
+                relation_type: io_maps::u64_to_relation_type::<i32>(relation_type),
+                label: relation_label,
+            });
+        }
 
         let response = nidx_protos::GraphSearchResponse {
             relations,
+            scores,
             ..Default::default()
         };
         Ok(response)

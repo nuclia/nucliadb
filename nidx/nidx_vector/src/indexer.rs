@@ -161,7 +161,7 @@ fn encode_metadata_field(rid: &str, fields: &HashSet<&String>) -> Vec<u8> {
     encode_field_list_metadata(&encoded_fields)
 }
 
-pub fn index_relations(
+pub fn index_relation_nodes(
     resource: &Resource,
     output_path: &Path,
     config: &VectorConfig,
@@ -209,6 +209,57 @@ pub fn index_relations(
         };
         elems.push(Elem::new(
             node.value.clone(),
+            vector,
+            vec![],
+            Some(encode_metadata_field(rid, fields)),
+        ));
+    }
+
+    if elems.is_empty() {
+        return Ok(None);
+    }
+
+    debug!("Creating the segment");
+    let segment = segment::create(output_path, elems, config, HashSet::new())?;
+
+    Ok(Some(segment.into_metadata()))
+}
+
+pub fn index_relation_edges(
+    resource: &Resource,
+    output_path: &Path,
+    config: &VectorConfig,
+) -> anyhow::Result<Option<VectorSegmentMetadata>> {
+    debug!("Creating elements for the main index");
+
+    let mut entity_fields = HashMap::new();
+    let Some(resource_id) = &resource.resource else {
+        return Err(anyhow!("resource_id required"));
+    };
+    let rid = &resource_id.uuid;
+
+    for (field, relations) in &resource.field_relations {
+        for relation in &relations.relations {
+            let Some(relation) = &relation.relation else {
+                return Err(anyhow!("relation required"));
+            };
+
+            entity_fields
+                .entry(relation.relation_label.clone())
+                .or_insert_with(HashSet::new)
+                .insert(field);
+        }
+    }
+
+    let mut elems = Vec::new();
+    for rel_vector in &resource.relation_edge_vectors {
+        let vector = rel_vector.vector.clone();
+        let fields = entity_fields.get(&rel_vector.relation_label);
+        let Some(fields) = fields else {
+            continue;
+        };
+        elems.push(Elem::new(
+            rel_vector.relation_label.clone(),
             vector,
             vec![],
             Some(encode_metadata_field(rid, fields)),

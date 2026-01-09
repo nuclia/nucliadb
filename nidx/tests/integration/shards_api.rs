@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use nidx_types::Seq;
@@ -46,10 +46,10 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
 
     // Create a new shard for a KB with 2 vectorsets
     let kbid = Uuid::new_v4();
-    let vector_configs = HashMap::from([
+    let vector_configs = vec![
         ("multilingual".to_string(), VECTOR_CONFIG),
         ("english".to_string(), VECTOR_CONFIG),
-    ]);
+    ];
     let shard = shards::create_shard(&meta, kbid, vector_configs).await?;
 
     let indexes = shard.indexes(&meta.pool).await?;
@@ -113,7 +113,7 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
 
     // Create a shard that will survive the purge, with some segments/deletions
     let kbid = Uuid::new_v4();
-    let vector_configs = HashMap::from([("english".to_string(), VECTOR_CONFIG)]);
+    let vector_configs = vec![("english".to_string(), VECTOR_CONFIG)];
     let surviving_shard = shards::create_shard(&meta, kbid, vector_configs).await?;
     let resource = people_and_places(surviving_shard.id.to_string());
     let rid = resource.resource.as_ref().unwrap().uuid.clone();

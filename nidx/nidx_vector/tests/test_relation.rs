@@ -23,8 +23,8 @@ mod common;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use nidx_protos::{
-    IndexRelation, IndexRelations, Relation, RelationNode, RelationNodeVector, Resource, ResourceId,
-    relation::RelationType, relation_node::NodeType,
+    IndexRelation, IndexRelations, Relation, RelationEdgeVector, RelationNode, RelationNodeVector, Resource,
+    ResourceId, relation::RelationType, relation_node::NodeType,
 };
 use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher, config::*};
@@ -85,7 +85,7 @@ fn node_vector(value: &str) -> RelationNodeVector {
 
 #[test]
 fn test_relations_deletion() -> anyhow::Result<()> {
-    let config = VectorConfig::for_relations(VectorType::DenseF32 { dimension: DIMENSION });
+    let config = VectorConfig::for_relation_nodes(VectorType::DenseF32 { dimension: DIMENSION });
 
     let resource = Resource {
         resource: Some(ResourceId {
@@ -272,7 +272,7 @@ fn test_relations_deletion() -> anyhow::Result<()> {
 
 #[test]
 fn test_relations_merge() -> anyhow::Result<()> {
-    let config = VectorConfig::for_relations(VectorType::DenseF32 { dimension: DIMENSION });
+    let config = VectorConfig::for_relation_nodes(VectorType::DenseF32 { dimension: DIMENSION });
 
     let resource1 = Resource {
         resource: Some(ResourceId {
@@ -427,7 +427,7 @@ fn test_relations_merge() -> anyhow::Result<()> {
 
 #[test]
 fn test_relations_merge_deletions() -> anyhow::Result<()> {
-    let config = VectorConfig::for_relations(VectorType::DenseF32 { dimension: DIMENSION });
+    let config = VectorConfig::for_relation_nodes(VectorType::DenseF32 { dimension: DIMENSION });
 
     let resource1 = Resource {
         resource: Some(ResourceId {
@@ -582,7 +582,7 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
 
 #[test]
 fn test_relations_merge_updates() -> anyhow::Result<()> {
-    let config = VectorConfig::for_relations(VectorType::DenseF32 { dimension: DIMENSION });
+    let config = VectorConfig::for_relation_nodes(VectorType::DenseF32 { dimension: DIMENSION });
 
     let resource1 = Resource {
         resource: Some(ResourceId {
@@ -770,6 +770,81 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
         .collect::<Vec<_>>();
     results_names.sort();
     assert_eq!(results_names, vec!["my cat", "my dog"]);
+
+    Ok(())
+}
+
+#[test]
+fn test_relations_labels() -> anyhow::Result<()> {
+    // Basic test for relation labels, other testing covered by relation nodes, this only needs
+    // to check the indexing part which is the only thing different
+    let config = VectorConfig::for_relation_edges(VectorType::DenseF32 { dimension: 4 });
+
+    let resource = Resource {
+        resource: Some(ResourceId {
+            uuid: "00112233445566778899aabbccddeeff".into(),
+            ..Default::default()
+        }),
+        field_relations: [
+            (
+                "a/title".into(),
+                IndexRelations {
+                    relations: vec![relation("dog", "faster than", "cat")],
+                },
+            ),
+            (
+                "f/file".into(),
+                IndexRelations {
+                    relations: vec![
+                        relation("dog", "bigger than", "fish"),
+                        relation("albatross", "bigger than", "dove"),
+                        relation("shark", "bigger than", "fish"),
+                        relation("leopard", "faster than", "turtle"),
+                    ],
+                },
+            ),
+        ]
+        .into(),
+        relation_edge_vectors: vec![
+            RelationEdgeVector {
+                relation_type: RelationType::Entity as i32,
+                relation_label: "faster than".into(),
+                vector: vec![1.0, 0.0, 0.0, 0.0],
+            },
+            RelationEdgeVector {
+                relation_type: RelationType::Entity as i32,
+                relation_label: "bigger than".into(),
+                vector: vec![0.0, 1.0, 0.0, 0.0],
+            },
+        ],
+        ..Default::default()
+    };
+
+    let segment_dir = tempdir()?;
+    let segment_meta = VectorIndexer
+        .index_resource(segment_dir.path(), &config, &resource, "default", true)?
+        .unwrap();
+    assert_eq!(segment_meta.records, 2);
+
+    // Search without deletions, all results
+    let searcher = VectorSearcher::open(
+        config.clone(),
+        TestOpener::new(vec![(segment_meta.clone(), 1i64.into())], vec![]),
+    )?;
+    let search_for = vec![1.0, 0.0, 0.0, 0.0];
+    let results = searcher.search(
+        &VectorSearchRequest {
+            vector: search_for.clone(),
+            result_per_page: 10,
+            with_duplicates: true,
+            ..Default::default()
+        },
+        &PrefilterResult::All,
+    )?;
+
+    assert_eq!(results.documents.len(), 2);
+    assert_eq!(results.documents[0].score, 1.0);
+    assert!(results.documents[1].score < 1.0);
 
     Ok(())
 }

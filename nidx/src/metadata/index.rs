@@ -35,12 +35,14 @@ use uuid::Uuid;
 use super::segment::Segment;
 
 #[derive(sqlx::Type, Copy, Clone, PartialEq, Eq, Hash, Debug)]
-#[sqlx(type_name = "index_kind", rename_all = "lowercase")]
+#[sqlx(type_name = "index_kind", rename_all = "snake_case")]
 pub enum IndexKind {
     Text,
     Paragraph,
     Vector,
     Relation,
+    VectorRelationNode,
+    VectorRelationEdge,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, sqlx::Type, Serialize, Deserialize)]
@@ -77,6 +79,8 @@ pub enum IndexConfig {
     Paragraph(()),
     Vector(VectorConfig),
     Relation(RelationConfig),
+    VectorRelationNode(VectorConfig),
+    VectorRelationEdge(VectorConfig),
 }
 
 impl Index {
@@ -249,7 +253,9 @@ impl Index {
 
     pub fn config<T: for<'de> Deserialize<'de> + 'static>(&self) -> anyhow::Result<T> {
         let config_type = match self.kind {
-            IndexKind::Vector => TypeId::of::<VectorConfig>(),
+            IndexKind::Vector | IndexKind::VectorRelationNode | IndexKind::VectorRelationEdge => {
+                TypeId::of::<VectorConfig>()
+            }
             IndexKind::Text => TypeId::of::<TextConfig>(),
             IndexKind::Relation => TypeId::of::<RelationConfig>(),
             _ => TypeId::of::<()>(),
@@ -275,6 +281,8 @@ impl IndexConfig {
             Self::Paragraph(_) => IndexKind::Paragraph,
             Self::Vector(_) => IndexKind::Vector,
             Self::Relation(_) => IndexKind::Relation,
+            Self::VectorRelationNode(_) => IndexKind::VectorRelationNode,
+            Self::VectorRelationEdge(_) => IndexKind::VectorRelationEdge,
         }
     }
 }
@@ -289,13 +297,19 @@ impl Serialize for IndexConfig {
             Self::Paragraph(config) => config.serialize(serializer),
             Self::Vector(config) => config.serialize(serializer),
             Self::Relation(config) => config.serialize(serializer),
+            Self::VectorRelationNode(config) => config.serialize(serializer),
+            Self::VectorRelationEdge(config) => config.serialize(serializer),
         }
     }
 }
 
 impl From<VectorConfig> for IndexConfig {
     fn from(value: VectorConfig) -> Self {
-        Self::Vector(value)
+        match value.entity {
+            nidx_vector::config::IndexEntity::Paragraph => Self::Vector(value),
+            nidx_vector::config::IndexEntity::RelationNode => Self::VectorRelationNode(value),
+            nidx_vector::config::IndexEntity::RelationEdge => Self::VectorRelationEdge(value),
+        }
     }
 }
 

@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashMap;
 use std::io::Write;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -102,12 +101,12 @@ impl NidxApi for ApiServer {
         // TODO? analytics event
         let request = request.into_inner();
         let kbid = Uuid::from_str(&request.kbid).map_err(NidxError::from)?;
-        let mut vector_configs = HashMap::with_capacity(request.vectorsets_configs.len());
+        let mut vector_configs = Vec::with_capacity(request.vectorsets_configs.len());
         for (vectorset_id, config) in request.vectorsets_configs {
-            vector_configs.insert(
+            vector_configs.push((
                 vectorset_id,
                 VectorConfig::try_from(config).map_err(|e| Status::internal(e.to_string()))?,
-            );
+            ));
         }
 
         let shard = shards::create_shard(&self.meta, kbid, vector_configs).await?;

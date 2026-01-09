@@ -99,7 +99,8 @@ pub enum VectorCardinality {
 pub enum IndexEntity {
     #[default]
     Paragraph,
-    Relation,
+    RelationNode,
+    RelationEdge,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -129,14 +130,25 @@ impl VectorConfig {
         }
     }
 
-    pub const fn for_relations(vector_type: VectorType) -> Self {
+    pub const fn for_relation_nodes(vector_type: VectorType) -> Self {
         Self {
             vector_type,
             similarity: Similarity::Dot,
             normalize_vectors: false,
             vector_cardinality: VectorCardinality::Single,
             flags: vec![],
-            entity: IndexEntity::Relation,
+            entity: IndexEntity::RelationNode,
+        }
+    }
+
+    pub const fn for_relation_edges(vector_type: VectorType) -> Self {
+        Self {
+            vector_type,
+            similarity: Similarity::Dot,
+            normalize_vectors: false,
+            vector_cardinality: VectorCardinality::Single,
+            flags: vec![],
+            entity: IndexEntity::RelationEdge,
         }
     }
 
@@ -150,6 +162,14 @@ impl VectorConfig {
     pub fn quantizable_vectors(&self) -> bool {
         matches!(self.similarity, Similarity::Dot)
             && matches!(&self.vector_type, VectorType::DenseF32 { dimension } if dimension.is_multiple_of(64))
+    }
+
+    /// Whether to deduplicate paragraphs based on their key, using `metadata` to store the list of field_keys
+    pub fn deduplicate_keys(&self) -> bool {
+        match self.entity {
+            IndexEntity::Paragraph => false,
+            IndexEntity::RelationNode | IndexEntity::RelationEdge => true,
+        }
     }
 }
 

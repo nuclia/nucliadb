@@ -389,7 +389,7 @@ fn index_resource_to_index(
 ) -> anyhow::Result<(Option<NewSegment>, Vec<String>)> {
     let t = Instant::now();
     let segment = match index.kind {
-        IndexKind::Vector => nidx_vector::VectorIndexer
+        IndexKind::Vector | IndexKind::VectorRelationNode | IndexKind::VectorRelationEdge => nidx_vector::VectorIndexer
             .index_resource(output_dir, &index.config()?, resource, &index.name, single_vector_index)?
             .map(|x| x.into()),
         IndexKind::Text => nidx_text::TextIndexer
@@ -404,7 +404,9 @@ fn index_resource_to_index(
     };
 
     let deletions = match index.kind {
-        IndexKind::Vector => nidx_vector::VectorIndexer.deletions_for_resource(resource, &index.name),
+        IndexKind::Vector | IndexKind::VectorRelationNode | IndexKind::VectorRelationEdge => {
+            nidx_vector::VectorIndexer.deletions_for_resource(resource, &index.name)
+        }
         IndexKind::Text => nidx_text::TextIndexer.deletions_for_resource(resource),
         IndexKind::Paragraph => nidx_paragraph::ParagraphIndexer.deletions_for_resource(resource),
         IndexKind::Relation => nidx_relation::RelationIndexer.deletions_for_resource(&index.config()?, resource),

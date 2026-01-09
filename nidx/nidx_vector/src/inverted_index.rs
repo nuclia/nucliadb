@@ -21,7 +21,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use fst_index::FstIndexWriter;
 
-use crate::{ParagraphAddr, VectorR, config::IndexEntity, data_store::DataStore};
+use crate::{ParagraphAddr, VectorR, config::VectorConfig, data_store::DataStore};
 use paragraph::ParagraphInvertedIndexes;
 use relation::RelationInvertedIndexes;
 
@@ -65,10 +65,11 @@ impl IndexBuilder {
 }
 
 /// Build indexes from a DataStore.
-pub fn build_indexes(work_path: &Path, indexes: &IndexEntity, data_store: &impl DataStore) -> VectorR<()> {
-    match indexes {
-        IndexEntity::Paragraph => ParagraphInvertedIndexes::build(work_path, data_store),
-        IndexEntity::Relation => RelationInvertedIndexes::build(work_path, data_store),
+pub fn build_indexes(work_path: &Path, config: &VectorConfig, data_store: &impl DataStore) -> VectorR<()> {
+    if config.deduplicate_keys() {
+        RelationInvertedIndexes::build(work_path, data_store)
+    } else {
+        ParagraphInvertedIndexes::build(work_path, data_store)
     }
 }
 
@@ -82,14 +83,15 @@ pub enum InvertedIndexes {
 }
 
 impl InvertedIndexes {
-    pub fn open(index_type: &IndexEntity, work_path: &Path, records: usize, options: OpenOptions) -> VectorR<Self> {
-        match index_type {
-            IndexEntity::Paragraph => Ok(InvertedIndexes::Paragraph(ParagraphInvertedIndexes::open(
-                work_path, records, options,
-            )?)),
-            IndexEntity::Relation => Ok(InvertedIndexes::Relation(RelationInvertedIndexes::open(
+    pub fn open(config: &VectorConfig, work_path: &Path, records: usize, options: OpenOptions) -> VectorR<Self> {
+        if config.deduplicate_keys() {
+            Ok(InvertedIndexes::Relation(RelationInvertedIndexes::open(
                 work_path, options,
-            )?)),
+            )?))
+        } else {
+            Ok(InvertedIndexes::Paragraph(ParagraphInvertedIndexes::open(
+                work_path, records, options,
+            )?))
         }
     }
 

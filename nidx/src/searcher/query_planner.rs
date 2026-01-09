@@ -18,8 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::HashMap;
+
 use nidx_paragraph::ParagraphSearchRequest;
 use nidx_protos::filter_expression::Expr;
+use nidx_protos::graph_query::{PathQuery, node, path_query, relation};
 use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::{FilterExpression, FilterOperator, GraphSearchRequest, SearchRequest};
 use nidx_text::DocumentSearchRequest;
@@ -31,6 +34,99 @@ use nidx_vector::VectorSearchRequest;
 
 use super::query_language::extract_label_filters;
 
+const SEMANTIC_MIN_SCORE: f32 = 0.7;
+
+#[derive(Clone)]
+pub struct GraphIndexQueries {
+    pub relations_request: GraphSearchRequest,
+    pub vector_node_requests: HashMap<String, VectorSearchRequest>,
+    pub vector_edge_requests: HashMap<String, VectorSearchRequest>,
+}
+
+impl GraphIndexQueries {
+    pub fn build(request: GraphSearchRequest) -> Self {
+        let mut vector_node_requests = HashMap::new();
+        let mut vector_edge_requests = HashMap::new();
+        if let Some(query) = &request.query
+            && let Some(path_query) = &query.path
+        {
+            Self::extract_vector_requests(
+                path_query,
+                &mut vector_node_requests,
+                &mut vector_edge_requests,
+                request.top_k,
+            );
+        }
+
+        GraphIndexQueries {
+            relations_request: request,
+            vector_node_requests,
+            vector_edge_requests,
+        }
+    }
+
+    fn extract_vector_requests(
+        query: &PathQuery,
+        node: &mut HashMap<String, VectorSearchRequest>,
+        edge: &mut HashMap<String, VectorSearchRequest>,
+        top_k: u32,
+    ) {
+        let Some(query) = &query.query else {
+            return;
+        };
+        match query {
+            path_query::Query::Path(path) => {
+                if let Some(source) = &path.source
+                    && let Some(node::MatchKind::Vector(filter)) = &source.match_kind
+                {
+                    node.insert(
+                        source.value().to_string(),
+                        VectorSearchRequest {
+                            vector: filter.vector.clone(),
+                            result_per_page: top_k as i32,
+                            min_score: SEMANTIC_MIN_SCORE,
+                            ..Default::default()
+                        },
+                    );
+                }
+                if let Some(destination) = &path.destination
+                    && let Some(node::MatchKind::Vector(filter)) = &destination.match_kind
+                {
+                    node.insert(
+                        destination.value().to_string(),
+                        VectorSearchRequest {
+                            vector: filter.vector.clone(),
+                            result_per_page: top_k as i32,
+                            min_score: SEMANTIC_MIN_SCORE,
+                            ..Default::default()
+                        },
+                    );
+                }
+                if let Some(relation) = &path.relation
+                    && let Some(relation::MatchKind::Vector(filter)) = &relation.match_kind
+                {
+                    edge.insert(
+                        relation.value().to_string(),
+                        VectorSearchRequest {
+                            vector: filter.vector.clone(),
+                            result_per_page: top_k as i32,
+                            min_score: SEMANTIC_MIN_SCORE,
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+            path_query::Query::BoolNot(not) => Self::extract_vector_requests(not, node, edge, top_k),
+            path_query::Query::BoolAnd(bool) | path_query::Query::BoolOr(bool) => {
+                for op in &bool.operands {
+                    Self::extract_vector_requests(op, node, edge, top_k);
+                }
+            }
+            path_query::Query::Facet(_) => {}
+        }
+    }
+}
+
 /// The queries a [`QueryPlan`] has decided to send to each index.
 #[derive(Default, Clone)]
 pub struct IndexQueries {
@@ -38,7 +134,7 @@ pub struct IndexQueries {
     pub vectors_request: Option<VectorSearchRequest>,
     pub paragraphs_request: Option<ParagraphSearchRequest>,
     pub texts_request: Option<DocumentSearchRequest>,
-    pub relations_request: Option<GraphSearchRequest>,
+    pub relations_request: Option<GraphIndexQueries>,
 }
 
 impl IndexQueries {
@@ -80,7 +176,7 @@ pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPl
             vectors_request,
             paragraphs_request,
             texts_request,
-            relations_request: graph_request,
+            relations_request: graph_request.map(GraphIndexQueries::build),
         },
     })
 }
@@ -175,6 +271,7 @@ fn compute_graph_request(search_request: &SearchRequest) -> anyhow::Result<Optio
         query: graph_search.query,
         top_k: std::cmp::max(search_request.result_per_page as u32, 20),
         kind: QueryKind::Path.into(),
+        graph_vectorset: search_request.graph_vectorset.clone(),
         // we don't need to populate filters nor shard as they won't be used in search. Prefilter
         // will be done with request filters and shard have been already obtained
         ..Default::default()
