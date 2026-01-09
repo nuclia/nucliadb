@@ -26,7 +26,8 @@ from nats.js import JetStreamContext
 
 from nucliadb_protos.audit_pb2 import AuditRequest
 from nucliadb_utils.settings import audit_settings
-from nucliadb_utils.utilities import Utility, clean_utility, set_utility
+from nucliadb_utils.utilities import Utility
+from tests.ndbfixtures.utils import global_utility
 
 
 async def get_audit_messages(sub):
@@ -50,48 +51,45 @@ async def test_ask_sends_only_one_audit(
         assert False, "Missing jetstream target in audit settings"
     subject = audit_settings.audit_jetstream_target.format(partition=partition, type="*")
 
-    set_utility(Utility.AUDIT, stream_audit)
+    with global_utility(Utility.AUDIT, stream_audit):
+        try:
+            await jetstream.delete_stream(name=audit_settings.audit_stream)
+            await jetstream.delete_stream(name="test_usage")
+        except nats.js.errors.NotFoundError:
+            pass
 
-    try:
-        await jetstream.delete_stream(name=audit_settings.audit_stream)
-        await jetstream.delete_stream(name="test_usage")
-    except nats.js.errors.NotFoundError:
-        pass
+        await jetstream.add_stream(name=audit_settings.audit_stream, subjects=[subject])
 
-    await jetstream.add_stream(name=audit_settings.audit_stream, subjects=[subject])
+        psub = await jetstream.pull_subscribe(subject, "psub")
 
-    psub = await jetstream.pull_subscribe(subject, "psub")
+        resp = await nucliadb_search.post(
+            f"/kb/{kbid}/ask",
+            json={"query": "title"},
+        )
+        assert resp.status_code == 200
 
-    resp = await nucliadb_search.post(
-        f"/kb/{kbid}/ask",
-        json={"query": "title"},
-    )
-    assert resp.status_code == 200
+        # Testing the middleware integration where it collects audit calls and sends a single message
+        # at requests ends. In this case we expect one seach and one chat sent once
+        stream_audit.search.assert_called_once()
+        stream_audit.chat.assert_called_once()
+        assert stream_audit.js.publish.call_count == 2
+        stream_audit.send.assert_called_once()
 
-    # Testing the middleware integration where it collects audit calls and sends a single message
-    # at requests ends. In this case we expect one seach and one chat sent once
-    stream_audit.search.assert_called_once()
-    stream_audit.chat.assert_called_once()
-    assert stream_audit.js.publish.call_count == 2
-    stream_audit.send.assert_called_once()
-
-    auditreq = await get_audit_messages(psub)
-    assert auditreq.type == AuditRequest.AuditType.CHAT
-    assert auditreq.kbid == kbid
-    assert auditreq.HasField("chat")
-    assert auditreq.HasField("search")
-    assert auditreq.request_time > 0
-    assert auditreq.generative_answer_time > 0
-    assert auditreq.retrieval_time > 0
-    assert (auditreq.generative_answer_time + auditreq.retrieval_time) < auditreq.request_time
-    try:
         auditreq = await get_audit_messages(psub)
-    except nats.errors.TimeoutError:
-        pass
-    else:
-        assert "There was an unexpected extra audit message in nats"
-    await psub.unsubscribe()
-    await nats_client.flush()
-    await nats_client.close()
-
-    clean_utility(Utility.AUDIT)
+        assert auditreq.type == AuditRequest.AuditType.CHAT
+        assert auditreq.kbid == kbid
+        assert auditreq.HasField("chat")
+        assert auditreq.HasField("search")
+        assert auditreq.request_time > 0
+        assert auditreq.generative_answer_time > 0
+        assert auditreq.retrieval_time > 0
+        assert (auditreq.generative_answer_time + auditreq.retrieval_time) < auditreq.request_time
+        try:
+            auditreq = await get_audit_messages(psub)
+        except nats.errors.TimeoutError:
+            pass
+        else:
+            assert "There was an unexpected extra audit message in nats"
+        await psub.unsubscribe()
+        await nats_client.flush()
+        await nats_client.close()
