@@ -88,33 +88,36 @@ pub async fn search(index_cache: Arc<IndexCache>, search_request: SearchRequest)
         None
     };
 
-    let (node_semantic_index, edge_semantic_index) = if let Some(relations_plan) =
-        &query_plan.index_queries.relations_request
-    {
-        let node_semantic_index = if !relations_plan.vector_node_requests.is_empty() {
-            let Some(index_id) = indexes.vector_relation_node_index(&relations_plan.relations_request.graph_vectorset)
-            else {
-                return Err(NidxError::NotFound);
+    let (node_semantic_index, edge_semantic_index) =
+        if let Some(relations_plan) = &query_plan.index_queries.relations_request {
+            let node_semantic_index = if !relations_plan.vector_node_requests.is_empty() {
+                let Some(vectorset) = &relations_plan.relations_request.graph_vectorset else {
+                    return Err(NidxError::NotFound);
+                };
+                let Some(index_id) = indexes.vector_relation_node_index(vectorset) else {
+                    return Err(NidxError::NotFound);
+                };
+                Some(index_cache.get(&index_id).await?)
+            } else {
+                None
             };
-            Some(index_cache.get(&index_id).await?)
-        } else {
-            None
-        };
 
-        let edge_semantic_index = if !relations_plan.vector_edge_requests.is_empty() {
-            let Some(index_id) = indexes.vector_relation_edge_index(&relations_plan.relations_request.graph_vectorset)
-            else {
-                return Err(NidxError::NotFound);
+            let edge_semantic_index = if !relations_plan.vector_edge_requests.is_empty() {
+                let Some(vectorset) = &relations_plan.relations_request.graph_vectorset else {
+                    return Err(NidxError::NotFound);
+                };
+                let Some(index_id) = indexes.vector_relation_edge_index(vectorset) else {
+                    return Err(NidxError::NotFound);
+                };
+                Some(index_cache.get(&index_id).await?)
+            } else {
+                None
             };
-            Some(index_cache.get(&index_id).await?)
-        } else {
-            None
-        };
 
-        (node_semantic_index, edge_semantic_index)
-    } else {
-        (None, None)
-    };
+            (node_semantic_index, edge_semantic_index)
+        } else {
+            (None, None)
+        };
 
     let current = Span::current();
     let search_results = tokio::task::spawn_blocking(move || {
@@ -258,8 +261,10 @@ pub async fn graph_search(
 
     let graph_queries = GraphIndexQueries::build(graph_request);
     let node_semantic_index = if !graph_queries.vector_node_requests.is_empty() {
-        let Some(index_id) = indexes.vector_relation_node_index(&graph_queries.relations_request.graph_vectorset)
-        else {
+        let Some(vectorset) = &graph_queries.relations_request.graph_vectorset else {
+            return Err(NidxError::NotFound);
+        };
+        let Some(index_id) = indexes.vector_relation_node_index(vectorset) else {
             return Err(NidxError::NotFound);
         };
         Some(index_cache.get(&index_id).await?)
@@ -267,8 +272,10 @@ pub async fn graph_search(
         None
     };
     let edge_semantic_index = if !graph_queries.vector_edge_requests.is_empty() {
-        let Some(index_id) = indexes.vector_relation_edge_index(&graph_queries.relations_request.graph_vectorset)
-        else {
+        let Some(vectorset) = &graph_queries.relations_request.graph_vectorset else {
+            return Err(NidxError::NotFound);
+        };
+        let Some(index_id) = indexes.vector_relation_edge_index(vectorset) else {
             return Err(NidxError::NotFound);
         };
         Some(index_cache.get(&index_id).await?)
