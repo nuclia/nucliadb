@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import uuid
 from contextlib import contextmanager
 from unittest.mock import patch
 
@@ -50,12 +49,15 @@ from tests.ndbfixtures.resources.lambs import lambs_resource
 
 @pytest.mark.deploy_modes("standalone")
 async def test__validate_mocked_text_block_search(
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     standalone_knowledgebox: str,
+    mocker: MockerFixture,
 ):
     """Simple test to validate that we are properly mocking search"""
     kbid = standalone_knowledgebox
-    rid = uuid.uuid4().hex
+    rid = await lambs_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
     mock_paragraph_id = f"{rid}/c/lambs/10/0-35"
 
