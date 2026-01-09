@@ -13,16 +13,15 @@
 # limitations under the License.
 #
 
-from enum import Enum
 from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints, model_validator
-from typing_extensions import Self
+from typing_extensions import Self, assert_never
 
 from nucliadb_models import filters
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
-from nucliadb_models.search import ResourceProperties
+from nucliadb_models.search import ResourceProperties, TextPosition
 
 ResourceIdPattern = r"^([0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
 ResourceId = Annotated[
@@ -57,71 +56,6 @@ ParagraphId = Annotated[
 # Request
 
 
-class ResourceProp(str, Enum):
-    """Superset of former `show` and `extracted` serializations options."""
-
-    # `show` props
-    BASIC = "basic"
-    ORIGIN = "origin"
-    EXTRA = "extra"
-    RELATIONS = "relations"
-    VALUES = "values"
-    ERRORS = "errors"
-    SECURITY = "security"
-    # `extracted` props
-    EXTRACTED_TEXT = "extracted_text"
-    EXTRACTED_METADATA = "extracted_metadata"
-    EXTRACTED_SHORTENED_METADATA = "extracted_shortened_metadata"
-    EXTRACTED_LARGE_METADATA = "extracted_large_metadata"
-    EXTRACTED_VECTOR = "extracted_vectors"
-    EXTRACTED_LINK = "extracted_link"
-    EXTRACTED_FILE = "extracted_file"
-    EXTRACTED_QA = "extracted_question_answers"
-    # new granular props
-    TITLE = "title"
-    SUMMARY = "summary"
-    CLASSIFICATION_LABELS = "classification_labels"
-
-    @classmethod
-    def from_show_and_extracted(
-        cls, show: list[ResourceProperties], extracted: list[ExtractedDataTypeName]
-    ) -> list["ResourceProp"]:
-        _show_to_prop = {
-            ResourceProperties.BASIC: cls.BASIC,
-            ResourceProperties.ORIGIN: cls.ORIGIN,
-            ResourceProperties.EXTRA: cls.EXTRA,
-            ResourceProperties.RELATIONS: cls.RELATIONS,
-            ResourceProperties.VALUES: cls.VALUES,
-            ResourceProperties.ERRORS: cls.ERRORS,
-            ResourceProperties.SECURITY: cls.SECURITY,
-        }
-        _extracted_to_prop = {
-            ExtractedDataTypeName.TEXT: cls.EXTRACTED_TEXT,
-            ExtractedDataTypeName.METADATA: cls.EXTRACTED_METADATA,
-            ExtractedDataTypeName.SHORTENED_METADATA: cls.EXTRACTED_SHORTENED_METADATA,
-            ExtractedDataTypeName.LARGE_METADATA: cls.EXTRACTED_LARGE_METADATA,
-            ExtractedDataTypeName.VECTOR: cls.EXTRACTED_VECTOR,
-            ExtractedDataTypeName.LINK: cls.EXTRACTED_LINK,
-            ExtractedDataTypeName.FILE: cls.EXTRACTED_FILE,
-            ExtractedDataTypeName.QA: cls.EXTRACTED_QA,
-        }
-
-        props = []
-        for s in show:
-            show_prop = _show_to_prop.get(s)
-            # show=extracted is not in the dict
-            if show_prop is None:
-                continue
-            props.append(show_prop)
-
-        if ResourceProperties.EXTRACTED in show:
-            for e in extracted:
-                extracted_prop = _extracted_to_prop[e]
-                props.append(extracted_prop)
-
-        return props
-
-
 class AugmentResourceFields(BaseModel):
     text: bool = False
     classification_labels: bool = False
@@ -132,8 +66,29 @@ class AugmentResourceFields(BaseModel):
 class AugmentResources(BaseModel):
     given: list[ResourceId]
 
-    # TODO(decoupled-ask): replace this select for bool fields
-    select: list[ResourceProp] = Field(default_factory=list)
+    # `show` props
+    basic: bool = False
+    origin: bool = False
+    extra: bool = False
+    relations: bool = False
+    values: bool = False
+    errors: bool = False
+    security: bool = False
+
+    # `extracted` props
+    extracted_text: bool = False
+    extracted_metadata: bool = False
+    extracted_shortened_metadata: bool = False
+    extracted_large_metadata: bool = False
+    extracted_vector: bool = False
+    extracted_link: bool = False
+    extracted_file: bool = False
+    extracted_qa: bool = False
+
+    # new granular props
+    title: bool = False
+    summary: bool = False
+    classification_labels: bool = False
 
     field_type_filter: list[FieldTypeName] | None = Field(
         default=None,
@@ -153,6 +108,51 @@ class AugmentResources(BaseModel):
             raise ValueError("`field_type_filter` and `fields` are incompatible together")
 
         return self
+
+    def apply_show_and_extracted(
+        self, show: list[ResourceProperties], extracted: list[ExtractedDataTypeName]
+    ):
+        show_extracted = False
+        for s in show:
+            if s == ResourceProperties.BASIC:
+                self.basic = True
+            elif s == ResourceProperties.ORIGIN:
+                self.origin = True
+            elif s == ResourceProperties.EXTRA:
+                self.extra = True
+            elif s == ResourceProperties.RELATIONS:
+                self.relations = True
+            elif s == ResourceProperties.VALUES:
+                self.values = True
+            elif s == ResourceProperties.ERRORS:
+                self.errors = True
+            elif s == ResourceProperties.SECURITY:
+                self.security = True
+            elif s == ResourceProperties.EXTRACTED:
+                show_extracted = True
+            else:  # pragma: no cover
+                assert_never(s)
+
+        if show_extracted:
+            for e in extracted:
+                if e == ExtractedDataTypeName.TEXT:
+                    self.extracted_text = True
+                elif e == ExtractedDataTypeName.METADATA:
+                    self.extracted_metadata = True
+                elif e == ExtractedDataTypeName.SHORTENED_METADATA:
+                    self.extracted_shortened_metadata = True
+                elif e == ExtractedDataTypeName.LARGE_METADATA:
+                    self.extracted_large_metadata = True
+                elif e == ExtractedDataTypeName.VECTOR:
+                    self.extracted_vector = True
+                elif e == ExtractedDataTypeName.LINK:
+                    self.extracted_link = True
+                elif e == ExtractedDataTypeName.FILE:
+                    self.extracted_file = True
+                elif e == ExtractedDataTypeName.QA:
+                    self.extracted_qa = True
+                else:  # pragma: no cover
+                    assert_never(s)
 
 
 class AugmentFields(BaseModel):
@@ -208,11 +208,7 @@ class AugmentFields(BaseModel):
         return self
 
 
-# TODO(decoupled-ask): remove unused metadata
 class ParagraphMetadata(BaseModel):
-    field_labels: list[str]
-    paragraph_labels: list[str]
-
     is_an_image: bool
     is_a_table: bool
 
@@ -257,9 +253,9 @@ class AugmentParagraphs(BaseModel):
 
 
 class AugmentRequest(BaseModel):
-    resources: AugmentResources | None = None
-    fields: AugmentFields | None = None
-    paragraphs: AugmentParagraphs | None = None
+    resources: list[AugmentResources] | None = Field(default=None, min_length=1)
+    fields: list[AugmentFields] | None = Field(default=None, min_length=1)
+    paragraphs: list[AugmentParagraphs] | None = Field(default=None, min_length=1)
 
 
 # Response
@@ -267,6 +263,7 @@ class AugmentRequest(BaseModel):
 
 class AugmentedParagraph(BaseModel):
     text: str | None = None
+    position: TextPosition | None = None
 
     neighbours_before: list[ParagraphId] | None = None
     neighbours_after: list[ParagraphId] | None = None
@@ -293,7 +290,6 @@ class AugmentedFileField(BaseModel):
     # former ners
     entities: dict[str, list[str]] | None = None
 
-    # TODO(decoupled-ask): implement image strategy
     page_preview_image: str | None = None
 
     # Path for the download API to retrieve the file thumbnail image

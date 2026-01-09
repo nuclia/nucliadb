@@ -41,16 +41,20 @@ async def test_augment_api(
     resp = await nucliadb_search.post(
         f"/{KB_PREFIX}/{kbid}/augment",
         json={
-            "resources": {
-                "given": [rid],
-                "select": ["basic"],
-            },
-            "paragraphs": {
-                "given": [
-                    {"id": f"{rid}/f/smb-wonder/145-234"},
-                ],
-                "text": True,
-            },
+            "resources": [
+                {
+                    "given": [rid],
+                    "basic": True,
+                }
+            ],
+            "paragraphs": [
+                {
+                    "given": [
+                        {"id": f"{rid}/f/smb-wonder/145-234"},
+                    ],
+                    "text": True,
+                }
+            ],
         },
     )
     assert resp.status_code == 200
@@ -78,12 +82,14 @@ async def test_augment_api_images(
     resp = await nucliadb_search.post(
         f"/{KB_PREFIX}/{kbid}/augment",
         json={
-            "paragraphs": {
-                "given": [
-                    {"id": f"{rid}/f/cookie-recipie/0-29"},
-                ],
-                "source_image": True,
-            },
+            "paragraphs": [
+                {
+                    "given": [
+                        {"id": f"{rid}/f/cookie-recipie/0-29"},
+                    ],
+                    "source_image": True,
+                }
+            ],
         },
     )
     assert resp.status_code == 200
@@ -93,12 +99,14 @@ async def test_augment_api_images(
     resp = await nucliadb_search.post(
         f"/{KB_PREFIX}/{kbid}/augment",
         json={
-            "paragraphs": {
-                "given": [
-                    {"id": f"{rid}/f/cookie-recipie/29-75"},
-                ],
-                "table_image": True,
-            },
+            "paragraphs": [
+                {
+                    "given": [
+                        {"id": f"{rid}/f/cookie-recipie/29-75"},
+                    ],
+                    "table_image": True,
+                }
+            ],
         },
     )
     assert resp.status_code == 200
@@ -110,13 +118,15 @@ async def test_augment_api_images(
     resp = await nucliadb_search.post(
         f"/{KB_PREFIX}/{kbid}/augment",
         json={
-            "paragraphs": {
-                "given": [
-                    {"id": f"{rid}/f/cookie-recipie/29-75"},
-                ],
-                "table_image": True,
-                "table_prefers_page_preview": True,
-            },
+            "paragraphs": [
+                {
+                    "given": [
+                        {"id": f"{rid}/f/cookie-recipie/29-75"},
+                    ],
+                    "table_image": True,
+                    "table_prefers_page_preview": True,
+                }
+            ],
         },
     )
     assert resp.status_code == 200
@@ -129,12 +139,14 @@ async def test_augment_api_images(
     resp = await nucliadb_search.post(
         f"/{KB_PREFIX}/{kbid}/augment",
         json={
-            "paragraphs": {
-                "given": [
-                    {"id": f"{rid}/f/cookie-recipie/29-75"},
-                ],
-                "page_preview_image": True,
-            },
+            "paragraphs": [
+                {
+                    "given": [
+                        {"id": f"{rid}/f/cookie-recipie/29-75"},
+                    ],
+                    "page_preview_image": True,
+                }
+            ],
         },
     )
     assert resp.status_code == 200
@@ -159,10 +171,12 @@ async def test_augment_api_file_thumbnails(
     resp = await nucliadb_search.post(
         f"/{KB_PREFIX}/{kbid}/augment",
         json={
-            "fields": {
-                "given": [f"{rid}/f/cookie-recipie"],
-                "file_thumbnail": True,
-            },
+            "fields": [
+                {
+                    "given": [f"{rid}/f/cookie-recipie"],
+                    "file_thumbnail": True,
+                }
+            ],
         },
     )
     assert resp.status_code == 200

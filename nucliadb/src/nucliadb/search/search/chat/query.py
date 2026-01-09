@@ -54,7 +54,6 @@ from nucliadb_models.augment import (
     AugmentRequest,
     AugmentResources,
     ParagraphMetadata,
-    ResourceProp,
 )
 from nucliadb_models.retrieval import RerankerScore, RetrievalMatch, ScoreType
 from nucliadb_models.search import (
@@ -532,7 +531,6 @@ async def find_retrieval(
     x_forwarded_for: str,
     metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, bool, Fetcher, Reranker]:
-    # TODO(decoupled-ask): Remove once the feature has been fully rolled out
     if not has_feature(const.Features.ASK_DECOUPLED, context={"kbid": kbid}):
         results, incomplete, parsed = await find(
             kbid,
@@ -764,35 +762,36 @@ async def hydrate_and_rerank(
         else:
             text_block_id_to_hydrate.add(paragraph_id)
 
-    resource_select = ResourceProp.from_show_and_extracted(
-        resource_hydration_options.show, resource_hydration_options.extracted
+    resource_augment = AugmentResources(
+        given=list(resources_to_hydrate),
+        field_type_filter=resource_hydration_options.field_type_filter,
+    )
+    resource_augment.apply_show_and_extracted(
+        resource_hydration_options.show,
+        resource_hydration_options.extracted,
     )
 
     # hydrate only the strictly needed before rerank
     augment_request = AugmentRequest(
-        resources=AugmentResources(
-            given=list(resources_to_hydrate),
-            select=resource_select,
-            field_type_filter=resource_hydration_options.field_type_filter,
-        ),
-        paragraphs=AugmentParagraphs(
-            given=[
-                AugmentParagraph(
-                    id=paragraph_id,
-                    metadata=ParagraphMetadata(
-                        field_labels=text_blocks_by_id[paragraph_id].field_labels,
-                        paragraph_labels=text_blocks_by_id[paragraph_id].paragraph_labels,
-                        is_an_image=text_blocks_by_id[paragraph_id].is_an_image,
-                        is_a_table=text_blocks_by_id[paragraph_id].is_a_table,
-                        source_file=text_blocks_by_id[paragraph_id].representation_file,
-                        page=text_blocks_by_id[paragraph_id].position.page_number,
-                        in_page_with_visual=text_blocks_by_id[paragraph_id].page_with_visual,
-                    ),
-                )
-                for paragraph_id in text_block_id_to_hydrate
-            ],
-            text=True,
-        ),
+        resources=[resource_augment],
+        paragraphs=[
+            AugmentParagraphs(
+                given=[
+                    AugmentParagraph(
+                        id=paragraph_id,
+                        metadata=ParagraphMetadata(
+                            is_an_image=text_blocks_by_id[paragraph_id].is_an_image,
+                            is_a_table=text_blocks_by_id[paragraph_id].is_a_table,
+                            source_file=text_blocks_by_id[paragraph_id].representation_file,
+                            page=text_blocks_by_id[paragraph_id].position.page_number,
+                            in_page_with_visual=text_blocks_by_id[paragraph_id].page_with_visual,
+                        ),
+                    )
+                    for paragraph_id in text_block_id_to_hydrate
+                ],
+                text=True,
+            )
+        ],
     )
     augment_response = await rpc.augment(kbid, augment_request)
     augmented_paragraphs = augment_response.paragraphs
@@ -856,15 +855,10 @@ async def hydrate_and_rerank(
 
     # Finally, fetch resource metadata if we haven't already done it
     if reranker.needs_extra_results:
+        resource_augment.given = list(resources_to_hydrate)
         augmented = await rpc.augment(
             kbid,
-            AugmentRequest(
-                resources=AugmentResources(
-                    given=list(resources_to_hydrate),
-                    select=resource_select,
-                    field_type_filter=resource_hydration_options.field_type_filter,
-                ),
-            ),
+            AugmentRequest(resources=[resource_augment]),
         )
         augmented_resources = augmented.resources
 

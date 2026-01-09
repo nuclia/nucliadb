@@ -45,7 +45,6 @@ from .resources import augment_resource, augment_resource_deep
 async def augment(
     kbid: str,
     augmentations: list[Augment],
-    # TODO(decoupled-ask): limits
     *,
     concurrency_control: asyncio.Semaphore | None = None,
 ) -> Augmented:

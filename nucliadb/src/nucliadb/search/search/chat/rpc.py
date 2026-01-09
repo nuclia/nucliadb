@@ -78,6 +78,7 @@ async def labelsets(kbid: str) -> KnowledgeBoxLabels:
     return await get_labelsets(kbid)
 
 
+# TODO(decoupled-ask): replace this for a sdk.download call when moving /ask to RAO
 async def download_image(kbid: str, field_id: FieldId, path: str, *, mime_type: str) -> Image | None:
     from nucliadb.search.search.hydrator.images import download_image
 

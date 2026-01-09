@@ -19,6 +19,9 @@
 #
 import asyncio
 from collections.abc import Sequence
+from typing import cast
+
+from typing_extensions import assert_never
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.ingest.fields.base import Field
@@ -30,16 +33,17 @@ from nucliadb.models.internal.augment import (
     Paragraph,
     ParagraphImage,
     ParagraphPage,
+    ParagraphPosition,
     ParagraphProp,
     ParagraphTable,
     ParagraphText,
     RelatedParagraphs,
 )
-from nucliadb.search import logger
 from nucliadb.search.augmentor.metrics import augmentor_observer
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 from nucliadb.search.search.paragraphs import get_paragraph_from_full_text
+from nucliadb_models.search import TextPosition
 from nucliadb_protos import resources_pb2
 
 
@@ -91,8 +95,6 @@ async def augment_paragraph(
         return None
     field = await resource.get_field(field_id.key, field_id.pb_type)
 
-    # TODO(decoupled-ask): make sure we don't repeat any select clause
-
     return await db_augment_paragraph(resource, field, paragraph_id, select, metadata)
 
 
@@ -103,6 +105,8 @@ async def db_augment_paragraph(
     select: list[ParagraphProp],
     metadata: Metadata | None,
 ) -> AugmentedParagraph:
+    select = dedup_paragraph_select(select)
+
     # we use an accessor to get the metadata to avoid unnecessary DB round
     # trips. With this, we'll only fetch it one and only if we need it
     _metadata = metadata
@@ -120,12 +124,17 @@ async def db_augment_paragraph(
         return _metadata
 
     text = None
+    position = None
     image_path = None
+    table_path = None
     page_preview_path = None
     related = None
     for prop in select:
         if isinstance(prop, ParagraphText):
             text = await get_paragraph_text(field, paragraph_id)
+
+        elif isinstance(prop, ParagraphPosition):
+            position = await get_paragraph_position(field, paragraph_id)
 
         elif isinstance(prop, ParagraphImage):
             metadata = await access_metadata()
@@ -141,8 +150,10 @@ async def db_augment_paragraph(
             if metadata.is_a_table:
                 if prop.prefer_page_preview and metadata.page and metadata.in_page_with_visual:
                     page_preview_path = f"generated/extracted_images_{metadata.page}.png"
+                    table_path = page_preview_path
                 elif metadata.source_file:
                     image_path = f"generated/{metadata.source_file}"
+                    table_path = image_path
 
         elif isinstance(prop, ParagraphPage):
             if prop.preview:
@@ -161,15 +172,57 @@ async def db_augment_paragraph(
             )
 
         else:  # pragma: no cover
-            logger.warning(f"Unexpected paragraph prop: {prop}")
+            assert_never(prop)
 
     return AugmentedParagraph(
         id=paragraph_id,
         text=text,
+        position=position,
         source_image_path=image_path,
+        table_image_path=table_path,
         page_preview_path=page_preview_path,
         related=related,
     )
+
+
+def dedup_paragraph_select(select: list[ParagraphProp]) -> list[ParagraphProp]:
+    """Merge any duplicated property taking the broader augmentation possible."""
+    merged = {}
+    for prop in select:
+        if prop.prop not in merged:
+            merged[prop.prop] = prop
+
+        else:
+            m = merged[prop.prop]
+
+            if (
+                isinstance(prop, ParagraphText)
+                or isinstance(prop, ParagraphPosition)
+                or isinstance(prop, ParagraphImage)
+            ):
+                # properties without parameters
+                pass
+
+            elif isinstance(prop, ParagraphTable):
+                prop = cast(ParagraphTable, prop)
+                m = cast(ParagraphTable, m)
+                m.prefer_page_preview = m.prefer_page_preview or prop.prefer_page_preview
+
+            elif isinstance(prop, ParagraphPage):
+                prop = cast(ParagraphPage, prop)
+                m = cast(ParagraphPage, m)
+                m.preview = m.preview or prop.preview
+
+            elif isinstance(prop, RelatedParagraphs):
+                prop = cast(RelatedParagraphs, prop)
+                m = cast(RelatedParagraphs, m)
+                m.neighbours_before = max(m.neighbours_before, prop.neighbours_before)
+                m.neighbours_after = max(m.neighbours_after, prop.neighbours_after)
+
+            else:  # pragma: no cover
+                assert_never(prop)
+
+    return list(merged.values())
 
 
 async def db_paragraph_metadata(field: Field, paragraph_id: ParagraphId) -> Metadata | None:
@@ -218,6 +271,29 @@ async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | N
     # we want to be explicit with not having the paragraph text but the function
     # above returns an empty string if it can't find it
     return text or None
+
+
+async def get_paragraph_position(field: Field, paragraph_id: ParagraphId) -> TextPosition | None:
+    field_paragraphs = await get_field_paragraphs(field)
+    if field_paragraphs is None:
+        return None
+
+    idx: int | None
+    for idx, paragraph in enumerate(field_paragraphs):
+        field_paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end)
+        if field_paragraph_id == paragraph_id:
+            break
+    else:
+        # we haven't found the paragraph, we can't provide a position
+        return None
+
+    return TextPosition(
+        index=idx,
+        start=paragraph.start,
+        end=paragraph.end,
+        start_seconds=list(paragraph.start_seconds),
+        end_seconds=list(paragraph.end_seconds),
+    )
 
 
 async def related_paragraphs(

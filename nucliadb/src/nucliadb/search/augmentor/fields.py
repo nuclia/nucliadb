@@ -42,6 +42,7 @@ from nucliadb.models.internal.augment import (
     AugmentedGenericField,
     AugmentedLinkField,
     AugmentedTextField,
+    ConversationAnswerOrAfter,
     ConversationAttachments,
     ConversationProp,
     ConversationSelector,
@@ -66,6 +67,10 @@ from nucliadb.search.search import cache
 from nucliadb_models.common import FieldTypeName
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.storages.storage import STORAGE_FILE_EXTRACTED
+
+# Number of messages to pull after a match in a message
+# The hope here is it will be enough to get the answer to the question.
+CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
 
 
 async def augment_fields(
@@ -101,8 +106,6 @@ async def augment_field(
     field_id: FieldId,
     select: Sequence[FieldProp | ConversationProp],
 ) -> AugmentedField | None:
-    # TODO(decoupled-ask): make sure we don't repeat any select clause
-
     rid = field_id.rid
     resource = await cache.get_resource(kbid, rid)
     if resource is None:
@@ -125,6 +128,8 @@ async def db_augment_field(
     field_id: FieldId,
     select: Sequence[FieldProp | FileProp | ConversationProp],
 ) -> AugmentedField:
+    select = dedup_field_select(select)
+
     field_type = field_id.type
 
     # Note we cast `select` to the specific Union type required by the
@@ -158,6 +163,42 @@ async def db_augment_field(
 
     else:  # pragma: no cover
         assert False, f"unknown field type: {field_type}"
+
+
+def dedup_field_select(
+    select: Sequence[FieldProp | FileProp | ConversationProp],
+) -> Sequence[FieldProp | FileProp | ConversationProp]:
+    """Merge any duplicated property taking the broader augmentation possible."""
+    merged = {}
+
+    # TODO(decoupled-ask): deduplicate conversation props.
+    #
+    # Note that only conversation properties can be deduplicated (none of the
+    # others have any field). However, deduplicating the selector is not
+    # possible in many cases, so we do nothing
+    unmergeable = []
+
+    for prop in select:
+        if prop.prop not in merged:
+            merged[prop.prop] = prop
+
+        else:
+            if isinstance(prop, ConversationText) or isinstance(prop, ConversationAttachments):
+                unmergeable.append(prop)
+            elif (
+                isinstance(prop, FieldText)
+                or isinstance(prop, FieldValue)
+                or isinstance(prop, FieldClassificationLabels)
+                or isinstance(prop, FieldEntities)
+                or isinstance(prop, FileThumbnail)
+                or isinstance(prop, ConversationAnswerOrAfter)
+            ):
+                # properties without parameters
+                pass
+            else:  # pragma: no cover
+                assert_never(prop)
+
+    return [*merged.values(), *unmergeable]
 
 
 @augmentor_observer.wrap({"type": "db_text_field"})
@@ -320,6 +361,14 @@ async def db_augment_conversation_field(
                         field.uuid, ref.field_type, ref.field_id, ref.split or None
                     )
                     augmented_message.attachments.append(field_id)
+
+        elif isinstance(prop, ConversationAnswerOrAfter):
+            async for page, index, message in conversation_answer_or_after(field, field_id):
+                augmented_message = messages.setdefault(
+                    (page, index), AugmentedConversationMessage(ident=message.ident)
+                )
+                if not augmented_message.text:
+                    augmented_message.text = message.content.text
 
         else:  # pragma: no cover
             assert_never(prop)
@@ -625,3 +674,31 @@ async def conversation_selector(
 
     else:  # pragma: no cover
         assert_never(selector)
+
+
+async def conversation_answer_or_after(
+    field: Conversation, field_id: FieldId
+) -> AsyncIterator[tuple[int, int, resources_pb2.Message]]:
+    m: resources_pb2.Message | None = None
+    # first search the message in the conversation
+    async for page, index, m in conversation_selector(field, field_id, MessageSelector()):
+        pass
+
+    if m is None:
+        return
+
+    if m.type == resources_pb2.Message.MessageType.QUESTION:
+        # try to find an answer for this question
+        found = await conversation_answer(field, start_from=(page, index + 1))
+        if found is None:
+            return
+        else:
+            page, index, answer = found
+            yield page, index, answer
+
+    else:
+        # add a bunch of messages after this for more context
+        async for page, index, message in conversation_messages_after(
+            field, start_from=(page, index + 1), limit=CONVERSATION_MESSAGE_CONTEXT_EXPANSION
+        ):
+            yield page, index, message

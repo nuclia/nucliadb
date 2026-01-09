@@ -43,8 +43,10 @@ from nucliadb.search.search.retrieval import text_block_search
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.retrieval import (
     KeywordScore,
+    RrfScore,
     ScoreSource,
     ScoreType,
+    SemanticScore,
 )
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -1853,18 +1855,15 @@ async def test_ask_neighbouring_paragraphs_rag_strategy(
     assert len(augmented) == 2
     augmented.sort(key=lambda p: p.id)
     assert augmented[0].text == paragraphs[0]
-
-    if not has_feature(const.Features.ASK_DECOUPLED, context={"kbid": kbid}):
-        # TODO(decoupled-ask): we are missing returning positions for neighbour paragraphs
-        assert augmented[0].position
-        assert augmented[0].position.start == positions[0][0]
-        assert augmented[0].position.end == positions[0][1]
-        assert augmented[0].position.index == 0
-        assert augmented[1].text == paragraphs[2]
-        assert augmented[1].position
-        assert augmented[1].position.start == positions[2][0]
-        assert augmented[1].position.end == positions[2][1]
-        assert augmented[1].position.index == 2
+    assert augmented[0].position
+    assert augmented[0].position.start == positions[0][0]
+    assert augmented[0].position.end == positions[0][1]
+    assert augmented[0].position.index == 0
+    assert augmented[1].text == paragraphs[2]
+    assert augmented[1].position
+    assert augmented[1].position.start == positions[2][0]
+    assert augmented[1].position.end == positions[2][1]
+    assert augmented[1].position.index == 2
 
     # Check that combined with hierarchy rag strategy works well
     resp = await nucliadb_reader.post(
@@ -1977,19 +1976,31 @@ async def test_ask_conversational_strategy(
     # not reliable. Thus, we mock here the results of a search to the index to
     # control the search results and properly test the RAG strategy
 
+    mock_paragraph_id = f"{rid}/c/lambs/10/0-35"
+
     async def mock_text_block_search(
         kbid: str, retrieval: UnitRetrieval
     ) -> tuple[list[TextBlockMatch], SearchRequest, SearchResponse, list[str]]:
+        nonlocal mock_paragraph_id
+
         _, pb_query, shards_response, queried_shards = await text_block_search(kbid, retrieval)
 
         text_blocks = [
             TextBlockMatch(
-                paragraph_id=ParagraphId.from_string(f"{rid}/c/lambs/10/0-35"),
-                score_type=SCORE_TYPE.BM25,
+                paragraph_id=ParagraphId.from_string(mock_paragraph_id),
+                score_type=SCORE_TYPE.BOTH,
                 scores=[
+                    SemanticScore(
+                        score=1.47892374982375, source=ScoreSource.INDEX, type=ScoreType.SEMANTIC
+                    ),
                     KeywordScore(
                         score=3.1989123821258545, source=ScoreSource.INDEX, type=ScoreType.KEYWORD
-                    )
+                    ),
+                    RrfScore(
+                        score=0.05693472,
+                        source=ScoreSource.RANK_FUSION,
+                        type=ScoreType.RRF,
+                    ),
                 ],
                 position=TextPosition(index=0, start=0, end=35),
                 order=0,
@@ -2012,16 +2023,113 @@ async def test_ask_conversational_strategy(
     ):
         data: SyncAskResponse
 
-        # TEST: full=True augments the whole conversation as paragraphs
+        # make sure we are enforcing the mock
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/ask",
+            headers={"x-synchronous": "true"},
+            json={
+                "query": "You know I can't make that promise.",
+                "top_k": 1,
+                "debug": True,
+                "reranker": "noop",
+            },
+        )
+        assert resp.status_code == 200
+        data = SyncAskResponse.model_validate_json(resp.content)
+
+        # validate we are enforcing the mock
+        assert data.retrieval_results.best_matches == [mock_paragraph_id], (
+            "we are actually enforcing this with a mock"
+        )
+        assert data.retrieval_results.resources.keys() == {rid}
+        assert data.retrieval_results.resources[rid].fields.keys() == {"/c/lambs"}
+        assert data.retrieval_results.resources[rid].fields["/c/lambs"].paragraphs.keys() == {
+            mock_paragraph_id
+        }
+
+        # TEST: default prompt context (conversations)
+        #
+        # lambs/4 is a QUESTION, so we'll search an answer and find lambs/5
+        #
+
+        mock_paragraph_id = f"{rid}/c/lambs/4/0-26"
 
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/ask",
             headers={"x-synchronous": "true"},
             json={
-                "query": "Orion is looking splendid tonight",
+                "query": "Where are you, Dr. Lecter?",
                 "top_k": 1,
                 "debug": True,
                 "reranker": "noop",
+            },
+        )
+        assert resp.status_code == 200
+        data = SyncAskResponse.model_validate_json(resp.content)
+
+        # default prompt context doesn't fill augmented context
+        augmented = data.augmented_context
+        assert augmented is not None
+        assert len(augmented.paragraphs) == 0
+        # we matched a question and we search and find the answer
+        assert data.prompt_context is not None
+        assert len(data.prompt_context) == 2
+        assert data.predict_request is not None
+        assert data.predict_request["query_context"].keys() == {
+            f"{rid}/c/lambs/4/0-26",
+            f"{rid}/c/lambs/5/0-31",
+        }
+
+        # TEST: default prompt context (conversations)
+        #
+        # lambs/6 is not a question, so we'll gather a bunch of messages after
+        # it
+
+        mock_paragraph_id = f"{rid}/c/lambs/6/0-80"
+
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/ask",
+            headers={"x-synchronous": "true"},
+            json={
+                "query": "You know I can't make that promise.",
+                "top_k": 1,
+                "debug": True,
+                "reranker": "noop",
+            },
+        )
+        assert resp.status_code == 200
+        data = SyncAskResponse.model_validate_json(resp.content)
+
+        # default prompt context doesn't fill augmented context
+        augmented = data.augmented_context
+        assert augmented is not None
+        assert len(augmented.paragraphs) == 0
+        # it actually fills propmt context with a window
+        assert data.prompt_context is not None
+        assert len(data.prompt_context) == 7
+        assert data.predict_request is not None
+        assert data.predict_request["query_context"].keys() == {
+            f"{rid}/c/lambs/6/0-80",
+            f"{rid}/c/lambs/7/0-191",
+            f"{rid}/c/lambs/8/0-12",
+            f"{rid}/c/lambs/9/0-130",
+            f"{rid}/c/lambs/10/0-35",
+            f"{rid}/c/lambs/11/0-72",
+            f"{rid}/c/lambs/12/0-28",
+        }
+
+        # TEST: full=True augments the whole conversation as paragraphs
+
+        mock_paragraph_id = f"{rid}/c/lambs/10/0-35"
+
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/ask",
+            headers={"x-synchronous": "true"},
+            json={
+                "query": "You know I can't make that promise.",
+                "top_k": 1,
+                "debug": True,
+                "reranker": "noop",  # /ask coupled doesn't work with reranker scores
                 "rag_strategies": [
                     {
                         "name": "conversation",
@@ -2036,19 +2144,9 @@ async def test_ask_conversational_strategy(
         assert resp.status_code == 200
         data = SyncAskResponse.model_validate_json(resp.content)
 
-        # validate we are enforcing the mock
-        assert data.retrieval_results.best_matches == [f"{rid}/c/lambs/10/0-35"], (
-            "we are actually enforcing this with a mock"
-        )
-        assert data.retrieval_results.resources.keys() == {rid}
-        assert data.retrieval_results.resources[rid].fields.keys() == {"/c/lambs"}
-        assert data.retrieval_results.resources[rid].fields["/c/lambs"].paragraphs.keys() == {
-            f"{rid}/c/lambs/10/0-35"
-        }
-
         augmented = data.augmented_context
         assert augmented is not None
-        assert data.prompt_context is not None, "we have debug=true for this"
+        assert data.prompt_context is not None
         assert len(augmented.paragraphs) == 11
         assert augmented.paragraphs[f"{rid}/c/lambs/4/0-26"].text == "Where are you, Dr. Lecter?"
         assert len(data.prompt_context) == 12
@@ -2068,7 +2166,7 @@ async def test_ask_conversational_strategy(
             f"/kb/{kbid}/ask",
             headers={"x-synchronous": "true"},
             json={
-                "query": "Orion is looking splendid tonight",
+                "query": "You know I can't make that promise.",
                 "top_k": 1,
                 "reranker": "noop",
                 "rag_strategies": [
@@ -2096,7 +2194,7 @@ async def test_ask_conversational_strategy(
             f"/kb/{kbid}/ask",
             headers={"x-synchronous": "true"},
             json={
-                "query": "Orion is looking splendid tonight",
+                "query": "You know I can't make that promise.",
                 "top_k": 1,
                 "reranker": "noop",
                 "rag_strategies": [
@@ -2127,7 +2225,7 @@ async def test_ask_conversational_strategy(
             f"/kb/{kbid}/ask",
             headers={"x-synchronous": "true"},
             json={
-                "query": "Orion is looking splendid tonight",
+                "query": "You know I can't make that promise.",
                 "top_k": 1,
                 "reranker": "noop",
                 "rag_strategies": [
@@ -2162,7 +2260,7 @@ async def test_ask_conversational_strategy(
             f"/kb/{kbid}/ask",
             headers={"x-synchronous": "true"},
             json={
-                "query": "Orion is looking splendid tonight",
+                "query": "You know I can't make that promise.",
                 "top_k": 1,
                 "reranker": "noop",
                 "rag_strategies": [
@@ -2211,7 +2309,7 @@ async def test_ask_conversational_strategy(
                 f"/kb/{kbid}/ask",
                 headers={"x-synchronous": "true"},
                 json={
-                    "query": "Orion is looking splendid tonight",
+                    "query": "You know I can't make that promise.",
                     "top_k": 1,
                     "reranker": "noop",
                     "rag_strategies": [

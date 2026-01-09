@@ -84,6 +84,9 @@ def kb(field_obj):
 
 
 async def test_get_next_conversation_messages(field_obj, messages):
+    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
+    from nucliadb.search.search.chat import old_prompt as chat_prompt
+
     assert (
         len(
             await chat_prompt.get_next_conversation_messages(
@@ -112,20 +115,29 @@ async def test_get_next_conversation_messages(field_obj, messages):
 
 
 async def test_find_conversation_message(field_obj, messages):
-    assert await chat_prompt.find_conversation_message(field_obj, ident="3") == (
+    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
+    from nucliadb.search.search.chat import old_prompt as chat_prompt
+
+    assert await chat_prompt.find_conversation_message(field_obj, mident="3") == (
+        messages[2],
         1,
         2,
-        messages[2],
     )
 
 
 async def test_get_expanded_conversation_messages(kb, messages):
+    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
+    from nucliadb.search.search.chat import old_prompt as chat_prompt
+
     assert await chat_prompt.get_expanded_conversation_messages(
         kb=kb, rid="rid", field_id="field_id", mident="3"
     ) == [messages[3]]
 
 
 async def test_get_expanded_conversation_messages_question(kb, messages):
+    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
+    from nucliadb.search.search.chat import old_prompt as chat_prompt
+
     assert (
         await chat_prompt.get_expanded_conversation_messages(
             kb=kb, rid="rid", field_id="field_id", mident="1"
@@ -138,6 +150,9 @@ async def test_get_expanded_conversation_messages_question(kb, messages):
 
 
 async def test_get_expanded_conversation_messages_missing(kb, messages):
+    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
+    from nucliadb.search.search.chat import old_prompt as chat_prompt
+
     assert (
         await chat_prompt.get_expanded_conversation_messages(
             kb=kb, rid="rid", field_id="field_id", mident="missing"
@@ -174,11 +189,13 @@ def _create_find_result(
 
 
 async def test_default_prompt_context(kb):
+    from nucliadb.search.search.chat import old_prompt as chat_prompt
+
     result_text = " ".join(["text"] * 10)
     with (
-        patch("nucliadb.search.search.chat.prompt.get_driver"),
-        patch("nucliadb.search.search.chat.prompt.get_storage"),
-        patch("nucliadb.search.search.chat.prompt.KnowledgeBoxORM", return_value=kb),
+        patch("nucliadb.search.search.chat.old_prompt.get_driver"),
+        patch("nucliadb.search.search.chat.old_prompt.get_storage"),
+        patch("nucliadb.search.search.chat.old_prompt.KnowledgeBoxORM", return_value=kb),
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         find_results = KnowledgeboxFindResults(

@@ -40,7 +40,7 @@ class AuditStorage:
         field_metadata: list[FieldID] | None = None,
         audit_fields: list[AuditField] | None = None,
     ):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     async def initialize(self):
         pass
@@ -55,10 +55,10 @@ class AuditStorage:
         user: str,
         origin: str,
     ):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def send(self, msg: AuditRequest):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def search(
         self,
@@ -71,7 +71,7 @@ class AuditStorage:
         resources: int,
         retrieval_rephrased_question: str | None = None,
     ):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def chat(
         self,
@@ -94,7 +94,7 @@ class AuditStorage:
         generative_answer_first_chunk_time: float | None = None,
         generative_reasoning_first_chunk_time: float | None = None,
     ):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def retrieve(
         self,
@@ -108,7 +108,7 @@ class AuditStorage:
         ...
 
     def report_storage(self, kbid: str, paragraphs: int, fields: int, bytes: int):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def report_resources(
         self,
@@ -116,10 +116,10 @@ class AuditStorage:
         kbid: str,
         resources: int,
     ):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def delete_kb(self, kbid: str):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def feedback(
         self,
@@ -133,4 +133,4 @@ class AuditStorage:
         feedback: str | None,
         text_block_id: str | None,
     ):
-        raise NotImplementedError
+        raise NotImplementedError()
