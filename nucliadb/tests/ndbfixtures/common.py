@@ -87,8 +87,6 @@ async def stream_audit(nats_server: str, mocker: MockerFixture) -> AsyncIterator
         mocker.spy(audit, "search")
         mocker.spy(audit, "chat")
 
-        print(f"stream_audit {audit} jetstream: {audit.js}")
-
         with global_utility(Utility.AUDIT, audit):
             yield audit
 

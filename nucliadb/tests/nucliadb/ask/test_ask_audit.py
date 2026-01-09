@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
+
 import nats
 import pytest
 from httpx import AsyncClient
@@ -68,11 +70,13 @@ async def test_ask_sends_only_one_audit(
         )
         assert resp.status_code == 200
 
-        # wait until audit and kb usage finish sending messages. This is
+        # Wait until audit and kb usage finish sending messages. This is
         # required as some times asyncio is funny and we run the asserts before
-        # waiting for the message to be sent
-        await stream_audit.queue.join()
-        await stream_audit.kb_usage_utility.queue.join()
+        # waiting for the message to be sent.
+        #
+        # Calling .join() on the queues doesn't work as we may call it when the
+        # message has been taken from the queue but not yet processed.
+        await asyncio.sleep(1)
 
         # Testing the middleware integration where it collects audit calls and sends a single message
         # at requests ends. In this case we expect one seach and one chat sent once
