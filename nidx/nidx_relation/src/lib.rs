@@ -57,7 +57,7 @@ use tantivy::{
 use tracing::{error, instrument};
 use uuid::Uuid;
 
-use crate::graph_query_parser::GraphQueryContext;
+use crate::graph_query_parser::VectorQueryResults;
 
 /// Minimum length for a word to be accepted as a entity to search for
 /// suggestions. Low values can provide too much noise and higher ones can
@@ -213,7 +213,7 @@ impl RelationSearcher {
         &self,
         request: &GraphSearchRequest,
         prefilter: &PrefilterResult,
-        context: GraphQueryContext,
+        context: VectorQueryResults,
     ) -> anyhow::Result<GraphSearchResponse> {
         self.reader.graph_search(request, prefilter, context)
     }
@@ -256,7 +256,7 @@ impl RelationSearcher {
             }),
             ..Default::default()
         };
-        let response = self.graph_search(&request, &PrefilterResult::All, GraphQueryContext::default())?;
+        let response = self.graph_search(&request, &PrefilterResult::All, VectorQueryResults::default())?;
         Ok(response.nodes)
     }
 

@@ -31,7 +31,7 @@ use nidx_protos::{
     GraphQuery, GraphSearchRequest, GraphSearchResponse, IndexRelation, IndexRelations, RelationNode, Resource,
     ResourceId,
 };
-use nidx_relation::graph_query_parser::GraphQueryContext;
+use nidx_relation::graph_query_parser::VectorQueryResults;
 use nidx_relation::{RelationConfig, RelationIndexer, RelationSearcher};
 use nidx_tests::graph::friendly_parse;
 use nidx_types::prefilter::{FieldId, PrefilterResult};
@@ -76,7 +76,7 @@ fn _search(
             ..Default::default()
         },
         &prefilter,
-        GraphQueryContext::default(),
+        VectorQueryResults::default(),
     )
 }
 

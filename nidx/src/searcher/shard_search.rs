@@ -22,7 +22,7 @@ use std::sync::Arc;
 
 use nidx_paragraph::ParagraphSearcher;
 use nidx_protos::{GraphSearchRequest, GraphSearchResponse, SearchRequest, SearchResponse};
-use nidx_relation::{RelationSearcher, graph_query_parser::GraphQueryContext};
+use nidx_relation::{RelationSearcher, graph_query_parser::VectorQueryResults};
 use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
 use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::VectorSearcher;
@@ -303,7 +303,7 @@ fn run_semantic_graph_queries(
     node_index: Option<&VectorSearcher>,
     relation_index: Option<&VectorSearcher>,
     prefilter: &PrefilterResult,
-) -> anyhow::Result<GraphQueryContext> {
+) -> anyhow::Result<VectorQueryResults> {
     std::thread::scope(|scope| {
         let mut node_threads: Vec<_> = graph_queries
             .vector_node_requests
@@ -330,10 +330,10 @@ fn run_semantic_graph_queries(
             })
             .collect();
 
-        let mut context = GraphQueryContext::default();
+        let mut context = VectorQueryResults::default();
         while let Some(node_thread) = node_threads.pop() {
             let (key, results) = node_thread.join().unwrap();
-            context.node_vector_results.insert(
+            context.nodes.insert(
                 key,
                 results?
                     .documents
@@ -344,7 +344,7 @@ fn run_semantic_graph_queries(
         }
         while let Some(edge_thread) = edge_threads.pop() {
             let (key, results) = edge_thread.join().unwrap();
-            context.edge_vector_results.insert(
+            context.edges.insert(
                 key,
                 results?
                     .documents

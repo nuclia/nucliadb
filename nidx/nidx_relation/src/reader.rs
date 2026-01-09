@@ -30,7 +30,7 @@ use tantivy::{Index, IndexReader};
 use uuid::Uuid;
 
 use crate::graph_collector::{Selector, TopUniqueCollector};
-use crate::graph_query_parser::{BoolGraphQuery, BoolNodeQuery, GraphQueryContext, GraphQueryParser};
+use crate::graph_query_parser::{BoolGraphQuery, BoolNodeQuery, GraphQueryParser, VectorQueryResults};
 use crate::schema::{Schema, decode_node, decode_relation, encode_field_id};
 use crate::top_unique_n::TopUniqueN;
 use crate::{RelationConfig, io_maps};
@@ -99,7 +99,7 @@ impl RelationsReaderService {
         &self,
         request: &GraphSearchRequest,
         prefilter: &PrefilterResult,
-        context: GraphQueryContext,
+        context: VectorQueryResults,
     ) -> anyhow::Result<GraphSearchResponse> {
         // No query? Empty graph
         let Some(query) = &request.query else {

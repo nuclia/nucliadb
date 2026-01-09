@@ -47,13 +47,13 @@ pub enum Term {
     ExactWord(String),
     Fuzzy(FuzzyTerm),
     FuzzyWord(FuzzyTerm),
-    FromContext(String),
+    FromVectorQuery(String),
 }
 
 #[derive(Clone)]
 pub enum RelationTerm {
     Exact(String),
-    FromContext(String),
+    FromVectorQuery(String),
 }
 
 #[derive(Default, Clone)]
@@ -150,19 +150,22 @@ struct NodeSchemaFields {
 }
 
 #[derive(Default)]
-pub struct GraphQueryContext {
-    pub node_vector_results: HashMap<String, Vec<(String, f32)>>,
-    pub edge_vector_results: HashMap<String, Vec<(String, f32)>>,
+pub struct VectorQueryResults {
+    pub nodes: HashMap<String, Vec<(String, f32)>>,
+    pub edges: HashMap<String, Vec<(String, f32)>>,
 }
 
 pub struct GraphQueryParser<'a> {
     schema: &'a Schema,
-    context: GraphQueryContext,
+    vector_results: VectorQueryResults,
 }
 
 impl<'a> GraphQueryParser<'a> {
-    pub fn new(schema: &'a Schema, context: GraphQueryContext) -> Self {
-        Self { schema, context }
+    pub fn new(schema: &'a Schema, context: VectorQueryResults) -> Self {
+        Self {
+            schema,
+            vector_results: context,
+        }
     }
 
     pub fn parse_bool(&self, query: BoolGraphQuery) -> Box<dyn Query> {
@@ -480,8 +483,8 @@ impl<'a> GraphQueryParser<'a> {
     }
 
     fn has_node_value(&self, value: &Term, exact_field: Field, tokenized_field: Field) -> Option<Box<dyn Query>> {
-        if let Term::FromContext(key) = value {
-            let Some(keys) = self.context.node_vector_results.get(key) else {
+        if let Term::FromVectorQuery(key) = value {
+            let Some(keys) = self.vector_results.nodes.get(key) else {
                 return Some(Box::new(EmptyQuery));
             };
 
@@ -504,7 +507,7 @@ impl<'a> GraphQueryParser<'a> {
         let text_value = match value {
             Term::Exact(value) | Term::ExactWord(value) => value,
             Term::Fuzzy(fuzzy) | Term::FuzzyWord(fuzzy) => &fuzzy.value,
-            Term::FromContext(_) => unreachable!(),
+            Term::FromVectorQuery(_) => unreachable!(),
         };
         if text_value.is_empty() {
             return None;
@@ -550,7 +553,7 @@ impl<'a> GraphQueryParser<'a> {
                     ))
                 }
             }
-            Term::FromContext(_) => unreachable!(),
+            Term::FromVectorQuery(_) => unreachable!(),
         };
 
         Some(query)
@@ -577,8 +580,8 @@ impl<'a> GraphQueryParser<'a> {
                 tantivy::Term::from_field_text(self.schema.label, label),
                 IndexRecordOption::Basic,
             )),
-            RelationTerm::FromContext(key) => {
-                let Some(keys) = self.context.edge_vector_results.get(key) else {
+            RelationTerm::FromVectorQuery(key) => {
+                let Some(keys) = self.vector_results.edges.get(key) else {
                     return Box::new(EmptyQuery);
                 };
 
@@ -806,7 +809,7 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
                         is_prefix: true,
                     }),
                 },
-                nidx_protos::graph_query::node::MatchKind::Vector(_) => Term::FromContext(value),
+                nidx_protos::graph_query::node::MatchKind::Vector(_) => Term::FromVectorQuery(value),
             }
         });
 
@@ -834,7 +837,7 @@ impl TryFrom<&nidx_protos::graph_query::Relation> for Relation {
                     nidx_protos::graph_query::relation::ExactMatch {},
                 )) {
                 nidx_protos::graph_query::relation::MatchKind::Exact(_) => RelationTerm::Exact(value),
-                nidx_protos::graph_query::relation::MatchKind::Vector(_) => RelationTerm::FromContext(value),
+                nidx_protos::graph_query::relation::MatchKind::Vector(_) => RelationTerm::FromVectorQuery(value),
             }
         });
         let relation_type = relation_pb.relation_type.map(RelationType::try_from).transpose()?;
