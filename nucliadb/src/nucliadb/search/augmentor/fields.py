@@ -680,6 +680,7 @@ async def conversation_answer_or_after(
     field: Conversation, field_id: FieldId
 ) -> AsyncIterator[tuple[int, int, resources_pb2.Message]]:
     m: resources_pb2.Message | None = None
+    # first search the message in the conversation
     async for page, index, m in conversation_selector(field, field_id, MessageSelector()):
         pass
 
