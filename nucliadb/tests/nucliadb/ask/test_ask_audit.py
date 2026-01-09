@@ -68,6 +68,12 @@ async def test_ask_sends_only_one_audit(
         )
         assert resp.status_code == 200
 
+        # wait until audit and kb usage finish sending messages. This is
+        # required as some times asyncio is funny and we run the asserts before
+        # waiting for the message to be sent
+        await stream_audit.queue.join()
+        await stream_audit.kb_usage_utility.queue.join()
+
         # Testing the middleware integration where it collects audit calls and sends a single message
         # at requests ends. In this case we expect one seach and one chat sent once
         stream_audit.search.assert_called_once()
