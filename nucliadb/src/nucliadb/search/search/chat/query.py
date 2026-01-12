@@ -698,6 +698,7 @@ async def augment_and_rerank(
                 end_seconds=[],
             ),
             order=-1,  # will be populated later
+            page_with_visual=match.metadata.in_page_with_visual or False,
             fuzzy_search=False,  # we don't have this info anymore
             is_a_table=match.metadata.is_a_table,
             representation_file=match.metadata.source_file,
