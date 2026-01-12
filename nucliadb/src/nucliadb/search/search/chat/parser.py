@@ -490,15 +490,18 @@ def convert_labels_to_filter_expressions(
             if label_filter.all:
                 labels = label_filter.all
                 combinator, negate = And, False
-            if label_filter.any:
+            elif label_filter.any:
                 labels = label_filter.any
                 combinator, negate = Or, False
-            if label_filter.none:
+            elif label_filter.none:
                 labels = label_filter.none
                 combinator, negate = And, True
-            if label_filter.not_all:
+            elif label_filter.not_all:
                 labels = label_filter.not_all
                 combinator, negate = Or, True
+            else:
+                # Empty filter, should not happen due to validation, but skip just in case
+                continue
 
             # equivalent to split_labels
             field = []
