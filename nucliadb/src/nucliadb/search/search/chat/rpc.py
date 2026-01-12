@@ -22,8 +22,6 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from httpx import AsyncClient
-from opentelemetry import trace
-from opentelemetry.trace import format_trace_id
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.ids import FieldId
@@ -39,7 +37,6 @@ from nucliadb_models.search import (
     KnowledgeboxFindResults,
     NucliaDBClientType,
 )
-from nucliadb_telemetry.fastapi.tracing import NUCLIA_TRACE_ID_HEADER
 from nucliadb_utils.settings import running_settings
 
 
@@ -153,22 +150,8 @@ async def download_image(kbid: str, field_id: FieldId, path: str, *, mime_type: 
 @asynccontextmanager
 async def get_client(_service: str) -> AsyncIterator[AsyncClient]:
     async with AsyncClient(
-        headers={"X-NUCLIADB-ROLES": "READER", **__get_tracing_headers()},
+        headers={"X-NUCLIADB-ROLES": "READER"},
         base_url=f"http://{running_settings.serving_host}:{running_settings.serving_port}/{API_PREFIX}/v1",
         timeout=10.0,
     ) as client:
         yield client
-
-
-def __get_tracing_headers() -> dict[str, str]:
-    headers = {}
-
-    span = trace.get_current_span()
-    if span is None:
-        return
-
-    trace_id = format_trace_id(span.get_span_context().trace_id)
-    if trace_id:
-        headers[NUCLIA_TRACE_ID_HEADER] = trace_id
-
-    return headers
