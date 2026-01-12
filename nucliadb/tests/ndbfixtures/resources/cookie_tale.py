@@ -154,13 +154,13 @@ async def cookie_tale_resource(
     ## +-------------------------------+
     ## |      +--------------+         |
     ## |      |              | <-------|--- cookies image (cookies.png)
-    ## |      +--------------+  page 0 |
+    ## |      +--------------+  page 0 |<-- page 0 preview (pdf)
     ## +-------------------------------+
     ## |      +---+---+---+--+         |
     ## |      +---+---+---+--+ <-------|--- ingredients table (ingredients_table.png)
     ## |      |   |   |   |  |         |
     ## |      +---+---+---+--+         |
-    ## |      Above you...      page 1 |
+    ## |      Above you...      page 1 |<-- page 1 preview (pdf)
     ## +-----------^-------------------+
     ##             |
     ##             +----------------------- text paragraph
