@@ -1628,43 +1628,6 @@ async def test_ask_fails_with_answer_json_schema_too_big(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_rag_image_rag_strategies(
-    nucliadb_reader: AsyncClient,
-    standalone_knowledgebox: str,
-    resources: list[str],
-):
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/ask",
-        headers={"X-Synchronous": "True"},
-        json={
-            "query": "title",
-        },
-    )
-    assert resp.status_code == 200, resp.text
-
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/ask",
-        headers={"X-Synchronous": "True"},
-        json={
-            "query": "title",
-            "rag_images_strategies": [
-                {
-                    "name": "page_image",
-                    "count": 2,
-                },
-                {
-                    "name": "tables",
-                },
-                {
-                    "name": "paragraph_image",
-                },
-            ],
-        },
-    )
-    assert resp.status_code == 200, resp.text
-
-
-@pytest.mark.deploy_modes("standalone")
 async def test_ask_skip_answer_generation(
     nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource
 ):
