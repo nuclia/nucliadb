@@ -21,7 +21,7 @@ from typing import cast
 
 from typing_extensions import assert_never
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_NAME, FieldId
+from nucliadb.common.ids import FieldId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
@@ -46,7 +46,7 @@ def page_preview_id(page_number: int) -> str:
 
 
 async def hydrate_field(field: Field, field_id: FieldId, config: hydration_models.FieldHydration):
-    field_type = FIELD_TYPE_STR_TO_NAME[field_id.type]
+    field_type = field_id.type_name
 
     if field_type == FieldTypeName.TEXT:
         if not config.text is not None:
