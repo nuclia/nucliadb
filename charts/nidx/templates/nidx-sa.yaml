@@ -1,0 +1,5 @@
+{{- include "serviceAccount" (dict "appLabel" "nidx-api" "serviceAccount" .Values.api.serviceAccount "Chart" .Chart "Release" .Release) }}
+{{- include "serviceAccount" (dict "appLabel" "nidx-indexer" "serviceAccount" .Values.indexer.serviceAccount "Chart" .Chart "Release" .Release) }}
+{{- include "serviceAccount" (dict "appLabel" "nidx-scheduler" "serviceAccount" .Values.scheduler.serviceAccount "Chart" .Chart "Release" .Release) }}
+{{- include "serviceAccount" (dict "appLabel" "nidx-searcher" "serviceAccount" .Values.searcher.serviceAccount "Chart" .Chart "Release" .Release) }}
+{{- include "serviceAccount" (dict "appLabel" "nidx-worker" "serviceAccount" .Values.worker.serviceAccount "Chart" .Chart "Release" .Release) }}

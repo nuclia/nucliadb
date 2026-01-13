@@ -24,3 +24,38 @@ Possible values for the map are:
     {{- end }}
     {{- end }}
 {{- end }}
+
+{{/*
+Render a ServiceAccount resource.
+Usage: {{ include "serviceAccount" (dict "component" "ingest" "appLabel" "ingest" "serviceAccount" .Values.ingest.serviceAccount "Chart" .Chart "Release" .Release) }}
+Parameters:
+- component: the component name (used for conditional creation)
+- appLabel: the value for the app label
+- serviceAccount: the serviceAccount configuration from values
+- Chart: the Chart object
+- Release: the Release object
+*/}}
+{{- define "serviceAccount" }}
+{{- if kindIs "map" .serviceAccount }}
+{{- if .serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .serviceAccount.name }}
+  labels:
+    app: {{ .appLabel }}
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+    {{- with .serviceAccount.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+{{- end }}
+{{- end }}
+{{- end }}

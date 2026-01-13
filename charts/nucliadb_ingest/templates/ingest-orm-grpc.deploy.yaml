@@ -50,7 +50,7 @@ spec:
 {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
 {{- end }}
-      serviceAccountName: {{ ((.Values.ingest_orm_grpc).serviceAccount) | default "default" }}
+      serviceAccountName: {{ if kindIs "string" .Values.ingest_orm_grpc.serviceAccount }}{{ .Values.ingest_orm_grpc.serviceAccount }}{{ else }}{{ .Values.ingest_orm_grpc.serviceAccount.name | default "default" }}{{ end }}
       containers:
       - name: ingest-orm-grpc
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"

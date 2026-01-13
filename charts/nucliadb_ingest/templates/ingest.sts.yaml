@@ -62,7 +62,7 @@ spec:
 {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
 {{- end }}
-      serviceAccountName: {{ ((.Values.ingest).serviceAccount) | default "default" }}
+      serviceAccountName: {{ if kindIs "string" .Values.ingest.serviceAccount }}{{ .Values.ingest.serviceAccount }}{{ else }}{{ .Values.ingest.serviceAccount.name | default "default" }}{{ end }}
       containers:
       - name: ingest
         securityContext:

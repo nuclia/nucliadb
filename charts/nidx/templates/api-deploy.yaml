@@ -61,7 +61,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       dnsPolicy: ClusterFirst
-      serviceAccountName: {{ .Values.api.serviceAccount | default "default" }}
+      serviceAccountName: {{ if kindIs "string" .Values.api.serviceAccount }}{{ .Values.api.serviceAccount }}{{ else }}{{ .Values.api.serviceAccount.name | default "default" }}{{ end }}
       containers:
       - name: nidx-api
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"

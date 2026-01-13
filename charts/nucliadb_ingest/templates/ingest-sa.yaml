@@ -1,0 +1,7 @@
+{{- include "serviceAccount" (dict "appLabel" "ingest" "serviceAccount" .Values.ingest.serviceAccount "Chart" .Chart "Release" .Release) }}
+{{- include "serviceAccount" (dict "appLabel" "ingest-orm-grpc" "serviceAccount" .Values.ingest_orm_grpc.serviceAccount "Chart" .Chart "Release" .Release) }}
+{{- include "serviceAccount" (dict "appLabel" "ingest-processed-consumer" "serviceAccount" .Values.ingest_processed_consumer.serviceAccount "Chart" .Chart "Release" .Release) }}
+{{- include "serviceAccount" (dict "appLabel" "ingest-subscriber-workers" "serviceAccount" .Values.ingest_subscriber_workers.serviceAccount "Chart" .Chart "Release" .Release) }}
+{{- include "serviceAccount" (dict "appLabel" "ingest-exporter" "serviceAccount" .Values.exporter.serviceAccount "Chart" .Chart "Release" .Release) }}
+{{- include "serviceAccount" (dict "appLabel" "ingest-migrator" "serviceAccount" .Values.migrator.serviceAccount "Chart" .Chart "Release" .Release) }}
+{{- include "serviceAccount" (dict "appLabel" "ingest-purge-cron" "serviceAccount" .Values.purgeCron.serviceAccount "Chart" .Chart "Release" .Release) }}

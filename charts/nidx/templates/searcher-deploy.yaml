@@ -57,7 +57,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       dnsPolicy: ClusterFirst
-      serviceAccountName: {{ .Values.searcher.serviceAccount | default "default" }}
+      serviceAccountName: {{ if kindIs "string" .Values.searcher.serviceAccount }}{{ .Values.searcher.serviceAccount }}{{ else }}{{ .Values.searcher.serviceAccount.name | default "default" }}{{ end }}
       volumes:
       - name: data-dir
         emptyDir:
