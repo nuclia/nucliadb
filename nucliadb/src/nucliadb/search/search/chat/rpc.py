@@ -89,6 +89,7 @@ async def retrieve(
 
     payload = item.model_dump()
     async with get_client("search") as client:
+        print(f"Calling /retrieve with {item}")
         resp = await client.post(
             f"/{KB_PREFIX}/{kbid}/retrieve",
             headers={
@@ -98,6 +99,7 @@ async def retrieve(
             },
             json=payload,
         )
+        print(f"/retrieve replied with {resp.status_code}")
         if resp.status_code != 200:
             raise Exception(f"/retrieve call failed: {resp.status_code} {resp.content.decode()}")
 
@@ -112,7 +114,9 @@ async def augment(kbid: str, item: AugmentRequest) -> AugmentResponse:
 
     payload = item.model_dump()
     async with get_client("search") as client:
+        print(f"Calling /augment with {item}")
         resp = await client.post(f"/{KB_PREFIX}/{kbid}/augment", json=payload)
+        print(f"/augment replied with {resp.status_code}")
         if resp.status_code != 200:
             raise Exception(f"/augment call failed: {resp.status_code} {resp.content.decode()}")
 
