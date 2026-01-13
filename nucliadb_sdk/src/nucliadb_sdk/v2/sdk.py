@@ -932,7 +932,7 @@ class _NucliaDBBase:
             try:
                 body = response.json()
                 try_after = body.get("detail", {}).get("try_after")
-            except JSONDecodeError:
+            except (JSONDecodeError, AttributeError):
                 pass
             raise exceptions.RateLimitError(response.text, try_after=try_after)
         elif response.status_code in (
