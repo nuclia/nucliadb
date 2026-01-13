@@ -19,11 +19,13 @@
 import base64
 from unittest import mock
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 
 import pytest
+from httpx import AsyncClient
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
-from nucliadb.search.search.chat import old_prompt as chat_prompt
+from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.search.search.chat import prompt as chat_prompt
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -80,84 +82,6 @@ def kb(field_obj):
     mock = AsyncMock()
     mock.get.return_value.get_field.return_value = field_obj
     yield mock
-
-
-async def test_get_next_conversation_messages(field_obj, messages):
-    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import old_prompt as chat_prompt
-
-    assert (
-        len(
-            await chat_prompt.get_next_conversation_messages(
-                field_obj=field_obj, page=1, start_idx=0, num_messages=5
-            )
-        )
-        == 5
-    )
-    assert (
-        len(
-            await chat_prompt.get_next_conversation_messages(
-                field_obj=field_obj, page=1, start_idx=0, num_messages=1
-            )
-        )
-        == 1
-    )
-
-    assert await chat_prompt.get_next_conversation_messages(
-        field_obj=field_obj,
-        page=1,
-        start_idx=0,
-        num_messages=1,
-        message_type=rpb2.Message.MessageType.ANSWER,
-        msg_to="1",
-    ) == [messages[3]]
-
-
-async def test_find_conversation_message(field_obj, messages):
-    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import old_prompt as chat_prompt
-
-    assert await chat_prompt.find_conversation_message(field_obj, mident="3") == (
-        messages[2],
-        1,
-        2,
-    )
-
-
-async def test_get_expanded_conversation_messages(kb, messages):
-    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import old_prompt as chat_prompt
-
-    assert await chat_prompt.get_expanded_conversation_messages(
-        kb=kb, rid="rid", field_id="field_id", mident="3"
-    ) == [messages[3]]
-
-
-async def test_get_expanded_conversation_messages_question(kb, messages):
-    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import old_prompt as chat_prompt
-
-    assert (
-        await chat_prompt.get_expanded_conversation_messages(
-            kb=kb, rid="rid", field_id="field_id", mident="1"
-        )
-        == messages[1:]
-    )
-
-    kb.get.assert_called_with("rid")
-    kb.get.return_value.get_field.assert_called_with("field_id", FIELD_TYPE_STR_TO_PB["c"], load=True)
-
-
-async def test_get_expanded_conversation_messages_missing(kb, messages):
-    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import old_prompt as chat_prompt
-
-    assert (
-        await chat_prompt.get_expanded_conversation_messages(
-            kb=kb, rid="rid", field_id="field_id", mident="missing"
-        )
-        == []
-    )
 
 
 def get_ordered_paragraphs(find_results):
@@ -342,28 +266,42 @@ def test_capped_prompt_context():
     assert context.size == 0
 
 
-async def test_hierarchy_promp_context(kb):
-    with mock.patch(
-        "nucliadb.search.search.chat.old_prompt.get_paragraph_text",
-        side_effect=["Title text", "Summary text"],
+@pytest.mark.deploy_modes("standalone")
+async def test_hierarchy_promp_context(nucliadb_search: AsyncClient, kb):
+    rid = uuid4().hex
+
+    async def _get_paragraph_text(field, paragraph_id: ParagraphId):
+        return {
+            f"{rid}/f/f1/0-10": "First paragraph text",
+            f"{rid}/f/f1/10-20": "Second paragraph text",
+            f"{rid}/a/title/0-500": "Title text",
+            f"{rid}/a/summary/0-1000": "Summary text",
+        }[paragraph_id.full()]
+
+    with (
+        mock.patch("nucliadb.search.augmentor.paragraphs.cache.get_resource"),
+        mock.patch(
+            "nucliadb.search.augmentor.paragraphs.get_paragraph_text",
+            side_effect=_get_paragraph_text,
+        ),
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         find_results = KnowledgeboxFindResults(
             resources={
-                "r1": FindResource(
-                    id="r1",
+                f"{rid}": FindResource(
+                    id=f"{rid}",
                     fields={
                         "f/f1": FindField(
                             paragraphs={
-                                "r1/f/f1/0-10": FindParagraph(
-                                    id="r1/f/f1/0-10",
+                                f"{rid}/f/f1/0-10": FindParagraph(
+                                    id=f"{rid}/f/f1/0-10",
                                     score=10,
                                     score_type=SCORE_TYPE.BM25,
                                     order=0,
-                                    text="First Paragraph text",
+                                    text="First paragraph text",
                                 ),
-                                "r1/f/f1/10-20": FindParagraph(
-                                    id="r1/f/f1/10-20",
+                                f"{rid}/f/f1/10-20": FindParagraph(
+                                    id=f"{rid}/f/f1/10-20",
                                     score=8,
                                     score_type=SCORE_TYPE.BM25,
                                     order=1,
@@ -386,23 +324,28 @@ async def test_hierarchy_promp_context(kb):
             augmented_context=augmented_context,
         )
         assert (
-            context.output["r1/f/f1/0-10"]
-            == "DOCUMENT: Title text \n SUMMARY: Summary text \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n First Paragraph text \n\n \n EXTRACTED BLOCK: \n Second paragraph text"
+            context.output[f"{rid}/f/f1/0-10"]
+            == "DOCUMENT: Title text \n SUMMARY: Summary text \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n First paragraph text \n\n \n EXTRACTED BLOCK: \n Second paragraph text"
         )
         # Chec that the original text of the paragraphs is preserved
-        assert ordered_paragraphs[0].text == "First Paragraph text"
+        assert ordered_paragraphs[0].text == "First paragraph text"
         assert ordered_paragraphs[1].text == "Second paragraph text"
 
-        assert augmented_context.paragraphs["r1/f/f1/0-10"].id == "r1/f/f1/0-10"
-        assert augmented_context.paragraphs["r1/f/f1/0-10"].text.startswith("DOCUMENT: Title")
-        assert augmented_context.paragraphs["r1/f/f1/0-10"].augmentation_type == "hierarchy"
+        assert augmented_context.paragraphs[f"{rid}/f/f1/0-10"].id == f"{rid}/f/f1/0-10"
+        assert augmented_context.paragraphs[f"{rid}/f/f1/0-10"].text.startswith("DOCUMENT: Title")
+        assert augmented_context.paragraphs[f"{rid}/f/f1/0-10"].augmentation_type == "hierarchy"
 
 
-async def test_extend_prompt_context_with_metadata():
+@pytest.mark.deploy_modes("standalone")
+async def test_extend_prompt_context_with_metadata(nucliadb_search: AsyncClient):
+    rid = uuid4().hex
+
     origin = rpb2.Origin()
     origin.tags.extend(["tag1", "tag2"])
     origin.metadata.update({"foo": "bar"})
+
     basic = rpb2.Basic()
+    basic.uuid = rid
     basic.usermetadata.classifications.append(rpb2.Classification(labelset="ls", label="l1"))
     basic.computedmetadata.field_classifications.append(
         rpb2.FieldClassifications(field=rpb2.FieldID(field="f1", field_type=rpb2.FieldType.FILE))
@@ -410,25 +353,31 @@ async def test_extend_prompt_context_with_metadata():
     basic.computedmetadata.field_classifications[0].classifications.append(
         rpb2.Classification(labelset="ls", label="l2")
     )
+
     extra = rpb2.Extra()
     extra.metadata.update({"key": "value"})
-    resource = mock.Mock()
-    resource.get_origin = AsyncMock(return_value=origin)
-    resource.get_basic = AsyncMock(return_value=basic)
+
     field = mock.Mock()
     fcm = rpb2.FieldComputedMetadata()
     fcm.metadata.entities["processor"].entities.extend(
         [rpb2.FieldEntity(text="Barcelona", label="LOCATION")]
     )
-
     field.get_field_metadata = AsyncMock(return_value=fcm)
+    field.field_id = FieldId.from_string(f"{rid}/f/f1")
+
+    resource = mock.Mock()
+    resource.uuid = rid
+    resource.get_origin = AsyncMock(return_value=origin)
+    resource.get_basic = AsyncMock(return_value=basic)
     resource.get_field = AsyncMock(return_value=field)
     resource.get_extra = AsyncMock(return_value=extra)
-    with mock.patch(
-        "nucliadb.search.search.chat.old_prompt.cache.get_resource",
-        return_value=resource,
+    resource.field_exists = AsyncMock(return_value=True)
+    with (
+        mock.patch("nucliadb.search.augmentor.fields.cache.get_resource", return_value=resource),
+        mock.patch("nucliadb.search.augmentor.resources.get_basic", return_value=basic),
+        mock.patch("nucliadb.search.augmentor.fields.get_basic", return_value=basic),
     ):
-        paragraph_id = ParagraphId.from_string("r1/f/f1/0-10")
+        paragraph_id = ParagraphId.from_string(f"{rid}/f/f1/0-10")
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         context[paragraph_id.full()] = "Paragraph text"
         kbid = "foo"
@@ -510,6 +459,7 @@ async def test_prompt_context_image_context_builder():
         image_strategies=[PageImageStrategy(count=10), TableImageStrategy(), ParagraphImageStrategy()],
     )
     with (
+        mock.patch("nucliadb.search.search.chat.prompt.get_paragraph_page_number", return_value=1),
         mock.patch("nucliadb.search.search.chat.old_prompt.get_paragraph_page_number", return_value=1),
         mock.patch(
             "nucliadb.search.search.chat.old_prompt.get_page_image",
@@ -518,6 +468,10 @@ async def test_prompt_context_image_context_builder():
         mock.patch(
             "nucliadb.search.search.chat.old_prompt.get_paragraph_image",
             return_value=Image(b64encoded="table_image_data", content_type="image/png"),
+        ),
+        mock.patch(
+            "nucliadb.search.search.chat.prompt.rpc.download_image",
+            return_value=Image(b64encoded=f"an-image", content_type="image/png"),
         ),
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
@@ -545,7 +499,7 @@ async def test_prompt_context_builder_with_extra_image_context():
         ordered_paragraphs=[],
         user_image_context=[user_image],
     )
-    with patch("nucliadb.search.search.chat.old_prompt.default_prompt_context"):
+    with patch("nucliadb.search.search.chat.prompt.default_prompt_context"):
         # context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         _, _, context_images, _ = await builder.build()
 
@@ -566,7 +520,7 @@ async def test_prompt_context_builder_with_query_image():
         query_image=query_image,
     )
 
-    with patch("nucliadb.search.search.chat.old_prompt.default_prompt_context"):
+    with patch("nucliadb.search.search.chat.prompt.default_prompt_context"):
         # context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         _, _, context_images, _ = await builder.build()
 

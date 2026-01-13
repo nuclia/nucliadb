@@ -58,32 +58,39 @@ def audit(basic_audit: BasicAuditStorage) -> Iterator[AuditStorage]:
 
 @pytest.fixture(scope="function")
 async def basic_audit() -> AsyncIterator[BasicAuditStorage]:
-    audit = BasicAuditStorage()
-    await audit.initialize()
-    with global_utility(Utility.AUDIT, audit):
-        yield audit
-    await audit.finalize()
+    with (
+        patch.object(audit_settings, "audit_driver", "basic"),
+    ):
+        audit = BasicAuditStorage()
+        await audit.initialize()
+        with global_utility(Utility.AUDIT, audit):
+            yield audit
+        await audit.finalize()
 
 
 @pytest.fixture(scope="function")
 async def stream_audit(nats_server: str, mocker: MockerFixture) -> AsyncIterator[StreamAuditStorage]:
-    audit = StreamAuditStorage(
-        [nats_server],
-        audit_settings.audit_jetstream_target,  # type: ignore
-        audit_settings.audit_partitions,
-        audit_settings.audit_hash_seed,
-    )
-    await audit.initialize()
+    with (
+        patch.object(audit_settings, "audit_driver", "stream"),
+        patch.object(audit_settings, "audit_jetstream_servers", [nats_server]),
+    ):
+        audit = StreamAuditStorage(
+            [nats_server],
+            audit_settings.audit_jetstream_target,  # type: ignore
+            audit_settings.audit_partitions,
+            audit_settings.audit_hash_seed,
+        )
+        await audit.initialize()
 
-    mocker.spy(audit, "send")
-    mocker.spy(audit.js, "publish")
-    mocker.spy(audit, "search")
-    mocker.spy(audit, "chat")
+        mocker.spy(audit, "send")
+        mocker.spy(audit.js, "publish")
+        mocker.spy(audit, "search")
+        mocker.spy(audit, "chat")
 
-    with global_utility(Utility.AUDIT, audit):
-        yield audit
+        with global_utility(Utility.AUDIT, audit):
+            yield audit
 
-    await audit.finalize()
+        await audit.finalize()
 
 
 # Local files

@@ -17,10 +17,96 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
 import asyncio
+import json
 
 import pytest
 from httpx import AsyncClient
+from pytest_mock import MockerFixture
+
+
+@pytest.mark.parametrize(
+    "endpoint,ask_module",
+    [
+        (f"/kb/{{kbid}}/ask", "kb_ask"),
+        # These slugs and ids are harcoded on the test_search_resource fixture
+        (f"/kb/{{kbid}}/slug/foobar-slug/ask", "resource_ask"),
+        (f"/kb/{{kbid}}/resource/68b6e3b747864293b71925b7bacaee77/ask", "resource_ask"),
+    ],
+)
+@pytest.mark.deploy_modes("standalone")
+async def test_ask_receives_injected_security_groups(
+    nucliadb_search: AsyncClient,
+    test_search_resource: str,
+    mocker: MockerFixture,
+    endpoint: str,
+    ask_module: str,
+) -> None:
+    from nucliadb.search.api.v1 import ask
+    from nucliadb.search.api.v1.resource import ask as resource_ask
+    from nucliadb_models.search import AskRequest
+
+    kbid = test_search_resource
+
+    target_module = ask if ask_module == "kb_ask" else resource_ask
+    spy = mocker.spy(target_module, "create_ask_response")
+
+    url = endpoint.format(kbid=kbid)
+
+    # Test security groups only on authorizer headers
+    resp = await nucliadb_search.post(
+        url,
+        json={"query": "title"},
+        headers={"x-nucliadb-security-groups": "group1;group2"},
+    )
+    assert resp.status_code == 200
+    spy.assert_called_once()
+    ask_request = spy.call_args[1]["ask_request"]
+    assert isinstance(ask_request, AskRequest)
+    assert ask_request.security is not None
+    assert set(ask_request.security.groups) == {"group1", "group2"}
+    spy.reset_mock()
+
+    # Test security groups only on payload
+    resp = await nucliadb_search.post(
+        url,
+        json={"query": "title", "security": {"groups": ["group1", "group2"]}},
+    )
+    assert resp.status_code == 200
+    spy.assert_called_once()
+    ask_request = spy.call_args[1]["ask_request"]
+    assert isinstance(ask_request, AskRequest)
+    assert ask_request.security is not None
+    assert set(ask_request.security.groups) == {"group1", "group2"}
+    spy.reset_mock()
+
+    # Test security groups on headers override payload
+    resp = await nucliadb_search.post(
+        url,
+        headers={"x-nucliadb-security-groups": "group1;group2"},
+        json={"query": "title", "security": {"groups": ["group3", "group4"]}},
+    )
+    assert resp.status_code == 200
+    spy.assert_called_once()
+    ask_request = spy.call_args[1]["ask_request"]
+    assert isinstance(ask_request, AskRequest)
+    assert ask_request.security is not None
+    assert set(ask_request.security.groups) == {"group1", "group2"}
+    spy.reset_mock()
+
+    # Test no security groups
+    resp = await nucliadb_search.post(
+        url,
+        json={"query": "title"},
+    )
+    assert resp.status_code == 200
+    spy.assert_called_once()
+    ask_request = spy.call_args[1]["ask_request"]
+    assert isinstance(ask_request, AskRequest)
+    assert ask_request.security is None
+    spy.reset_mock()
+
 
 PLATFORM_GROUP = "platform"
 DEVELOPERS_GROUP = "developers"
@@ -45,55 +131,14 @@ async def resource_with_security(nucliadb_writer: AsyncClient, standalone_knowle
     return resp.json()["uuid"]
 
 
+@pytest.mark.parametrize("ask_endpoint", ("ask_post",))
 @pytest.mark.deploy_modes("standalone")
-async def test_resource_security_is_returned_serialization(
-    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource_with_security
-):
-    kbid = standalone_knowledgebox
-    resource_id = resource_with_security
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{resource_id}", params={"show": ["security"]})
-    assert resp.status_code == 200, resp.text
-    resource = resp.json()
-    assert set(resource["security"]["access_groups"]) == {PLATFORM_GROUP, DEVELOPERS_GROUP}
-
-
-@pytest.mark.deploy_modes("standalone")
-async def test_resource_security_is_updated(
-    nucliadb_reader: AsyncClient, nucliadb_writer, standalone_knowledgebox: str, resource_with_security
-):
-    kbid = standalone_knowledgebox
-    resource_id = resource_with_security
-
-    # Update the security of the resource: make it public for all groups
-    resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{resource_id}",
-        json={
-            "security": {
-                "access_groups": [],
-            },
-        },
-    )
-    assert resp.status_code == 200, resp.text
-
-    # Check that it was updated properly
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{resource_id}",
-        params={"show": ["security"]},
-    )
-    assert resp.status_code == 200, resp.text
-    resource = resp.json()
-    assert resource["security"]["access_groups"] == []
-
-
-@pytest.mark.parametrize("search_endpoint", ("find_get", "find_post", "search_get", "search_post"))
-@pytest.mark.deploy_modes("standalone")
-async def test_resource_security_search(
+async def test_resource_security_ask(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     standalone_knowledgebox: str,
     resource_with_security,
-    search_endpoint,
+    ask_endpoint: str,
 ):
     kbid = standalone_knowledgebox
     resource_id = resource_with_security
@@ -110,8 +155,8 @@ async def test_resource_security_search(
     assert resp.status_code == 200, resp.text
 
     # Querying without security should return the resource
-    await _test_search_request_with_security(
-        search_endpoint,
+    await _test_ask_request_with_security(
+        ask_endpoint,
         nucliadb_reader,
         kbid,
         query="resource",
@@ -129,8 +174,8 @@ async def test_resource_security_search(
         # the index is returning the union of results for each group
         [DEVELOPERS_GROUP, "some-unknown-group"],
     ):
-        await _test_search_request_with_security(
-            search_endpoint,
+        await _test_ask_request_with_security(
+            ask_endpoint,
             nucliadb_reader,
             kbid,
             query="resource",
@@ -139,8 +184,8 @@ async def test_resource_security_search(
         )
 
     # Querying with an unknown security group should not return the resource
-    await _test_search_request_with_security(
-        search_endpoint,
+    await _test_ask_request_with_security(
+        ask_endpoint,
         nucliadb_reader,
         kbid,
         query="resource",
@@ -164,8 +209,8 @@ async def test_resource_security_search(
     await asyncio.sleep(1)
 
     # Querying with an unknown security group should return the resource now, as it is public
-    await _test_search_request_with_security(
-        search_endpoint,
+    await _test_ask_request_with_security(
+        ask_endpoint,
         nucliadb_reader,
         kbid,
         query="resource",
@@ -174,9 +219,9 @@ async def test_resource_security_search(
     )
 
 
-async def _test_search_request_with_security(
-    search_endpoint: str,
-    nucliadb_reader: AsyncClient,
+async def _test_ask_request_with_security(
+    ask_endpoint: str,
+    nucliadb_reader,
     kbid: str,
     query: str,
     security_groups: list[str] | None,
@@ -185,39 +230,23 @@ async def _test_search_request_with_security(
     payload = {
         "query": query,
     }
+    headers = {"x_synchronous": "true"}
     if security_groups:
         payload["security"] = {"groups": security_groups}  # type: ignore
 
-    params = {
-        "query": query,
-    }
-    if security_groups:
-        params["security_groups"] = security_groups  # type: ignore
+    if ask_endpoint == "ask_post":
+        resp = await nucliadb_reader.post(f"/kb/{kbid}/ask", json=payload, headers=headers)
+        assert resp.status_code == 200, resp.text
 
-    if search_endpoint == "find_post":
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/find",
-            json=payload,
-        )
-    elif search_endpoint == "find_get":
-        resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/find",
-            params=params,
-        )
-    elif search_endpoint == "search_post":
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/search",
-            json=payload,
-        )
-    elif search_endpoint == "search_get":
-        resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/search",
-            params=params,
-        )
+        messages = resp.text.split("\n")
+        for message in messages:
+            json_message = json.loads(message)
+            if json_message["item"]["type"] == "retrieval":
+                search_response = json_message["item"]["results"]
+                resource_ids = list(search_response["resources"].keys())
+                break
     else:
-        raise ValueError(f"Unknown search endpoint: {search_endpoint}")
+        raise ValueError(f"Unknown search endpoint: {ask_endpoint}")
 
-    assert resp.status_code == 200, resp.text
-    search_response = resp.json()
-    assert len(search_response["resources"]) == len(expected_resources)
-    assert set(search_response["resources"]) == set(expected_resources)
+    assert len(resource_ids) == len(expected_resources)
+    assert set(resource_ids) == set(expected_resources)

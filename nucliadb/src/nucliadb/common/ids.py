@@ -120,6 +120,10 @@ class FieldId:
     def pb_type(self) -> FieldType.ValueType:
         return FIELD_TYPE_STR_TO_PB[self.type]
 
+    @property
+    def type_name(self) -> FieldTypeName:
+        return FIELD_TYPE_STR_TO_NAME[self.type]
+
     def full(self) -> str:
         if self.subfield_id is None:
             return f"{self.rid}/{self.type}/{self.key}"
