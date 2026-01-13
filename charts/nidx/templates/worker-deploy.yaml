@@ -59,7 +59,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       dnsPolicy: ClusterFirst
-      serviceAccountName: {{ .Values.worker.serviceAccount | default "default" }}
+      serviceAccountName: {{ if kindIs "string" .Values.worker.serviceAccount }}{{ .Values.worker.serviceAccount }}{{ else }}{{ .Values.worker.serviceAccount.name | default "default" }}{{ end }}
       terminationGracePeriodSeconds: {{ .Values.worker.terminationGracePeriodSeconds | default 120 }}
       volumes:
       - name: data-dir

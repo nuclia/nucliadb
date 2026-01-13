@@ -96,3 +96,9 @@ nidx:
     affinity: {}
     tolerations: []
     resources: {}
+
+serviceAccount:
+  create: false
+  name: default
+  labels: {}
+  annotations: {}

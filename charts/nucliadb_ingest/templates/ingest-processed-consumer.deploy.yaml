@@ -47,7 +47,7 @@ spec:
 {{ toYaml .Values.affinity | indent 8 }}
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
-      serviceAccountName: {{ ((.Values.ingest_processed_consumer).serviceAccount) | default "default" }}
+      serviceAccountName: {{ if kindIs "string" .Values.ingest_processed_consumer.serviceAccount }}{{ .Values.ingest_processed_consumer.serviceAccount }}{{ else }}{{ .Values.ingest_processed_consumer.serviceAccount.name | default "default" }}{{ end }}
       dnsPolicy: ClusterFirst
 {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}

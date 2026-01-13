@@ -43,6 +43,12 @@ resources: {}
 #  requests:
 #    cpu: "300m"
 
+serviceAccount:
+  create: false
+  name: default
+  # labels: {}
+  # annotations: {}
+
 serving:
   port: 8080
   metricsPort: &metricsPort '3030'

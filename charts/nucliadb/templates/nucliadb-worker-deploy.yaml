@@ -44,7 +44,7 @@ spec:
       tolerations:
 {{ toYaml .Values.worker.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
-      serviceAccountName:  {{ .Values.serviceAccount | default "default" }}
+      serviceAccountName: {{ if kindIs "string" .Values.serviceAccount }}{{ .Values.serviceAccount }}{{ else }}{{ .Values.serviceAccount.name | default "default" }}{{ end }}
       containers:
       - name: worker
         image: "{{ .Values.image }}:{{ .Values.imageVersion | default .Chart.AppVersion }}"

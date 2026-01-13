@@ -35,6 +35,6 @@ roleRef:
   name: nidx-cluster-viewer
 subjects:
 - kind: ServiceAccount
-  name: {{ .Values.searcher.serviceAccount | default "default" }}
+  name: {{ if kindIs "string" .Values.searcher.serviceAccount }}{{ .Values.searcher.serviceAccount }}{{ else }}{{ .Values.searcher.serviceAccount.name | default "default" }}{{ end }}
   namespace: {{ .Release.Namespace }}
 {{- end }}

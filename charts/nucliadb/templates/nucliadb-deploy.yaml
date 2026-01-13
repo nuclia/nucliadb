@@ -43,7 +43,7 @@ spec:
 {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
 {{- end }}
-      serviceAccountName:  {{ .Values.serviceAccount | default "default" }}
+      serviceAccountName: {{ if kindIs "string" .Values.serviceAccount }}{{ .Values.serviceAccount }}{{ else }}{{ .Values.serviceAccount.name | default "default" }}{{ end }}
       containers:
       - name: app
         image: "{{ .Values.image }}:{{ .Values.imageVersion | default .Chart.AppVersion }}"

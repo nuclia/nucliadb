@@ -43,7 +43,7 @@ spec:
             {{- end }}
           {{- end }}
         spec:
-          serviceAccountName: {{ ((.Values.purgeCron).serviceAccount) | default "default" }}
+          serviceAccountName: {{ if kindIs "string" .Values.purgeCron.serviceAccount }}{{ .Values.purgeCron.serviceAccount }}{{ else }}{{ .Values.purgeCron.serviceAccount.name | default "default" }}{{ end }}
           nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 12 }}
           topologySpreadConstraints:

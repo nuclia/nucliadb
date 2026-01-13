@@ -39,6 +39,13 @@ resources: {}
 #    memory: "600Mi"
 #  requests:
 #    cpu: "300m"
+
+serviceAccount:
+  create: false
+  name: default
+  # labels: {}
+  # annotations: {}
+
 jaeger_agent_resources: {}
 
 serving:

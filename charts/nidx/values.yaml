@@ -37,8 +37,15 @@ api:
   podAnnotations: {}
   # -- Pod labels to add to the API pods
   podLabels: {}
-  # -- Service account name for the API pods
-  serviceAccount: default
+  serviceAccount:
+    # -- Whether to create a new service account
+    create: false
+    # -- Name of the service account to use
+    name: default
+    # -- Additional service account labels
+    labels: {}
+    # -- Additional service account annotations
+    annotations: {}
   # -- Affinity settings for the API pods
   affinity: {}
   # -- Tolerations for the API pods
@@ -65,18 +72,45 @@ indexer:
   podAnnotations: {}
   # -- Pod labels to add to the indexer pods
   podLabels: {}
+  serviceAccount:
+    # -- Whether to create a new service account
+    create: false
+    # -- Name of the service account to use
+    name: default
+    # -- Additional service account labels
+    labels: {}
+    # -- Additional service account annotations
+    annotations: {}
 
 scheduler:
   # -- Pod annotations to add to the scheduler pods
   podAnnotations: {}
   # -- Pod labels to add to the scheduler pods
   podLabels: {}
+  serviceAccount:
+    # -- Whether to create a new service account
+    create: false
+    # -- Name of the service account to use
+    name: default
+    # -- Additional service account labels
+    labels: {}
+    # -- Additional service account annotations
+    annotations: {}
 
 worker:
   # -- Pod annotations to add to the worker pods
   podAnnotations: {}
   # -- Pod labels to add to the worker pods
   podLabels: {}
+  serviceAccount:
+    # -- Whether to create a new service account
+    create: false
+    # -- Name of the service account to use
+    name: default
+    # -- Additional service account labels
+    labels: {}
+    # -- Additional service account annotations
+    annotations: {}
 
 searcher:
   # -- Number of replicas for the searcher deployment
@@ -89,8 +123,15 @@ searcher:
   podLabels: {}
   # -- Topology spread constraints for the searcher pods
   topologySpreadConstraints: []
-  # -- Service account name for the searcher pods
-  serviceAccount: default
+  serviceAccount:
+    # -- Whether to create a new service account
+    create: false
+    # -- Name of the service account to use
+    name: default
+    # -- Additional service account labels
+    labels: {}
+    # -- Additional service account annotations
+    annotations: {}
   # -- Affinity settings for the searcher pods
   affinity: {}
   # -- Tolerations for the searcher pods

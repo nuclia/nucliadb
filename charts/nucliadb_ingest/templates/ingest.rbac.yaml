@@ -41,5 +41,5 @@ roleRef:
   name: statefulset-viewer
 subjects:
 - kind: ServiceAccount
-  name: {{ ((.Values.purgeCron).serviceAccount) | default "default" }}
+  name: {{ if kindIs "string" .Values.purgeCron.serviceAccount }}{{ .Values.purgeCron.serviceAccount }}{{ else }}{{ .Values.purgeCron.serviceAccount.name | default "default" }}{{ end }}
   namespace: {{ .Release.Namespace }}

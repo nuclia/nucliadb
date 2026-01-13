@@ -74,6 +74,13 @@ indexing:
   index_jetstream_servers:
     - nats1
 
+ingest:
+  serviceAccount:
+    create: false
+    name: default
+    # labels: {}
+    # annotations: {}
+
 # ingest-orm-grpc settings
 # flat structure so no issues merging
 ingest_orm_grpc_resources:
@@ -93,6 +100,12 @@ ingest_orm_grpc_autoscaling:
           averageUtilization: 75
 ingest_orm_grpc_podLabels: {}
 ingest_orm_grpc_podAnnotations: {}
+ingest_orm_grpc:
+  serviceAccount:
+    create: false
+    name: default
+    # labels: {}
+    # annotations: {}
 
 # ingest-processed-consumer settings
 ingest_processed_consumer_resources:
@@ -112,6 +125,12 @@ ingest_processed_consumer_autoscaling:
           averageUtilization: 75
 ingest_processed_consumer_podLabels: {}
 ingest_processed_consumer_podAnnotations: {}
+ingest_processed_consumer:
+  serviceAccount:
+    create: false
+    name: default
+    # labels: {}
+    # annotations: {}
 
 # ingest-subscriber-workers settings
 ingest_subscriber_workers_resources:
@@ -131,17 +150,38 @@ ingest_subscriber_workers_autoscaling:
           averageUtilization: 75
 ingest_subscriber_workers_podLabels: {}
 ingest_subscriber_workers_podAnnotations: {}
+ingest_subscriber_workers: 
+  serviceAccount:
+    create: false
+    name: default
+    # labels: {}
+    # annotations: {}
 
 exporter:
-  # serviceAccount: default
   podLabels: {}
   podAnnotations: {}
+  serviceAccount:
+    create: false
+    name: default
+    # labels: {}
+    # annotations: {}
 
 # migrator settings
 migrator:
-  # serviceAccount: default
   podLabels: {}
   podAnnotations: {}
+  serviceAccount:
+    create: false
+    name: default
+    # labels: {}
+    # annotations: {}
+
+purgeCron:
+  serviceAccount:
+    create: false
+    name: default
+    # labels: {}
+    # annotations: {}
 
 # extra_pod_annotations:
 #   what: "add annotations"
