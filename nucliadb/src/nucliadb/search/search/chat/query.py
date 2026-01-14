@@ -667,7 +667,7 @@ async def augment_and_rerank(
     text_block_hydration_options: TextBlockHydrationOptions,
     reranker: Reranker,
     reranking_options: RerankingOptions,
-):
+) -> tuple[list[TextBlockMatch], list[AugmentedResource], list[str]]:
     score_type_map = {
         ScoreType.SEMANTIC: SCORE_TYPE.VECTOR,
         ScoreType.KEYWORD: SCORE_TYPE.BM25,
