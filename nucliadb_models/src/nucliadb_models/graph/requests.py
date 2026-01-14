@@ -38,6 +38,7 @@ class GraphProp(BaseModel):
 class NodeMatchKindName(str, Enum):
     EXACT = "exact"
     FUZZY = "fuzzy"
+    FUZZY_WORDS = "fuzzy_words"
 
 
 class GraphNode(BaseModel, extra="forbid"):
@@ -48,7 +49,7 @@ class GraphNode(BaseModel, extra="forbid"):
 
     @model_validator(mode="after")
     def validate_fuzzy_usage(self) -> Self:
-        if self.match == NodeMatchKindName.FUZZY:
+        if self.match in (NodeMatchKindName.FUZZY, NodeMatchKindName.FUZZY_WORDS):
             if self.value is None:
                 raise ValueError("Fuzzy match can only be used if a node value is provided")
             else:

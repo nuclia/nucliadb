@@ -224,6 +224,10 @@ def _set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuer
             pb.fuzzy.kind = nodereader_pb2.GraphQuery.Node.MatchLocation.PREFIX
             pb.fuzzy.distance = 1
 
+        elif node.match == graph_requests.NodeMatchKindName.FUZZY_WORDS:
+            pb.fuzzy.kind = nodereader_pb2.GraphQuery.Node.MatchLocation.WORDS
+            pb.fuzzy.distance = 1
+
         else:  # pragma: no cover
             assert_never(node.match)
 
