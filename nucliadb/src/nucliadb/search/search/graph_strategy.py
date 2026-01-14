@@ -36,6 +36,7 @@ from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.search import logger
 from nucliadb.search.requesters.utils import Method, nidx_query
+from nucliadb.search.search.chat import rpc
 from nucliadb.search.search.chat.query import (
     find_request_from_ask_request,
 )
@@ -52,6 +53,7 @@ from nucliadb.search.search.rerankers import (
 )
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.graph.requests import AnyNode, GraphNodesSearchRequest, NodeMatchKindName, Or
 from nucliadb_models.internal.predict import (
     RerankModel,
 )
@@ -473,29 +475,36 @@ async def fuzzy_search_entities(
     # Build an OR for each word in the query matching with fuzzy any word in any
     # node in any position. I.e., for the query "Rose Hamiltn", it'll match
     # "Rosa Parks" and "Margaret Hamilton"
-    request = nodereader_pb2.GraphSearchRequest()
-    # XXX Are those enough results? Too many?
-    request.top_k = 50
-    request.kind = nodereader_pb2.GraphSearchRequest.QueryKind.NODES
+    operands = []
     for word in query.split():
-        subquery = nodereader_pb2.GraphQuery.PathQuery()
-        subquery.path.source.value = word
-        subquery.path.source.fuzzy.kind = nodereader_pb2.GraphQuery.Node.MatchLocation.WORDS
-        subquery.path.source.fuzzy.distance = 1
-        subquery.path.undirected = True
-        request.query.path.bool_or.operands.append(subquery)
+        if len(word) >= 3:
+            subquery = AnyNode(value=word, match=NodeMatchKindName.FUZZY_WORDS)
+        else:
+            # words smaller than 3 characters are too noisy and thus, forbidden in the API
+            subquery = AnyNode(value=word, match=NodeMatchKindName.EXACT)
+        operands.append(subquery)
+
+    if len(operands) == 0:
+        return RelatedEntities(entities=[], total=0)
+
+    # XXX: are those enough results? Too many?
+    top_k = 50
+    if len(operands) == 1:
+        request = GraphNodesSearchRequest(query=operands[1], top_k=top_k)
+    else:
+        request = GraphNodesSearchRequest(query=Or(operands=operands), top_k=top_k)
 
     try:
-        results, _ = await nidx_query(kbid, Method.GRAPH, request)
+        response = await rpc.graph_nodes(kbid, request)
     except Exception as exc:
         capture_exception(exc)
         logger.exception("Error in finding entities in query for graph strategy")
         return None
 
     # merge shard results while deduplicating repeated entities across shards
-    unique_entities: set[RelatedEntity] = set()
-    for response in results:
-        unique_entities.update(RelatedEntity(family=e.subtype, value=e.value) for e in response.nodes)
+    unique_entities: set[RelatedEntity] = {
+        RelatedEntity(family=e.group, value=e.value) for e in response.nodes
+    }
 
     return RelatedEntities(entities=list(unique_entities), total=len(unique_entities))
 
