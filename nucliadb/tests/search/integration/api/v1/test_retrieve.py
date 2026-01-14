@@ -46,7 +46,7 @@ async def test_retrieve(
     rid = await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
     resp = await nucliadb_search.post(
-        f"/{KB_PREFIX}/{kbid}/retrieve",
+        f"/internal/{KB_PREFIX}/{kbid}/retrieve",
         json={
             "query": {
                 "keyword": {
@@ -101,7 +101,7 @@ async def test_retrieve(
 
     # Check that invalid semantic model is rejected
     resp = await nucliadb_search.post(
-        f"/{KB_PREFIX}/{kbid}/retrieve",
+        f"/internal/{KB_PREFIX}/{kbid}/retrieve",
         json={
             "query": {
                 "semantic": {
@@ -120,7 +120,7 @@ async def test_retrieve(
 
     # Test that matryochka dimension is enforced
     resp = await nucliadb_search.post(
-        f"/{KB_PREFIX}/{kbid}/retrieve",
+        f"/internal/{KB_PREFIX}/{kbid}/retrieve",
         json={
             "query": {
                 "semantic": {

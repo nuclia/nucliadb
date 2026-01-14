@@ -585,13 +585,7 @@ async def rao_find(
         if find_request.query != retrieval_request.query.keyword.query:
             rephrased_query = retrieval_request.query.keyword.query
 
-    retrieval_response = await rpc.retrieve(
-        kbid,
-        retrieval_request,
-        x_ndb_client=x_ndb_client,
-        x_nucliadb_user=x_nucliadb_user,
-        x_forwarded_for=x_forwarded_for,
-    )
+    retrieval_response = await rpc.retrieve(kbid, retrieval_request)
     matches = retrieval_response.matches
 
     relations = None

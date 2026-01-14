@@ -80,22 +80,13 @@ async def find(
 async def retrieve(
     kbid: str,
     item: RetrievalRequest,
-    *,
-    x_ndb_client: NucliaDBClientType,
-    x_nucliadb_user: str,
-    x_forwarded_for: str,
 ) -> RetrievalResponse:
     """RPC to /augment endpoint making it look as an internal call."""
 
     payload = item.model_dump()
     async with get_client("search") as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/retrieve",
-            headers={
-                "x-ndb-client": x_ndb_client,
-                "x-nucliadb-user": x_nucliadb_user,
-                "x-forwarded-for": x_forwarded_for,
-            },
+            f"/internal/{KB_PREFIX}/{kbid}/retrieve",
             json=payload,
         )
         if resp.status_code != 200:
@@ -112,7 +103,7 @@ async def augment(kbid: str, item: AugmentRequest) -> AugmentResponse:
 
     payload = item.model_dump()
     async with get_client("search") as client:
-        resp = await client.post(f"/{KB_PREFIX}/{kbid}/augment", json=payload)
+        resp = await client.post(f"/internal/{KB_PREFIX}/{kbid}/augment", json=payload)
         if resp.status_code != 200:
             raise Exception(f"/augment call failed: {resp.status_code} {resp.content.decode()}")
 

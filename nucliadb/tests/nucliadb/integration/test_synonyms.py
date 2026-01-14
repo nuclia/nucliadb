@@ -186,7 +186,7 @@ async def test_search_with_synonyms(
 
     # Check /retrieve endpoint with synonyms
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/retrieve",
+        f"/internal/kb/{kbid}/retrieve",
         json={"query": {"keyword": {"query": "planet", "with_synonyms": True}}},
     )
     assert resp.status_code == 200
@@ -194,7 +194,7 @@ async def test_search_with_synonyms(
     assert len(body["matches"]) == 4
 
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/retrieve",
+        f"/internal/kb/{kbid}/retrieve",
         json={"query": {"keyword": {"query": "planet"}}},
     )
     assert resp.status_code == 200
@@ -204,7 +204,7 @@ async def test_search_with_synonyms(
     # Check that searching with a term that has synonyms and
     # one that doesn't matches all of them
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/retrieve",
+        f"/internal/kb/{kbid}/retrieve",
         json={"query": {"keyword": {"query": "planet tomatoe", "with_synonyms": True}}},
     )
     assert resp.status_code == 200
