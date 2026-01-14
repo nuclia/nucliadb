@@ -24,11 +24,22 @@ from httpx import AsyncClient
 
 from nucliadb_models.search import SyncAskResponse
 from nucliadb_protos.utils_pb2 import RelationNode
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
+
+if has_feature(const.Features.ASK_DECOUPLED):
+    from nucliadb.search.search import graph_strategy
+
+    MODULE = "nucliadb.search.search.graph_strategy"
+else:
+    from nucliadb.search.search import old_graph_strategy as graph_strategy  # type: ignore[no-redef]
+
+    MODULE = "nucliadb.search.search.old_graph_strategy"
 
 
 @pytest.mark.parametrize("relation_ranking", ["generative", "reranker"])
-@patch("nucliadb.search.search.graph_strategy.rank_relations_reranker")
-@patch("nucliadb.search.search.graph_strategy.rank_relations_generative")
+@patch(f"{MODULE}.rank_relations_reranker")
+@patch(f"{MODULE}.rank_relations_generative")
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_graph_strategy(
     mocker_generative,
@@ -171,8 +182,8 @@ async def test_ask_graph_strategy(
     await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
 
 
-@patch("nucliadb.search.search.graph_strategy.rank_relations_reranker")
-@patch("nucliadb.search.search.graph_strategy.rank_relations_generative")
+@patch(f"{MODULE}.rank_relations_reranker")
+@patch(f"{MODULE}.rank_relations_generative")
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_graph_strategy_with_user_relations(
     mocker_generative,
@@ -300,11 +311,9 @@ async def test_ask_graph_strategy_inner_fuzzy_prefix_search(
     graph_resource,
     dummy_predict,
 ):
-    from nucliadb.search.search.graph_strategy import fuzzy_search_entities
-
     kbid = standalone_knowledgebox
 
-    related = await fuzzy_search_entities(
+    related = await graph_strategy.fuzzy_search_entities(
         kbid, "Which actors have been in movies directed by Christopher Nolan?"
     )
     assert related is not None
@@ -312,7 +321,9 @@ async def test_ask_graph_strategy_inner_fuzzy_prefix_search(
     related.entities[0].value == "Christopher Nolan"
     related.entities[0].family == "DIRECTOR"
 
-    related = await fuzzy_search_entities(kbid, "Did Leonard and Joseph perform in the same film?")
+    related = await graph_strategy.fuzzy_search_entities(
+        kbid, "Did Leonard and Joseph perform in the same film?"
+    )
     assert related is not None
     assert related.total == 2 == len(related.entities)
     assert {(r.value, r.family) for r in related.entities} == {
