@@ -38,25 +38,18 @@ from nucliadb.search import logger
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat import rpc
 from nucliadb.search.search.chat.query import (
-    find_request_from_ask_request,
-)
-from nucliadb.search.search.find_merge import (
     compose_find_resources,
+    find_request_from_ask_request,
     hydrate_and_rerank,
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
 from nucliadb.search.search.merge import entity_type_to_relation_node_type, merge_relations_results
 from nucliadb.search.search.metrics import Metrics
-from nucliadb.search.search.rerankers import (
-    Reranker,
-    RerankingOptions,
-)
+from nucliadb.search.search.rerankers import Reranker, RerankingOptions
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.graph.requests import AnyNode, GraphNodesSearchRequest, NodeMatchKindName, Or
-from nucliadb_models.internal.predict import (
-    RerankModel,
-)
+from nucliadb_models.internal.predict import RerankModel
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.retrieval import GraphScore
 from nucliadb_models.search import (
