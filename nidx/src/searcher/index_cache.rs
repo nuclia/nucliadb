@@ -409,7 +409,7 @@ mod tests {
         impl CacheItem {
             async fn new(k: usize) -> anyhow::Result<Self> {
                 tokio::time::sleep(Duration::from_millis(50)).await;
-                if rand::thread_rng().gen_ratio(1, 10) {
+                if rand::rng().random_ratio(1, 10) {
                     return Err(anyhow!("patata"));
                 }
                 let old = OBJCOUNTER[k].fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -450,11 +450,11 @@ mod tests {
                 tasks.spawn(async move {
                     for _i in 0..50 {
                         // Wait for next request
-                        let t = Duration::from_millis(rand::thread_rng().gen_range(0..5));
+                        let t = Duration::from_millis(rand::rng().random_range(0..5));
                         tokio::time::sleep(t).await;
 
                         // Get a shard
-                        let k = rand::thread_rng().gen_range(0..8);
+                        let k = rand::rng().random_range(0..8);
                         let shard = {
                             loop {
                                 let cached = { cc.lock().unwrap().get(&k) };
@@ -473,7 +473,7 @@ mod tests {
                         };
 
                         // Do something
-                        let t = Duration::from_millis(rand::thread_rng().gen_range(1..20));
+                        let t = Duration::from_millis(rand::rng().random_range(1..20));
                         tokio::time::sleep(t).await;
                         drop(shard);
                     }

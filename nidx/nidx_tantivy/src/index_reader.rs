@@ -25,7 +25,6 @@ use std::{
 };
 
 use nidx_types::{OpenIndexMetadata, Seq};
-use tantivy::index::SegmentId;
 use tantivy::{
     Directory, Index, IndexMeta, IndexSettings, SegmentReader,
     directory::{MmapDirectory, RamDirectory, error::OpenReadError},
@@ -33,7 +32,8 @@ use tantivy::{
     query::Query,
     schema::Schema,
 };
-use tantivy_common::{BitSet, TerminatingWrite as _};
+use tantivy::{directory::TerminatingWrite, index::SegmentId};
+use tantivy_common::BitSet;
 
 use crate::{TantivyMeta, TantivySegmentMetadata};
 

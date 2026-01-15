@@ -261,7 +261,7 @@ mod tests {
     const DIMENSION: usize = 2048;
 
     fn random_vector(rng: &mut impl Rng) -> Vec<f32> {
-        let v: Vec<f32> = (0..DIMENSION).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let v: Vec<f32> = (0..DIMENSION).map(|_| rng.random_range(-1.0..1.0)).collect();
         normalize(v)
     }
 

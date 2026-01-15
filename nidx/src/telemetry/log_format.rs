@@ -44,7 +44,6 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-use opentelemetry::trace::TraceContextExt;
 use serde::ser::{SerializeMap, Serializer as _};
 use serde_json::Serializer;
 use std::fmt;
@@ -101,11 +100,8 @@ where
                 .or_else(|| ctx.lookup_current());
             if let Some(span) = span
                 && let Some(otel_data) = span.extensions().get::<OtelData>()
+                && let Some(trace_id) = otel_data.trace_id()
             {
-                let trace_id = match otel_data.builder.trace_id {
-                    Some(trace_id) => trace_id,
-                    None => otel_data.parent_cx.span().span_context().trace_id(),
-                };
                 serializer.serialize_entry("trace_id", &trace_id.to_string())?;
             }
 

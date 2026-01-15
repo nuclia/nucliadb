@@ -90,7 +90,7 @@ where
             propagator.extract(&HeaderMapWrapper { inner: req.headers() })
         });
 
-        span.set_parent(parent_context);
+        let _ = span.set_parent(parent_context);
 
         let fut = inner.call(req).instrument(span);
         Box::pin(fut)
