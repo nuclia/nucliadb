@@ -122,16 +122,6 @@ async def graph_paths(kbid: str, item: GraphSearchRequest) -> GraphSearchRespons
 
     return await graph_path_search(kbid, item)
 
-    payload = item.model_dump()
-    async with get_client("search") as client:
-        resp = await client.post(f"/{KB_PREFIX}/{kbid}/graph", json=payload)
-        if resp.status_code != 200:
-            raise Exception(f"/graphcall failed: {resp.status_code} {resp.content.decode()}")
-
-        paths = GraphSearchResponse.model_validate(resp.json())
-
-    return paths
-
 
 # TODO(decoupled-ask): replace this for a sdk.augment call when moving /ask to RAO
 async def graph_nodes(kbid: str, item: GraphNodesSearchRequest) -> GraphNodesSearchResponse:
@@ -140,16 +130,6 @@ async def graph_nodes(kbid: str, item: GraphNodesSearchRequest) -> GraphNodesSea
     from nucliadb.search.api.v1.graph import graph_nodes_search
 
     return await graph_nodes_search(kbid, item)
-
-    payload = item.model_dump()
-    async with get_client("search") as client:
-        resp = await client.post(f"/{KB_PREFIX}/{kbid}/graph/nodes", json=payload)
-        if resp.status_code != 200:
-            raise Exception(f"/graph/nodes call failed: {resp.status_code} {resp.content.decode()}")
-
-        nodes = GraphNodesSearchResponse.model_validate(resp.json())
-
-    return nodes
 
 
 # TODO(decoupled-ask): replace this for a sdk.labelsets call when moving /ask to RAO
