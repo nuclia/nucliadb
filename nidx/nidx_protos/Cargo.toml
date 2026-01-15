@@ -6,9 +6,9 @@ build = "build.rs"
 license = "AGPL-3.0-or-later"
 
 [build-dependencies]
-tonic-build = "0.12.3"
+tonic-build = "0.14.2"
 
 [dependencies]
-tonic = "0.12.3"
-prost = "0.13"
-prost-types = "0.13"
+tonic = "0.14.2"
+prost = "0.14"
+prost-types = "0.14"
