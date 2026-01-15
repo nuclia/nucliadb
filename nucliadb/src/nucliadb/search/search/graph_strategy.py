@@ -1028,8 +1028,8 @@ def merge_relations_results(
         destination = path.destination
         metadata = path.metadata
 
-        # BUG(decoupled-ask): if for some reason we don't have the field_id and
-        # we skip the next if, we'll reuse a wrong resource id
+        # BUG: if for some reason we don't have the field_id and we skip the
+        # next if, we'll reuse a wrong resource id
         if path.metadata is not None and path.metadata.field_id:
             resource_id = path.metadata.field_id.split("/")[0]
 
