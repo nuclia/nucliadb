@@ -88,7 +88,7 @@ async def retrieve(
     payload = item.model_dump()
     async with get_client("search") as client:
         resp = await client.post(
-            f"/internal/{KB_PREFIX}/{kbid}/retrieve",
+            f"/{KB_PREFIX}/{kbid}/retrieve",
             json=payload,
         )
         if resp.status_code != 200:
@@ -105,7 +105,7 @@ async def augment(kbid: str, item: AugmentRequest) -> AugmentResponse:
 
     payload = item.model_dump()
     async with get_client("search") as client:
-        resp = await client.post(f"/internal/{KB_PREFIX}/{kbid}/augment", json=payload)
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/augment", json=payload)
         if resp.status_code != 200:
             raise Exception(f"/augment call failed: {resp.status_code} {resp.content.decode()}")
 
@@ -124,7 +124,7 @@ async def graph_paths(kbid: str, item: GraphSearchRequest) -> GraphSearchRespons
 
     payload = item.model_dump()
     async with get_client("search") as client:
-        resp = await client.post(f"/internal/{KB_PREFIX}/{kbid}/graph", json=payload)
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/graph", json=payload)
         if resp.status_code != 200:
             raise Exception(f"/graphcall failed: {resp.status_code} {resp.content.decode()}")
 
@@ -143,7 +143,7 @@ async def graph_nodes(kbid: str, item: GraphNodesSearchRequest) -> GraphNodesSea
 
     payload = item.model_dump()
     async with get_client("search") as client:
-        resp = await client.post(f"/internal/{KB_PREFIX}/{kbid}/graph/nodes", json=payload)
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/graph/nodes", json=payload)
         if resp.status_code != 200:
             raise Exception(f"/graph/nodes call failed: {resp.status_code} {resp.content.decode()}")
 

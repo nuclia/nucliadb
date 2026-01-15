@@ -83,11 +83,8 @@ from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import ResourceProperties
 
 
-# NOTE this is an internal endpoint used only inside the cluster. It doesn't
-# require auth (as it's not exposed through the virtual service) nor any role
-# and it's not audited either.
 @api.post(
-    f"/internal/{KB_PREFIX}/{{kbid}}/augment",
+    f"/{KB_PREFIX}/{{kbid}}/augment",
     status_code=200,
     description="Augment data on a Knowledge Box",
     include_in_schema=False,

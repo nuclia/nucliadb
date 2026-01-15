@@ -39,7 +39,7 @@ async def test_augment_api(
     rid = await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
     resp = await nucliadb_search.post(
-        f"/internal/{KB_PREFIX}/{kbid}/augment",
+        f"/{KB_PREFIX}/{kbid}/augment",
         json={
             "resources": [
                 {
@@ -80,7 +80,7 @@ async def test_augment_api_images(
     rid = await cookie_tale_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
     resp = await nucliadb_search.post(
-        f"/internal/{KB_PREFIX}/{kbid}/augment",
+        f"/{KB_PREFIX}/{kbid}/augment",
         json={
             "paragraphs": [
                 {
@@ -97,7 +97,7 @@ async def test_augment_api_images(
     assert body.paragraphs[f"{rid}/f/cookie-recipie/0-29"].source_image == "generated/cookies.png"
 
     resp = await nucliadb_search.post(
-        f"/internal/{KB_PREFIX}/{kbid}/augment",
+        f"/{KB_PREFIX}/{kbid}/augment",
         json={
             "paragraphs": [
                 {
@@ -116,7 +116,7 @@ async def test_augment_api_images(
     )
 
     resp = await nucliadb_search.post(
-        f"/internal/{KB_PREFIX}/{kbid}/augment",
+        f"/{KB_PREFIX}/{kbid}/augment",
         json={
             "paragraphs": [
                 {
@@ -137,7 +137,7 @@ async def test_augment_api_images(
     )
 
     resp = await nucliadb_search.post(
-        f"/internal/{KB_PREFIX}/{kbid}/augment",
+        f"/{KB_PREFIX}/{kbid}/augment",
         json={
             "paragraphs": [
                 {
@@ -169,7 +169,7 @@ async def test_augment_api_file_thumbnails(
     rid = await cookie_tale_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
     resp = await nucliadb_search.post(
-        f"/internal/{KB_PREFIX}/{kbid}/augment",
+        f"/{KB_PREFIX}/{kbid}/augment",
         json={
             "fields": [
                 {

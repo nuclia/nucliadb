@@ -333,12 +333,12 @@ SDK_DEFINITION = {
         path_params=("kbid",),
     ),
     "retrieve": SdkEndpointDefinition(
-        path_template="/v1/internal/kb/{kbid}/retrieve",
+        path_template="/v1/kb/{kbid}/retrieve",
         method="POST",
         path_params=("kbid",),
     ),
     "augment": SdkEndpointDefinition(
-        path_template="/v1/internal/kb/{kbid}/augment",
+        path_template="/v1/kb/{kbid}/augment",
         method="POST",
         path_params=("kbid",),
     ),
