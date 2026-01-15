@@ -62,11 +62,11 @@ impl ApiServer {
         Routes::new(NidxApiServer::new(self))
             .into_axum_router()
             .route(
-                "/api/shard/:shard_id/download",
+                "/api/shard/{shard_id}/download",
                 axum::routing::get(download_shard).with_state(myself),
             )
             .route(
-                "/api/index/:index_id/download",
+                "/api/index/{index_id}/download",
                 axum::routing::get(download_index).with_state(myself2),
             )
     }

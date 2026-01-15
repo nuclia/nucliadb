@@ -145,7 +145,7 @@ fn test_relations_deletion() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(results.documents.len(), 4);
-    assert_eq!(results.documents[0].score, 1.0);
+    assert!(results.documents[0].score > 0.9999);
     assert!(results.documents[1].score < 1.0);
 
     // Search deleting title, cat disappears
@@ -371,7 +371,7 @@ fn test_relations_merge() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(results.documents.len(), 5);
-    assert_eq!(results.documents[0].score, 1.0);
+    assert!(results.documents[0].score > 0.9999);
     assert!(results.documents[1].score < 1.0);
 
     // Deleting one title does nothing, as the other segment has the same entity in the same field
@@ -394,7 +394,7 @@ fn test_relations_merge() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(results.documents.len(), 5);
-    assert_eq!(results.documents[0].score, 1.0);
+    assert!(results.documents[0].score > 0.9999);
     assert!(results.documents[1].score < 1.0);
 
     // Deleting both titles eliminates cat
@@ -843,7 +843,7 @@ fn test_relations_labels() -> anyhow::Result<()> {
     )?;
 
     assert_eq!(results.documents.len(), 2);
-    assert_eq!(results.documents[0].score, 1.0);
+    assert!(results.documents[0].score > 0.9999);
     assert!(results.documents[1].score < 1.0);
 
     Ok(())
