@@ -34,6 +34,9 @@ from sentry_sdk import capture_exception
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.models_utils.from_proto import (
+    RelationNodeTypeMap,
+)
 from nucliadb.search import logger
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat.query import (
@@ -44,7 +47,7 @@ from nucliadb.search.search.find_merge import (
     hydrate_and_rerank,
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
-from nucliadb.search.search.merge import entity_type_to_relation_node_type, merge_relations_results
+from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.rerankers import (
     Reranker,
@@ -375,7 +378,7 @@ async def get_graph_results(
                 for subgraph in relations.entities.values()
                 for relation in subgraph.related_to
                 if FrozenRelationNode(
-                    ntype=entity_type_to_relation_node_type(relation.entity_type),
+                    ntype=RelationNodeTypeMap[relation.entity_type],
                     subtype=relation.entity_subtype,
                     value=relation.entity,
                 )

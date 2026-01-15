@@ -42,9 +42,6 @@ from nucliadb.search.search.chat.query import (
     hydrate_and_rerank,
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
-from nucliadb.search.search.merge import (
-    entity_type_to_relation_node_type,
-)
 from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.rerankers import Reranker, RerankingOptions
 from nucliadb.search.utilities import get_predict
@@ -389,7 +386,7 @@ async def get_graph_results(
                 for subgraph in relations.entities.values()
                 for relation in subgraph.related_to
                 if FrozenRelationNode(
-                    ntype=entity_type_to_relation_node_type(relation.entity_type),
+                    ntype=RelationNodeTypeMap[relation.entity_type],
                     subtype=relation.entity_subtype,
                     value=relation.entity,
                 )
