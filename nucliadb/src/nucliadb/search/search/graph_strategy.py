@@ -23,7 +23,6 @@ from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from nidx_protos import nodereader_pb2
 from nuclia_models.predict.generative_responses import (
     JSONGenerativeResponse,
     MetaGenerativeResponse,
@@ -34,8 +33,8 @@ from sentry_sdk import capture_exception
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap, RelationNodeTypePbMap
 from nucliadb.search import logger
-from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.chat import rpc
 from nucliadb.search.search.chat.query import (
     compose_find_resources,
@@ -43,13 +42,33 @@ from nucliadb.search.search.chat.query import (
     hydrate_and_rerank,
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
-from nucliadb.search.search.merge import entity_type_to_relation_node_type, merge_relations_results
+from nucliadb.search.search.merge import (
+    entity_type_to_relation_node_type,
+)
 from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.rerankers import Reranker, RerankingOptions
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.graph.requests import AnyNode, GraphNodesSearchRequest, NodeMatchKindName, Or
+from nucliadb_models.graph.requests import (
+    And,
+    AnyNode,
+    Generated,
+    Generator,
+    GraphNode,
+    GraphNodesSearchRequest,
+    GraphPath,
+    GraphPathQuery,
+    GraphSearchRequest,
+    NodeMatchKindName,
+    Not,
+    Or,
+    Relation,
+    RelationNodeType,
+    RelationType,
+)
+from nucliadb_models.graph.responses import GraphSearchResponse
 from nucliadb_models.internal.predict import RerankModel
+from nucliadb_models.metadata import RelationMetadata
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.retrieval import GraphScore
 from nucliadb_models.search import (
@@ -72,7 +91,7 @@ from nucliadb_models.search import (
     TextPosition,
     UserPrompt,
 )
-from nucliadb_protos.utils_pb2 import Relation, RelationNode
+from nucliadb_protos.utils_pb2 import RelationNode
 
 SCHEMA = {
     "title": "score_triplets",
@@ -294,7 +313,7 @@ class FrozenRelationNode:
     value: str
 
 
-def freeze_node(r: RelationNode):
+def freeze_node(r: RelationNode) -> FrozenRelationNode:
     return FrozenRelationNode(ntype=r.ntype, subtype=r.subtype, value=r.value)
 
 
@@ -381,17 +400,16 @@ async def get_graph_results(
             break
 
         # Get the relations for the new entities
-        relations_results = []
         with metrics.time("graph_strat_neighbor_relations"):
             try:
-                relations_results = await find_graph_neighbours(
+                graph_response = await find_graph_neighbours(
                     kbid,
                     entities_to_explore,
                     explored_entities,
                     exclude_processor_relations=graph_strategy.exclude_processor_relations,
                 )
-                new_relations = await merge_relations_results(
-                    relations_results,
+                new_relations = merge_relations_results(
+                    graph_response,
                     entities_to_explore,
                     only_with_metadata=not graph_strategy.relation_text_as_paragraphs,
                 )
@@ -403,8 +421,13 @@ async def get_graph_results(
             relations.entities.update(new_relations.entities)
             discovered_entities = []
 
-            for shard in relations_results:
-                for node in shard.nodes:
+            for path in graph_response.paths:
+                for path_node in [path.source, path.destination]:
+                    node = RelationNode(
+                        value=path_node.value,
+                        ntype=RelationNodeTypeMap[path_node.type],
+                        subtype=path_node.group,
+                    )
                     if node not in entities_to_explore and freeze_node(node) not in explored_entities:
                         discovered_entities.append(node)
 
@@ -939,45 +962,119 @@ async def find_graph_neighbours(
     entities_to_explore: list[RelationNode],
     explored_entities: set[FrozenRelationNode],
     exclude_processor_relations: bool,
-) -> list[nodereader_pb2.GraphSearchResponse]:
-    graph_query = nodereader_pb2.GraphSearchRequest(
-        kind=nodereader_pb2.GraphSearchRequest.QueryKind.PATH, top_k=100
-    )
+) -> GraphSearchResponse:
+    subqueries: list[GraphPathQuery] = []
 
     # Explore starting from some entities
-    query_to_explore = nodereader_pb2.GraphQuery.PathQuery()
-    for entity in entities_to_explore:
-        entity_query = nodereader_pb2.GraphQuery.PathQuery()
-        entity_query.path.source.node_type = entity.ntype
-        entity_query.path.source.node_subtype = entity.subtype
-        entity_query.path.source.value = entity.value
-        entity_query.path.destination.node_type = RelationNode.NodeType.ENTITY
-        entity_query.path.undirected = True
-        query_to_explore.bool_or.operands.append(entity_query)
-    graph_query.query.path.bool_and.operands.append(query_to_explore)
+    query_to_explore = [
+        GraphPath(
+            source=GraphNode(
+                value=entity.value,
+                type=RelationNodeTypePbMap[entity.ntype],
+                group=entity.subtype,
+            ),
+            destination=GraphNode(
+                type=RelationNodeType.ENTITY,
+            ),
+            undirected=True,
+        )
+        for entity in entities_to_explore
+    ]
+    if len(query_to_explore) > 0:
+        subqueries.append(Or(operands=query_to_explore))
 
     # Do not return already known entities
     if explored_entities:
-        query_exclude_explored = nodereader_pb2.GraphQuery.PathQuery()
-        for explored in explored_entities:
-            entity_query = nodereader_pb2.GraphQuery.PathQuery()
-            entity_query.path.source.node_type = explored.ntype
-            entity_query.path.source.node_subtype = explored.subtype
-            entity_query.path.source.value = explored.value
-            entity_query.path.undirected = True
-            query_exclude_explored.bool_not.bool_or.operands.append(entity_query)
-        graph_query.query.path.bool_and.operands.append(query_exclude_explored)
+        query_exclude_explored = [
+            GraphPath(
+                source=GraphNode(
+                    value=explored.value,
+                    type=RelationNodeTypePbMap[explored.ntype],
+                    group=explored.subtype,
+                ),
+                undirected=True,
+            )
+            for explored in explored_entities
+        ]
+        if len(query_exclude_explored):
+            subqueries.append(Not(operand=Or(operands=query_exclude_explored)))
 
     # Only include relations between entities
-    only_entities = nodereader_pb2.GraphQuery.PathQuery()
-    only_entities.path.relation.relation_type = Relation.RelationType.ENTITY
-    graph_query.query.path.bool_and.operands.append(only_entities)
+    only_entities = Relation(type=RelationType.ENTITY)
+    subqueries.append(only_entities)
 
     # Exclude processor entities
     if exclude_processor_relations:
-        exclude_processor = nodereader_pb2.GraphQuery.PathQuery()
-        exclude_processor.facet.facet = "/g"
-        graph_query.query.path.bool_and.operands.append(exclude_processor)
+        exclude_processor: GraphPathQuery = Not(operand=Generated(by=Generator.PROCESSOR))
+        subqueries.append(exclude_processor)
 
-    (relations_results, _) = await nidx_query(kbid, Method.GRAPH, graph_query, timeout=5.0)
-    return relations_results
+    graph_query = GraphSearchRequest(query=And(operands=subqueries), top_k=100)
+    response = await rpc.graph_paths(kbid, graph_query)
+
+    return response
+
+
+def merge_relations_results(
+    graph_response: GraphSearchResponse,
+    query_entry_points: Iterable[RelationNode],
+    only_with_metadata: bool = False,
+) -> Relations:
+    """Merge relation search responses into a single Relations object while applying filters."""
+    relations = Relations(entities={})
+
+    for entry_point in query_entry_points:
+        relations.entities[entry_point.value] = EntitySubgraph(related_to=[])
+
+    for path in graph_response.paths:
+        relation = path.relation
+        source = path.source
+        destination = path.destination
+        metadata = path.metadata
+
+        # BUG(decoupled-ask): if for some reason we don't have the field_id and
+        # we skip the next if, we'll reuse a wrong resource id
+        if path.metadata is not None and path.metadata.field_id:
+            resource_id = path.metadata.field_id.split("/")[0]
+
+        if only_with_metadata and path.metadata is None:
+            continue
+
+        if source.value in relations.entities:
+            relations.entities[source.value].related_to.append(
+                DirectionalRelation(
+                    entity=destination.value,
+                    entity_type=destination.type,
+                    entity_subtype=destination.group,
+                    relation=relation.type,
+                    relation_label=relation.label,
+                    direction=RelationDirection.OUT,
+                    metadata=RelationMetadata(
+                        paragraph_id=metadata.paragraph_id,
+                        # TODO(decoupled-ask): do we need more fields in the relation metadata?
+                    )
+                    if metadata is not None
+                    else None,
+                    resource_id=resource_id,
+                )
+            )
+
+        elif destination.value in relations.entities:
+            relations.entities[destination.value].related_to.append(
+                DirectionalRelation(
+                    entity=source.value,
+                    entity_type=source.type,
+                    entity_subtype=source.group,
+                    relation=relation.type,
+                    relation_label=relation.label,
+                    direction=RelationDirection.IN,
+                    metadata=RelationMetadata(
+                        paragraph_id=metadata.paragraph_id,
+                        # TODO(decoupled-ask): do we need more fields in the relation metadata?
+                    )
+                    if metadata is not None
+                    else None,
+                    resource_id=resource_id,
+                )
+            )
+
+    return relations

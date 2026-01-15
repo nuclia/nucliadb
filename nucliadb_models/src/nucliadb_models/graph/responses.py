@@ -14,7 +14,7 @@
 #
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nucliadb_models.metadata import RelationNodeType, RelationType
 
@@ -40,10 +40,22 @@ class GraphRelation(BaseModel):
     type: RelationType
 
 
+class PathMetadata(BaseModel):
+    # {rid}/{field_type}/{field_id}
+    field_id: str | None = Field(
+        default=None, description="Field id where the relation has been extracted from"
+    )
+    # {rid}/{field_type}/{field_id}/{paragraph_start}-{paragraph_end}
+    paragraph_id: str | None = Field(
+        default=None, description="Paragraph id where the relation has been extracted from"
+    )
+
+
 class GraphPath(BaseModel):
     source: GraphNode
     relation: GraphRelation
     destination: GraphNode
+    metadata: PathMetadata | None
 
 
 class GraphSearchResponse(BaseModel):

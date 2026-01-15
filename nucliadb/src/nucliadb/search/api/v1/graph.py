@@ -68,6 +68,31 @@ async def graph_search_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> GraphSearchResponse:
+    # TODO: audit this request!
+    return await graph_path_search(kbid, item)
+
+
+# NOTE this is an internal endpoint used only inside the cluster. It doesn't
+# require auth (as it's not exposed through the virtual service) nor any role
+# and it's not audited either.
+@api.post(
+    f"/internal/{KB_PREFIX}/{{kbid}}/graph",
+    status_code=200,
+    response_model_exclude_unset=True,
+    include_in_schema=False,
+    tags=["Search"],
+)
+@version(1)
+async def internal_graph_search_knowledgebox(
+    request: Request,
+    response: Response,
+    kbid: str,
+    item: GraphSearchRequest,
+) -> GraphSearchResponse:
+    return await graph_path_search(kbid, item)
+
+
+async def graph_path_search(kbid: str, item: GraphSearchRequest) -> GraphSearchResponse:
     pb_query = await parse_graph_search(kbid, item)
 
     results, _ = await nidx_query(kbid, Method.GRAPH, pb_query)

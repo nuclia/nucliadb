@@ -27,6 +27,7 @@ from nucliadb_models.graph.responses import (
     GraphNodesSearchResponse,
     GraphRelationsSearchResponse,
     GraphSearchResponse,
+    PathMetadata,
 )
 
 
@@ -37,6 +38,14 @@ def build_graph_response(results: list[nodereader_pb2.GraphSearchResponse]) -> G
             source = shard_results.nodes[pb_path.source]
             relation = shard_results.relations[pb_path.relation]
             destination = shard_results.nodes[pb_path.destination]
+
+            metadata = None
+            field_id = pb_path.resource_field_id or None
+            paragraph_id = None
+            if pb_path.HasField("metadata") and pb_path.metadata.paragraph_id:
+                paragraph_id = pb_path.metadata.paragraph_id
+            if field_id or paragraph_id:
+                metadata = PathMetadata(field_id=field_id, paragraph_id=paragraph_id)
 
             path = graph_responses.GraphPath(
                 source=graph_responses.GraphNode(
@@ -53,6 +62,7 @@ def build_graph_response(results: list[nodereader_pb2.GraphSearchResponse]) -> G
                     type=RelationNodeTypePbMap[destination.ntype],
                     group=destination.subtype,
                 ),
+                metadata=metadata,
             )
             paths.append(path)
 
