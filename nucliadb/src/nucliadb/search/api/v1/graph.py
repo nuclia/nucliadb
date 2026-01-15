@@ -68,6 +68,11 @@ async def graph_search_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> GraphSearchResponse:
+    # TODO: audit this request!
+    return await graph_path_search(kbid, item)
+
+
+async def graph_path_search(kbid: str, item: GraphSearchRequest) -> GraphSearchResponse:
     pb_query = await parse_graph_search(kbid, item)
 
     results, _ = await nidx_query(kbid, Method.GRAPH, pb_query)
@@ -94,6 +99,11 @@ async def graph_nodes_search_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> GraphNodesSearchResponse:
+    # TODO: audit this request!
+    return await graph_nodes_search(kbid, item)
+
+
+async def graph_nodes_search(kbid: str, item: GraphNodesSearchRequest) -> GraphNodesSearchResponse:
     pb_query = await parse_graph_node_search(kbid, item)
 
     results, _ = await nidx_query(kbid, Method.GRAPH, pb_query)
@@ -119,6 +129,13 @@ async def graph_relations_search_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
+) -> GraphRelationsSearchResponse:
+    # TODO: audit this request!
+    return await graph_relations_search(kbid, item)
+
+
+async def graph_relations_search(
+    kbid: str, item: GraphRelationsSearchRequest
 ) -> GraphRelationsSearchResponse:
     pb_query = await parse_graph_relation_search(kbid, item)
 

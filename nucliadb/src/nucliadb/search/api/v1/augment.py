@@ -21,7 +21,7 @@
 import asyncio
 from typing import cast
 
-from fastapi import Header, Request
+from fastapi import Request
 from fastapi_versioning import version
 
 from nucliadb.common.ids import FieldId, ParagraphId
@@ -79,9 +79,8 @@ from nucliadb_models.augment import (
     AugmentResponse,
 )
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
-from nucliadb_models.search import NucliaDBClientType, ResourceProperties
-from nucliadb_utils.authentication import requires
+from nucliadb_models.resource import ExtractedDataTypeName
+from nucliadb_models.search import ResourceProperties
 
 
 @api.post(
@@ -91,15 +90,11 @@ from nucliadb_utils.authentication import requires
     include_in_schema=False,
     tags=["Augment"],
 )
-@requires(NucliaDBRoles.READER)
 @version(1)
 async def _augment_endpoint(
     request: Request,
     kbid: str,
     item: AugmentRequest,
-    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
-    x_nucliadb_user: str = Header(""),
-    x_forwarded_for: str = Header(""),
 ) -> AugmentResponse:
     return await augment_endpoint(kbid, item)
 

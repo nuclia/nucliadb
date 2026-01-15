@@ -18,18 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from time import time
 
-from fastapi import Header, HTTPException, Request
+from fastapi import HTTPException, Request
 from fastapi_versioning import version
 
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.external_index_providers.base import TextBlockMatch
-from nucliadb.common.models_utils import to_proto
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.query_parser.parsers.retrieve import parse_retrieve
 from nucliadb.search.search.retrieval import text_block_search
-from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.retrieval import (
     Metadata,
     RetrievalMatch,
@@ -37,9 +34,6 @@ from nucliadb_models.retrieval import (
     RetrievalResponse,
     Scores,
 )
-from nucliadb_models.search import NucliaDBClientType
-from nucliadb_utils.authentication import requires
-from nucliadb_utils.utilities import get_audit
 
 
 @api.post(
@@ -49,36 +43,16 @@ from nucliadb_utils.utilities import get_audit
     include_in_schema=False,
     tags=["Search"],
 )
-@requires(NucliaDBRoles.READER)
 @version(1)
 async def _retrieve_endpoint(
     request: Request,
     kbid: str,
     item: RetrievalRequest,
-    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
-    x_nucliadb_user: str = Header(""),
-    x_forwarded_for: str = Header(""),
 ) -> RetrievalResponse:
-    return await retrieve_endpoint(
-        kbid,
-        item,
-        x_ndb_client=x_ndb_client,
-        x_nucliadb_user=x_nucliadb_user,
-        x_forwarded_for=x_forwarded_for,
-    )
+    return await retrieve_endpoint(kbid, item)
 
 
-async def retrieve_endpoint(
-    kbid: str,
-    item: RetrievalRequest,
-    *,
-    x_ndb_client: NucliaDBClientType,
-    x_nucliadb_user: str,
-    x_forwarded_for: str,
-) -> RetrievalResponse:
-    audit = get_audit()
-    start_time = time()
-
+async def retrieve_endpoint(kbid: str, item: RetrievalRequest) -> RetrievalResponse:
     try:
         retrieval = await parse_retrieve(kbid, item)
     except InvalidQueryError as err:
@@ -94,17 +68,6 @@ async def retrieve_endpoint(
 
     # convert to response models
     matches = [text_block_match_to_retrieval_match(text_block) for text_block in text_blocks]
-
-    if audit is not None:
-        retrieval_time = time() - start_time
-        audit.retrieve(
-            kbid,
-            x_nucliadb_user,
-            to_proto.client_type(x_ndb_client),
-            x_forwarded_for,
-            retrieval_time,
-            # TODO(decoupled-ask): add interesting things to audit
-        )
 
     return RetrievalResponse(matches=matches)
 

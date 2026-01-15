@@ -70,6 +70,7 @@ from nucliadb.search.search.exceptions import (
 )
 from nucliadb.search.search.graph_strategy import get_graph_results
 from nucliadb.search.search.metrics import AskMetrics, Metrics
+from nucliadb.search.search.old_graph_strategy import get_graph_results as old_get_graph_results
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
 from nucliadb.search.search.rank_fusion import WeightedCombSum
@@ -864,17 +865,30 @@ async def retrieval_in_kb(
     )
 
     if graph_strategy is not None:
-        graph_results, graph_request = await get_graph_results(
-            kbid=kbid,
-            query=main_query,
-            item=ask_request,
-            ndb_client=client_type,
-            user=user_id,
-            origin=origin,
-            graph_strategy=graph_strategy,
-            metrics=metrics.child_span("graph_retrieval"),
-            text_block_reranker=reranker,
-        )
+        if has_feature(const.Features.ASK_DECOUPLED, context={"kbid": kbid}):
+            graph_results, graph_request = await get_graph_results(
+                kbid=kbid,
+                query=main_query,
+                item=ask_request,
+                ndb_client=client_type,
+                user=user_id,
+                origin=origin,
+                graph_strategy=graph_strategy,
+                metrics=metrics.child_span("graph_retrieval"),
+                text_block_reranker=reranker,
+            )
+        else:
+            graph_results, graph_request = await old_get_graph_results(
+                kbid=kbid,
+                query=main_query,
+                item=ask_request,
+                ndb_client=client_type,
+                user=user_id,
+                origin=origin,
+                graph_strategy=graph_strategy,
+                metrics=metrics.child_span("graph_retrieval"),
+                text_block_reranker=reranker,
+            )
 
         if prequeries_results is None:
             prequeries_results = []

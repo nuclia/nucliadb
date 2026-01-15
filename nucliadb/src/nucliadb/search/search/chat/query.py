@@ -585,13 +585,7 @@ async def rao_find(
         if find_request.query != retrieval_request.query.keyword.query:
             rephrased_query = retrieval_request.query.keyword.query
 
-    retrieval_response = await rpc.retrieve(
-        kbid,
-        retrieval_request,
-        x_ndb_client=x_ndb_client,
-        x_nucliadb_user=x_nucliadb_user,
-        x_forwarded_for=x_forwarded_for,
-    )
+    retrieval_response = await rpc.retrieve(kbid, retrieval_request)
     matches = retrieval_response.matches
 
     relations = None
@@ -673,7 +667,7 @@ async def augment_and_rerank(
     text_block_hydration_options: TextBlockHydrationOptions,
     reranker: Reranker,
     reranking_options: RerankingOptions,
-):
+) -> tuple[list[TextBlockMatch], list[AugmentedResource], list[str]]:
     score_type_map = {
         ScoreType.SEMANTIC: SCORE_TYPE.VECTOR,
         ScoreType.KEYWORD: SCORE_TYPE.BM25,

@@ -37,7 +37,11 @@ from nidx_protos.nodereader_pb2 import (
 
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.models_utils import from_proto
-from nucliadb.common.models_utils.from_proto import RelationTypePbMap
+from nucliadb.common.models_utils.from_proto import (
+    RelationNodeTypeMap,
+    RelationNodeTypePbMap,
+    RelationTypePbMap,
+)
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.fetch import (
     fetch_resources,
@@ -83,22 +87,8 @@ TitleScore = str
 SortValue = Bm25Score | TimestampScore | TitleScore
 
 
-def relation_node_type_to_entity_type(node_type: RelationNode.NodeType.ValueType) -> EntityType:
-    return {
-        RelationNode.NodeType.ENTITY: EntityType.ENTITY,
-        RelationNode.NodeType.LABEL: EntityType.LABEL,
-        RelationNode.NodeType.RESOURCE: EntityType.RESOURCE,
-        RelationNode.NodeType.USER: EntityType.USER,
-    }[node_type]
-
-
 def entity_type_to_relation_node_type(node_type: EntityType) -> RelationNode.NodeType.ValueType:
-    return {
-        EntityType.ENTITY: RelationNode.NodeType.ENTITY,
-        EntityType.LABEL: RelationNode.NodeType.LABEL,
-        EntityType.RESOURCE: RelationNode.NodeType.RESOURCE,
-        EntityType.USER: RelationNode.NodeType.USER,
-    }[node_type]
+    return RelationNodeTypeMap[node_type]
 
 
 def sort_results_by_score(results: list[ParagraphResult] | list[DocumentResult]):
@@ -480,7 +470,7 @@ def _merge_relations_results(
                 relations.entities[origin.value].related_to.append(
                     DirectionalRelation(
                         entity=destination.value,
-                        entity_type=relation_node_type_to_entity_type(destination.ntype),
+                        entity_type=RelationNodeTypePbMap[destination.ntype],
                         entity_subtype=destination.subtype,
                         relation=relation_type,
                         relation_label=relation_label,
@@ -493,7 +483,7 @@ def _merge_relations_results(
                 relations.entities[destination.value].related_to.append(
                     DirectionalRelation(
                         entity=origin.value,
-                        entity_type=relation_node_type_to_entity_type(origin.ntype),
+                        entity_type=RelationNodeTypePbMap[origin.ntype],
                         entity_subtype=origin.subtype,
                         relation=relation_type,
                         relation_label=relation_label,

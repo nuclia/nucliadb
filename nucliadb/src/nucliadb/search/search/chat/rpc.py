@@ -29,6 +29,8 @@ from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.augment import AugmentRequest, AugmentResponse
+from nucliadb_models.graph.requests import GraphNodesSearchRequest, GraphSearchRequest
+from nucliadb_models.graph.responses import GraphNodesSearchResponse, GraphSearchResponse
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.retrieval import RetrievalRequest, RetrievalResponse
 from nucliadb_models.search import (
@@ -80,10 +82,6 @@ async def find(
 async def retrieve(
     kbid: str,
     item: RetrievalRequest,
-    *,
-    x_ndb_client: NucliaDBClientType,
-    x_nucliadb_user: str,
-    x_forwarded_for: str,
 ) -> RetrievalResponse:
     """RPC to /augment endpoint making it look as an internal call."""
 
@@ -91,11 +89,6 @@ async def retrieve(
     async with get_client("search") as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{kbid}/retrieve",
-            headers={
-                "x-ndb-client": x_ndb_client,
-                "x-nucliadb-user": x_nucliadb_user,
-                "x-forwarded-for": x_forwarded_for,
-            },
             json=payload,
         )
         if resp.status_code != 200:
@@ -119,6 +112,44 @@ async def augment(kbid: str, item: AugmentRequest) -> AugmentResponse:
         augmented = AugmentResponse.model_validate(resp.json())
 
     return augmented
+
+
+# TODO(decoupled-ask): replace this for a sdk.augment call when moving /ask to RAO
+async def graph_paths(kbid: str, item: GraphSearchRequest) -> GraphSearchResponse:
+    """RPC to /augment endpoint making it look as an internal call."""
+
+    from nucliadb.search.api.v1.graph import graph_path_search
+
+    return await graph_path_search(kbid, item)
+
+    payload = item.model_dump()
+    async with get_client("search") as client:
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/graph", json=payload)
+        if resp.status_code != 200:
+            raise Exception(f"/graphcall failed: {resp.status_code} {resp.content.decode()}")
+
+        paths = GraphSearchResponse.model_validate(resp.json())
+
+    return paths
+
+
+# TODO(decoupled-ask): replace this for a sdk.augment call when moving /ask to RAO
+async def graph_nodes(kbid: str, item: GraphNodesSearchRequest) -> GraphNodesSearchResponse:
+    """RPC to /augment endpoint making it look as an internal call."""
+
+    from nucliadb.search.api.v1.graph import graph_nodes_search
+
+    return await graph_nodes_search(kbid, item)
+
+    payload = item.model_dump()
+    async with get_client("search") as client:
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/graph/nodes", json=payload)
+        if resp.status_code != 200:
+            raise Exception(f"/graph/nodes call failed: {resp.status_code} {resp.content.decode()}")
+
+        nodes = GraphNodesSearchResponse.model_validate(resp.json())
+
+    return nodes
 
 
 # TODO(decoupled-ask): replace this for a sdk.labelsets call when moving /ask to RAO
