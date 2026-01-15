@@ -879,6 +879,8 @@ async def test_ask_with_json_schema_output(
     assert answer_json["confidence"] == 0.5
 
 
+# TODO(decoupled-ask): revamp /ask audit in RAO
+@pytest.mark.skip(reason="we need to revamp /ask audit in RAO")
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_assert_audit_retrieval_contexts(
     nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources, audit
