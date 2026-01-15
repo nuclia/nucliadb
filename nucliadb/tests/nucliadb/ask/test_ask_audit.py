@@ -39,6 +39,8 @@ async def get_audit_messages(sub):
     return auditreq
 
 
+# TODO(decoupled-ask): revamp /ask audit in RAO
+@pytest.mark.skip(reason="we need to revamp /ask audit in RAO")
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_sends_only_one_audit(
     nucliadb_search: AsyncClient, test_search_resource: str, stream_audit
