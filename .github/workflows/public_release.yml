@@ -174,7 +174,7 @@ jobs:
         run: uv sync --no-editable --no-group nidx
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_DOCS_SYNC_ROLE }}
           aws-region: ${{ secrets.AWS_DOCS_SYNC_REGION }}
