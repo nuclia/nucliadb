@@ -1,0 +1,57 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:recommended",
+        ":dependencyDashboard"
+    ],
+    "rebaseWhen": "never",
+    "assignees": [
+        "lferran",
+        "jotare",
+        "javitonino",
+        "rastut"
+    ],
+    "pip_setup": {
+        "enabled": false
+    },
+    "pip_requirements": {
+        "enabled": false
+    },
+    "pipenv": {
+        "enabled": false
+    },
+    "poetry": {
+        "enabled": false
+    },
+    "pep621": {
+        "enabled": false
+    },
+    "cargo": {
+        "enabled": false
+    },
+    "ignorePaths": [
+        "charts/**",
+        "docs/**",
+        "e2e/**",
+        "nidx/**",
+        "nucliadb/**",
+        "nucliadb_dataset/**",
+        "nucliadb_models/**",
+        "nucliadb_protos/**",
+        "nucliadb_sdk/**",
+        "nucliadb_telemetry/**",
+        "nucliadb_utils/**",
+        "proposals/**",
+        "scripts/**",
+        ".github/workflows/blackduck-sca.yaml",
+        ".github/workflows/polaris.yaml",
+        ".github/workflows/wf-dispatch-bd-sca-dispatch.yaml"
+    ],
+    "packageRules": [
+        {
+            "matchPackageNames": ["python"],
+            "matchCurrentVersion": "3.10.19",
+            "allowedVersions": "<3.11"
+        }
+    ]
+}

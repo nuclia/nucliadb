@@ -67,7 +67,6 @@ pub fn serialize_into<W: io::Write>(mut buf: W, trie: Trie) -> io::Result<()> {
     for node in (0..no_nodes).rev() {
         let is_in = indexing[&node];
         buf.write_all(&is_in.to_le_bytes())?;
-        byte_offset += USIZE_LEN;
     }
     buf.flush()
 }

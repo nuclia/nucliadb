@@ -32,7 +32,7 @@ jobs:
           sudo ufw disable
           sudo iptables -P FORWARD ACCEPT
 
-      - uses: balchua/microk8s-actions@v0.3.2
+      - uses: balchua/microk8s-actions@v0.4.3
         with:
           channel: "1.33/stable"
           devMode: "true"
@@ -119,7 +119,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.14.1
+          python-version: 3.14.2
           cache: "pip"
 
       - name: Install test deps

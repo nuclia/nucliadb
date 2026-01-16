@@ -694,7 +694,7 @@ mod test {
     const DIMENSION: usize = 256;
 
     fn random_vector(rng: &mut impl Rng) -> Vec<f32> {
-        let v: Vec<f32> = (0..DIMENSION).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let v: Vec<f32> = (0..DIMENSION).map(|_| rng.random_range(-1.0..1.0)).collect();
         normalize(v)
     }
 
@@ -720,11 +720,11 @@ mod test {
     }
 
     fn random_key(rng: &mut impl Rng) -> String {
-        format!("{:032x?}/f/file/0-100", rng.r#gen::<u128>())
+        format!("{:032x?}/f/file/0-100", rng.random::<u128>())
     }
 
     fn random_string(rng: &mut impl Rng) -> String {
-        String::from_utf8_lossy(&[rng.gen_range(40..110)].repeat(rng.gen_range(1..16))).to_string()
+        String::from_utf8_lossy(&[rng.random_range(40..110)].repeat(rng.random_range(1..16))).to_string()
     }
 
     fn similarity(x: &[f32], y: &[f32]) -> f32 {
@@ -732,7 +732,7 @@ mod test {
     }
 
     fn random_elem(rng: &mut impl Rng) -> (Elem, Vec<String>) {
-        let labels: Vec<_> = (0..rng.gen_range(0..=2)).map(|_| random_string(rng)).collect();
+        let labels: Vec<_> = (0..rng.random_range(0..=2)).map(|_| random_string(rng)).collect();
         let metadata = SentenceMetadata {
             position: Some(Position {
                 index: 1,
@@ -894,7 +894,7 @@ mod test {
         let correct: f32 = (0..100)
             .map(|_| {
                 // Search near an existing segment (simulates that the query is related to the data)
-                let base_v = elems.values().nth(rng.gen_range(0..elems.len())).unwrap();
+                let base_v = elems.values().nth(rng.random_range(0..elems.len())).unwrap();
                 let query = random_nearby_vector(&mut rng, base_v, 0.05);
 
                 let mut similarities: Vec<_> = elems.iter().map(|(k, v)| (k, similarity(v, &query))).collect();

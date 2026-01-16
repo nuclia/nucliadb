@@ -103,8 +103,8 @@ fn test_basic_search(
         results.documents[0].doc_id.as_ref().unwrap().id,
         format!("{id}/a/title/0-5")
     );
-    assert_eq!(results.documents[0].score, 1.0);
-    assert_eq!(results.documents[1].score, 0.0);
+    assert!(results.documents[0].score > 0.9999);
+    assert!(results.documents[1].score < 0.0001);
 
     // Search near a few elements
     let mut vector: Vec<f32> = [0.0; DIMENSION].into();

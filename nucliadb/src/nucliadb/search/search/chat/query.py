@@ -19,7 +19,6 @@
 #
 import asyncio
 from collections.abc import AsyncGenerator, Iterable
-from time import time
 
 from nidx_protos.nodereader_pb2 import GraphSearchResponse, SearchResponse
 from nuclia_models.predict.generative_responses import GenerativeChunk
@@ -346,6 +345,10 @@ def maybe_audit_chat(
     learning_id: str | None,
     model: str | None,
 ):
+    # TODO(decoupled-ask): revamp /ask audit in RAO
+    if has_feature(const.Features.ASK_DECOUPLED, context={"kbid": kbid}):
+        return
+
     audit = get_audit()
     if audit is None:
         return
@@ -574,9 +577,6 @@ async def rao_find(
     we fallback to /find, as it's the simplest way to provide bw/c.
 
     """
-    audit = get_audit()
-    start_time = time()
-
     fetcher, retrieval_request, reranker = await rao_parse_find(kbid, find_request)
 
     query = find_request.query
@@ -637,24 +637,6 @@ async def rao_find(
         page_size=find_request.top_k,
         next_page=False,
     )
-
-    # audit request
-    if audit is not None:
-        from nidx_protos.nodereader_pb2 import SearchRequest
-
-        search_time = time() - start_time
-        # TODO(decoupled-ask): implement audit.retrieve or something like that?
-        audit.search(
-            kbid,
-            x_nucliadb_user,
-            to_proto.client_type(x_ndb_client),
-            x_forwarded_for,
-            # TODO(decoupled-ask): we don't have this proto anymore
-            SearchRequest(),
-            search_time,
-            len(find_resources),
-            retrieval_rephrased_question=rephrased_query,
-        )
 
     return find_results, False, fetcher, reranker
 
