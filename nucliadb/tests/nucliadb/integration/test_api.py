@@ -345,7 +345,10 @@ async def test_extracted_shortened_metadata(
 
     # Add some relations
     relation = rpb.Relation(
-        source=rpb.RelationNode(value="abc"), to=rpb.RelationNode(value="xyz"), relation_label="foo"
+        source=rpb.RelationNode(value="abc"),
+        to=rpb.RelationNode(value="xyz"),
+        relation_label="foo",
+        relation=rpb.Relation.RelationType.ENTITY,
     )
     relations = rpb.Relations()
     relations.relations.append(relation)
