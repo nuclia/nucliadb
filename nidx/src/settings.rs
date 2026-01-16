@@ -262,6 +262,7 @@ impl Default for VectorMergeSettings {
 }
 
 #[derive(Clone, Deserialize, Debug, Default)]
+#[serde(rename_all = "lowercase")]
 pub enum LogFormat {
     #[default]
     Pretty,
@@ -316,6 +317,7 @@ impl Default for ShardPartitioningSettings {
 }
 
 #[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
 pub enum ShardPartitioningMethod {
     Single,
     Kubernetes,
