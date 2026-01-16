@@ -32,7 +32,7 @@ jobs:
     steps:
       
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Calculate short sha
         id: env-vars
@@ -75,10 +75,10 @@ jobs:
           owner: nuclia
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout tooling repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: nuclia/tooling
           ref: main
@@ -148,10 +148,10 @@ jobs:
           owner: nuclia
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout tooling repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: nuclia/tooling
           ref: main
@@ -215,10 +215,10 @@ jobs:
           owner: nuclia
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout tooling repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: nuclia/tooling
           ref: main
