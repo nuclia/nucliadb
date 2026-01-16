@@ -20,7 +20,7 @@ jobs:
     name: "nidx: Rust code Format"
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: rustup component add rustfmt
       - name: rustfmt
         run: cd nidx && cargo fmt --check --all
@@ -29,7 +29,7 @@ jobs:
     name: "nidx: Clippy lint"
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: rustup component add clippy
       - uses: Swatinem/rust-cache@v2
         with:
@@ -49,7 +49,7 @@ jobs:
     needs:
       - build-virtual-env
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14.2"
@@ -72,7 +72,7 @@ jobs:
     name: "Pre-checks: Python lint 3.10"
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: nidx
@@ -119,7 +119,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Helm
         uses: azure/setup-helm@v4
@@ -135,7 +135,7 @@ jobs:
     name: Check Licenses
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Check License Header
         uses: apache/skywalking-eyes/header@v0.8.0
         env:
@@ -152,7 +152,7 @@ jobs:
     needs:
       - build-virtual-env
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -182,7 +182,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: nidx
@@ -211,7 +211,7 @@ jobs:
     name: Build nidx binary
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: nidx
@@ -231,7 +231,7 @@ jobs:
     name: Build virtual environment
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: nidx
@@ -274,7 +274,7 @@ jobs:
       matrix:
         disable_ask_decoupled_ff: [ true, false ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -334,7 +334,7 @@ jobs:
 
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -382,7 +382,7 @@ jobs:
 
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -424,7 +424,7 @@ jobs:
 
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
         uses: actions/setup-python@v5

@@ -52,7 +52,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Generate a token
         id: app-token
@@ -63,7 +63,7 @@ jobs:
           owner: nuclia
 
       - name: Checkout tooling repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: nuclia/tooling
           ref: main
