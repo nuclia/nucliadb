@@ -46,7 +46,7 @@ jobs:
         run: |
           python bump.py --build=${{github.run_number}}
 
-      - uses: dorny/paths-filter@v2
+      - uses: dorny/paths-filter@v3
         id: component_changes
         with:
           filters: |
