@@ -35,9 +35,10 @@ use log_format::StructuredFormat;
 use opentelemetry::global::get_text_map_propagator;
 use opentelemetry::propagation::Extractor;
 use opentelemetry::trace::TraceContextExt;
-use opentelemetry::{KeyValue, trace::TracerProvider as _};
+use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_sdk::{Resource, trace::TracerProvider};
+use opentelemetry_sdk::Resource;
+use opentelemetry_sdk::trace::SdkTracerProvider;
 use tracing::{Level, Metadata};
 use tracing_core::LevelFilter;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -89,9 +90,9 @@ pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
             .with_endpoint(otlp_collector_url)
             .with_timeout(Duration::from_secs(2))
             .build()?;
-        let provider = TracerProvider::builder()
-            .with_batch_exporter(otlp_exporter, opentelemetry_sdk::runtime::Tokio)
-            .with_resource(Resource::new(vec![KeyValue::new("service.name", "nidx")]))
+        let provider = SdkTracerProvider::builder()
+            .with_batch_exporter(otlp_exporter)
+            .with_resource(Resource::builder().with_service_name("nidx").build())
             .build();
         let tracer_otlp = provider.tracer("nidx");
         Some(
@@ -138,6 +139,6 @@ pub fn set_trace_from_nats(span: &tracing::Span, headers: async_nats::HeaderMap)
 
     // Create a link back from the original trace to us
     let link_span = tracing::span!(Level::INFO, "Link to nidx trace");
-    link_span.set_parent(parent_context);
+    let _ = link_span.set_parent(parent_context);
     link_span.add_link(span.context().span().span_context().clone());
 }

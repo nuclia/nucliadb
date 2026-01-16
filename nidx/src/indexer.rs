@@ -28,7 +28,7 @@ use nidx_protos::nidx::nidx_indexer_server::NidxIndexer;
 use nidx_protos::nidx::nidx_indexer_server::NidxIndexerServer;
 use nidx_protos::prost::*;
 use nidx_types::Seq;
-use object_store::{DynObjectStore, ObjectStore};
+use object_store::{DynObjectStore, ObjectStoreExt};
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;

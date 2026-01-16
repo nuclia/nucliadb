@@ -102,14 +102,14 @@ mod tests {
     #[test]
     fn test_inverted_map_write_read() -> VectorR<()> {
         // Create some random entries for the map
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut entries: Vec<Vec<u32>> = Vec::new();
 
         for _ in 0..20 {
-            let len = rng.gen_range(1..2000);
+            let len = rng.random_range(1..2000);
             let mut entry = Vec::new();
             for _ in 0..len {
-                entry.push(rng.r#gen());
+                entry.push(rng.random());
             }
             entries.push(entry);
         }

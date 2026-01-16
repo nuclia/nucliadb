@@ -20,7 +20,7 @@
 
 use std::collections::BinaryHeap;
 
-use rand::{Rng, SeedableRng, distributions::Uniform, rngs::SmallRng};
+use rand::{Rng, SeedableRng, distr::Uniform, rngs::SmallRng};
 
 use crate::{
     VectorAddr,
@@ -41,7 +41,7 @@ impl<'a, DR: DataRetriever> HnswBuilder<'a, DR> {
     pub fn new(retriever: &DR) -> HnswBuilder<'_, DR> {
         HnswBuilder {
             retriever,
-            distribution: Uniform::new(0.0, 1.0),
+            distribution: Uniform::new(0.0, 1.0).unwrap(),
             layer_rng: SmallRng::seed_from_u64(2),
             searcher: HnswSearcher::new(retriever, false),
         }

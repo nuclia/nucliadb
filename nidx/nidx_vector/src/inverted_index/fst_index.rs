@@ -108,18 +108,18 @@ mod tests {
     #[test]
     fn test_fst_index_write_read() -> VectorR<()> {
         // Create some random entries for the map
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut entries: BTreeMap<Vec<u8>, Vec<u32>> = BTreeMap::new();
 
         for _ in 0..20 {
-            let len = rng.gen_range(1..2000);
+            let len = rng.random_range(1..2000);
             let mut ids = Vec::new();
             for _ in 0..len {
-                ids.push(rng.r#gen());
+                ids.push(rng.random());
             }
             let mut key = [0; 16];
             for k in &mut key {
-                *k = rng.r#gen();
+                *k = rng.random();
             }
             entries.insert(key.to_vec(), ids);
         }
