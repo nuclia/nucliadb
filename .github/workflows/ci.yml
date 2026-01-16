@@ -137,7 +137,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check License Header
-        uses: apache/skywalking-eyes/header@501a28d2fb4a9b962661987e50cf0219631b32ff
+        uses: apache/skywalking-eyes/header@v0.8.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: EmbarkStudios/cargo-deny-action@v2
