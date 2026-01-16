@@ -27,6 +27,7 @@ from unittest.mock import patch
 
 import pytest
 
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.settings import DriverSettings
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.run import run_async_nucliadb
@@ -50,6 +51,7 @@ async def standalone_nucliadb(
     endecryptor_settings,
     dummy_processing,
     analytics_disabled,
+    maindb_driver: Driver,
     maindb_settings: DriverSettings,
     storage: Storage,
     storage_settings,
