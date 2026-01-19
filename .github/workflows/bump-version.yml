@@ -21,11 +21,11 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Generate a token
       id: app-token
-      uses: actions/create-github-app-token@v1
+      uses: actions/create-github-app-token@v2
       with:
         app-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
         private-key: ${{ secrets.PK_GHAPP_NUCLIABOT }}
@@ -44,7 +44,7 @@ jobs:
         python-version: "3.14.2"
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v5
+      uses: astral-sh/setup-uv@v7
 
     # we update the lock to reflect the newly updated versions of our packages
     - name: Update uv.lock

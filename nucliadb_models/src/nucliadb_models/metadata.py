@@ -30,7 +30,7 @@ class EntityRelation(BaseModel):
     entity_type: str
 
 
-class RelationType(Enum):
+class RelationType(str, Enum):
     ABOUT = "ABOUT"
     CHILD = "CHILD"
     COLAB = "COLAB"

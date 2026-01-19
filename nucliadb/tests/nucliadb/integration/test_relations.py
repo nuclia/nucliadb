@@ -212,13 +212,13 @@ async def create_broker_message_with_relations():
     e0 = RelationNode(value="E0", ntype=RelationNode.NodeType.ENTITY, subtype="")
     e1 = RelationNode(value="E1", ntype=RelationNode.NodeType.ENTITY, subtype="Official")
     e2 = RelationNode(value="E2", ntype=RelationNode.NodeType.ENTITY, subtype="Propaganda")
-    r0 = Relation(relation=Relation.RelationType.CHILD, source=e0, to=e1, relation_label="R0")
-    r1 = Relation(relation=Relation.RelationType.CHILD, source=e1, to=e2, relation_label="R1")
-    r2 = Relation(relation=Relation.RelationType.CHILD, source=e2, to=e0, relation_label="R2")
+    r0 = Relation(relation=Relation.RelationType.ENTITY, source=e0, to=e1, relation_label="R0")
+    r1 = Relation(relation=Relation.RelationType.ENTITY, source=e1, to=e2, relation_label="R1")
+    r2 = Relation(relation=Relation.RelationType.ENTITY, source=e2, to=e0, relation_label="R2")
     mickey = RelationNode(value="Mickey", ntype=RelationNode.NodeType.ENTITY, subtype="")
     minnie = RelationNode(value="Minnie", ntype=RelationNode.NodeType.ENTITY, subtype="Official")
     love_relation = Relation(
-        relation=Relation.RelationType.CHILD,
+        relation=Relation.RelationType.ENTITY,
         source=mickey,
         to=minnie,
         relation_label="love",

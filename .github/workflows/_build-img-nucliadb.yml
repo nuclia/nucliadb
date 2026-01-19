@@ -52,18 +52,18 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Generate a token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
           private-key: ${{ secrets.PK_GHAPP_NUCLIABOT }}
           owner: nuclia
 
       - name: Checkout tooling repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: nuclia/tooling
           ref: main
