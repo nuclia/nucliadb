@@ -151,7 +151,7 @@ jobs:
         run: echo "${{ steps.build.outputs.digest }}" > /tmp/digest-${{ matrix.image.name }}-${{ matrix.arch.tag }}
 
       - name: Upload digest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: digests-${{ matrix.image.name }}-${{ matrix.arch.tag }}
           path: /tmp/digest-${{ matrix.image.name }}-${{ matrix.arch.tag }}
@@ -182,7 +182,7 @@ jobs:
           echo "hash=$HASH" >> $GITHUB_OUTPUT
 
       - name: Download digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: /tmp/digests
           pattern: digests-${{ matrix.image }}-*
