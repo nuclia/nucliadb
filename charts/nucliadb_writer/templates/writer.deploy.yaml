@@ -51,7 +51,7 @@ spec:
       - name: writer
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         securityContext:
-          privileged: true
+          privileged: false
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         livenessProbe:
           failureThreshold: 5
