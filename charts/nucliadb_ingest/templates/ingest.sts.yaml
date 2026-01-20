@@ -66,7 +66,7 @@ spec:
       containers:
       - name: ingest
         securityContext:
-          privileged: true
+          privileged: false
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         livenessProbe:
