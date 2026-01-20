@@ -1113,8 +1113,8 @@ class NucliaDB(_NucliaDBBase):
     feedback = _request_sync_builder("feedback", FeedbackRequest, type(None))
     start_export = _request_sync_builder("start_export", type(None), CreateExportResponse)
     export_status = _request_sync_builder("export_status", type(None), StatusResponse)
-    _retrieve = _request_sync_builder("retrieve", RetrievalRequest, RetrievalResponse)
-    _augment = _request_sync_builder("augment", AugmentRequest, AugmentResponse)
+    retrieve = _request_sync_builder("retrieve", RetrievalRequest, RetrievalResponse)
+    augment = _request_sync_builder("augment", AugmentRequest, AugmentResponse)
 
     # misc
     download_export = _request_iterator_sync_builder("download_export")
@@ -1320,8 +1320,8 @@ class NucliaDBAsync(_NucliaDBBase):
     feedback = _request_async_builder("feedback", FeedbackRequest, type(None))
     start_export = _request_async_builder("start_export", type(None), CreateExportResponse)
     export_status = _request_async_builder("export_status", type(None), StatusResponse)
-    _retrieve = _request_async_builder("retrieve", RetrievalRequest, RetrievalResponse)
-    _augment = _request_async_builder("augment", AugmentRequest, AugmentResponse)
+    retrieve = _request_async_builder("retrieve", RetrievalRequest, RetrievalResponse)
+    augment = _request_async_builder("augment", AugmentRequest, AugmentResponse)
 
     download_export = _request_iterator_async_builder("download_export")
     create_kb_from_import = _request_async_builder(

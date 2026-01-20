@@ -17,7 +17,7 @@ from nucliadb_models.retrieval import KeywordQuery, Query, RetrievalRequest, Ret
 
 
 def test_retrieve(docs_dataset: str, sdk: nucliadb_sdk.NucliaDB):
-    results: RetrievalResponse = sdk._retrieve(
+    results: RetrievalResponse = sdk.retrieve(
         kbid=docs_dataset, content=RetrievalRequest(query=Query(keyword=KeywordQuery(query="love")))
     )
     assert len(results.matches) > 0

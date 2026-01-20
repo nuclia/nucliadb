@@ -16,4 +16,4 @@ from nucliadb_models.augment import AugmentRequest
 
 
 def test_retrieve(docs_dataset: str, sdk: nucliadb_sdk.NucliaDB):
-    _ = sdk._augment(kbid=docs_dataset, content=AugmentRequest())
+    _ = sdk.augment(kbid=docs_dataset, content=AugmentRequest())
