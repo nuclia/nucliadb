@@ -99,6 +99,7 @@ def gcs_storage_settings(gcs) -> Iterator[dict[str, Any]]:
         "gcs_base64_creds": None,
         "gcs_bucket": "test_{kbid}",
         "gcs_location": "location",
+        "gcs_anonymous": True,
     }
     extended_settings = {
         "gcs_deadletter_bucket": "deadletter",
@@ -127,7 +128,7 @@ async def gcs_storage(gcs, gcs_storage_settings: dict[str, Any]):
         deadletter_bucket=extended_storage_settings.gcs_deadletter_bucket,
         indexing_bucket=extended_storage_settings.gcs_indexing_bucket,
         labels=storage_settings.gcs_bucket_labels,
-        anonymous=True,
+        anonymous=storage_settings.gcs_anonymous,
     )
     await storage.initialize()
     await storage.create_bucket("nidx")

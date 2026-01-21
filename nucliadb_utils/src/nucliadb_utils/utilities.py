@@ -168,6 +168,7 @@ async def _create_storage(gcs_scopes: list[str] | None = None) -> Storage:
             executor=ThreadPoolExecutor(extended_storage_settings.gcs_threads),
             labels=storage_settings.gcs_bucket_labels,
             scopes=gcs_scopes,
+            anonymous=storage_settings.gcs_anonymous,
         )
         logger.info("Configuring GCS Storage")
         await gcsutil.initialize()

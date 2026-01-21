@@ -90,6 +90,7 @@ class StorageSettings(BaseSettings):
         description="Map of labels with which GCS buckets will be labeled with: https://cloud.google.com/storage/docs/tags-and-labels",
     )
     gcs_endpoint_url: str = "https://www.googleapis.com"
+    gcs_anonymous: bool = False
 
     s3_client_id: str | None = None
     s3_client_secret: str | None = None
