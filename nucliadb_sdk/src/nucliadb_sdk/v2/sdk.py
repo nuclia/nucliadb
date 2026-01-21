@@ -169,9 +169,9 @@ SDK_DEFINITION = {
         path_params=("kbid", "rid"),
     ),
     "exists_resource_by_slug": SdkEndpointDefinition(
-        path_template="/v1/kb/{kbid}/slug/{rslug}",
+        path_template="/v1/kb/{kbid}/slug/{slug}",
         method="HEAD",
-        path_params=("kbid", "rslug"),
+        path_params=("kbid", "slug"),
     ),
     "create_resource": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resources",

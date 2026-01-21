@@ -48,12 +48,12 @@ async def test_kb_services(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
 async def test_resource_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     # Create, Get, List, Update
     assert not await sdk_async.exists_resource(kbid=kb.uuid, rid="nonexistent")
-    assert not await sdk_async.exists_resource_by_slug(kbid=kb.uuid, rslug="nonexistent")
+    assert not await sdk_async.exists_resource_by_slug(kbid=kb.uuid, slug="nonexistent")
     await sdk_async.create_resource(kbid=kb.uuid, title="Resource", slug="resource")
     resource = await sdk_async.get_resource_by_slug(kbid=kb.uuid, slug="resource")
     await sdk_async.get_resource_by_id(kbid=kb.uuid, rid=resource.id)
     assert await sdk_async.exists_resource(kbid=kb.uuid, rid=resource.id)
-    assert await sdk_async.exists_resource_by_slug(kbid=kb.uuid, rslug="resource")
+    assert await sdk_async.exists_resource_by_slug(kbid=kb.uuid, slug="resource")
     resources = await sdk_async.list_resources(kbid=kb.uuid)
     assert len(resources.resources) == 1
     await sdk_async.catalog(kbid=kb.uuid, query="foo")
