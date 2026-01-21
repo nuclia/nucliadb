@@ -60,7 +60,7 @@ class GCS(BaseImage):
         options = super().get_image_options()
         options["ports"] = {str(self.port): str(self.port)}
         options["command"] = (
-            f"-scheme http -external-url http://{DOCKER_HOST}:{self.port} -port {self.port} -public-host 172.17.0.1:{self.port}"
+            f"-scheme http -external-url http://172.17.0.1:{self.port} -port {self.port} -public-host 172.17.0.1:{self.port}"
         )
         return options
 
