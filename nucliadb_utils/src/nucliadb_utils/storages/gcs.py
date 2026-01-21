@@ -496,10 +496,8 @@ class GCSStorage(Storage):
 
     @storage_ops_observer.wrap({"type": "initialize"})
     async def initialize(self):
-        loop = asyncio.get_event_loop()
-
         self._session = aiohttp.ClientSession(
-            loop=loop, connector=aiohttp.TCPConnector(ttl_dns_cache=60 * 5), timeout=TIMEOUT
+            connector=aiohttp.TCPConnector(ttl_dns_cache=60 * 5), timeout=TIMEOUT
         )
         try:
             if self.deadletter_bucket is not None and self.deadletter_bucket != "":
