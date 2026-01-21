@@ -68,13 +68,13 @@ def get_testing_storage_backend() -> str:
     return selected
 
 
-def lazy_storage_fixture():
+def lazy_storage_fixture(pattern: str):
     backend = get_testing_storage_backend()
-    fixture_name = f"{backend}_storage"
+    fixture_name = pattern.format(backend=backend)
     return [lazy_fixture.lf(fixture_name)]
 
 
-@pytest.fixture(scope="function", params=lazy_storage_fixture())
+@pytest.fixture(scope="function", params=lazy_storage_fixture("{backend}_storage"))
 def storage(request: FixtureRequest) -> Iterator[Storage]:
     """
     Generic storage fixture that allows us to run the same tests for different storage backends.
@@ -116,3 +116,8 @@ def storage_settings(request, storage) -> Iterator[dict[str, Any]]:
         assert fixture_name in request.fixturenames
         settings: dict[str, Any] = request.getfixturevalue(fixture_name)
         yield settings
+
+
+@pytest.fixture(scope="session", params=lazy_storage_fixture("session_{backend}_storage_settings"))
+def session_storage_settings(request) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
+    yield request.param
