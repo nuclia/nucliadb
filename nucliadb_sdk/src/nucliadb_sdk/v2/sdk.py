@@ -718,11 +718,11 @@ def _request_sync_builder(
                 path, method, content=data, query_params=query_params, extra_headers=headers
             )
         except exceptions.NotFoundError:
-            if response_type is not None and isinstance(response_type, bool):
+            if response_type is bool:
                 return False
             raise
         if response_type is not None:
-            if isinstance(response_type, bool):
+            if response_type is bool:
                 return True
             if issubclass(response_type, SyncAskResponse):
                 return ask_response_parser(resp)  # type: ignore
@@ -818,11 +818,11 @@ def _request_async_builder(
                 path, method, content=data, query_params=query_params, extra_headers=headers
             )
         except exceptions.NotFoundError:
-            if response_type is not None and isinstance(response_type, bool):
+            if response_type is bool:
                 return False
             raise
         if response_type is not None:
-            if isinstance(response_type, bool):
+            if response_type is bool:
                 return True
             if isinstance(response_type, type) and issubclass(response_type, SyncAskResponse):
                 return await ask_response_parser_async(resp)  # type: ignore
