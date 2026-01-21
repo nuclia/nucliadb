@@ -242,9 +242,9 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
             usermetadata={"classifications": [{"labelset": "emoji", "label": label}]},
         )
 
-    resources = sdk.list_resources(kbid=kb.uuid, query_params={"size": 50})
-    assert resources.pagination.size == 50
-    assert resources.pagination.last
+    resources_list = sdk.list_resources(kbid=kb.uuid, query_params={"size": 50})
+    assert resources_list.pagination.size == 50
+    assert resources_list.pagination.last
 
     results = sdk.search(
         kbid=kb.uuid,
@@ -252,21 +252,25 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
         faceted=["/classification.labels"],
         top_k=0,
     )
+    assert results.fulltext is not None
     assert results.fulltext.facets == {
         "/classification.labels": {"/classification.labels/emoji": 50 * 2}
     }
 
-    resources = sdk.search(kbid=kb.uuid, query="love")
-    assert resources.fulltext.total == 5
-    assert len(resources.resources) == 5
+    results = sdk.search(kbid=kb.uuid, query="love")
+    assert results.fulltext is not None
+    assert results.fulltext.total == 5
+    assert len(results.resources) == 5
 
-    resources = sdk.search(
+    results = sdk.search(
         kbid=kb.uuid,
         features=[SearchOptions.FULLTEXT],
         faceted=["/classification.labels/emoji"],
         top_k=0,
     )
+    assert results.fulltext is not None
+    assert results.fulltext.facets is not None
     assert (
-        resources.fulltext.facets["/classification.labels/emoji"]["/classification.labels/emoji/0"]
+        results.fulltext.facets["/classification.labels/emoji"]["/classification.labels/emoji/0"]
         == 9 * 2
     )

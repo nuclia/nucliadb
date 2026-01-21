@@ -36,11 +36,11 @@ async def test_graph_search(
         }
     )
 
-    results = sdk.graph_search(kbid=docs_dataset, content=paths_request)
-    assert len(results.paths) == 10
+    graph_search = sdk.graph_search(kbid=docs_dataset, content=paths_request)
+    assert len(graph_search.paths) == 10
 
-    results = await sdk_async.graph_search(kbid=docs_dataset, content=paths_request)
-    assert len(results.paths) == 10
+    graph_search = await sdk_async.graph_search(kbid=docs_dataset, content=paths_request)
+    assert len(graph_search.paths) == 10
 
     # nodes
 
@@ -54,11 +54,11 @@ async def test_graph_search(
         }
     )
 
-    results = sdk.graph_nodes(kbid=docs_dataset, content=nodes_request)
-    assert len(results.nodes) == 10
+    nodes_search = sdk.graph_nodes(kbid=docs_dataset, content=nodes_request)
+    assert len(nodes_search.nodes) == 10
 
-    results = await sdk_async.graph_nodes(kbid=docs_dataset, content=nodes_request)
-    assert len(results.nodes) == 10
+    nodes_search = await sdk_async.graph_nodes(kbid=docs_dataset, content=nodes_request)
+    assert len(nodes_search.nodes) == 10
 
     # relations
 
@@ -72,8 +72,8 @@ async def test_graph_search(
         }
     )
 
-    results = sdk.graph_relations(kbid=docs_dataset, content=relations_request)
-    assert len(results.relations) == 1
+    relations_search = sdk.graph_relations(kbid=docs_dataset, content=relations_request)
+    assert len(relations_search.relations) == 1
 
-    results = await sdk_async.graph_relations(kbid=docs_dataset, content=relations_request)
-    assert len(results.relations) == 1
+    relations_search = await sdk_async.graph_relations(kbid=docs_dataset, content=relations_request)
+    assert len(relations_search.relations) == 1

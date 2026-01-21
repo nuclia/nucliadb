@@ -54,8 +54,11 @@ def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
     )
     assert resource.data is not None
     assert resource.data.texts is not None
+    assert resource.data.texts["text"].value is not None
     assert resource.data.texts["text"].value.body == "I'm Ramon"
     assert resource.data.files is not None
+    assert resource.data.files["file"].value is not None
+    assert resource.data.files["file"].value.file is not None
     assert resource.data.files["file"].value.file.filename == "data"
 
     sdk.update_resource(
@@ -69,6 +72,9 @@ def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
         slug="mykey1",
         query_params={"show": [ResourceProperties.BASIC.value, ResourceProperties.VALUES.value]},
     )
+    assert resource.data is not None
+    assert resource.data.texts is not None
+    assert resource.data.texts["text"].value is not None
     assert resource.data.texts["text"].value.body == "I'm an updated Ramon"
 
     sdk.delete_resource_by_slug(kbid=kb.uuid, rslug="mykey1")

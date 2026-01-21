@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from typing import cast
+
 import httpx
 import pytest
 
+import nucliadb_models
 import nucliadb_sdk
 from nucliadb_models.conversation import InputMessage, InputMessageContent
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
@@ -114,6 +117,9 @@ def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb, method: str):
     )
     assert field.field_id == fid
     assert field.field_type == "conversation"
+    assert field.value is not None
+    field.value = cast(nucliadb_models.Conversation, field.value)
+    assert field.value.messages is not None
     assert field.value.messages[0].ident == "1"
     assert field.value.messages[0].content.text == "Hello"
 
@@ -122,6 +128,9 @@ def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb, method: str):
     )
     assert field.field_id == fid
     assert field.field_type == "conversation"
+    assert field.value is not None
+    field.value = cast(nucliadb_models.Conversation, field.value)
+    assert field.value.messages is not None
     assert field.value.messages[0].ident == "1"
     assert field.value.messages[0].content.text == "Hello"
 

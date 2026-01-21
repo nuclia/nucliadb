@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from json import JSONDecodeError
 from typing import (
     Any,
+    Awaitable,
     TypeVar,
 )
 
@@ -691,7 +692,7 @@ def _request_sync_builder(
     name: str,
     request_type: type[INPUT_TYPE],
     response_type: type[OUTPUT_TYPE],
-):
+) -> Callable[..., OUTPUT_TYPE]:
     """
     SYNC standard Pydantic response builder
     """
@@ -705,7 +706,7 @@ def _request_sync_builder(
         content: INPUT_TYPE | None = None,
         headers: dict[str, str] | None = None,
         **kwargs,
-    ) -> OUTPUT_TYPE:
+    ):
         path, data, query_params = prepare_request(
             path_template=path_template,
             path_params=path_params,
@@ -719,11 +720,11 @@ def _request_sync_builder(
             )
         except exceptions.NotFoundError:
             if response_type is bool:
-                return False
+                return False  # type: ignore[return-value]
             raise
         if response_type is not None:
             if response_type is bool:
-                return True
+                return True  # type: ignore[return-value]
             if issubclass(response_type, SyncAskResponse):
                 return ask_response_parser(resp)  # type: ignore
             elif issubclass(response_type, BaseModel):
@@ -790,7 +791,7 @@ def _request_async_builder(
     name: str,
     request_type: type[INPUT_TYPE],
     response_type: type[OUTPUT_TYPE],
-):
+) -> Callable[..., Awaitable[OUTPUT_TYPE]]:
     """
     ASYNC standard Pydantic response builder
     """
@@ -805,7 +806,7 @@ def _request_async_builder(
         content: INPUT_TYPE | None = None,
         headers: dict[str, str] | None = None,
         **kwargs,
-    ) -> OUTPUT_TYPE:
+    ):
         path, data, query_params = prepare_request(
             path_template=path_template,
             path_params=path_params,
@@ -819,11 +820,11 @@ def _request_async_builder(
             )
         except exceptions.NotFoundError:
             if response_type is bool:
-                return False
+                return False  # type: ignore[return-value]
             raise
         if response_type is not None:
             if response_type is bool:
-                return True
+                return True  # type: ignore[return-value]
             if isinstance(response_type, type) and issubclass(response_type, SyncAskResponse):
                 return await ask_response_parser_async(resp)  # type: ignore
             elif isinstance(response_type, type) and issubclass(response_type, BaseModel):
