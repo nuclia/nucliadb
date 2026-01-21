@@ -109,7 +109,7 @@ from nucliadb_models.writer import (
 from nucliadb_sdk.v2 import exceptions
 
 # Generics
-OUTPUT_TYPE = TypeVar("OUTPUT_TYPE", bound=BaseModel | None)
+OUTPUT_TYPE = TypeVar("OUTPUT_TYPE", bound=BaseModel | None | bool)
 
 RawRequestContent = str | bytes | Iterable[bytes] | AsyncIterable[bytes] | dict[str, Any]
 
@@ -163,6 +163,16 @@ SDK_DEFINITION = {
         path_params=(),
     ),
     # Resource Endpoints
+    "exists_resource": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}",
+        method="HEAD",
+        path_params=("kbid", "rid"),
+    ),
+    "exists_resource_by_slug": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/slug/{rslug}",
+        method="HEAD",
+        path_params=("kbid", "rslug"),
+    ),
     "create_resource": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resources",
         method="POST",
@@ -796,10 +806,17 @@ def _request_async_builder(
             content=content,
             **kwargs,
         )
-        resp = await self._request(
-            path, method, content=data, query_params=query_params, extra_headers=headers
-        )
+        try:
+            resp = await self._request(
+                path, method, content=data, query_params=query_params, extra_headers=headers
+            )
+        except exceptions.NotFoundError:
+            if response_type is not None and isinstance(response_type, bool):
+                return False
+            raise
         if response_type is not None:
+            if isinstance(response_type, bool):
+                return True
             if isinstance(response_type, type) and issubclass(response_type, SyncAskResponse):
                 return await ask_response_parser_async(resp)  # type: ignore
             elif isinstance(response_type, type) and issubclass(response_type, BaseModel):
@@ -1055,6 +1072,8 @@ class NucliaDB(_NucliaDBBase):
     )
     list_knowledge_boxes = _request_sync_builder("list_knowledge_boxes", type(None), KnowledgeBoxList)
     # Resource Endpoints
+    exists_resource = _request_sync_builder("exists_resource", type(None), bool)
+    exists_resource_by_slug = _request_sync_builder("exists_resource_by_slug", type(None), bool)
     create_resource = _request_sync_builder("create_resource", CreateResourcePayload, ResourceCreated)
     update_resource = _request_sync_builder("update_resource", UpdateResourcePayload, ResourceUpdated)
     update_resource_by_slug = _request_sync_builder(
@@ -1260,6 +1279,8 @@ class NucliaDBAsync(_NucliaDBBase):
     )
     list_knowledge_boxes = _request_async_builder("list_knowledge_boxes", type(None), KnowledgeBoxList)
     # Resource Endpoints
+    exists_resource = _request_async_builder("exists_resource", type(None), bool)
+    exists_resource_by_slug = _request_async_builder("exists_resource_by_slug", type(None), bool)
     create_resource = _request_async_builder("create_resource", CreateResourcePayload, ResourceCreated)
     update_resource = _request_async_builder("update_resource", UpdateResourcePayload, ResourceUpdated)
     update_resource_by_slug = _request_async_builder(
