@@ -116,6 +116,8 @@ RawRequestContent = str | bytes | Iterable[bytes] | AsyncIterable[bytes] | dict[
 INPUT_TYPE = TypeVar("INPUT_TYPE", BaseModel, list[InputMessage], RawRequestContent, object, None)
 USER_AGENT = f"nucliadb-sdk/{importlib.metadata.version('nucliadb_sdk')}"
 
+QUERY_PARAMS_TYPE = dict[str, str | int | float | bool | list[str]] | None
+
 
 class Region(enum.Enum):
     EUROPE1 = "europe-1"
@@ -617,7 +619,7 @@ def prepare_request_base(
     path_template: str,
     path_params: tuple[str, ...],
     kwargs: dict[str, Any],
-):
+) -> str:
     path_data = {}
     for param in path_params:
         if param not in kwargs:
@@ -635,7 +637,7 @@ def prepare_request(
     request_type: type[INPUT_TYPE] | None,
     content: INPUT_TYPE | None = None,
     **kwargs,
-):
+) -> tuple[str, RawRequestContent | None, QUERY_PARAMS_TYPE]:
     path = prepare_request_base(path_template, path_params, kwargs)
     data: RawRequestContent | None = None
     if request_type is not None and request_type is not type(None):
@@ -668,7 +670,7 @@ def prepare_request(
     ):
         data = content
 
-    query_params = kwargs.pop("query_params", None)
+    query_params: QUERY_PARAMS_TYPE = kwargs.pop("query_params", None)
     if len(kwargs) > 0:
         raise TypeError(f"Invalid arguments provided: {kwargs}")
 
@@ -903,7 +905,7 @@ class _NucliaDBBase:
         self,
         path,
         method: str,
-        query_params: dict[str, str] | None = None,
+        query_params: QUERY_PARAMS_TYPE = None,
         content: RawRequestContent | None = None,
         extra_headers: dict[str, str] | None = None,
     ):
@@ -914,7 +916,7 @@ class _NucliaDBBase:
         path,
         method: str,
         data: str | bytes | None = None,
-        query_params: dict[str, str] | None = None,
+        query_params: QUERY_PARAMS_TYPE = None,
     ):
         raise NotImplementedError
 
@@ -1005,7 +1007,7 @@ class NucliaDB(_NucliaDBBase):
         self,
         path,
         method: str,
-        query_params: dict[str, str] | None = None,
+        query_params: QUERY_PARAMS_TYPE = None,
         content: RawRequestContent | None = None,
         extra_headers: dict[str, str] | None = None,
     ):
@@ -1027,7 +1029,7 @@ class NucliaDB(_NucliaDBBase):
         path,
         method: str,
         data: str | bytes | None = None,
-        query_params: dict[str, str] | None = None,
+        query_params: QUERY_PARAMS_TYPE = None,
     ) -> Callable[[int | None], Iterator[bytes]]:
         url = f"{self.base_url}{path}"
         opts: dict[str, Any] = {}
@@ -1209,7 +1211,7 @@ class NucliaDBAsync(_NucliaDBBase):
         self,
         path,
         method: str,
-        query_params: dict[str, str] | None = None,
+        query_params: QUERY_PARAMS_TYPE = None,
         content: RawRequestContent | None = None,
         extra_headers: dict[str, str] | None = None,
     ):
@@ -1231,7 +1233,7 @@ class NucliaDBAsync(_NucliaDBBase):
         path,
         method: str,
         data: str | bytes | None = None,
-        query_params: dict[str, str] | None = None,
+        query_params: QUERY_PARAMS_TYPE = None,
     ) -> Callable[[int | None], AsyncGenerator[bytes]]:
         url = f"{self.base_url}{path}"
         opts: dict[str, Any] = {}
