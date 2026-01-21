@@ -706,7 +706,7 @@ def _request_sync_builder(
         content: INPUT_TYPE | None = None,
         headers: dict[str, str] | None = None,
         **kwargs,
-    ):
+    ) -> OUTPUT_TYPE:
         path, data, query_params = prepare_request(
             path_template=path_template,
             path_params=path_params,
@@ -726,10 +726,10 @@ def _request_sync_builder(
             if response_type is bool:
                 return True  # type: ignore[return-value]
             if issubclass(response_type, SyncAskResponse):
-                return ask_response_parser(resp)  # type: ignore
+                return ask_response_parser(resp)  # type: ignore[return-value]
             elif issubclass(response_type, BaseModel):
-                return response_type.model_validate_json(resp.content)  # type: ignore
-        return None  # type: ignore
+                return response_type.model_validate_json(resp.content)  # type: ignore[return-value]
+        return None  # type: ignore[return-value]
 
     return _func
 
@@ -826,10 +826,10 @@ def _request_async_builder(
             if response_type is bool:
                 return True  # type: ignore[return-value]
             if isinstance(response_type, type) and issubclass(response_type, SyncAskResponse):
-                return await ask_response_parser_async(resp)  # type: ignore
+                return await ask_response_parser_async(resp)  # type: ignore[return-value]
             elif isinstance(response_type, type) and issubclass(response_type, BaseModel):
-                return response_type.model_validate_json(resp.content)  # type: ignore
-        return None  # type: ignore
+                return response_type.model_validate_json(resp.content)  # type: ignore[return-value]
+        return None  # type: ignore[return-value]
 
     return _func
 
