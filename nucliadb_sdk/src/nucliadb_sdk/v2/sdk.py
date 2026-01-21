@@ -713,10 +713,17 @@ def _request_sync_builder(
             content=content,
             **kwargs,
         )
-        resp = self._request(
-            path, method, content=data, query_params=query_params, extra_headers=headers
-        )
+        try:
+            resp = self._request(
+                path, method, content=data, query_params=query_params, extra_headers=headers
+            )
+        except exceptions.NotFoundError:
+            if response_type is not None and isinstance(response_type, bool):
+                return False
+            raise
         if response_type is not None:
+            if isinstance(response_type, bool):
+                return True
             if issubclass(response_type, SyncAskResponse):
                 return ask_response_parser(resp)  # type: ignore
             elif issubclass(response_type, BaseModel):
