@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from typing import cast
+
 import httpx
 import pytest
 
+import nucliadb_models
 import nucliadb_sdk
 from nucliadb_models.conversation import InputMessage, InputMessageContent
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
@@ -62,8 +65,12 @@ def test_kb_services(sdk: nucliadb_sdk.NucliaDB, kb):
 
 def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     # Create, Get, List, Update
+    assert not sdk.exists_resource(kbid=kb.uuid, rid="nonexistent")
+    assert not sdk.exists_resource_by_slug(kbid=kb.uuid, slug="nonexistent")
     sdk.create_resource(kbid=kb.uuid, title="Resource", slug="resource")
     resource = sdk.get_resource_by_slug(kbid=kb.uuid, slug="resource")
+    assert sdk.exists_resource(kbid=kb.uuid, rid=resource.id)
+    assert sdk.exists_resource_by_slug(kbid=kb.uuid, slug="resource")
     sdk.get_resource_by_id(kbid=kb.uuid, rid=resource.id)
     resources = sdk.list_resources(kbid=kb.uuid)
     assert len(resources.resources) == 1
@@ -110,6 +117,9 @@ def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb, method: str):
     )
     assert field.field_id == fid
     assert field.field_type == "conversation"
+    assert field.value is not None
+    field.value = cast(nucliadb_models.Conversation, field.value)
+    assert field.value.messages is not None
     assert field.value.messages[0].ident == "1"
     assert field.value.messages[0].content.text == "Hello"
 
@@ -118,6 +128,9 @@ def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb, method: str):
     )
     assert field.field_id == fid
     assert field.field_type == "conversation"
+    assert field.value is not None
+    field.value = cast(nucliadb_models.Conversation, field.value)
+    assert field.value.messages is not None
     assert field.value.messages[0].ident == "1"
     assert field.value.messages[0].content.text == "Hello"
 

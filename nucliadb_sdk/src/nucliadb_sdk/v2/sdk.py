@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from json import JSONDecodeError
 from typing import (
     Any,
+    Awaitable,
     TypeVar,
 )
 
@@ -163,6 +164,16 @@ SDK_DEFINITION = {
         path_params=(),
     ),
     # Resource Endpoints
+    "exists_resource": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}",
+        method="HEAD",
+        path_params=("kbid", "rid"),
+    ),
+    "exists_resource_by_slug": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/slug/{slug}",
+        method="HEAD",
+        path_params=("kbid", "slug"),
+    ),
     "create_resource": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resources",
         method="POST",
@@ -681,7 +692,7 @@ def _request_sync_builder(
     name: str,
     request_type: type[INPUT_TYPE],
     response_type: type[OUTPUT_TYPE],
-):
+) -> Callable[..., OUTPUT_TYPE]:
     """
     SYNC standard Pydantic response builder
     """
@@ -708,10 +719,37 @@ def _request_sync_builder(
         )
         if response_type is not None:
             if issubclass(response_type, SyncAskResponse):
-                return ask_response_parser(resp)  # type: ignore
+                return ask_response_parser(resp)  # type: ignore[return-value]
             elif issubclass(response_type, BaseModel):
-                return response_type.model_validate_json(resp.content)  # type: ignore
-        return None  # type: ignore
+                return response_type.model_validate_json(resp.content)  # type: ignore[return-value]
+        return None  # type: ignore[return-value]
+
+    return _func
+
+
+def _request_bool_sync_builder(
+    name: str,
+) -> Callable[..., bool]:
+    """
+    Make a request that returns bool (typically HEAD requests for existence checks).
+    """
+    sdk_def = SDK_DEFINITION[name]
+    method = sdk_def.method
+    path_template = sdk_def.path_template
+    path_params = sdk_def.path_params
+
+    def _func(self: NucliaDB, **kwargs) -> bool:
+        path = prepare_request_base(
+            path_template=path_template,
+            path_params=path_params,
+            kwargs=kwargs,
+        )
+        query_params = kwargs.pop("query_params", None)
+        try:
+            self._request(path, method, query_params=query_params)
+            return True
+        except exceptions.NotFoundError:
+            return False
 
     return _func
 
@@ -769,11 +807,38 @@ def _request_iterator_sync_builder(
     return _func
 
 
+def _request_bool_async_builder(
+    name: str,
+):
+    """
+    Make a request that returns bool (typically HEAD requests for existence checks).
+    """
+    sdk_def = SDK_DEFINITION[name]
+    method = sdk_def.method
+    path_template = sdk_def.path_template
+    path_params = sdk_def.path_params
+
+    async def _func(self: NucliaDBAsync, **kwargs) -> bool:
+        path = prepare_request_base(
+            path_template=path_template,
+            path_params=path_params,
+            kwargs=kwargs,
+        )
+        query_params = kwargs.pop("query_params", None)
+        try:
+            await self._request(path, method, query_params=query_params)
+            return True
+        except exceptions.NotFoundError:
+            return False
+
+    return _func
+
+
 def _request_async_builder(
     name: str,
     request_type: type[INPUT_TYPE],
     response_type: type[OUTPUT_TYPE],
-):
+) -> Callable[..., Awaitable[OUTPUT_TYPE]]:
     """
     ASYNC standard Pydantic response builder
     """
@@ -788,7 +853,7 @@ def _request_async_builder(
         content: INPUT_TYPE | None = None,
         headers: dict[str, str] | None = None,
         **kwargs,
-    ) -> OUTPUT_TYPE:
+    ):
         path, data, query_params = prepare_request(
             path_template=path_template,
             path_params=path_params,
@@ -801,10 +866,10 @@ def _request_async_builder(
         )
         if response_type is not None:
             if isinstance(response_type, type) and issubclass(response_type, SyncAskResponse):
-                return await ask_response_parser_async(resp)  # type: ignore
+                return await ask_response_parser_async(resp)  # type: ignore[return-value]
             elif isinstance(response_type, type) and issubclass(response_type, BaseModel):
-                return response_type.model_validate_json(resp.content)  # type: ignore
-        return None  # type: ignore
+                return response_type.model_validate_json(resp.content)  # type: ignore[return-value]
+        return None  # type: ignore[return-value]
 
     return _func
 
@@ -1055,6 +1120,8 @@ class NucliaDB(_NucliaDBBase):
     )
     list_knowledge_boxes = _request_sync_builder("list_knowledge_boxes", type(None), KnowledgeBoxList)
     # Resource Endpoints
+    exists_resource = _request_bool_sync_builder("exists_resource")
+    exists_resource_by_slug = _request_bool_sync_builder("exists_resource_by_slug")
     create_resource = _request_sync_builder("create_resource", CreateResourcePayload, ResourceCreated)
     update_resource = _request_sync_builder("update_resource", UpdateResourcePayload, ResourceUpdated)
     update_resource_by_slug = _request_sync_builder(
@@ -1260,6 +1327,8 @@ class NucliaDBAsync(_NucliaDBBase):
     )
     list_knowledge_boxes = _request_async_builder("list_knowledge_boxes", type(None), KnowledgeBoxList)
     # Resource Endpoints
+    exists_resource = _request_bool_async_builder("exists_resource")
+    exists_resource_by_slug = _request_bool_async_builder("exists_resource_by_slug")
     create_resource = _request_async_builder("create_resource", CreateResourcePayload, ResourceCreated)
     update_resource = _request_async_builder("update_resource", UpdateResourcePayload, ResourceUpdated)
     update_resource_by_slug = _request_async_builder(
