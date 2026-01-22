@@ -46,7 +46,7 @@ images.settings["gcs"] = {
     "image": "tustvold/fake-gcs-server",
     "version": "latest",
     "options": {
-        "command": f"-scheme http -external-url http://{{network_gateway}}:{{port}} -port {{port}} -public-host {DOCKER_HOST}:{{port}}"
+        "command": f"-scheme http -external-url http://{DOCKER_HOST}:{{port}} -port {{port}} -public-host {{network_gateway}}:{{port}}"
     },
 }
 
