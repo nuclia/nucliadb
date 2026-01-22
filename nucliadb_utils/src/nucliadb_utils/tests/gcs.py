@@ -59,8 +59,12 @@ class GCS(BaseImage):
     def get_image_options(self):
         options = super().get_image_options()
         options["ports"] = {str(self.port): str(self.port)}
+        external_url = (
+            docker.from_env().networks.get(self.default_network).attrs["IPAM"]["Config"][0]["Gateway"]
+        )
+        print(f"GCS container using external URL from {self.default_network} network: {external_url}")
         options["command"] = (
-            f"-scheme http -external-url http://{DOCKER_HOST}:{self.port} -port {self.port} -public-host 172.17.0.1:{self.port}"
+            f"-scheme http -external-url http://{external_url}:{self.port} -port {self.port} -public-host 172.17.0.1:{self.port}"
         )
         return options
 
