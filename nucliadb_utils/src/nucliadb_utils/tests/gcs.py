@@ -23,7 +23,7 @@ from contextlib import ExitStack
 from typing import Any, AsyncIterator, Iterator
 from unittest.mock import patch
 
-import docker  # type: ignore  # type: ignore
+import docker  # type: ignore
 import pytest
 import requests
 from pytest_docker_fixtures import images  # type: ignore
@@ -45,7 +45,9 @@ DOCKER_HOST: str | None = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else N
 images.settings["gcs"] = {
     "image": "tustvold/fake-gcs-server",
     "version": "latest",
-    "options": {},
+    "options": {
+        "command": f"-scheme http -external-url http://{{network_gateway}}:{{port}} -port {{port}} -public-host {DOCKER_HOST}:{{port}}"
+    },
 }
 
 
@@ -59,13 +61,14 @@ class GCS(BaseImage):
     def get_image_options(self):
         options = super().get_image_options()
         options["ports"] = {str(self.port): str(self.port)}
-        external_url = (
+
+        # configure external URLs to be accessible outside the container using
+        # the docker network gateway IP address
+        network_gateway = (
             docker.from_env().networks.get(self.default_network).attrs["IPAM"]["Config"][0]["Gateway"]
         )
-        print(f"GCS container using external URL from {self.default_network} network: {external_url}")
-        options["command"] = (
-            f"-scheme http -external-url http://{external_url}:{self.port} -port {self.port} -public-host 172.17.0.1:{self.port}"
-        )
+        options["command"] = options["command"].format(network_gateway=network_gateway, port=self.port)
+
         return options
 
     def check(self):
