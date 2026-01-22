@@ -861,17 +861,10 @@ def _request_async_builder(
             content=content,
             **kwargs,
         )
-        try:
-            resp = await self._request(
-                path, method, content=data, query_params=query_params, extra_headers=headers
-            )
-        except exceptions.NotFoundError:
-            if response_type is bool:
-                return False  # type: ignore[return-value]
-            raise
+        resp = await self._request(
+            path, method, content=data, query_params=query_params, extra_headers=headers
+        )
         if response_type is not None:
-            if response_type is bool:
-                return True  # type: ignore[return-value]
             if isinstance(response_type, type) and issubclass(response_type, SyncAskResponse):
                 return await ask_response_parser_async(resp)  # type: ignore[return-value]
             elif isinstance(response_type, type) and issubclass(response_type, BaseModel):
