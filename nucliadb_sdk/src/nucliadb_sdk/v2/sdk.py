@@ -110,7 +110,7 @@ from nucliadb_models.writer import (
 from nucliadb_sdk.v2 import exceptions
 
 # Generics
-OUTPUT_TYPE = TypeVar("OUTPUT_TYPE", bound=BaseModel | None | bool)
+OUTPUT_TYPE = TypeVar("OUTPUT_TYPE", bound=BaseModel | None)
 
 RawRequestContent = str | bytes | Iterable[bytes] | AsyncIterable[bytes] | dict[str, Any]
 
@@ -714,22 +714,42 @@ def _request_sync_builder(
             content=content,
             **kwargs,
         )
-        try:
-            resp = self._request(
-                path, method, content=data, query_params=query_params, extra_headers=headers
-            )
-        except exceptions.NotFoundError:
-            if response_type is bool:
-                return False  # type: ignore[return-value]
-            raise
+        resp = self._request(
+            path, method, content=data, query_params=query_params, extra_headers=headers
+        )
         if response_type is not None:
-            if response_type is bool:
-                return True  # type: ignore[return-value]
             if issubclass(response_type, SyncAskResponse):
                 return ask_response_parser(resp)  # type: ignore[return-value]
             elif issubclass(response_type, BaseModel):
                 return response_type.model_validate_json(resp.content)  # type: ignore[return-value]
         return None  # type: ignore[return-value]
+
+    return _func
+
+
+def _request_bool_sync_builder(
+    name: str,
+) -> Callable[..., bool]:
+    """
+    Make a request that returns bool (typically HEAD requests for existence checks).
+    """
+    sdk_def = SDK_DEFINITION[name]
+    method = sdk_def.method
+    path_template = sdk_def.path_template
+    path_params = sdk_def.path_params
+
+    def _func(self: NucliaDB, **kwargs) -> bool:
+        path = prepare_request_base(
+            path_template=path_template,
+            path_params=path_params,
+            kwargs=kwargs,
+        )
+        query_params = kwargs.pop("query_params", None)
+        try:
+            self._request(path, method, query_params=query_params)
+            return True
+        except exceptions.NotFoundError:
+            return False
 
     return _func
 
@@ -783,6 +803,33 @@ def _request_iterator_sync_builder(
         )
         query_params = kwargs.pop("query_params", None)
         return self._stream_request(path, method, query_params=query_params)
+
+    return _func
+
+
+def _request_bool_async_builder(
+    name: str,
+):
+    """
+    Make a request that returns bool (typically HEAD requests for existence checks).
+    """
+    sdk_def = SDK_DEFINITION[name]
+    method = sdk_def.method
+    path_template = sdk_def.path_template
+    path_params = sdk_def.path_params
+
+    async def _func(self: NucliaDBAsync, **kwargs) -> bool:
+        path = prepare_request_base(
+            path_template=path_template,
+            path_params=path_params,
+            kwargs=kwargs,
+        )
+        query_params = kwargs.pop("query_params", None)
+        try:
+            await self._request(path, method, query_params=query_params)
+            return True
+        except exceptions.NotFoundError:
+            return False
 
     return _func
 
@@ -1080,8 +1127,8 @@ class NucliaDB(_NucliaDBBase):
     )
     list_knowledge_boxes = _request_sync_builder("list_knowledge_boxes", type(None), KnowledgeBoxList)
     # Resource Endpoints
-    exists_resource = _request_sync_builder("exists_resource", type(None), bool)
-    exists_resource_by_slug = _request_sync_builder("exists_resource_by_slug", type(None), bool)
+    exists_resource = _request_bool_sync_builder("exists_resource")
+    exists_resource_by_slug = _request_bool_sync_builder("exists_resource_by_slug")
     create_resource = _request_sync_builder("create_resource", CreateResourcePayload, ResourceCreated)
     update_resource = _request_sync_builder("update_resource", UpdateResourcePayload, ResourceUpdated)
     update_resource_by_slug = _request_sync_builder(
@@ -1287,8 +1334,8 @@ class NucliaDBAsync(_NucliaDBBase):
     )
     list_knowledge_boxes = _request_async_builder("list_knowledge_boxes", type(None), KnowledgeBoxList)
     # Resource Endpoints
-    exists_resource = _request_async_builder("exists_resource", type(None), bool)
-    exists_resource_by_slug = _request_async_builder("exists_resource_by_slug", type(None), bool)
+    exists_resource = _request_bool_async_builder("exists_resource")
+    exists_resource_by_slug = _request_bool_async_builder("exists_resource_by_slug")
     create_resource = _request_async_builder("create_resource", CreateResourcePayload, ResourceCreated)
     update_resource = _request_async_builder("update_resource", UpdateResourcePayload, ResourceUpdated)
     update_resource_by_slug = _request_async_builder(
