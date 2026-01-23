@@ -3,7 +3,7 @@
 # For a version that uses pre-built binaries (outside Docker) see `Dockerfile.nidx_prebuild`
 #
 
-FROM rust:1.92.0-trixie AS builder
+FROM rust:1.93.0-trixie AS builder
 RUN apt update && apt install -y protobuf-compiler
 COPY nucliadb_protos/*proto /app/nucliadb_protos/
 COPY nidx /app/nidx
