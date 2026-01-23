@@ -31,6 +31,8 @@ dependencies = [
     "PyNaCl",
     "pyjwt>=2.4.0",
     "mrflagly>=0.2.14",
+    # only for tests, but packaged in src/ so it's actually a dependency
+    "pytest-lazy-fixtures",
 
     # automatically bumped during release"
     "nidx-protos",

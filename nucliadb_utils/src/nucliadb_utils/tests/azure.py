@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from collections.abc import Generator, Iterator
+from collections.abc import AsyncIterator, Generator, Iterator
 from contextlib import ExitStack
 from dataclasses import dataclass
 from typing import Any
@@ -113,8 +113,10 @@ def azurite() -> Generator[AzuriteFixture, None, None]:
         container.stop()
 
 
-@pytest.fixture(scope="function")
-def azure_storage_settings(azurite: AzuriteFixture) -> Iterator[dict[str, Any]]:
+@pytest.fixture(scope="session")
+def session_azure_storage_settings(
+    azurite: AzuriteFixture,
+) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
     settings = {
         "file_backend": FileBackendConfig.AZURE,
         "azure_account_url": azurite.account_url,
@@ -124,6 +126,14 @@ def azure_storage_settings(azurite: AzuriteFixture) -> Iterator[dict[str, Any]]:
         "azure_deadletter_bucket": "deadletter",
         "azure_indexing_bucket": "indexing",
     }
+    yield settings, extended_settings
+
+
+@pytest.fixture(scope="function")
+def azure_storage_settings(
+    azurite: AzuriteFixture, session_azure_storage_settings: tuple[dict[str, Any], dict[str, Any]]
+) -> Iterator[dict[str, Any]]:
+    settings, extended_settings = session_azure_storage_settings
     with ExitStack() as stack:
         for key, value in settings.items():
             context = patch.object(storage_settings, key, value)
@@ -135,7 +145,7 @@ def azure_storage_settings(azurite: AzuriteFixture) -> Iterator[dict[str, Any]]:
 
 
 @pytest.fixture(scope="function")
-async def azure_storage(azurite, azure_storage_settings: dict[str, Any]):
+async def azure_storage(azurite, azure_storage_settings: dict[str, Any]) -> AsyncIterator[AzureStorage]:
     assert storage_settings.azure_account_url is not None
 
     storage = AzureStorage(

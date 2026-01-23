@@ -2220,6 +2220,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyjwt" },
     { name = "pynacl" },
+    { name = "pytest-lazy-fixtures" },
     { name = "types-requests" },
 ]
 
@@ -2270,6 +2271,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.2" },
     { name = "pyjwt", specifier = ">=2.4.0" },
     { name = "pynacl" },
+    { name = "pytest-lazy-fixtures" },
     { name = "redis", marker = "extra == 'cache'", specifier = ">=4.3.4" },
     { name = "starlette", marker = "extra == 'fastapi'", specifier = ">=0.21.0" },
     { name = "types-aiofiles", marker = "extra == 'storages'", specifier = ">=0.8.3" },

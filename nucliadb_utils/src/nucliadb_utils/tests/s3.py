@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from contextlib import ExitStack
 from typing import Any
 from unittest.mock import patch
@@ -54,7 +54,7 @@ class S3(BaseImage):
 
 
 @pytest.fixture(scope="session")
-def s3():
+def s3() -> Iterator[str]:
     container = S3()
     host, port = container.run()
     public_api_url = f"http://{host}:{port}"
@@ -63,7 +63,7 @@ def s3():
 
 
 @pytest.fixture(scope="function")
-async def s3_storage_settings(s3) -> AsyncIterator[dict[str, Any]]:
+def session_s3_storage_settings(s3: str) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
     settings = {
         "file_backend": FileBackendConfig.S3,
         "s3_endpoint": s3,
@@ -82,6 +82,14 @@ async def s3_storage_settings(s3) -> AsyncIterator[dict[str, Any]]:
         "s3_indexing_bucket": "indexing",
         "s3_deadletter_bucket": "deadletter",
     }
+    yield settings, extended_settings
+
+
+@pytest.fixture(scope="function")
+async def s3_storage_settings(
+    s3: str, session_s3_storage_settings: tuple[dict[str, Any], dict[str, Any]]
+) -> AsyncIterator[dict[str, Any]]:
+    settings, extended_settings = session_s3_storage_settings
     with ExitStack() as stack:
         for key, value in settings.items():
             context = patch.object(storage_settings, key, value)
@@ -94,7 +102,7 @@ async def s3_storage_settings(s3) -> AsyncIterator[dict[str, Any]]:
 
 
 @pytest.fixture(scope="function")
-async def s3_storage(s3, s3_storage_settings: dict[str, Any]):
+async def s3_storage(s3: str, s3_storage_settings: dict[str, Any]) -> AsyncIterator[S3Storage]:
     storage = S3Storage(
         aws_client_id=storage_settings.s3_client_id,
         aws_client_secret=storage_settings.s3_client_secret,

@@ -18,13 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import re
-from collections.abc import Iterator
 from concurrent.futures.thread import ThreadPoolExecutor
 from contextlib import ExitStack
-from typing import Any
+from typing import Any, AsyncIterator, Iterator
 from unittest.mock import patch
 
-import docker  # type: ignore  # type: ignore
+import docker  # type: ignore
 import pytest
 import requests
 from pytest_docker_fixtures import images  # type: ignore
@@ -46,7 +45,9 @@ DOCKER_HOST: str | None = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else N
 images.settings["gcs"] = {
     "image": "tustvold/fake-gcs-server",
     "version": "latest",
-    "options": {},
+    "options": {
+        "command": f"-scheme http -external-url http://{DOCKER_HOST}:{{port}} -port {{port}} -public-host {{network_gateway}}:{{port}}"
+    },
 }
 
 
@@ -60,9 +61,14 @@ class GCS(BaseImage):
     def get_image_options(self):
         options = super().get_image_options()
         options["ports"] = {str(self.port): str(self.port)}
-        options["command"] = (
-            f"-scheme http -external-url http://{DOCKER_HOST}:{self.port} -port {self.port} -public-host 172.17.0.1:{self.port}"
+
+        # configure external URLs to be accessible outside the container using
+        # the docker network gateway IP address
+        network_gateway = (
+            docker.from_env().networks.get(self.default_network).attrs["IPAM"]["Config"][0]["Gateway"]
         )
+        options["command"] = options["command"].format(network_gateway=network_gateway, port=self.port)
+
         return options
 
     def check(self):
@@ -74,7 +80,7 @@ class GCS(BaseImage):
 
 
 @pytest.fixture(scope="session")
-def gcs():
+def gcs() -> Iterator[str]:
     container = GCS()
     host, port = container.run()
     if running_in_mac_os():
@@ -91,19 +97,29 @@ def running_in_mac_os() -> bool:
     return os.uname().sysname == "Darwin"
 
 
-@pytest.fixture(scope="function")
-def gcs_storage_settings(gcs) -> Iterator[dict[str, Any]]:
+@pytest.fixture(scope="session")
+def session_gcs_storage_settings(gcs: str) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
     settings = {
         "file_backend": FileBackendConfig.GCS,
         "gcs_endpoint_url": gcs,
         "gcs_base64_creds": None,
         "gcs_bucket": "test_{kbid}",
         "gcs_location": "location",
+        "gcs_anonymous": True,
     }
     extended_settings = {
         "gcs_deadletter_bucket": "deadletter",
         "gcs_indexing_bucket": "indexing",
+        "gcs_threads": 1,
     }
+    yield settings, extended_settings
+
+
+@pytest.fixture(scope="function")
+def gcs_storage_settings(
+    gcs: str, session_gcs_storage_settings: tuple[dict[str, Any], dict[str, Any]]
+) -> Iterator[dict[str, Any]]:
+    settings, extended_settings = session_gcs_storage_settings
     with ExitStack() as stack:
         for key, value in settings.items():
             context = patch.object(storage_settings, key, value)
@@ -116,18 +132,18 @@ def gcs_storage_settings(gcs) -> Iterator[dict[str, Any]]:
 
 
 @pytest.fixture(scope="function")
-async def gcs_storage(gcs, gcs_storage_settings: dict[str, Any]):
+async def gcs_storage(gcs: str, gcs_storage_settings: dict[str, Any]) -> AsyncIterator[GCSStorage]:
     storage = GCSStorage(
         url=storage_settings.gcs_endpoint_url,
         account_credentials=storage_settings.gcs_base64_creds,
         bucket=storage_settings.gcs_bucket,  # type: ignore
         location=storage_settings.gcs_location,
         project=storage_settings.gcs_project,
-        executor=ThreadPoolExecutor(1),
+        executor=ThreadPoolExecutor(extended_storage_settings.gcs_threads),
         deadletter_bucket=extended_storage_settings.gcs_deadletter_bucket,
         indexing_bucket=extended_storage_settings.gcs_indexing_bucket,
         labels=storage_settings.gcs_bucket_labels,
-        anonymous=True,
+        anonymous=storage_settings.gcs_anonymous,
     )
     await storage.initialize()
     await storage.create_bucket("nidx")
