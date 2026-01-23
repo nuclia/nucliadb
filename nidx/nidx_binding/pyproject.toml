@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-version = "6.11.0"
+version = "6.11.1"
 
 [project.urls]
 Homepage = "https://nuclia.com"
