@@ -18,9 +18,23 @@ from nucliadb_telemetry import context
 from .utils import get_path_template
 
 
+def _get_header(scope, header_name: str) -> str | None:
+    """Get a header value from ASGI scope"""
+    headers = scope.get("headers")
+    if not headers:
+        return None
+
+    # ASGI header keys are in lower case
+    header_name = header_name.lower()
+    for key, value in headers:
+        if key.decode("utf8", errors="replace").lower() == header_name:
+            return value.decode("utf8", errors="replace")
+    return None
+
+
 class ContextInjectorMiddleware:
     """
-    Automatically inject context values for the current request's path parameters
+    Automatically inject context values for the current request's parameters, like path parameters or specific headers.
 
     For example:
         - `/api/v1/kb/{kbid}` would inject a context value for `kbid`
@@ -31,8 +45,19 @@ class ContextInjectorMiddleware:
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
+            context_data = {}
+
+            # Add path parameters
             found_path_template = get_path_template(scope)
             if found_path_template.match:
-                context.add_context(found_path_template.scope.get("path_params", {}))  # type: ignore
+                context_data.update(found_path_template.scope.get("path_params", {}))  # type: ignore
+
+            # Add user agent
+            user_agent = _get_header(scope, "user-agent")
+            if user_agent:
+                context_data["user_agent"] = user_agent
+
+            if context_data:
+                context.add_context(context_data)
 
         return await self.app(scope, receive, send)
