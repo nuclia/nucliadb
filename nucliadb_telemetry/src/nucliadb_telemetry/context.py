@@ -31,15 +31,16 @@ from nucliadb_telemetry.settings import telemetry_settings
 context_data = contextvars.ContextVar[dict[str, str] | None]("data", default=None)
 
 
-def add_context(new_data: dict[str, str]):
+def add_context(new_data: dict[str, str], set_span: bool = True):
     """
     This implementation always merges and sets the context, even if is was already set.
 
     This is so data is propated forward but not backward.
     """
 
-    # set the data on the current active span
-    set_info_on_span({f"nuclia.{key}": value for key, value in new_data.items()})
+    if set_span:
+        # set the data on the current active span
+        set_info_on_span({f"nuclia.{key}": value for key, value in new_data.items()})
 
     data = context_data.get()
     if data is None:

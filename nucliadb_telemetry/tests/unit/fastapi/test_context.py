@@ -34,6 +34,12 @@ async def test_context_injected():
     client = AsyncClient(transport=transport, base_url="http://test/api/v1")
 
     with patch("nucliadb_telemetry.fastapi.context.context.add_context") as add_context:
-        await client.get("/kb/123")
-        assert add_context.call_count == 1
-        assert add_context.call_args[0][0] == {"kbid": "123"}
+        await client.get("/kb/123", headers={"User-Agent": "test-agent/1.0"})
+        assert add_context.call_count == 2
+
+        context_data = add_context.call_args_list[0].args[0]
+        assert context_data["kbid"] == "123"
+
+        context_data = add_context.call_args_list[1].args[0]
+        assert context_data["user_agent"] == "test-agent/1.0"
+        assert add_context.call_args_list[1].kwargs["set_span"] is False
