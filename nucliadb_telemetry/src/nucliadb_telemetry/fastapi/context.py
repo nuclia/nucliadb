@@ -45,19 +45,20 @@ class ContextInjectorMiddleware:
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
-            context_data = {}
-
-            # Add path parameters
+            # Add path parameters to context (including tracing spans)
             found_path_template = get_path_template(scope)
             if found_path_template.match:
-                context_data.update(found_path_template.scope.get("path_params", {}))  # type: ignore
+                context.add_context(
+                    found_path_template.scope.get("path_params", {}),
+                )
 
-            # Add user agent
+            # Other context data that is not added to tracing spans
+            context_data = {}
             user_agent = _get_header(scope, "user-agent")
             if user_agent:
                 context_data["user_agent"] = user_agent
 
             if context_data:
-                context.add_context(context_data)
+                context.add_context(context_data, set_span=False)
 
         return await self.app(scope, receive, send)
