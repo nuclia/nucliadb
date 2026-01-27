@@ -614,7 +614,7 @@ mod tests {
     use std::{io::BufWriter, path::Path, sync::Arc};
 
     use nidx_vector::config::{VectorConfig, VectorType};
-    use object_store::ObjectStore;
+    use object_store::ObjectStoreExt;
     use object_store::PutPayload;
     use tempfile::tempdir;
 

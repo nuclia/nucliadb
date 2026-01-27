@@ -29,6 +29,7 @@ use nidx_protos::nidx::nidx_indexer_server::NidxIndexerServer;
 use nidx_protos::prost::*;
 use nidx_types::Seq;
 use object_store::DynObjectStore;
+use object_store::ObjectStoreExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -424,7 +425,7 @@ mod tests {
 
     use nidx_protos::StringList;
     use nidx_vector::config::{VectorConfig, VectorType};
-    use object_store::ObjectStore;
+    use object_store::ObjectStoreExt;
     use tempfile::tempfile;
     use uuid::Uuid;
 

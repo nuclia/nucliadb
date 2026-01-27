@@ -116,7 +116,7 @@ impl ObjectStoreConfig {
                 region_name,
                 endpoint,
             } => {
-                let mut builder = AmazonS3Builder::new()
+                let mut builder = AmazonS3Builder::from_env()
                     .with_region(region_name.clone())
                     .with_bucket_name(bucket.clone());
                 // Unless client_id and client_secret are specified, the library will try to use the credentials by looking
