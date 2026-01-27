@@ -47,7 +47,7 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "pytest-benchmark",
     "pytest-cov==3.0.0",
-    "pytest-docker-fixtures[pg]>=1.4.1",
+    "pytest-docker-fixtures[pg]>=1.4.2",
     "pytest-lazy-fixtures",
     "pytest-mock",
     "pytest-rerunfailures>=11.1.2",
