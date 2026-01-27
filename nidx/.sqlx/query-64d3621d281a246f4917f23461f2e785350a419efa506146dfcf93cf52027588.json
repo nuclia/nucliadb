@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT NOW() - MIN(updated_at) FROM indexes WHERE shard_id = ANY($1) AND updated_at > $2 AND deleted_at IS NULL",
+  "query": "SELECT NOW() - MIN(updated_at) FROM indexes WHERE ((shard_id = ANY($1) AND updated_at > $2) OR id = ANY($3)) AND deleted_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -12,12 +12,13 @@
     "parameters": {
       "Left": [
         "UuidArray",
-        "Timestamp"
+        "Timestamp",
+        "Int8Array"
       ]
     },
     "nullable": [
       null
     ]
   },
-  "hash": "1d3fca2682e25a01143da92285297f134a6a105a96f64d87e0db3abb219855e4"
+  "hash": "64d3621d281a246f4917f23461f2e785350a419efa506146dfcf93cf52027588"
 }

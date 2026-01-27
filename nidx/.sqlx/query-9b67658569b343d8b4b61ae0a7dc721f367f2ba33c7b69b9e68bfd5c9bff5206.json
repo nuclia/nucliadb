@@ -24,7 +24,9 @@
                 "text",
                 "paragraph",
                 "vector",
-                "relation"
+                "relation",
+                "vector_relation_node",
+                "vector_relation_edge"
               ]
             }
           }
