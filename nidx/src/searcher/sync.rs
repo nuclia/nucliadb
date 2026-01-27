@@ -95,9 +95,10 @@ pub async fn run_sync(
             metrics::searcher::SHARD_SELECTOR_TIME.observe(t.elapsed().as_secs_f64());
 
             let delay = sqlx::query_scalar!(
-                "SELECT NOW() - MIN(updated_at) FROM indexes WHERE shard_id = ANY($1) AND updated_at > $2 AND deleted_at IS NULL",
+                "SELECT NOW() - MIN(updated_at) FROM indexes WHERE ((shard_id = ANY($1) AND updated_at > $2) OR id = ANY($3)) AND deleted_at IS NULL",
                 &selected_shards,
-                last_updated_at
+                last_updated_at,
+                &failed_indexes.keys().map(IndexId::sql).collect::<Vec<_>>()
             )
             .fetch_one(&meta.pool)
             .await?;

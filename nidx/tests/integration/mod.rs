@@ -19,6 +19,7 @@
 //
 
 mod date_range_search;
+mod initial_sync;
 mod search_filtering;
 mod search_relations;
 mod search_sorting;
