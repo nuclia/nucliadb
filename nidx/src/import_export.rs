@@ -26,7 +26,7 @@ use std::{
 
 use anyhow::anyhow;
 use futures::TryStreamExt;
-use object_store::{DynObjectStore, ObjectStoreExt};
+use object_store::DynObjectStore;
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolCopyExt;
 use tar::Header;
@@ -258,7 +258,8 @@ mod tests {
     use nidx_tests::little_prince;
     use nidx_vector::config::VectorConfig;
     use nidx_vector::config::VectorType;
-    use object_store::ObjectStoreExt;
+    use object_store::ObjectStore;
+
     use sqlx::Postgres;
     use sqlx::testing::TestArgs;
     use sqlx::testing::TestSupport;
@@ -352,7 +353,7 @@ mod tests {
         for segment in all_segments {
             assert_eq!(
                 storage_dest.get(&segment.id.storage_key()).await?.meta.size,
-                segment.size_bytes.unwrap() as u64
+                segment.size_bytes.unwrap() as usize
             );
         }
 
