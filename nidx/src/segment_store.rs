@@ -22,7 +22,7 @@ use std::path::PathBuf;
 use std::{path::Path, sync::Arc};
 
 use futures::TryStreamExt;
-use object_store::DynObjectStore;
+use object_store::{DynObjectStore, ObjectStoreExt};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tokio_util::io::SyncIoBridge;
 use tracing::*;
