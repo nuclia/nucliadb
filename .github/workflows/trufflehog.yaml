@@ -1,0 +1,20 @@
+name: Trufflehog - Secrets security scan
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  trufflehog-scan:
+    runs-on: nuclia-base
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      
+      - name: TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --results=verified,unknown
