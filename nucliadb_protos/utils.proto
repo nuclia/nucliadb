@@ -103,14 +103,13 @@ message Security {
 }
 
 message RelationNodeVector {
-    RelationNode node = 1;
+    string node_value = 1;
     repeated float vector = 2;
 }
 
 message RelationEdgeVector {
-    Relation.RelationType relation_type = 1;
-    string relation_label = 2;
-    repeated float vector = 3;
+    string relation_label = 1;
+    repeated float vector = 2;
 }
 
 message RelationNodeVectors {

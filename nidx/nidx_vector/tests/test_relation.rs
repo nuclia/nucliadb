@@ -74,11 +74,7 @@ fn vector_for(value: &str) -> Vec<f32> {
 
 fn node_vector(value: &str) -> RelationNodeVector {
     RelationNodeVector {
-        node: Some(RelationNode {
-            value: value.into(),
-            ntype: NodeType::Entity as i32,
-            subtype: "animal".into(),
-        }),
+        node_value: value.into(),
         vector: vector_for(value),
     }
 }
@@ -852,12 +848,10 @@ fn test_relations_labels() -> anyhow::Result<()> {
             RelationEdgeVectors {
                 vectors: vec![
                     RelationEdgeVector {
-                        relation_type: RelationType::Entity as i32,
                         relation_label: "faster than".into(),
                         vector: vec![1.0, 0.0, 0.0, 0.0],
                     },
                     RelationEdgeVector {
-                        relation_type: RelationType::Entity as i32,
                         relation_label: "bigger than".into(),
                         vector: vec![0.0, 1.0, 0.0, 0.0],
                     },

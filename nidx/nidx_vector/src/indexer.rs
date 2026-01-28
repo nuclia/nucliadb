@@ -204,15 +204,12 @@ pub fn index_relation_nodes(
     if let Some(vectorset) = &resource.relation_node_vectors.get(index_name) {
         for node_vector in &vectorset.vectors {
             let vector = node_vector.vector.clone();
-            let Some(node) = &node_vector.node else {
-                return Err(anyhow!("relation node required"));
-            };
-            let fields = entity_fields.get(&node.value);
+            let fields = entity_fields.get(&node_vector.node_value);
             let Some(fields) = fields else {
                 continue;
             };
             elems.push(Elem::new(
-                node.value.clone(),
+                node_vector.node_value.clone(),
                 vector,
                 vec![],
                 Some(encode_metadata_field(rid, fields)),

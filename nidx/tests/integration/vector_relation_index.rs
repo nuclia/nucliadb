@@ -60,11 +60,7 @@ fn relation(from: &str, relation: &str, to: &str) -> IndexRelation {
 
 fn node_vector(value: &str, vector: Vec<f32>) -> RelationNodeVector {
     RelationNodeVector {
-        node: Some(RelationNode {
-            value: value.into(),
-            ntype: NodeType::Entity as i32,
-            subtype: "animal".into(),
-        }),
+        node_value: value.to_string(),
         vector,
     }
 }
@@ -72,7 +68,6 @@ fn node_vector(value: &str, vector: Vec<f32>) -> RelationNodeVector {
 fn relation_vector(value: &str, vector: Vec<f32>) -> RelationEdgeVector {
     RelationEdgeVector {
         vector,
-        relation_type: RelationType::Entity as i32,
         relation_label: value.to_string(),
     }
 }
