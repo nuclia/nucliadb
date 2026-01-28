@@ -163,6 +163,7 @@ fn encode_metadata_field(rid: &str, fields: &HashSet<&String>) -> Vec<u8> {
 
 pub fn index_relation_nodes(
     resource: &Resource,
+    index_name: &str,
     output_path: &Path,
     config: &VectorConfig,
 ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
@@ -175,6 +176,7 @@ pub fn index_relation_nodes(
     let rid = &resource_id.uuid;
 
     for (field, relations) in &resource.field_relations {
+        // Find all copies of each relation node
         for relation in &relations.relations {
             let Some(relation) = &relation.relation else {
                 return Err(anyhow!("relation required"));
@@ -197,22 +199,25 @@ pub fn index_relation_nodes(
         }
     }
 
+    // Index each vector
     let mut elems = Vec::new();
-    for node_vector in &resource.relation_node_vectors {
-        let vector = node_vector.vector.clone();
-        let Some(node) = &node_vector.node else {
-            return Err(anyhow!("relation node required"));
-        };
-        let fields = entity_fields.get(&node.value);
-        let Some(fields) = fields else {
-            continue;
-        };
-        elems.push(Elem::new(
-            node.value.clone(),
-            vector,
-            vec![],
-            Some(encode_metadata_field(rid, fields)),
-        ));
+    if let Some(vectorset) = &resource.relation_node_vectors.get(index_name) {
+        for node_vector in &vectorset.vectors {
+            let vector = node_vector.vector.clone();
+            let Some(node) = &node_vector.node else {
+                return Err(anyhow!("relation node required"));
+            };
+            let fields = entity_fields.get(&node.value);
+            let Some(fields) = fields else {
+                continue;
+            };
+            elems.push(Elem::new(
+                node.value.clone(),
+                vector,
+                vec![],
+                Some(encode_metadata_field(rid, fields)),
+            ));
+        }
     }
 
     if elems.is_empty() {
@@ -227,6 +232,7 @@ pub fn index_relation_nodes(
 
 pub fn index_relation_edges(
     resource: &Resource,
+    index_name: &str,
     output_path: &Path,
     config: &VectorConfig,
 ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
@@ -239,6 +245,7 @@ pub fn index_relation_edges(
     let rid = &resource_id.uuid;
 
     for (field, relations) in &resource.field_relations {
+        // Find all copies of each relation edge
         for relation in &relations.relations {
             let Some(relation) = &relation.relation else {
                 return Err(anyhow!("relation required"));
@@ -251,19 +258,22 @@ pub fn index_relation_edges(
         }
     }
 
+    // Index each vector
     let mut elems = Vec::new();
-    for rel_vector in &resource.relation_edge_vectors {
-        let vector = rel_vector.vector.clone();
-        let fields = entity_fields.get(&rel_vector.relation_label);
-        let Some(fields) = fields else {
-            continue;
-        };
-        elems.push(Elem::new(
-            rel_vector.relation_label.clone(),
-            vector,
-            vec![],
-            Some(encode_metadata_field(rid, fields)),
-        ));
+    if let Some(vectorset) = &resource.relation_edge_vectors.get(index_name) {
+        for rel_vector in &vectorset.vectors {
+            let vector = rel_vector.vector.clone();
+            let fields = entity_fields.get(&rel_vector.relation_label);
+            let Some(fields) = fields else {
+                continue;
+            };
+            elems.push(Elem::new(
+                rel_vector.relation_label.clone(),
+                vector,
+                vec![],
+                Some(encode_metadata_field(rid, fields)),
+            ));
+        }
     }
 
     if elems.is_empty() {

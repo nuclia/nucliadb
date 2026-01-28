@@ -101,3 +101,22 @@ enum VectorSimilarity {
 message Security {
     repeated string access_groups = 1;
 }
+
+message RelationNodeVector {
+    RelationNode node = 1;
+    repeated float vector = 2;
+}
+
+message RelationEdgeVector {
+    Relation.RelationType relation_type = 1;
+    string relation_label = 2;
+    repeated float vector = 3;
+}
+
+message RelationNodeVectors {
+    repeated RelationNodeVector vectors = 1;
+}
+
+message RelationEdgeVectors {
+    repeated RelationEdgeVector vectors = 1;
+}

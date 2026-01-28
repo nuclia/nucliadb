@@ -85,8 +85,8 @@ impl VectorIndexer {
                     ResourceWrapper::new_vectorset_resource(resource, index_name, use_default_vectorset);
                 index_resource(vectorset_resource, output_dir, config)
             }
-            IndexEntity::RelationNode => index_relation_nodes(resource, output_dir, config),
-            IndexEntity::RelationEdge => index_relation_edges(resource, output_dir, config),
+            IndexEntity::RelationNode => index_relation_nodes(resource, index_name, output_dir, config),
+            IndexEntity::RelationEdge => index_relation_edges(resource, index_name, output_dir, config),
         }
     }
 
