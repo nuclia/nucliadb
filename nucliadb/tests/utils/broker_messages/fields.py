@@ -56,6 +56,7 @@ class Field:
     id: rpb.FieldID
     user: FieldUser = dataclasses.field(default_factory=FieldUser)
     extracted: FieldExtracted = dataclasses.field(default_factory=FieldExtracted)
+    semantic_graph_vectors: list[rpb.SemanticGraphVectors] = dataclasses.field(default_factory=list)
 
 
 class FieldBuilder:
@@ -70,6 +71,7 @@ class FieldBuilder:
         self.__question_answers: rpb.FieldQuestionAnswerWrapper | None = None
         self.__file: rpb.FileExtractedData | None = None
         self.__link: rpb.LinkExtractedData | None = None
+        self._semantic_graph_vectors: list[rpb.SemanticGraphVectors] = []
 
     @property
     def id(self) -> rpb.FieldID:
@@ -158,6 +160,8 @@ class FieldBuilder:
         if self.__user_metadata is not None:
             field.user.metadata = rpb.UserFieldMetadata()
             field.user.metadata.CopyFrom(self.__user_metadata)
+
+        field.semantic_graph_vectors = self._semantic_graph_vectors
 
         return field
 
@@ -273,6 +277,47 @@ class FieldBuilder:
                 self.with_extracted_vectors([vector_pb], vectorset, split)
 
         return paragraph_id, self.with_extracted_paragraph_metadata(paragraph, split)
+
+    def _graph_vectors(self, vectorset: str) -> rpb.SemanticGraphVectors:
+        for extracted_vectors in self._semantic_graph_vectors:
+            if extracted_vectors.field == self._field_id and extracted_vectors.vectorset_id == vectorset:
+                return extracted_vectors
+
+        extracted_vectors = rpb.SemanticGraphVectors(
+            field=self._field_id,
+            vectorset_id=vectorset,
+        )
+        self._semantic_graph_vectors.append(extracted_vectors)
+        return extracted_vectors
+
+    def add_relation(
+        self,
+        source: utils_pb2.RelationNode,
+        label: str,
+        target: utils_pb2.RelationNode,
+        source_vectors: dict[str, list[float]],
+        relation_vectors: dict[str, list[float]],
+        target_vectors: dict[str, list[float]],
+    ):
+        relation = utils_pb2.Relation(
+            source=source,
+            to=target,
+            relation=utils_pb2.Relation.RelationType.ENTITY,
+            relation_label=label,
+        )
+
+        if len(self._extracted_metadata.metadata.metadata.relations) == 0:
+            self._extracted_metadata.metadata.metadata.relations.add(relations=[])
+        self._extracted_metadata.metadata.metadata.relations[0].relations.append(relation)
+
+        for node, vectors in [(source, source_vectors), (target, target_vectors)]:
+            for vectorset, vector in vectors.items():
+                self._graph_vectors(vectorset).node_vectors.vectors.add(
+                    node_value=node.value, vector=vector
+                )
+
+        for vectorset, vector in relation_vectors.items():
+            self._graph_vectors(vectorset).edge_vectors.vectors.add(relation_label=label, vector=vector)
 
     def add_question_answer(
         self,

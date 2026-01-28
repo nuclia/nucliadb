@@ -42,3 +42,4 @@ class Features:
     LOG_REQUEST_PAYLOADS = "nucliadb_log_request_payloads"
     IGNORE_EXTRACTED_IN_SEARCH = "nucliadb_ignore_extracted_in_search"
     ASK_DECOUPLED = "nucliadb_ask_decoupled"
+    SEMANTIC_GRAPH = "nucliadb_semantic_graph"

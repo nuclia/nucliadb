@@ -162,7 +162,7 @@ message Conversation {
     string extract_strategy = 2;
     string split_strategy = 3;
 
-    // The same message is used for both replacing and appending messages to an existing conversation. 
+    // The same message is used for both replacing and appending messages to an existing conversation.
     // We need this boolean flag to disambiguate at the ingestion of writer messages to know if new pages
     // need to be created or if we need to replace existing ones. replace_field will be false on append operations.
     bool replace_field = 4;
@@ -251,6 +251,19 @@ message ExtractedVectorsWrapper {
     }
     FieldID field = 3;
     string vectorset_id = 4;
+}
+
+message SemanticGraphVectors {
+    FieldID field = 1;
+    string vectorset_id = 2;
+    oneof node_data {
+        utils.RelationNodeVectors node_vectors = 3;
+        CloudFile node_file = 4;
+    }
+    oneof edge_data {
+        utils.RelationEdgeVectors edge_vectors = 5;
+        CloudFile edge_file = 6;
+    }
 }
 
 
