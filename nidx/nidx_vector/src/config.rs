@@ -23,8 +23,8 @@ use nidx_protos::VectorIndexConfig;
 use nidx_protos::{VectorSimilarity, VectorType as ProtoVectorType};
 use serde::{Deserialize, Serialize};
 
-use crate::VectorErr;
 use crate::vector_types::*;
+use crate::{VectorErr, VectorR};
 
 pub mod flags {
     // pub const DATA_STORE_V2: &str = "data_store_v2";
@@ -171,12 +171,20 @@ impl VectorConfig {
             IndexEntity::RelationNode | IndexEntity::RelationEdge => true,
         }
     }
-}
 
-impl TryFrom<VectorIndexConfig> for VectorConfig {
-    type Error = VectorErr;
+    pub fn from_paragraph_proto(proto: VectorIndexConfig) -> VectorR<Self> {
+        Self::from_proto(proto, IndexEntity::Paragraph)
+    }
 
-    fn try_from(proto: VectorIndexConfig) -> Result<Self, Self::Error> {
+    pub fn from_relation_node_proto(proto: VectorIndexConfig) -> VectorR<Self> {
+        Self::from_proto(proto, IndexEntity::RelationNode)
+    }
+
+    pub fn from_relation_edge_proto(proto: VectorIndexConfig) -> VectorR<Self> {
+        Self::from_proto(proto, IndexEntity::RelationEdge)
+    }
+
+    fn from_proto(proto: VectorIndexConfig, entity: IndexEntity) -> VectorR<Self> {
         let vector_type = match (proto.vector_type(), proto.vector_dimension) {
             (ProtoVectorType::DenseF32, Some(0)) => {
                 return Err(VectorErr::InvalidConfiguration("Vector dimension cannot be 0"));
@@ -188,6 +196,7 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
                 dimension: dim as usize,
             },
         };
+
         // TODO: Add support for multivectors. It is incompatible with vector normalization for now
         Ok(VectorConfig {
             similarity: proto.similarity().into(),
@@ -195,7 +204,7 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
             vector_type,
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
-            entity: IndexEntity::Paragraph,
+            entity,
         })
     }
 }

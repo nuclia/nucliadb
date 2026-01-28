@@ -105,7 +105,19 @@ impl NidxApi for ApiServer {
         for (vectorset_id, config) in request.vectorsets_configs {
             vector_configs.push((
                 vectorset_id,
-                VectorConfig::try_from(config).map_err(|e| Status::internal(e.to_string()))?,
+                VectorConfig::from_paragraph_proto(config).map_err(|e| Status::internal(e.to_string()))?,
+            ));
+        }
+        for (vectorset_id, config) in request.relation_node_vectorsets_configs {
+            vector_configs.push((
+                vectorset_id,
+                VectorConfig::from_relation_node_proto(config).map_err(|e| Status::internal(e.to_string()))?,
+            ));
+        }
+        for (vectorset_id, config) in request.relation_edge_vectorsets_configs {
+            vector_configs.push((
+                vectorset_id,
+                VectorConfig::from_relation_edge_proto(config).map_err(|e| Status::internal(e.to_string()))?,
             ));
         }
 
@@ -150,7 +162,7 @@ impl NidxApi for ApiServer {
         };
         let shard_id = Uuid::from_str(shard_id).map_err(NidxError::from)?;
         let config = if let Some(config) = request.config {
-            VectorConfig::try_from(config)
+            VectorConfig::from_paragraph_proto(config)
                 .map_err(|error| NidxError::invalid(&format!("Invalid vectorset configuration: {error:?}")))?
         } else {
             return Err(NidxError::invalid("Vectorset configuration is required").into());
