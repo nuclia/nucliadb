@@ -2220,7 +2220,6 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyjwt" },
     { name = "pynacl" },
-    { name = "pytest-lazy-fixtures" },
     { name = "types-requests" },
 ]
 
@@ -2244,6 +2243,14 @@ storages = [
     { name = "google-auth" },
     { name = "oauth2client" },
     { name = "types-aiofiles" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-benchmark" },
+    { name = "pytest-docker-fixtures" },
+    { name = "pytest-lazy-fixtures" },
 ]
 
 [package.metadata]
@@ -2271,7 +2278,6 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.2" },
     { name = "pyjwt", specifier = ">=2.4.0" },
     { name = "pynacl" },
-    { name = "pytest-lazy-fixtures" },
     { name = "redis", marker = "extra == 'cache'", specifier = ">=4.3.4" },
     { name = "starlette", marker = "extra == 'fastapi'", specifier = ">=0.21.0" },
     { name = "types-aiofiles", marker = "extra == 'storages'", specifier = ">=0.8.3" },
@@ -2279,6 +2285,14 @@ requires-dist = [
     { name = "uvicorn", marker = "extra == 'fastapi'" },
 ]
 provides-extras = ["cache", "fastapi", "storages"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-benchmark" },
+    { name = "pytest-docker-fixtures", specifier = ">=1.4.2" },
+    { name = "pytest-lazy-fixtures" },
+]
 
 [[package]]
 name = "nucliadb-workspace"
@@ -2336,7 +2350,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.23.0" },
     { name = "pytest-benchmark" },
     { name = "pytest-cov", specifier = "==3.0.0" },
-    { name = "pytest-docker-fixtures", extras = ["pg"], specifier = ">=1.4.1" },
+    { name = "pytest-docker-fixtures", extras = ["pg"], specifier = ">=1.4.2" },
     { name = "pytest-lazy-fixtures" },
     { name = "pytest-mock" },
     { name = "pytest-rerunfailures", specifier = ">=11.1.2" },

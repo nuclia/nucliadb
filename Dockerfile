@@ -13,7 +13,7 @@ RUN pip install uv
 # Install Python dependencies
 WORKDIR /usr/src/app
 COPY pyproject.toml uv.lock .
-RUN python -m venv /app && VIRTUAL_ENV=/app uv sync --active --no-group nidx --no-group sdk --no-install-workspace --frozen
+RUN python -m venv /app && VIRTUAL_ENV=/app uv sync --active --no-dev --no-group nidx --no-group sdk --no-install-workspace --frozen
 
 # Copy application
 COPY VERSION pyproject.toml uv.lock /usr/src/app
@@ -30,7 +30,7 @@ COPY nucliadb_sdk/pyproject.toml /usr/src/app/nucliadb_sdk/pyproject.toml
 COPY nucliadb_dataset/pyproject.toml /usr/src/app/nucliadb_dataset/pyproject.toml
 
 # Install our packages to the virtualenv
-RUN VIRTUAL_ENV=/app uv sync --active --no-editable --no-group nidx --no-group sdk --compile-bytecode
+RUN VIRTUAL_ENV=/app uv sync --active --no-dev --no-editable --no-group nidx --no-group sdk --compile-bytecode
 
 #
 # This is the main image, it just copies the virtual env into the base image

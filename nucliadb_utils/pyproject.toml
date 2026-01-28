@@ -59,9 +59,11 @@ storages = [
     "azure-storage-blob==12.20.0",
     "azure-identity>=1.16.1",
 ]
+
+[dependency-groups]
 # these dependencies are actually in the src/ folder (under
 # src/nucliadb_utils/tests/), but only used when the module is imported
-test = [
+dev = [
     "pytest",
     "pytest-benchmark",
     "pytest-docker-fixtures>=1.4.2",
