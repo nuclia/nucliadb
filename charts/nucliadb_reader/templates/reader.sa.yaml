@@ -4,7 +4,7 @@ kind: ServiceAccount
 metadata:
   name: {{ .Values.serviceAccount.name }}
   labels:
-    app: train
+    app: reader
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
