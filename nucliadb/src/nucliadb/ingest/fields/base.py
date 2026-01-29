@@ -44,8 +44,14 @@ from nucliadb_protos.resources_pb2 import (
     LargeComputedMetadata,
     LargeComputedMetadataWrapper,
     QuestionAnswers,
+    SemanticGraphVectors,
 )
-from nucliadb_protos.utils_pb2 import ExtractedText, VectorObject
+from nucliadb_protos.utils_pb2 import (
+    ExtractedText,
+    RelationEdgeVectors,
+    RelationNodeVectors,
+    VectorObject,
+)
 from nucliadb_protos.writer_pb2 import Error, FieldStatus
 from nucliadb_utils.storages.exceptions import CouldNotCopyNotFound
 from nucliadb_utils.storages.storage import Storage, StorageField
@@ -69,6 +75,8 @@ class FieldTypes(str, enum.Enum):
     FIELD_LARGE_METADATA = "large_metadata"
     THUMBNAIL = "thumbnail"
     QUESTION_ANSWERS = "question_answers"
+    RELATION_NODE_VECTORS = "{vectorset}/relation_node_vectors"
+    RELATION_EDGE_VECTORS = "{vectorset}/relation_edge_vectors"
 
 
 PbType = TypeVar("PbType", bound=Message)
@@ -83,6 +91,8 @@ class Field(Generic[PbType]):
     computed_metadata: FieldComputedMetadata | None
     large_computed_metadata: LargeComputedMetadata | None
     question_answers: FieldQuestionAnswers | None
+    relation_node_vectors: dict[str, RelationNodeVectors]
+    relation_edge_vectors: dict[str, RelationEdgeVectors]
 
     def __init__(
         self,
@@ -100,6 +110,8 @@ class Field(Generic[PbType]):
         self.computed_metadata = None
         self.large_computed_metadata = None
         self.question_answers = None
+        self.relation_node_vectors = {}
+        self.relation_edge_vectors = {}
 
         self.id: str = id
         self.resource = resource
@@ -383,6 +395,74 @@ class Field(Generic[PbType]):
                     if payload is not None:
                         self.extracted_text = payload
         return self.extracted_text
+
+    async def set_relation_node_vectors(self, payload: SemanticGraphVectors, vectorset: str):
+        node_key = FieldTypes.RELATION_NODE_VECTORS.value.format(vectorset=vectorset)
+        node_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, node_key)
+        if payload.HasField("node_file"):
+            try:
+                await self.storage.normalize_binary(payload.node_file, node_sf)
+            except CouldNotCopyNotFound:
+                # A failure here could mean the payload has already been
+                # moved and we're retrying due to a redelivery or another
+                # retry mechanism
+                already_moved = await node_sf.exists()
+                if already_moved:
+                    # We assume is the correct one and do nothing else
+                    pass
+                else:
+                    raise
+            self.relation_node_vectors[vectorset] = await self.storage.download_pb(node_sf, VectorObject)
+        elif payload.HasField("node_vectors"):
+            await self.storage.upload_pb(node_sf, payload.node_vectors)
+            self.relation_node_vectors[vectorset] = payload.node_vectors
+
+    async def get_relation_node_vectors(
+        self,
+        vectorset: str,
+        force: bool = False,
+    ) -> RelationNodeVectors | None:
+        if self.relation_node_vectors.get(vectorset, None) is None or force:
+            node_key = FieldTypes.RELATION_NODE_VECTORS.value.format(vectorset=vectorset)
+            node_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, node_key)
+            payload = await self.storage.download_pb(node_sf, VectorObject)
+            if payload is not None:
+                self.relation_node_vectors[vectorset] = payload
+        return self.relation_node_vectors.get(vectorset, None)
+
+    async def get_relation_edge_vectors(
+        self,
+        vectorset: str,
+        force: bool = False,
+    ) -> RelationEdgeVectors | None:
+        if self.relation_edge_vectors.get(vectorset, None) is None or force:
+            edge_key = FieldTypes.RELATION_EDGE_VECTORS.value.format(vectorset=vectorset)
+            edge_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, edge_key)
+            payload = await self.storage.download_pb(edge_sf, VectorObject)
+            if payload is not None:
+                self.relation_edge_vectors[vectorset] = payload
+        return self.relation_edge_vectors.get(vectorset, None)
+
+    async def set_relation_edge_vectors(self, payload: SemanticGraphVectors, vectorset: str):
+        edge_key = FieldTypes.RELATION_EDGE_VECTORS.value.format(vectorset=vectorset)
+        edge_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, edge_key)
+        if payload.HasField("edge_file"):
+            try:
+                await self.storage.normalize_binary(payload.edge_file, edge_sf)
+            except CouldNotCopyNotFound:
+                # A failure here could mean the payload has already been
+                # moved and we're retrying due to a redelivery or another
+                # retry mechanism
+                already_moved = await edge_sf.exists()
+                if already_moved:
+                    # We assume is the correct one and do nothing else
+                    pass
+                else:
+                    raise
+            self.relation_edge_vectors[vectorset] = await self.storage.download_pb(edge_sf, VectorObject)
+        elif payload.HasField("edge_vectors"):
+            await self.storage.upload_pb(edge_sf, payload.edge_vectors)
+            self.relation_edge_vectors[vectorset] = payload.edge_vectors
 
     async def set_vectors(
         self,
