@@ -425,7 +425,7 @@ class Field(Generic[PbType]):
         if self.relation_node_vectors.get(vectorset, None) is None or force:
             node_key = FieldTypes.RELATION_NODE_VECTORS.value.format(vectorset=vectorset)
             node_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, node_key)
-            payload = await self.storage.download_pb(node_sf, VectorObject)
+            payload = await self.storage.download_pb(node_sf, RelationNodeVectors)
             if payload is not None:
                 self.relation_node_vectors[vectorset] = payload
         return self.relation_node_vectors.get(vectorset, None)
@@ -438,7 +438,7 @@ class Field(Generic[PbType]):
         if self.relation_edge_vectors.get(vectorset, None) is None or force:
             edge_key = FieldTypes.RELATION_EDGE_VECTORS.value.format(vectorset=vectorset)
             edge_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, edge_key)
-            payload = await self.storage.download_pb(edge_sf, VectorObject)
+            payload = await self.storage.download_pb(edge_sf, RelationEdgeVectors)
             if payload is not None:
                 self.relation_edge_vectors[vectorset] = payload
         return self.relation_edge_vectors.get(vectorset, None)

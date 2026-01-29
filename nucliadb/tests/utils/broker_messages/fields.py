@@ -312,12 +312,20 @@ class FieldBuilder:
 
         for node, vectors in [(source, source_vectors), (target, target_vectors)]:
             for vectorset, vector in vectors.items():
-                self._graph_vectors(vectorset).node_vectors.vectors.add(
-                    node_value=node.value, vector=vector
+                nv = utils_pb2.RelationNodeVector(
+                    node_value=node.value,
+                    vector=vector,
                 )
+                if nv not in self._graph_vectors(vectorset).node_vectors.vectors:
+                    self._graph_vectors(vectorset).node_vectors.vectors.append(nv)
 
         for vectorset, vector in relation_vectors.items():
-            self._graph_vectors(vectorset).edge_vectors.vectors.add(relation_label=label, vector=vector)
+            ev = utils_pb2.RelationEdgeVector(
+                relation_label=label,
+                vector=vector,
+            )
+            if ev not in self._graph_vectors(vectorset).edge_vectors.vectors:
+                self._graph_vectors(vectorset).edge_vectors.vectors.append(ev)
 
     def add_question_answer(
         self,

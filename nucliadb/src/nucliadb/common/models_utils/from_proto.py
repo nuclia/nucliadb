@@ -34,6 +34,8 @@ from nucliadb_models.extracted import (
     FileExtractedData,
     LargeComputedMetadata,
     LinkExtractedData,
+    RelationEdgeVector,
+    RelationNodeVector,
     VectorObject,
 )
 from nucliadb_models.file import FieldFile
@@ -248,6 +250,26 @@ def extracted_text(message: resources_pb2.ExtractedText) -> ExtractedText:
 
 def vector_object(message: resources_pb2.VectorObject) -> VectorObject:
     return VectorObject(
+        **MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            always_print_fields_with_no_presence=True,
+        )
+    )
+
+
+def relation_node_vector(message: resources_pb2.RelationNodeVector) -> RelationNodeVector:
+    return RelationNodeVector(
+        **MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            always_print_fields_with_no_presence=True,
+        )
+    )
+
+
+def relation_edge_vector(message: resources_pb2.RelationEdgeVector) -> RelationEdgeVector:
+    return RelationEdgeVector(
         **MessageToDict(
             message,
             preserving_proto_field_name=True,

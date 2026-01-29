@@ -34,8 +34,20 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+PAD = [0.0] * 508
+VECTORS = {
+    "cat": [0.8, 0.6, 0.0, 0.0, *PAD],
+    "mouse": [0.5, 0.8, 0.33, 0.0, *PAD],
+    "dog": [0.0, 0.2, 0.9, 0.4, *PAD],
+    "bigger": [0.0, 0.0, 0.0, 1.0, *PAD],
+    "faster": [0.0, 0.0, 0.6, 0.8, *PAD],
+    "lives": [1.0, 0.0, 0.0, 0.0, *PAD],
+    "world": [0.0, 0.0, 1.0, 0.0, *PAD],
+    "home": [0.2, 0.9, 0.4, 0.0, *PAD],
+}
 
-@pytest.fixture(scope="function")
+
+@pytest.fixture
 async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, standalone_knowledgebox):
     resp = await nucliadb_writer.post(
         f"/kb/{standalone_knowledgebox}/resources",
@@ -62,8 +74,9 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
         "cat": RelationNode(value="Cat", ntype=RelationNode.NodeType.ENTITY, subtype="ANIMAL"),
         "dog": RelationNode(value="Dog", ntype=RelationNode.NodeType.ENTITY, subtype="ANIMAL"),
         "mouse": RelationNode(value="Mouse", ntype=RelationNode.NodeType.ENTITY, subtype="ANIMAL"),
+        "world": RelationNode(value="Worldwide", ntype=RelationNode.NodeType.ENTITY, subtype="PLACE"),
+        "home": RelationNode(value="Home", ntype=RelationNode.NodeType.ENTITY, subtype="PLACE"),
     }
-    vectors = {"cat": [0.0] * 512, "dog": [1.0] * 512, "bigger": [0.5] * 512, "mouse": [0.2] * 512}
 
     bmb = BrokerMessageBuilder(
         kbid=standalone_knowledgebox,
@@ -76,17 +89,57 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
         nodes["cat"],
         "bigger_than",
         nodes["mouse"],
-        {vectorset: vectors["cat"]},
-        {vectorset: vectors["bigger"]},
-        {vectorset: vectors["mouse"]},
+        {vectorset: VECTORS["cat"]},
+        {vectorset: VECTORS["bigger"]},
+        {vectorset: VECTORS["mouse"]},
     )
     field.add_relation(
         nodes["dog"],
         "bigger_than",
         nodes["cat"],
-        {vectorset: vectors["dog"]},
-        {vectorset: vectors["bigger"]},
-        {vectorset: vectors["cat"]},
+        {vectorset: VECTORS["dog"]},
+        {vectorset: VECTORS["bigger"]},
+        {vectorset: VECTORS["cat"]},
+    )
+    field.add_relation(
+        nodes["cat"],
+        "faster_than",
+        nodes["dog"],
+        {vectorset: VECTORS["cat"]},
+        {vectorset: VECTORS["faster"]},
+        {vectorset: VECTORS["dog"]},
+    )
+    field.add_relation(
+        nodes["dog"],
+        "faster_than",
+        nodes["mouse"],
+        {vectorset: VECTORS["dog"]},
+        {vectorset: VECTORS["faster"]},
+        {vectorset: VECTORS["mouse"]},
+    )
+    field.add_relation(
+        nodes["dog"],
+        "lives",
+        nodes["home"],
+        {vectorset: VECTORS["dog"]},
+        {vectorset: VECTORS["lives"]},
+        {vectorset: VECTORS["home"]},
+    )
+    field.add_relation(
+        nodes["cat"],
+        "lives",
+        nodes["home"],
+        {vectorset: VECTORS["cat"]},
+        {vectorset: VECTORS["lives"]},
+        {vectorset: VECTORS["home"]},
+    )
+    field.add_relation(
+        nodes["mouse"],
+        "lives",
+        nodes["world"],
+        {vectorset: VECTORS["mouse"]},
+        {vectorset: VECTORS["lives"]},
+        {vectorset: VECTORS["world"]},
     )
     bm = bmb.build()
 
@@ -96,7 +149,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ingestion(
+async def test_serialize(
     nucliadb_reader: AsyncClient,
     standalone_knowledgebox: str,
     graph_resource: str,
@@ -105,15 +158,94 @@ async def test_ingestion(
         f"/kb/{standalone_knowledgebox}/resource/{graph_resource}",
         params=dict(
             show=["relations", "extracted"],
-            extracted=["metadata"],
+            extracted=["metadata", "relation_vectors"],
         ),
     )
     assert resp.status_code == 200
     body = resp.json()
+    extracted = body["data"]["texts"]["animals"]["extracted"]
+    assert len(extracted["relation_node_vectors"]["multilingual"]) == 5
+    assert len(extracted["relation_edge_vectors"]["multilingual"]) == 3
 
-    # TODO: Check that get returns relation vectors?
 
-    # Check that it is indexed and we can search for it
+@pytest.mark.deploy_modes("standalone")
+async def test_node_queries(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    graph_resource: str,
+):
+    predict = get_predict()
+    with patch.object(
+        predict,
+        "query",
+        AsyncMock(
+            return_value=QueryInfo(
+                language=None,
+                visual_llm=False,
+                query="cat",
+                max_context=10,
+                entities=None,
+                sentence=SentenceSearch(vectors={"multilingual": VECTORS["cat"]}),
+            )
+        ),
+    ):
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/graph/nodes",
+            json={"query": {"prop": "node", "value": "dog", "match": "semantic"}},
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    nodes = body["nodes"]
+
+    assert len(nodes) == 2
+    assert nodes[0]["value"] == "Cat"
+    assert nodes[1]["value"] == "Mouse"
+    assert nodes[0]["score"] > nodes[1]["score"]
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_relation_queries(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    graph_resource: str,
+):
+    predict = get_predict()
+    with patch.object(
+        predict,
+        "query",
+        AsyncMock(
+            return_value=QueryInfo(
+                language=None,
+                visual_llm=False,
+                query="faster",
+                max_context=10,
+                entities=None,
+                sentence=SentenceSearch(vectors={"multilingual": VECTORS["faster"]}),
+            )
+        ),
+    ):
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/graph/relations",
+            json={"query": {"prop": "relation", "label": "faster", "match": "semantic"}},
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    relations = body["relations"]
+
+    assert len(relations) == 2
+    assert relations[0]["label"] == "faster_than"
+    assert relations[1]["label"] == "bigger_than"
+    assert relations[0]["score"] > relations[1]["score"]
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_path_queries(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    graph_resource: str,
+):
     predict = get_predict()
     with patch.object(
         predict,
@@ -125,16 +257,114 @@ async def test_ingestion(
                 query="dog",
                 max_context=10,
                 entities=None,
-                sentence=SentenceSearch(vectors={"multilingual": [0.3] * 512}),
+                sentence=SentenceSearch(vectors={"multilingual": VECTORS["dog"]}),
             )
         ),
     ):
         resp = await nucliadb_reader.post(
-            f"/kb/{standalone_knowledgebox}/graph/nodes",
+            f"/kb/{standalone_knowledgebox}/graph",
             json={"query": {"prop": "node", "value": "dog", "match": "semantic"}},
         )
 
-    assert resp.status_code == 200, resp.text
+    assert resp.status_code == 200
     body = resp.json()
-    # TODO: Check scores once we add them to the response, use better fake vectors
-    assert sorted([n["value"] for n in body["nodes"]]) == ["Dog", "Mouse"]
+    paths = body["paths"]
+
+    assert len(paths) == 5
+
+    def to_text(path):
+        return f"{path['source']['value']} {path['relation']['label']} {path['destination']['value']}"
+
+    assert sorted([to_text(p) for p in paths]) == sorted(
+        [
+            "Cat faster_than Dog",
+            "Mouse lives Worldwide",  # Dog & Worldwide vectors are close
+            "Dog bigger_than Cat",
+            "Dog faster_than Mouse",
+            "Dog lives Home",
+        ]
+    )
+    assert (
+        paths[0]["score"]
+        >= paths[1]["score"]
+        >= paths[2]["score"]
+        >= paths[3]["score"]
+        >= paths[4]["score"]
+    )
+
+    # Repeat, excluding Worldwide via the node subtype filter
+    with patch.object(
+        predict,
+        "query",
+        AsyncMock(
+            return_value=QueryInfo(
+                language=None,
+                visual_llm=False,
+                query="dog",
+                max_context=10,
+                entities=None,
+                sentence=SentenceSearch(vectors={"multilingual": VECTORS["dog"]}),
+            )
+        ),
+    ):
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/graph",
+            json={"query": {"prop": "node", "value": "dog", "match": "semantic", "group": "ANIMAL"}},
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    paths = body["paths"]
+
+    assert len(paths) == 4
+
+    assert sorted([to_text(p) for p in paths]) == sorted(
+        [
+            "Cat faster_than Dog",
+            "Dog bigger_than Cat",
+            "Dog faster_than Mouse",
+            "Dog lives Home",
+        ]
+    )
+    assert paths[0]["score"] >= paths[1]["score"] >= paths[2]["score"] >= paths[3]["score"]
+
+    # Repeat, excluding Worldwide via the node subtype filter and faster_than via exact match
+    with patch.object(
+        predict,
+        "query",
+        AsyncMock(
+            return_value=QueryInfo(
+                language=None,
+                visual_llm=False,
+                query="dog",
+                max_context=10,
+                entities=None,
+                sentence=SentenceSearch(vectors={"multilingual": VECTORS["dog"]}),
+            )
+        ),
+    ):
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/graph",
+            json={
+                "query": {
+                    "and": [
+                        {"prop": "node", "value": "dog", "match": "semantic", "group": "ANIMAL"},
+                        {"not": {"prop": "relation", "label": "faster_than"}},
+                    ]
+                }
+            },
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    paths = body["paths"]
+
+    assert len(paths) == 2
+
+    assert sorted([to_text(p) for p in paths]) == sorted(
+        [
+            "Dog bigger_than Cat",
+            "Dog lives Home",
+        ]
+    )
+    assert paths[0]["score"] >= paths[1]["score"]

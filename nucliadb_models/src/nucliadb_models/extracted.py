@@ -49,6 +49,16 @@ class VectorObject(BaseModel):
     deleted_splits: list[str] | None = None
 
 
+class RelationNodeVector(BaseModel):
+    node_value: str
+    vector: list[float]
+
+
+class RelationEdgeVector(BaseModel):
+    relation_label: str
+    vector: list[float]
+
+
 class Position(BaseModel):
     start: int
     end: int

@@ -34,7 +34,7 @@ from nucliadb_models.graph.responses import (
 def build_graph_response(results: list[nodereader_pb2.GraphSearchResponse]) -> GraphSearchResponse:
     paths = []
     for shard_results in results:
-        for pb_path in shard_results.graph:
+        for pb_path, score in zip(shard_results.graph, shard_results.scores):
             source = shard_results.nodes[pb_path.source]
             relation = shard_results.relations[pb_path.relation]
             destination = shard_results.nodes[pb_path.destination]
@@ -63,6 +63,7 @@ def build_graph_response(results: list[nodereader_pb2.GraphSearchResponse]) -> G
                     group=destination.subtype,
                 ),
                 metadata=metadata,
+                score=score,
             )
             paths.append(path)
 
@@ -75,12 +76,13 @@ def build_graph_nodes_response(
 ) -> GraphNodesSearchResponse:
     nodes = []
     for shard_results in results:
-        for node in shard_results.nodes:
+        for node, score in zip(shard_results.nodes, shard_results.scores):
             nodes.append(
                 graph_responses.GraphNode(
                     value=node.value,
                     type=RelationNodeTypePbMap[node.ntype],
                     group=node.subtype,
+                    score=score,
                 )
             )
     response = GraphNodesSearchResponse(nodes=nodes)
@@ -92,11 +94,12 @@ def build_graph_relations_response(
 ) -> GraphRelationsSearchResponse:
     relations = []
     for shard_results in results:
-        for relation in shard_results.relations:
+        for relation, score in zip(shard_results.relations, shard_results.scores):
             relations.append(
                 graph_responses.GraphRelation(
                     label=relation.label,
                     type=RelationTypePbMap[relation.relation_type],
+                    score=score,
                 )
             )
     response = GraphRelationsSearchResponse(relations=relations)
