@@ -216,6 +216,8 @@ class SyncMetadata(BaseModel):
     auth_provider: str = Field(
         description="Authentication provider used to access the origin cloud storage system"
     )
+    md5: str | None
+    quick_xor_hash: str | None
 
 
 class InputOrigin(BaseModel):
