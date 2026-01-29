@@ -22,18 +22,24 @@
 from nidx_protos import nodereader_pb2
 from typing_extensions import assert_never
 
+from nucliadb.common import datamanagers
 from nucliadb.common.filter_expression import add_and_expression, parse_expression
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap, RelationTypeMap
+from nucliadb.search.predict_models import QueryModel
 from nucliadb.search.search.query_parser.models import GraphRetrieval
 from nucliadb.search.search.utils import filter_hidden_resources
+from nucliadb.search.utilities import get_predict
+from nucliadb_models import filters
 from nucliadb_models.graph import requests as graph_requests
 from nucliadb_models.labels import LABEL_HIDDEN
 from nucliadb_protos import utils_pb2
 
 
 async def parse_graph_search(kbid: str, item: graph_requests.GraphSearchRequest) -> GraphRetrieval:
+    node_vectors, relation_vectors = await _calculate_graph_vectors(kbid, item)
+
     pb = await _parse_common(kbid, item)
-    pb.query.path.CopyFrom(parse_path_query(item.query))
+    pb.query.path.CopyFrom(parse_path_query(item.query, node_vectors, relation_vectors))
     pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.PATH
     return pb
 
@@ -41,8 +47,10 @@ async def parse_graph_search(kbid: str, item: graph_requests.GraphSearchRequest)
 async def parse_graph_node_search(
     kbid: str, item: graph_requests.GraphNodesSearchRequest
 ) -> GraphRetrieval:
+    node_vectors, _ = await _calculate_graph_vectors(kbid, item)
+
     pb = await _parse_common(kbid, item)
-    pb.query.path.CopyFrom(_parse_node_query(item.query))
+    pb.query.path.CopyFrom(_parse_node_query(item.query, node_vectors))
     pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.NODES
     return pb
 
@@ -50,8 +58,10 @@ async def parse_graph_node_search(
 async def parse_graph_relation_search(
     kbid: str, item: graph_requests.GraphRelationsSearchRequest
 ) -> GraphRetrieval:
+    _, relation_vectors = await _calculate_graph_vectors(kbid, item)
+
     pb = await _parse_common(kbid, item)
-    pb.query.path.CopyFrom(_parse_relation_query(item.query))
+    pb.query.path.CopyFrom(_parse_relation_query(item.query, relation_vectors))
     pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.RELATIONS
     return pb
 
@@ -74,6 +84,14 @@ async def _parse_common(kbid: str, item: AnyGraphRequest) -> nodereader_pb2.Grap
     security = _parse_security(kbid, item)
     if security is not None:
         pb.security.CopyFrom(security)
+
+    # TODO: Use proper vectorsets
+    # Maybe this could come from the call to predict API?
+    vss = []
+    async with datamanagers.with_ro_transaction() as txn:
+        async for vs_id, vs_config in datamanagers.vectorsets.iter(txn, kbid=kbid):
+            vss.append(vs_id)
+    pb.graph_vectorset = vss[0]
 
     return pb
 
@@ -111,44 +129,48 @@ def _parse_security(kbid: str, item: AnyGraphRequest) -> utils_pb2.Security | No
         return None
 
 
-def parse_path_query(expr: graph_requests.GraphPathQuery) -> nodereader_pb2.GraphQuery.PathQuery:
+def parse_path_query(
+    expr: graph_requests.GraphPathQuery,
+    node_vectors: dict[str, list[float]],
+    relation_vectors: dict[str, list[float]],
+) -> nodereader_pb2.GraphQuery.PathQuery:
     pb = nodereader_pb2.GraphQuery.PathQuery()
 
     if isinstance(expr, graph_requests.And):
         for op in expr.operands:
-            pb.bool_and.operands.append(parse_path_query(op))
+            pb.bool_and.operands.append(parse_path_query(op, node_vectors, relation_vectors))
 
     elif isinstance(expr, graph_requests.Or):
         for op in expr.operands:
-            pb.bool_or.operands.append(parse_path_query(op))
+            pb.bool_or.operands.append(parse_path_query(op, node_vectors, relation_vectors))
 
     elif isinstance(expr, graph_requests.Not):
-        pb.bool_not.CopyFrom(parse_path_query(expr.operand))
+        pb.bool_not.CopyFrom(parse_path_query(expr.operand, node_vectors, relation_vectors))
 
     elif isinstance(expr, graph_requests.GraphPath):
         if expr.source is not None:
-            _set_node_to_pb(expr.source, pb.path.source)
+            _set_node_to_pb(expr.source, pb.path.source, node_vectors)
 
         if expr.destination is not None:
-            _set_node_to_pb(expr.destination, pb.path.destination)
+            _set_node_to_pb(expr.destination, pb.path.destination, node_vectors)
 
         if expr.relation is not None:
-            _set_relation_to_pb(expr.relation, pb.path.relation)
+            _set_relation_to_pb(expr.relation, pb.path.relation, relation_vectors)
 
         pb.path.undirected = expr.undirected
 
     elif isinstance(expr, graph_requests.SourceNode):
-        _set_node_to_pb(expr, pb.path.source)
+        _set_node_to_pb(expr, pb.path.source, node_vectors)
 
     elif isinstance(expr, graph_requests.DestinationNode):
-        _set_node_to_pb(expr, pb.path.destination)
+        _set_node_to_pb(expr, pb.path.destination, node_vectors)
 
     elif isinstance(expr, graph_requests.AnyNode):
-        _set_node_to_pb(expr, pb.path.source)
+        _set_node_to_pb(expr, pb.path.source, node_vectors)
         pb.path.undirected = True
 
     elif isinstance(expr, graph_requests.Relation):
-        _set_relation_to_pb(expr, pb.path.relation)
+        _set_relation_to_pb(expr, pb.path.relation, relation_vectors)
 
     elif isinstance(expr, graph_requests.Generated):
         _set_generated_to_pb(expr, pb)
@@ -159,22 +181,24 @@ def parse_path_query(expr: graph_requests.GraphPathQuery) -> nodereader_pb2.Grap
     return pb
 
 
-def _parse_node_query(expr: graph_requests.GraphNodesQuery) -> nodereader_pb2.GraphQuery.PathQuery:
+def _parse_node_query(
+    expr: graph_requests.GraphNodesQuery, node_vectors: dict[str, list[float]]
+) -> nodereader_pb2.GraphQuery.PathQuery:
     pb = nodereader_pb2.GraphQuery.PathQuery()
 
     if isinstance(expr, graph_requests.And):
         for op in expr.operands:
-            pb.bool_and.operands.append(_parse_node_query(op))
+            pb.bool_and.operands.append(_parse_node_query(op, node_vectors))
 
     elif isinstance(expr, graph_requests.Or):
         for op in expr.operands:
-            pb.bool_or.operands.append(_parse_node_query(op))
+            pb.bool_or.operands.append(_parse_node_query(op, node_vectors))
 
     elif isinstance(expr, graph_requests.Not):
-        pb.bool_not.CopyFrom(_parse_node_query(expr.operand))
+        pb.bool_not.CopyFrom(_parse_node_query(expr.operand, node_vectors))
 
     elif isinstance(expr, graph_requests.AnyNode):
-        _set_node_to_pb(expr, pb.path.source)
+        _set_node_to_pb(expr, pb.path.source, node_vectors)
         pb.path.undirected = True
 
     elif isinstance(expr, graph_requests.Generated):
@@ -188,22 +212,23 @@ def _parse_node_query(expr: graph_requests.GraphNodesQuery) -> nodereader_pb2.Gr
 
 def _parse_relation_query(
     expr: graph_requests.GraphRelationsQuery,
+    relation_vectors: dict[str, list[float]],
 ) -> nodereader_pb2.GraphQuery.PathQuery:
     pb = nodereader_pb2.GraphQuery.PathQuery()
 
     if isinstance(expr, graph_requests.And):
         for op in expr.operands:
-            pb.bool_and.operands.append(_parse_relation_query(op))
+            pb.bool_and.operands.append(_parse_relation_query(op, relation_vectors))
 
     elif isinstance(expr, graph_requests.Or):
         for op in expr.operands:
-            pb.bool_or.operands.append(_parse_relation_query(op))
+            pb.bool_or.operands.append(_parse_relation_query(op, relation_vectors))
 
     elif isinstance(expr, graph_requests.Not):
-        pb.bool_not.CopyFrom(_parse_relation_query(expr.operand))
+        pb.bool_not.CopyFrom(_parse_relation_query(expr.operand, relation_vectors))
 
     elif isinstance(expr, graph_requests.Relation):
-        _set_relation_to_pb(expr, pb.path.relation)
+        _set_relation_to_pb(expr, pb.path.relation, relation_vectors)
 
     elif isinstance(expr, graph_requests.Generated):
         _set_generated_to_pb(expr, pb)
@@ -214,7 +239,11 @@ def _parse_relation_query(
     return pb
 
 
-def _set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuery.Node):
+def _set_node_to_pb(
+    node: graph_requests.GraphNode,
+    pb: nodereader_pb2.GraphQuery.Node,
+    node_vectors: dict[str, list[float]],
+):
     if node.value is not None:
         pb.value = node.value
         if node.match == graph_requests.NodeMatchKindName.EXACT:
@@ -228,6 +257,9 @@ def _set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuer
             pb.fuzzy.kind = nodereader_pb2.GraphQuery.Node.MatchLocation.WORDS
             pb.fuzzy.distance = 1
 
+        elif node.match == graph_requests.NodeMatchKindName.SEMANTIC:
+            pb.vector.vector.extend(node_vectors[node.value])
+
         else:  # pragma: no cover
             assert_never(node.match)
 
@@ -238,11 +270,24 @@ def _set_node_to_pb(node: graph_requests.GraphNode, pb: nodereader_pb2.GraphQuer
         pb.node_subtype = node.group
 
 
-def _set_relation_to_pb(relation: graph_requests.GraphRelation, pb: nodereader_pb2.GraphQuery.Relation):
+def _set_relation_to_pb(
+    relation: graph_requests.GraphRelation,
+    pb: nodereader_pb2.GraphQuery.Relation,
+    relation_vectors: dict[str, list[float]],
+):
     if relation.label is not None:
         pb.value = relation.label
     if relation.type is not None:
         pb.relation_type = RelationTypeMap[relation.type]
+
+    if relation.label is not None:
+        match relation.match:
+            case graph_requests.RelationMatchKindName.EXACT:
+                pb.exact.SetInParent()
+            case graph_requests.RelationMatchKindName.SEMANTIC:
+                pb.vector.vector.extend(relation_vectors[relation.label])
+            case _:  # pragma: no cover
+                assert_never(relation.match)
 
 
 def _set_generated_to_pb(generated: graph_requests.Generated, pb: nodereader_pb2.GraphQuery.PathQuery):
@@ -261,3 +306,66 @@ def _set_generated_to_pb(generated: graph_requests.Generated, pb: nodereader_pb2
 
     else:  # pragma: no cover
         assert_never(generated.by)
+
+
+async def _calculate_graph_vectors(
+    kbid: str,
+    request: AnyGraphRequest,
+) -> tuple[dict[str, list[float]], dict[str, list[float]]]:
+    nodes: set[str] = set()
+    relations: set[str] = set()
+    _extract_semantic_terms(request.query, nodes, relations)
+
+    node_vectors = {}
+    relation_vectors = {}
+
+    # TODO: This should use a specific endpoint that uses the appropriate models
+    # and supports embedding multiple terms at once
+    predict = get_predict()
+    for node in nodes:
+        result = await predict.query(kbid, QueryModel(text=node))
+        assert result.sentence
+        vector = next(iter(result.sentence.vectors.values()))
+        node_vectors[node] = vector
+
+    for relation in relations:
+        result = await predict.query(kbid, QueryModel(text=relation))
+        assert result.sentence
+        vector = next(iter(result.sentence.vectors.values()))
+        relation_vectors[relation] = vector
+
+    return node_vectors, relation_vectors
+
+
+def _extract_semantic_terms(
+    query: graph_requests.GraphPathQuery
+    | graph_requests.GraphNodesQuery
+    | graph_requests.GraphRelationsQuery
+    | graph_requests.GraphNode
+    | graph_requests.GraphRelation
+    | None,
+    nodes: set[str],
+    relations: set[str],
+):
+    match query:
+        case filters.And() | filters.Or():
+            for op in query.operands:
+                _extract_semantic_terms(op, nodes, relations)
+        case filters.Not():
+            _extract_semantic_terms(query.operand, nodes, relations)
+        case graph_requests.GraphPath():
+            _extract_semantic_terms(query.source, nodes, relations)
+            _extract_semantic_terms(query.relation, nodes, relations)
+            _extract_semantic_terms(query.destination, nodes, relations)
+        case graph_requests.GraphNode():
+            if query.match == graph_requests.NodeMatchKindName.SEMANTIC and query.value:
+                nodes.add(query.value)
+        case graph_requests.GraphRelation():
+            if query.match == graph_requests.RelationMatchKindName.SEMANTIC and query.label:
+                relations.add(query.label)
+        case graph_requests.Generated():
+            pass
+        case None:
+            pass
+        case _:
+            assert_never(query)

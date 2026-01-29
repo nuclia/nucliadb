@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from httpx import AsyncClient
 from tests.utils import inject_message
@@ -24,6 +26,8 @@ from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import wait_for_sync
 
 from nucliadb.common import datamanagers
+from nucliadb.search.utilities import get_predict
+from nucliadb_models.internal.predict import QueryInfo, SentenceSearch
 from nucliadb_protos.resources_pb2 import (
     FieldType,
 )
@@ -106,9 +110,31 @@ async def test_ingestion(
     )
     assert resp.status_code == 200
     body = resp.json()
-    print(body)
-    breakpoint()
-    extracted_metadata = body["data"]["texts"]["text1"]["extracted"]["metadata"]
-    assert len(extracted_metadata["metadata"]["relations"]) == 1
-    assert "from" in extracted_metadata["metadata"]["relations"][0]
-    assert "from_" not in extracted_metadata["metadata"]["relations"][0]
+
+    # TODO: Check that get returns relation vectors?
+
+    # Check that it is indexed and we can search for it
+    predict = get_predict()
+    with patch.object(
+        predict,
+        "query",
+        AsyncMock(
+            return_value=QueryInfo(
+                language=None,
+                visual_llm=False,
+                query="dog",
+                max_context=10,
+                entities=None,
+                sentence=SentenceSearch(vectors={"multilingual": [0.3] * 512}),
+            )
+        ),
+    ):
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/graph/nodes",
+            json={"query": {"prop": "node", "value": "dog", "match": "semantic"}},
+        )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # TODO: Check scores once we add them to the response, use better fake vectors
+    assert sorted([n["value"] for n in body["nodes"]]) == ["Dog", "Mouse"]

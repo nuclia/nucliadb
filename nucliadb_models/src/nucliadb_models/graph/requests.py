@@ -39,6 +39,7 @@ class NodeMatchKindName(str, Enum):
     EXACT = "exact"
     FUZZY = "fuzzy"
     FUZZY_WORDS = "fuzzy_words"
+    SEMANTIC = "semantic"
 
 
 class GraphNode(BaseModel, extra="forbid"):
@@ -48,7 +49,7 @@ class GraphNode(BaseModel, extra="forbid"):
     group: str | None = None
 
     @model_validator(mode="after")
-    def validate_fuzzy_usage(self) -> Self:
+    def validate_match_usage(self) -> Self:
         if self.match in (NodeMatchKindName.FUZZY, NodeMatchKindName.FUZZY_WORDS):
             if self.value is None:
                 raise ValueError("Fuzzy match can only be used if a node value is provided")
@@ -57,12 +58,28 @@ class GraphNode(BaseModel, extra="forbid"):
                     raise ValueError(
                         "Fuzzy match must be used with values containing at least 3 characters"
                     )
+        if self.match == NodeMatchKindName.SEMANTIC and self.value is None:
+            raise ValueError("Semantic match can only be used if a node value is provided")
+
         return self
+
+
+class RelationMatchKindName(str, Enum):
+    EXACT = "exact"
+    SEMANTIC = "semantic"
 
 
 class GraphRelation(BaseModel, extra="forbid"):
     label: str | None = None
     type: RelationType | None = None
+    match: RelationMatchKindName = RelationMatchKindName.EXACT
+
+    @model_validator(mode="after")
+    def validate_match_usage(self) -> Self:
+        if self.match == RelationMatchKindName.SEMANTIC and self.label is None:
+            raise ValueError("Semantic match can only be used if a label is provided")
+
+        return self
 
 
 ## Models for query expressions
