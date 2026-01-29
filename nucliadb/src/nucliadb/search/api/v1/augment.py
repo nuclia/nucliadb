@@ -297,6 +297,8 @@ def parse_deep_resource_augment(
         extracted.append(ExtractedDataTypeName.FILE)
     if item.extracted_qa:
         extracted.append(ExtractedDataTypeName.QA)
+    if item.extracted_relation_vectors:
+        extracted.append(ExtractedDataTypeName.RELATION_VECTORS)
 
     if len(extracted) > 0:
         show.append(ResourceProperties.EXTRACTED)

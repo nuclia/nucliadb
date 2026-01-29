@@ -84,6 +84,7 @@ class AugmentResources(BaseModel):
     extracted_link: bool = False
     extracted_file: bool = False
     extracted_qa: bool = False
+    extracted_relation_vectors: bool = False
 
     # new granular props
     title: bool = False
@@ -151,8 +152,10 @@ class AugmentResources(BaseModel):
                     self.extracted_file = True
                 elif e == ExtractedDataTypeName.QA:
                     self.extracted_qa = True
+                elif e == ExtractedDataTypeName.RELATION_VECTORS:
+                    self.extracted_relation_vectors = True
                 else:  # pragma: no cover
-                    assert_never(s)
+                    assert_never(e)
 
 
 class AugmentFields(BaseModel):

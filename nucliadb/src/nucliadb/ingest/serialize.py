@@ -442,7 +442,7 @@ async def serialize_extracted_vectors(field: Field) -> VectorObject | None:
 
 
 async def serialize_relation_node_vectors(field: Field) -> dict[str, list[RelationNodeVector]]:
-    vectors = {}
+    vectors: dict[str, list[RelationNodeVector]] = {}
     async with datamanagers.with_ro_transaction() as txn:
         async for vectorset_id, _ in datamanagers.vectorsets.iter(txn=txn, kbid=field.kbid):
             data_vec = await field.get_relation_node_vectors(vectorset_id)
@@ -454,7 +454,7 @@ async def serialize_relation_node_vectors(field: Field) -> dict[str, list[Relati
 
 
 async def serialize_relation_edge_vectors(field: Field) -> dict[str, list[RelationEdgeVector]]:
-    vectors = {}
+    vectors: dict[str, list[RelationEdgeVector]] = {}
     async with datamanagers.with_ro_transaction() as txn:
         async for vectorset_id, _ in datamanagers.vectorsets.iter(txn=txn, kbid=field.kbid):
             data_vec = await field.get_relation_edge_vectors(vectorset_id)

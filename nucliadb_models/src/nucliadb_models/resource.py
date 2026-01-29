@@ -30,9 +30,9 @@ from nucliadb_models.extracted import (
     FileExtractedData,
     LargeComputedMetadata,
     LinkExtractedData,
-    VectorObject,
-    RelationNodeVector,
     RelationEdgeVector,
+    RelationNodeVector,
+    VectorObject,
 )
 from nucliadb_models.file import FieldFile
 from nucliadb_models.link import FieldLink
