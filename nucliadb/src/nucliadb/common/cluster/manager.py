@@ -133,7 +133,7 @@ class KBShardManager:
             prewarm_enabled=prewarm_enabled,
         )
 
-        if has_feature(const.Features.SEMANTIC_GRAPH):
+        if has_feature(const.Features.SEMANTIC_GRAPH) and vectorsets:
             # TODO: We are using the first paragraph vectorset config for the relation index.
             # TODO: This should come from a different field in learning_config and a different configuration key in maindb.
             (name, config) = next(iter(vectorsets.items()))
