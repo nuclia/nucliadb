@@ -47,6 +47,7 @@ def parse_origin(origin: Origin, origin_payload: InputOrigin):
             resources_pb2.SyncMetadata(
                 file_id=origin_payload.sync_metadata.file_id,
                 auth_provider=origin_payload.sync_metadata.auth_provider,
+                content_hash=origin_payload.sync_metadata.content_hash,
             )
         )
     origin.source = Origin.Source.API

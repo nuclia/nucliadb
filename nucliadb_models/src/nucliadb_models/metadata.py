@@ -216,6 +216,9 @@ class SyncMetadata(BaseModel):
     auth_provider: str = Field(
         description="Authentication provider used to access the origin cloud storage system"
     )
+    content_hash: str = Field(
+        description="Content hash of the file in the origin cloud storage system. The hash algorithm used depends on the origin system.",
+    )
 
 
 class InputOrigin(BaseModel):

@@ -996,6 +996,7 @@ async def test_origin_sync_metadata(
                 "sync_metadata": {
                     "file_id": "1234",
                     "auth_provider": "google_oauth",
+                    "content_hash": "098f6bcd4621d373cade4e832627b4f6",
                 },
             },
         },
@@ -1007,6 +1008,7 @@ async def test_origin_sync_metadata(
     assert resp.status_code == 200, resp.text
     assert resp.json()["origin"]["sync_metadata"]["file_id"] == "1234"
     assert resp.json()["origin"]["sync_metadata"]["auth_provider"] == "google_oauth"
+    assert resp.json()["origin"]["sync_metadata"]["content_hash"] == "098f6bcd4621d373cade4e832627b4f6"
 
     # Test patching sync_metadata
     resp = await nucliadb_writer.patch(
@@ -1016,6 +1018,7 @@ async def test_origin_sync_metadata(
                 "sync_metadata": {
                     "file_id": "5678",
                     "auth_provider": "dropbox_oauth",
+                    "content_hash": "abcdef1234567890",
                 },
             },
         },
@@ -1026,6 +1029,7 @@ async def test_origin_sync_metadata(
     assert resp.status_code == 200, resp.text
     assert resp.json()["origin"]["sync_metadata"]["file_id"] == "5678"
     assert resp.json()["origin"]["sync_metadata"]["auth_provider"] == "dropbox_oauth"
+    assert resp.json()["origin"]["sync_metadata"]["content_hash"] == "abcdef1234567890"
 
 
 @pytest.mark.deploy_modes("standalone")
