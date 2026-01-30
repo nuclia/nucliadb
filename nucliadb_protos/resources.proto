@@ -88,8 +88,8 @@ message Basic {
 message SyncMetadata {
     string file_id = 1;
     string auth_provider = 2;
-    string md5 = 3;
-    string quick_xor_hash = 4;
+    optional string md5 = 3;
+    optional string quick_xor_hash = 4;
 }
 
 // Block behaviors
