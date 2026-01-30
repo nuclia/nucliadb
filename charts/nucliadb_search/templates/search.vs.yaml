@@ -19,10 +19,6 @@ spec:
           method:
             regex: "GET|POST|OPTIONS"
         - uri:
-            regex: '^/api/v\d+/kb/[^/]+/ask$'
-          method:
-            regex: "POST|OPTIONS"
-        - uri:
             regex: '^/api/v\d+/kb/[^/]+/feedback$'
           method:
             regex: "POST|OPTIONS"
@@ -47,7 +43,7 @@ spec:
           method:
             regex: "GET|POST|OPTIONS"
         - uri:
-            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/(find|search|ask)$'
+            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/(find|search)$'
           method:
             regex: "GET|POST|OPTIONS"
         - uri:
@@ -82,3 +78,29 @@ spec:
             port:
               number: {{.Values.serving.port}}
             host: "search.{{ .Release.Namespace }}.svc.cluster.local"
+
+    # Canary release (traffic shifting) for /ask endpoints
+    - name: nucliadb_search_canary
+      match:
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/ask$'
+          method:
+            regex: "POST|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/ask$'
+          method:
+            regex: "POST|OPTIONS"
+      route:
+        - destination:
+            host: "search.{{ .Release.Namespace }}.svc.cluster.local"
+            port:
+              number: {{ .Values.serving.port }}
+          weight: {{ .Values.ask_canary.nucliadb_weight | default 100 }}
+        - destination:
+            host: "arag-api.arag.svc.cluster.local"
+            port:
+              number: {{ .Values.ask_canary.rao_serving_port }}
+          weight: {{ .Values.ask_canary.rao_weight | default 0 }}
+      retries:
+        attempts: 3
+        retryOn: connect-failure,5xx

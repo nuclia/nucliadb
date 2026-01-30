@@ -82,6 +82,9 @@ zone:
 tracing:
   enabled: false
 
+ask_canary:
+  rao_serving_port: 8080
+
 # extra_pod_annotations:
 #   key: value
 
