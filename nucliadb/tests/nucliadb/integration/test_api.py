@@ -997,7 +997,7 @@ async def test_origin_sync_metadata(
                     "file_id": "1234",
                     "auth_provider": "google_oauth",
                     "md5": "098f6bcd4621d373cade4e832627b4f6",
-                    "quick_xor_hash": "abc123def456"
+                    "quick_xor_hash": "abc123def456",
                 },
             },
         },
@@ -1021,7 +1021,7 @@ async def test_origin_sync_metadata(
                     "file_id": "5678",
                     "auth_provider": "dropbox_oauth",
                     "md5": "abcdef1234567890",
-                    "quick_xor_hash": "654321fedcba"
+                    "quick_xor_hash": "654321fedcba",
                 },
             },
         },
