@@ -23,8 +23,8 @@ mod common;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use nidx_protos::{
-    IndexRelation, IndexRelations, Relation, RelationEdgeVector, RelationNode, RelationNodeVector, Resource,
-    ResourceId, relation::RelationType, relation_node::NodeType,
+    IndexRelation, IndexRelations, Relation, RelationEdgeVector, RelationEdgeVectors, RelationNode, RelationNodeVector,
+    RelationNodeVectors, Resource, ResourceId, relation::RelationType, relation_node::NodeType,
 };
 use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher, config::*};
@@ -74,11 +74,7 @@ fn vector_for(value: &str) -> Vec<f32> {
 
 fn node_vector(value: &str) -> RelationNodeVector {
     RelationNodeVector {
-        node: Some(RelationNode {
-            value: value.into(),
-            ntype: NodeType::Entity as i32,
-            subtype: "animal".into(),
-        }),
+        node_value: value.into(),
         vector: vector_for(value),
     }
 }
@@ -113,12 +109,18 @@ fn test_relations_deletion() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: vec![
-            node_vector("dog"),
-            node_vector("cat"),
-            node_vector("fish"),
-            node_vector("sheep"),
-        ],
+        relation_node_vectors: [(
+            "default".to_string(),
+            RelationNodeVectors {
+                vectors: vec![
+                    node_vector("dog"),
+                    node_vector("cat"),
+                    node_vector("fish"),
+                    node_vector("sheep"),
+                ],
+            },
+        )]
+        .into(),
         ..Default::default()
     };
 
@@ -294,7 +296,13 @@ fn test_relations_merge() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: vec![node_vector("dog"), node_vector("cat"), node_vector("fish")],
+        relation_node_vectors: [(
+            "default".to_string(),
+            RelationNodeVectors {
+                vectors: vec![node_vector("dog"), node_vector("cat"), node_vector("fish")],
+            },
+        )]
+        .into(),
         ..Default::default()
     };
 
@@ -324,12 +332,18 @@ fn test_relations_merge() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: vec![
-            node_vector("dog"),
-            node_vector("cat"),
-            node_vector("sheep"),
-            node_vector("rat"),
-        ],
+        relation_node_vectors: [(
+            "default".to_string(),
+            RelationNodeVectors {
+                vectors: vec![
+                    node_vector("dog"),
+                    node_vector("cat"),
+                    node_vector("sheep"),
+                    node_vector("rat"),
+                ],
+            },
+        )]
+        .into(),
         ..Default::default()
     };
 
@@ -449,7 +463,13 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: vec![node_vector("dog"), node_vector("cat"), node_vector("fish")],
+        relation_node_vectors: [(
+            "default".to_string(),
+            RelationNodeVectors {
+                vectors: vec![node_vector("dog"), node_vector("cat"), node_vector("fish")],
+            },
+        )]
+        .into(),
         ..Default::default()
     };
 
@@ -479,12 +499,18 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: vec![
-            node_vector("dog"),
-            node_vector("cat"),
-            node_vector("sheep"),
-            node_vector("rat"),
-        ],
+        relation_node_vectors: [(
+            "default".to_string(),
+            RelationNodeVectors {
+                vectors: vec![
+                    node_vector("dog"),
+                    node_vector("cat"),
+                    node_vector("sheep"),
+                    node_vector("rat"),
+                ],
+            },
+        )]
+        .into(),
         ..Default::default()
     };
 
@@ -604,7 +630,13 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: vec![node_vector("dog"), node_vector("cat"), node_vector("fish")],
+        relation_node_vectors: [(
+            "default".to_string(),
+            RelationNodeVectors {
+                vectors: vec![node_vector("dog"), node_vector("cat"), node_vector("fish")],
+            },
+        )]
+        .into(),
         ..Default::default()
     };
 
@@ -634,7 +666,13 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: vec![node_vector("my dog"), node_vector("my cat"), node_vector("my fish")],
+        relation_node_vectors: [(
+            "default".to_string(),
+            RelationNodeVectors {
+                vectors: vec![node_vector("my dog"), node_vector("my cat"), node_vector("my fish")],
+            },
+        )]
+        .into(),
         ..Default::default()
     };
 
@@ -805,18 +843,22 @@ fn test_relations_labels() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_edge_vectors: vec![
-            RelationEdgeVector {
-                relation_type: RelationType::Entity as i32,
-                relation_label: "faster than".into(),
-                vector: vec![1.0, 0.0, 0.0, 0.0],
+        relation_edge_vectors: [(
+            "default".to_string(),
+            RelationEdgeVectors {
+                vectors: vec![
+                    RelationEdgeVector {
+                        relation_label: "faster than".into(),
+                        vector: vec![1.0, 0.0, 0.0, 0.0],
+                    },
+                    RelationEdgeVector {
+                        relation_label: "bigger than".into(),
+                        vector: vec![0.0, 1.0, 0.0, 0.0],
+                    },
+                ],
             },
-            RelationEdgeVector {
-                relation_type: RelationType::Entity as i32,
-                relation_label: "bigger than".into(),
-                vector: vec![0.0, 1.0, 0.0, 0.0],
-            },
-        ],
+        )]
+        .into(),
         ..Default::default()
     };
 

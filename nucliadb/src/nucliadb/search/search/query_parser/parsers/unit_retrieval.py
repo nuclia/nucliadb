@@ -187,7 +187,7 @@ class _Converter:
         if self.retrieval.query.graph is None:
             return
 
-        q = parse_path_query(self.retrieval.query.graph.query)
+        q = parse_path_query(self.retrieval.query.graph.query, {}, {})
         self.req.graph_search.query.path.CopyFrom(q)
 
     def _apply_filters(self) -> None:

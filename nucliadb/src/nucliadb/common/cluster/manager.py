@@ -42,7 +42,8 @@ from nucliadb.common.nidx import get_nidx, get_nidx_api_client
 from nucliadb.common.vector_index_config import nucliadb_index_config_to_nidx
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_telemetry import errors
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils import const
+from nucliadb_utils.utilities import get_storage, has_feature
 
 logger = logging.getLogger(__name__)
 
@@ -126,17 +127,24 @@ class KBShardManager:
             async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid)
         }
 
+        req = NewShardRequest(
+            kbid=kbid,
+            vectorsets_configs=vectorsets,
+            prewarm_enabled=prewarm_enabled,
+        )
+
+        if has_feature(const.Features.SEMANTIC_GRAPH) and vectorsets:
+            # TODO: We are using the first paragraph vectorset config for the relation index.
+            # TODO: This should come from a different field in learning_config and a different configuration key in maindb.
+            (name, config) = next(iter(vectorsets.items()))
+            req.relation_node_vectorsets_configs[name].MergeFrom(config)
+            req.relation_edge_vectorsets_configs[name].MergeFrom(config)
+
         shard_uuid = uuid.uuid4().hex
 
         shard = writer_pb2.ShardObject(shard=shard_uuid, read_only=False)
         try:
             nidx_api = get_nidx_api_client()
-            req = NewShardRequest(
-                kbid=kbid,
-                vectorsets_configs=vectorsets,
-                prewarm_enabled=prewarm_enabled,
-            )
-
             resp = await nidx_api.NewShard(req)  # type: ignore
             shard.nidx_shard_id = resp.id
 

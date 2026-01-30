@@ -60,7 +60,8 @@ message NewShardRequest {
 
     map<string, VectorIndexConfig> vectorsets_configs = 6;
     bool prewarm_enabled = 7;
-
+    map<string, VectorIndexConfig> relation_node_vectorsets_configs = 8;
+    map<string, VectorIndexConfig> relation_edge_vectorsets_configs = 9;
 }
 
 message NewVectorSetRequest {

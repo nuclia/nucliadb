@@ -31,6 +31,17 @@ from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.extracted import (
+    ExtractedText,
+    FieldComputedMetadata,
+    FieldQuestionAnswers,
+    FileExtractedData,
+    LargeComputedMetadata,
+    LinkExtractedData,
+    RelationEdgeVector,
+    RelationNodeVector,
+    VectorObject,
+)
 from nucliadb_models.metadata import Extra, Origin, Relation
 from nucliadb_models.resource import (
     ConversationFieldData,
@@ -38,15 +49,9 @@ from nucliadb_models.resource import (
     Error,
     ExtractedDataType,
     ExtractedDataTypeName,
-    ExtractedText,
-    FieldComputedMetadata,
-    FieldQuestionAnswers,
-    FileExtractedData,
     FileFieldData,
     FileFieldExtractedData,
     GenericFieldData,
-    LargeComputedMetadata,
-    LinkExtractedData,
     LinkFieldData,
     LinkFieldExtractedData,
     QueueType,
@@ -54,7 +59,6 @@ from nucliadb_models.resource import (
     ResourceData,
     TextFieldData,
     TextFieldExtractedData,
-    VectorObject,
 )
 from nucliadb_models.search import ResourceProperties
 from nucliadb_models.security import ResourceSecurity
@@ -396,6 +400,10 @@ async def set_resource_field_extracted_data(
     ):
         field_data.link = await serialize_link_extracted_data(field)
 
+    if ExtractedDataTypeName.RELATION_VECTORS in wanted_extracted_data:
+        field_data.relation_node_vectors = await serialize_relation_node_vectors(field)
+        field_data.relation_edge_vectors = await serialize_relation_edge_vectors(field)
+
 
 async def serialize_extracted_text(field: Field) -> ExtractedText | None:
     data_et = await field.get_extracted_text()
@@ -431,6 +439,30 @@ async def serialize_extracted_vectors(field: Field) -> VectorObject | None:
     if data_vec is None:
         return None
     return from_proto.vector_object(data_vec)
+
+
+async def serialize_relation_node_vectors(field: Field) -> dict[str, list[RelationNodeVector]]:
+    vectors: dict[str, list[RelationNodeVector]] = {}
+    async with datamanagers.with_ro_transaction() as txn:
+        async for vectorset_id, _ in datamanagers.vectorsets.iter(txn=txn, kbid=field.kbid):
+            data_vec = await field.get_relation_node_vectors(vectorset_id)
+            if data_vec is None:
+                vectors[vectorset_id] = []
+            else:
+                vectors[vectorset_id] = [from_proto.relation_node_vector(v) for v in data_vec.vectors]
+    return vectors
+
+
+async def serialize_relation_edge_vectors(field: Field) -> dict[str, list[RelationEdgeVector]]:
+    vectors: dict[str, list[RelationEdgeVector]] = {}
+    async with datamanagers.with_ro_transaction() as txn:
+        async for vectorset_id, _ in datamanagers.vectorsets.iter(txn=txn, kbid=field.kbid):
+            data_vec = await field.get_relation_edge_vectors(vectorset_id)
+            if data_vec is None:
+                vectors[vectorset_id] = []
+            else:
+                vectors[vectorset_id] = [from_proto.relation_edge_vector(v) for v in data_vec.vectors]
+    return vectors
 
 
 async def serialize_extracted_question_answers(field: Field) -> FieldQuestionAnswers | None:

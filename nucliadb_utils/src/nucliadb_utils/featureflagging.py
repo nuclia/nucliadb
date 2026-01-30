@@ -52,6 +52,10 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": [] if Settings().disable_ask_decoupled_ff else ["local"]},
     },
+    const.Features.SEMANTIC_GRAPH: {
+        "rollout": 0,
+        "variants": {"environment": ["local"]},
+    },
 }
 
 

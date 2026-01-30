@@ -35,6 +35,8 @@ from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import Basic, FieldID, FieldType
 from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 
 class IndexMessageBuilder:
@@ -143,6 +145,7 @@ class IndexMessageBuilder:
                         vector_dimension=dimension,
                         append_splits=append_splits,
                     )
+
         if relations:
             await asyncio.to_thread(
                 brain.generate_relations,
@@ -151,6 +154,28 @@ class IndexMessageBuilder:
                 basic.usermetadata,
                 replace_field=replace,
             )
+            if has_feature(const.Features.SEMANTIC_GRAPH):
+                assert vectorset_configs is not None
+                for vectorset_config in vectorset_configs:
+                    node_vectors = await field.get_relation_node_vectors(
+                        vectorset=vectorset_config.vectorset_id
+                    )
+                    if node_vectors is not None:
+                        await asyncio.to_thread(
+                            brain.generate_relation_node_vectors,
+                            node_vectors,
+                            vectorset_config.vectorset_id,
+                        )
+
+                    edge_vectors = await field.get_relation_edge_vectors(
+                        vectorset=vectorset_config.vectorset_id
+                    )
+                    if edge_vectors is not None:
+                        await asyncio.to_thread(
+                            brain.generate_relation_edge_vectors,
+                            edge_vectors,
+                            vectorset_config.vectorset_id,
+                        )
 
     def _apply_field_deletions(
         self,

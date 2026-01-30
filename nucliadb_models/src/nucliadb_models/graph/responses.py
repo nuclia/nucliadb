@@ -23,6 +23,7 @@ class GraphNode(BaseModel):
     value: str
     type: RelationNodeType
     group: str
+    score: float | None = None
 
 
 class GraphNodePosition(str, Enum):
@@ -38,6 +39,7 @@ class PositionedGraphNode(GraphNode):
 class GraphRelation(BaseModel):
     label: str
     type: RelationType
+    score: float | None = None
 
 
 class PathMetadata(BaseModel):
@@ -56,6 +58,7 @@ class GraphPath(BaseModel):
     relation: GraphRelation
     destination: GraphNode
     metadata: PathMetadata | None
+    score: float | None = None
 
 
 class GraphSearchResponse(BaseModel):

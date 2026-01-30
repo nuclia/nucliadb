@@ -75,6 +75,8 @@ class ResourceBrain:
         self.rid = rid
         self.brain: PBBrainResource = PBBrainResource(resource=ResourceID(uuid=rid))
         self.labels: dict[str, set[str]] = deepcopy(BASE_LABELS)
+        self._relation_node_vectors: set[str] = set()
+        self._relation_edge_vectors: set[str] = set()
 
     @observer.wrap({"type": "generate_resource_metadata"})
     def generate_resource_metadata(
@@ -583,6 +585,28 @@ class ResourceBrain:
         if replace_field:
             full_field_id = ids.FieldId(rid=self.rid, type=fid.type, key=fid.key).full()
             self.brain.vector_prefixes_to_delete[vectorset].items.append(full_field_id)
+
+    @observer.wrap({"type": "generate_relation_node_vectors"})
+    def generate_relation_node_vectors(
+        self,
+        vectors: utils_pb2.RelationNodeVectors,
+        vectorset: str,
+    ):
+        for vector in vectors.vectors:
+            if vector.node_value not in self._relation_node_vectors:
+                self.brain.relation_node_vectors[vectorset].vectors.append(vector)
+                self._relation_node_vectors.add(vector.node_value)
+
+    @observer.wrap({"type": "generate_relation_edge_vectors"})
+    def generate_relation_edge_vectors(
+        self,
+        vectors: utils_pb2.RelationEdgeVectors,
+        vectorset: str,
+    ):
+        for vector in vectors.vectors:
+            if vector.relation_label not in self._relation_edge_vectors:
+                self.brain.relation_edge_vectors[vectorset].vectors.append(vector)
+                self._relation_edge_vectors.add(vector.relation_label)
 
     @observer.wrap({"type": "apply_field_vector"})
     def _apply_field_vector(

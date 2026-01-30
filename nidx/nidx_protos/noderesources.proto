@@ -166,19 +166,8 @@ message Resource {
     bool skip_texts = 18;
     bool skip_paragraphs = 19;
 
-    repeated RelationNodeVector relation_node_vectors = 20;
-    repeated RelationEdgeVector relation_edge_vectors = 21;
-}
-
-message RelationNodeVector {
-    utils.RelationNode node = 1;
-    repeated float vector = 2;
-}
-
-message RelationEdgeVector {
-    utils.Relation.RelationType relation_type = 1;
-    string relation_label = 2;
-    repeated float vector = 3;
+    map<string, utils.RelationNodeVectors> relation_node_vectors = 20;
+    map<string, utils.RelationEdgeVectors> relation_edge_vectors = 21;
 }
 
 message ShardMetadata {

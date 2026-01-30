@@ -30,6 +30,8 @@ from nucliadb_models.extracted import (
     FileExtractedData,
     LargeComputedMetadata,
     LinkExtractedData,
+    RelationEdgeVector,
+    RelationNodeVector,
     VectorObject,
 )
 from nucliadb_models.file import FieldFile
@@ -70,6 +72,7 @@ class ExtractedDataTypeName(str, Enum):
     LINK = "link"
     FILE = "file"
     QA = "question_answers"
+    RELATION_VECTORS = "relation_vectors"
 
 
 class KnowledgeBoxConfig(BaseModel):
@@ -168,6 +171,8 @@ class ExtractedData(BaseModel):
     large_metadata: LargeComputedMetadata | None = None
     vectors: VectorObject | None = None
     question_answers: FieldQuestionAnswers | None = None
+    relation_node_vectors: dict[str, list[RelationNodeVector]] | None = None
+    relation_edge_vectors: dict[str, list[RelationEdgeVector]] | None = None
 
 
 class TextFieldExtractedData(ExtractedData):

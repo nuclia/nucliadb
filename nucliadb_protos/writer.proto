@@ -151,6 +151,9 @@ message BrokerMessage {
     repeated FieldIDStatus field_statuses = 41;
 
     repeated resources.FieldID delete_question_answers = 42;
+
+    // Vectors for the relation graph nodes & edges
+    repeated resources.SemanticGraphVectors field_semantic_graph_vectors = 44;
 }
 
 message BrokerMessageBlobReference {
