@@ -24,7 +24,7 @@
 import contextvars
 from collections.abc import Sequence
 
-from opentelemetry.trace import get_current_span
+from opentelemetry.trace import INVALID_SPAN, get_current_span
 
 from nucliadb_telemetry.settings import telemetry_settings
 
@@ -68,5 +68,5 @@ def set_info_on_span(
 ):
     if telemetry_settings.jaeger_enabled:
         span = get_current_span()
-        if span is not None:
+        if span is not INVALID_SPAN:
             span.set_attributes(headers)

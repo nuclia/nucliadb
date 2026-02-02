@@ -119,7 +119,7 @@ class JSONFormatter(logging.Formatter):
             data["context"] = current_ctx
 
         current_span = trace.get_current_span()
-        if current_span not in (INVALID_SPAN, None):
+        if current_span is not INVALID_SPAN:
             span_context = current_span.get_span_context()
             # for us, this is opentelemetry trace_id/span_id
             # GCP has logging.googleapis.com/spanId but it's for it's own cloud tracing system
