@@ -473,6 +473,28 @@ class StreamAuditStorage(AuditStorage):
         if model is not None:
             auditrequest.chat.model = model
 
+    def retrieve(
+        self,
+        kbid: str,
+        user: str,
+        client: int,
+        origin: str,
+        retrieval_time: float,
+    ):
+        # TODO(decoupled-ask): implement audit for /retrieve
+        ...
+
+    def augment(
+        self,
+        kbid: str,
+        user: str,
+        client: int,
+        origin: str,
+        augment_time: float,
+    ):
+        # TODO(decoupled-ask): implement audit for /augment
+        ...
+
     def feedback(
         self,
         kbid: str,
