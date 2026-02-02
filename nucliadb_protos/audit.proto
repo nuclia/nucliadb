@@ -87,6 +87,8 @@ message AuditRequest {
     INDEXED = 10 [deprecated=true];
     CHAT = 11;
     FEEDBACK = 12;
+    RETRIEVE = 13;
+    AUGMENT = 14;
   }
 
   AuditType type = 1;
