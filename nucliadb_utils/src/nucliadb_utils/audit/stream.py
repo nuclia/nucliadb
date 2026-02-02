@@ -481,8 +481,17 @@ class StreamAuditStorage(AuditStorage):
         origin: str,
         retrieval_time: float,
     ):
-        # TODO(decoupled-ask): implement audit for /retrieve
-        ...
+        rcontext = get_request_context()
+        if rcontext is None:
+            return
+
+        audit_request = rcontext.audit_request
+        audit_request.kbid = kbid
+        audit_request.userid = user
+        audit_request.client_type = client  # type: ignore
+        audit_request.origin = origin
+
+        audit_request.retrieve.retrieval_time = retrieval_time
 
     def augment(
         self,
@@ -492,8 +501,17 @@ class StreamAuditStorage(AuditStorage):
         origin: str,
         augment_time: float,
     ):
-        # TODO(decoupled-ask): implement audit for /augment
-        ...
+        rcontext = get_request_context()
+        if rcontext is None:
+            return
+
+        audit_request = rcontext.audit_request
+        audit_request.kbid = kbid
+        audit_request.userid = user
+        audit_request.client_type = client  # type: ignore
+        audit_request.origin = origin
+
+        audit_request.augment.augment_time = augment_time
 
     def feedback(
         self,
