@@ -89,6 +89,7 @@ message AuditRequest {
     FEEDBACK = 12;
     RETRIEVE = 13;
     AUGMENT = 14;
+    ASK = 15;
   }
 
   AuditType type = 1;
