@@ -35,9 +35,7 @@ from nucliadb_models.retrieval import (
     RetrievalResponse,
     Scores,
 )
-from nucliadb_models.search import (
-    NucliaDBClientType,
-)
+from nucliadb_models.search import NucliaDBClientType
 from nucliadb_utils.utilities import get_audit
 
 

@@ -17,14 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
 import asyncio
+from time import time
 from typing import cast
 
-from fastapi import Request
+from fastapi import Header, Request
 from fastapi_versioning import version
 
 from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.models_utils import to_proto
 from nucliadb.models.internal import augment as internal_augment
 from nucliadb.models.internal.augment import (
     Augment,
@@ -80,7 +81,8 @@ from nucliadb_models.augment import (
 )
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
-from nucliadb_models.search import ResourceProperties
+from nucliadb_models.search import NucliaDBClientType, ResourceProperties
+from nucliadb_utils.utilities import get_audit
 
 
 @api.post(
@@ -95,11 +97,30 @@ async def _augment_endpoint(
     request: Request,
     kbid: str,
     item: AugmentRequest,
+    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
+    x_nucliadb_user: str = Header(""),
+    x_forwarded_for: str = Header(""),
 ) -> AugmentResponse:
-    return await augment_endpoint(kbid, item)
+    return await augment_endpoint(
+        kbid,
+        item,
+        x_ndb_client=x_ndb_client,
+        x_nucliadb_user=x_nucliadb_user,
+        x_forwarded_for=x_forwarded_for,
+    )
 
 
-async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
+async def augment_endpoint(
+    kbid: str,
+    item: AugmentRequest,
+    *,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+) -> AugmentResponse:
+    audit = get_audit()
+    start_time = time()
+
     augmentations = parse_first_augments(item)
 
     if len(augmentations) == 0:
@@ -123,6 +144,15 @@ async def augment_endpoint(kbid: str, item: AugmentRequest) -> AugmentResponse:
         if len(augmentations) > 0:
             second_augmented = await augmentor.augment(kbid, augmentations, concurrency_control=max_ops)
             merge_second_augment(item, response, second_augmented)
+
+    if audit is not None:
+        audit.augment(
+            kbid,
+            x_nucliadb_user,
+            to_proto.client_type(x_ndb_client),
+            x_forwarded_for,
+            augment_time=time() - start_time,
+        )
 
     return response
 
