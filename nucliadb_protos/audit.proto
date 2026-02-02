@@ -85,11 +85,11 @@ message AuditRequest {
     KB_DELETED = 8 [deprecated=true];
     SUGGEST = 9 [deprecated=true];
     INDEXED = 10 [deprecated=true];
-    CHAT = 11;
+    CHAT = 11;                  // nucliadb /ask
     FEEDBACK = 12;
-    RETRIEVE = 13;
-    AUGMENT = 14;
-    ASK = 15;
+    RETRIEVE = 13;              // nucliadb /retrieve
+    AUGMENT = 14;               // nucliadb /augment
+    ASK = 15;                   // RAO /ask
   }
 
   AuditType type = 1;
