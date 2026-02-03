@@ -894,8 +894,13 @@ async def test_search_sends_audit(
     psub = await jetstream.pull_subscribe(subject, "psub")
 
     # Test search sends audit
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/search", headers={"x-ndb-client": "chrome_extension"})
-    assert resp.status_code == 200
+    with patch(
+        "nucliadb_utils.audit.stream.get_trace_id", return_value="00000000000000000000000000000000"
+    ):
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/search", headers={"x-ndb-client": "chrome_extension"}
+        )
+        assert resp.status_code == 200
 
     auditreq = await get_audit_messages(psub)
 

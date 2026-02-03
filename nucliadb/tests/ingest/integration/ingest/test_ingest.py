@@ -394,7 +394,10 @@ async def test_ingest_audit_stream_files_only(
         message,
         [("file_1", "file.png"), ("file_2", "text.pb"), ("file_3", "vectors.pb")],
     )
-    await processor.process(message=message, seqid=1)
+    with patch(
+        "nucliadb_utils.audit.stream.get_trace_id", return_value="00000000000000000000000000000000"
+    ):
+        await processor.process(message=message, seqid=1)
 
     auditreq = await get_audit_messages(psub)
 
