@@ -104,8 +104,17 @@ class AuditStorage:
         origin: str,
         retrieval_time: float,
     ):
-        # TODO(decoupled-ask): implement audit for /retrieve
-        ...
+        raise NotImplementedError()
+
+    def augment(
+        self,
+        kbid: str,
+        user: str,
+        client: int,
+        origin: str,
+        augment_time: float,
+    ):
+        raise NotImplementedError()
 
     def report_storage(self, kbid: str, paragraphs: int, fields: int, bytes: int):
         raise NotImplementedError()

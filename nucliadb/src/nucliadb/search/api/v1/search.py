@@ -45,7 +45,6 @@ from nucliadb.search.search.utils import (
 )
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.filters import FilterExpression
-from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
     KnowledgeboxSearchResults,
@@ -222,12 +221,11 @@ async def _search_endpoint(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    **kwargs,
 ) -> KnowledgeboxSearchResults | HTTPClientError:
     try:
         with cache.request_caches():
             results, incomplete = await search(
-                kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, **kwargs
+                kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
             )
             response.status_code = 206 if incomplete else 200
             return results
@@ -250,8 +248,6 @@ async def search(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    do_audit: bool = True,
-    with_status: ResourceProcessingStatus | None = None,
 ) -> tuple[KnowledgeboxSearchResults, bool]:
     audit = get_audit()
     start_time = time()
@@ -275,7 +271,7 @@ async def search(
         offset=item.offset,
     )
 
-    if audit is not None and do_audit:
+    if audit is not None:
         audit.search(
             kbid,
             x_nucliadb_user,

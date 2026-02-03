@@ -31,7 +31,7 @@ from fastapi import Request
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.timestamp_pb2 import Timestamp
 from nidx_protos.nodereader_pb2 import SearchRequest
-from opentelemetry.trace import format_trace_id, get_current_span
+from opentelemetry.trace import INVALID_SPAN, format_trace_id, get_current_span
 from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
@@ -76,7 +76,7 @@ request_context_var = contextvars.ContextVar[RequestContext | None]("request_con
 
 def get_trace_id() -> str | None:
     span = get_current_span()
-    if span is None:
+    if span is INVALID_SPAN:
         return None
     return format_trace_id(span.get_span_context().trace_id)
 
@@ -472,6 +472,60 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.chat.status_code = status_code
         if model is not None:
             auditrequest.chat.model = model
+
+    def retrieve(
+        self,
+        kbid: str,
+        user: str,
+        client: int,
+        origin: str,
+        retrieval_time: float,
+    ):
+        from nucliadb_utils import const
+        from nucliadb_utils.utilities import has_feature
+
+        if not has_feature(const.Features.AUDIT_RETRIEVE_AND_AUGMENT):
+            return
+
+        rcontext = get_request_context()
+        if rcontext is None:
+            return
+
+        audit_request = rcontext.audit_request
+        audit_request.type = AuditRequest.AuditType.RETRIEVE
+        audit_request.kbid = kbid
+        audit_request.userid = user
+        audit_request.client_type = client  # type: ignore
+        audit_request.origin = origin
+
+        audit_request.retrieve.retrieval_time = retrieval_time
+
+    def augment(
+        self,
+        kbid: str,
+        user: str,
+        client: int,
+        origin: str,
+        augment_time: float,
+    ):
+        from nucliadb_utils import const
+        from nucliadb_utils.utilities import has_feature
+
+        if not has_feature(const.Features.AUDIT_RETRIEVE_AND_AUGMENT):
+            return
+
+        rcontext = get_request_context()
+        if rcontext is None:
+            return
+
+        audit_request = rcontext.audit_request
+        audit_request.type = AuditRequest.AuditType.RETRIEVE
+        audit_request.kbid = kbid
+        audit_request.userid = user
+        audit_request.client_type = client  # type: ignore
+        audit_request.origin = origin
+
+        audit_request.augment.augment_time = augment_time
 
     def feedback(
         self,

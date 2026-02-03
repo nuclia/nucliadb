@@ -97,6 +97,26 @@ class BasicAuditStorage(AuditStorage):
     ):
         logger.debug(f"CHAT {kbid} {user} {origin}")
 
+    def retrieve(
+        self,
+        kbid: str,
+        user: str,
+        client: int,
+        origin: str,
+        retrieval_time: float,
+    ):
+        logger.debug(f"RETRIEVE {kbid} {user} {client} {origin} took {retrieval_time}s")
+
+    def augment(
+        self,
+        kbid: str,
+        user: str,
+        client: int,
+        origin: str,
+        augment_time: float,
+    ):
+        logger.debug(f"AUGMENT {kbid} {user} {client} {origin} took {augment_time}s")
+
     def report_storage(self, kbid: str, paragraphs: int, fields: int, bytes: int):
         logger.debug(f"FIELDS & PARAGRAPHS {kbid} {paragraphs} {fields}")
 

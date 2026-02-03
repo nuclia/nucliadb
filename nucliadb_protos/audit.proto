@@ -85,8 +85,11 @@ message AuditRequest {
     KB_DELETED = 8 [deprecated=true];
     SUGGEST = 9 [deprecated=true];
     INDEXED = 10 [deprecated=true];
-    CHAT = 11;
+    CHAT = 11;                  // nucliadb /ask
     FEEDBACK = 12;
+    RETRIEVE = 13;              // nucliadb /retrieve
+    AUGMENT = 14;               // nucliadb /augment
+    ASK = 15;                   // RAO /ask
   }
 
   AuditType type = 1;
@@ -120,6 +123,8 @@ message AuditRequest {
   optional string processing_id = 28;
   optional string retrieval_rephrased_question = 29;
   optional float generative_reasoning_first_chunk_time = 30;
+  AuditRetrieveRequest retrieve = 31;
+  AuditAugmentRequest augment = 32;
 }
 
 
@@ -138,4 +143,12 @@ message AuditSearchRequest {
     optional utils.Security security = 24;
 
     optional string filter = 30;
+}
+
+message AuditRetrieveRequest {
+    float retrieval_time = 1;
+}
+
+message AuditAugmentRequest {
+    float augment_time = 1;
 }
