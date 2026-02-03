@@ -59,10 +59,9 @@ from nucliadb_protos.kb_usage_pb2 import (
 )
 from nucliadb_protos.resources_pb2 import FieldID
 from nucliadb_telemetry.jetstream import get_traced_jetstream, get_traced_nats_client
-from nucliadb_utils import const, logger
+from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
-from nucliadb_utils.utilities import has_feature
 
 
 class RequestContext:
@@ -482,6 +481,9 @@ class StreamAuditStorage(AuditStorage):
         origin: str,
         retrieval_time: float,
     ):
+        from nucliadb_utils import const
+        from nucliadb_utils.utilities import has_feature
+
         if not has_feature(const.Features.AUDIT_RETRIEVE_AND_AUGMENT):
             return
 
@@ -506,6 +508,9 @@ class StreamAuditStorage(AuditStorage):
         origin: str,
         augment_time: float,
     ):
+        from nucliadb_utils import const
+        from nucliadb_utils.utilities import has_feature
+
         if not has_feature(const.Features.AUDIT_RETRIEVE_AND_AUGMENT):
             return
 
