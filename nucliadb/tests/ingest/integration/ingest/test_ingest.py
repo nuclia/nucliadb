@@ -386,101 +386,101 @@ async def test_ingest_audit_stream_files_only(
     test_text_size = getsize(f"{dirname(__file__)}/assets/text.pb")
     test_vectors_size = getsize(f"{dirname(__file__)}/assets/vectors.pb")
 
-    #
-    # Test 1: add a resource with some files
-    #
-    message = make_message(knowledgebox, rid)
-    add_filefields(
-        message,
-        [("file_1", "file.png"), ("file_2", "text.pb"), ("file_3", "vectors.pb")],
-    )
     with patch(
         "nucliadb_utils.audit.stream.get_trace_id", return_value="00000000000000000000000000000000"
     ):
+        #
+        # Test 1: add a resource with some files
+        #
+        message = make_message(knowledgebox, rid)
+        add_filefields(
+            message,
+            [("file_1", "file.png"), ("file_2", "text.pb"), ("file_3", "vectors.pb")],
+        )
         await processor.process(message=message, seqid=1)
 
-    auditreq = await get_audit_messages(psub)
+        auditreq = await get_audit_messages(psub)
 
-    # Minimal assert to make sure we get the information from the node on the audit
-    # gets from the sidecar to the audit report when adding or modifying a resource
-    # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
+        # Minimal assert to make sure we get the information from the node on the audit
+        # gets from the sidecar to the audit report when adding or modifying a resource
+        # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreq.kbid == knowledgebox
-    assert auditreq.rid == rid
-    assert auditreq.type == AuditRequest.AuditType.NEW
+        assert auditreq.kbid == knowledgebox
+        assert auditreq.rid == rid
+        assert auditreq.type == AuditRequest.AuditType.NEW
 
-    try:
-        int(auditreq.trace_id)
-    except ValueError:
-        assert False, "Invalid trace ID"
+        try:
+            int(auditreq.trace_id)
+        except ValueError:
+            assert False, "Invalid trace ID"
 
-    audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
-    assert audit_by_fieldid["file_1"].action == AuditField.FieldAction.MODIFIED
-    assert audit_by_fieldid["file_1"].size == test_png_size
-    assert audit_by_fieldid["file_2"].action == AuditField.FieldAction.MODIFIED
-    assert audit_by_fieldid["file_2"].size == test_text_size
-    assert audit_by_fieldid["file_3"].action == AuditField.FieldAction.MODIFIED
-    assert audit_by_fieldid["file_3"].size == test_vectors_size
+        audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
+        assert audit_by_fieldid["file_1"].action == AuditField.FieldAction.MODIFIED
+        assert audit_by_fieldid["file_1"].size == test_png_size
+        assert audit_by_fieldid["file_2"].action == AuditField.FieldAction.MODIFIED
+        assert audit_by_fieldid["file_2"].size == test_text_size
+        assert audit_by_fieldid["file_3"].action == AuditField.FieldAction.MODIFIED
+        assert audit_by_fieldid["file_3"].size == test_vectors_size
 
-    #
-    # Test 2: delete one of the previous field on the same resource
-    #
+        #
+        # Test 2: delete one of the previous field on the same resource
+        #
 
-    message.files.clear()
-    fieldid = FieldID(field="file_1", field_type=FieldType.FILE)
-    message.delete_fields.append(fieldid)
+        message.files.clear()
+        fieldid = FieldID(field="file_1", field_type=FieldType.FILE)
+        message.delete_fields.append(fieldid)
 
-    await processor.process(message=message, seqid=2)
-    auditreq = await get_audit_messages(psub)
+        await processor.process(message=message, seqid=2)
+        auditreq = await get_audit_messages(psub)
 
-    # Minimal assert to make sure we get the information from the node on the audit
-    # gets from the sidecar to the audit report when adding or modifying a resource
-    # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
+        # Minimal assert to make sure we get the information from the node on the audit
+        # gets from the sidecar to the audit report when adding or modifying a resource
+        # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreq.kbid == knowledgebox
-    assert auditreq.rid == rid
-    assert auditreq.type == AuditRequest.AuditType.MODIFIED
+        assert auditreq.kbid == knowledgebox
+        assert auditreq.rid == rid
+        assert auditreq.type == AuditRequest.AuditType.MODIFIED
 
-    #
-    # Test 3: modify a file while adding and deleting other files
-    #
+        #
+        # Test 3: modify a file while adding and deleting other files
+        #
 
-    message = make_message(knowledgebox, rid)
-    add_filefields(message, [("file_2", "file.png"), ("file_4", "text.pb")])
-    fieldid = FieldID(field="file_3", field_type=FieldType.FILE)
-    message.delete_fields.append(fieldid)
+        message = make_message(knowledgebox, rid)
+        add_filefields(message, [("file_2", "file.png"), ("file_4", "text.pb")])
+        fieldid = FieldID(field="file_3", field_type=FieldType.FILE)
+        message.delete_fields.append(fieldid)
 
-    await processor.process(message=message, seqid=3)
-    auditreq = await get_audit_messages(psub)
+        await processor.process(message=message, seqid=3)
+        auditreq = await get_audit_messages(psub)
 
-    # Minimal assert to make sure we get the information from the node on the audit
-    # gets from the sidecar to the audit report when adding or modifying a resource
-    # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
+        # Minimal assert to make sure we get the information from the node on the audit
+        # gets from the sidecar to the audit report when adding or modifying a resource
+        # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreq.kbid == knowledgebox
-    assert auditreq.rid == rid
-    assert auditreq.type == AuditRequest.AuditType.MODIFIED
+        assert auditreq.kbid == knowledgebox
+        assert auditreq.rid == rid
+        assert auditreq.type == AuditRequest.AuditType.MODIFIED
 
-    audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
-    assert audit_by_fieldid["file_2"].action == AuditField.FieldAction.MODIFIED
-    assert audit_by_fieldid["file_2"].size == test_png_size
-    assert audit_by_fieldid["file_4"].action == AuditField.FieldAction.MODIFIED
-    assert audit_by_fieldid["file_4"].size == test_text_size
-    assert audit_by_fieldid["file_3"].action == AuditField.FieldAction.DELETED
-    assert audit_by_fieldid["file_3"].size == 0
+        audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
+        assert audit_by_fieldid["file_2"].action == AuditField.FieldAction.MODIFIED
+        assert audit_by_fieldid["file_2"].size == test_png_size
+        assert audit_by_fieldid["file_4"].action == AuditField.FieldAction.MODIFIED
+        assert audit_by_fieldid["file_4"].size == test_text_size
+        assert audit_by_fieldid["file_3"].action == AuditField.FieldAction.DELETED
+        assert audit_by_fieldid["file_3"].size == 0
 
-    #
-    # Test 4: delete resource
-    #
+        #
+        # Test 4: delete resource
+        #
 
-    message = make_message(knowledgebox, rid, message_type=BrokerMessage.MessageType.DELETE)
-    await processor.process(message=message, seqid=4)
-    auditreq = await get_audit_messages(psub)
+        message = make_message(knowledgebox, rid, message_type=BrokerMessage.MessageType.DELETE)
+        await processor.process(message=message, seqid=4)
+        auditreq = await get_audit_messages(psub)
 
-    assert auditreq.type == AuditRequest.AuditType.DELETED
+        assert auditreq.type == AuditRequest.AuditType.DELETED
 
-    # Test 5: Delete knowledgebox
-    await KnowledgeBox.delete(maindb_driver, knowledgebox)
+        # Test 5: Delete knowledgebox
+        await KnowledgeBox.delete(maindb_driver, knowledgebox)
 
     await client.drain()
     await client.close()
