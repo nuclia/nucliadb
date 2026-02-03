@@ -34,7 +34,8 @@ from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldType,
     LargeComputedMetadataWrapper,
-    SemanticGraphVectors,
+    SemanticGraphEdgeVectors,
+    SemanticGraphNodeVectors,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus
 
@@ -98,7 +99,8 @@ class _BrokerMessageBuilder:
                 await self.generate_field_vectors(
                     type_id, field_id, field, vectorset_id, vs.storage_key_kind
                 )
-                await self.generate_semantic_graph_vectors(type_id, field_id, field, vectorset_id)
+                await self.generate_semantic_graph_node_vectors(type_id, field_id, field, vectorset_id)
+                await self.generate_semantic_graph_edge_vectors(type_id, field_id, field, vectorset_id)
 
             # Large metadata
             await self.generate_field_large_computed_metadata(type_id, field_id, field)
@@ -193,7 +195,7 @@ class _BrokerMessageBuilder:
         evw.vectors.CopyFrom(vo)
         self.bm.field_vectors.append(evw)
 
-    async def generate_semantic_graph_vectors(
+    async def generate_semantic_graph_node_vectors(
         self,
         type_id: FieldType.ValueType,
         field_id: str,
@@ -201,19 +203,35 @@ class _BrokerMessageBuilder:
         vectorset: str,
     ):
         vnode = await field.get_relation_node_vectors(vectorset)
-        vedge = await field.get_relation_edge_vectors(vectorset)
-        if vnode is None and vedge is None:
+        if vnode is None:
             return
 
-        graph = SemanticGraphVectors()
+        graph = SemanticGraphNodeVectors()
         graph.field.field = field_id
         graph.field.field_type = type_id
         graph.vectorset_id = vectorset
         if vnode is not None:
             graph.node_vectors.CopyFrom(vnode)
+        self.bm.field_semantic_graph_node_vectors.append(graph)
+
+    async def generate_semantic_graph_edge_vectors(
+        self,
+        type_id: FieldType.ValueType,
+        field_id: str,
+        field: Field,
+        vectorset: str,
+    ):
+        vedge = await field.get_relation_edge_vectors(vectorset)
+        if vedge is None:
+            return
+
+        graph = SemanticGraphEdgeVectors()
+        graph.field.field = field_id
+        graph.field.field_type = type_id
+        graph.vectorset_id = vectorset
         if vedge is not None:
             graph.edge_vectors.CopyFrom(vedge)
-        self.bm.field_semantic_graph_vectors.append(graph)
+        self.bm.field_semantic_graph_edge_vectors.append(graph)
 
     async def generate_field_large_computed_metadata(
         self,

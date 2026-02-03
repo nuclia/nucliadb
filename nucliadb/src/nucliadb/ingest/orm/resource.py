@@ -60,7 +60,8 @@ from nucliadb_protos.resources_pb2 import (
     LinkExtractedData,
     Metadata,
     Paragraph,
-    SemanticGraphVectors,
+    SemanticGraphEdgeVectors,
+    SemanticGraphNodeVectors,
 )
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
@@ -617,7 +618,8 @@ class Resource:
         # Upload to binary storage
         if self.disable_vectors is False:
             await self._apply_extracted_vectors(message.field_vectors)
-            await self._apply_semantic_graph_vectors(message.field_semantic_graph_vectors)
+            await self._apply_semantic_graph_node_vectors(message.field_semantic_graph_node_vectors)
+            await self._apply_semantic_graph_edge_vectors(message.field_semantic_graph_edge_vectors)
 
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
@@ -843,11 +845,12 @@ class Resource:
             if vo is None:
                 raise AttributeError("Vector object not found on set_vectors")
 
-    async def _apply_semantic_graph_vectors(
+    async def _apply_semantic_graph_node_vectors(
         self,
-        fields_vectors: Sequence[SemanticGraphVectors],
+        fields_vectors: Sequence[SemanticGraphNodeVectors],
     ):
         await self.get_fields(force=True)
+        # TODO: Use node vectorsets
         vectorsets = {
             vectorset_id: vs
             async for vectorset_id, vs in datamanagers.vectorsets.iter(self.txn, kbid=self.kbid)
@@ -875,6 +878,40 @@ class Resource:
                 load=False,
             )
             await field_obj.set_relation_node_vectors(field_vectors, vectorset.vectorset_id)
+            self.modified = True
+
+    async def _apply_semantic_graph_edge_vectors(
+        self,
+        fields_vectors: Sequence[SemanticGraphEdgeVectors],
+    ):
+        await self.get_fields(force=True)
+        # TODO: Use edge vectorsets
+        vectorsets = {
+            vectorset_id: vs
+            async for vectorset_id, vs in datamanagers.vectorsets.iter(self.txn, kbid=self.kbid)
+        }
+
+        for field_vectors in fields_vectors:
+            if field_vectors.vectorset_id not in vectorsets:
+                logger.warning(
+                    "Dropping extracted vectors for unknown vectorset",
+                    extra={"kbid": self.kbid, "vectorset": field_vectors.vectorset_id},
+                )
+                continue
+
+            vectorset = vectorsets[field_vectors.vectorset_id]
+
+            # Store vectors in the resource
+            if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
+                # skipping because field does not exist
+                logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
+                return
+
+            field_obj = await self.get_field(
+                field_vectors.field.field,
+                field_vectors.field.field_type,
+                load=False,
+            )
             await field_obj.set_relation_edge_vectors(field_vectors, vectorset.vectorset_id)
             self.modified = True
 

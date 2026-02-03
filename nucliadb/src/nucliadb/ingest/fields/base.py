@@ -44,7 +44,8 @@ from nucliadb_protos.resources_pb2 import (
     LargeComputedMetadata,
     LargeComputedMetadataWrapper,
     QuestionAnswers,
-    SemanticGraphVectors,
+    SemanticGraphEdgeVectors,
+    SemanticGraphNodeVectors,
 )
 from nucliadb_protos.utils_pb2 import (
     ExtractedText,
@@ -396,7 +397,7 @@ class Field(Generic[PbType]):
                         self.extracted_text = payload
         return self.extracted_text
 
-    async def set_relation_node_vectors(self, payload: SemanticGraphVectors, vectorset: str):
+    async def set_relation_node_vectors(self, payload: SemanticGraphNodeVectors, vectorset: str):
         node_key = FieldTypes.RELATION_NODE_VECTORS.value.format(vectorset=vectorset)
         node_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, node_key)
         if payload.HasField("node_file"):
@@ -443,7 +444,7 @@ class Field(Generic[PbType]):
                 self.relation_edge_vectors[vectorset] = payload
         return self.relation_edge_vectors.get(vectorset, None)
 
-    async def set_relation_edge_vectors(self, payload: SemanticGraphVectors, vectorset: str):
+    async def set_relation_edge_vectors(self, payload: SemanticGraphEdgeVectors, vectorset: str):
         edge_key = FieldTypes.RELATION_EDGE_VECTORS.value.format(vectorset=vectorset)
         edge_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, edge_key)
         if payload.HasField("edge_file"):
