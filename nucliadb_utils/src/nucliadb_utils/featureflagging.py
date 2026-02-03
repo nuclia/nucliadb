@@ -56,6 +56,10 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
+    const.Features.AUDIT_RETRIEVE_AND_AUGMENT: {
+        "rollout": 0,
+        "variants": {"environment": ["local"]},
+    },
 }
 
 
