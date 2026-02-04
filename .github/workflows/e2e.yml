@@ -119,7 +119,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: 3.14.2
+          python-version: 3.14.3
           cache: "pip"
 
       - name: Install test deps
