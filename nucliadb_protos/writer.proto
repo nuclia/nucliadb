@@ -355,6 +355,9 @@ message NewKnowledgeBoxV2Request {
     // this flag allow faster searches (with less cold start) but it is
     // expensive on the infrastructure
     bool prewarm_enabled = 9;
+
+    repeated VectorSet graph_node_vectorsets = 10;
+    repeated VectorSet graph_edge_vectorsets = 11;
 }
 
 message NewKnowledgeBoxV2Response {

@@ -99,8 +99,20 @@ class _BrokerMessageBuilder:
                 await self.generate_field_vectors(
                     type_id, field_id, field, vectorset_id, vs.storage_key_kind
                 )
-                await self.generate_semantic_graph_node_vectors(type_id, field_id, field, vectorset_id)
-                await self.generate_semantic_graph_edge_vectors(type_id, field_id, field, vectorset_id)
+
+            for vectorset in await datamanagers.graph_vectorsets.node.get_all(
+                resource.txn, kbid=resource.kbid
+            ):
+                await self.generate_semantic_graph_node_vectors(
+                    type_id, field_id, field, vectorset.vectorset_id
+                )
+
+            for vectorset in await datamanagers.graph_vectorsets.edge.get_all(
+                resource.txn, kbid=resource.kbid
+            ):
+                await self.generate_semantic_graph_edge_vectors(
+                    type_id, field_id, field, vectorset.vectorset_id
+                )
 
             # Large metadata
             await self.generate_field_large_computed_metadata(type_id, field_id, field)

@@ -70,6 +70,16 @@ from nucliadb_utils.utilities import (
 )
 
 
+def semantic_model_to_metadata(
+    vs: writer_pb2.NewKnowledgeBoxV2Request.VectorSet,
+) -> SemanticModelMetadata:
+    return SemanticModelMetadata(
+        similarity_function=vs.similarity,
+        vector_dimension=vs.vector_dimension,
+        matryoshka_dimensions=vs.matryoshka_dimensions,
+    )
+
+
 class WriterServicer(writer_pb2_grpc.WriterServicer):
     def __init__(self):
         self.partitions = settings.partitions
@@ -109,12 +119,15 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 title=request.title,
                 description=request.description,
                 semantic_models={
-                    vs.vectorset_id: SemanticModelMetadata(
-                        similarity_function=vs.similarity,
-                        vector_dimension=vs.vector_dimension,
-                        matryoshka_dimensions=vs.matryoshka_dimensions,
-                    )
-                    for vs in request.vectorsets
+                    vs.vectorset_id: semantic_model_to_metadata(vs) for vs in request.vectorsets
+                },
+                semantic_graph_node_models={
+                    vs.vectorset_id: semantic_model_to_metadata(vs)
+                    for vs in request.graph_node_vectorsets
+                },
+                semantic_graph_edge_models={
+                    vs.vectorset_id: semantic_model_to_metadata(vs)
+                    for vs in request.graph_edge_vectorsets
                 },
                 external_index_provider=request.external_index_provider,
                 hidden_resources_enabled=request.hidden_resources_enabled,

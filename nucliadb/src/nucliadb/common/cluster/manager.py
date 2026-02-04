@@ -134,11 +134,14 @@ class KBShardManager:
         )
 
         if has_feature(const.Features.SEMANTIC_GRAPH) and vectorsets:
-            # TODO: We are using the first paragraph vectorset config for the relation index.
-            # TODO: This should come from a different field in learning_config and a different configuration key in maindb.
-            (name, config) = next(iter(vectorsets.items()))
-            req.relation_node_vectorsets_configs[name].MergeFrom(config)
-            req.relation_edge_vectorsets_configs[name].MergeFrom(config)
+            for model in await datamanagers.graph_vectorsets.node.get_all(txn, kbid=kbid):
+                req.relation_node_vectorsets_configs[model.vectorset_id].MergeFrom(
+                    nucliadb_index_config_to_nidx(model.vectorset_index_config)
+                )
+            for model in await datamanagers.graph_vectorsets.edge.get_all(txn, kbid=kbid):
+                req.relation_edge_vectorsets_configs[model.vectorset_id].MergeFrom(
+                    nucliadb_index_config_to_nidx(model.vectorset_index_config)
+                )
 
         shard_uuid = uuid.uuid4().hex
 
