@@ -153,7 +153,8 @@ message BrokerMessage {
     repeated resources.FieldID delete_question_answers = 42;
 
     // Vectors for the relation graph nodes & edges
-    repeated resources.SemanticGraphVectors field_semantic_graph_vectors = 44;
+    repeated resources.SemanticGraphNodeVectors field_semantic_graph_node_vectors = 44;
+    repeated resources.SemanticGraphEdgeVectors field_semantic_graph_edge_vectors = 45;
 }
 
 message BrokerMessageBlobReference {
@@ -354,6 +355,9 @@ message NewKnowledgeBoxV2Request {
     // this flag allow faster searches (with less cold start) but it is
     // expensive on the infrastructure
     bool prewarm_enabled = 9;
+
+    repeated VectorSet graph_node_vectorsets = 10;
+    repeated VectorSet graph_edge_vectorsets = 11;
 }
 
 message NewKnowledgeBoxV2Response {

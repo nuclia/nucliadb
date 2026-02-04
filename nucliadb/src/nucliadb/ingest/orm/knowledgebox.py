@@ -59,11 +59,13 @@ from nucliadb_protos.knowledgebox_pb2 import (
     VectorSetPurge,
 )
 from nucliadb_protos.resources_pb2 import Basic
+from nucliadb_utils import const
 from nucliadb_utils.settings import is_onprem_nucliadb
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     get_audit,
     get_storage,
+    has_feature,
 )
 
 # XXX Eventually all these keys should be moved to datamanagers.kb
@@ -82,6 +84,22 @@ KB_TO_DELETE_STORAGE = f"{KB_TO_DELETE_STORAGE_BASE}{{kbid}}"
 
 KB_VECTORSET_TO_DELETE_BASE = "/vectorsettodelete"
 KB_VECTORSET_TO_DELETE = f"{KB_VECTORSET_TO_DELETE_BASE}/{{kbid}}/{{vectorset}}"
+
+
+def semantic_model_to_vectorset(
+    model_name: str, model: SemanticModelMetadata, dimension: int | None = None
+) -> knowledgebox_pb2.VectorSetConfig:
+    return knowledgebox_pb2.VectorSetConfig(
+        vectorset_id=model_name,
+        vectorset_index_config=knowledgebox_pb2.VectorIndexConfig(
+            similarity=model.similarity_function,
+            vector_type=knowledgebox_pb2.VectorType.DENSE_F32,
+            normalize_vectors=len(model.matryoshka_dimensions) > 0,
+            vector_dimension=dimension or model.vector_dimension,
+        ),
+        matryoshka_dimensions=model.matryoshka_dimensions,
+        storage_key_kind=knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX,
+    )
 
 
 class KnowledgeBox:
@@ -110,6 +128,8 @@ class KnowledgeBox:
         hidden_resources_enabled: bool = False,
         hidden_resources_hide_on_creation: bool = False,
         prewarm_enabled: bool = False,
+        semantic_graph_node_models: dict[str, SemanticModelMetadata] = dict(),
+        semantic_graph_edge_models: dict[str, SemanticModelMetadata] = dict(),
     ) -> tuple[str, str]:
         """Creates a new knowledge box and return its id and slug."""
 
@@ -164,19 +184,31 @@ class KnowledgeBox:
                         )
                     )
 
-                    vectorset_config = knowledgebox_pb2.VectorSetConfig(
-                        vectorset_id=vectorset_id,
-                        vectorset_index_config=knowledgebox_pb2.VectorIndexConfig(
-                            similarity=semantic_model.similarity_function,
-                            # XXX: hardcoded value
-                            vector_type=knowledgebox_pb2.VectorType.DENSE_F32,
-                            normalize_vectors=len(semantic_model.matryoshka_dimensions) > 0,
-                            vector_dimension=dimension,
-                        ),
-                        matryoshka_dimensions=semantic_model.matryoshka_dimensions,
-                        storage_key_kind=knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX,
+                    vectorset_config = semantic_model_to_vectorset(
+                        vectorset_id, semantic_model, dimension
                     )
                     await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
+
+                if has_feature(const.Features.SEMANTIC_GRAPH):
+                    if semantic_graph_node_models:
+                        await datamanagers.graph_vectorsets.node.set_all(
+                            txn,
+                            kbid=kbid,
+                            configs=[
+                                semantic_model_to_vectorset(name, model)
+                                for name, model in semantic_graph_node_models.items()
+                            ],
+                        )
+
+                    if semantic_graph_edge_models:
+                        await datamanagers.graph_vectorsets.edge.set_all(
+                            txn,
+                            kbid=kbid,
+                            configs=[
+                                semantic_model_to_vectorset(name, model)
+                                for name, model in semantic_graph_edge_models.items()
+                            ],
+                        )
 
                 stored_external_index_provider = await cls._maybe_create_external_indexes(
                     kbid, request=external_index_provider, indexes=vs_external_indexes

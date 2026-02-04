@@ -78,7 +78,8 @@ BM_FIELDS = {
         "field_large_metadata",
         "question_answers",
         "field_statuses",
-        "field_semantic_graph_vectors",
+        "field_semantic_graph_node_vectors",
+        "field_semantic_graph_edge_vectors",
     ],
     # These fields are mostly used for internal purposes and they are not part of
     # the representation of the exported resource as broker message.

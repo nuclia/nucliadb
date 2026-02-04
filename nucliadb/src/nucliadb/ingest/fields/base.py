@@ -44,7 +44,8 @@ from nucliadb_protos.resources_pb2 import (
     LargeComputedMetadata,
     LargeComputedMetadataWrapper,
     QuestionAnswers,
-    SemanticGraphVectors,
+    SemanticGraphEdgeVectors,
+    SemanticGraphNodeVectors,
 )
 from nucliadb_protos.utils_pb2 import (
     ExtractedText,
@@ -210,6 +211,12 @@ class Field(Generic[PbType]):
         await self.delete_extracted_text()
         async for vectorset_id, vs in datamanagers.vectorsets.iter(self.resource.txn, kbid=self.kbid):
             await self.delete_vectors(vectorset_id, vs.storage_key_kind)
+
+        for model in await datamanagers.graph_vectorsets.node.get_all(self.resource.txn, kbid=self.kbid):
+            await self.delete_relation_node_vectors(model.vectorset_id)
+        for model in await datamanagers.graph_vectorsets.edge.get_all(self.resource.txn, kbid=self.kbid):
+            await self.delete_relation_edge_vectors(model.vectorset_id)
+
         await self.delete_metadata()
         await self.delete_question_answers()
 
@@ -236,6 +243,30 @@ class Field(Generic[PbType]):
         sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
         try:
             await self.storage.delete_upload(sf.key, sf.bucket)
+        except KeyError:
+            pass
+
+    async def delete_relation_node_vectors(
+        self,
+        vectorset: str,
+    ) -> None:
+        # Try delete vectors
+        node_key = FieldTypes.RELATION_NODE_VECTORS.value.format(vectorset=vectorset)
+        node_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, node_key)
+        try:
+            await self.storage.delete_upload(node_sf.key, node_sf.bucket)
+        except KeyError:
+            pass
+
+    async def delete_relation_edge_vectors(
+        self,
+        vectorset: str,
+    ) -> None:
+        # Try delete vectors
+        edge_key = FieldTypes.RELATION_EDGE_VECTORS.value.format(vectorset=vectorset)
+        edge_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, edge_key)
+        try:
+            await self.storage.delete_upload(edge_sf.key, edge_sf.bucket)
         except KeyError:
             pass
 
@@ -396,7 +427,7 @@ class Field(Generic[PbType]):
                         self.extracted_text = payload
         return self.extracted_text
 
-    async def set_relation_node_vectors(self, payload: SemanticGraphVectors, vectorset: str):
+    async def set_relation_node_vectors(self, payload: SemanticGraphNodeVectors, vectorset: str):
         node_key = FieldTypes.RELATION_NODE_VECTORS.value.format(vectorset=vectorset)
         node_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, node_key)
         if payload.HasField("node_file"):
@@ -443,7 +474,7 @@ class Field(Generic[PbType]):
                 self.relation_edge_vectors[vectorset] = payload
         return self.relation_edge_vectors.get(vectorset, None)
 
-    async def set_relation_edge_vectors(self, payload: SemanticGraphVectors, vectorset: str):
+    async def set_relation_edge_vectors(self, payload: SemanticGraphEdgeVectors, vectorset: str):
         edge_key = FieldTypes.RELATION_EDGE_VECTORS.value.format(vectorset=vectorset)
         edge_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, edge_key)
         if payload.HasField("edge_file"):

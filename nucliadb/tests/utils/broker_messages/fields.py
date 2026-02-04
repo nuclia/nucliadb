@@ -56,7 +56,12 @@ class Field:
     id: rpb.FieldID
     user: FieldUser = dataclasses.field(default_factory=FieldUser)
     extracted: FieldExtracted = dataclasses.field(default_factory=FieldExtracted)
-    semantic_graph_vectors: list[rpb.SemanticGraphVectors] = dataclasses.field(default_factory=list)
+    semantic_graph_node_vectors: list[rpb.SemanticGraphNodeVectors] = dataclasses.field(
+        default_factory=list
+    )
+    semantic_graph_edge_vectors: list[rpb.SemanticGraphEdgeVectors] = dataclasses.field(
+        default_factory=list
+    )
 
 
 class FieldBuilder:
@@ -71,7 +76,8 @@ class FieldBuilder:
         self.__question_answers: rpb.FieldQuestionAnswerWrapper | None = None
         self.__file: rpb.FileExtractedData | None = None
         self.__link: rpb.LinkExtractedData | None = None
-        self._semantic_graph_vectors: list[rpb.SemanticGraphVectors] = []
+        self._semantic_graph_node_vectors: list[rpb.SemanticGraphNodeVectors] = []
+        self._semantic_graph_edge_vectors: list[rpb.SemanticGraphEdgeVectors] = []
 
     @property
     def id(self) -> rpb.FieldID:
@@ -161,7 +167,8 @@ class FieldBuilder:
             field.user.metadata = rpb.UserFieldMetadata()
             field.user.metadata.CopyFrom(self.__user_metadata)
 
-        field.semantic_graph_vectors = self._semantic_graph_vectors
+        field.semantic_graph_node_vectors = self._semantic_graph_node_vectors
+        field.semantic_graph_edge_vectors = self._semantic_graph_edge_vectors
 
         return field
 
@@ -278,16 +285,28 @@ class FieldBuilder:
 
         return paragraph_id, self.with_extracted_paragraph_metadata(paragraph, split)
 
-    def _graph_vectors(self, vectorset: str) -> rpb.SemanticGraphVectors:
-        for extracted_vectors in self._semantic_graph_vectors:
+    def _graph_node_vectors(self, vectorset: str) -> rpb.SemanticGraphNodeVectors:
+        for extracted_vectors in self._semantic_graph_node_vectors:
             if extracted_vectors.field == self._field_id and extracted_vectors.vectorset_id == vectorset:
                 return extracted_vectors
 
-        extracted_vectors = rpb.SemanticGraphVectors(
+        extracted_vectors = rpb.SemanticGraphNodeVectors(
             field=self._field_id,
             vectorset_id=vectorset,
         )
-        self._semantic_graph_vectors.append(extracted_vectors)
+        self._semantic_graph_node_vectors.append(extracted_vectors)
+        return extracted_vectors
+
+    def _graph_edge_vectors(self, vectorset: str) -> rpb.SemanticGraphEdgeVectors:
+        for extracted_vectors in self._semantic_graph_edge_vectors:
+            if extracted_vectors.field == self._field_id and extracted_vectors.vectorset_id == vectorset:
+                return extracted_vectors
+
+        extracted_vectors = rpb.SemanticGraphEdgeVectors(
+            field=self._field_id,
+            vectorset_id=vectorset,
+        )
+        self._semantic_graph_edge_vectors.append(extracted_vectors)
         return extracted_vectors
 
     def add_relation(
@@ -316,16 +335,16 @@ class FieldBuilder:
                     node_value=node.value,
                     vector=vector,
                 )
-                if nv not in self._graph_vectors(vectorset).node_vectors.vectors:
-                    self._graph_vectors(vectorset).node_vectors.vectors.append(nv)
+                if nv not in self._graph_node_vectors(vectorset).node_vectors.vectors:
+                    self._graph_node_vectors(vectorset).node_vectors.vectors.append(nv)
 
         for vectorset, vector in relation_vectors.items():
             ev = utils_pb2.RelationEdgeVector(
                 relation_label=label,
                 vector=vector,
             )
-            if ev not in self._graph_vectors(vectorset).edge_vectors.vectors:
-                self._graph_vectors(vectorset).edge_vectors.vectors.append(ev)
+            if ev not in self._graph_edge_vectors(vectorset).edge_vectors.vectors:
+                self._graph_edge_vectors(vectorset).edge_vectors.vectors.append(ev)
 
     def add_question_answer(
         self,

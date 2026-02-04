@@ -177,4 +177,5 @@ class BrokerMessageBuilder:
             if field.extracted.question_answers is not None:
                 self.bm.question_answers.append(field.extracted.question_answers)
 
-            self.bm.field_semantic_graph_vectors.extend(field.semantic_graph_vectors)
+            self.bm.field_semantic_graph_node_vectors.extend(field.semantic_graph_node_vectors)
+            self.bm.field_semantic_graph_edge_vectors.extend(field.semantic_graph_edge_vectors)

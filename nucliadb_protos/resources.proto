@@ -254,16 +254,21 @@ message ExtractedVectorsWrapper {
     string vectorset_id = 4;
 }
 
-message SemanticGraphVectors {
+message SemanticGraphNodeVectors {
     FieldID field = 1;
     string vectorset_id = 2;
     oneof node_data {
         utils.RelationNodeVectors node_vectors = 3;
         CloudFile node_file = 4;
     }
+}
+
+message SemanticGraphEdgeVectors {
+    FieldID field = 1;
+    string vectorset_id = 2;
     oneof edge_data {
-        utils.RelationEdgeVectors edge_vectors = 5;
-        CloudFile edge_file = 6;
+        utils.RelationEdgeVectors edge_vectors = 3;
+        CloudFile edge_file = 4;
     }
 }
 

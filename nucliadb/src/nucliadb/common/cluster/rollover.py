@@ -40,6 +40,8 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.migrator.settings import settings
 from nucliadb_protos import writer_pb2
 from nucliadb_telemetry import errors
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 from .utils import (
     delete_resource_from_shard,
@@ -152,6 +154,16 @@ async def create_rollover_shards(
                 kbid=kbid,
                 vectorsets_configs=vectorsets,
             )
+
+            if has_feature(const.Features.SEMANTIC_GRAPH) and vectorsets:
+                for model in await datamanagers.graph_vectorsets.node.get_all(txn, kbid=kbid):
+                    req.relation_node_vectorsets_configs[model.vectorset_id].MergeFrom(
+                        nucliadb_index_config_to_nidx(model.vectorset_index_config)
+                    )
+                for model in await datamanagers.graph_vectorsets.edge.get_all(txn, kbid=kbid):
+                    req.relation_edge_vectorsets_configs[model.vectorset_id].MergeFrom(
+                        nucliadb_index_config_to_nidx(model.vectorset_index_config)
+                    )
 
             nidx_shard = await get_nidx_api_client().NewShard(req)
 
