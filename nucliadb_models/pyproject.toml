@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb_models"
-version = "6.11.1"
+version = "6.12.0"
 license = "Apache-2.0"
 readme = "README.md"
 authors = [{ name = "Nuclia", email = "nucliadb@nuclia.com" }]
