@@ -102,6 +102,8 @@ class LearningConfiguration(BaseModel):
 
     # This is where the config for each semantic model (aka vectorsets) is returned
     semantic_model_configs: dict[str, SemanticConfig] = Field(default_factory=dict)
+    semantic_graph_node_model_configs: dict[str, SemanticConfig] = Field(default_factory=dict)
+    semantic_graph_edge_model_configs: dict[str, SemanticConfig] = Field(default_factory=dict)
 
     @model_validator(mode="before")
     @classmethod
@@ -128,6 +130,22 @@ class LearningConfiguration(BaseModel):
     ) -> dict[str, knowledgebox_pb2.SemanticModelMetadata]:
         result = {}
         for model_name, config in self.semantic_model_configs.items():
+            result[model_name] = config.into_semantic_model_metadata()
+        return result
+
+    def into_semantic_graph_node_models_metadata(
+        self,
+    ) -> dict[str, knowledgebox_pb2.SemanticModelMetadata]:
+        result = {}
+        for model_name, config in self.semantic_graph_node_model_configs.items():
+            result[model_name] = config.into_semantic_model_metadata()
+        return result
+
+    def into_semantic_graph_edge_models_metadata(
+        self,
+    ) -> dict[str, knowledgebox_pb2.SemanticModelMetadata]:
+        result = {}
+        for model_name, config in self.semantic_graph_edge_model_configs.items():
             result[model_name] = config.into_semantic_model_metadata()
         return result
 
@@ -501,6 +519,22 @@ class InMemoryLearningConfig(LearningConfigService):
                 semantic_matryoshka_dims=[],
                 semantic_models=[default_model],
                 semantic_model_configs={
+                    default_model: SemanticConfig(
+                        similarity=SimilarityFunction.COSINE,
+                        size=size,
+                        threshold=0,
+                        matryoshka_dims=[],
+                    )
+                },
+                semantic_graph_node_model_configs={
+                    default_model: SemanticConfig(
+                        similarity=SimilarityFunction.COSINE,
+                        size=size,
+                        threshold=0,
+                        matryoshka_dims=[],
+                    )
+                },
+                semantic_graph_edge_model_configs={
                     default_model: SemanticConfig(
                         similarity=SimilarityFunction.COSINE,
                         size=size,

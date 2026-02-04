@@ -121,6 +121,8 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
             title=item.title or "",
             description=item.description or "",
             semantic_models=semantic_models,
+            semantic_graph_node_models=learning_config.into_semantic_graph_node_models_metadata(),
+            semantic_graph_edge_models=learning_config.into_semantic_graph_edge_models_metadata(),
             external_index_provider=external_index_provider,
             hidden_resources_enabled=item.hidden_resources_enabled,
             hidden_resources_hide_on_creation=item.hidden_resources_hide_on_creation,
