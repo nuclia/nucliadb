@@ -850,21 +850,20 @@ class Resource:
         fields_vectors: Sequence[SemanticGraphNodeVectors],
     ):
         await self.get_fields(force=True)
-        # TODO: Use node vectorsets
-        vectorsets = {
-            vectorset_id: vs
-            async for vectorset_id, vs in datamanagers.vectorsets.iter(self.txn, kbid=self.kbid)
-        }
+        vectorset_ids = [
+            vs.vectorset_id
+            for vs in await datamanagers.graph_vectorsets.node.get_all(self.txn, kbid=self.kbid)
+        ]
 
         for field_vectors in fields_vectors:
-            if field_vectors.vectorset_id not in vectorsets:
+            if field_vectors.vectorset_id not in vectorset_ids:
                 logger.warning(
                     "Dropping extracted vectors for unknown vectorset",
                     extra={"kbid": self.kbid, "vectorset": field_vectors.vectorset_id},
                 )
                 continue
 
-            vectorset = vectorsets[field_vectors.vectorset_id]
+            vectorset_id = field_vectors.vectorset_id
 
             # Store vectors in the resource
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
@@ -877,7 +876,7 @@ class Resource:
                 field_vectors.field.field_type,
                 load=False,
             )
-            await field_obj.set_relation_node_vectors(field_vectors, vectorset.vectorset_id)
+            await field_obj.set_relation_node_vectors(field_vectors, vectorset_id)
             self.modified = True
 
     async def _apply_semantic_graph_edge_vectors(
@@ -885,21 +884,20 @@ class Resource:
         fields_vectors: Sequence[SemanticGraphEdgeVectors],
     ):
         await self.get_fields(force=True)
-        # TODO: Use edge vectorsets
-        vectorsets = {
-            vectorset_id: vs
-            async for vectorset_id, vs in datamanagers.vectorsets.iter(self.txn, kbid=self.kbid)
-        }
+        vectorset_ids = [
+            vs.vectorset_id
+            for vs in await datamanagers.graph_vectorsets.node.get_all(self.txn, kbid=self.kbid)
+        ]
 
         for field_vectors in fields_vectors:
-            if field_vectors.vectorset_id not in vectorsets:
+            if field_vectors.vectorset_id not in vectorset_ids:
                 logger.warning(
                     "Dropping extracted vectors for unknown vectorset",
                     extra={"kbid": self.kbid, "vectorset": field_vectors.vectorset_id},
                 )
                 continue
 
-            vectorset = vectorsets[field_vectors.vectorset_id]
+            vectorset_id = field_vectors.vectorset_id
 
             # Store vectors in the resource
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
@@ -912,7 +910,7 @@ class Resource:
                 field_vectors.field.field_type,
                 load=False,
             )
-            await field_obj.set_relation_edge_vectors(field_vectors, vectorset.vectorset_id)
+            await field_obj.set_relation_edge_vectors(field_vectors, vectorset_id)
             self.modified = True
 
     async def _apply_field_large_metadata(self, field_large_metadata: LargeComputedMetadataWrapper):
