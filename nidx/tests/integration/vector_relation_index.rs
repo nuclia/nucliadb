@@ -170,7 +170,8 @@ async fn test_relation_node_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
             query: Some(graph_query.clone()),
             kind: QueryKind::Nodes as i32,
             top_k: 100,
-            graph_vectorset: Some("minivectors".to_string()),
+            graph_node_vectorset: Some("minivectors".to_string()),
+            graph_edge_vectorset: Some("minivectors".to_string()),
             ..Default::default()
         })
         .await?
@@ -217,7 +218,8 @@ async fn test_relation_path_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
             query: Some(graph_query.clone()),
             kind: QueryKind::Path as i32,
             top_k: 100,
-            graph_vectorset: Some("minivectors".to_string()),
+            graph_node_vectorset: Some("minivectors".to_string()),
+            graph_edge_vectorset: Some("minivectors".to_string()),
             ..Default::default()
         })
         .await?
@@ -257,7 +259,8 @@ async fn test_relation_path_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
             graph_search: Some(nidx_protos::search_request::GraphSearch {
                 query: Some(graph_query),
             }),
-            graph_vectorset: Some("minivectors".to_string()),
+            graph_node_vectorset: Some("minivectors".to_string()),
+            graph_edge_vectorset: Some("minivectors".to_string()),
             ..Default::default()
         })
         .await?
@@ -323,7 +326,8 @@ async fn test_relation_edge_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
             query: Some(graph_query.clone()),
             kind: QueryKind::Relations as i32,
             top_k: 100,
-            graph_vectorset: Some("minivectors".to_string()),
+            graph_node_vectorset: Some("minivectors".to_string()),
+            graph_edge_vectorset: Some("minivectors".to_string()),
             ..Default::default()
         })
         .await?

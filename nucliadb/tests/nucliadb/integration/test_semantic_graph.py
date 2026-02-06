@@ -24,7 +24,7 @@ from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.search.utilities import get_predict
-from nucliadb_models.internal.predict import QueryInfo, SentenceSearch
+from nucliadb_models.internal.predict import GraphNodeSearch, QueryInfo, SentenceSearch
 from nucliadb_protos.resources_pb2 import (
     FieldType,
 )
@@ -182,16 +182,23 @@ async def test_node_queries(
             return_value=QueryInfo(
                 language=None,
                 visual_llm=False,
-                query="cat",
                 max_context=10,
                 entities=None,
-                sentence=SentenceSearch(vectors={"multilingual": VECTORS["cat"]}),
+                query=None,
+                sentence=None,
+                graph_nodes=GraphNodeSearch(
+                    vectors={
+                        "multilingual": {
+                            "cat": VECTORS["cat"],
+                        }
+                    }
+                ),
             )
         ),
     ):
         resp = await nucliadb_reader.post(
             f"/kb/{standalone_knowledgebox}/graph/nodes",
-            json={"query": {"prop": "node", "value": "dog", "match": "semantic"}},
+            json={"query": {"prop": "node", "value": "cat", "match": "semantic"}},
         )
 
     assert resp.status_code == 200
@@ -204,6 +211,8 @@ async def test_node_queries(
     assert nodes[0]["score"] > nodes[1]["score"]
 
 
+# TODO(semantic-graph): Disabled for now, not supported by NUA/processor yet
+@pytest.mark.skip
 @pytest.mark.deploy_modes("standalone")
 async def test_relation_queries(
     nucliadb_reader: AsyncClient,
@@ -254,10 +263,17 @@ async def test_path_queries(
             return_value=QueryInfo(
                 language=None,
                 visual_llm=False,
-                query="dog",
+                query=None,
+                sentence=None,
                 max_context=10,
                 entities=None,
-                sentence=SentenceSearch(vectors={"multilingual": VECTORS["dog"]}),
+                graph_nodes=GraphNodeSearch(
+                    vectors={
+                        "multilingual": {
+                            "dog": VECTORS["dog"],
+                        }
+                    }
+                ),
             )
         ),
     ):
@@ -300,10 +316,17 @@ async def test_path_queries(
             return_value=QueryInfo(
                 language=None,
                 visual_llm=False,
-                query="dog",
+                query=None,
+                sentence=None,
                 max_context=10,
                 entities=None,
-                sentence=SentenceSearch(vectors={"multilingual": VECTORS["dog"]}),
+                graph_nodes=GraphNodeSearch(
+                    vectors={
+                        "multilingual": {
+                            "dog": VECTORS["dog"],
+                        }
+                    }
+                ),
             )
         ),
     ):
@@ -336,10 +359,17 @@ async def test_path_queries(
             return_value=QueryInfo(
                 language=None,
                 visual_llm=False,
-                query="dog",
+                query=None,
+                sentence=None,
                 max_context=10,
                 entities=None,
-                sentence=SentenceSearch(vectors={"multilingual": VECTORS["dog"]}),
+                graph_nodes=GraphNodeSearch(
+                    vectors={
+                        "multilingual": {
+                            "dog": VECTORS["dog"],
+                        }
+                    }
+                ),
             )
         ),
     ):
