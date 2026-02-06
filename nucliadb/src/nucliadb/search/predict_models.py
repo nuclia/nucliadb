@@ -203,3 +203,7 @@ Please return ONLY the question without any explanation.""",
         default=False,
         description="If true, the model will return the entities detected in the sentence guided by an already defined Graph Extraction Agent in the Knowledge Box.",
     )
+    graph_nodes: list[str] | None = Field(
+        None,
+        description="List of graph node names to compute embeddings for. If not provided, no graph node embeddings will be computed.",
+    )

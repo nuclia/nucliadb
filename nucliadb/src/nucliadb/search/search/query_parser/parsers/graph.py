@@ -19,6 +19,8 @@
 #
 
 
+from dataclasses import dataclass
+
 from nidx_protos import nodereader_pb2
 from typing_extensions import assert_never
 
@@ -36,33 +38,41 @@ from nucliadb_protos import utils_pb2
 
 
 async def parse_graph_search(kbid: str, item: graph_requests.GraphSearchRequest) -> GraphRetrieval:
-    node_vectors, relation_vectors = await _calculate_graph_vectors(kbid, item)
+    vectors = await _calculate_graph_vectors(kbid, item)
 
     pb = await _parse_common(kbid, item)
-    pb.query.path.CopyFrom(parse_path_query(item.query, node_vectors, relation_vectors))
+    pb.query.path.CopyFrom(parse_path_query(item.query, vectors.node_vectors, vectors.relation_vectors))
     pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.PATH
+    if vectors.node_vectorset:
+        pb.graph_node_vectorset = vectors.node_vectorset
+    if vectors.relation_vectorset:
+        pb.graph_edge_vectorset = vectors.relation_vectorset
     return pb
 
 
 async def parse_graph_node_search(
     kbid: str, item: graph_requests.GraphNodesSearchRequest
 ) -> GraphRetrieval:
-    node_vectors, _ = await _calculate_graph_vectors(kbid, item)
+    vectors = await _calculate_graph_vectors(kbid, item)
 
     pb = await _parse_common(kbid, item)
-    pb.query.path.CopyFrom(_parse_node_query(item.query, node_vectors))
+    pb.query.path.CopyFrom(_parse_node_query(item.query, vectors.node_vectors))
     pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.NODES
+    if vectors.node_vectorset:
+        pb.graph_node_vectorset = vectors.node_vectorset
     return pb
 
 
 async def parse_graph_relation_search(
     kbid: str, item: graph_requests.GraphRelationsSearchRequest
 ) -> GraphRetrieval:
-    _, relation_vectors = await _calculate_graph_vectors(kbid, item)
+    vectors = await _calculate_graph_vectors(kbid, item)
 
     pb = await _parse_common(kbid, item)
-    pb.query.path.CopyFrom(_parse_relation_query(item.query, relation_vectors))
+    pb.query.path.CopyFrom(_parse_relation_query(item.query, vectors.relation_vectors))
     pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.RELATIONS
+    if vectors.relation_vectorset:
+        pb.graph_edge_vectorset = vectors.relation_vectorset
     return pb
 
 
@@ -91,7 +101,6 @@ async def _parse_common(kbid: str, item: AnyGraphRequest) -> nodereader_pb2.Grap
     async with datamanagers.with_ro_transaction() as txn:
         async for vs_id, vs_config in datamanagers.vectorsets.iter(txn, kbid=kbid):
             vss.append(vs_id)
-    pb.graph_vectorset = vss[0]
 
     return pb
 
@@ -281,13 +290,15 @@ def _set_relation_to_pb(
         pb.relation_type = RelationTypeMap[relation.type]
 
     if relation.label is not None:
-        match relation.match:
-            case graph_requests.RelationMatchKindName.EXACT:
-                pb.exact.SetInParent()
-            case graph_requests.RelationMatchKindName.SEMANTIC:
-                pb.vector.vector.extend(relation_vectors[relation.label])
-            case _:  # pragma: no cover
-                assert_never(relation.match)
+        pb.exact.SetInParent()
+        # TODO(semantic-graph): Disabled for now, not supported by NUA/processor yet
+        # match relation.match:
+        #     case graph_requests.RelationMatchKindName.EXACT:
+        #         pb.exact.SetInParent()
+        #     case graph_requests.RelationMatchKindName.SEMANTIC:
+        #         pb.vector.vector.extend(relation_vectors[relation.label])
+        #     case _:  # pragma: no cover
+        #         assert_never(relation.match)
 
 
 def _set_generated_to_pb(generated: graph_requests.Generated, pb: nodereader_pb2.GraphQuery.PathQuery):
@@ -308,33 +319,42 @@ def _set_generated_to_pb(generated: graph_requests.Generated, pb: nodereader_pb2
         assert_never(generated.by)
 
 
+@dataclass
+class GraphVectors:
+    node_vectors: dict[str, list[float]]
+    relation_vectors: dict[str, list[float]]
+    node_vectorset: str | None
+    relation_vectorset: str | None
+
+
 async def _calculate_graph_vectors(
     kbid: str,
     request: AnyGraphRequest,
-) -> tuple[dict[str, list[float]], dict[str, list[float]]]:
+) -> GraphVectors:
     nodes: set[str] = set()
     relations: set[str] = set()
     _extract_semantic_terms(request.query, nodes, relations)
 
     node_vectors = {}
-    relation_vectors = {}
+    relation_vectors: dict[str, list[float]] = {}
+    node_vectorset: str = ""
+    relation_vectoset: str = ""
 
-    # TODO: This should use a specific endpoint that uses the appropriate models
-    # and supports embedding multiple terms at once
+    # TODO(semantic-graph): Disabled relations for now, not supported by NUA/processor yet
+    # TODO(semantic-graph): Assumming a single vectorset for now
     predict = get_predict()
-    for node in nodes:
-        result = await predict.query(kbid, QueryModel(text=node))
-        assert result.sentence
-        vector = next(iter(result.sentence.vectors.values()))
-        node_vectors[node] = vector
+    result = await predict.query(kbid, QueryModel(graph_nodes=list(nodes)))
+    if result.graph_nodes:
+        node_vectorset = next(iter(result.graph_nodes.vectors.keys()))
+        for node in nodes:
+            node_vectors[node] = result.graph_nodes.vectors[node_vectorset][node]
 
-    for relation in relations:
-        result = await predict.query(kbid, QueryModel(text=relation))
-        assert result.sentence
-        vector = next(iter(result.sentence.vectors.values()))
-        relation_vectors[relation] = vector
-
-    return node_vectors, relation_vectors
+    return GraphVectors(
+        node_vectors=node_vectors,
+        relation_vectors=relation_vectors,
+        node_vectorset=node_vectorset,
+        relation_vectorset=relation_vectoset,
+    )
 
 
 def _extract_semantic_terms(
@@ -361,8 +381,10 @@ def _extract_semantic_terms(
             if query.match == graph_requests.NodeMatchKindName.SEMANTIC and query.value:
                 nodes.add(query.value)
         case graph_requests.GraphRelation():
-            if query.match == graph_requests.RelationMatchKindName.SEMANTIC and query.label:
-                relations.add(query.label)
+            pass
+            # TODO(semantic-graph): Disabled for now, not supported by NUA/processor yet
+            # if query.match == graph_requests.RelationMatchKindName.SEMANTIC and query.label:
+            #     relations.add(query.label)
         case graph_requests.Generated():
             pass
         case None:

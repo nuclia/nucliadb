@@ -252,7 +252,8 @@ message GraphSearchRequest {
     optional utils.Security security = 5;
     optional FilterExpression field_filter = 6;
 
-    optional string graph_vectorset = 7;
+    optional string graph_node_vectorset = 7;
+    optional string graph_edge_vectorset = 8;
 }
 
 message GraphSearchResponse {
@@ -341,7 +342,8 @@ message SearchRequest {
     repeated float vector = 10; // Embedded vector search.
 
     string vectorset = 15;
-    optional string graph_vectorset = 30;
+    optional string graph_node_vectorset = 30;
+    optional string graph_edge_vectorset = 31;
 
     bool paragraph = 12;
     bool document = 13;

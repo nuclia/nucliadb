@@ -48,6 +48,11 @@ class TokenSearch(BaseModel):
     input_tokens: int = 0
 
 
+class GraphNodeSearch(BaseModel):
+    # {model: {node: vector}}
+    vectors: dict[str, dict[str, list[float]]]
+
+
 class QueryInfo(BaseModel):
     language: str | None
     stop_words: list[str] = Field(default_factory=list)
@@ -60,8 +65,9 @@ class QueryInfo(BaseModel):
     max_context: int
     entities: TokenSearch | None
     sentence: SentenceSearch | None
-    query: str
+    query: str | None
     rephrased_query: str | None = None
+    graph_nodes: GraphNodeSearch | None = None
 
 
 class RerankModel(BaseModel):

@@ -271,7 +271,8 @@ fn compute_graph_request(search_request: &SearchRequest) -> anyhow::Result<Optio
         query: graph_search.query,
         top_k: std::cmp::max(search_request.result_per_page as u32, 20),
         kind: QueryKind::Path.into(),
-        graph_vectorset: search_request.graph_vectorset.clone(),
+        graph_node_vectorset: search_request.graph_node_vectorset.clone(),
+        graph_edge_vectorset: search_request.graph_edge_vectorset.clone(),
         // we don't need to populate filters nor shard as they won't be used in search. Prefilter
         // will be done with request filters and shard have been already obtained
         ..Default::default()
