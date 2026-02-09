@@ -362,6 +362,7 @@ async def query_information(
         rephrase=rephrase,
         rephrase_prompt=rephrase_prompt,
         query_image=query_image,
+        graph_nodes=None,
     )
     return await predict.query(kbid, item)
 

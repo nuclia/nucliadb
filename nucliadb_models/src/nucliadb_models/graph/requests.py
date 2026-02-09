@@ -72,14 +72,15 @@ class RelationMatchKindName(str, Enum):
 class GraphRelation(BaseModel, extra="forbid"):
     label: str | None = None
     type: RelationType | None = None
-    match: RelationMatchKindName = RelationMatchKindName.EXACT
+    # TODO(semantic-graph): Disabled for now, not supported by NUA/processor yet
+    # match: RelationMatchKindName = RelationMatchKindName.EXACT
 
-    @model_validator(mode="after")
-    def validate_match_usage(self) -> Self:
-        if self.match == RelationMatchKindName.SEMANTIC and self.label is None:
-            raise ValueError("Semantic match can only be used if a label is provided")
+    # @model_validator(mode="after")
+    # def validate_match_usage(self) -> Self:
+    #     if self.match == RelationMatchKindName.SEMANTIC and self.label is None:
+    #         raise ValueError("Semantic match can only be used if a label is provided")
 
-        return self
+    #     return self
 
 
 ## Models for query expressions
