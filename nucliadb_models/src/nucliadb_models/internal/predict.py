@@ -26,12 +26,10 @@ class SentenceSearch(BaseModel):
     vectors: dict[str, list[float]] = Field(
         default_factory=dict,
         description="Sentence vectors for each semantic model",
-        min_length=1,
     )
     timings: dict[str, float] = Field(
         default_factory=dict,
         description="Time taken to compute the sentence vector for each semantic model",
-        min_length=1,
     )
 
 

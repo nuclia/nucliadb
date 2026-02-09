@@ -335,19 +335,20 @@ async def _calculate_graph_vectors(
     relations: set[str] = set()
     _extract_semantic_terms(request.query, nodes, relations)
 
-    node_vectors = {}
+    node_vectors: dict[str, list[float]] = {}
     relation_vectors: dict[str, list[float]] = {}
     node_vectorset: str = ""
     relation_vectoset: str = ""
 
     # TODO(semantic-graph): Disabled relations for now, not supported by NUA/processor yet
     # TODO(semantic-graph): Assumming a single vectorset for now
-    predict = get_predict()
-    result = await predict.query(kbid, QueryModel(graph_nodes=list(nodes)))
-    if result.graph_nodes:
-        node_vectorset = next(iter(result.graph_nodes.vectors.keys()))
-        for node in nodes:
-            node_vectors[node] = result.graph_nodes.vectors[node_vectorset][node]
+    if nodes or relations:
+        predict = get_predict()
+        result = await predict.query(kbid, QueryModel(graph_nodes=list(nodes)))
+        if result.graph_nodes:
+            node_vectorset = next(iter(result.graph_nodes.vectors.keys()))
+            for node in nodes:
+                node_vectors[node] = result.graph_nodes.vectors[node_vectorset][node]
 
     return GraphVectors(
         node_vectors=node_vectors,
