@@ -25,7 +25,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.common.ids import FieldId, ParagraphId
-from nucliadb.search.search.chat import prompt as chat_prompt
+from nucliadb.search.search.chat import old_prompt as chat_prompt
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -112,8 +112,6 @@ def _create_find_result(
 
 
 async def test_default_prompt_context(kb):
-    from nucliadb.search.search.chat import old_prompt as chat_prompt
-
     result_text = " ".join(["text"] * 10)
     with (
         patch("nucliadb.search.search.chat.old_prompt.get_driver"),

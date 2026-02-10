@@ -26,7 +26,7 @@ from nuclia_models.predict.generative_responses import (
     StatusGenerativeResponse,
 )
 
-from nucliadb.search.search.graph_strategy import (
+from nucliadb.search.search.old_graph_strategy import (
     get_paragraph_info_from_relations,
     rank_relations_generative,
     rank_relations_reranker,
@@ -46,7 +46,7 @@ from nucliadb_models.search import (
 
 
 @pytest.mark.asyncio
-@patch("nucliadb.search.search.graph_strategy.get_predict")
+@patch("nucliadb.search.search.old_graph_strategy.get_predict")
 async def test_rank_relations_generative(
     mocker,
 ):
@@ -161,7 +161,7 @@ async def test_rank_relations_generative(
 
 
 @pytest.mark.asyncio
-@patch("nucliadb.search.search.graph_strategy.get_predict")
+@patch("nucliadb.search.search.old_graph_strategy.get_predict")
 async def test_rank_relations_reranker(
     mocker,
 ):

@@ -22,19 +22,11 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.search.search import old_graph_strategy as graph_strategy  # type: ignore[no-redef]
 from nucliadb_models.search import SyncAskResponse
 from nucliadb_protos.utils_pb2 import RelationNode
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
-if has_feature(const.Features.ASK_DECOUPLED):
-    from nucliadb.search.search import graph_strategy
-
-    MODULE = "nucliadb.search.search.graph_strategy"
-else:
-    from nucliadb.search.search import old_graph_strategy as graph_strategy  # type: ignore[no-redef]
-
-    MODULE = "nucliadb.search.search.old_graph_strategy"
+MODULE = "nucliadb.search.search.old_graph_strategy"
 
 
 @pytest.mark.parametrize("relation_ranking", ["generative", "reranker"])
