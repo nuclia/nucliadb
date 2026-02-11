@@ -67,7 +67,7 @@ from nucliadb.search.search.chat.query import (
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
 )
-from nucliadb.search.search.graph_strategy import get_graph_results as old_get_graph_results
+from nucliadb.search.search.graph_strategy import get_graph_results
 from nucliadb.search.search.metrics import AskMetrics, Metrics
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
@@ -845,7 +845,7 @@ async def retrieval_in_kb(
     )
 
     if graph_strategy is not None:
-        graph_results, graph_request = await old_get_graph_results(
+        graph_results, graph_request = await get_graph_results(
             kbid=kbid,
             query=main_query,
             item=ask_request,
