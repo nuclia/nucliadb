@@ -270,9 +270,6 @@ jobs:
     needs:
       - build-nidx-binary
       - build-virtual-env
-    strategy:
-      matrix:
-        disable_ask_decoupled_ff: [ true, false ]
     steps:
       - uses: actions/checkout@v6
       - name: Setup Python
@@ -315,7 +312,6 @@ jobs:
       fail-fast: false
       matrix:
         shard: [0, 1, 2]
-        disable_ask_decoupled_ff: [ true, false ]
 
     services:
       postgres:
