@@ -371,7 +371,6 @@ async def test_ask_conversational_strategy__attachments(
                 "nucliadb.search.augmentor.fields.get_file_thumbnail_path",
                 side_effect=get_file_thumbnail_path,
             ),
-            patch("nucliadb.search.search.chat.prompt.rpc.download_image", return_value=image),
         ):
             spy = mocker.spy(ask, "get_answer_stream")
 
