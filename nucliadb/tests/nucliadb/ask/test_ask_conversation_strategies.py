@@ -366,7 +366,7 @@ async def test_ask_conversational_strategy__attachments(
 
         image = Image(b64encoded="my image", content_type="image/jpeg")
         with (
-            patch("nucliadb.search.search.chat.old_prompt.get_file_thumbnail_image", return_value=image),
+            patch("nucliadb.search.search.chat.prompt.get_file_thumbnail_image", return_value=image),
             patch(
                 "nucliadb.search.augmentor.fields.get_file_thumbnail_path",
                 side_effect=get_file_thumbnail_path,

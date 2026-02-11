@@ -25,7 +25,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.common.ids import FieldId, ParagraphId
-from nucliadb.search.search.chat import old_prompt as chat_prompt
+from nucliadb.search.search.chat import prompt as chat_prompt
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -114,9 +114,9 @@ def _create_find_result(
 async def test_default_prompt_context(kb):
     result_text = " ".join(["text"] * 10)
     with (
-        patch("nucliadb.search.search.chat.old_prompt.get_driver"),
-        patch("nucliadb.search.search.chat.old_prompt.get_storage"),
-        patch("nucliadb.search.search.chat.old_prompt.KnowledgeBoxORM", return_value=kb),
+        patch("nucliadb.search.search.chat.prompt.get_driver"),
+        patch("nucliadb.search.search.chat.prompt.get_storage"),
+        patch("nucliadb.search.search.chat.prompt.KnowledgeBoxORM", return_value=kb),
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         find_results = KnowledgeboxFindResults(
@@ -458,13 +458,13 @@ async def test_prompt_context_image_context_builder():
     )
     with (
         mock.patch("nucliadb.search.search.chat.prompt.get_paragraph_page_number", return_value=1),
-        mock.patch("nucliadb.search.search.chat.old_prompt.get_paragraph_page_number", return_value=1),
+        mock.patch("nucliadb.search.search.chat.prompt.get_paragraph_page_number", return_value=1),
         mock.patch(
-            "nucliadb.search.search.chat.old_prompt.get_page_image",
+            "nucliadb.search.search.chat.prompt.get_page_image",
             return_value=Image(b64encoded="page_image_data", content_type="image/png"),
         ),
         mock.patch(
-            "nucliadb.search.search.chat.old_prompt.get_paragraph_image",
+            "nucliadb.search.search.chat.prompt.get_paragraph_image",
             return_value=Image(b64encoded="table_image_data", content_type="image/png"),
         ),
         mock.patch(

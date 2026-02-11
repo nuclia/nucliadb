@@ -51,7 +51,7 @@ from nucliadb.search.search.chat.exceptions import (
     AnswerJsonSchemaTooLong,
     NoRetrievalResultsError,
 )
-from nucliadb.search.search.chat.old_prompt import PromptContextBuilder
+from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
     ChatAuditor,
@@ -67,8 +67,8 @@ from nucliadb.search.search.chat.query import (
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
 )
+from nucliadb.search.search.graph_strategy import get_graph_results as old_get_graph_results
 from nucliadb.search.search.metrics import AskMetrics, Metrics
-from nucliadb.search.search.old_graph_strategy import get_graph_results as old_get_graph_results
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
 from nucliadb.search.search.rank_fusion import WeightedCombSum

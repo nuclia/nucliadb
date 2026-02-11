@@ -22,11 +22,11 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.search.search import old_graph_strategy as graph_strategy  # type: ignore[no-redef]
+from nucliadb.search.search import graph_strategy
 from nucliadb_models.search import SyncAskResponse
 from nucliadb_protos.utils_pb2 import RelationNode
 
-MODULE = "nucliadb.search.search.old_graph_strategy"
+MODULE = "nucliadb.search.search.graph_strategy"
 
 
 @pytest.mark.parametrize("relation_ranking", ["generative", "reranker"])
