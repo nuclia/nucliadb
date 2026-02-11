@@ -48,9 +48,9 @@ async def test_ask_forwarding_rerank_options_to_find(
     expected_reranker: RerankerName,
 ):
     kbid = "kbid"
-    find_mock = AsyncMock(return_value=(KnowledgeboxFindResults(resources={}), False, Mock()))
+    find_mock = AsyncMock(return_value=(KnowledgeboxFindResults(resources={}), False, Mock(), Mock()))
 
-    with patch("nucliadb.search.search.chat.query.find", new=find_mock):
+    with patch("nucliadb.search.search.chat.query.find_retrieval", new=find_mock):
         ask_result = await ask(
             kbid=kbid,
             ask_request=AskRequest(
